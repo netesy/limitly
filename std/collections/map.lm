@@ -1,13 +1,13 @@
 // Standard Library Map Collection
-import std.collections.hashmap as hashmap_mod;
+import std.collections.hashmap as hashmap;
 
 pub import std.collections.hashmap show HashMap, hashmap;
 
 frame HashMapWrapper {
-    pub impl: hashmap_mod.HashMap;
+    pub impl: hashmap.HashMap;
 
     pub init() {
-        self.impl = hashmap_mod.hashmap(16);
+        self.impl = hashmap.hashmap(16);
     }
 
     pub fn put(key: str, value: any) {

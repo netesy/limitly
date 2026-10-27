@@ -2,12 +2,12 @@
 
 pub import std.http.client as client;
 pub import std.http.server as server;
-pub import std.http.router as router_mod;
+pub import std.http.router as router;
 
 pub import std.http.client show HTTPClient, HTTPRequest, HTTPResponse;
 pub import std.http.server show HTTPServer, ServerRequest, ServerResponse;
 pub import std.http.router show Request, Response, Route, Router;
 
-pub fn router(): router_mod.Router {
-    return router_mod.Router();
+pub fn make_router(): Router {
+    return Router();
 }

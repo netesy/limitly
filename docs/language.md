@@ -226,6 +226,10 @@ frame Car {
   `Engine.start()` writes are the same slot.
 - Embedding is **anonymous**. `embed Engine;` creates no `self.engine` accessor — if
   you need to name the component, declare a field (`pub engine: Engine;`) instead.
+- `embed` takes **no visibility modifier**. It is a statement, not a member declaration:
+  write `embed Engine;`, never `pub embed Engine;` (a `pub`/`prot` prefix carries no
+  meaning there and is discarded). Each flattened field keeps the visibility it declared
+  inside the component; promoted methods keep theirs too.
 - Name collisions are resolved first-wins: a member the host already declares is never
   overwritten by a promoted one.
 - `embed` accepts a mixin name as well as a frame name; an unknown name is an error.

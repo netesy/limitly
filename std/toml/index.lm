@@ -1,12 +1,14 @@
 // TOML Module Gateway Index
 
-import std.toml.parser as parser_mod;
-import std.toml.writer as writer_mod;
+import std.toml.parser as parser;
+import std.toml.writer as writer;
+
+pub import std.toml.value show TOMLValue;
 
 pub fn parse(text: str): any {
-    return parser_mod.parse(text);
+    return parser.parse(text);
 }
 
 pub fn stringify(val_any: any): str {
-    return writer_mod.stringify(val_any);
+    return writer.stringify(val_any);
 }

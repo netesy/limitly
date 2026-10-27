@@ -1,8 +1,8 @@
 frame FunctionInt {
     var fn_ref: fn(int): int;
 
-    pub fn init(fn_ref: fn(int): int): FunctionInt {
-        return FunctionInt(fn_ref=fn_ref);
+    pub init(fn_ref: fn(int): int) {
+        self.fn_ref = fn_ref;
     }
 
     pub fn call(value: int): int {
@@ -49,8 +49,8 @@ frame FunctionInt {
 frame FunctionIntBool {
     var fn_ref: fn(int): bool;
 
-    pub fn init(fn_ref: fn(int): bool): FunctionIntBool {
-        return FunctionIntBool(fn_ref=fn_ref);
+    pub init(fn_ref: fn(int): bool) {
+        self.fn_ref = fn_ref;
     }
 
     pub fn call(value: int): bool {
@@ -79,8 +79,8 @@ frame FunctionIntBool {
 frame FunctionStrStr {
     var fn_ref: fn(str): str;
 
-    pub fn init(fn_ref: fn(str): str): FunctionStrStr {
-        return FunctionStrStr(fn_ref=fn_ref);
+    pub init(fn_ref: fn(str): str) {
+        self.fn_ref = fn_ref;
     }
 
     pub fn call(value: str): str {
@@ -256,19 +256,19 @@ fn is_zero(x: int): bool {
 }
 
 // Predicate combinators
-fn not(predicate: fn(int): bool): fn(int): bool {
+pub fn not_fn(predicate: fn(int): bool): fn(int): bool {
     return fn(x: int): bool {
         return !predicate(x);
     };
 }
 
-fn and(pred1: fn(int): bool, pred2: fn(int): bool): fn(int): bool {
+pub fn and_fn(pred1: fn(int): bool, pred2: fn(int): bool): fn(int): bool {
     return fn(x: int): bool {
         return pred1(x) and pred2(x);
     };
 }
 
-fn or(pred1: fn(int): bool, pred2: fn(int): bool): fn(int): bool {
+pub fn or_fn(pred1: fn(int): bool, pred2: fn(int): bool): fn(int): bool {
     return fn(x: int): bool {
         return pred1(x) or pred2(x);
     };

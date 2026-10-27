@@ -20,10 +20,7 @@ fn test_env_frame(): int {
     assert(e.unset("LYMAR_TEST_VAR") == true, "unset failed");
     assert(e.get("LYMAR_TEST_VAR") == nil, "unset left the variable visible");
 
-    assert(len(e.home()) > 0, "home failed");
-    assert(len(e.temp_dir()) > 0, "temp_dir failed");
-    assert(len(e.platform()) > 0, "platform failed");
-    assert(len(e.arch()) > 0, "arch failed");
+    // path() reads the PATH environment variable, so it belongs here.
     assert(len(e.path("")) > 0, "path failed");
     return 1;
 }
@@ -92,6 +89,12 @@ fn test_surfaces_moved_out_of_env(): int {
     // cwd belongs to std.os, program arguments to std.process.
     var working = os.cwd();
     assert(len(working) > 0, "os.cwd failed after the move out of std.env");
+    // Home/temp directories and platform/arch identity are std.os concerns,
+    // not environment variables; std.env no longer re-exports them.
+    assert(len(os.home_dir()) > 0, "os.home_dir failed");
+    assert(len(os.temp_dir()) > 0, "os.temp_dir failed");
+    assert(len(os.platform()) > 0, "os.platform failed");
+    assert(len(os.arch()) > 0, "os.arch failed");
     return 1;
 }
 

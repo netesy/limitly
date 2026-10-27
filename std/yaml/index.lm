@@ -1,12 +1,14 @@
 // YAML Module Gateway Index
 
-import std.yaml.parser as parser_mod;
-import std.yaml.writer as writer_mod;
+import std.yaml.parser as parser;
+import std.yaml.writer as writer;
+
+pub import std.yaml.value show YAMLValue;
 
 pub fn parse(text: str): any {
-    return parser_mod.parse(text);
+    return parser.parse(text);
 }
 
 pub fn stringify(val_any: any): str {
-    return writer_mod.stringify(val_any);
+    return writer.stringify(val_any);
 }

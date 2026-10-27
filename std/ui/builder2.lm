@@ -4,8 +4,8 @@
 
 import std.ui.builder as b;
 import std.ui.types as ui;
-import std.ui.draw_list as dl_mod;
-import std.ui.theme as theme_mod;
+import std.ui.draw_list as draw_list;
+import std.ui.theme as theme;
 
 pub import std.ui.builder show ThemeSnap, LayoutCtx;
 
@@ -13,10 +13,10 @@ pub fn default_theme_snap(): b.ThemeSnap {
     return b.default_theme_snap();
 }
 
-pub fn snap_theme(pal: theme_mod.ColorPalette, font_scale: float): b.ThemeSnap {
+pub fn snap_theme(pal: theme.ColorPalette, font_scale: float): b.ThemeSnap {
     return b.snap_theme(pal, font_scale);
 }
 
-pub fn build(root: ui.Widget, vw: float, vh: float, ts: any = nil, x: float = 0.0, y: float = 0.0): dl_mod.DrawList {
+pub fn build(root: ui.Widget, vw: float, vh: float, ts: any = nil, x: float = 0.0, y: float = 0.0): draw_list.DrawList {
     return b.build(root, vw, vh, ts, x, y);
 }

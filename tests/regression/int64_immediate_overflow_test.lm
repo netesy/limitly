@@ -1,0 +1,77 @@
+// Regression: values at or beyond 2^60 must not be corrupted.
+//
+// An SMI immediate carries only 61 signed bits (MAX_SMI = 2^60-1, MIN_SMI = -2^60)
+// while `int` is a 64-bit language type, so out-of-range magnitudes have to be
+// heap integers. The unchecked/inline arithmetic and bitwise paths used to encode
+// their results with BOX_INT unconditionally and decode operands without checking
+// for an immediate, which silently shifted away the top bits (and read a heap
+// pointer as if it were a number). Everything below fails on that behaviour.
+
+fn main(): int {
+    var failures = 0;
+
+    // 1. Every power of two up to 2^62 must round-trip through +, &, |, >> and <<.
+    var a = 1;
+    var k = 0;
+    while (k < 63) {
+        if (((a + 1) - a) != 1) {
+            print("FAIL: 2^{k} + 1 does not round-trip");
+            failures = failures + 1;
+        }
+        if ((a & a) != a) {
+            print("FAIL: 2^{k} & itself is not itself");
+            failures = failures + 1;
+        }
+        if (((a | 1) & a) != a) {
+            print("FAIL: 2^{k} | 1 loses the high bit");
+            failures = failures + 1;
+        }
+        if ((a >> k) != 1) {
+            print("FAIL: 2^{k} >> {k} is not 1");
+            failures = failures + 1;
+        }
+        if ((1 << k) != a) {
+            print("FAIL: 1 << {k} does not equal 2^{k}");
+            failures = failures + 1;
+        }
+        a = a * 2;
+        k = k + 1;
+    }
+
+    // 2. The documented boundary values, spelled out.
+    const TWO_P60 = 1152921504606846976;
+    const TWO_P62 = 4611686018427387904;
+    if (TWO_P60 + 1 != 1152921504606846977) {
+        print("FAIL: 2^60 + 1 wrong");
+        failures = failures + 1;
+    }
+    if ((TWO_P62 & TWO_P60) != 0) {
+        print("FAIL: 2^62 & 2^60 should be 0");
+        failures = failures + 1;
+    }
+    if ((TWO_P62 | TWO_P60) != 5764607523034234880) {
+        print("FAIL: 2^62 | 2^60 wrong");
+        failures = failures + 1;
+    }
+
+    // 3. Multiplication that lands past the immediate payload.
+    if ((1099511627776 * 1048576) != TWO_P60) {
+        print("FAIL: 2^40 * 2^20 != 2^60");
+        failures = failures + 1;
+    }
+
+    // 4. MIN_SMI / -1 == 2^60: one past MAX_SMI, so it must heap-promote.
+    var negative = 0 - TWO_P60;
+    var quotient = negative / (0 - 1);
+    if (quotient != TWO_P60) {
+        print("FAIL: -2^60 / -1 != 2^60");
+        failures = failures + 1;
+    }
+
+    if (failures != 0) {
+        print("{failures} integer-overflow check(s) failed");
+        return 1;
+    }
+    print("OK: integers past the 61-bit immediate payload stay exact");
+    return 0;
+}

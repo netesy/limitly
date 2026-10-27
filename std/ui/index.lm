@@ -4,69 +4,70 @@
 import std.ui.types as ui_types;
 pub import std.ui.types show Widget, Style, Alignment;
 
-import std.ui.color as color_mod;
+import std.ui.color as color;
 pub import std.ui.types show Color;
 
-import std.ui.state as state_mod;
+import std.ui.state as state;
 pub import std.ui.state show Signal, ComputedSignal, Effect;
 
-import std.ui.viewport as viewport_mod;
+import std.ui.viewport as viewport;
 
-import std.ui.layout as layout_mod;
+import std.ui.layout as layout;
 pub import std.ui.layout show LayoutBox, GridSpec, Breakpoint;
 
-import std.ui.navigation as nav_mod;
+import std.ui.navigation as nav;
 pub import std.ui.navigation show Router, RouterParams, Route;
 
-import std.ui.charts as charts_mod;
+import std.ui.charts as charts;
 
-import std.ui.application as app_mod;
+import std.ui.application as app;
 pub import std.ui.application show Application;
 
-import std.ui.window as win_mod;
+import std.ui.window as win;
 pub import std.ui.window show Window;
 
-import std.ui.theme as theme_mod;
-import std.ui.dialog as dialog_mod;
+import std.ui.theme as theme;
+import std.ui.dialog as dialog;
 
-import std.ui.grid as grid_mod;
+import std.ui.grid as grid;
 pub import std.ui.grid show GridLayout;
 
-import std.animation as anim_mod;
+import std.animation as anim;
 pub import std.animation as animation;
 
-import std.graphics.shadow as shadow_mod;
-import std.ui.builder as builder_mod;
+import std.graphics.shadow as shadow;
+pub import std.graphics.shadow show Shadow;
+import std.ui.builder as builder;
 
-import std.ui.draw_list as dl_mod;
+import std.ui.draw_list as dlist;
 pub import std.ui.draw_list show DrawList, HitZone;
 
-import std.ui.replay as replay_mod;
+import std.ui.replay as replay;
 
 // ── Colors ────────────────────────────────────────────────────────────────────
-pub var white: Color = color_mod.white;
-pub var black: Color = color_mod.black;
-pub var red: Color = color_mod.red;
-pub var green: Color = color_mod.green;
-pub var blue: Color = color_mod.blue;
-pub var indigo: Color = color_mod.indigo;
-pub var yellow: Color = color_mod.yellow;
-pub var gray: Color = color_mod.gray;
-pub var dark_gray: Color = color_mod.dark_gray;
-pub var light_gray: Color = color_mod.light_gray;
-pub var transparent: Color = color_mod.transparent;
+pub var white: Color = color.white;
+pub var black: Color = color.black;
+pub var red: Color = color.red;
+pub var green: Color = color.green;
+pub var blue: Color = color.blue;
+pub var indigo: Color = color.indigo;
+pub var yellow: Color = color.yellow;
+pub var gray: Color = color.gray;
+pub var dark_gray: Color = color.dark_gray;
+pub var light_gray: Color = color.light_gray;
+pub var transparent: Color = color.transparent;
 
-pub fn rgb(r: int, g: int, b: int): Color { return color_mod.rgb(r, g, b); }
-pub fn rgba(r: int, g: int, b: int, a: float): Color { return color_mod.rgba(r, g, b, a); }
-pub fn rgb_f(r: float, g: float, b: float): Color { return color_mod.color_rgb(r, g, b); }
-pub fn rgba_f(r: float, g: float, b: float, a: float): Color { return color_mod.color_rgba(r, g, b, a); }
-pub fn color_rgb(r: float, g: float, b: float): Color { return color_mod.color_rgb(r, g, b); }
-pub fn color_rgba(r: float, g: float, b: float, a: float): Color { return color_mod.color_rgba(r, g, b, a); }
-pub fn color_rgb8(r: int, g: int, b: int): Color { return color_mod.rgb(r, g, b); }
-pub fn hex(h: int): Color { return color_mod.hex(h); }
-pub fn hsl(h: float, s: float, l: float): Color { return color_mod.hsl(h, s, l); }
+pub fn rgb(r: int, g: int, b: int): Color { return color.rgb(r, g, b); }
+pub fn rgba(r: int, g: int, b: int, a: float): Color { return color.rgba(r, g, b, a); }
+pub fn rgb_f(r: float, g: float, b: float): Color { return color.color_rgb(r, g, b); }
+pub fn rgba_f(r: float, g: float, b: float, a: float): Color { return color.color_rgba(r, g, b, a); }
+pub fn color_rgb(r: float, g: float, b: float): Color { return color.color_rgb(r, g, b); }
+pub fn color_rgba(r: float, g: float, b: float, a: float): Color { return color.color_rgba(r, g, b, a); }
+pub fn color_rgb8(r: int, g: int, b: int): Color { return color.rgb(r, g, b); }
+pub fn hex(h: int): Color { return color.hex(h); }
+pub fn hsl(h: float, s: float, l: float): Color { return color.hsl(h, s, l); }
 
-// ── Alignment & Style ─────────────────────────────────────────────────────────
+// ── Styles & Layout Constants ─────────────────────────────────────────────────
 pub var align_start = ui_types.align_start;
 pub var align_center = ui_types.align_center;
 pub var align_end = ui_types.align_end;
@@ -131,7 +132,6 @@ pub var LIFECYCLE_EXITING: int = ui_types.LIFECYCLE_EXITING;
 pub var LIFECYCLE_REMOVED: int = ui_types.LIFECYCLE_REMOVED;
 
 // ── Application & Window ──────────────────────────────────────────────────────
-pub var Shadow = shadow_mod.Shadow;
 pub fn shadow(
     r: float = 0.0,
     g: float = 0.0,
@@ -142,43 +142,43 @@ pub fn shadow(
     blur: float = 8.0,
     spread: float = 0.0
 ): Shadow {
-    return shadow_mod.shadow(r=r, g=g, b=b, a=a, off_x=off_x, off_y=off_y, blur=blur, spread=spread);
+    return shadow.shadow(r=r, g=g, b=b, a=a, off_x=off_x, off_y=off_y, blur=blur, spread=spread);
 }
 
 // ── State Management ───────────────────────────────────────────────────────────
-pub fn signal(init_val: any): Signal { return state_mod.signal(init_val); }
-pub fn signal_bool(init_val: bool): Signal { return state_mod.signal_bool(init_val); }
-pub fn signal_int(init_val: int): Signal { return state_mod.signal_int(init_val); }
-pub fn signal_float(init_val: float): Signal { return state_mod.signal_float(init_val); }
-pub fn signal_str(init_val: str): Signal { return state_mod.signal_str(init_val); }
-pub fn computed(compute_fn: fn(): any, deps: [Signal]): ComputedSignal { return state_mod.computed(compute_fn, deps); }
-pub fn effect(effect_fn: fn(): nil, deps: [Signal]): Effect { return state_mod.effect(effect_fn, deps); }
-pub fn effect_with_cleanup(effect_fn: fn(): nil, cleanup_fn: fn(): nil, deps: [Signal]): Effect { return state_mod.effect_with_cleanup(effect_fn, cleanup_fn, deps); }
-pub fn batch_updates(updates: fn(): nil): nil { return state_mod.batch_updates(updates); }
-pub fn dispose_all_effects(): nil { return state_mod.dispose_all_effects(); }
+pub fn signal(init_val: any): Signal { return state.signal(init_val); }
+pub fn signal_bool(init_val: bool): Signal { return state.signal_bool(init_val); }
+pub fn signal_int(init_val: int): Signal { return state.signal_int(init_val); }
+pub fn signal_float(init_val: float): Signal { return state.signal_float(init_val); }
+pub fn signal_str(init_val: str): Signal { return state.signal_str(init_val); }
+pub fn computed(compute_fn: fn(): any, deps: [Signal]): ComputedSignal { return state.computed(compute_fn, deps); }
+pub fn effect(effect_fn: fn(): nil, deps: [Signal]): Effect { return state.effect(effect_fn, deps); }
+pub fn effect_with_cleanup(effect_fn: fn(): nil, cleanup_fn: fn(): nil, deps: [Signal]): Effect { return state.effect_with_cleanup(effect_fn, cleanup_fn, deps); }
+pub fn batch_updates(updates: fn(): nil): nil { return state.batch_updates(updates); }
+pub fn dispose_all_effects(): nil { return state.dispose_all_effects(); }
 
-// ── Layout Helpers ───────────────────────────────────────────────────────────
-pub fn compute_layout(widget: Widget, x: float, y: float, available_w: float, available_h: float): LayoutBox { return layout_mod.compute_layout(widget, x, y, available_w, available_h); }
-pub fn compute_layout_enhanced(widget: Widget, x: float, y: float, available_w: float, available_h: float): LayoutBox { return layout_mod.compute_layout_enhanced(widget, x, y, available_w, available_h); }
-pub fn flatten_layout(box: LayoutBox): [LayoutBox] { return layout_mod.flatten_layout(box); }
-pub fn hit_test_boxes(boxes: [LayoutBox], px: float, py: float): LayoutBox { return layout_mod.hit_test_boxes(boxes, px, py); }
-pub fn compute_grid_layout(spec: GridSpec, children: [Widget], x: float, y: float, available_w: float, available_h: float): [LayoutBox] { return layout_mod.compute_grid_layout(spec, children, x, y, available_w, available_h); }
-pub fn responsive_layout(breakpoints: [Breakpoint], viewport_w: float, default_widget: Widget): Widget { return layout_mod.responsive_layout(breakpoints, viewport_w, default_widget); }
-pub fn responsive(mobile: Widget, tablet: Widget, desktop: Widget, viewport_w: float): Widget { return layout_mod.responsive(mobile, tablet, desktop, viewport_w); }
-pub fn breakpoint(small: Widget, large: Widget, threshold: float = 768.0, viewport_w: float): Widget { return layout_mod.breakpoint(small, large, threshold, viewport_w); }
+// ── Layout Operations ─────────────────────────────────────────────────────────
+pub fn compute_layout(widget: Widget, x: float, y: float, available_w: float, available_h: float): LayoutBox { return layout.compute_layout(widget, x, y, available_w, available_h); }
+pub fn compute_layout_enhanced(widget: Widget, x: float, y: float, available_w: float, available_h: float): LayoutBox { return layout.compute_layout_enhanced(widget, x, y, available_w, available_h); }
+pub fn flatten_layout(box: LayoutBox): [LayoutBox] { return layout.flatten_layout(box); }
+pub fn hit_test_boxes(boxes: [LayoutBox], px: float, py: float): LayoutBox { return layout.hit_test_boxes(boxes, px, py); }
+pub fn compute_grid_layout(spec: GridSpec, children: [Widget], x: float, y: float, available_w: float, available_h: float): [LayoutBox] { return layout.compute_grid_layout(spec, children, x, y, available_w, available_h); }
+pub fn responsive_layout(breakpoints: [Breakpoint], viewport_w: float, default_widget: Widget): Widget { return layout.responsive_layout(breakpoints, viewport_w, default_widget); }
+pub fn responsive(mobile: Widget, tablet: Widget, desktop: Widget, viewport_w: float): Widget { return layout.responsive(mobile, tablet, desktop, viewport_w); }
+pub fn breakpoint(small: Widget, large: Widget, threshold: float = 768.0, viewport_w: float): Widget { return layout.breakpoint(small, large, threshold, viewport_w); }
 
 // ── Grid Layout ─────────────────────────────────────────────────────────────
-pub fn grid_two_column(left: Widget, right: Widget, gap: float = 16.0): Widget { return grid_mod.grid_two_column(left, right, gap); }
-pub fn grid_three_column(a: Widget, b: Widget, c: Widget, gap: float = 12.0): Widget { return grid_mod.grid_three_column(a, b, c, gap); }
-pub fn grid_with_aspect(columns_count: int, children: [Widget], aspect_ratio: float, spacing_val: float = 8.0): Widget { return grid_mod.grid_with_aspect(columns_count, children, aspect_ratio, spacing_val); }
-pub fn grid_enhanced(spec: GridSpec, children: [Widget]): Widget { return grid_mod.grid_enhanced(spec, children); }
+pub fn grid_two_column(left: Widget, right: Widget, gap: float = 16.0): Widget { return grid.grid_two_column(left, right, gap); }
+pub fn grid_three_column(a: Widget, b: Widget, c: Widget, gap: float = 12.0): Widget { return grid.grid_three_column(a, b, c, gap); }
+pub fn grid_with_aspect(columns_count: int, children: [Widget], aspect_ratio: float, spacing_val: float = 8.0): Widget { return grid.grid_with_aspect(columns_count, children, aspect_ratio, spacing_val); }
+pub fn grid_enhanced(spec: GridSpec, children: [Widget]): Widget { return grid.grid_enhanced(spec, children); }
 
 // ── Navigation & Routing ─────────────────────────────────────────────────────
-pub fn make_router(): Router { return nav_mod.make_router(); }
-pub fn make_router_with_base(base: str): Router { return nav_mod.make_router_with_base(base); }
-pub fn router_link(label: str, path: str, router: Router): Widget { return nav_mod.router_link(label, path, router); }
-pub fn tab_bar(routes: [(str, str)], router: Router): Widget { return nav_mod.tab_bar(routes, router); }
-pub fn breadcrumbs(router: Router): Widget { return nav_mod.breadcrumbs(router); }
+pub fn make_router(): Router { return nav.make_router(); }
+pub fn make_router_with_base(base: str): Router { return nav.make_router_with_base(base); }
+pub fn router_link(label: str, path: str, router: Router): Widget { return nav.router_link(label, path, router); }
+pub fn tab_bar(routes: [(str, str)], router: Router): Widget { return nav.tab_bar(routes, router); }
+pub fn breadcrumbs(router: Router): Widget { return nav.breadcrumbs(router); }
 
 // ── Semantic Widget Constructors ──────────────────────────────────────────────
 pub fn accordion(title: str, content: Widget, default_open: bool = false): Widget { return ui_types.accordion(title, content, default_open); }
@@ -192,11 +192,11 @@ pub fn card(title: str, content: Widget): Widget { return ui_types.card(title, c
 pub fn checkbox(checked: bool = false, on_change: any = nil): Widget { return ui_types.checkbox(checked, on_change); }
 pub fn color_picker(label: str, color: Color, on_change: any = nil): Widget { return ui_types.color_picker(label, color, on_change); }
 pub fn column(children: [Widget]): Widget { return ui_types.column(children); }
-pub fn dialog(title: str, content: Widget, is_open: bool = true, width: float = 400.0, height: float = 300.0, on_close: any = nil): Widget { return dialog_mod.dialog(title, content, is_open, width, height, on_close); }
-pub fn alert_dialog(title: str, message: str, on_ok: any = nil): Widget { return dialog_mod.alert_dialog(title, message, on_ok); }
-pub fn confirm(title: str, message: str, on_yes: any = nil, on_no: any = nil): Widget { return dialog_mod.confirm(title, message, on_yes, on_no); }
-pub fn confirm_dialog(title: str, message: str, on_yes: any = nil, on_no: any = nil): Widget { return dialog_mod.confirm(title, message, on_yes, on_no); }
-pub fn modal_backdrop(alpha: float = 0.6): Widget { return dialog_mod.modal_backdrop(alpha); }
+pub fn dialog(title: str, content: Widget, is_open: bool = true, width: float = 400.0, height: float = 300.0, on_close: any = nil): Widget { return dialog.dialog(title, content, is_open, width, height, on_close); }
+pub fn alert_dialog(title: str, message: str, on_ok: any = nil): Widget { return dialog.alert_dialog(title, message, on_ok); }
+pub fn confirm(title: str, message: str, on_yes: any = nil, on_no: any = nil): Widget { return dialog.confirm(title, message, on_yes, on_no); }
+pub fn confirm_dialog(title: str, message: str, on_yes: any = nil, on_no: any = nil): Widget { return dialog.confirm(title, message, on_yes, on_no); }
+pub fn modal_backdrop(alpha: float = 0.6): Widget { return dialog.modal_backdrop(alpha); }
 pub fn diff(old_text: str, new_text: str): Widget { return ui_types.diff(old_text, new_text); }
 pub fn dock(items: [Widget]): Widget { return ui_types.dock(items); }
 pub fn doughnut_chart(label: str, values: [float], labels: [str] = [] as [str]): Widget { return ui_types.doughnut_chart(label, values, labels); }
@@ -243,12 +243,12 @@ pub fn tooltip(label: str, content: Widget): Widget { return ui_types.tooltip(la
 pub fn tree_node(label: str, children: [Widget], default_open: bool = false): Widget { return ui_types.tree_node(label, children, default_open); }
 
 // ── Hybrid UI Execution Engine ────────────────────────────────────────────────
-pub fn build(root: Widget, vw: float, vh: float, ts: any = nil, x: float = 0.0, y: float = 0.0): dl_mod.DrawList {
-    return builder_mod.build(root, vw, vh, ts, x, y);
+pub fn build(root: Widget, vw: float, vh: float, ts: any = nil, x: float = 0.0, y: float = 0.0): DrawList {
+    return builder.build(root, vw, vh, ts, x, y);
 }
-pub fn replay(dl: dl_mod.DrawList): nil {
-    replay_mod.replay(dl);
+pub fn replay(dlist_obj: DrawList): nil {
+    replay.replay(dlist_obj);
 }
-pub fn dl_hit_test(dl: dl_mod.DrawList, px: float, py: float): dl_mod.HitZone {
-    return dl_mod.dl_hit_test(dl, px, py);
+pub fn dl_hit_test(dlist_obj: DrawList, px: float, py: float): HitZone {
+    return dlist.dl_hit_test(dlist_obj, px, py);
 }

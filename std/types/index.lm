@@ -1,7 +1,11 @@
 // Provides foundation types and common type definitions
 
 // Standard ordering enumeration
-type Ordering = Less | Equal | Greater;
+enum Ordering {
+    Less,
+    Equal,
+    Greater
+}
 
 // Common error types for standard library
 type StdError = {
@@ -10,21 +14,20 @@ type StdError = {
     debug_info: {str: str}
 };
 
-// Category-specific error types
-type CollectionError = IndexOutOfBounds | EmptyCollection | CapacityExceeded;
-type StringError = InvalidEncoding | PatternNotFound | InvalidFormat;
-type MathError = DomainError | OverflowError | UnderflowError | DivisionByZero;
-type TimeError = InvalidDateTime | ParseError | TimezoneError;
-
 // Collection error variants
 type IndexOutOfBounds = { index: int, length: int };
 type EmptyCollection = { operation: str };
 type CapacityExceeded = { requested: int, maximum: int };
 
+// Category-specific error types
+type CollectionError = IndexOutOfBounds | EmptyCollection | CapacityExceeded;
+
 // String error variants
 type InvalidEncoding = { position: int, byte_value: int };
 type PatternNotFound = { pattern: str, text: str };
 type InvalidFormat = { expected: str, actual: str };
+
+type StringError = InvalidEncoding | PatternNotFound | InvalidFormat;
 
 // Math error variants
 type DomainError = { func_name: str, value: float };
@@ -32,10 +35,14 @@ type OverflowError = { operation: str };
 type UnderflowError = { operation: str };
 type DivisionByZero = { numerator: float };
 
+type MathError = DomainError | OverflowError | UnderflowError | DivisionByZero;
+
 // Time error variants
 type InvalidDateTime = { year: int, month: int, day: int };
 type ParseError = { input: str, position: int };
 type TimezoneError = { timezone: str };
+
+type TimeError = InvalidDateTime | ParseError | TimezoneError;
 
 // Memory management types
 type IntMemoryPool = {
@@ -49,51 +56,63 @@ type StrMemoryPool = {
 };
 
 // Reference counting for shared ownership
-type IntRc = {
-    data: int,
-    ref_count: int
-};
+frame IntRc {
+    pub data: int;
+    pub ref_count: int;
 
-type StrRc = {
-    data: str,
-    ref_count: int
-};
+    pub init(data: int, count: int = 1) {
+        self.data = data;
+        self.ref_count = count;
+    }
+
+    pub fn clone(): IntRc {
+        return IntRc(data=self.data, count=self.ref_count + 1);
+    }
+
+    pub fn strong_count(): int {
+        return self.ref_count;
+    }
+}
+
+frame StrRc {
+    pub data: str;
+    pub ref_count: int;
+
+    pub init(data: str, count: int = 1) {
+        self.data = data;
+        self.ref_count = count;
+    }
+
+    pub fn clone(): StrRc {
+        return StrRc(data=self.data, count=self.ref_count + 1);
+    }
+
+    pub fn strong_count(): int {
+        return self.ref_count;
+    }
+}
 
 // Utility functions for reference counting
 fn new_int_rc(value: int): IntRc {
-    return IntRc {
-        data: value,
-        ref_count: 1
-    };
+    return IntRc(data=value, count=1);
 }
 
-fn clone_int_rc(self: IntRc): IntRc {
-    // Clone reference (increment count)
-    return IntRc {
-        data: self.data,
-        ref_count: self.ref_count + 1
-    };
+fn clone_int_rc(rc: IntRc): IntRc {
+    return rc.clone();
 }
 
-fn strong_count_int(self: IntRc): int {
-    return self.ref_count;
+fn strong_count_int(rc: IntRc): int {
+    return rc.strong_count();
 }
 
 fn new_str_rc(value: str): StrRc {
-    return StrRc {
-        data: value,
-        ref_count: 1
-    };
+    return StrRc(data=value, count=1);
 }
 
-fn clone_str_rc(self: StrRc): StrRc {
-    // Clone reference (increment count)
-    return StrRc {
-        data: self.data,
-        ref_count: self.ref_count + 1
-    };
+fn clone_str_rc(rc: StrRc): StrRc {
+    return rc.clone();
 }
 
-fn strong_count_str(self: StrRc): int {
-    return self.ref_count;
+fn strong_count_str(rc: StrRc): int {
+    return rc.strong_count();
 }

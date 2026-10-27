@@ -4,7 +4,7 @@
 
 import std.game as game;
 import std.math as math;
-import std.string as str_mod;
+import std.string show substring, replace, String;
 
 frame EditorDocument {
     pub var title: str;
@@ -34,8 +34,8 @@ fn find_substring_from(haystack: str, needle: str, start_pos: int): int {
     if (n_len == 0) return -1;
     if (start_pos < 0) start_pos = 0;
     if (start_pos + n_len > h_len) return -1;
-    var sub = str_mod.substring(haystack, start_pos, h_len);
-    var idx = str_mod.String(value=sub).index_of(needle);
+    var sub = substring(haystack, start_pos, h_len);
+    var idx = String(value=sub).index_of(needle);
     if (idx < 0) return -1;
     return start_pos + idx;
 }
@@ -409,8 +409,8 @@ frame TextEditorApp {
         var count = 0;
         var pos = 0;
         while (pos + q_len <= c_len) {
-            var sub = str_mod.substring(content, pos, c_len);
-            var idx = str_mod.String(value=sub).index_of(self.find_query);
+            var sub = substring(content, pos, c_len);
+            var idx = String(value=sub).index_of(self.find_query);
             if (idx < 0) return count;
             count = count + 1;
             pos = pos + idx + q_len;
@@ -481,14 +481,14 @@ frame TextEditorApp {
             return;
         }
 
-        var current_match = str_mod.substring(content, match_pos, match_pos + q_len);
+        var current_match = substring(content, match_pos, match_pos + q_len);
         if (current_match != self.find_query) {
             self.find_next(g);
             return;
         }
 
-        var prefix = str_mod.substring(content, 0, match_pos);
-        var suffix = str_mod.substring(content, match_pos + q_len, len(content));
+        var prefix = substring(content, 0, match_pos);
+        var suffix = substring(content, match_pos + q_len, len(content));
         var new_content = prefix + self.replace_query + suffix;
 
         cur_doc.content = new_content;
@@ -519,7 +519,7 @@ frame TextEditorApp {
             return;
         }
 
-        var new_content = str_mod.replace(content, self.find_query, self.replace_query);
+        var new_content = replace(content, self.find_query, self.replace_query);
         cur_doc.content = new_content;
         cur_doc.is_dirty = true;
 

@@ -1,12 +1,28 @@
 import std.scene.node as node;
+import std.graphics.transform as transform;
 import std.graphics.rect as rect;
 
 frame ClipNode {
-    pub var base_node: node.Node;
+    embed node.Node;
     pub var clip_rect: rect.Rect;
 
-    pub init(b: node.Node = node.Node(), r: rect.Rect = rect.Rect()) {
-        self.base_node = b;
-        self.clip_rect = r;
+    pub init(b: node.Node? = nil, r: rect.Rect? = nil) {
+        if (b != nil) {
+            var bn = b as node.Node;
+            self.id = bn.id;
+            self.children = bn.children;
+            self.transform_val = bn.transform_val;
+            self.visible = bn.visible;
+        } else {
+            self.id = 0;
+            self.children = [] as [node.Node];
+            self.transform_val = transform.Transform();
+            self.visible = true;
+        }
+        if (r != nil) {
+            self.clip_rect = r as rect.Rect;
+        } else {
+            self.clip_rect = rect.Rect();
+        }
     }
 }

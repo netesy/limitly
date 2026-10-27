@@ -504,8 +504,18 @@ bool Verifier::verify_use_before_def(const LIR_Function& func, std::vector<std::
                 ok = false;
             }
         };
-        check_use(inst.a);
-        check_use(inst.b);
+        // Frame field offsets are immediates packed into a or b, not register
+        // uses (mirrors reference_operands in the capability pass above).
+        // Get-form: reads a (object), b holds the offset.
+        // Set/atomic-store form: reads b (value), a holds the offset.
+        const bool offset_in_a = inst.op == LIR_Op::FrameSetField ||
+                                 inst.op == LIR_Op::FrameSetFieldAtomic ||
+                                 inst.op == LIR_Op::FrameFieldAtomicAdd ||
+                                 inst.op == LIR_Op::FrameFieldAtomicSub;
+        const bool offset_in_b = inst.op == LIR_Op::FrameGetField ||
+                                 inst.op == LIR_Op::FrameGetFieldAtomic;
+        if (!offset_in_a) check_use(inst.a);
+        if (!offset_in_b) check_use(inst.b);
         for (Reg arg : inst.call_args) check_use(arg);
 
         // Mark destination as defined (over-permissive for ops that use dst

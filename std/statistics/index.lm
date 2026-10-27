@@ -21,7 +21,7 @@ fn median(items: [any]): float {
     // Create copy for sorting
     var copy = [];
     for (var i = 0; i < n; i = i + 1) {
-        append(copy, items[i]);
+        copy.append(items[i]);
     }
     sort.sort(copy);
     

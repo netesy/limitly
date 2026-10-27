@@ -58,24 +58,11 @@ frame Env {
         return os.env_vars();
     }
 
-    pub fn home(): str {
-        return os.home_dir();
-    }
-
-    pub fn temp_dir(): str {
-        return os.temp_dir();
-    }
-
-    // Read PATH, or fallback when it is unset.
+    // Read PATH, or fallback when it is unset. PATH is an environment variable,
+    // so it stays in scope for a variables-only facade. Home/temp directories and
+    // platform/arch identity live in std.os (home_dir/temp_dir/platform/arch);
+    // they are not environment variables and are intentionally not re-exported here.
     pub fn path(fallback: str): str {
         return os.getenv_or("PATH", fallback);
-    }
-
-    pub fn platform(): str {
-        return os.platform();
-    }
-
-    pub fn arch(): str {
-        return os.arch();
     }
 }

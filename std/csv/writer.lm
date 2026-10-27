@@ -1,6 +1,6 @@
 // CSV Writer Module
 
-import std.string.join as join_mod;
+import std.string.join as join;
 
 pub fn stringify_csv(rows: [[str]]): str {
     var res = "";
@@ -8,7 +8,7 @@ pub fn stringify_csv(rows: [[str]]): str {
     var rows_len = len(rows);
     while (i < rows_len) {
         var row = rows[i];
-        res = res + join_mod.join(row, ",");
+        res = res + join.join(row, ",");
         res = res + "\n";
         i = i + 1;
     }

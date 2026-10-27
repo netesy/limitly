@@ -10,5 +10,9 @@ trait B {
 }
 
 frame Both: A, B {
-    // Cannot implement both - method() return type conflict
+    // One member cannot satisfy both: the int version satisfies A and conflicts
+    // with B's `str` return requirement.
+    pub fn method(): int {
+        return 1;
+    }
 }

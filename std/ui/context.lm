@@ -3,24 +3,24 @@
 
 import std.ui.types as ui_types;
 import std.ui.types as ui;
-import std.ui.theme as theme_mod;
+import std.ui.theme as theme;
 import std.ui.theme_renderer as theme_renderer;
-import std.ui.layout as layout_mod;
+import std.ui.layout as layout;
 import std.animation as anim;
 import std.string as std_string;
 import std.text.controller as text_ctrl;
-import std.focus.manager as focus_mod;
+import std.focus.manager as focus;
 import std.gg as gg;
 import std.graphics.canvas as canvas;
 import std.graphics.paint as paint;
 import std.graphics.color as color;
 import std.graphics.rect as rect;
-import std.graphics.shadow as shadow_mod;
-import std.ui.state as state_mod;
-import std.ui.viewport as viewport_mod;
-import std.ui.builder as builder_mod;
-import std.ui.draw_list as dl_mod;
-import std.ui.replay as replay_mod;
+import std.graphics.shadow as shadow;
+import std.ui.state as state;
+import std.ui.viewport as viewport;
+import std.ui.builder as builder;
+import std.ui.draw_list as dlist;
+import std.ui.replay as replay;
 
 frame UIContextState {
     pub var is_initialized: int;
@@ -29,7 +29,7 @@ frame UIContextState {
     pub var dirty: int;
     pub var current_blueprint: ui_types.Blueprint;
     pub var current_widget: ui.Widget;
-    pub var focus_manager: focus_mod.FocusManager;
+    pub var focus_manager: focus.FocusManager;
     pub var modifiers: int;
     pub var get_clipboard_cb: (fn(): str)?;
     pub var set_clipboard_cb: (fn(str): nil)?;
@@ -100,7 +100,7 @@ pub fn ui_init(): int {
     global_ui_context.dirty = 1;
     
     // Wire signal state changes into the UI dirty flag
-    state_mod.register_dirty_notifier(_signal_dirty_cb);
+    state.register_dirty_notifier(_signal_dirty_cb);
     
     return 1;
 }
@@ -118,8 +118,8 @@ pub fn set_viewport_size(w: float, h: float): nil {
         if (global_ui_context.viewport_w != w or global_ui_context.viewport_h != h) {
             global_ui_context.viewport_w = w;
             global_ui_context.viewport_h = h;
-            viewport_mod.global_viewport.width = w;
-            viewport_mod.global_viewport.height = h;
+            viewport.global_viewport.width = w;
+            viewport.global_viewport.height = h;
             global_ui_context.dirty = 1;
         }
     }
@@ -888,11 +888,11 @@ pub fn dispatch_pointer_down(px: float, py: float): nil {
     }
     if (global_ui_context.has_widget == 1) {
         if (global_ui_context.cached_draw_list == nil or global_ui_context.dirty != 0) {
-            global_ui_context.cached_draw_list = builder_mod.build(global_ui_context.current_widget, content_w, content_h, nil, 20.0, 20.0);
+            global_ui_context.cached_draw_list = builder.build(global_ui_context.current_widget, content_w, content_h, nil, 20.0, 20.0);
         }
-        var dl = global_ui_context.cached_draw_list as dl_mod.DrawList;
-        var hz = dl_mod.dl_hit_test(dl, px, py);
-        if (hz.kind == dl_mod.HZONE_BUTTON) {
+        var dl = global_ui_context.cached_draw_list as dlist.DrawList;
+        var hz = dlist.dl_hit_test(dl, px, py);
+        if (hz.kind == dlist.HZONE_BUTTON) {
             if (hz.widget != nil) {
                 var w = hz.widget as ui.Widget;
                 if (w.kind == ui.KIND_TABS) {
@@ -913,7 +913,7 @@ pub fn dispatch_pointer_down(px: float, py: float): nil {
                 global_ui_context.captured_bounds_h = hz.h;
                 mark_element_dirty(1);
             }
-        } elif (hz.kind == dl_mod.HZONE_SLIDER) {
+        } elif (hz.kind == dlist.HZONE_SLIDER) {
             if (hz.widget != nil) {
                 var w = hz.widget as ui.Widget;
                 global_ui_context.captured_widget = w;
@@ -932,7 +932,7 @@ pub fn dispatch_pointer_down(px: float, py: float): nil {
                 }
                 mark_element_dirty(1);
             }
-        } elif (hz.kind == dl_mod.HZONE_CHECKBOX) {
+        } elif (hz.kind == dlist.HZONE_CHECKBOX) {
             if (hz.widget != nil) {
                 var w = hz.widget as ui.Widget;
                 global_ui_context.captured_widget = w;
@@ -942,14 +942,14 @@ pub fn dispatch_pointer_down(px: float, py: float): nil {
                 global_ui_context.captured_bounds_w = hz.w;
                 global_ui_context.captured_bounds_h = hz.h;
             }
-        } elif (hz.kind == dl_mod.HZONE_INPUT) {
+        } elif (hz.kind == dlist.HZONE_INPUT) {
             if (hz.widget != nil) {
                 var w = hz.widget as ui.Widget;
                 blur_focus_recursive(global_ui_context.current_widget);
                 w.is_focused = 1;
                 mark_element_dirty(1);
             }
-        } elif (hz.kind == dl_mod.HZONE_SELECT) {
+        } elif (hz.kind == dlist.HZONE_SELECT) {
             if (hz.widget != nil) {
                 var w = hz.widget as ui.Widget;
                 if (hz.tab_index >= 0 and hz.tab_index < len(w.select_options)) {
@@ -1326,7 +1326,7 @@ fn render_widget_node(w: ui.Widget, x: float, y: float, available_w: float, avai
     if (w.kind == ui.KIND_BUTTON) {
         var bg = w.background_color;
         if (bg.a <= 0.0) {
-            bg = theme_mod.global_theme.colors.primary;
+            bg = theme.global_theme.colors.primary;
         }
         if (w.is_pressed == 1) {
             if (w.pressed_style_val.has_bg) {
@@ -1477,9 +1477,9 @@ if (w.kind == ui.KIND_INPUT) {
 
         var border_p = paint.Paint();
         if (w.is_focused == 1) {
-            border_p.color_val = theme_mod.global_theme.colors.focus_ring;
+            border_p.color_val = theme.global_theme.colors.focus_ring;
         } elif (w.is_hovered == 1) {
-            border_p.color_val = theme_mod.global_theme.colors.border;
+            border_p.color_val = theme.global_theme.colors.border;
         } else {
             border_p.color_val = color.rgb(55, 60, 75);
         }
@@ -1497,13 +1497,13 @@ if (w.kind == ui.KIND_INPUT) {
             if (w.is_focused == 1) {
                 var caret_x = tx + (len(w.text_val) as float) * 8.0;
                 var caret_p = paint.Paint();
-                caret_p.color_val = theme_mod.global_theme.colors.focus_ring;
+                caret_p.color_val = theme.global_theme.colors.focus_ring;
                 cvs.draw_text("|", caret_x, ty, caret_p, 1);
             }
         } else {
             if (w.is_focused == 1) {
                 var caret_p = paint.Paint();
-                caret_p.color_val = theme_mod.global_theme.colors.focus_ring;
+                caret_p.color_val = theme.global_theme.colors.focus_ring;
                 cvs.draw_text("|", tx, ty, caret_p, 1);
             } else {
                 var ph_p = paint.Paint();
@@ -2059,7 +2059,7 @@ pub fn update_animations_recursive(w: ui.Widget, dt: float): nil {
 
 // Render using pre-computed layout boxes for better performance
 // This is called when layout.lm's LayoutBox system is integrated
-fn render_from_layout_boxes(boxes: [layout_mod.LayoutBox], cvs: canvas.Canvas): nil {
+fn render_from_layout_boxes(boxes: [layout.LayoutBox], cvs: canvas.Canvas): nil {
     var i = 0;
     while (i < len(boxes)) {
         var box = boxes[i];
@@ -2071,7 +2071,7 @@ fn render_from_layout_boxes(boxes: [layout_mod.LayoutBox], cvs: canvas.Canvas): 
 }
 
 // Update layout box positions for a widget tree (layout pass)
-// Delegated to layout_mod.compute_layout — this function is no longer needed.
+// Delegated to layout.compute_layout — this function is no longer needed.
 
 pub fn frame_update(delta_time: float): nil {
     var vw = global_ui_context.viewport_w;
@@ -2089,21 +2089,21 @@ pub fn frame_update(delta_time: float): nil {
 
         // Hybrid Single-Pass Rebuild: only re-evaluates tree into DrawList if dirty or list missing
         if (global_ui_context.dirty != 0 or global_ui_context.cached_draw_list == nil) {
-            var dl = builder_mod.build(global_ui_context.current_widget, content_w, content_h, nil, 20.0, 20.0);
+            var dl = builder.build(global_ui_context.current_widget, content_w, content_h, nil, 20.0, 20.0);
 
             // Append active overlays if any
             var o_idx = 0;
             while (o_idx < len(global_ui_context.active_overlays)) {
                 var ov = global_ui_context.active_overlays[o_idx];
-                var ov_dl = builder_mod.build(ov, content_w, content_h, nil, ov.padding_left, ov.padding_top);
+                var ov_dl = builder.build(ov, content_w, content_h, nil, ov.padding_left, ov.padding_top);
                 var c_idx = 0;
                 while (c_idx < len(ov_dl.cmds)) {
-                    dl_mod.dl_add(dl, ov_dl.cmds[c_idx]);
+                    dlist.dl_add(dl, ov_dl.cmds[c_idx]);
                     c_idx = c_idx + 1;
                 }
                 var h_idx = 0;
                 while (h_idx < len(ov_dl.hits)) {
-                    dl_mod.dl_add_hit(dl, ov_dl.hits[h_idx]);
+                    dlist.dl_add_hit(dl, ov_dl.hits[h_idx]);
                     h_idx = h_idx + 1;
                 }
                 o_idx = o_idx + 1;
@@ -2114,7 +2114,7 @@ pub fn frame_update(delta_time: float): nil {
         }
 
         // Linear GPU replay — pure immediate mode underneath, zero recursion, zero allocations
-        replay_mod.replay(global_ui_context.cached_draw_list as dl_mod.DrawList);
+        replay.replay(global_ui_context.cached_draw_list as dlist.DrawList);
     } else {
         var cvs = canvas.Canvas(w=vw, h=vh);
         render_blueprint_node(global_ui_context.current_blueprint, 20.0, 20.0, content_w, content_h, cvs);

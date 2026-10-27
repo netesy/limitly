@@ -1,9 +1,9 @@
 // TOML Writer Module
 
-import std.toml.value as val_mod;
+import std.toml.value as value;
 
 pub fn stringify(val_any: any): str {
-    var jval = val_any as val_mod.TOMLValue;
+    var jval = val_any as value.TOMLValue;
     if (jval == nil) {
         return "";
     }

@@ -1,5 +1,5 @@
 //import tests.modules.my_module as m hide greet;
-import tests.functions.basic_functions as math hide greet, greet_name;
+import tests.functions.basic as math hide greet;
 
 //print(m.message); 
 

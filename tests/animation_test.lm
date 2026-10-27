@@ -2,8 +2,7 @@
 import std.animation as anim;
 import std.ui as ui;
 import std.ui.context as ctx;
-import std.game.gui as gui_mod;
-import std.graphics.shadow as shadow_mod;
+import std.graphics.shadow show Shadow;
 
 fn test_time_based_property_animation(): nil {
     print("Testing PropertyAnimation easing and time-based progression...");
@@ -86,7 +85,7 @@ fn test_imgui_animation_store(): nil {
 fn test_retained_ui_animation_modifiers(): nil {
     print("Testing std.ui retained animation modifiers...");
 
-    var sh_inst = shadow_mod.Shadow(r=0.0, g=0.0, b=0.0, a=0.3, off_x=2.0, off_y=4.0, blur=8.0);
+    var sh_inst = Shadow(r=0.0, g=0.0, b=0.0, a=0.3, off_x=2.0, off_y=4.0, blur=8.0);
     var btn = ui.button("Animated Btn")
         .opacity(0.8)
         .scale(1.1)
@@ -108,8 +107,8 @@ fn test_retained_ui_animation_modifiers(): nil {
 fn test_shadow_interpolation(): nil {
     print("Testing Shadow property interpolation...");
 
-    var s1 = shadow_mod.Shadow(r=0.0, g=0.0, b=0.0, a=0.0, off_x=0.0, off_y=0.0, blur=0.0, spread=0.0);
-    var s2 = shadow_mod.Shadow(r=1.0, g=1.0, b=1.0, a=1.0, off_x=10.0, off_y=20.0, blur=16.0, spread=4.0);
+    var s1 = Shadow(r=0.0, g=0.0, b=0.0, a=0.0, off_x=0.0, off_y=0.0, blur=0.0, spread=0.0);
+    var s2 = Shadow(r=1.0, g=1.0, b=1.0, a=1.0, off_x=10.0, off_y=20.0, blur=16.0, spread=4.0);
 
     var s_mid = anim.lerp_shadow(s1, s2, 0.5);
     assert(s_mid.offset_x == 5.0, "shadow offset_x lerp");

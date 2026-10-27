@@ -82,7 +82,7 @@ frame Memory {
     }
 }
 
-frame ResourceReader {
+frame Reader {
     pub var resource: Resource;
     pub init(r: Resource) {
         self.resource = r;
@@ -98,7 +98,14 @@ frame ResourceReader {
     }
 }
 
-frame ResourceWriter {
+frame ResourceReader {
+    embed Reader;
+    pub init(r: Resource) {
+        self.resource = r;
+    }
+}
+
+frame Writer {
     pub var resource: Resource;
     pub init(r: Resource) {
         self.resource = r;
@@ -107,6 +114,14 @@ frame ResourceWriter {
         return rt.call(self.resource.handle, rt.OP_WRITE, args);
     }
 }
+
+frame ResourceWriter {
+    embed Writer;
+    pub init(r: Resource) {
+        self.resource = r;
+    }
+}
+
 
 
 frame Pollable {

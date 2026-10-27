@@ -134,9 +134,15 @@ frame HTTPClient {
         client.send(full_request)?;
 
         var response_data = "";
-        while (true) {
-            var chunk = client.recv()? else { break; };
-            response_data = response_data + chunk;
+        var reading = true;
+        while (reading) {
+            var chunk = client.recv()? else {
+                reading = false;
+                "";
+            };
+            if (reading) {
+                response_data = response_data + chunk;
+            }
         }
         client.close()?;
 

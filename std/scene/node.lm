@@ -6,14 +6,22 @@ frame Node {
     pub var transform_val: transform.Transform;
     pub var visible: bool;
 
-    pub init(id: int = 0, ch: [Node] = [], t: transform.Transform = transform.Transform(), vis: bool = true) {
+    pub init(id: int = 0, ch: [Node]? = nil, t: transform.Transform? = nil, vis: bool = true) {
         self.id = id;
-        self.children = ch;
-        self.transform_val = t;
+        if (ch != nil) {
+            self.children = ch as [Node];
+        } else {
+            self.children = [] as [Node];
+        }
+        if (t != nil) {
+            self.transform_val = t as transform.Transform;
+        } else {
+            self.transform_val = transform.Transform();
+        }
         self.visible = vis;
     }
 
     pub fn add_child(child: Node): nil {
-        self.children = self.children + [child];
+        self.children.append(child);
     }
 }

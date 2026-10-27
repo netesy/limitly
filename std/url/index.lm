@@ -6,18 +6,6 @@ pub import std.url.url show URL;
 pub import std.url.builder show URLBuilder;
 pub import std.url.query show QueryParams;
 
-pub fn URL(url_str: str): url.URL {
-    return url.URL(url_str);
-}
-
-pub fn URLBuilder(): builder.URLBuilder {
-    return builder.URLBuilder();
-}
-
-pub fn QueryParams(): query.QueryParams {
-    return query.QueryParams();
-}
-
 pub fn parse(url_str: str): url.URL {
     return url.URL(url_str);
 }

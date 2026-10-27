@@ -4,8 +4,8 @@
 
 import std.ui as ui;
 import std.ui.builder as builder;
-import std.ui.draw_list as dl_mod;
-import std.ui.replay as replay_mod;
+import std.ui.draw_list as dlist;
+import std.ui.replay as replay;
 import std.app as app;
 import std.gg as gg;
 
@@ -35,18 +35,18 @@ fn main(): nil {
 
     // ── Phase 3: Hit test — O(n) linear scan, no recursion
     print("\nHit testing first button zone:");
-    var b1_zone = dl.hits[0] as dl_mod.HitZone;
-    var hz1 = dl_mod.dl_hit_test(dl, b1_zone.x + 10.0, b1_zone.y + 10.0);
-    if (hz1.kind == dl_mod.HZONE_BUTTON) {
+    var b1_zone = dl.hits[0] as dlist.HitZone;
+    var hz1 = dlist.dl_hit_test(dl, b1_zone.x + 10.0, b1_zone.y + 10.0);
+    if (hz1.kind == dlist.HZONE_BUTTON) {
         print("  Hit button 1: '{hz1.id}'");
     } else {
         print("  Miss");
     }
 
     print("Hit testing second button zone:");
-    var b2_zone = dl.hits[1] as dl_mod.HitZone;
-    var hz2 = dl_mod.dl_hit_test(dl, b2_zone.x + 10.0, b2_zone.y + 10.0);
-    if (hz2.kind == dl_mod.HZONE_BUTTON) {
+    var b2_zone = dl.hits[1] as dlist.HitZone;
+    var hz2 = dlist.dl_hit_test(dl, b2_zone.x + 10.0, b2_zone.y + 10.0);
+    if (hz2.kind == dlist.HZONE_BUTTON) {
         print("  Hit button 2: '{hz2.id}'");
     } else {
         print("  Miss");
@@ -59,7 +59,7 @@ fn main(): nil {
     var fn_idx = 0;
     while (fn_idx < 5) {
         gg.begin_pass(800, 600, 0.06, 0.06, 0.08, 1.0);
-        replay_mod.replay(dl);  // O(n) iteration — no recursion, no tree walk
+        replay.replay(dl);  // O(n) iteration — no recursion, no tree walk
         gg.end_pass();
         gg.commit();
         sleep(0.016);

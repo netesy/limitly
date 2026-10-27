@@ -3,7 +3,7 @@
 import std.validation.email as email;
 import std.validation.phone as phone;
 import std.validation.url as url;
-import std.string.split as split_mod;
+import std.string.split as split;
 
 // Helpers to work around lack of string primitive methods in compiler type checker
 fn starts_with(s: str, prefix: str): bool {
@@ -253,7 +253,7 @@ frame Validate {
     pub fn is_ipv4(value: str): bool {
         if (value == "") return false;
 
-        var parts = split_mod.split(value, ".");
+        var parts = split.split(value, ".");
         if (len(parts) != 4) return false;
 
         var i: int = 0;

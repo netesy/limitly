@@ -4,8 +4,16 @@ frame Camera {
     pub var projection: matrix.Matrix;
     pub var view: matrix.Matrix;
 
-    pub init(proj: matrix.Matrix = matrix.Matrix(), v: matrix.Matrix = matrix.Matrix()) {
-        self.projection = proj;
-        self.view = v;
+    pub init(proj: matrix.Matrix? = nil, v: matrix.Matrix? = nil) {
+        if (proj != nil) {
+            self.projection = proj as matrix.Matrix;
+        } else {
+            self.projection = matrix.Matrix();
+        }
+        if (v != nil) {
+            self.view = v as matrix.Matrix;
+        } else {
+            self.view = matrix.Matrix();
+        }
     }
 }

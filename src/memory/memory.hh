@@ -21,6 +21,7 @@
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #define STRINGIFY(x) #x
@@ -49,6 +50,10 @@ private:
     std::vector<void*> allocatedChunks;  // Track chunks for cleanup
     size_t blockSize;
     size_t freeCount;
+    // TEMP DIAGNOSTIC (LYMAR_POOL_DIAG): catch double-free / foreign-free at
+    // the first bad release instead of at the later cascaded corruption.
+    bool diag = std::getenv("LYMAR_POOL_DIAG") != nullptr;
+    std::unordered_set<void*> diag_inflight;
 
     // Use a simple spinlock for better performance
     std::atomic_flag lock = ATOMIC_FLAG_INIT;
@@ -112,6 +117,7 @@ public:
         void* block = freeBlocks.back();
         freeBlocks.pop_back();
         freeCount--;
+        if (diag) diag_inflight.insert(block);
 
         spinUnlock();
         return block;
@@ -121,6 +127,14 @@ public:
         if (!ptr) return;
 
         spinLock();
+        if (diag) {
+            if (!diag_inflight.erase(ptr)) {
+                std::fprintf(stderr,
+                    "[POOL DIAG] block %p not inflight (double free or foreign block, blockSize=%zu)\n",
+                    ptr, blockSize);
+                std::abort();
+            }
+        }
         try { freeBlocks.push_back(ptr); }
         catch (...) { spinUnlock(); throw; }
         freeCount++;

@@ -1,6 +1,6 @@
 // std/ui/grid - Grid layout container (CSS-grid like layout)
 import std.ui.types as ui_types;
-import std.ui.layout as layout_mod;
+import std.ui.layout as layout;
 
 // Create a grid layout with columns × rows
 pub fn grid(columns_count: int, children: [ui_types.Widget], spacing_val: float = 8.0): ui_types.Widget {
@@ -78,7 +78,7 @@ pub fn grid_with_aspect(columns_count: int, children: [ui_types.Widget], aspect_
 }
 
 // Grid using enhanced layout system
-pub fn grid_enhanced(spec: layout_mod.GridSpec, children: [ui_types.Widget]): ui_types.Widget {
+pub fn grid_enhanced(spec: layout.GridSpec, children: [ui_types.Widget]): ui_types.Widget {
     var w = ui_types.Widget(ui_types.KIND_CONTAINER);
     w.is_vertical = 0;
     w.active_tab = spec.columns;

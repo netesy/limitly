@@ -7,7 +7,7 @@
 
 // Imported under an alias: calling the unqualified `split(...)` from inside the
 // `String.split` method would resolve back to the method itself, not the helper.
-import std.string.split as split_mod;
+import std.string.split as split;
 
 frame String {
     pub var value: str;
@@ -39,7 +39,7 @@ frame String {
     }
 
     pub fn split(delimiter: str): [str] {
-        return split_mod.split(self.value, delimiter);
+        return split.split(self.value, delimiter);
     }
 
     pub fn replace(old: str, replacement: str): str {

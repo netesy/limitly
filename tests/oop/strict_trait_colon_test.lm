@@ -1,15 +1,82 @@
+// Strict `:` conformance. Covers the three guarantees the composition contract
+// makes: a requirement must be met by the whole signature, a trait body acts as a
+// default implementation, and members gained from a mixin or an embedded component
+// count as real members of the host frame.
+
 trait Printable {
     fn print_info();
+    fn tag(): str { return "printable"; }   // default implementation
 }
 
-frame Book : Printable {
-    pub fn print_info() {
-        print("Book info");
+trait Sized {
+    fn area(): int;
+}
+
+// Satisfied only by a method promoted from an embedded component.
+trait Drivable {
+    fn start();
+}
+
+frame Engine {
+    pub rpm: int;
+
+    pub fn start() {
+        self.rpm = 1000;
     }
+}
+
+mixin Identifiable {
+    pub id: int;
+
+    pub fn set_id(value: int) {
+        self.id = value;
+    }
+}
+
+frame Book : Printable, Sized, Drivable {
+    mixin Identifiable;
+    embed Engine;
+
+    pub pages: int;
+
+    pub fn print_info() {
+        print("Book info, id={self.id}");
+    }
+
+    pub fn area(): int {
+        return self.pages * 2;
+    }
+    // `start()` is never declared here: it is promoted by `embed Engine;`.
+}
+
+// Callers pass the failure predicate (`value != expected`), so this reports a
+// failure when the condition holds. Returns bool -- `if` requires a bool in Lymar.
+fn failed(condition: bool, label: str): bool {
+    if (condition) {
+        print("FAIL: {label}");
+        return true;
+    }
+    return false;
 }
 
 fn main(): int {
     var b = Book();
+
+    b.set_id(7);
     b.print_info();
+
+    b.pages = 5;
+    if (failed(b.area() != 10, "own method satisfies Sized")) { return 1; }
+
+    if (failed(b.id != 7, "mixin accessor writes flattened field")) { return 1; }
+
+    // Trait default: Book never declares tag(), yet inherits it.
+    if (failed(b.tag() != "printable", "trait default implementation is callable")) { return 1; }
+
+    // Promoted method: satisfies Drivable and writes the flattened field.
+    b.start();
+    if (failed(b.rpm != 1000, "embedded method promoted onto host")) { return 1; }
+
+    print("OK: strict conformance, trait defaults, mixin and embed members");
     return 0;
 }

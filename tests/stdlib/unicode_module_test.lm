@@ -4,9 +4,9 @@ import std.unicode as u;
 
 fn test_rune(): int {
     print("Testing Rune...");
-    var r1 = u.Rune("a") as u.Rune;
-    var r2 = u.Rune("b") as u.Rune;
-    var r3 = u.Rune("a") as u.Rune;
+    var r1 = u.Rune("a");
+    var r2 = u.Rune("b");
+    var r3 = u.Rune("a");
 
     assert(r1.to_string() == "a", "Rune to_string failed");
     assert(r1.compare(r2) == -1, "Rune compare less failed");

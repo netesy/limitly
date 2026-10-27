@@ -6,11 +6,11 @@ import std.gg as gg;
 import std.game.types as types;
 import std.string as std_string;
 import std.text.controller as text_ctrl;
-import std.focus.manager as focus_mod;
-import std.graphics.text_layout as layout_mod;
-import std.ui.viewport as viewport_mod;
+import std.focus.manager as focus;
+import std.graphics.text_layout as layout;
+import std.ui.viewport as viewport;
 import std.animation as anim;
-import std.graphics.shadow as shadow_mod;
+import std.graphics.shadow as shadow;
 
 frame WindowState {
     pub var x: float;
@@ -87,7 +87,7 @@ frame GUI {
     pub var combo_open_id: str;
     pub var editor_controllers: {str: any};
     pub var scroll_offsets: {str: float};
-    pub var focus_manager: focus_mod.FocusManager;
+    pub var focus_manager: focus.FocusManager;
 
     // Immediate-mode Modifier Support (Shadows, Opacity, Disabled)
     pub var next_shadow: any;
@@ -163,7 +163,7 @@ frame GUI {
         self.combo_open_id = "";
         self.editor_controllers = {} as {str: any};
         self.scroll_offsets = {} as {str: float};
-        self.focus_manager = focus_mod.FocusManager();
+        self.focus_manager = focus.FocusManager();
 
         self.next_shadow = nil;
         self.has_next_shadow = false;
@@ -648,7 +648,7 @@ frame GUI {
         // Optional Button Elevation Drop Shadow (opt-in via set_next_shadow, shadow(), shadow_stack, or theme)
         var raw_sh = self.get_active_shadow(self.theme.button_shadow);
         if (raw_sh != nil and not is_disabled) {
-            var sh = raw_sh as shadow_mod.Shadow;
+            var sh = raw_sh as shadow.Shadow;
             if (sh.a > 0.0) {
                 var s_alpha = sh.a * active_opacity;
                 var s_y = sh.offset_y;
@@ -1106,7 +1106,7 @@ frame GUI {
             var rel_x = self.mouse_x - text_origin_x;
             if (rel_x < 0.0) { rel_x = 0.0; }
             var rel_y = self.mouse_y - (by + 6.0) + cur_scroll;
-            var hit = layout_mod.hit_test_multiline(ctrl.get_lines(), rel_x, rel_y, lh, self.theme.font_scale);
+            var hit = layout.hit_test_multiline(ctrl.get_lines(), rel_x, rel_y, lh, self.theme.font_scale);
             if (show_line_numbers and self.mouse_x < (bx + gutter_w)) {
                 ctrl.set_cursor(hit[0], 0);
                 var l_str = ctrl.get_line(hit[0]);
@@ -1120,7 +1120,7 @@ frame GUI {
             var rel_x = self.mouse_x - text_origin_x;
             if (rel_x < 0.0) { rel_x = 0.0; }
             var rel_y = self.mouse_y - (by + 6.0) + cur_scroll;
-            var hit = layout_mod.hit_test_multiline(ctrl.get_lines(), rel_x, rel_y, lh, self.theme.font_scale);
+            var hit = layout.hit_test_multiline(ctrl.get_lines(), rel_x, rel_y, lh, self.theme.font_scale);
             ctrl.set_selection(hit[0], hit[1]);
         }
 
@@ -1172,7 +1172,7 @@ frame GUI {
         }
 
         var total_content_h = (ctrl.get_line_count() as float) * lh + 12.0;
-        var vp = viewport_mod.Viewport(text_area_w, h - 2.0, text_area_w, total_content_h);
+        var vp = viewport.Viewport(text_area_w, h - 2.0, text_area_w, total_content_h);
         vp.scroll_y = cur_scroll;
 
         if (is_focused) {
@@ -1451,7 +1451,7 @@ frame GUI {
             // Optional elevation drop shadow for combo dropdown (opt-in)
             var raw_csh = self.get_active_shadow(self.theme.popup_shadow);
             if (raw_csh != nil) {
-                var csh = raw_csh as shadow_mod.Shadow;
+                var csh = raw_csh as shadow.Shadow;
                 if (csh.a > 0.0) {
                     gg.draw_shadow_primitive(bx, popup_y, w, popup_h, csh.r, csh.g, csh.b, csh.a, csh.offset_x, csh.offset_y, csh.blur_radius, csh.spread_radius);
                 }
@@ -1857,7 +1857,7 @@ frame GUI {
         // Optional popup drop shadow (opt-in)
         var raw_psh = self.get_active_shadow(self.theme.popup_shadow);
         if (raw_psh != nil) {
-            var psh = raw_psh as shadow_mod.Shadow;
+            var psh = raw_psh as shadow.Shadow;
             if (psh.a > 0.0) {
                 gg.draw_shadow_primitive(x, y, w, h, psh.r, psh.g, psh.b, psh.a, psh.offset_x, psh.offset_y, psh.blur_radius, psh.spread_radius);
             }
@@ -2022,7 +2022,7 @@ frame GUI {
         // Optional window elevation drop shadow (opt-in)
         var raw_wsh = self.get_active_shadow(self.theme.window_shadow);
         if (raw_wsh != nil) {
-            var wsh = raw_wsh as shadow_mod.Shadow;
+            var wsh = raw_wsh as shadow.Shadow;
             if (wsh.a > 0.0) {
                 gg.draw_shadow_primitive(wx, wy, ww, panel_h, wsh.r, wsh.g, wsh.b, wsh.a, wsh.offset_x, wsh.offset_y, wsh.blur_radius, wsh.spread_radius);
             }

@@ -406,3 +406,7 @@ pub fn sleep_seconds(seconds: float): nil {
 pub fn sleep_duration(duration: dur.TimeDuration): nil {
     sleep_ms(duration.to_milliseconds());
 }
+
+pub fn parse_datetime(value: str): DateTime? {
+    return DateTime.from_string(value);
+}

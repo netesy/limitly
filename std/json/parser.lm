@@ -1,6 +1,6 @@
 // JSON Parser Module
 
-import std.json.value as val_mod;
+import std.json.value as value;
 
 fn is_digit_char(ch: str): bool {
     if (ch == "0") return true;
@@ -36,7 +36,7 @@ frame JSONParser {
     pub fn parse_value(): any {
         self.skip_whitespace();
         var length = len(self.text);
-        if (self.idx >= length) return val_mod.make_null() as any;
+        if (self.idx >= length) return value.make_null() as any;
 
         var ch = _builtin_substring(self.text, self.idx, self.idx + 1);
         if (ch == "\"") {
@@ -52,10 +52,10 @@ frame JSONParser {
         } elif (ch == "-" or is_digit_char(ch) == true) {
             return self.parse_number() as any;
         }
-        return val_mod.make_null() as any;
+        return value.make_null() as any;
     }
 
-    pub fn parse_string(): val_mod.JSONValue {
+    pub fn parse_string(): value.JSONValue {
         self.idx = self.idx + 1; // skip leading "
         var start = self.idx;
         var length = len(self.text);
@@ -70,26 +70,26 @@ frame JSONParser {
         }
         var s = _builtin_substring(self.text, start, self.idx);
         self.idx = self.idx + 1; // skip trailing "
-        return val_mod.make_string(s);
+        return value.make_string(s);
     }
 
-    pub fn parse_bool(): val_mod.JSONValue {
+    pub fn parse_bool(): value.JSONValue {
         var ch = _builtin_substring(self.text, self.idx, self.idx + 1);
         if (ch == "t") {
             self.idx = self.idx + 4; // skip true
-            return val_mod.make_bool(true);
+            return value.make_bool(true);
         } else {
             self.idx = self.idx + 5; // skip false
-            return val_mod.make_bool(false);
+            return value.make_bool(false);
         }
     }
 
-    pub fn parse_null(): val_mod.JSONValue {
+    pub fn parse_null(): value.JSONValue {
         self.idx = self.idx + 4; // skip null
-        return val_mod.make_null();
+        return value.make_null();
     }
 
-    pub fn parse_number(): val_mod.JSONValue {
+    pub fn parse_number(): value.JSONValue {
         var start = self.idx;
         var length = len(self.text);
         var keep_going = true;
@@ -103,17 +103,17 @@ frame JSONParser {
         }
         var num_str = _builtin_substring(self.text, start, self.idx);
         var num_val = num_str as int;
-        return val_mod.make_number(num_val);
+        return value.make_number(num_val);
     }
 
-    pub fn parse_array(): val_mod.JSONValue {
+    pub fn parse_array(): value.JSONValue {
         self.idx = self.idx + 1; // skip [
         var list: [any] = [];
         self.skip_whitespace();
         var next_ch = _builtin_substring(self.text, self.idx, self.idx + 1);
         if (next_ch == "]") {
             self.idx = self.idx + 1;
-            return val_mod.make_array(list);
+            return value.make_array(list);
         }
 
         var keep_going = true;
@@ -132,10 +132,10 @@ frame JSONParser {
                 keep_going = false;
             }
         }
-        return val_mod.make_array(list);
+        return value.make_array(list);
     }
 
-    pub fn parse_object(): val_mod.JSONValue {
+    pub fn parse_object(): value.JSONValue {
         self.idx = self.idx + 1; // skip {
         var keys: [str] = [];
         var vals: [any] = [];
@@ -143,7 +143,7 @@ frame JSONParser {
         var next_ch = _builtin_substring(self.text, self.idx, self.idx + 1);
         if (next_ch == "}") {
             self.idx = self.idx + 1;
-            return val_mod.make_object(keys, vals);
+            return value.make_object(keys, vals);
         }
 
         var keep_going = true;
@@ -176,7 +176,7 @@ frame JSONParser {
                 keep_going = false;
             }
         }
-        return val_mod.make_object(keys, vals);
+        return value.make_object(keys, vals);
     }
 }
 

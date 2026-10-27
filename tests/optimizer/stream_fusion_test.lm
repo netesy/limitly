@@ -2,7 +2,7 @@
 
 import std.ffi as ffi;
 import std.io as io;
-import std.io.file as file_mod;
+import std.io.file as file;
 
 fn host_is_windows(): bool {
     unsafe {
@@ -86,11 +86,11 @@ fn main(): int {
     assert(res == 0, "LIR compilation execution failed");
     assert(io.exists(tmp_file), "LIR temporary output file should exist");
 
-    var file_res = file_mod.open(tmp_file, "r");
+    var file_res = file.open(tmp_file, "r");
     var content = "";
     match (file_res) {
         val f_obj => {
-            var f_concrete = f_obj as file_mod.File;
+            var f_concrete = f_obj as file.File;
             var content_res = f_concrete.read();
             match (content_res) {
                 val text => {

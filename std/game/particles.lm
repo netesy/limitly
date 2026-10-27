@@ -4,7 +4,7 @@
 import std.math as math;
 import std.gg as gg;
 import std.game.types as types;
-import std.game.camera as camera_mod;
+import std.game.camera show Camera2D;
 
 frame Particle {
     pub var pos: types.Vec2;
@@ -209,7 +209,7 @@ frame ParticleEmitter2D {
                 var screen_pos = p.pos;
                 var zoom = 1.0;
                 if (camera != nil) {
-                    var cam = camera as camera_mod.Camera2D;
+                    var cam = camera as Camera2D;
                     screen_pos = cam.world_to_screen(p.pos);
                     zoom = cam.zoom;
                 }

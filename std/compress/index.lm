@@ -1,24 +1,26 @@
 // std/compress/index.lm
 // Clean standard library entrypoint for data compression
 
-import std.compress.zlib as zlib_mod;
+import std.compress.zlib as zlib;
 
-pub fn Zlib(): zlib_mod.Zlib {
-    return zlib_mod.Zlib();
+pub import std.compress.zlib show Zlib;
+
+pub fn Zlib(): zlib.Zlib {
+    return zlib.Zlib();
 }
 
 pub fn compress(data: str, level: int = 6): str? {
-    return zlib_mod.compress(data, level);
+    return zlib.compress(data, level);
 }
 
 pub fn decompress(compressed: str, max_limit: int = 10485760): str? {
-    return zlib_mod.decompress(compressed, max_limit);
+    return zlib.decompress(compressed, max_limit);
 }
 
 pub fn compress_hex(data: str, level: int = 6): str? {
-    return zlib_mod.compress_hex(data, level);
+    return zlib.compress_hex(data, level);
 }
 
 pub fn decompress_hex(compressed_hex: str, max_limit: int = 10485760): str? {
-    return zlib_mod.decompress_hex(compressed_hex, max_limit);
+    return zlib.decompress_hex(compressed_hex, max_limit);
 }

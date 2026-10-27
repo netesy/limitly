@@ -96,6 +96,23 @@ inline std::optional<AOTValueKind> scalar_return_kind(const LIR::LIR_Function& f
         case Op::Jump: case Op::JumpIf: case Op::JumpIfFalse:
         case Op::RegionEnter: case Op::RegionExit: case Op::RegionMove:
         case Op::Return: case Op::Ret: break;
+        // Wrapping integer arithmetic never allocates, so it can carry a
+        // proven kind. Checked forms may promote on overflow and stay outside.
+        case Op::IAdd_Unchecked: case Op::IXor_Unchecked:
+        case Op::IAnd_Unchecked: case Op::IOr_Unchecked: break;
+        case Op::FrameGetField: {
+            // A field load contributes a proven kind only when the field's
+            // declared ABI type is an immediate integer or boolean. Float and
+            // pointer fields carry tracked objects and keep the dynamic contract.
+            auto field = function.register_types.find(inst.dst);
+            if (field == function.register_types.end()) return {};
+            switch (field->second) {
+            case LIR::Type::I8: case LIR::Type::U8: case LIR::Type::I16: case LIR::Type::U16:
+            case LIR::Type::I32: case LIR::Type::U32: case LIR::Type::I64: case LIR::Type::U64:
+            case LIR::Type::Bool: break;
+            default: return {};
+            }
+        } break;
         default: return {}; // Includes unknown calls, arithmetic overflow, and every memory effect.
         }
     }
@@ -119,6 +136,10 @@ inline std::optional<AOTValueKind> scalar_return_kind(const LIR::LIR_Function& f
             else if (inst.op == Op::Mov) state[inst.dst] = kind(state, inst.a);
             else if (inst.op >= Op::CmpEQ && inst.op <= Op::CmpGE) state[inst.dst] = boolean;
             else if (inst.op >= Op::Add && inst.op <= Op::Xor) state[inst.dst] = integer;
+            else if (inst.op == Op::IAdd_Unchecked || inst.op == Op::IXor_Unchecked ||
+                     inst.op == Op::IAnd_Unchecked || inst.op == Op::IOr_Unchecked) state[inst.dst] = integer;
+            else if (inst.op == Op::FrameGetField)
+                state[inst.dst] = function.register_types.at(inst.dst) == LIR::Type::Bool ? boolean : integer;
         }
         for (auto next : block.successors) {
             bool changed = false;
@@ -152,6 +173,14 @@ inline std::optional<AOTValueKind> scalar_return_kind(const LIR::LIR_Function& f
                     (kind(state, inst.a) == boolean && inst.op != Op::CmpEQ && inst.op != Op::CmpNEQ)) return {};
                 state[inst.dst] = boolean; break;
             case Op::RegionMove: if (!valid(inst.a)) return {}; break;
+            case Op::IAdd_Unchecked: case Op::IXor_Unchecked:
+            case Op::IAnd_Unchecked: case Op::IOr_Unchecked:
+                if (!valid(inst.a) || !valid(inst.b)) return {};
+                state[inst.dst] = integer; break;
+            case Op::FrameGetField:
+                // The scan gate already proved the declared field kind immediate.
+                state[inst.dst] = function.register_types.at(inst.dst) == LIR::Type::Bool ? boolean : integer;
+                break;
             case Op::JumpIf: case Op::JumpIfFalse:
                 if (kind(state, inst.a) != boolean || block.successors.size() != 2) return {};
                 break;

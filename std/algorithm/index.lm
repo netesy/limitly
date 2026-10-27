@@ -1,140 +1,140 @@
-import std.algorithm.search as search_mod;
-import std.algorithm.sort as sort_mod;
-import std.algorithm.partition as partition_mod;
-import std.algorithm.transform as transform_mod;
-import std.algorithm.reduce as reduce_mod;
-import std.algorithm.filter as filter_mod;
-import std.algorithm.unique as unique_mod;
-import std.algorithm.shuffle as shuffle_mod;
-import std.algorithm.binary_search as binary_search_mod;
+import std.algorithm.search as search;
+import std.algorithm.sort as sort;
+import std.algorithm.partition as partition;
+import std.algorithm.transform as transform;
+import std.algorithm.reduce as reduce;
+import std.algorithm.filter as filter;
+import std.algorithm.unique as unique;
+import std.algorithm.shuffle as shuffle;
+import std.algorithm.binary_search as binary_search;
 
 // Search re-exports
 pub fn find(items: [any], value: any): int {
-    return search_mod.find(items, value);
+    return search.find(items, value);
 }
 pub fn find_if(items: [any], p: fn(any): bool): int {
-    return search_mod.find_if(items, p);
+    return search.find_if(items, p);
 }
 pub fn any_match(items: [any], p: fn(any): bool): bool {
-    return search_mod.any_match(items, p);
+    return search.any_match(items, p);
 }
 pub fn none(items: [any], p: fn(any): bool): bool {
-    return search_mod.none(items, p);
+    return search.none(items, p);
 }
 pub fn all(items: [any], p: fn(any): bool): bool {
-    return search_mod.all(items, p);
+    return search.all(items, p);
 }
 pub fn count(items: [any], value: any): int {
-    return search_mod.count(items, value);
+    return search.count(items, value);
 }
 pub fn linear_search(items: [any], value: any): int {
-    return search_mod.linear_search(items, value);
+    return search.linear_search(items, value);
 }
 
 // Sort re-exports
 pub fn sort(items: [any]) {
-    sort_mod.sort(items);
+    sort.sort(items);
 }
 pub fn quicksort(items: [any]) {
-    sort_mod.quicksort(items);
+    sort.quicksort(items);
 }
 pub fn quicksort_descending(items: [any]) {
-    sort_mod.quicksort_descending(items);
+    sort.quicksort_descending(items);
 }
 pub fn mergesort(items: [any]) {
-    sort_mod.mergesort(items);
+    sort.mergesort(items);
 }
 pub fn heapsort(items: [any]) {
-    sort_mod.heapsort(items);
+    sort.heapsort(items);
 }
 pub fn insertion_sort(items: [any]) {
-    sort_mod.insertion_sort(items);
+    sort.insertion_sort(items);
 }
 pub fn counting_sort(items: [int]) {
-    sort_mod.counting_sort(items);
+    sort.counting_sort(items);
 }
 pub fn radix_sort(items: [int]) {
-    sort_mod.radix_sort(items);
+    sort.radix_sort(items);
 }
 pub fn timsort(items: [any]) {
-    sort_mod.timsort(items);
+    sort.timsort(items);
 }
 pub fn stable_sort(items: [any]) {
-    sort_mod.stable_sort(items);
+    sort.stable_sort(items);
 }
 pub fn partial_sort(items: [any], count: int) {
-    sort_mod.partial_sort(items, count);
+    sort.partial_sort(items, count);
 }
 
 // Partition re-exports
 pub fn partition(items: [any], p: fn(any): bool): int {
-    return partition_mod.partition(items, p);
+    return partition.partition(items, p);
 }
 pub fn partition_copy(items: [any], p: fn(any): bool): ([any], [any]) {
-    return partition_mod.partition_copy(items, p);
+    return partition.partition_copy(items, p);
 }
 pub fn is_partitioned(items: [any], p: fn(any): bool): bool {
-    return partition_mod.is_partitioned(items, p);
+    return partition.is_partitioned(items, p);
 }
 
 // Transform re-exports
 pub fn map(items: [any], f: fn(any): any): [any] {
-    return transform_mod.map(items, f);
+    return transform.map(items, f);
 }
 pub fn zip(left: [any], right: [any]): [any] {
-    return transform_mod.zip(left, right);
+    return transform.zip(left, right);
 }
 pub fn unzip(pairs: [any]): ([any], [any]) {
-    return transform_mod.unzip(pairs);
+    return transform.unzip(pairs);
 }
 pub fn transform(items: [any], f: fn(any): any): [any] {
-    return transform_mod.transform(items, f);
+    return transform.transform(items, f);
 }
 pub fn reverse(items: [any]) {
-    transform_mod.reverse(items);
+    transform.reverse(items);
 }
 pub fn rotate(items: [any], k: int) {
-    transform_mod.rotate(items, k);
+    transform.rotate(items, k);
 }
 
 // Reduce re-exports
 pub fn reduce(items: [any], f: fn(any, any): any, initial: any): any {
-    return reduce_mod.reduce(items, f, initial);
+    return reduce.reduce(items, f, initial);
 }
 pub fn fold(items: [any], initial: any, f: fn(any, any): any): any {
-    return reduce_mod.fold(items, initial, f);
+    return reduce.fold(items, initial, f);
 }
 
 // Filter re-exports
 pub fn filter(items: [any], p: fn(any): bool): [any] {
-    return filter_mod.filter(items, p);
+    return filter.filter(items, p);
 }
 pub fn remove_if(items: [any], p: fn(any): bool): [any] {
-    return filter_mod.remove_if(items, p);
+    return filter.remove_if(items, p);
 }
 
 // Unique re-exports
 pub fn unique(items: [any]): [any] {
-    return unique_mod.unique(items);
+    return unique.unique(items);
 }
 
 // Shuffle re-exports
 pub fn shuffle(items: [any]) {
-    shuffle_mod.shuffle(items);
+    shuffle.shuffle(items);
 }
 
 // Binary Search re-exports
 pub fn binary_search(items: [any], value: any): int {
-    return binary_search_mod.binary_search(items, value);
+    return binary_search.binary_search(items, value);
 }
 pub fn lower_bound(items: [any], value: any): int {
-    return binary_search_mod.lower_bound(items, value);
+    return binary_search.lower_bound(items, value);
 }
 pub fn upper_bound(items: [any], value: any): int {
-    return binary_search_mod.upper_bound(items, value);
+    return binary_search.upper_bound(items, value);
 }
 pub fn equal_range(items: [any], value: any): (int, int) {
-    return binary_search_mod.equal_range(items, value);
+    return binary_search.equal_range(items, value);
 }
 
 pub fn is_prime(n: int): bool {

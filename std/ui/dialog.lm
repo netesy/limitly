@@ -1,6 +1,6 @@
 // std/ui/dialog - Modal dialog and overlay widgets
 import std.ui.types as ui_types;
-import std.ui.viewport as viewport_mod;
+import std.ui.viewport as viewport;
 
 // Modal dialog with title, content, close button, and dynamic viewport centering
 pub fn dialog(title: str, content: ui_types.Widget, is_open: bool = true, width: float = 400.0, height: float = 300.0, on_close: any = nil): ui_types.Widget {
@@ -38,9 +38,9 @@ pub fn dialog(title: str, content: ui_types.Widget, is_open: bool = true, width:
     dialog_content.height_val = height;
     
     // Dynamic centering using active viewport
-    var vw = viewport_mod.global_viewport.width;
+    var vw = viewport.global_viewport.width;
     if (vw <= 0.0) { vw = 800.0; }
-    var vh = viewport_mod.global_viewport.height;
+    var vh = viewport.global_viewport.height;
     if (vh <= 0.0) { vh = 600.0; }
 
     var x = (vw - width) / 2.0;
@@ -97,9 +97,9 @@ pub fn confirm_dialog(title: str, message: str, on_yes: any = nil, on_no: any = 
 
 // Modal backdrop (darkened background behind dialog)
 pub fn modal_backdrop(alpha: float = 0.6): ui_types.Widget {
-    var vw = viewport_mod.global_viewport.width;
+    var vw = viewport.global_viewport.width;
     if (vw <= 0.0) { vw = 800.0; }
-    var vh = viewport_mod.global_viewport.height;
+    var vh = viewport.global_viewport.height;
     if (vh <= 0.0) { vh = 600.0; }
 
     var backdrop = ui_types.empty();

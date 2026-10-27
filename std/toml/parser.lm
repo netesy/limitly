@@ -1,6 +1,6 @@
 // TOML Parser Module
 
-import std.toml.value as val_mod;
+import std.toml.value as value;
 import std.string as std_string;
 
 fn is_digit_char(ch: str): bool {
@@ -83,27 +83,27 @@ frame TOMLParser {
                     vr_idx = vr_idx + 1;
                 }
 
-                var val_obj = val_mod.make_string("");
+                var val_obj = value.make_string("");
                 var val_len = len(val_trimmed);
                 if (val_len > 0) {
                     var first_ch = _builtin_substring(val_trimmed, 0, 1);
                     if (first_ch == "\"") {
                         var inner = _builtin_substring(val_trimmed, 1, val_len - 1);
-                        val_obj = val_mod.make_string(inner);
+                        val_obj = value.make_string(inner);
                     } elif (val_trimmed == "true") {
-                        val_obj = val_mod.make_bool(true);
+                        val_obj = value.make_bool(true);
                     } elif (val_trimmed == "false") {
-                        val_obj = val_mod.make_bool(false);
+                        val_obj = value.make_bool(false);
                     } else {
                         var val_int = val_trimmed as int;
-                        val_obj = val_mod.make_number(val_int);
+                        val_obj = value.make_number(val_int);
                     }
                     keys.append(key);
                     vals.append(val_obj as any);
                 }
             }
         }
-        return val_mod.make_object(keys, vals) as any;
+        return value.make_object(keys, vals) as any;
     }
 }
 

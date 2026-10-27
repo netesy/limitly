@@ -1,14 +1,10 @@
 // std.ui.types - Type definitions for Fluent, Retained UI System
 
 import std.text.controller as text_ctrl;
-import std.animation as anim_mod;
-import std.graphics.shadow as shadow_mod;
-import std.ui.state as state_mod;
-
-pub var Shadow = shadow_mod.Shadow;
-pub fn shadow(r: float = 0.0, g: float = 0.0, b: float = 0.0, a: float = 0.0, off_x: float = 0.0, off_y: float = 0.0, blur: float = 0.0, spread: float = 0.0): shadow_mod.Shadow {
-    return shadow_mod.shadow(r, g, b, a, off_x, off_y, blur, spread);
-}
+import std.animation as anim;
+import std.graphics.shadow as shadow;
+import std.ui.state as state;
+pub import std.graphics.shadow show Shadow, shadow;
 
 // ── Canonical Retained UI Color ──────────────────────────────────────────────
 frame Color {
@@ -307,9 +303,9 @@ pub var KIND_PIE_CHART: int = 48;
 pub var KIND_OVERLAY: int = 49;
 pub var KIND_FORM_FIELD: int = 50;
 pub var _shared_empty_style: Style = Style();
-pub var _shared_empty_shadow: shadow_mod.Shadow = shadow_mod.Shadow();
-pub var _shared_empty_trans: anim_mod.Transition = anim_mod.Transition();
-pub var _shared_empty_anim: anim_mod.PropertyAnimation = anim_mod.PropertyAnimation();
+pub var _shared_empty_shadow: shadow.Shadow = shadow.Shadow();
+pub var _shared_empty_trans: anim.Transition = anim.Transition();
+pub var _shared_empty_anim: anim.PropertyAnimation = anim.PropertyAnimation();
 
 // Unified Retained UI Node with Fluent Modifiers
 frame Widget {
@@ -353,12 +349,12 @@ frame Widget {
     pub var is_open: int;
     pub var opacity_val: float;
     pub var scale_val: float;
-    pub var shadow_val: shadow_mod.Shadow;
+    pub var shadow_val: shadow.Shadow;
     pub var lifecycle_state: int;
-    pub var enter_transition: anim_mod.Transition;
-    pub var exit_transition: anim_mod.Transition;
-    pub var anim_property: anim_mod.PropertyAnimation;
-    pub var active_transition: anim_mod.Transition;
+    pub var enter_transition: anim.Transition;
+    pub var exit_transition: anim.Transition;
+    pub var anim_property: anim.PropertyAnimation;
+    pub var active_transition: anim.Transition;
 
     pub var text_editor_state: any;
     pub var scroll_x: float;
@@ -602,27 +598,27 @@ frame Widget {
     // ── Retained Visual & Animation Modifiers ──────────────────────────────
     pub fn opacity(o: float): Widget { self.opacity_val = o; return self; }
     pub fn scale(s: float): Widget { self.scale_val = s; return self; }
-    pub fn shadow(s: shadow_mod.Shadow): Widget { self.shadow_val = s; return self; }
+    pub fn shadow(s: shadow.Shadow): Widget { self.shadow_val = s; return self; }
     pub fn animate(dur: float = 0.25, easing: int = 0): Widget {
-        self.anim_property = anim_mod.PropertyAnimation(0.0, 1.0, dur, easing);
+        self.anim_property = anim.PropertyAnimation(0.0, 1.0, dur, easing);
         return self;
     }
     pub fn spring(stiffness: float = 180.0, damping: float = 12.0): Widget {
-        self.anim_property.spring_model = anim_mod.Spring(stiffness, damping);
+        self.anim_property.spring_model = anim.Spring(stiffness, damping);
         self.anim_property.is_spring = true;
         return self;
     }
-    pub fn transition(trans: anim_mod.Transition): Widget { self.active_transition = trans; return self; }
+    pub fn transition(trans: anim.Transition): Widget { self.active_transition = trans; return self; }
     pub fn on_change(cb: any): Widget { self.on_change_action = cb; return self; }
     pub fn checked(c: bool): Widget { if (c) { self.is_checked = 1; } else { self.is_checked = 0; } return self; }
     pub fn disabled(): Widget { self.is_enabled = 0; return self; }
     pub fn hover(s: Style): Widget { self.hover_style_val = s; return self; }
-    pub fn enter(t: anim_mod.Transition): Widget {
+    pub fn enter(t: anim.Transition): Widget {
         self.enter_transition = t;
         self.lifecycle_state = LIFECYCLE_ENTERING;
         return self;
     }
-    pub fn exit(t: anim_mod.Transition): Widget {
+    pub fn exit(t: anim.Transition): Widget {
         self.exit_transition = t;
         return self;
     }
@@ -636,7 +632,7 @@ frame Widget {
     // ── Signal Binding Modifiers ───────────────────────────────────────────
     // Bind a signal to this widget's text property
     pub fn bind_text(sig: any): Widget {
-        var s = sig as state_mod.Signal;
+        var s = sig as state.Signal;
         if (s != nil) {
             s.subscribe(fn(new_val: any): nil {
                 var txt = new_val as str;
@@ -648,7 +644,7 @@ frame Widget {
 
     // Bind a signal to this widget's checked property
     pub fn bind_checked(sig: any): Widget {
-        var s = sig as state_mod.Signal;
+        var s = sig as state.Signal;
         if (s != nil) {
             s.subscribe(fn(new_val: any): nil {
                 var checked = new_val as bool;
@@ -664,7 +660,7 @@ frame Widget {
 
     // Bind a signal to this widget's slider_val property
     pub fn bind_value(sig: any): Widget {
-        var s = sig as state_mod.Signal;
+        var s = sig as state.Signal;
         if (s != nil) {
             s.subscribe(fn(new_val: any): nil {
                 var v = new_val as float;
@@ -676,7 +672,7 @@ frame Widget {
 
     // Bind a signal to this widget's enabled state
     pub fn bind_enabled(sig: any): Widget {
-        var s = sig as state_mod.Signal;
+        var s = sig as state.Signal;
         if (s != nil) {
             s.subscribe(fn(new_val: any): nil {
                 var enabled = new_val as bool;

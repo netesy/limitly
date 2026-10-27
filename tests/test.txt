@@ -126,6 +126,8 @@ tests/stdlib/net/net_test.lm
 tests/regression/ownership_refactor_test.lm
 # Regression - Trait Dispatch
 tests/regression/trait_dispatch_test.lm
+# Regression - Integer Payload Overflow Past 2^60
+tests/regression/int64_immediate_overflow_test.lm
 # Graphics & Retained UI
 tests/std_gg_smoke.lm
 tests/graphics_triangle_test.lm

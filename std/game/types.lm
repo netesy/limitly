@@ -2,10 +2,7 @@
 // Fundamental math primitives, color definitions, and themes for std.game IMGUI
 
 import std.math as math;
-import std.graphics.shadow as shadow_mod;
-
-pub var Shadow = shadow_mod.Shadow;
-pub var shadow = shadow_mod.shadow;
+pub import std.graphics.shadow show Shadow, shadow;
 
 frame Vec2 {
     pub var x: float;

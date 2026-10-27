@@ -1,7 +1,7 @@
 // tests/ui_dialog_window_test.lm - Regression test for dialog, modal, and window fixes
 import std.ui as ui;
-import std.ui.window as win_mod;
-import std.ui.viewport as viewport_mod;
+import std.ui.window show Window;
+import std.ui.viewport as viewport;
 
 fn on_close_handler(): nil {
     print("[Action] Dialog on_close called");
@@ -12,7 +12,7 @@ fn on_ok_handler(): nil {
 }
 
 fn test_window(): nil {
-    var win = win_mod.Window(t="My Test App", w=1024.0, h=768.0);
+    var win = Window(t="My Test App", w=1024.0, h=768.0);
     if (win.title != "My Test App") {
         print("FAIL: window title mismatch");
         return;
@@ -40,8 +40,8 @@ fn test_dialog(): nil {
     }
 
     // Active dialog
-    viewport_mod.global_viewport.width = 1000.0;
-    viewport_mod.global_viewport.height = 800.0;
+    viewport.global_viewport.width = 1000.0;
+    viewport.global_viewport.height = 800.0;
 
     var content = ui.text("Dialog Body");
     var dlg = ui.dialog("Test Dialog", content, true, 400.0, 300.0, on_close_handler);
@@ -85,8 +85,8 @@ fn test_alert_and_confirm(): nil {
 }
 
 fn test_modal_backdrop(): nil {
-    viewport_mod.global_viewport.width = 1280.0;
-    viewport_mod.global_viewport.height = 720.0;
+    viewport.global_viewport.width = 1280.0;
+    viewport.global_viewport.height = 720.0;
 
     var bd = ui.modal_backdrop(0.5);
     if (bd.width_val != 1280.0 or bd.height_val != 720.0) {

@@ -6,60 +6,60 @@
 // Command). Facts about the surrounding machine - environment variables, working
 // directory, home/temp locations, platform identity - belong to std.os.
 
-import std.process.process as process_mod;
+import std.process.process as proc;
 pub import std.process.command show Command;
 pub import std.process.pipe show Pipe;
 
 frame Process {
     pub init() {}
-    pub fn exit(code: int): nil { return process_mod.exit(code); }
-    pub fn run(cmd_str: str): int { return process_mod.run(cmd_str); }
-    pub fn id(): int { return process_mod.id(); }
-    pub fn args(): [str] { return process_mod.args(); }
-    pub fn command(): str { return process_mod.command(); }
-    pub fn memory(): int { return process_mod.memory(); }
-    pub fn peak_memory(): int { return process_mod.peak_memory(); }
-    pub fn current_rss(): int { return process_mod.current_rss(); }
-    pub fn peak_rss(): int { return process_mod.peak_rss(); }
+    pub fn exit(code: int): nil { return proc.exit(code); }
+    pub fn run(cmd_str: str): int { return proc.run(cmd_str); }
+    pub fn id(): int { return proc.id(); }
+    pub fn args(): [str] { return proc.args(); }
+    pub fn command(): str { return proc.command(); }
+    pub fn memory(): int { return proc.memory(); }
+    pub fn peak_memory(): int { return proc.peak_memory(); }
+    pub fn current_rss(): int { return proc.current_rss(); }
+    pub fn peak_rss(): int { return proc.peak_rss(); }
 }
 
 pub fn exit(code: int): nil {
-    return process_mod.exit(code);
+    return proc.exit(code);
 }
 
 pub fn run(cmd_str: str): int {
-    return process_mod.run(cmd_str);
+    return proc.run(cmd_str);
 }
 
 pub fn exec(program: str, arguments: [str]): int {
-    return process_mod.exec(program, arguments);
+    return proc.exec(program, arguments);
 }
 
 pub fn id(): int {
-    return process_mod.id();
+    return proc.id();
 }
 
 pub fn args(): [str] {
-    return process_mod.args();
+    return proc.args();
 }
 
 pub fn command(): str {
-    return process_mod.command();
+    return proc.command();
 }
 
 pub fn memory(): int {
-    return process_mod.memory();
+    return proc.memory();
 }
 
 pub fn peak_memory(): int {
-    return process_mod.peak_memory();
+    return proc.peak_memory();
 }
 
 // Aliases for the names used before the shared OS layer; see std.process.memory.
 pub fn current_rss(): int {
-    return process_mod.current_rss();
+    return proc.current_rss();
 }
 
 pub fn peak_rss(): int {
-    return process_mod.peak_rss();
+    return proc.peak_rss();
 }

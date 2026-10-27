@@ -2,10 +2,7 @@
 // Shared Generic Animation Core Engine for Lymar
 // Time-based, interruptible, easing curves, spring physics, transitions, keyframes, composition, and ID-keyed state store
 
-import std.graphics.shadow as shadow_mod;
-
-pub var Shadow = shadow_mod.Shadow;
-pub var shadow = shadow_mod.shadow;
+pub import std.graphics.shadow show Shadow, shadow, lerp_shadow;
 
 // Easing Curve Type Identifiers
 pub var EASE_LINEAR: int = 0;
@@ -127,10 +124,6 @@ pub fn lerp_rgba(r1: float, g1: float, b1: float, a1: float, r2: float, g2: floa
         lerp_float(b1, b2, t),
         lerp_float(a1, a2, t)
     ];
-}
-
-pub fn lerp_shadow(s1: shadow_mod.Shadow, s2: shadow_mod.Shadow, t: float): shadow_mod.Shadow {
-    return shadow_mod.lerp_shadow(s1, s2, t);
 }
 
 // ── Multi-Stage Keyframe Animation ─────────────────────────────────────────

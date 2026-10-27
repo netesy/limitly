@@ -95,6 +95,7 @@ No implicit type conversions. You must explicitly cast types using `as` (e.g. `x
 #### **Frames**
 Frames are class-like structures that define fields and methods.
 - **Modifiers**: Fields and methods use `pub` (public), `prot` (protected), or default to private.
+- **`embed` Has No Visibility Modifier**: Write `embed Engine;` — never `pub embed Engine;` or `prot embed Engine;`. An embed is a statement, not a member declaration; a visibility prefix carries no meaning and is discarded. Flattened fields and promoted methods keep the visibility they declare inside the embedded frame.
 - **`self` Reference**: Inside methods, `self` is the canonical reference to the current instance (`this` is unsupported).
 - **Lifecycle Methods**:
  - `pub init(...)` (constructor)

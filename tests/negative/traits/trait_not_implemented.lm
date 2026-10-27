@@ -5,7 +5,7 @@ trait Drawable {
     fn draw();
 }
 
-frame Square {
+frame Square: Drawable {
     pub side: int;
     
     pub init(s: int) {

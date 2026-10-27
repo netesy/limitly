@@ -1,12 +1,28 @@
 import std.scene.node as node;
+import std.graphics.transform as transform;
 import std.graphics.animation as animation;
 
 frame AnimationNode {
-    pub var base_node: node.Node;
+    embed node.Node;
     pub var anim: animation.Animation;
 
-    pub init(b: node.Node = node.Node(), a: animation.Animation = animation.Animation()) {
-        self.base_node = b;
-        self.anim = a;
+    pub init(b: node.Node? = nil, a: animation.Animation? = nil) {
+        if (b != nil) {
+            var bn = b as node.Node;
+            self.id = bn.id;
+            self.children = bn.children;
+            self.transform_val = bn.transform_val;
+            self.visible = bn.visible;
+        } else {
+            self.id = 0;
+            self.children = [] as [node.Node];
+            self.transform_val = transform.Transform();
+            self.visible = true;
+        }
+        if (a != nil) {
+            self.anim = a as animation.Animation;
+        } else {
+            self.anim = animation.Animation();
+        }
     }
 }

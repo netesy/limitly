@@ -39,6 +39,7 @@
 #define NOMINMAX
 #endif
 #include <windows.h>
+#include <tlhelp32.h>
 #endif
 
 namespace {
@@ -124,7 +125,14 @@ struct Files {
 #if !defined(__wasi__)
     std::map<Word,std::unique_ptr<NativeGraphics>> graphics;
 #endif
-    ~Files() { for (auto [id, file] : handles) if (file) std::fclose(file); for (auto [id, buf] : mems) if (buf.first) std::free(buf.first); }
+    // Release OS-facing resources held by the file/service tables. Driven
+    // explicitly from SharedHeap::shutdown() rather than a destructor because
+    // the SharedHeap singleton is intentionally process-lifetime (leaked) so it
+    // outlives every thread_local Heap whose exit-time teardown still needs it.
+    void close() {
+        for (auto [id, file] : handles) if (file) std::fclose(file);
+        for (auto [id, buf] : mems) if (buf.first) std::free(buf.first);
+    }
 };
 // Shared metadata is synchronized; invocation state and the active region are
 // thread-local. Region identities remain unique across recursive workers.
@@ -158,8 +166,304 @@ struct SharedHeap {
     std::map<Word,SchedulerConfiguration> schedulers;
     std::unordered_set<Word> closed_channels;
     std::condition_variable_any work_available;
+    // Deterministic exit teardown, run once on the owner thread from ~Heap after
+    // every region has unwound. Because the singleton is leaked (see
+    // shared_heap()), no destructor fires at process exit, so file streams and
+    // native graphics are released here instead.
+    void shutdown() {
+        files.close();
+#if !defined(__wasi__)
+        files.graphics.clear();
+#endif
+    }
 };
-SharedHeap& shared_heap() { static SharedHeap state; return state; }
+// Deliberately leaked process-lifetime singleton. The per-thread Heap's
+// exit-time destructor (~Heap) unwinds still-open regions and finalizes
+// globals through these tables (allocations, regions, allocator). A
+// function-local static would be destroyed during process exit BEFORE the
+// thread_local ~Heap runs, leaving ~Heap reading a freed ConcurrentRegions --
+// a use-after-free that surfaced as std::out_of_range("Inactive region
+// identity") at exit for every AOT program. The OS reclaims this fixed-size
+// control block at termination.
+#if defined(_WIN32)
+// TEMP DIAGNOSTIC (trait-list AV hunt): watcher-child mode. Self-attach
+// DebugActiveProcess is policy-blocked (ERROR_PRIVILEGE_NOT_HELD), so a child
+// process (same exe, LYMAR_PROBE_WATCH=<parent pid>:<parent slot addr>) runs a
+// debug loop installing a hardware write-watchpoint on the parent's leaked
+// SharedHeap* singleton slot, and blocks in a static ctor so parent main never
+// runs in the child.
+static const bool g_probe_watcher_mode = [] {
+    const char* v = std::getenv("LYMAR_PROBE_WATCH");
+    return v && *v;
+}();
+static unsigned long long g_probe_slot = 0;
+static const char* probe_env_value(const char* key) {
+    char buf[512];
+    const DWORD n = GetEnvironmentVariableA(key, buf, sizeof(buf));
+    if (!n || n >= sizeof(buf)) return nullptr;
+    buf[n] = 0;
+    // Duplicate through malloc: returned pointer must outlive this call.
+    char* out = (char*)std::malloc(n + 1);
+    if (out) std::memcpy(out, buf, n + 1);
+    return out;
+}
+static unsigned long long probe_parent_slot_from_env() {
+    const char* v = probe_env_value("LYMAR_PROBE_WATCH");
+    if (!v) return 0;
+    // Some CRT paths return "KEY=VALUE"; strip a leading key if present.
+    if (const char* eq = strstr(v, "LYMAR_PROBE_WATCH=")) v = eq + 16;
+    const char* colon = std::strchr(v, ':');
+    if (!colon) return 0;
+    ++colon;
+    unsigned long long slot = 0;
+    for (; *colon >= '0' && *colon <= '9'; ++colon) slot = slot * 10 + (*colon - '0');
+    return slot;
+}
+static unsigned long long probe_parent_pid_from_env() {
+    const char* v = probe_env_value("LYMAR_PROBE_WATCH");
+    if (!v) return 0;
+    if (const char* eq = strstr(v, "LYMAR_PROBE_WATCH=")) v = eq + 16;
+    // Manual decimal parse (bypasses any CRT strtoul weirdness).
+    unsigned long long pid = 0;
+    for (; *v >= '0' && *v <= '9'; ++v) pid = pid * 10 + (*v - '0');
+    return pid;
+}
+#endif
+static unsigned long long probe_state_slot = 0; // address of shared_heap()'s state ptr (captured pre-guard)
+SharedHeap& shared_heap() { static SharedHeap* state = new SharedHeap();
+#if defined(_WIN32)
+    if (!g_probe_watcher_mode && !probe_state_slot) probe_state_slot = (unsigned long long)(uintptr_t)&state;
+#endif
+    return *state; }
+#if defined(_WIN32)
+// TEMP DIAGNOSTIC (trait-list AV hunt): first-fault dump + post-init page
+// guard on the .data page holding shared_heap()'s state pointer. ALL mutable
+// probe state lives in a heap-allocated ctx and stack buffers because this
+// TU's statics may share the guarded page (a handler write there is fatal).
+struct ProbeCtx {
+    volatile unsigned long long reports, allocs, arm_at, guard_page;
+};
+static ProbeCtx* probe_ctx = nullptr;
+static void probe_emit(const char* text) {
+    DWORD written;
+    WriteFile(GetStdHandle(STD_ERROR_HANDLE), text, (DWORD)lstrlenA(text), &written, nullptr);
+}
+static LONG WINAPI probe_exception_filter(PEXCEPTION_POINTERS e) {
+    if (!probe_ctx) return EXCEPTION_CONTINUE_SEARCH;
+    if (++probe_ctx->reports > 12) return EXCEPTION_CONTINUE_SEARCH;
+    char line[512];
+    auto code = (unsigned long long)e->ExceptionRecord->ExceptionCode;
+    auto rip = (unsigned long long)(uintptr_t)e->ExceptionRecord->ExceptionAddress;
+    auto addr = (unsigned long long)(uintptr_t)e->ExceptionRecord->ExceptionInformation[1];
+    auto access = (unsigned long long)e->ExceptionRecord->ExceptionInformation[0];
+    HMODULE fault_mod = nullptr;
+    GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+        (LPCWSTR)(LPCVOID)(uintptr_t)rip, &fault_mod);
+    char modname[260] = "?";
+    if (fault_mod) GetModuleFileNameA(fault_mod, modname, 259);
+    std::snprintf(line, sizeof(line),
+        "[PROBE] FAULT code=0x%llx access=%llu rip=0x%llx fault=0x%llx mod=%s mod_rva=0x%llx\n",
+        code, access, rip, addr, modname, fault_mod ? rip - (unsigned long long)(uintptr_t)fault_mod : 0ull);
+    probe_emit(line);
+    if (probe_state_slot) {
+        probe_emit("[PROBE] data:");
+        for (int i = -3; i <= 3; ++i) {
+            unsigned long long value = 0; SIZE_T got = 0;
+            if (ReadProcessMemory(GetCurrentProcess(), (LPCVOID)(uintptr_t)(probe_state_slot + i * 8), &value, 8, &got) && got == 8)
+                std::snprintf(line, sizeof(line), " q=0x%llx", value);
+            else std::snprintf(line, sizeof(line), " q=?");
+            probe_emit(line);
+        }
+        probe_emit("\n");
+    }
+    auto rsp = (unsigned long long)(uintptr_t)e->ContextRecord->Rsp;
+    unsigned printed = 0;
+    for (unsigned slot = 0; slot < 512 && printed < 24; ++slot) {
+        unsigned long long value = 0;
+        if (!ReadProcessMemory(GetCurrentProcess(), (LPCVOID)(uintptr_t)(rsp + slot * 8), &value, 8, nullptr) || !value) continue;
+        HMODULE mod = nullptr;
+        if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+            (LPCWSTR)(LPCVOID)(uintptr_t)value, &mod) || !mod) continue;
+        char name[260] = "?";
+        GetModuleFileNameA(mod, name, 259);
+        auto* base = (unsigned char*)(uintptr_t)mod;
+        auto size = ((PIMAGE_NT_HEADERS)(base + ((PIMAGE_DOS_HEADER)base)->e_lfanew))->OptionalHeader.SizeOfImage;
+        auto rva = value - (unsigned long long)(uintptr_t)mod;
+        if (rva >= size) continue; // data pointer inside module, not code range
+        std::snprintf(line, sizeof(line), "[PROBE] st[%u]=%s+0x%llx\n",
+            slot, strrchr(name, '\\') ? strrchr(name, '\\') + 1 : name, rva);
+        probe_emit(line);
+        ++printed;
+    }
+    // Write trips are no longer page-trapped (hardware watchpoints below).
+    TerminateProcess(GetCurrentProcess(), 4242);
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+static struct ProbeExceptionInstall { ProbeExceptionInstall() {
+    probe_ctx = (ProbeCtx*)std::calloc(1, sizeof(ProbeCtx));
+    probe_ctx->arm_at = 2000; // arm once the runtime is fully initialized
+    AddVectoredExceptionHandler(1, probe_exception_filter);
+    probe_emit("[PROBE] handler installed\n");
+} } probe_exception_install;
+// Watcher: a hardware write-watchpoint on the exact 8 bytes of the parent's
+// shared_heap() state pointer. Reports the faulting RIP of every write.
+// Arm Dr0 write-breakpoint on one (debugger-suspended) thread.
+static void probe_arm_thread(DWORD pid, DWORD tid, unsigned long long slot, unsigned& armed_threads) {
+    if (!slot || armed_threads >= 64) return;
+    HANDLE t = OpenThread(THREAD_ALL_ACCESS, FALSE, tid);
+    if (!t) return;
+    CONTEXT ctx; ctx.ContextFlags = CONTEXT_DEBUG_REGISTERS;
+    if (GetThreadContext(t, &ctx)) {
+        ctx.Dr0 = (DWORD64)slot;
+        ctx.Dr6 = 0; ctx.Dr7 = 0;
+        ctx.Dr7 |= 0x1ull;          // L0 local
+        ctx.Dr7 &= ~(3ull << 16);    // RW0 = 00 -> write access
+        ctx.Dr7 |= 3ull << 18;       // LEN0 = 8 bytes
+        SetThreadContext(t, &ctx);
+        ++armed_threads;
+    }
+    CloseHandle(t);
+}
+static void probe_debug_loop(DWORD target_pid, unsigned long long slot) {
+    if (!DebugActiveProcess(target_pid)) {
+        char line[128];
+        snprintf(line, sizeof(line), "[PROBE] attach pid=%lu failed err=%lu\n", target_pid, GetLastError());
+        probe_emit(line);
+        return;
+    }
+    DebugSetProcessKillOnExit(FALSE);
+    DEBUG_EVENT ev;
+    unsigned hits = 0, armed_threads = 0;
+    // Attach does not deliver BREAKPOINT for already-existing threads; enumerate
+    // and arm them while the initial break suspends the target.
+    {
+        HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, target_pid);
+        if (snap != INVALID_HANDLE_VALUE) {
+            THREADENTRY32 te; te.dwSize = sizeof(te);
+            if (Thread32First(snap, &te)) {
+                do if (te.th32OwnerProcessID == target_pid)
+                    probe_arm_thread(target_pid, te.th32ThreadID, slot, armed_threads);
+                while (Thread32Next(snap, &te));
+            }
+            CloseHandle(snap);
+        }
+    }
+    char line[256];
+    snprintf(line, sizeof(line), "[PROBE] attached armed=%u slot=0x%llx\n", armed_threads, slot);
+    probe_emit(line);
+    while (WaitForDebugEvent(&ev, INFINITE)) {
+        DWORD status = DBG_CONTINUE;
+        if (ev.dwDebugEventCode == CREATE_THREAD_DEBUG_EVENT) {
+            snprintf(line, sizeof(line), "[PROBE] new-thread %lu\n", ev.dwThreadId);
+            probe_emit(line);
+        }
+        if (ev.dwDebugEventCode == EXCEPTION_DEBUG_EVENT) {
+            auto& rec = ev.u.Exception.ExceptionRecord;
+            if (rec.ExceptionCode == EXCEPTION_BREAKPOINT) {
+                // Thread is suspended here: install Dr0 write-breakpoint.
+                probe_arm_thread(target_pid, ev.dwThreadId, slot, armed_threads);
+            } else if (rec.ExceptionCode == EXCEPTION_SINGLE_STEP && hits < 12) {
+                ++hits;
+                HMODULE mod = nullptr;
+                GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                    (LPCWSTR)(LPCVOID)(uintptr_t)rec.ExceptionAddress, &mod);
+                char name[260] = "?";
+                if (mod) GetModuleFileNameA(mod, name, 259);
+                snprintf(line, sizeof(line), "[PROBE] WRITE-HIT rip=%s+0x%llx thread=%lu\n",
+                    strrchr(name, '\\') ? strrchr(name, '\\') + 1 : name, mod ? (unsigned long long)((char*)rec.ExceptionAddress - (char*)mod) : 0ull,
+                    ev.dwThreadId);
+                probe_emit(line);
+            } else status = DBG_EXCEPTION_NOT_HANDLED;
+            if (rec.ExceptionCode != EXCEPTION_BREAKPOINT && rec.ExceptionCode != EXCEPTION_SINGLE_STEP && hits < 12) {
+                snprintf(line, sizeof(line), "[PROBE] exc 0x%lx rip=%p first=%lu\n", rec.ExceptionCode,
+                    rec.ExceptionAddress, ev.u.Exception.dwFirstChance);
+                probe_emit(line);
+            }
+        } else if (ev.dwDebugEventCode == OUTPUT_DEBUG_STRING_EVENT || ev.dwDebugEventCode == RIP_EVENT)
+            status = DBG_EXCEPTION_NOT_HANDLED;
+        ContinueDebugEvent(ev.dwProcessId, ev.dwThreadId, status);
+        if (ev.dwDebugEventCode == EXIT_PROCESS_DEBUG_EVENT) {
+            snprintf(line, sizeof(line), "[PROBE] target exited code=0x%lx\n", ev.u.ExitProcess.dwExitCode);
+            probe_emit(line);
+            break;
+        }
+    }
+    snprintf(line, sizeof(line), "[PROBE] loop done hits=%u\n", hits);
+    probe_emit(line);
+}
+// Watcher child: static ctor blocks here, so the exe's main never runs and the
+// child exists purely to pump debug events for its parent. stderr is inherited.
+static struct ProbeWatcherInit {
+    ProbeWatcherInit() {
+        if (!g_probe_watcher_mode) return;
+        const char* v = probe_env_value("LYMAR_PROBE_WATCH");
+        unsigned long long parent = 0, slot = 0;
+        if (v) {
+            while (*v && (*v < '0' || *v > '9')) ++v;   // tolerate "KEY=" prefix
+            for (; *v >= '0' && *v <= '9'; ++v) parent = parent * 10 + (*v - '0');
+            if (*v == ':') { ++v; for (; *v >= '0' && *v <= '9'; ++v) slot = slot * 10 + (*v - '0'); }
+        }
+        char line[256];
+        snprintf(line, sizeof(line), "[PROBE] watcher up parent=%llu slot=0x%llx\n", parent, slot);
+        probe_emit(line);
+        if (parent && slot) probe_debug_loop((DWORD)parent, slot);
+        ExitProcess(0);
+    }
+} probe_watcher_init;
+static void probe_arm_guard() {
+    if (!probe_ctx || !probe_state_slot) return;
+    // Self-contained AOT exes skip CRT startup, so GetModuleFileName* fails
+    // (PEB ProcessParameters NULL). Read the image path from the PEB loader
+    // list instead.
+    char exe_path[1024] = "?";
+    {
+        HMODULE main_mod = nullptr;
+        GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+            (LPCWSTR)(LPCVOID)(uintptr_t)&probe_state_slot, &main_mod);
+        if (main_mod) {
+            wchar_t wpath[1024];
+            const DWORD wn = GetModuleFileNameW(main_mod, wpath, 1023);
+            if (wn) {
+                int need = WideCharToMultiByte(CP_UTF8, 0, wpath, (int)wn, exe_path, sizeof(exe_path) - 1, nullptr, nullptr);
+                if (need > 0) exe_path[need] = 0;
+            }
+        }
+    }
+    char cmd[2048];
+    snprintf(cmd, sizeof(cmd), "\"%s\"", exe_path);
+    char envv[96];
+    snprintf(envv, sizeof(envv), "LYMAR_PROBE_WATCH=%lu:%llu", GetCurrentProcessId(), probe_state_slot);
+    SetEnvironmentVariableA("LYMAR_PROBE_WATCH", envv);
+    STARTUPINFOA si; PROCESS_INFORMATION pi;
+    std::memset(&si, 0, sizeof(si)); si.cb = sizeof(si);
+    HANDLE err = GetStdHandle(STD_ERROR_HANDLE);
+    SetHandleInformation(err, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
+    si.hStdError = err; si.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
+    si.dwFlags = STARTF_USESTDHANDLES;
+    if (CreateProcessA(nullptr, cmd, nullptr, nullptr, TRUE, 0, nullptr, nullptr, &si, &pi)) {
+        char line[128];
+        snprintf(line, sizeof(line), "[PROBE] watcher spawned pid=%lu\n", pi.dwProcessId);
+        probe_emit(line);
+        CloseHandle(pi.hThread); CloseHandle(pi.hProcess);
+    } else {
+        char line[256];
+        snprintf(line, sizeof(line), "[PROBE] spawn failed err=%lu cmd=[%s]\n", GetLastError(), cmd);
+        probe_emit(line);
+        std::memset(&si, 0, sizeof(si)); si.cb = sizeof(si);
+        if (CreateProcessA(nullptr, cmd, nullptr, nullptr, FALSE, CREATE_NEW_CONSOLE, nullptr, nullptr, &si, &pi)) {
+            snprintf(line, sizeof(line), "[PROBE] watcher spawned(new console) pid=%lu\n", pi.dwProcessId);
+            probe_emit(line);
+            CloseHandle(pi.hThread); CloseHandle(pi.hProcess);
+        } else {
+            snprintf(line, sizeof(line), "[PROBE] spawn2 failed err=%lu\n", GetLastError());
+            probe_emit(line);
+        }
+    }
+}
+#else
+static void probe_arm_guard() {}
+static unsigned long long probe_state_slot_guard_placeholder = 0; (void)probe_state_slot_guard_placeholder;
+#endif
 thread_local unsigned runtime_lock_depth = 0;
 struct RuntimeGuard {
     RuntimeGuard() { shared_heap().mutex.lock(); ++runtime_lock_depth; }
@@ -299,7 +603,13 @@ struct Heap {
                 regions.erase(active);
                 active = parent;
             }
-            if (std::this_thread::get_id() == shared_heap().owner) cleanup(0);
+            if (std::this_thread::get_id() == shared_heap().owner) {
+                cleanup(0);
+                // Finalize globals first (cleanup above), then release the
+                // process-level file/graphics resources the leaked singleton
+                // would otherwise never free via a destructor.
+                shared_heap().shutdown();
+            }
         } catch (...) { std::terminate(); }
     }
 };
@@ -1092,6 +1402,9 @@ void lymar_aot_region_move(uint64_t value, uint64_t lexical, uint64_t caller, ui
 uint64_t lymar_aot_alloc(uint64_t size) {
     try {
     RuntimeGuard runtime_guard;
+
+    // TEMP DIAGNOSTIC: periodic page-guard arming around the state slot.
+    if (probe_ctx && ++probe_ctx->allocs == probe_ctx->arm_at) probe_arm_guard();
 
     if (size > SIZE_MAX) throw std::bad_alloc();
     auto pointer = reinterpret_cast<Word>(heap().allocator.allocate(std::max(size, Word(1))));

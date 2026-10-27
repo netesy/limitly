@@ -4,38 +4,63 @@
 import std.core as core;
 import std.resource as res;
 
-pub type ServerRequest = {
-    method: str,
-    path: str,
-    query_string: str,
-    version: str,
-    headers: {str: str},
-    body: str,
-    remote_addr: str,
-    client_resource: res.Resource?
-};
+frame ServerRequest {
+    pub var method: str;
+    pub var path: str;
+    pub var query_string: str;
+    pub var version: str;
+    pub var headers: {str: str};
+    pub var body: str;
+    pub var remote_addr: str;
+    pub var client_resource: res.Resource?;
 
-pub type ServerResponse = {
-    status: int,
-    headers: {str: str},
-    body: str
-};
+    pub init(method: str = "GET", path: str = "/", query_string: str = "", version: str = "HTTP/1.1", headers: {str: str}? = nil, body: str = "", remote_addr: str = "", client_resource: res.Resource? = nil) {
+        self.method = method;
+        self.path = path;
+        self.query_string = query_string;
+        self.version = version;
+        if (headers != nil) {
+            self.headers = headers as {str: str};
+        } else {
+            self.headers = {};
+        }
+        self.body = body;
+        self.remote_addr = remote_addr;
+        self.client_resource = client_resource;
+    }
+}
+
+frame ServerResponse {
+    pub var status: int;
+    pub var headers: {str: str};
+    pub var body: str;
+
+    pub init(status: int = 200, headers: {str: str}? = nil, body: str = "") {
+        self.status = status;
+        if (headers != nil) {
+            self.headers = headers as {str: str};
+        } else {
+            self.headers = {};
+        }
+        self.body = body;
+    }
+}
 
 pub type ResultServerRequest = ServerRequest | str; // Simplified Result pattern
 
 frame HTTPServer {
-    var host: str;
-    var port: int;
-    var handle: int;
-    var running: bool;
+    pub var host: str;
+    pub var port: int;
+    pub var handle: int;
+    pub var running: bool;
     pub var resource: res.Resource?;
     pub var binder: res.Binder?;
     pub var listener: res.Listener?;
     pub var accepter: res.Accepter?;
 
-    pub fn init() {
-        self.host = "0.0.0.0";
-        self.port = 80;
+    pub init() {
+        self.host = "127.0.0.1";
+        self.port = 8080;
         self.handle = -1;
         self.running = false;
         self.resource = nil;
@@ -44,8 +69,7 @@ frame HTTPServer {
         self.accepter = nil;
     }
 
-    // Bind and listen
-    pub fn listen(host: str, port: int, backlog: int): core.ResultInt {
+    pub fn listen(host: str, port: int, backlog: int = 128): core.ResultInt {
         self.host = host;
         self.port = port;
 
@@ -54,13 +78,13 @@ frame HTTPServer {
                 var binder = res.Binder(r=r);
                 if (not binder.bind(args=[host, port])) {
                     r.close();
-                    return core.err_int("failed to bind to " + host + ":" + port as str);
+                    return core.err_int("failed to bind to {host}:{port}");
                 }
 
                 var listener = res.Listener(r=r);
                 if (not listener.listen(args=[backlog])) {
                     r.close();
-                    return core.err_int("listen failed on port " + port as str);
+                    return core.err_int("listen failed on port {port}");
                 }
 
                 self.resource = r;
@@ -75,58 +99,64 @@ frame HTTPServer {
         }
     }
 
-    // Accept a single connection and process the request
-    pub fn accept_request(): ResultServerRequest {
-        match (self.accepter) {
-            val acc => {
-                var client_fd = acc.accept();
-                if (client_fd == -1) return "accept returned nil (no connection)" as ResultServerRequest;
+    pub fn close(): nil {
+        if (self.resource != nil) {
+            var r = self.resource as res.Resource;
+            r.close();
+        }
+        self.running = false;
+    }
 
-                var cr = res.adopt_socket(fd=client_fd);
-                var rd = res.Reader(r=cr);
-                // Read request data
-                var request_data: str = "";
-                var max_read: int = 1048576; // 1MB max
-                var total: int = 0;
-                while (total < max_read) {
-                    var chunk = rd.read(args=[ []]);
-                    if (chunk == nil) break;
-                    request_data = request_data + (chunk as str);
-                    total = total + len(chunk as str);
-                    if (index_of_h(request_data, "\r\n\r\n") != -1) {
-                        total = max_read; // Simplified
+    pub fn accept_client(): res.Resource? {
+        if (not self.running or self.accepter == nil) return nil;
+        var accepter = self.accepter as res.Accepter;
+        var fd = accepter.accept();
+        if (fd < 0) return nil;
+        return res.adopt_socket(fd);
+    }
+
+    pub fn read_request(client: res.Resource): ServerRequest? {
+        var reader = res.Reader(r=client);
+        var raw_bytes = reader.read_bytes();
+        if (len(raw_bytes) == 0) return nil;
+        
+        var raw = _builtin_string_from_bytes(raw_bytes);
+        return parse_server_request(raw);
+    }
+
+    pub fn send_response(client: res.Resource, resp: ServerResponse): bool {
+        var writer = res.Writer(r=client);
+        var raw = "HTTP/1.1 " + (resp.status as str) + " OK\r\n";
+        var resp_headers = resp.headers;
+        iter (k in resp_headers) {
+            raw = raw + k + ": " + resp_headers[k] + "\r\n";
+        }
+        raw = raw + "\r\n" + resp.body;
+        
+        var bytes: [int] = [];
+        for (var i = 0; i < len(raw); i = i + 1) {
+            bytes.append(_builtin_string_byte_at(raw, i));
+        }
+        return writer.write(args=[bytes]) == true;
+    }
+
+    pub fn serve(handler: any): bool {
+        if (not self.running) return false;
+        
+        match (self.accept_client()) {
+            val client => {
+                match (self.read_request(client)) {
+                    val req => {
+                        var resp = handler(req as any) as ServerResponse;
+                        self.send_response(client, resp);
+                        client.close();
+                        return true;
+                    },
+                    nil => {
+                        client.close();
+                        return false;
                     }
                 }
-
-                var req: ServerRequest = parse_server_request(request_data);
-                req.client_resource = cr;
-                req.remote_addr = "client";
-                return req as ResultServerRequest;
-            },
-            nil => return "server not listening" as ResultServerRequest
-        }
-    }
-
-    // Close the server
-    pub fn close(): core.ResultInt {
-        self.running = false;
-        match (self.resource) {
-            val r => {
-                r.close();
-            },
-            nil => {}
-        }
-        self.resource = nil;
-        self.handle = -1;
-        return core.ok_int(0);
-    }
-
-    // Check for incoming connections (non-blocking)
-    pub fn has_connection(): bool {
-        match (self.resource) {
-            val r => {
-                var poller = res.Poller(r=r);
-                return poller.poll();
             },
             nil => return false
         }
@@ -134,12 +164,8 @@ frame HTTPServer {
 }
 
 fn parse_server_request(raw: str): ServerRequest {
-    var req: ServerRequest = {
-        method: "", path: "", query_string: "", version: "", 
-        headers: {}, body: "", remote_addr: "", client_resource: nil
-    };
-    // ... Simplified parser ...
-    return req;
+    var h: {str: str} = {};
+    return ServerRequest(method="", path="", query_string="", version="", headers=h, body="", remote_addr="", client_resource=nil);
 }
 
 fn index_of_h(s: str, pattern: str): int {
@@ -152,24 +178,28 @@ fn index_of_h(s: str, pattern: str): int {
 }
 
 frame HTTP2Server {
-    pub var base_server: HTTPServer;
+    embed HTTPServer;
     pub var active_streams: int;
 
     pub init() {
-        self.base_server = HTTPServer();
+        self.host = "127.0.0.1";
+        self.port = 8080;
+        self.handle = -1;
+        self.running = false;
+        self.resource = nil;
+        self.binder = nil;
+        self.listener = nil;
+        self.accepter = nil;
         self.active_streams = 0;
     }
 
-    pub fn listen(host: str, port: int): core.ResultInt {
-        return self.base_server.listen(host, port, 128);
-    }
-
     pub fn handle_stream(stream_id: int, req: ServerRequest): ServerResponse {
-        var resp: ServerResponse = {
-            status: 200,
-            headers: {"content-type": "text/plain"},
-            body: "HTTP/2 Response Stream " + stream_id as str
-        };
+        var h: {str: str} = {"content-type": "text/plain"};
+        var resp = ServerResponse(
+            status=200,
+            headers=h,
+            body="HTTP/2 Response Stream {stream_id}"
+        );
         return resp;
     }
 }

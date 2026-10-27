@@ -159,14 +159,14 @@ fn crc32(s: str): int {
         var c: int = i;
         var j: int = 0;
         while (j < 8) {
-            if (c & 1) {
+            if ((c & 1) != 0) {
                 c = 0xEDB88320 ^ (c >> 1);
             } else {
                 c = c >> 1;
             }
             j = j + 1;
         }
-        append(table, c);
+        table.append(c);
         i = i + 1;
     }
 

@@ -1,9 +1,9 @@
 // YAML Writer Module
 
-import std.yaml.value as val_mod;
+import std.yaml.value as value;
 
 pub fn stringify(val_any: any): str {
-    var jval = val_any as val_mod.YAMLValue;
+    var jval = val_any as value.YAMLValue;
     if (jval == nil) {
         return "";
     }

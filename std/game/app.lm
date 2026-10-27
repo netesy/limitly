@@ -4,13 +4,12 @@
 import std.app as app;
 import std.gg as gg;
 import std.time as time;
-import std.time.timer as timer_mod;
-import std.time.duration as dur_mod;
+import std.time.timer show Timer;
 import std.math as math;
-import std.game.gui as gui_mod;
+import std.game.gui show GUI;
 import std.game.types as types;
-import std.game.input as input_mod;
-import std.game.scene as scene_mod;
+import std.game.input show InputManager;
+import std.game.scene show SceneManager;
 
 frame GameConfig {
     pub var title: str;
@@ -36,9 +35,9 @@ pub fn default_config(): GameConfig {
 
 frame Game {
     pub var config: GameConfig;
-    pub var gui: gui_mod.GUI;
-    pub var input: input_mod.InputManager;
-    pub var scenes: scene_mod.SceneManager;
+    pub var gui: GUI;
+    pub var input: InputManager;
+    pub var scenes: SceneManager;
     pub var is_running: bool;
 
     // Window dimensions
@@ -46,7 +45,7 @@ frame Game {
     pub var height: int;
 
     // High-resolution timing & loop state
-    pub var timer: timer_mod.Timer;
+    pub var timer: Timer;
     pub var delta_time: float;
     pub var unscaled_delta_time: float;
     pub var time_scale: float;
@@ -68,15 +67,15 @@ frame Game {
         } else {
             self.config = cfg as GameConfig;
         }
-        self.gui = gui_mod.GUI();
-        self.input = input_mod.InputManager();
-        self.scenes = scene_mod.SceneManager();
+        self.gui = GUI();
+        self.input = InputManager();
+        self.scenes = SceneManager();
         self.is_running = false;
 
         self.width = self.config.width;
         self.height = self.config.height;
 
-        self.timer = timer_mod.Timer();
+        self.timer = Timer();
         self.delta_time = 0.01666667;
         self.unscaled_delta_time = 0.01666667;
         self.time_scale = 1.0;

@@ -6,7 +6,7 @@ trait Drawable {
 }
 
 frame Shape: Drawable {
-    pub fn draw(): void {  // Missing scale parameter
+    pub fn draw() {  // Missing scale parameter
         print("Drawing");
     }
 }

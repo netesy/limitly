@@ -361,6 +361,7 @@ frame Car {
 - [x] `embed` inlines the component's fields into the host and promotes its methods onto the host
 - [x] Promoted fields are the host's own storage -- host and component method see and write the same slot
 - [x] Embedding is anonymous: no accessor name is introduced. Declare a field (`pub engine: Engine;`) when you need to name the component
+- [x] `embed` takes no visibility modifier -- write `embed Engine;`, not `pub embed Engine;`. A `pub`/`prot` prefix is meaningless on an embed statement (it is discarded). Flattened fields and promoted methods keep the visibility they declared inside the component
 - [x] On a name collision the host's own member wins; a promoted member never overwrites it
 - [x] Promoted members count as real members, so they can satisfy a trait the host conforms to
 - [ ] Embedded components are **not** auto-destroyed: the component's `deinit()` is neither promoted nor called when the host is destroyed. Forward it from the host's own `deinit()` if cleanup is required.

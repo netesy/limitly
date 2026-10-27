@@ -1,29 +1,29 @@
 // std/search/index.lm
 // Compatibility re-export forwarding to std.algorithm.search and std.algorithm.binary_search
 
-import std.algorithm.search as search_mod;
-import std.algorithm.binary_search as bs_mod;
+import std.algorithm.search as search;
+import std.algorithm.binary_search as bs;
 
 pub fn linear_search(items: [any], target: any): int {
-    return search_mod.linear_search(items, target);
+    return search.linear_search(items, target);
 }
 
 pub fn binary_search(items: [any], target: any): int {
-    return bs_mod.binary_search(items, target);
+    return bs.binary_search(items, target);
 }
 
 pub fn lower_bound(items: [any], target: any): int {
-    return bs_mod.lower_bound(items, target);
+    return bs.lower_bound(items, target);
 }
 
 pub fn upper_bound(items: [any], target: any): int {
-    return bs_mod.upper_bound(items, target);
+    return bs.upper_bound(items, target);
 }
 
 pub fn equal_range(items: [any], target: any): (int, int) {
-    return bs_mod.equal_range(items, target);
+    return bs.equal_range(items, target);
 }
 
 pub fn interpolation_search(items: [int], target: int): int {
-    return search_mod.interpolation_search(items, target);
+    return search.interpolation_search(items, target);
 }

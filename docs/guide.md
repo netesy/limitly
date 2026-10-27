@@ -694,7 +694,7 @@ print(Counter.count); // Output: 1
 Lymar is a **pure composition** language. Frame inheritance (`frame A : B` where B is a frame) is eliminated. The colon `:` is reserved **exclusively** for trait conformance.
 
 * **Data Mixins (`mixin`)**: Define reusable blocks of state fields that inject directly into a host frame. Methods are allowed so a mixin can expose accessors over its own fields, but a mixin is *not* an interface — it never dispatches dynamically and cannot be instantiated on its own.
-* **Anonymous Field Embedding (`embed`)**: Flattens another component frame into the host at compile time — the component's fields become the host's own storage and its methods are promoted onto the host. There is no wrapper object and no accessor name, so `embed Engine;` gives you `car.rpm`, never `car.engine.rpm`. The component's `deinit()` is not promoted and does not run when the host is destroyed; forward it yourself if cleanup is required.
+* **Anonymous Field Embedding (`embed`)**: Flattens another component frame into the host at compile time — the component's fields become the host's own storage and its methods are promoted onto the host. There is no wrapper object and no accessor name, so `embed Engine;` gives you `car.rpm`, never `car.engine.rpm`. `embed` takes no visibility modifier — write `embed Engine;`, not `pub embed Engine;` (the component's own field/method visibility is what applies). The component's `deinit()` is not promoted and does not run when the host is destroyed; forward it yourself if cleanup is required.
 
 ```lymar
 mixin Timestamped {
