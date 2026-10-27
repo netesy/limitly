@@ -50,6 +50,7 @@ void printUsage(const char* programName) {
     std::cout << "\n  Tooling:\n";
     std::cout << "    " << programName << " up [--check] [--version TAG] [--prefix DIR] Update compiler from GitHub releases\n";
     std::cout << "    " << programName << " -lsp                 Start LSP server\n";
+    std::cout << "    " << programName << " -dap [--port PORT]   Start DAP server\n";
     std::cout << "    " << programName << " -format <file>       Format a source file\n";
     std::cout << "\n  Debugging:\n";
     std::cout << "    " << programName << " -ast <source_file>      Print the AST\n";
@@ -79,6 +80,18 @@ int main(int argc, char* argv[]) {
 
     if (command == "-lsp") {
         LM::LSP::run();
+        return 0;
+    }
+
+    if (command == "-dap" || command == "dap") {
+        int port = 0;
+        for (int i = 2; i < argc; i++) {
+            std::string arg = argv[i];
+            if ((arg == "--port" || arg == "-port" || arg == "-p") && i + 1 < argc) {
+                port = std::stoi(argv[++i]);
+            }
+        }
+        LM::DapRunner::run(port);
         return 0;
     }
 

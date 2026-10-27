@@ -107,6 +107,13 @@ set(ERROR_SOURCES
     src/error/debugger.cpp
 )
 
+set(DAP_SOURCES
+    src/dap/dap.cpp
+    src/dap/dap_server.cpp
+    src/dap/vm_debug_target.cpp
+    src/dap/lldb_dap_target.cpp
+)
+
 set(RUNTIME_SOURCES
     src/runtime/runtime.c
     src/runtime/runtime_dict.c
@@ -121,6 +128,7 @@ set(MAIN_SOURCES
     src/lymar.cpp
     src/formatter.cpp
     src/lsp.cpp
+    ${DAP_SOURCES}
     ${FRONTEND_SOURCES}
     ${BACKEND_COMMON_SOURCES}
     ${LIR_SOURCES}

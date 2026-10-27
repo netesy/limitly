@@ -137,7 +137,9 @@ BACKEND_COMMON_SRCS := src/backend/symbol_table.cpp src/frontend/value.cpp src/b
 
 ERROR_SRCS := src/error/debugger.cpp
 
-LIB_LYMAR_SRCS := src/lymar.cpp src/formatter.cpp src/lsp.cpp $(BACKEND_COMMON_SRCS) $(BACK_SRCS) $(ERROR_SRCS) \
+DAP_SRCS := src/dap/dap.cpp src/dap/dap_server.cpp src/dap/vm_debug_target.cpp src/dap/lldb_dap_target.cpp
+
+LIB_LYMAR_SRCS := src/lymar.cpp src/formatter.cpp src/lsp.cpp $(DAP_SRCS) $(BACKEND_COMMON_SRCS) $(BACK_SRCS) $(ERROR_SRCS) \
              $(FRONT_SRCS) $(REGISTER_SRCS) $(LIR_CORE_SRCS)
 
 MAIN_SRCS := src/main.cpp
@@ -148,6 +150,10 @@ TEST_SRCS := src/test_parser.cpp $(BACKEND_COMMON_SRCS) $(LIR_CORE_SRCS) $(ERROR
 # LIR round-trip test (C17)
 LIR_TEST_SRCS := tests/lir/test_round_trip.cpp
 LIR_TEST_OBJS := $(patsubst %.cpp,$(OBJ_DIR)/%.o,$(LIR_TEST_SRCS))
+
+# DAP Server Integration Test
+DAP_TEST_SRCS := tests/dap/test_dap_server.cpp
+DAP_TEST_OBJS := $(patsubst %.cpp,$(OBJ_DIR)/%.o,$(DAP_TEST_SRCS))
 
 # =============================
 # Objects and response files
@@ -359,6 +365,17 @@ lir-test: $(BIN_DIR) $(OBJ_DIR)/liblymar.a $(LIR_TEST_OBJS)
 	@echo "[OK] lir_test built."
 	@echo "[RUN] Running lir_test ..."
 	$(BIN_DIR)/lir_test$(EXE_EXT)
+
+# =============================
+# DAP Server Test Target
+# =============================
+.PHONY: dap-test
+dap-test: $(BIN_DIR) $(OBJ_DIR)/liblymar.a $(DAP_TEST_OBJS)
+	@echo "[BUILD] Linking dap_test ..."
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(DAP_TEST_OBJS) $(OBJ_DIR)/liblymar.a $(FYRA_LIB) -o $(BIN_DIR)/dap_test $(LIBS) -lpthread
+	@echo "[OK] dap_test built."
+	@echo "[RUN] Running dap_test ..."
+	$(BIN_DIR)/dap_test$(EXE_EXT)
 
 # =============================
 # Test Target

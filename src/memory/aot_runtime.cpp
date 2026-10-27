@@ -461,8 +461,10 @@ static void probe_arm_guard() {
     }
 }
 #else
-static void probe_arm_guard() {}
-static unsigned long long probe_state_slot_guard_placeholder = 0; (void)probe_state_slot_guard_placeholder;
+[[maybe_unused]] static void probe_arm_guard() {
+    static unsigned long long probe_state_slot_guard_placeholder = 0;
+    (void)probe_state_slot_guard_placeholder;
+}
 #endif
 thread_local unsigned runtime_lock_depth = 0;
 struct RuntimeGuard {
@@ -1404,7 +1406,9 @@ uint64_t lymar_aot_alloc(uint64_t size) {
     RuntimeGuard runtime_guard;
 
     // TEMP DIAGNOSTIC: periodic page-guard arming around the state slot.
+#if defined(_WIN32)
     if (probe_ctx && ++probe_ctx->allocs == probe_ctx->arm_at) probe_arm_guard();
+#endif
 
     if (size > SIZE_MAX) throw std::bad_alloc();
     auto pointer = reinterpret_cast<Word>(heap().allocator.allocate(std::max(size, Word(1))));

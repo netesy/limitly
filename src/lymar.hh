@@ -55,4 +55,9 @@ namespace LM {
     public:
         static void run();
     };
+
+    class DapRunner {
+    public:
+        static void run(int port = 0);
+    };
 }
