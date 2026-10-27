@@ -10,6 +10,7 @@
 #include "memory/ownership.hh"
 #include "lir/generator.hh"
 #include "lir/functions.hh"
+#include "lir/cache_manager.hh"
 #include "backend/vm/register.hh"
 #include "error/debugger.hh"
 #include "runtime/os_info.hh"
@@ -47,118 +48,144 @@ int Compiler::executeFile(const std::string& filename, const CompileOptions& opt
     // executable never reaches here and reads its native argv instead.
     LM::Runtime::OS::set_program_arguments(filename, options.program_args);
     try {
-        std::string source = readFile(filename);
+        std::unique_ptr<LIR::LIR_Function> lir_function = nullptr;
         std::string exported_module;
-        // A module library must be lowered in its module namespace, not as an
-        // application root (whose uncalled functions are otherwise unreachable).
-        if (options.use_aot && (options.artifact_type == ArtifactType::SharedLibrary ||
-                                options.artifact_type == ArtifactType::StaticLibrary)) {
-            std::filesystem::path module_path(filename);
-            module_path.replace_extension();
-            std::string name = module_path.generic_string();
-            if (name.starts_with("./")) name.erase(0, 2);
-            std::replace(name.begin(), name.end(), '/', '.');
-            if (name.ends_with(".index")) name.resize(name.size() - 6);
-            exported_module = name;
-            source = "import " + name + ";";
-        }
-        LM::Frontend::Scanner scanner(source, filename);
-        scanner.scanTokens();
+        bool loaded_from_cache = false;
+        bool can_cache = !options.use_aot && !options.print_tokens && !options.print_ast &&
+                         !options.print_cst && !options.print_lir && !options.print_fyra_ir &&
+                         !options.no_cache;
 
-        if (options.print_tokens) {
-            std::cout << "=== Tokens ===\n";
-            for (const auto& token : scanner.getTokens()) {
-                std::cout << scanner.tokenTypeToString(token.type)
-                          << ": '" << token.lexeme << "' (line " << token.line << ")\n";
+        if (can_cache) {
+            auto t_cache_start = std::chrono::steady_clock::now();
+            lir_function = LIR::CacheManager::try_load_program_cache(filename);
+            if (lir_function) {
+                loaded_from_cache = true;
+                if (options.profile) {
+                    auto ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t_cache_start).count();
+                    std::cout << "\n========================================================================================\n"
+                              << "Lymar Execution (Loaded from LIR Bytecode Cache in " << ms << " ms): " << filename << "\n"
+                              << "========================================================================================\n\n";
+                }
             }
-            std::cout << "\n";
-            return 0;
         }
 
-        auto t_start = std::chrono::steady_clock::now();
-        LM::Frontend::Parser parser(scanner, options.print_cst);
-        std::shared_ptr<LM::Frontend::AST::Program> ast = parser.parse();
-        if (LM::Error::Debugger::hasError()) {
-            std::cerr << "Parser hasError is true! reportedErrors size: " << LM::Error::Debugger::hasError() << std::endl;
-            return 1;
-        }
-        auto t_parse = std::chrono::steady_clock::now();
-
-        LM::Frontend::ModuleManager::getInstance().set_include_dirs(options.include_dirs);
-
-        ast = LM::Frontend::AST::StreamFusionVisitor::optimizeProgram(ast);
-        auto t_opt = std::chrono::steady_clock::now();
-
-        const auto verification_policy = options.strict_verification
-            ? LM::Frontend::VerificationPolicy::Strict
-            : LM::Frontend::VerificationPolicy::Hybrid;
-        auto type_check_result = LM::Frontend::TypeCheckerFactory::check_program(ast, source, filename, verification_policy);
-        if (!type_check_result.success || !type_check_result.errors.empty()) {
-            for (const auto& err : type_check_result.errors) {
-                std::cerr << "Type Check Error: " << err << std::endl;
+        if (!loaded_from_cache) {
+            std::string source = readFile(filename);
+            // A module library must be lowered in its module namespace, not as an
+            // application root (whose uncalled functions are otherwise unreachable).
+            if (options.use_aot && (options.artifact_type == ArtifactType::SharedLibrary ||
+                                    options.artifact_type == ArtifactType::StaticLibrary)) {
+                std::filesystem::path module_path(filename);
+                module_path.replace_extension();
+                std::string name = module_path.generic_string();
+                if (name.starts_with("./")) name.erase(0, 2);
+                std::replace(name.begin(), name.end(), '/', '.');
+                if (name.ends_with(".index")) name.resize(name.size() - 6);
+                exported_module = name;
+                source = "import " + name + ";";
             }
-            return 1;
-        }
-        auto t_typecheck = std::chrono::steady_clock::now();
+            LM::Frontend::Scanner scanner(source, filename);
+            scanner.scanTokens();
 
-        auto memory_check_result = LM::Frontend::MemoryCheckerFactory::check_program(type_check_result.program, source, filename);
-        if (!memory_check_result.success) {
-            std::cerr << "Memory Check Failed! Local errors count: " << memory_check_result.errors.size() << std::endl;
-            for (const auto& err : memory_check_result.errors) {
-                std::cerr << "  Memory Error: " << err << std::endl;
+            if (options.print_tokens) {
+                std::cout << "=== Tokens ===\n";
+                for (const auto& token : scanner.getTokens()) {
+                    std::cout << scanner.tokenTypeToString(token.type)
+                              << ": '" << token.lexeme << "' (line " << token.line << ")\n";
+                }
+                std::cout << "\n";
+                return 0;
             }
-            return 1;
-        }
-        ast = memory_check_result.program;
-        auto t_memcheck = std::chrono::steady_clock::now();
 
-        if (options.print_cst) {
-            std::cout << "=== CST ===\n";
-            const auto* cstRoot = parser.getCST();
-            if (cstRoot) std::cout << Frontend::CST::Printer::printCST(cstRoot) << "\n";
-            return 0;
-        }
-
-        if (options.print_ast) {
-            std::cout << "=== AST ===\n";
-            LM::Frontend::AST::ASTPrinter printer;
-            printer.process(ast);
-            std::cout << "\n";
-            return 0;
-        }
-
-        LIR::Generator lir_generator;
-        lir_generator.set_import_aliases(type_check_result.import_aliases);
-        lir_generator.set_registered_modules(type_check_result.registered_modules);
-
-        auto lir_function = lir_generator.generate_program(type_check_result);
-        if (lir_generator.has_errors()) {
-            std::cerr << "[ERROR] LIR generation had errors:" << std::endl;
-            for (const auto& err : lir_generator.get_errors()) {
-                std::cerr << "  " << err << std::endl;
+            auto t_start = std::chrono::steady_clock::now();
+            LM::Frontend::Parser parser(scanner, options.print_cst);
+            std::shared_ptr<LM::Frontend::AST::Program> ast = parser.parse();
+            if (LM::Error::Debugger::hasError()) {
+                std::cerr << "Parser hasError is true! reportedErrors size: " << LM::Error::Debugger::hasError() << std::endl;
+                return 1;
             }
-            return 1;
-        }
-        if (!lir_function) {
-            std::cerr << "[ERROR] LIR generation failed" << std::endl;
-            return 1;
-        }
-        auto t_lir = std::chrono::steady_clock::now();
+            auto t_parse = std::chrono::steady_clock::now();
 
-        if (options.profile) {
-            auto ms = [](auto d) { return std::chrono::duration<double, std::milli>(d).count(); };
-            std::cout << "\n========================================================================================\n"
-                      << "Lymar Compilation Profile: " << filename << "\n"
-                      << "----------------------------------------------------------------------------------------\n"
-                      << "Parse: " << ms(t_parse - t_start) << " ms\n"
-                      << "Stream Fusion: " << ms(t_opt - t_parse) << " ms\n"
-                      << "Type Check & Imports: " << ms(t_typecheck - t_opt) << " ms (" << type_check_result.loaded_modules_count << " modules)\n"
-                      << "  - Module Resolution: " << type_check_result.resolve_all_ms << " ms\n"
-                      << "  - Decl Resolution:   " << type_check_result.decl_resolve_ms << " ms\n"
-                      << "  - Type Checking:     " << type_check_result.typecheck_ms << " ms\n"
-                      << "Memory Check: " << ms(t_memcheck - t_typecheck) << " ms\n"
-                      << "LIR Gen: " << ms(t_lir - t_memcheck) << " ms\n"
-                      << "========================================================================================\n\n";
+            LM::Frontend::ModuleManager::getInstance().set_include_dirs(options.include_dirs);
+
+            ast = LM::Frontend::AST::StreamFusionVisitor::optimizeProgram(ast);
+            auto t_opt = std::chrono::steady_clock::now();
+
+            const auto verification_policy = options.strict_verification
+                ? LM::Frontend::VerificationPolicy::Strict
+                : LM::Frontend::VerificationPolicy::Hybrid;
+            auto type_check_result = LM::Frontend::TypeCheckerFactory::check_program(ast, source, filename, verification_policy);
+            if (!type_check_result.success || !type_check_result.errors.empty()) {
+                for (const auto& err : type_check_result.errors) {
+                    std::cerr << "Type Check Error: " << err << std::endl;
+                }
+                return 1;
+            }
+            auto t_typecheck = std::chrono::steady_clock::now();
+
+            auto memory_check_result = LM::Frontend::MemoryCheckerFactory::check_program(type_check_result.program, source, filename);
+            if (!memory_check_result.success) {
+                std::cerr << "Memory Check Failed! Local errors count: " << memory_check_result.errors.size() << std::endl;
+                for (const auto& err : memory_check_result.errors) {
+                    std::cerr << "  Memory Error: " << err << std::endl;
+                }
+                return 1;
+            }
+            ast = memory_check_result.program;
+            auto t_memcheck = std::chrono::steady_clock::now();
+
+            if (options.print_cst) {
+                std::cout << "=== CST ===\n";
+                const auto* cstRoot = parser.getCST();
+                if (cstRoot) std::cout << Frontend::CST::Printer::printCST(cstRoot) << "\n";
+                return 0;
+            }
+
+            if (options.print_ast) {
+                std::cout << "=== AST ===\n";
+                LM::Frontend::AST::ASTPrinter printer;
+                printer.process(ast);
+                std::cout << "\n";
+                return 0;
+            }
+
+            LIR::Generator lir_generator;
+            lir_generator.set_import_aliases(type_check_result.import_aliases);
+            lir_generator.set_registered_modules(type_check_result.registered_modules);
+
+            lir_function = lir_generator.generate_program(type_check_result);
+            if (lir_generator.has_errors()) {
+                std::cerr << "[ERROR] LIR generation had errors:" << std::endl;
+                for (const auto& err : lir_generator.get_errors()) {
+                    std::cerr << "  " << err << std::endl;
+                }
+                return 1;
+            }
+            if (!lir_function) {
+                std::cerr << "[ERROR] LIR generation failed" << std::endl;
+                return 1;
+            }
+            auto t_lir = std::chrono::steady_clock::now();
+
+            if (options.profile) {
+                auto ms = [](auto d) { return std::chrono::duration<double, std::milli>(d).count(); };
+                std::cout << "\n========================================================================================\n"
+                          << "Lymar Compilation Profile: " << filename << "\n"
+                          << "----------------------------------------------------------------------------------------\n"
+                          << "Parse: " << ms(t_parse - t_start) << " ms\n"
+                          << "Stream Fusion: " << ms(t_opt - t_parse) << " ms\n"
+                          << "Type Check & Imports: " << ms(t_typecheck - t_opt) << " ms (" << type_check_result.loaded_modules_count << " modules)\n"
+                          << "  - Module Resolution: " << type_check_result.resolve_all_ms << " ms\n"
+                          << "  - Decl Resolution:   " << type_check_result.decl_resolve_ms << " ms\n"
+                          << "  - Type Checking:     " << type_check_result.typecheck_ms << " ms\n"
+                          << "Memory Check: " << ms(t_memcheck - t_typecheck) << " ms\n"
+                          << "LIR Gen: " << ms(t_lir - t_memcheck) << " ms\n"
+                          << "========================================================================================\n\n";
+            }
+
+            if (can_cache && lir_function) {
+                LIR::CacheManager::save_program_cache(filename, *lir_function);
+            }
         }
 
         if (options.print_lir) {

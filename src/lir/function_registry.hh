@@ -19,6 +19,9 @@ public:
     
     // Register LIR functions
     void registerFunction(const std::string& name, std::unique_ptr<LIR_Function> function);
+    void registerVerifiedFunction(const std::string& name, std::unique_ptr<LIR_Function> function) {
+        if (function) lir_functions_[name] = std::move(function);
+    }
     
     // Function lookup
     bool hasFunction(const std::string& name) const;

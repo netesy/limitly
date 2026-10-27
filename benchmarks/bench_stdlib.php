@@ -1,4 +1,5 @@
 <?php
+ini_set('memory_limit', '2048M');
 function get_time_ms() {
     return microtime(true) * 1000.0;
 }

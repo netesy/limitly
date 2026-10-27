@@ -192,14 +192,20 @@ void RegisterVM::execute_arithmetic(const LIR::LIR_Inst* pc) {
             // copy so existing callers don't crash.
             int src_scale = -1;
             int dst_scale = -1;
-            if (current_function_) {
-                auto src_it = current_function_->register_language_types.find(pc->a);
-                if (src_it != current_function_->register_language_types.end()) {
-                    src_scale = decimal_scale_of(src_it->second);
-                }
-                auto dst_it = current_function_->register_language_types.find(pc->dst);
-                if (dst_it != current_function_->register_language_types.end()) {
-                    dst_scale = decimal_scale_of(dst_it->second);
+            if (pc->imm & 0x80000000ULL) {
+                src_scale = static_cast<int>((pc->imm >> 8) & 0xFF);
+                dst_scale = static_cast<int>(pc->imm & 0xFF);
+            }
+            if (src_scale < 0 || dst_scale < 0) {
+                if (current_function_) {
+                    auto src_it = current_function_->register_language_types.find(pc->a);
+                    if (src_it != current_function_->register_language_types.end()) {
+                        src_scale = decimal_scale_of(src_it->second);
+                    }
+                    auto dst_it = current_function_->register_language_types.find(pc->dst);
+                    if (dst_it != current_function_->register_language_types.end()) {
+                        dst_scale = decimal_scale_of(dst_it->second);
+                    }
                 }
             }
             if (dst_scale > 0 && src_scale < 0) {

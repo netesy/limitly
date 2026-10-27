@@ -1836,11 +1836,18 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 break;
             }
             case LIR::LIR_Op::DecRescale: {
-                int src_scale = decimal_scale_for_reg(inst.a);
-                int dst_scale = decimal_scale_for_reg(inst.dst);
+                int src_scale = -1;
+                int dst_scale = -1;
+                if (inst.imm & 0x80000000ULL) {
+                    src_scale = static_cast<int>((inst.imm >> 8) & 0xFF);
+                    dst_scale = static_cast<int>(inst.imm & 0xFF);
+                }
                 if (src_scale <= 0) {
-                    auto it = lir_func.register_language_types.find(inst.a);
-                    if (it != lir_func.register_language_types.end() && it->second) src_scale = it->second->getDecimalScale();
+                    src_scale = decimal_scale_for_reg(inst.a);
+                    if (src_scale <= 0) {
+                        auto it = lir_func.register_language_types.find(inst.a);
+                        if (it != lir_func.register_language_types.end() && it->second) src_scale = it->second->getDecimalScale();
+                    }
                 }
                 if (dst_scale <= 0) {
                     auto it = lir_func.register_language_types.find(inst.dst);

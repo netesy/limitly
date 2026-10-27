@@ -40,6 +40,7 @@ namespace LM {
         std::string profile_sort = "self";
         size_t profile_top = 25;
         bool profile_json = false;
+        bool no_cache = false;
         std::vector<std::string> include_dirs;
         // Arguments written after the script path (`lymar run app.lm -- --x`),
         // reported to the program by std.process.args().

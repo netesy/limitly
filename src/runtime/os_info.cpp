@@ -390,8 +390,9 @@ namespace {
 // resolved dynamically to avoid a psapi link dependency in every toolchain.
 struct WinProcessMemoryCounters {
     DWORD cb;
-    size_t working_set;
+    DWORD page_fault_count;
     size_t peak_working_set;
+    size_t working_set;
     size_t quota_peak_paged_pool;
     size_t quota_paged_pool;
     size_t quota_peak_non_paged_pool;

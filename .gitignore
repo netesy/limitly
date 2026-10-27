@@ -23,6 +23,7 @@ core
 !core/
 tags
 .cachez
+.cache/
 !.vscode/launch.json
 .DS_Store
 .directory

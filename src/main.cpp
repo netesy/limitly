@@ -187,6 +187,9 @@ int main(int argc, char* argv[]) {
             else if (arg == "--json") {
                 options.profile_json = true;
             }
+            else if (arg == "--no-cache") {
+                options.no_cache = true;
+            }
             else if (arg == "--verify=strict") options.strict_verification = true;
             else if (arg == "--verify=hybrid") options.strict_verification = false;
             else if (arg[0] != '-') { if (source_file.empty()) source_file = arg; else trailing.push_back(arg); }

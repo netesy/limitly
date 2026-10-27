@@ -102,6 +102,13 @@ public:
     
     // Function registration
     void registerFunction(std::shared_ptr<LIRFunction> function);
+    void registerCachedFunction(const std::string& name, std::shared_ptr<LIRFunction> function) {
+        if (function) functions_[name] = function;
+    }
+    void clear() {
+        functions_.clear();
+        initialized_ = false;
+    }
     
     // Function lookup
     std::shared_ptr<LIRFunction> getFunction(const std::string& name);
