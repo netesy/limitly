@@ -24,6 +24,8 @@ typedef struct {
 
 // List operations
 RUNTIME_API LmList* lm_list_new(void);
+RUNTIME_API LmList* lm_list_new_with_capacity(uint64_t capacity);
+RUNTIME_API void lm_list_reserve(LmList* list, uint64_t capacity);
 RUNTIME_API void lm_list_append(LmList* list, LmValue element);
 RUNTIME_API LmValue lm_list_get(LmList* list, uint64_t index);
 RUNTIME_API void lm_list_set(LmList* list, uint64_t index, LmValue element);

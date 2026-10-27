@@ -53,21 +53,29 @@ RegisterValue RegisterVM::call_interpreted(const LIR::LIR_Function* function,
     size_t caller_depth = vm_region_stack.size();
     uint64_t caller_region = active_region_id;
     invocation_parents.push_back(caller_region);
-    auto caller_arguments = std::move(argument_stack);
-    argument_stack.clear();
-    auto caller_registers = std::move(registers);
+
+    size_t caller_fp = frame_pointer_;
+    size_t caller_size = registers.size();
     const auto* caller_function = current_function_;
-    if (!spare_register_files_.empty()) {
-        registers = std::move(spare_register_files_.back());
-        spare_register_files_.pop_back();
-    }
+
     size_t reg_count = std::max({(size_t)function->register_count, arg_count, (size_t)1});
-    registers.resize(reg_count, VAL_NIL);
-    std::fill(registers.begin(), registers.end(), VAL_NIL);
+    size_t callee_fp = caller_fp + caller_size;
+    if (callee_fp + reg_count + 64 > register_stack_.size()) {
+        size_t new_cap = (callee_fp + reg_count + 64) * 2;
+        register_stack_.resize(new_cap, VAL_NIL);
+        registers = RegisterSpan(register_stack_.data() + caller_fp, caller_size);
+    }
+
+    frame_pointer_ = callee_fp;
+    registers = RegisterSpan(register_stack_.data() + callee_fp, reg_count);
     for (size_t i = 0; i < arg_count; ++i) {
         registers[i] = args[i];
     }
+    for (size_t i = arg_count; i < reg_count; ++i) {
+        registers[i] = VAL_NIL;
+    }
     current_function_ = function;
+
     try {
         // The registry already owns the immutable instructions and type maps.
         execute_instructions(*function, 0, function->instructions.size());
@@ -78,17 +86,15 @@ RegisterValue RegisterVM::call_interpreted(const LIR::LIR_Function* function,
         }
         while (vm_region_stack.size() > caller_depth) exit_region();
         invocation_parents.pop_back();
-        argument_stack = std::move(caller_arguments);
-        spare_register_files_.push_back(std::move(registers));
-        registers = std::move(caller_registers);
+        frame_pointer_ = caller_fp;
+        registers = RegisterSpan(register_stack_.data() + caller_fp, caller_size);
         current_function_ = caller_function;
         return result;
     } catch (...) {
         while (vm_region_stack.size() > caller_depth) exit_region();
         invocation_parents.pop_back();
-        argument_stack = std::move(caller_arguments);
-        spare_register_files_.push_back(std::move(registers));
-        registers = std::move(caller_registers);
+        frame_pointer_ = caller_fp;
+        registers = RegisterSpan(register_stack_.data() + caller_fp, caller_size);
         current_function_ = caller_function;
         throw;
     }
@@ -114,20 +120,74 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
     }
 
     ResourceManager::getInstance().setCurrentFiber(get_current_fiber());
-    // Call-site cache: hot loops re-enter the same interpreted function at the
-    // same instruction; skip the repeated string-hash registry resolutions.
-    if (pc->op == LIR::LIR_Op::Call) {
-        auto cached = call_site_cache_.find(pc);
-        if (cached != call_site_cache_.end()) {
-            call_args_scratch_.clear();
-            for (auto arg_reg : pc->call_args) {
-                if (arg_reg < registers.size()) call_args_scratch_.push_back(registers[arg_reg]);
-                else call_args_scratch_.push_back(VAL_NIL);
+    if (pc->op == LIR::LIR_Op::Call && !LIR::BuiltinUtils::isBuiltinFunction(pc->func_name)) {
+        const auto* target = pc->cached_function;
+        if (!target) {
+            if (!CompiledResolver::getInstance().dispatch(pc->func_name, *pc, registers, this)) {
+                auto* rf = LIR::FunctionRegistry::getInstance().getFunction(pc->func_name);
+                if (rf) {
+                    target = rf;
+                    pc->cached_function = target;
+                    pc->cached_param_count = rf->param_count;
+                }
+            } else {
+                return;
             }
-            while (call_args_scratch_.size() < cached->second.parameter_count) call_args_scratch_.push_back(VAL_NIL);
-            auto return_value = call_interpreted(cached->second.function, call_args_scratch_.data(), call_args_scratch_.size());
-            if (pc->dst != UINT32_MAX) registers[pc->dst] = return_value;
-            return;
+        }
+        if (target) {
+            size_t caller_fp = frame_pointer_;
+            size_t caller_size = registers.size();
+            size_t arg_count = pc->call_args.size();
+            size_t reg_count = std::max({(size_t)target->register_count, arg_count, (size_t)1});
+            size_t callee_fp = caller_fp + caller_size;
+
+            if (__builtin_expect(callee_fp + reg_count + 64 > register_stack_.size(), 0)) {
+                size_t new_cap = (callee_fp + reg_count + 64) * 2;
+                register_stack_.resize(new_cap, VAL_NIL);
+            }
+
+            for (size_t i = 0; i < arg_count; ++i) {
+                uint32_t r = pc->call_args[i];
+                register_stack_[callee_fp + i] = (r < caller_size) ? register_stack_[caller_fp + r] : VAL_NIL;
+            }
+            for (size_t i = arg_count; i < reg_count; ++i) {
+                register_stack_[callee_fp + i] = VAL_NIL;
+            }
+
+            frame_pointer_ = callee_fp;
+            registers = RegisterSpan(register_stack_.data() + callee_fp, reg_count);
+            const auto* caller_func = current_function_;
+            current_function_ = target;
+
+            size_t caller_depth = vm_region_stack.size();
+            uint64_t caller_region = active_region_id;
+            invocation_parents.push_back(caller_region);
+
+            try {
+                execute_instructions(*target, 0, target->instructions.size());
+                auto result = registers[0];
+                if (IS_PTR(result)) {
+                    register_native_allocation(result);
+                    promote_graph(result, caller_region);
+                }
+                while (vm_region_stack.size() > caller_depth) exit_region();
+                invocation_parents.pop_back();
+
+                frame_pointer_ = caller_fp;
+                registers = RegisterSpan(register_stack_.data() + caller_fp, caller_size);
+                current_function_ = caller_func;
+                if (pc->dst != UINT32_MAX && pc->dst < caller_size) {
+                    registers[pc->dst] = result;
+                }
+                return;
+            } catch (...) {
+                while (vm_region_stack.size() > caller_depth) exit_region();
+                invocation_parents.pop_back();
+                frame_pointer_ = caller_fp;
+                registers = RegisterSpan(register_stack_.data() + caller_fp, caller_size);
+                current_function_ = caller_func;
+                throw;
+            }
         }
     }
     if (pc->op == LIR::LIR_Op::Call || pc->op == LIR::LIR_Op::CallBuiltin) {
@@ -167,7 +227,8 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
                 }
             }
             bool is_builtin_target = (pc->op == LIR::LIR_Op::CallBuiltin) ||
-                                     (pc->func_name.rfind("_builtin_", 0) == 0);
+                                     (pc->func_name.rfind("_builtin_", 0) == 0) ||
+                                     LIR::BuiltinUtils::isBuiltinFunction(pc->func_name);
 
             if (is_builtin_target && LIR::BuiltinUtils::isBuiltinFunction(pc->func_name)) {
                 ProfileScope prof_scope(pc->func_name);
@@ -193,6 +254,28 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
                     registers[pc->dst] = Backend::Native::host_api().helper(this,
                         static_cast<uint32_t>(Backend::Native::Helper::Builtin),
                         VAL_NIL, VAL_NIL, VAL_NIL, fname.c_str(), args.data(), args.size());
+                    handled = true;
+                } else if (fname == "_builtin_list_reserve" && pc->call_args.size() >= 2) {
+                    RegisterValue list_val = registers[pc->call_args[0]];
+                    RegisterValue cap_val = registers[pc->call_args[1]];
+                    if (IS_PTR(list_val)) {
+                        ObjHeader* h = (ObjHeader*)UNBOX_PTR(list_val);
+                        if (h && h->type_id == TYPE_LIST) {
+                            int64_t cap = IS_INT(cap_val) ? UNBOX_INT(cap_val) : as_i64(cap_val);
+                            if (cap > 0) lm_list_reserve((LmList*)h, static_cast<uint64_t>(cap));
+                        }
+                    }
+                    if (pc->dst != UINT32_MAX && pc->dst < registers.size()) registers[pc->dst] = VAL_NIL;
+                    handled = true;
+                } else if (fname == "_builtin_list_with_capacity" && pc->call_args.size() >= 1) {
+                    RegisterValue cap_val = registers[pc->call_args[0]];
+                    int64_t cap = IS_INT(cap_val) ? UNBOX_INT(cap_val) : as_i64(cap_val);
+                    if (cap < 0) cap = 0;
+                    LmList* list = lm_list_new_with_capacity(static_cast<uint64_t>(cap));
+                    if (pc->dst != UINT32_MAX && pc->dst < registers.size()) {
+                        registers[pc->dst] = BOX_PTR(list);
+                        register_native_allocation(registers[pc->dst]);
+                    }
                     handled = true;
                 } else if (fname == "_builtin_string_from_cstr" && pc->call_args.size() >= 1) {
                     RegisterValue arg = registers[pc->call_args[0]];
@@ -233,7 +316,7 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
                         registers[pc->dst] = result;
                     }
                     handled = true;
-                } else if (fname == "_builtin_substring" && pc->call_args.size() >= 3) {
+                } else if ((fname == "_builtin_substring" || fname == "substring") && pc->call_args.size() >= 3) {
                     LmStringHeader* str = get_hdr(pc->call_args[0]);
                     int64_t start = as_i64(registers[pc->call_args[1]]);
                     int64_t end = as_i64(registers[pc->call_args[2]]);
@@ -246,39 +329,39 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
                     int64_t idx = as_i64(registers[pc->call_args[1]]);
                     registers[pc->dst] = make_i64(lm_str_byte_at(str, idx >= 0 ? (uint64_t)idx : UINT64_MAX));
                     handled = true;
-                } else if (fname == "_builtin_string_index_of" && pc->call_args.size() >= 2) {
+                } else if ((fname == "_builtin_string_index_of" || fname == "index_of") && pc->call_args.size() >= 2) {
                     LmStringHeader* str = get_hdr(pc->call_args[0]);
                     LmStringHeader* sub = get_hdr(pc->call_args[1]);
                     registers[pc->dst] = make_i64(lm_str_index_of(str, sub));
                     handled = true;
-                } else if (fname == "_builtin_string_contains" && pc->call_args.size() >= 2) {
+                } else if ((fname == "_builtin_string_contains" || fname == "contains") && pc->call_args.size() >= 2) {
                     LmStringHeader* str = get_hdr(pc->call_args[0]);
                     LmStringHeader* sub = get_hdr(pc->call_args[1]);
                     registers[pc->dst] = lm_str_contains(str, sub) ? VAL_TRUE : VAL_FALSE;
                     handled = true;
-                } else if (fname == "_builtin_string_starts_with" && pc->call_args.size() >= 2) {
+                } else if ((fname == "_builtin_string_starts_with" || fname == "starts_with") && pc->call_args.size() >= 2) {
                     LmStringHeader* str = get_hdr(pc->call_args[0]);
                     LmStringHeader* pre = get_hdr(pc->call_args[1]);
                     registers[pc->dst] = lm_str_starts_with(str, pre) ? VAL_TRUE : VAL_FALSE;
                     handled = true;
-                } else if (fname == "_builtin_string_ends_with" && pc->call_args.size() >= 2) {
+                } else if ((fname == "_builtin_string_ends_with" || fname == "ends_with") && pc->call_args.size() >= 2) {
                     LmStringHeader* str = get_hdr(pc->call_args[0]);
                     LmStringHeader* sfx = get_hdr(pc->call_args[1]);
                     registers[pc->dst] = lm_str_ends_with(str, sfx) ? VAL_TRUE : VAL_FALSE;
                     handled = true;
-                } else if (fname == "_builtin_string_trim" && pc->call_args.size() >= 1) {
+                } else if ((fname == "_builtin_string_trim" || fname == "trim") && pc->call_args.size() >= 1) {
                     LmStringHeader* str = get_hdr(pc->call_args[0]);
                     LmStringHeader* res = lm_str_trim(str);
                     registers[pc->dst] = BOX_PTR(res);
                     register_native_allocation(registers[pc->dst]);
                     handled = true;
-                } else if (fname == "_builtin_string_to_lower" && pc->call_args.size() >= 1) {
+                } else if ((fname == "_builtin_string_to_lower" || fname == "to_lower") && pc->call_args.size() >= 1) {
                     LmStringHeader* str = get_hdr(pc->call_args[0]);
                     LmStringHeader* res = lm_str_to_lower(str);
                     registers[pc->dst] = BOX_PTR(res);
                     register_native_allocation(registers[pc->dst]);
                     handled = true;
-                } else if (fname == "_builtin_string_to_upper" && pc->call_args.size() >= 1) {
+                } else if ((fname == "_builtin_string_to_upper" || fname == "to_upper") && pc->call_args.size() >= 1) {
                     LmStringHeader* str = get_hdr(pc->call_args[0]);
                     LmStringHeader* res = lm_str_to_upper(str);
                     registers[pc->dst] = BOX_PTR(res);
@@ -311,6 +394,19 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
                     }
                     std::cout << '\n';
                     registers[pc->dst] = VAL_NIL;
+                    handled = true;
+                } else if (fname == "channel") {
+                    size_t cap = 1024;
+                    if (!pc->call_args.empty() && pc->call_args[0] < registers.size()) {
+                        int64_t c = as_i64(registers[pc->call_args[0]]);
+                        if (c > 0) cap = static_cast<size_t>(c);
+                    }
+                    auto ch = std::make_unique<LM::Backend::Channel>(cap);
+                    channels.push_back(std::move(ch));
+                    if (pc->dst != UINT32_MAX && pc->dst < registers.size()) {
+                        registers[pc->dst] = BOX_PTR(channels.back().get());
+                        opaque_runtime_pointers.insert(reinterpret_cast<uintptr_t>(channels.back().get()));
+                    }
                     handled = true;
                 }
 

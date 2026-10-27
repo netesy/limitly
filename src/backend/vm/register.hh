@@ -39,6 +39,44 @@ void* box_register_value(const RegisterValue& value);
 RegisterValue unbox_register_value(void* boxed_value);
 ValuePtr register_to_value_ptr(RegisterValue rv, TypePtr lang_type = nullptr);
 
+class RegisterSpan {
+public:
+    RegisterValue* data_ = nullptr;
+    size_t size_ = 0;
+
+    RegisterSpan() = default;
+    RegisterSpan(RegisterValue* d, size_t s) : data_(d), size_(s) {}
+
+    inline RegisterValue& operator[](size_t i) { return data_[i]; }
+    inline const RegisterValue& operator[](size_t i) const { return data_[i]; }
+    inline RegisterValue& at(size_t i) { return data_[i]; }
+    inline const RegisterValue& at(size_t i) const { return data_[i]; }
+
+    inline size_t size() const { return size_; }
+    inline bool empty() const { return size_ == 0; }
+    inline RegisterValue* data() { return data_; }
+    inline const RegisterValue* data() const { return data_; }
+
+    inline RegisterValue* begin() { return data_; }
+    inline const RegisterValue* begin() const { return data_; }
+    inline RegisterValue* end() { return data_ + size_; }
+    inline const RegisterValue* end() const { return data_ + size_; }
+
+    inline void resize(size_t new_size, RegisterValue val = VAL_NIL) {
+        if (new_size > size_) {
+            for (size_t i = size_; i < new_size; ++i) data_[i] = val;
+        }
+        size_ = new_size;
+    }
+    inline void push_back(RegisterValue val) {
+        data_[size_++] = val;
+    }
+    inline void assign(size_t n, RegisterValue val) {
+        size_ = n;
+        for (size_t i = 0; i < n; ++i) data_[i] = val;
+    }
+};
+
 class RegisterVM {
 public:
     RegisterVM();
@@ -83,7 +121,7 @@ public:
     Fiber* get_current_fiber();
     
     void set_current_function(const LIR::LIR_Function* func) { current_function_ = func; }
-    const std::vector<RegisterValue>& get_registers() const { return registers; }
+    const RegisterSpan& get_registers() const { return registers; }
     CallStack& get_call_stack() { return call_stack; }
 
     ValuePtr createErrorValue(const std::string& errorType, const std::string& message);
@@ -219,7 +257,9 @@ private:
     void execute_extern_calc_struct_layout(const LIR::LIR_Inst* pc);
     void execute_extern_get_abi_info(const LIR::LIR_Inst* pc);
 
-    std::vector<RegisterValue> registers;
+    std::vector<RegisterValue> register_stack_;
+    size_t frame_pointer_ = 0;
+    RegisterSpan registers;
     
     Memory::LifetimeRegistry memory_lifetimes_;
     // Region and memory model tracking

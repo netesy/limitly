@@ -2,13 +2,13 @@
 #include "vm_list.hh"
 #include <string.h>
 
-RUNTIME_API LmList* lm_list_new(void) {
+RUNTIME_API LmList* lm_list_new_with_capacity(uint64_t capacity) {
     LmList* list = (LmList*)malloc(sizeof(LmList));
     if (!list) return NULL;
     
     list->header.type_id = TYPE_LIST;
     list->header.metadata = 0;
-    list->capacity = 8;
+    list->capacity = capacity < 8 ? 8 : capacity;
     list->size = 0;
     list->data = (LmValue*)malloc(sizeof(LmValue) * list->capacity);
     if (!list->data) {
@@ -17,6 +17,18 @@ RUNTIME_API LmList* lm_list_new(void) {
     }
     
     return list;
+}
+
+RUNTIME_API LmList* lm_list_new(void) {
+    return lm_list_new_with_capacity(8);
+}
+
+RUNTIME_API void lm_list_reserve(LmList* list, uint64_t capacity) {
+    if (!list || capacity <= list->capacity) return;
+    LmValue* new_data = (LmValue*)realloc(list->data, sizeof(LmValue) * capacity);
+    if (!new_data) return;
+    list->data = new_data;
+    list->capacity = capacity;
 }
 
 RUNTIME_API void lm_list_append(LmList* list, LmValue element) {

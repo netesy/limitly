@@ -42,7 +42,9 @@ size_t required_register_count(const LIR::LIR_Function& function) {
 } // namespace
 
 RegisterVM::RegisterVM() : type_system(std::make_unique<TypeSystem>()) {
-    registers.resize(1024, VAL_NIL);
+    register_stack_.resize(262144, VAL_NIL);
+    frame_pointer_ = 0;
+    registers = RegisterSpan(register_stack_.data(), 1024);
     scheduler = std::make_unique<Scheduler>();
     slice_capabilities.clear();
     current_time = 0;
@@ -116,7 +118,9 @@ void RegisterVM::reset() {
     frame_instances.clear();
     spare_register_files_.clear();
     call_site_cache_.clear();
-    registers.assign(registers.size(), VAL_NIL);
+    register_stack_.assign(262144, VAL_NIL);
+    frame_pointer_ = 0;
+    registers = RegisterSpan(register_stack_.data(), 1024);
     argument_stack.clear();
     task_contexts.clear();
     channels.clear();
@@ -221,7 +225,10 @@ void RegisterVM::execute_function(const LIR::LIR_Function& function) {
 
 void RegisterVM::execute_instructions(const LIR::LIR_Function& function, uint64_t start_pc, uint64_t end_pc) {
     size_t needed_registers = function.register_count > 0 ? function.register_count : required_register_count(function);
-    if (registers.size() < needed_registers) registers.resize(needed_registers, VAL_NIL);
+    if (frame_pointer_ + needed_registers + 64 > register_stack_.size()) {
+        register_stack_.resize((frame_pointer_ + needed_registers + 64) * 2, VAL_NIL);
+    }
+    registers = RegisterSpan(register_stack_.data() + frame_pointer_, std::max(registers.size(), needed_registers));
 
     const LIR::LIR_Inst* instructions_ptr = function.instructions.data();
     const LIR::LIR_Inst* pc = instructions_ptr + start_pc;

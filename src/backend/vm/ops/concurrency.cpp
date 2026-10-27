@@ -301,7 +301,7 @@ void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
             break;
         }
         case LIR::LIR_Op::SchedulerRun: {
-            auto saved_registers = registers;
+            std::vector<RegisterValue> saved_registers(registers.begin(), registers.end());
             const LIR::LIR_Function* saved_func = current_function_;
             auto& registry = LIR::FunctionRegistry::getInstance();
 
@@ -345,9 +345,8 @@ void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
 
                             auto run_once = [&](RegisterValue field1) {
                                 if (context->cancelled.load() || stop_tasks.load()) return;
-                                worker_vm.registers = saved_registers;
-                                if (worker_vm.registers.size() < saved_registers.size()) {
-                                    worker_vm.registers.resize(saved_registers.size(), VAL_NIL);
+                                for (size_t i = 0; i < saved_registers.size() && i < worker_vm.registers.size(); ++i) {
+                                    worker_vm.registers[i] = saved_registers[i];
                                 }
                                 for (const auto& [field,value] : context->fields)
                                     if(field >= 11 && static_cast<size_t>(field-8) < worker_vm.registers.size()) worker_vm.registers[field-8]=value;
@@ -429,8 +428,8 @@ void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
 
                 auto run_once = [&](RegisterValue field1) {
                     if (context->cancelled.load() || stop_tasks) return;
-                    if (registers.size() < saved_registers.size()) {
-                        registers.resize(saved_registers.size(), VAL_NIL);
+                    for (size_t i = 0; i < saved_registers.size() && i < registers.size(); ++i) {
+                        registers[i] = saved_registers[i];
                     }
                     for (const auto& [field,value] : context->fields)
                         if(field >= 11 && static_cast<size_t>(field-8) < registers.size()) registers[field-8]=value;

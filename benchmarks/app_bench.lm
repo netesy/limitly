@@ -36,6 +36,7 @@ fn quicksort(arr: [int], left: int, right: int) {
 fn main(): int {
     var N = 1000000;
     var data: [int] = [];
+    data.reserve(N);
 
     var t0 = clock();
 

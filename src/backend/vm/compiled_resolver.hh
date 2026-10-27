@@ -59,8 +59,9 @@ public:
         return nullptr;
     }
 
+    template <typename RegContainer>
     bool dispatch(const std::string& symbol, const LIR::LIR_Inst& call,
-                  std::vector<LmValue>& registers, void* vm_context,
+                  RegContainer& registers, void* vm_context,
                   const std::vector<LmValue>& closure_args = {}) {
         // Baseline ABI 1 shares canonical VM values; legacy scalar artifacts must rebuild.
         auto* function = LIR::FunctionRegistry::getInstance().getFunction(symbol);
