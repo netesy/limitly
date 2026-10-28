@@ -307,10 +307,11 @@ void Generator::generate_function(LM::Frontend::AST::FunctionDeclaration& fn) {
     lir_func->setRegisterTypes(result->register_types);
     
     // Optimize the generated LIR for this function
-    if (false && Generator::is_optimization_enabled()) {
+    if (Generator::is_optimization_enabled()) {
         Optimizer optimizer(*result);
-        optimizer.optimize();
-        lir_func->setInstructions(result->instructions);
+        if (optimizer.remove_loop_region_ops()) {
+            lir_func->setInstructions(result->instructions);
+        }
     }
 
     // Register with manager AFTER instructions and optimization are complete

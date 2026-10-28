@@ -467,87 +467,88 @@ bool Optimizer::loop_unroll() {
 }
 
 bool Optimizer::remove_loop_region_ops() {
-    // Remove unnecessary region operations from tight scalar loops
-    // A loop is "scalar" if it only uses local registers and no pointers/objects
+    // Remove redundant RegionEnter/RegionExit/RegionMove in loops and blocks whose
+    // bodies contain no heap allocations.
     bool changed = false;
 
-    // Always remove Nop instructions with ownership comments - they're metadata
-    for (size_t i = 0; i < func_.instructions.size(); ) {
-        if (func_.instructions[i].op == LIR_Op::Nop) {
-            func_.instructions.erase(func_.instructions.begin() + i);
-            changed = true;
-        } else {
-            i++;
+    auto is_allocating_op = [](LIR_Op op) -> bool {
+        switch (op) {
+        case LIR_Op::Call:
+        case LIR_Op::CallVoid:
+        case LIR_Op::CallIndirect:
+        case LIR_Op::CallBuiltin:
+        case LIR_Op::CallVariadic:
+        case LIR_Op::ForeignCall:
+        case LIR_Op::ForeignCallDirect:
+        case LIR_Op::FrameCallMethod:
+        case LIR_Op::FrameCallInit:
+        case LIR_Op::TraitCallMethod:
+        case LIR_Op::MemoryAlloc:
+        case LIR_Op::MemoryResize:
+        case LIR_Op::BufferCreate:
+        case LIR_Op::BufferResize:
+        case LIR_Op::ListCreate:
+        case LIR_Op::ListAppend:
+        case LIR_Op::DictCreate:
+        case LIR_Op::TupleCreate:
+        case LIR_Op::NewFrame:
+        case LIR_Op::MakeTraitObject:
+        case LIR_Op::ResourceCreate:
+        case LIR_Op::TaskContextAlloc:
+        case LIR_Op::ChannelAlloc:
+        case LIR_Op::STR_CONCAT:
+        case LIR_Op::STR_FORMAT:
+        case LIR_Op::ToString:
+        case LIR_Op::ConstructError:
+        case LIR_Op::ConstructOk:
+        case LIR_Op::RefCreate:
+        case LIR_Op::EffectPerform:
+            return true;
+        default:
+            return false;
         }
-    }
+    };
 
-    for (size_t i = 0; i < func_.instructions.size(); ) {
-        // Find RegionEnter
-        if (func_.instructions[i].op != LIR_Op::RegionEnter) {
-            i++;
-            continue;
-        }
+    bool pass_changed = false;
+    do {
+        pass_changed = false;
+        for (size_t i = 0; i < func_.instructions.size(); ++i) {
+            if (func_.instructions[i].op != LIR_Op::RegionEnter) continue;
+            uint32_t region_id = func_.instructions[i].imm;
+            // Root function regions (0, 1, 2) manage parameter and return boundaries
+            if (region_id <= 2) continue;
 
-        size_t region_start = i;
-        size_t region_end = UINT32_MAX;
-        uint32_t region_id = func_.instructions[i].imm;
-
-        // Find matching RegionExit
-        for (size_t j = i + 1; j < func_.instructions.size(); j++) {
-            if (func_.instructions[j].op == LIR_Op::RegionExit && func_.instructions[j].imm == region_id) {
-                region_end = j;
-                break;
+            size_t region_start = i;
+            size_t region_end = SIZE_MAX;
+            for (size_t j = i + 1; j < func_.instructions.size(); ++j) {
+                if (func_.instructions[j].op == LIR_Op::RegionExit && func_.instructions[j].imm == region_id) {
+                    region_end = j;
+                }
             }
-        }
+            if (region_end == SIZE_MAX) continue;
 
-        if (region_end == UINT32_MAX) {
-            i++;
-            continue;
-        }
-
-        // Check if region contains only scalar operations (no memory ops, no calls, no pointer ops)
-        bool has_non_scalar = false;
-        for (size_t j = region_start + 1; j < region_end; j++) {
-            auto& inst = func_.instructions[j];
-            if (inst.op == LIR_Op::RegionEnter || inst.op == LIR_Op::RegionExit ||
-                inst.op == LIR_Op::RegionMove) {
-                continue; // Nested regions
+            // Check if there are any allocating operations between region_start and region_end
+            bool has_allocations = false;
+            for (size_t j = region_start + 1; j < region_end; ++j) {
+                if (is_allocating_op(func_.instructions[j].op)) {
+                    has_allocations = true;
+                    break;
+                }
             }
-            // Check for non-scalar operations
-            if (inst.op == LIR_Op::Call || inst.op == LIR_Op::CallIndirect ||
-                inst.op == LIR_Op::MemoryLoad || inst.op == LIR_Op::MemoryStore ||
-                inst.op == LIR_Op::MemoryAlloc || inst.op == LIR_Op::MemoryFree ||
-                inst.op == LIR_Op::ListCreate || inst.op == LIR_Op::ListIndex ||
-                inst.op == LIR_Op::ListSet || inst.op == LIR_Op::ListAppend ||
-                inst.op == LIR_Op::DictCreate || inst.op == LIR_Op::DictGet ||
-                inst.op == LIR_Op::DictSet || inst.op == LIR_Op::STR_CONCAT ||
-                inst.op == LIR_Op::STR_FORMAT || inst.op == LIR_Op::StringIndex) {
-                has_non_scalar = true;
-                break;
-            }
-        }
 
-        if (has_non_scalar) {
-            i = region_end + 1;
-            continue;
-        }
-
-        // Remove scalar region operations (RegionEnter, RegionExit, RegionMove, Nop ownership)
-        size_t j = region_start;
-        while (j <= region_end && j < func_.instructions.size()) {
-            auto& inst = func_.instructions[j];
-            if (inst.op == LIR_Op::RegionEnter || inst.op == LIR_Op::RegionExit ||
-                inst.op == LIR_Op::RegionMove || inst.op == LIR_Op::Nop) {
-                func_.instructions.erase(func_.instructions.begin() + j);
+            if (!has_allocations) {
+                for (size_t j = region_start; j <= region_end; ++j) {
+                    if ((func_.instructions[j].op == LIR_Op::RegionEnter && func_.instructions[j].imm == region_id) ||
+                        (func_.instructions[j].op == LIR_Op::RegionExit && func_.instructions[j].imm == region_id) ||
+                        (func_.instructions[j].op == LIR_Op::RegionMove && func_.instructions[j].imm == region_id)) {
+                        func_.instructions[j].op = LIR_Op::Nop;
+                    }
+                }
+                pass_changed = true;
                 changed = true;
-                // Don't increment j, we're removing
-            } else {
-                j++;
             }
         }
-
-        i = j;
-    }
+    } while (pass_changed);
 
     return changed;
 }

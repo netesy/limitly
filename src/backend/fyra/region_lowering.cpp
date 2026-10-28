@@ -353,12 +353,14 @@ void lower_region_ownership(ir::Module& module, const std::unordered_map<std::st
                 } else if ((inst->getOpcode() == ir::Instruction::Load || inst->getOpcode() == ir::Instruction::Loadl) && !current_operands.empty()) {
                     auto* address = current_operands[0]->get();
                     auto* addr_inst = dynamic_cast<ir::Instruction*>(address);
-                    if (addr_inst && addr_inst->getName().starts_with("scalar_slot_")) {
+                    if (addr_inst && (addr_inst->getName().starts_with("scalar_slot_") || addr_inst->getName().starts_with("scalar_"))) {
                         flags[inst] = zero;
                     } else if (addr_inst && addr_inst->getName().starts_with("slot_")) {
                         flags[inst] = one;
-                    } else if (inst->getName().starts_with("lidx_elem_")) {
+                    } else if (inst->getName().starts_with("lidx_elem_") || inst->getName().starts_with("scalar_")) {
                         flags[inst] = zero;
+                    } else if (inst->getName().starts_with("lidx_data_ptr_") || inst->getName().starts_with("lset_data_ptr_")) {
+                        flags[inst] = one;
                     } else {
                         flags[inst] = emit(block, after, "lymar_aot_slot_pointer", {address});
                     }
@@ -366,8 +368,29 @@ void lower_region_ownership(ir::Module& module, const std::unordered_map<std::st
                     auto* value = current_operands[0]->get();
                     auto* address = current_operands[1]->get();
                     auto* addr_inst = dynamic_cast<ir::Instruction*>(address);
-                    if (addr_inst && addr_inst->getName().starts_with("scalar_slot_")) {
-                        // Scalar slot allocations need no region GC edge.
+                    auto* val_flag = flag(value);
+                    bool is_const_zero = (val_flag == zero);
+                    if (!is_const_zero) {
+                        if (auto* ci = dynamic_cast<ir::ConstantInt*>(val_flag)) {
+                            if (ci->getValue() == 0) is_const_zero = true;
+                        }
+                    }
+                    bool is_scalar_dest = (addr_inst && (addr_inst->getName().starts_with("scalar_slot_") ||
+                                                         addr_inst->getName().starts_with("scalar_elem_") ||
+                                                         addr_inst->getName().starts_with("scalar_"))) ||
+                                          inst->getName().starts_with("scalar_store_") ||
+                                          inst->getName().starts_with("scalar_");
+                    if (is_scalar_dest) {
+                        // Scalar slot allocations and scalar list element stores need no region GC edge.
+                    } else if (value->getType()->isFloatingPoint() || is_const_zero) {
+                        // Primitive scalar values (I64, F64, I32, etc.) cannot carry pointers.
+                        if (!addr_inst || !addr_inst->getName().starts_with("slot_")) {
+                            // Non-slot stores of provable scalars do not create heap edges.
+                        } else {
+                            // Slot that previously could have held a pointer: clear old pointer edge with flag 0
+                            emit(block, after, dynamic_cast<ir::GlobalVariable*>(address) ? "lymar_aot_global_edge" : "lymar_aot_edge",
+                                 {address, value->getType()->isFloatingPoint() ? static_cast<ir::Value*>(zero) : value, zero});
+                        }
                     } else if (addr_inst && addr_inst->getName().starts_with("slot_")) {
                         emit(block, after, dynamic_cast<ir::GlobalVariable*>(address) ? "lymar_aot_global_edge" : "lymar_aot_edge",
                              {address, value->getType()->isFloatingPoint() ? static_cast<ir::Value*>(zero) : value,

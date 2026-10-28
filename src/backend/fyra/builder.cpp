@@ -2062,12 +2062,14 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 // Step 2: In b_chk_hdr, safely unbox pointer, load header type_id and size
                 builder_->setInsertPoint(b_chk_hdr);
                 ir::Value* unboxed_ptr = builder_->createAnd(list_val, context_->getConstantInt(context_->getIntegerType(64), ~7ULL));
-                ir::Value* hdr_val = builder_->createLoadl(unboxed_ptr);
+                ir::Instruction* hdr_val = builder_->createLoadl(unboxed_ptr);
+                hdr_val->setName("scalar_hdr_" + lidx_id);
                 ir::Value* type_id = builder_->createAnd(hdr_val, context_->getConstantInt(context_->getIntegerType(64), 0xFFFFFFFF));
                 ir::Value* is_list_type = builder_->createCeq(type_id, context_->getConstantInt(context_->getIntegerType(64), TYPE_LIST));
 
                 ir::Value* size_addr = builder_->createAdd(unboxed_ptr, context_->getConstantInt(context_->getIntegerType(64), 16));
-                ir::Value* list_size = builder_->createLoadl(size_addr);
+                ir::Instruction* list_size = builder_->createLoadl(size_addr);
+                list_size->setName("scalar_size_" + lidx_id);
                 ir::Value* non_neg = builder_->createCsge(idx_val, context_->getConstantInt(context_->getIntegerType(64), 0));
                 ir::Value* in_upper = builder_->createCslt(idx_val, list_size);
                 ir::Value* valid_idx = builder_->createAnd(non_neg, in_upper);
@@ -2078,7 +2080,8 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 // Step 3: Fast path array access
                 builder_->setInsertPoint(b_fast);
                 ir::Value* data_addr = builder_->createAdd(unboxed_ptr, context_->getConstantInt(context_->getIntegerType(64), 8));
-                ir::Value* data_ptr = builder_->createLoadl(data_addr);
+                ir::Instruction* data_ptr = builder_->createLoadl(data_addr);
+                data_ptr->setName("lidx_data_ptr_" + lidx_id);
                 ir::Value* offset = builder_->createMul(idx_val, context_->getConstantInt(context_->getIntegerType(64), 8));
                 ir::Value* elem_addr = builder_->createAdd(data_ptr, offset);
                 ir::Instruction* elem = builder_->createLoadl(elem_addr);
@@ -2122,12 +2125,14 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 // Step 2: Unbox ptr & inspect header / size safely
                 builder_->setInsertPoint(b_chk_hdr);
                 ir::Value* unboxed_ptr = builder_->createAnd(list_val, context_->getConstantInt(context_->getIntegerType(64), ~7ULL));
-                ir::Value* hdr_val = builder_->createLoadl(unboxed_ptr);
+                ir::Instruction* hdr_val = builder_->createLoadl(unboxed_ptr);
+                hdr_val->setName("scalar_hdr_set_" + lset_id);
                 ir::Value* type_id = builder_->createAnd(hdr_val, context_->getConstantInt(context_->getIntegerType(64), 0xFFFFFFFF));
                 ir::Value* is_list_type = builder_->createCeq(type_id, context_->getConstantInt(context_->getIntegerType(64), TYPE_LIST));
 
                 ir::Value* size_addr = builder_->createAdd(unboxed_ptr, context_->getConstantInt(context_->getIntegerType(64), 16));
-                ir::Value* list_size = builder_->createLoadl(size_addr);
+                ir::Instruction* list_size = builder_->createLoadl(size_addr);
+                list_size->setName("scalar_size_set_" + lset_id);
                 ir::Value* non_neg = builder_->createCsge(idx_val, context_->getConstantInt(context_->getIntegerType(64), 0));
                 ir::Value* in_upper = builder_->createCslt(idx_val, list_size);
                 ir::Value* valid_idx = builder_->createAnd(non_neg, in_upper);
@@ -2138,10 +2143,47 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 // Step 3: Fast path array store
                 builder_->setInsertPoint(b_fast);
                 ir::Value* data_addr = builder_->createAdd(unboxed_ptr, context_->getConstantInt(context_->getIntegerType(64), 8));
-                ir::Value* data_ptr = builder_->createLoadl(data_addr);
+                ir::Instruction* data_ptr = builder_->createLoadl(data_addr);
+                data_ptr->setName("lset_data_ptr_" + lset_id);
                 ir::Value* offset = builder_->createMul(idx_val, context_->getConstantInt(context_->getIntegerType(64), 8));
                 ir::Value* elem_addr = builder_->createAdd(data_ptr, offset);
-                builder_->createStore(erased_word(elem_val), elem_addr);
+
+                bool is_scalar_elem = (inst.type_b != LIR::Type::Ptr && inst.type_b != LIR::Type::Void);
+                if (!is_scalar_elem) {
+                    auto it_b = lir_func.register_types.find(inst.b);
+                    if (it_b != lir_func.register_types.end() && it_b->second != LIR::Type::Ptr && it_b->second != LIR::Type::Void) {
+                        is_scalar_elem = true;
+                    }
+                }
+                if (!is_scalar_elem) {
+                    auto it_list = lir_func.register_language_types.find(inst.dst);
+                    if (it_list != lir_func.register_language_types.end() && it_list->second && it_list->second->tag == ::TypeTag::List) {
+                        auto* lt = std::get_if<ListType>(&it_list->second->extra);
+                        if (lt && lt->elementType) {
+                            auto etag = lt->elementType->tag;
+                            if (etag != ::TypeTag::List && etag != ::TypeTag::String &&
+                                etag != ::TypeTag::Frame && etag != ::TypeTag::Dict &&
+                                etag != ::TypeTag::Tuple && etag != ::TypeTag::Any &&
+                                etag != ::TypeTag::Enum && etag != ::TypeTag::Trait &&
+                                etag != ::TypeTag::TraitObject) {
+                                is_scalar_elem = true;
+                            }
+                        }
+                    }
+                }
+                if (!is_scalar_elem && pointer_assigned_regs.count(inst.b) == 0 && !is_pointer_lang_type(inst.b)) {
+                    is_scalar_elem = true;
+                }
+
+                if (is_scalar_elem) {
+                    if (auto* add_inst = dynamic_cast<ir::Instruction*>(elem_addr)) {
+                        add_inst->setName("scalar_elem_" + lset_id);
+                    }
+                    auto* store_inst = builder_->createStore(erased_word(elem_val), elem_addr);
+                    store_inst->setName("scalar_store_" + lset_id);
+                } else {
+                    builder_->createStore(erased_word(elem_val), elem_addr);
+                }
                 builder_->createJmp(b_done);
 
                 // Step 4: Slow path
