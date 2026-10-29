@@ -1,0 +1,63 @@
+// Stage-0 enum values: equality on variants folds at compile time, so enum-driven branches strip.
+// Regression for docs/staged.md Example B, which could not fold before enum values entered the
+// stage-0 constant model.
+
+enum TargetPlatform {
+    Linux,
+    Windows,
+    Wasm
+}
+
+const CURRENT_PLATFORM = TargetPlatform.Linux;
+
+// 1. The docs Example B shape: only the taken branch survives stage 0. Proof of stripping rather
+// than of printing -- if the condition failed to fold, both assignments would run at runtime and
+// `picked` would end as 20.
+fn picked_backend(): int {
+    var picked = 0;
+    staged {
+        if (CURRENT_PLATFORM == TargetPlatform.Linux) {
+            picked = 10;
+        } else {
+            picked = 20;
+        }
+    }
+    return picked;
+}
+assert(picked_backend() == 10);
+
+// 2. A staged fn taking an enum parameter selects at compile time.
+staged fn syscall_number(p: TargetPlatform): int {
+    if (p == TargetPlatform.Linux) {
+        return 1;
+    } elif (p == TargetPlatform.Windows) {
+        return 2;
+    } else {
+        return 3;
+    }
+    return 0;
+}
+val from_literal = syscall_number(TargetPlatform.Windows);
+assert(from_literal == 2);
+
+val from_const = syscall_number(CURRENT_PLATFORM);
+assert(from_const == 1);
+
+val from_fallthrough = syscall_number(TargetPlatform.Wasm);
+assert(from_fallthrough == 3);
+
+// 3. Folded results are ordinary constants and compose with runtime code.
+fn explain(n: int): str {
+    if (n == 1) {
+        return "linux";
+    }
+    return "other";
+}
+assert(explain(syscall_number(TargetPlatform.Linux)) == "linux");
+
+// 4. The runtime comparison agrees with the folded answer.
+var live: TargetPlatform = TargetPlatform.Windows;
+assert(live == TargetPlatform.Windows);
+assert(not (live == TargetPlatform.Linux));
+
+print("staged enum OK");

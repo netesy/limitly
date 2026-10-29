@@ -32,6 +32,7 @@ tests/types/unions.lm
 tests/types/options.lm
 tests/types/advanced.lm
 tests/types/enums.lm
+tests/types/enum_equality.lm
 tests/types/refined_types.lm
 tests/types/structural_type_tests.lm
 # Modules
@@ -148,3 +149,8 @@ tests/net/test_tls.lm
 tests/ffi/test_font_lib.lm
 tests/game/test_imgui.lm
 tests/game/test_imgui_expanded.lm
+# Staged fn compile-time value folding (AST folder and stage-0 VM)
+tests/staged/staged_fn_test.lm
+tests/staged/staged_type_fn_test.lm
+tests/staged/staged_enum_test.lm
+tests/staged/staged_vm_test.lm

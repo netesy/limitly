@@ -17,6 +17,7 @@ namespace LIR {
 void Generator::collect_function_signatures(const LM::Frontend::TypeCheckResult& type_check_result) {
     for (const auto& stmt : type_check_result.program->statements) {
         if (auto func_stmt = dynamic_cast<LM::Frontend::AST::FunctionDeclaration*>(stmt.get())) {
+            if (func_stmt->isStaged) continue;  // staged fns are compile-time only
             collect_function_signature(*func_stmt);
         }
     }
@@ -45,6 +46,7 @@ void Generator::lower_function_bodies(const LM::Frontend::TypeCheckResult& type_
         for (const auto& stmt : type_check_result.program->statements) {
             if (!stmt) continue;
             if (auto func_stmt = dynamic_cast<LM::Frontend::AST::FunctionDeclaration*>(stmt.get())) {
+                 if (func_stmt->isStaged) continue;  // staged fns are compile-time only
                  lower_function_body(*func_stmt);
             } else if (auto trait_stmt = dynamic_cast<LM::Frontend::AST::TraitDeclaration*>(stmt.get())) {
                 lower_trait_declaration(*trait_stmt);

@@ -27,6 +27,15 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
     }
     
     current_program_ = program;  // Store for import handling
+
+    // Pre-register staged functions so calls to them (even before the declaration in
+    // program order) can be folded at compile time.
+    staged_functions_.clear();
+    for (const auto& st : program->statements) {
+        if (auto fd = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(st)) {
+            if (fd->isStaged) staged_functions_[fd->name] = fd;
+        }
+    }
     
     Debugger::resetError();
     errors.clear();

@@ -423,7 +423,12 @@ void Generator::emit_var_stmt(LM::Frontend::AST::VarDeclaration& stmt) {
         global_variables_.insert(stmt.name);
         Reg val_reg = 0;
         if (stmt.initializer) {
-            if (auto literal = dynamic_cast<LM::Frontend::AST::LiteralExpr*>(stmt.initializer.get())) {
+            // A folded staged fn call must behave exactly like its constant literal,
+            // including the declared-type literal path below.
+            LM::Frontend::AST::Expression* init = stmt.initializer.get();
+            if (auto* call = dynamic_cast<LM::Frontend::AST::CallExpr*>(init))
+                if (call->foldedConst) init = call->foldedConst.get();
+            if (auto literal = dynamic_cast<LM::Frontend::AST::LiteralExpr*>(init)) {
                 val_reg = emit_literal_expr(*literal, declared_type);
             } else {
                 val_reg = emit_expr(*stmt.initializer);
@@ -447,14 +452,19 @@ void Generator::emit_var_stmt(LM::Frontend::AST::VarDeclaration& stmt) {
     Reg value_reg;
     
     if (stmt.initializer) {
+        // Unwrap a folded staged fn call so it takes the same literal/declared-type
+        // path as a plain constant initializer.
+        LM::Frontend::AST::Expression* init = stmt.initializer.get();
+        if (auto* call = dynamic_cast<LM::Frontend::AST::CallExpr*>(init))
+            if (call->foldedConst) init = call->foldedConst.get();
         Reg value = 0;
-        if (auto literal = dynamic_cast<LM::Frontend::AST::LiteralExpr*>(stmt.initializer.get())) {
+        if (auto literal = dynamic_cast<LM::Frontend::AST::LiteralExpr*>(init)) {
             value = emit_literal_expr(*literal, declared_type);
         } else {
             value = emit_expr(*stmt.initializer);
         }
 
-        bool is_literal = (dynamic_cast<LM::Frontend::AST::LiteralExpr*>(stmt.initializer.get()) != nullptr);
+        bool is_literal = (dynamic_cast<LM::Frontend::AST::LiteralExpr*>(init) != nullptr);
         bool is_immutable = stmt.isConst;
         bool is_var_alias = is_variable_alias_expr(stmt.initializer.get());
 

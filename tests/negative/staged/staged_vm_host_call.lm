@@ -1,0 +1,21 @@
+// @error:type_error
+// Stage-0 VM isolation: a body compiled for the VM may not call a runtime function. The callee is
+// not part of the compile-time unit, so there is nothing to dispatch to, and reaching it would be
+// host access by another name (dispatch also crosses into precompiled native libraries).
+
+fn helper(n: int): int {
+    return n + 1;
+}
+
+staged fn loop_call(n: int): int {
+    var acc = 0;
+    var i = 0;
+    while (i < n) {
+        acc = acc + helper(i);
+        i = i + 1;
+    }
+    return acc;
+}
+
+val v = loop_call(3);
+print("{v}");

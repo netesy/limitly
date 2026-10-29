@@ -1,0 +1,9 @@
+// @error:type_error
+// Stage-0 sandbox: unbounded staged fn recursion aborts at the 1000-frame depth bound
+
+staged fn spin(n: int): int {
+    return spin(n + 1);
+}
+
+val runaway = spin(0);
+print("{runaway}");

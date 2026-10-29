@@ -1,0 +1,19 @@
+// @error:type_error
+// Stage-0 VM opcode fence: the instruction allowlist refuses anything that is not pure and
+// deterministic. Reading a module global emits LoadGlobal, and at fold time no module has been
+// initialised, so the value a staged body would read is not defined.
+
+var gbase = 7;
+
+staged fn uses_global(n: int): int {
+    var acc = 0;
+    var i = 0;
+    while (i < n) {
+        acc = acc + gbase;
+        i = i + 1;
+    }
+    return acc;
+}
+
+val v = uses_global(3);
+print("{v}");

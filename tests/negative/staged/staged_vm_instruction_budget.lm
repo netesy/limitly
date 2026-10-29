@@ -1,0 +1,16 @@
+// @error:type_error
+// Stage-0 VM budget: a staged loop that never advances must be stopped by the compile-time
+// instruction bound rather than hanging the compiler. The opcode fence decides what may run; it
+// says nothing about how long, so the VM charges one count per executed instruction and refuses
+// once STAGE0_MAX_STEPS is spent.
+
+staged fn spin(n: int): int {
+    var i = 0;
+    while (i < n) {
+        i = 0;
+    }
+    return i;
+}
+
+val v = spin(1);
+print("{v}");

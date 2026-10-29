@@ -1,0 +1,66 @@
+// staged fn value-folding tests (roadmap item 1, v1 subset)
+// A staged fn call folds to a compile-time constant; surrounding code uses it normally.
+
+staged fn square(x: int): int {
+    return x * x;
+}
+
+staged fn classify(n: int): int {
+    if (n < 0) {
+        return 0 - n;
+    } elif (n > 100) {
+        return 100;
+    } else {
+        var twice = n * 2;
+        return twice;
+    }
+}
+
+// Nested staged fn call as an argument.
+staged fn sum_sq(a: int, b: int): int {
+    return square(a) + square(b);
+}
+
+val a = square(7);          // 49
+val b = classify(5);        // 10
+val c = classify(-3);       // 3
+val d = classify(500);      // 100
+val e = sum_sq(3, 4);       // 9 + 16 = 25
+
+assert(a == 49);
+assert(b == 10);
+assert(c == 3);
+assert(d == 100);
+assert(e == 25);
+
+// Use a folded value in ordinary arithmetic.
+val result = square(6) + classify(2);  // 36 + 4 = 40
+assert(result == 40);
+
+// Shadowing regression (probe A): a nested staged call's parameter bindings must
+// not leak into the enclosing staged fn's environment. Before the fix, g's param
+// 'a' clobbered f's param 'a' and every f(...) silently folded to 100.
+staged fn g(a: int): int {
+    return a + 1;
+}
+staged fn f(a: int): int {
+    var mid = g(100);
+    return a + 0;
+}
+assert(f(5) == 5);
+assert(f(7) == 7);
+
+// Same shape with a float parameter shared by caller and callee.
+staged fn h(v: d4): d4 {
+    return v * 2;
+}
+staged fn k(v: d4): d4 {
+    var twice = h(100);
+    return v;
+}
+val fs1 = k(1.5);
+val fs2 = k(2.5);
+assert(fs1 == 1.5);
+assert(fs2 == 2.5);
+
+print("{a} {b} {c} {d} {e} {result}");

@@ -5,9 +5,18 @@ using namespace LM::Frontend;
 namespace LM {
 namespace Frontend {
 
+bool TypeChecker::is_stage0_meta_name(const std::string& name) {
+    return name == "type" || name == "enum" || name == "frame";
+}
+
 TypePtr TypeChecker::resolve_type_annotation(std::shared_ptr<LM::Frontend::AST::TypeAnnotation> annotation) {
     if (!annotation) return nullptr;
-    
+
+    // Stage-0 type constructor call in a type position, e.g. `var v: nullable(int) = ...`.
+    if (annotation->isStagedCall) {
+        return resolve_staged_call_annotation(annotation);
+    }
+
     TypePtr base_type = nullptr;
 
     // Handle structural types
@@ -118,6 +127,23 @@ TypePtr TypeChecker::resolve_type_annotation(std::shared_ptr<LM::Frontend::AST::
             }
         }
 
+        // A name bound to a type value inside a staged fold (generic-style parameter)
+        // resolves directly to that type. Mirrors how frame fields of type `T` flatten.
+        if (auto ct = constant_types_.find(type_name); ct != constant_types_.end()) {
+            return ct->second;
+        }
+        if (auto ct2 = constant_types_.find(annotation->typeName); ct2 != constant_types_.end()) {
+            return ct2->second;
+        }
+
+        // Stage-0 meta types: `type` (any type) plus the kind bounds `enum` and `frame`. They
+        // are only meaningful as parameters of a staged fn returning `type` — the fold
+        // executor consumes those annotations and enforces the bound — so the ordinary
+        // signature pass maps them to `any` instead of failing to find such a type.
+        if (is_stage0_meta_name(type_name) || is_stage0_meta_name(annotation->typeName)) {
+            return type_system.ANY_TYPE;
+        }
+
         // First try to get the base type from the type system (handles built-in types and aliases)
         base_type = type_system.getType(type_name);
 
@@ -160,6 +186,11 @@ TypePtr TypeChecker::resolve_type_annotation(std::shared_ptr<LM::Frontend::AST::
                 } else if (const FrameInfo* fi2 = lookup_frame_info(annotation->typeName)) {
                     base_type = type_system.createFrameType(fi2->name);
                     type_system.addUserDefinedType(annotation->typeName, base_type);
+                } else if (auto sf = staged_functions_.find(type_name); sf != staged_functions_.end() && is_staged_type_fn(sf->second)) {
+                    // Bare reference to a staged type constructor; the call form supplies
+                    // the type arguments.
+                    add_error("'" + type_name + "' is a staged type constructor and must be called with type arguments");
+                    return type_system.NIL_TYPE;
                 } else {
                     std::vector<std::string> candidates = get_visible_types();
                     std::string suggestion = find_similar_name(annotation->typeName, candidates);

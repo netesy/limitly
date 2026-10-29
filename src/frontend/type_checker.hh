@@ -10,6 +10,7 @@
 #include <unordered_set>
 #include <string>
 #include <cstring>
+#include <optional>
 #include "symbol_database.hh"
 
 // =============================================================================
@@ -112,7 +113,52 @@ private:
 public:
     std::unordered_map<std::string, long long> constant_ints;
     std::unordered_map<std::string, double> constant_doubles;
+    // Type-value bindings for staged fns that return `type` (params annotated `: type`,
+    // locals, and resolved constructor results). Fold sites snapshot/restore this map
+    // exactly like the int/double constant maps, so callee bindings never leak.
+    std::unordered_map<std::string, TypePtr> constant_types_;
+    // Enum-value bindings for stage 0: variable name -> (enum type name, variant tag). Kept
+    // separate from constant_ints on purpose -- an enum value is not a number, and folding
+    // `status == Status.Active` into an integer comparison would let stage 0 accept mixed
+    // enum/int equalities the runtime evaluates differently. Fold sites snapshot/restore this
+    // map like the other constant environments.
+    std::unordered_map<std::string, std::pair<std::string, long long>> constant_enums_;
+    // Resolves an expression that is a compile-time enum value: a bare `Enum.Variant` member
+    // access (unit variants only -- a variant with associated values is a call, not a value)
+    // or a variable recorded in constant_enums_. Reports the variant tag and its owning enum.
+    bool try_stage0_enum_value(const std::shared_ptr<LM::Frontend::AST::Expression>& e,
+                               long long& out_tag, std::string& out_enum_name);
     bool is_root = true;
+
+    // Staged functions ('staged fn'): registered for compile-time call folding.
+    std::unordered_map<std::string, std::shared_ptr<LM::Frontend::AST::FunctionDeclaration>> staged_functions_;
+    int staged_fold_depth_ = 0;
+    // Set while check_staged_body_for_vm() checks a body that the stage-0 VM will execute.
+    // A staged call is not folded there (the callee's arguments are runtime values, not
+    // constants); it is compiled as an ordinary call and resolved through the LIR
+    // FunctionRegistry, which stage0_prepare_fn() keeps populated for the whole evaluation.
+    bool checking_staged_body_ = false;
+    // Names stage 0 lowered and registered, and the nesting depth of compile-time runs. The
+    // entries must not outlive the fold, or a compile-time-only function would leak into code
+    // generation, the cache, or an export list.
+    std::vector<std::string> stage0_registered_fns_;
+    size_t stage0_vm_depth_ = 0;
+
+    // --- stage-0 sandbox (docs/staged.md section 4) ---
+    // One budget for the whole compilation. Work is never re-credited: spreading the same
+    // effort over many staged calls cannot buy more compile time than doing it in one.
+    static constexpr size_t STAGE0_MAX_DEPTH = 1000;             // nested fold frames
+    static constexpr size_t STAGE0_MAX_STEPS = 1000000;          // AST nodes executed
+    static constexpr size_t STAGE0_MAX_BYTES = 67108864;         // 64 MB retained output
+    size_t staged_steps_ = 0;
+    size_t staged_bytes_ = 0;
+    // Latched once the budget is gone, so the one error that matters is not repeated by every
+    // frame unwinding back through the exceeded limit.
+    bool staged_budget_exhausted_ = false;
+    // Charges stage-0 work against the sandbox budget (docs/staged.md section 4). A false
+    // return means the budget is spent and the caller must abandon the fold; the diagnostic has
+    // already been reported.
+    bool stage0_charge(long line, size_t steps = 1, size_t bytes = 0);
 
     // Constructor accepting TypeSystem and SymbolDatabase
     explicit TypeChecker(TypeSystem& ts, SymbolDatabase& symbol_db) : type_system(ts), symbol_db_(symbol_db) {}
@@ -208,6 +254,70 @@ private:
     TypePtr check_staged_expr(std::shared_ptr<LM::Frontend::AST::StagedExpr> staged_expr);
     std::shared_ptr<LM::Frontend::AST::Expression> evaluate_staged_expression(std::shared_ptr<LM::Frontend::AST::Expression> expr, size_t depth = 0);
     std::shared_ptr<LM::Frontend::AST::Statement> evaluate_staged_statement_node(std::shared_ptr<LM::Frontend::AST::Statement> stmt, size_t depth = 0);
+
+    // --- staged fn compile-time evaluation (value-returning subset) ---
+    // Attempt to fold a call to a registered staged function into a constant literal,
+    // attaching the result to expr->foldedConst. Returns true on success.
+    bool try_fold_staged_call(std::shared_ptr<LM::Frontend::AST::CallExpr> expr,
+                              const std::string& name,
+                              std::shared_ptr<LM::Frontend::AST::FunctionDeclaration> fn);
+    // Recursively collapses nested staged-fn calls inside an expression into literals.
+    std::shared_ptr<LM::Frontend::AST::Expression> fold_stage0_expr(std::shared_ptr<LM::Frontend::AST::Expression> e, int depth);
+    // --- type-level path: staged fn returning `type` ---
+    // True when a registered staged fn's return annotation is `type` (a type constructor).
+    bool is_staged_type_fn(std::shared_ptr<LM::Frontend::AST::FunctionDeclaration> fn);
+    // Reduces an expression to a TypePtr in the fold environment: variable references to
+    // type bindings, `type { ... }` literals, `A | B` unions, and nested constructor calls.
+    TypePtr resolve_staged_type_expr(std::shared_ptr<LM::Frontend::AST::Expression> e, int depth);
+    // Resolves a staged constructor call appearing in a type annotation, e.g. `nullable(int)`.
+    TypePtr resolve_staged_call_annotation(std::shared_ptr<LM::Frontend::AST::TypeAnnotation> annotation);
+    // Stage-0 meta type names usable as staged type parameters: `type` and the kind bounds.
+    static bool is_stage0_meta_name(const std::string& name);
+    // Kind bounds for staged type parameters. `: type` binds any type, while `: enum` and
+    // `: frame` require that specific kind. `is_kind_bound` reports whether the annotation is
+    // a type parameter at all; the return value is the required tag, or nullopt when every
+    // type qualifies (`: type`).
+    std::optional<TypeTag> staged_kind_bound(const std::shared_ptr<LM::Frontend::AST::TypeAnnotation>& pann,
+                                             bool& is_kind_bound);
+    // Binds a resolved type argument to a staged type parameter, enforcing its kind bound.
+    // Reports and returns false when the bound is violated or the parameter takes values.
+    bool bind_staged_type_arg(const std::string& ctor_name, const std::string& pn,
+                              const std::shared_ptr<LM::Frontend::AST::TypeAnnotation>& pann,
+                              TypePtr arg, int line);
+    // Executes a staged function body against the current constant environment; emits
+    // result into out_* . Returns false if the body cannot be reduced to a constant.
+    // want_type selects type mode: the folded return value is a TypePtr in out_type.
+    bool fold_staged_body(std::shared_ptr<LM::Frontend::AST::FunctionDeclaration> fn,
+                          long long& out_int, double& out_double, bool& out_is_int,
+                          TypePtr& out_type, bool want_type);
+    // Executes a single statement of a staged fn body against the constant environment.
+    // Returns false when the statement cannot be reduced at compile time.
+    bool exec_staged_stmt(std::shared_ptr<LM::Frontend::AST::Statement> stmt,
+                          long long& out_int, double& out_double, bool& out_is_int,
+                          TypePtr& out_type, bool want_type,
+                          bool& returned, bool& failed);
+
+    // --- stage-0 VM fallback (docs/staged.md, roadmaps build step 4) ---
+    // True when a staged body uses a construct the AST folder does not implement -- loops and
+    // local mutation -- so it must run on the Register VM instead. The test is syntactic, so
+    // the routing decision is made before any folding, and a body never reports both "folded"
+    // and "unsupported" diagnostics.
+    static bool staged_body_needs_vm(const std::shared_ptr<LM::Frontend::AST::Statement>& body);
+    // Type-checks a body destined for the VM so lowering sees an inferred type on every node.
+    bool check_staged_body_for_vm(const std::shared_ptr<LM::Frontend::AST::FunctionDeclaration>& fn);
+    // Type-checks, lowers, fences, and keeps registered one staged fn so the VM can call it.
+    // Nested staged callees are prepared recursively, which is what lets a body compiled for the
+    // VM call another staged fn: inside the VM the arguments are runtime values, so there is
+    // nothing to fold and the call has to resolve through the LIR FunctionRegistry instead.
+    bool stage0_prepare_fn(const std::shared_ptr<LM::Frontend::AST::FunctionDeclaration>& fn);
+    // Drops every function stage 0 registered. Only the outermost run does this, so a nested
+    // prepare can rely on its callee staying available for the whole compile-time evaluation.
+    void stage0_release_fns();
+    // Lowers the staged fn to one LIR function, refuses any instruction that would reach the
+    // host, and runs it on the embedded Register VM against the constants already bound for
+    // its parameters. Reports and returns false when any of those steps fails.
+    bool run_staged_fn_on_vm(const std::shared_ptr<LM::Frontend::AST::FunctionDeclaration>& fn,
+                             long long& out_int, double& out_double, bool& out_is_int);
     
     // Expression type checking
     TypePtr check_literal_expr(std::shared_ptr<LM::Frontend::AST::LiteralExpr> expr, TypePtr expected_type = nullptr);

@@ -235,6 +235,14 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, uint64_
     const LIR::LIR_Inst* end_ptr = instructions_ptr + (end_pc < function.instructions.size() ? end_pc : function.instructions.size());
 
     while (pc < end_ptr) {
+        // Stage-0 charges compile time per executed instruction. The bound is off (budget is
+        // SIZE_MAX) for runtime execution, so the hot path only pays one predicted compare.
+        if (__builtin_expect(instruction_budget_ != std::numeric_limits<size_t>::max(), 0)) {
+            if (instruction_budget_ == 0) {
+                throw std::runtime_error("stage 0 VM: instruction budget exhausted");
+            }
+            --instruction_budget_;
+        }
         if (pc->op == LIR::LIR_Op::Nop || pc->op == LIR::LIR_Op::Label) {
             pc++;
             continue;

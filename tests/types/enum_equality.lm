@@ -1,0 +1,74 @@
+// Enum equality tests: `==`/`!=` on variants follow value semantics -- same enum, same variant,
+// equal payload -- and agree with `match`. Regression for the identity-compare defect tracked in
+// docs/roadmaps.md item 1.
+
+enum Color {
+    Red,
+    Green,
+    Blue
+}
+
+enum Status {
+    Active,
+    Inactive
+}
+
+enum Shape {
+    Circle(int),
+    Square(int)
+}
+
+// 1. Identical unit variants compare equal even though each use allocates a fresh value.
+var a = Color.Red;
+var b = Color.Red;
+assert(a == b);
+assert(a == Color.Red);
+assert(not (a != b));
+
+// 2. Different variants of the same enum compare unequal.
+assert(a != Color.Green);
+assert(not (a == Color.Green));
+
+// 3. Same tag, different enum: Color.Red and Status.Active are both tag 0, and must not be equal.
+var c: Color = Color.Red;
+var s: Status = Status.Active;
+assert(not (c == s));
+assert(c != s);
+
+// 4. Variants with associated values compare their payload as well as their tag.
+var k1 = Shape.Circle(3);
+var k2 = Shape.Circle(3);
+var k3 = Shape.Circle(4);
+var k4 = Shape.Square(3);
+assert(k1 == k2);
+assert(k1 != k3);
+assert(k1 != k4);
+
+// 5. Equality works through parameters and in control flow.
+fn is_red(x: Color): bool {
+    return x == Color.Red;
+}
+assert(is_red(Color.Red));
+assert(not is_red(Color.Blue));
+
+var branch = 0;
+if (a == Color.Red) {
+    branch = 1;
+} else {
+    branch = 2;
+}
+assert(branch == 1);
+
+// 6. `==` and `match` agree.
+fn describe(x: Color): str {
+    match (x) {
+        Color.Red => { return "red"; },
+        Color.Green => { return "green"; },
+        _ => { return "other"; }
+    }
+    return "end";
+}
+assert(describe(a) == "red");
+assert(describe(a) == describe(b));
+
+print("enum equality OK");

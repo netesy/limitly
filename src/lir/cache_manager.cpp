@@ -12,6 +12,11 @@
 #include <algorithm>
 #include <unordered_set>
 #include <cstring>
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <unistd.h>
+#endif
 
 namespace fs = std::filesystem;
 
@@ -131,6 +136,34 @@ struct CacheReader {
     }
 };
 
+// Stamp of the compiler executable itself. Source-file dependency checks alone
+// cannot detect a compiler semantics change; without this, an older binary's LIR
+// can be replayed after the compiler is rebuilt (stale folded code, etc.).
+// Returns false when the running binary cannot be located (check is then skipped).
+bool get_self_binary_stamp(int64_t& nanos, uint64_t& size) {
+    std::error_code ec;
+    fs::path self;
+#ifdef _WIN32
+    char buf[4096];
+    DWORD n = GetModuleFileNameA(nullptr, buf, static_cast<DWORD>(sizeof(buf)));
+    if (n == 0 || n >= sizeof(buf)) return false;
+    self = fs::path(buf);
+#else
+    char buf[4096];
+    ssize_t n = readlink("/proc/self/exe", buf, sizeof(buf) - 1);
+    if (n <= 0) return false;
+    buf[n] = '\0';
+    self = fs::path(buf);
+#endif
+    auto ftime = fs::last_write_time(self, ec);
+    if (ec) return false;
+    auto sz = fs::file_size(self, ec);
+    if (ec) return false;
+    nanos = std::chrono::duration_cast<std::chrono::nanoseconds>(ftime.time_since_epoch()).count();
+    size = static_cast<uint64_t>(sz);
+    return true;
+}
+
 } // namespace
 
 bool CacheManager::save_program_cache(
@@ -171,8 +204,14 @@ bool CacheManager::save_program_cache(
 
         CacheWriter w;
         w.bytes("LMC1", 4);
-        w.u8(1); // cache format version
+        w.u8(2); // cache format version (v2: embeds compiler-binary stamp)
         w.u8(1); // ABI version
+
+        // Compiler-binary stamp: invalidates every cache produced by a different build.
+        int64_t self_nanos = 0; uint64_t self_size = 0;
+        get_self_binary_stamp(self_nanos, self_size); // 0/0 => unavailable, check skipped
+        w.i64(self_nanos);
+        w.u64(self_size);
 
         // Dependencies
         w.u32(static_cast<uint32_t>(dep_paths.size()));
@@ -271,7 +310,23 @@ std::unique_ptr<LIR_Function> CacheManager::try_load_program_cache(
 
         uint8_t version = r.u8();
         uint8_t abi_version = r.u8();
-        if (version != 1 || abi_version != 1) return nullptr;
+        if (version != 2 || abi_version != 1) return nullptr;
+
+        // Validate compiler-binary stamp (0/0 means the writer could not stamp; skip).
+        {
+            int64_t stored_self_nanos = r.i64();
+            uint64_t stored_self_size = r.u64();
+            if (stored_self_nanos != 0 || stored_self_size != 0) {
+                int64_t cur_self_nanos = 0; uint64_t cur_self_size = 0;
+                if (!get_self_binary_stamp(cur_self_nanos, cur_self_size) ||
+                    cur_self_nanos != stored_self_nanos || cur_self_size != stored_self_size) {
+                    if (verbose || std::getenv("LYMAR_TRACE_CACHE")) {
+                        std::cerr << "[CACHE_MISS] Compiler binary changed: " << entry_file << "\n";
+                    }
+                    return nullptr;
+                }
+            }
+        }
 
         // Validate dependencies
         uint32_t dep_count = r.u32();

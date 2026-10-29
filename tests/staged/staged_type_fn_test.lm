@@ -1,0 +1,207 @@
+// =============================================================================
+// staged fn type-level path: type-returning staged functions fold to concrete
+// types at compile time (comptime type functions = the generic mechanism).
+// =============================================================================
+
+frame Money {
+    pub var cents: int;
+}
+
+// 1. Type parameter + union return: nullable(T) = T | nil
+staged fn nullable(T: type): type {
+    return T | nil;
+}
+
+var nv: nullable(int) = 42;
+assert(nv == 42);
+var nn: nullable(int) = nil;
+assert(nn == nil);
+
+// Alias form (docs/staged.md Example A shape).
+type IntOpt = nullable(int);
+var ao: IntOpt = 7;
+assert(ao == 7);
+
+// 2. A type parameter passed straight through carries the real type: fields resolve.
+staged fn only(T: type): type {
+    return T;
+}
+
+var m: only(Money) = Money();
+m.cents = 25;
+assert(m.cents == 25);
+
+// 3. Multiple type parameters: either(T, U) = T | U
+staged fn either(T: type, U: type): type {
+    return T | U;
+}
+
+var ev: either(int, str) = "union-value";
+assert(ev == "union-value");
+var ei: either(int, str) = 3;
+assert(ei == 3);
+
+// 4. Structural type result: pair(T, U) = { first: T, second: U }
+staged fn pair(T: type, U: type): type {
+    return type { first: T, second: U };
+}
+
+fn use_pair(p: pair(int, str)): int {
+    return p.first;
+}
+
+frame PairImpl {
+    pub var first: int;
+    pub var second: str;
+}
+
+var pi = PairImpl();
+pi.first = 11;
+pi.second = "ok";
+assert(use_pair(pi) == 11);
+
+// 5. Conditional type selection driven by a compile-time value parameter.
+staged fn pick(flag: int, T: type, U: type): type {
+    if (flag == 0) {
+        return T;
+    }
+    return U;
+}
+
+var pa: pick(0, Money, int) = Money();
+pa.cents = 1;
+assert(pa.cents == 1);
+var pb: pick(1, Money, int) = 9;
+assert(pb == 9);
+
+// 6. Nested constructors in annotation position.
+var w: nullable(either(int, str)) = "nested";
+assert(w == "nested");
+
+// 7. Shadowing inside the type fold: the inner constructor binds the SAME parameter
+//    name 'T' to int; outer's own T must survive it (the nested-call leak class at
+//    the type level). If T leaked, outer(str) would fold to int and reject a str.
+staged fn inner(T: type): type {
+    return T;
+}
+
+staged fn outer(T: type): type {
+    var dup: type = inner(int);
+    return either(T, dup);
+}
+
+var os: outer(str) = "survived";
+assert(os == "survived");
+
+// 8. Type-valued local bound to a frame type, then combined with the parameter.
+staged fn withLocal(T: type): type {
+    var other: type = Money;
+    return either(T, other);
+}
+
+var lw: withLocal(int) = 42;
+assert(lw == 42);
+
+// 9. The same constructor folded at two different instantiations.
+var x1: nullable(int) = 1;
+var x2: nullable(str) = "two";
+assert(x1 == 1);
+assert(x2 == "two");
+
+// 10. enum values flow through stage-0 types: a folded union accepts an enum
+// variant, and a constructor may return an existing enum type directly.
+enum Status {
+    Active,
+    Inactive
+}
+
+fn describe(s: nullable(Status)): str {
+    match (s) {
+        Status.Active => {
+            return "active";
+        },
+        Status.Inactive => {
+            return "inactive";
+        },
+        nil => {
+            return "none";
+        },
+        _ => {
+            return "other";
+        }
+    }
+    return "end";
+}
+
+staged fn statusType(): type {
+    return Status;
+}
+
+fn useStatus(s: statusType()): str {
+    match (s) {
+        Status.Active => {
+            return "direct";
+        },
+        _ => {
+            return "other";
+        }
+    }
+    return "end";
+}
+
+var bound: nullable(Status) = Status.Active;
+assert(describe(bound) == "active");
+var nilbound: nullable(Status) = nil;
+assert(describe(nilbound) == "none");
+assert(describe(Status.Inactive) == "inactive");
+assert(useStatus(Status.Active) == "direct");
+
+// A type argument selected by a compile-time value condition.
+var p: pick(0, Status, int) = Status.Active;
+assert(useStatus(p) == "direct");
+
+// 11. kind bounds: `: enum` and `: frame` restrict which type argument a
+// constructor accepts (docs/staged.md Example A). Verified structurally by passing a
+// frame whose fields match the folded type, as object literals are not checker-supported.
+staged fn result_of(OkType: type, ErrType: enum): type {
+    return type {
+        is_ok: bool,
+        ok_value: OkType,
+        err_value: ErrType
+    };
+}
+
+fn take_result(r: result_of(int, Status)): str {
+    return "ok";
+}
+
+frame ResImpl {
+    pub var is_ok: bool;
+    pub var ok_value: int;
+    pub var err_value: Status;
+}
+
+var ri = ResImpl();
+ri.ok_value = 7;
+assert(take_result(ri) == "ok");
+
+staged fn boxed(T: frame, U: type): type {
+    return type {
+        item: T,
+        tag: U
+    };
+}
+
+fn use_boxed(b: boxed(Money, str)): int {
+    return 1;
+}
+
+frame BoxImpl {
+    pub var item: Money;
+    pub var tag: str;
+}
+
+var bi = BoxImpl();
+assert(use_boxed(bi) == 1);
+
+print("staged type fn OK");

@@ -69,6 +69,10 @@ void FunctionRegistry::clear() {
     lir_functions_.clear();
 }
 
+void FunctionRegistry::erase(const std::string& name) {
+    lir_functions_.erase(name);
+}
+
 
 } // namespace LIR
 } // namespace LM

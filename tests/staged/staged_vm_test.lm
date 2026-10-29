@@ -1,0 +1,110 @@
+// Stage-0 VM tests: staged bodies outside the AST folder's subset (roadmap item 1, build step 4).
+// A loop or a local mutation makes the body need a real execution engine: it is lowered to LIR,
+// fenced, and run on the embedded Register VM at compile time. The folded result is a literal, so
+// nothing below differs from a body the folder evaluates.
+
+// Loop with local mutation.
+staged fn fact(n: int): int {
+    var r = 1;
+    var i = 2;
+    while (i <= n) {
+        r = r * i;
+        i = i + 1;
+    }
+    return r;
+}
+
+// Loop with a modulo chain and re-bound locals.
+staged fn gcd(a: int, b: int): int {
+    var x = a;
+    var y = b;
+    while (y != 0) {
+        var t = x % y;
+        x = y;
+        y = t;
+    }
+    return x;
+}
+
+// Loop plus self-recursion: the call resolves through the LIR FunctionRegistry entry that the
+// compile-time evaluation keeps registered for its duration.
+staged fn down(n: int): int {
+    var total = n;
+    var i = 0;
+    while (i < 1) {
+        if (n > 0) {
+            total = total + down(n - 1);
+        }
+        i = i + 1;
+    }
+    return total;
+}
+
+// Loop plus a call to another staged fn, whose own body is foldable. Preparing the callee is what
+// lets a VM body reuse the same helpers as a folder body.
+staged fn add1(x: int): int {
+    return x + 1;
+}
+staged fn count_up(n: int): int {
+    var acc = 0;
+    var i = 0;
+    while (i < n) {
+        acc = add1(acc);
+        i = i + 1;
+    }
+    return acc;
+}
+
+// A body the folder handles still folds, and a folded constant feeds ordinary code.
+staged fn square(x: int): int {
+    return x * x;
+}
+
+// Enum argument crossing into the VM. The while loop makes the body non-foldable, so normal
+// routing sends it to the VM; the unit-variant parameter is rebuilt as the VM's boxed enum
+// ([tag, nil, nil]) so `m == Mode.Fast` lowers to a tag compare that agrees with the folder.
+enum Mode {
+    Slow,
+    Fast
+}
+
+staged fn scaled(m: Mode, n: int): int {
+    var unit = 1;
+    if (m == Mode.Fast) {
+        unit = 2;
+    } elif (m == Mode.Slow) {
+        unit = 5;
+    }
+    var total = 0;
+    var i = 0;
+    while (i < n) {
+        total = total + unit;
+        i = i + 1;
+    }
+    return total;
+}
+
+val f = fact(10);       // 3628800
+val g = gcd(48, 18);    // 6
+val d = down(4);        // 4 + 3 + 2 + 1 + 0 = 10
+val c = count_up(5);    // 5
+val s = square(9);      // 81, folded by the AST folder
+
+assert(f == 3628800);
+assert(g == 6);
+assert(d == 10);
+assert(c == 5);
+assert(s == 81);
+
+// A VM-folded constant used as an ordinary operand.
+val mixed = fact(5) + gcd(100, 75);   // 120 + 25
+assert(mixed == 145);
+
+// Enum-valued argument folded on the VM (loop forces VM routing in normal mode).
+val e1 = scaled(Mode.Fast, 3);   // 2 * 3
+val e2 = scaled(Mode.Slow, 4);   // 5 * 4
+assert(e1 == 6);
+assert(e2 == 20);
+
+print("{f} {g} {d} {c} {s} {mixed}");
+print("{e1} {e2}");

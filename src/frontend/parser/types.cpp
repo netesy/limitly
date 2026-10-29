@@ -103,6 +103,32 @@ std::shared_ptr<LM::Frontend::AST::TypeAnnotation> Parser::parseBasicType() {
             }
         }
         type->isUserDefined = true;
+        // Stage-0 type constructor call: `name(ann, ...)` in a type position, e.g.
+        // `type IntOpt = nullable(int);`. Resolved by the staged evaluator at check time.
+        if (check(TokenType::LEFT_PAREN)) {
+            advance();
+            type->isStagedCall = true;
+            type->stagedCallName = type->typeName;
+            type->isUserDefined = false;
+            if (!check(TokenType::RIGHT_PAREN)) {
+                do {
+                    // Literal value argument, e.g. the 8 in `vector(8, int)`.
+                    if (check(TokenType::INT_LITERAL) || check(TokenType::FLOAT_LITERAL) ||
+                        check(TokenType::STRING) || check(TokenType::TRUE) || check(TokenType::FALSE)) {
+                        auto holder = std::make_shared<LM::Frontend::AST::TypeAnnotation>();
+                        holder->stagedCallValueArg = expression();
+                        if (!holder->stagedCallValueArg) return nullptr;
+                        type->stagedCallArgs.push_back(holder);
+                        continue;
+                    }
+                    auto argAnn = parseTypeAnnotation();
+                    if (!argAnn) return nullptr;
+                    type->stagedCallArgs.push_back(argAnn);
+                } while (match({TokenType::COMMA}));
+            }
+            consume(TokenType::RIGHT_PAREN, "Expected ')' after staged type constructor arguments.");
+            return type;
+        }
     } else if (match({TokenType::INT_TYPE})) { type->typeName = "int"; type->isPrimitive = true; }
     else if (match({TokenType::INT8_TYPE})) { type->typeName = "i8"; type->isPrimitive = true; }
     else if (match({TokenType::INT16_TYPE})) { type->typeName = "i16"; type->isPrimitive = true; }

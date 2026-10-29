@@ -139,6 +139,13 @@ public:
     
     // Type system access
     std::shared_ptr<TypeSystem> get_type_system() const { return type_system_; }
+    // Installs the type system that lowering reads language types through. generate_program()
+    // does this for a whole-program pass, and a single-function pass (compile-time evaluation of
+    // one staged fn) has to supply it the same way: the decimal and enum lowering paths call
+    // type_system_->getType(...) without a null guard.
+    void set_type_system(const std::shared_ptr<TypeSystem>& type_system) {
+        type_system_ = type_system;
+    }
     
 private:
     void emit_typed_instruction(const LIR_Inst& inst);

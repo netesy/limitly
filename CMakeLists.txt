@@ -39,6 +39,7 @@ set(FRONTEND_SOURCES
     src/frontend/type_checker/expressions.cpp
     src/frontend/type_checker/declarations.cpp
     src/frontend/type_checker/types.cpp
+    src/frontend/type_checker/staged_vm.cpp
     src/frontend/type_checker_factory.cpp
     src/frontend/memory_checker.cpp
     src/memory/ownership.cpp

@@ -1,0 +1,13 @@
+// @error:type_error
+// Stage-0 sandbox: a staged fn body has no host access, so it cannot call runtime code
+
+fn runtime_value(): int {
+    return 7;
+}
+
+staged fn peek(): int {
+    return runtime_value();
+}
+
+val stolen = peek();
+print("{stolen}");

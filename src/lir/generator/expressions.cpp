@@ -1228,6 +1228,94 @@ Reg Generator::emit_binary_expr(LM::Frontend::AST::BinaryExpr& expr) {
         result_type = get_promoted_numeric_type(left_type, right_type);
     }
     
+    // Enum equality is value semantics, so it cannot be left to the backends' boxed-value
+    // comparison: a variant is a heap object, and CmpEQ on the two registers is pointer identity.
+    // Lower it here over GetTag/GetPayload -- the instructions `match` already depends on, so every
+    // backend implements them faithfully -- which gives the language one equality definition instead
+    // of three value-equality helpers that disagree (see docs/roadmaps.md, item 1).
+    if ((op == LIR_Op::CmpEQ || op == LIR_Op::CmpNEQ) && left_type && right_type &&
+        left_type->tag == ::TypeTag::Enum && right_type->tag == ::TypeTag::Enum) {
+        auto enum_name = [](const TypePtr& t) -> std::string {
+            if (auto* e = std::get_if<EnumType>(&t->extra)) return e->name;
+            return std::string();
+        };
+        const std::string left_enum = enum_name(left_type);
+        const std::string right_enum = enum_name(right_type);
+        auto bool_type = std::make_shared<::Type>(::TypeTag::Bool);
+        set_register_type(dst, bool_type);
+
+        // Values of two different enums are never equal whatever their tags say -- Color.Red and
+        // Status.Active are both tag 0 -- so answer statically rather than comparing payloads.
+        if (!left_enum.empty() && !right_enum.empty() && left_enum != right_enum) {
+            Backend::Value constant = (op == LIR_Op::CmpNEQ) ? VAL_TRUE : VAL_FALSE;
+            emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Bool, dst, constant));
+            return dst;
+        }
+
+        const bool negated = (op == LIR_Op::CmpNEQ);
+        const LIR_Op pair_op = negated ? LIR_Op::CmpNEQ : LIR_Op::CmpEQ;
+        // `==` needs the payload only when the tags matched, `!=` only when they did not. The join
+        // is a jump rather than And/Or: those two LIR ops are bitwise, and `as_i64` of the boolean
+        // immediates VAL_TRUE/VAL_FALSE is 0, so ANDing two bools would answer false on the VM.
+        // This mirrors how the generator already lowers `and`/`or` above.
+        const LIR_Op skip_op = negated ? LIR_Op::JumpIf : LIR_Op::JumpIfFalse;
+
+        Reg tag_left = allocate_register();
+        Reg tag_right = allocate_register();
+        emit_instruction(LIR_Inst(LIR_Op::GetTag, Type::I64, tag_left, left));
+        emit_instruction(LIR_Inst(LIR_Op::GetTag, Type::I64, tag_right, right));
+
+        // dst holds the tag answer, which is also the answer when the payload is not consulted.
+        emit_instruction(LIR_Inst(pair_op, Type::Bool, dst, tag_left, tag_right));
+        set_register_type(dst, bool_type);
+
+        // An enum with no payload variants stores nil on both sides, so the payload compare can
+        // only ever be true and the tag answer is final. Skipping it keeps unit-variant equality a
+        // single compare with no join -- the shape `match` emits.
+        auto has_payload_variants = [](const TypePtr& t) -> bool {
+            if (auto* e = std::get_if<EnumType>(&t->extra)) {
+                for (const auto& variant : e->variantTypes) {
+                    if (!variant.second.empty()) return true;
+                }
+            }
+            return false;
+        };
+        if (!has_payload_variants(left_type) && !has_payload_variants(right_type)) {
+            return dst;
+        }
+
+        if (cfg_context_.building_cfg) {
+            LIR_BasicBlock* payload_block = create_basic_block("enum_cmp_payload");
+            LIR_BasicBlock* end_block = create_basic_block("enum_cmp_end");
+            emit_instruction(LIR_Inst(skip_op, 0, dst, 0, end_block->id));
+            add_block_edge(get_current_block(), payload_block);
+            add_block_edge(get_current_block(), end_block);
+            set_current_block(payload_block);
+            Reg pay_left = allocate_register();
+            Reg pay_right = allocate_register();
+            emit_instruction(LIR_Inst(LIR_Op::GetPayload, Type::Ptr, pay_left, left));
+            emit_instruction(LIR_Inst(LIR_Op::GetPayload, Type::Ptr, pay_right, right));
+            emit_instruction(LIR_Inst(pair_op, Type::Bool, dst, pay_left, pay_right));
+            set_register_type(dst, bool_type);
+            if (get_current_block() && !get_current_block()->has_terminator()) {
+                emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, end_block->id));
+                add_block_edge(get_current_block(), end_block);
+            }
+            set_current_block(end_block);
+        } else {
+            size_t jump_to_patch = current_function_->instructions.size();
+            emit_instruction(LIR_Inst(skip_op, Type::Void, 0, dst, 0, 0));
+            Reg pay_left = allocate_register();
+            Reg pay_right = allocate_register();
+            emit_instruction(LIR_Inst(LIR_Op::GetPayload, Type::Ptr, pay_left, left));
+            emit_instruction(LIR_Inst(LIR_Op::GetPayload, Type::Ptr, pay_right, right));
+            emit_instruction(LIR_Inst(pair_op, Type::Bool, dst, pay_left, pay_right));
+            set_register_type(dst, bool_type);
+            current_function_->instructions[jump_to_patch].imm = current_function_->instructions.size();
+        }
+        return dst;
+    }
+
     // Set type BEFORE emitting so it's available during emit_instruction
     if (result_type) {
         set_register_type(dst, result_type);
@@ -1388,6 +1476,11 @@ Reg Generator::emit_unary_expr(LM::Frontend::AST::UnaryExpr& expr) {
 
 
 Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
+    // A staged fn call is folded to a compile-time constant by the type checker; emit
+    // the constant instead of a runtime call (identical on VM and AOT backends).
+    if (expr.foldedConst) {
+        return emit_expr(*expr.foldedConst);
+    }
     auto argument_effect = [&](size_t index) {
         if (ownership_facts_) {
             auto fact = ownership_facts_->nodes.find(expr.memory_info.semantic_id);

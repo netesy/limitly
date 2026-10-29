@@ -32,6 +32,11 @@ public:
     
     // Clear all functions (for testing)
     void clear();
+
+    // Drops a single function. Compile-time (stage-0) evaluation registers the staged fn it
+    // is about to run and removes it again, so a compile-time-only function never becomes
+    // part of the program that is generated, cached, or exported afterwards.
+    void erase(const std::string& name);
     
 private:
     FunctionRegistry() = default;

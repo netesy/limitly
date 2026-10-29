@@ -1,0 +1,14 @@
+// @error:type_error
+// Stage-0 sandbox: the 1000000-step instruction cap bounds total fold work
+
+// Exponential fold: the recursion is shallow (40 deep) but the work is 2^40 calls, so
+// only a step budget can stop it.
+staged fn fib(n: int): int {
+    if (n < 2) {
+        return n;
+    }
+    return fib(n - 1) + fib(n - 2);
+}
+
+val blowup = fib(40);
+print("{blowup}");

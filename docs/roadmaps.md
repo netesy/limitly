@@ -18,7 +18,7 @@ what actually matters, and in what order to build it.
 
 | # | Item | Class | New LIR surface? | Cost | Depends on |
 |---|---|---|---|---|---|
-| 1 | Finish `staged fn` (compile-time execution) | Essential | No (folds at AST; VM-fallback reuses canonical LIR) | Med | — |
+| 1 | Finish `staged fn` (compile-time execution) — folding, type path, sandbox done | Essential | No (folds at AST; VM-fallback reuses canonical LIR) | Med | — |
 | 2 | Seamless C interop + foreign `.c/.cpp` linking | Capability | No (reuses existing FFI ops) | Med | 1 (comptime bindings) |
 | 3 | Generators (`yield`) over a coroutine substrate | Sugar | Fix existing effect ops | Med | — |
 | 4 | SIMD: auto-vectorize fused numeric streams | Capability | Phase 1: no; Phase 2: yes | Med–High | 3 (fusion input) |
@@ -62,8 +62,15 @@ These facts shape items 1–4 and are the ground truth the plan assumes.
   through. The frontend never emits them.
 - **Lazy iteration already exists** as the `std.iterator.Iterator` trait (`next(): any`)
   with `map/filter/take/skip/chain/zip/enumerate/flat_map` adapters.
-- **`staged` folds constant values** at type-check time and strips dead branches, but
-  `staged fn` is rejected and type-level returns are unimplemented.
+- **`staged` folds constant values** at type-check time and strips dead branches.
+  `staged fn` folds value-returning calls with compile-time-constant arguments into
+  literals (v1 subset: `val`/`var` constants, `if`/`elif`/`else`, nested staged calls,
+  `return`); the body is executed by the type checker and never reaches LIR. Type-level
+  returns are implemented: a `staged fn` annotated `: type` folds, in type position, to a
+  concrete type (union, structural, passed-through type parameter, existing enum type, or
+  value-conditioned selection). Type parameters carry kind bounds (`: type`, `: enum`,
+  `: frame`). Enum *types* flow through stage-0 as arguments and results; synthesizing a
+  *new* enum (fresh variants) at stage 0 is not implemented.
 - **C access is manual and runtime-only** (`declare(name, fnptr, param_types,
   return_type)`); no header parsing or auto-binding. The FFI lowering ops
   (`ForeignCall`, `Marshal`/`Unmarshal`, `LibraryLoad/Symbol/Unload`, `CallbackCreate`)
@@ -78,6 +85,22 @@ These facts shape items 1–4 and are the ground truth the plan assumes.
 
 ### 1. Finish `staged fn` — the keystone  [Essential]
 
+> **Status:** value folding and the type-level path are implemented (incl. nested-call
+> shadowing at both the value and type level, and decimal return fidelity), enum values joined the
+> stage-0 constant model so enum-driven branches fold and strip, and the sandbox bounds from
+> `docs/staged.md` section 4 are enforced (depth / step / byte budgets, host-call refusal). Build
+> steps 4 and 5 are done: non-foldable staged bodies now run on an embedded Register VM behind a
+> fail-closed opcode allowlist and a call fence, and the two executors are reconciled by the
+> `LYMAR_STAGE0_FORCE_VM` parity harness plus the consolidated test set (114 positive / 90 negative).
+
+Lymar has exactly **one** compile-time capability — `staged` — and comptime evaluation,
+generics, and "macros" are all things you do *with* it, not three systems. A macro
+subsystem is explicitly out of scope: macro-like power comes from ordinary `staged fn`
+code evaluated inside the type checker (the Zig position — no macro syntax, no `<T>`
+syntax), so there is no second surface where "a call" means different things at
+different phases. If `<T>`-style sugar ever ships, it must desugar to staged calls and
+may never coexist as a separately-implemented instantiation machinery.
+
 Lymar deliberately has **no generics**. The only current ways to write reusable,
 type-parameterized code are `any` (the dynamic escape hatch the stdlib is told not to
 overuse) and traits (runtime vtable dispatch — no monomorphization). `staged fn` — a
@@ -90,17 +113,193 @@ deferred module-values depend on.
 residual to LIR, so nothing here touches a backend.
 
 **Build:**
-1. Implement `staged fn`: register stage-0 callables, evaluate calls with concrete args,
-   fold to literals, re-validate (per `docs/staged.md` PASS-2).
-2. Add the type-level path: `staged fn` returning `type`/`union`/`enum` (this is the
-   generics replacement and the item's main payoff).
-3. Enforce the sandbox bounds documented in `docs/staged.md` (recursion depth, instruction
-   cap, memory cap, no host calls) with the specified `SemanticError`s.
-4. For staged bodies beyond the foldable subset, run their LIR on an embedded Register VM
-   with the syscall fence (block `ForeignCall`/`LibraryLoad`/`Channel*`) and fold the
-   result as `LoadConst`.
-5. Tests: `docs/staged.md` Examples A/B as regression; `tests/negative/` for bound
-   violations.
+1. *(done)* Implement `staged fn` value folding: register stage-0 callables, evaluate
+   calls with concrete args, fold to literals (`CallExpr::foldedConst`), skip staged
+   bodies in codegen — no new LIR surface, so VM and AOT conform by construction.
+   Regression: `tests/staged/staged_fn_test.lm`.
+2. *(done)* Add the type-level path: `staged fn` returning `type`/`union`/`enum` (this is
+   the generics replacement and the item's main payoff). A constructor is declared with a
+   `type` return annotation and `: type` parameters, and is callable only from type
+   positions — variable/parameter/type-alias annotations and staged bodies — never as a
+   value expression. Annotation arguments may also be compile-time constants
+   (`vector(8, int)`), which is what lets a comptime `if` select the returned type.
+   Type parameters carry a **kind bound**: `: type` accepts any type, `: enum` and `: frame`
+   accept only that kind and report a violation at the call site (`requires an enum type,
+   found \`Frame<Money>\``). The meta names are rejected anywhere a runtime signature or
+   binding could use them, so `var x: frame` and `fn f(a: enum)` fail loudly instead of
+   silently becoming `any`. `docs/staged.md` Example A is written in this spelling and runs.
+   Enum types are accepted as type arguments and returned as type results (verified with
+   `nullable(Status)` and a zero-argument constructor returning an existing enum). What is
+   *not* implemented is stage-0 construction of a brand-new enum with fresh variants; a
+   constructor composes existing types instead. In Example A that means `ErrType` is supplied
+   as an already-declared enum rather than being generated.
+   Regression: `tests/staged/staged_type_fn_test.lm`.
+3. *(done)* Enforce the sandbox bounds documented in `docs/staged.md` (recursion depth, instruction
+   cap, memory cap, no host calls) with the specified `SemanticError`s. One compilation-wide budget
+   charged by every stage-0 entry point (`TypeChecker::stage0_charge`); the first exhaustion latches
+   so a deep unwind reports once. Points worth knowing:
+   - The staged-fn fold depth was capped at 256 with a vague "depth/step limit" message; it is now
+     the documented 1000 and reports *maximum recursion depth exceeded*. 1000 nested C++ frames of
+     `fold_staged_body` → `exec_staged_stmt` → `fold_stage0_expr` is safe (measured, ~2 s to fail).
+   - Steps and bytes are separate currencies because they stop different shapes: an exponential
+     staged `fib(40)` (depth 40, 2^40 calls) trips the **byte** bound first at ~0.3 s because every
+     fold produces a literal node; a fold that spins over bound names trips the **step** bound. Both
+     are hard stops, and which one fires is a property of the program, not of the checker.
+   - The isolation boundary needed code because a host call was previously *silently* left in the
+     residual expression (failing later with "must be a compile-time constant"). Stage 0 is a
+     constant folder with no interpreter that could reach the OS, so it now refuses explicitly:
+     any callee in a staged fn body that is not a registered `staged fn` errors with *cannot call
+     \`name\` at compile time*. A `staged { ... }` block inside a runtime function is unaffected:
+     it decides a branch, and its residual statements are ordinary runtime code.
+   Regressions: `tests/negative/staged/staged_{recursion_depth,instruction_limit,host_call}.lm`,
+   checked by `tests/memory/run_negative_validation.py` (87 passed).
+4. *(done)* For staged bodies beyond the foldable subset, run their LIR on an embedded Register VM
+   with the syscall fence and fold the result as `LoadConst`. The AST folder stays canonical — the
+   type domain (`: type` params, type constructors, kind bounds) has no LIR representation, and a
+   folded constant changes the *type* of the expression around it, so folding has to happen while
+   the program is typed. Points worth knowing:
+   - Routing is **syntactic** (`TypeChecker::staged_body_needs_vm`), decided before anything folds,
+     because `add_error` prints as it records: a speculative "try the VM, fall back to the folder"
+     would emit diagnostics that have to be discarded, and a body would be reported twice.
+   - The fence is an **allowlist**, not the denylist the step was written as. Denying
+     `ForeignCall`/`LibraryLoad`/`Channel*` by name means a new opcode is sandbox-accessible until
+     someone remembers to add it; refusing everything unlisted makes the omission a compile error.
+     Stage 0 gets arithmetic, comparison, control flow, conversion, string building, fallible
+     values, enums, aggregates, region bookkeeping, and named calls.
+   - **`Call` was the hole the step did not mention.** It is not a safe opcode: VM dispatch reaches
+     precompiled native shared libraries for any exported symbol. A call is allowed only to the
+     staged fn itself, to another `staged fn` (lowered and registered on demand, so loops compose
+     with recursion and helper calls), to a `_builtin_*` intrinsic, or to a deterministic builtin —
+     with `print`/`input`/`time`/`clock`/`random`/`sleep` refused, because a compile-time value must
+     be pure.
+   - The fence bounds *what* runs, not *how long*: `RegisterVM::set_instruction_budget()` (off by
+     default, so runtime execution pays one predicted compare) stops a non-advancing staged loop
+     from hanging the compiler.
+   - Lowering one function outside `generate_program` needs the **type system installed**
+     (`Generator::set_type_system`): the decimal and enum paths call `type_system_->getType(...)`
+     unguarded. Without it a `d4` staged body faults — found by the parity switch, not by review.
+   - Compile-time functions are **erased** from `FunctionRegistry` and `LIRFunctionManager` when the
+     evaluation ends, so a `staged fn` cannot leak into codegen, the cache, or an export list.
+   - **Parity harness:** `LYMAR_STAGE0_FORCE_VM=1` routes every value-shaped body through the VM,
+     which turns each staged test into a cross-executor equality check. It must be run with
+     `--no-cache` (a cached program never re-folds), and it is what found the `d4` fault and the
+     the harness that found the `d4` fault and, once the enum boundary below was closed, drove every
+     staged body (including enum-valued ones) to a byte-identical VM result. This is the harness that
+     makes deleting the folder a safe deletion.
+   - Boundary: numbers, bools and **unit-variant enums** cross. An enum argument is rebuilt in the
+     VM's own boxed representation (`MakeEnum`'s 3-field frame `[tag, payload, variant_name]`, tag in
+     field 0) so a body's `m == Mode.Fast` lowers to the same `GetTag` compare the folder answers --
+     passing the bare tag as an int would compare unequal against the boxed enum and fold a wrong
+     constant. Payload-carrying variants are never a stage-0 *value* (`try_stage0_enum_value` refuses
+     them), so the payload/name fields stay nil and equality is a single tag compare. A **type-valued**
+     parameter still refuses: LIR has no representation for a type, and such bodies stay on the folder.
+     Default parameter values are refused too (their defaults have no environment on the VM).
+   Regressions: `tests/staged/staged_vm_test.lm` (loop, mutation, self-recursion, nested staged
+   call, **enum-argument crossing under a loop** → `3628800 6 10 5 81 145` / `6 20`),
+   `tests/staged/staged_enum_test.lm` (passes identically under `LYMAR_STAGE0_FORCE_VM=1`),
+   `tests/negative/staged/staged_vm_{host_call,opcode,instruction_budget}.lm` (90 negative
+   validations passing). Documented in `docs/staged.md` section 5.
+5. *(done)* Tests consolidating the two executors. `docs/staged.md` Examples A/B are mirrored by
+   live regressions -- Example A by `tests/staged/staged_type_fn_test.lm` (its `: enum`/`: frame`
+   kind-bound `result_of`/`boxed` cases), Example B by `tests/staged/staged_enum_test.lm`, runtime
+   enum `==` by `tests/types/enum_equality.lm`. Bound violations carry a negative per enforced limit,
+   one for each executor: the folder's `staged_{recursion_depth,instruction_limit,host_call}.lm` and
+   the VM's `staged_vm_{opcode,host_call,instruction_budget}.lm` (all under `// @error:type_error`).
+   `tests/memory/run_negative_validation.py` drives the negative tree (**90 passed**); the positive
+   manifest `tests/test.txt` runs all four staged tests in `run_tests.py` (**114 passed**).
+
+**Defects found while exercising item 1 (pre-existing, outside `staged`):**
+
+- **`==` had three different implementations; enums are now fixed in the generator.** *(fixed)*
+  The pre-fix measurements are kept because the shape recurs:
+
+  | site | enum / heap compare | result for `Status.Linux == Status.Linux` |
+  | --- | --- | --- |
+  | VM `src/backend/vm/ops/comparison.cpp` -> `lm_value_eq` (`vm_value.cpp:183`) | pointer identity; the PTR branch special-cases only `TYPE_STRING` / boxed strings | `false` |
+  | Fyra AOT `lymar_aot_value_equal` (`src/memory/aot_runtime.cpp:1143`) | structural: `tag` + `payload` when the header is `'ENUM'` (`0x454e554d`) | `true` |
+  | stage 0 `evaluate_const_expr` (`expressions.cpp:413`) | int/double only; **no** `MemberAccessExpr` case | did not fold at all |
+
+  Root cause was **two incompatible runtime representations for one language value**.
+  `MakeEnum` lowers to a heap object, not an integer tag: the VM allocates
+  `lm_frame_alloc("__lir_internal_enum__", 3)` (`ops/objects.cpp:15`, which stamps `TYPE_FRAME`),
+  while Fyra emits `lm_enum_new` (`fyra/builder.cpp:2360`), which writes a `'ENUM'` magic header.
+  Nothing in the VM marks its enum frames with that magic, and `lm_value_eq` has no frame branch,
+  so enum `==` degraded to identity on the VM. `match` was unaffected because the generator emits
+  `GetTag` + an *integer* `CmpEQ` (`lir/generator/statements.cpp:2159`), which takes the
+  `IS_INT && IS_INT` fast path. `print` was unaffected because `lm_value_to_string` **does** know
+  the internal name (`vm_value.cpp:396`) — formatting was taught about enum frames, equality was not.
+
+  Blast radius was wider than enums: on the VM every heap-structured value compares by identity —
+  `[1,2] == [1,2]`, `{"a":1} == {"a":1}`, `(1,2) == (1,2)` and same-field frames all yielded
+  `false`, while `"abc" == "abc"` yielded `true`; `c1 == c1` was `true`, confirming pure
+  identity. That is a language-design question, not a backend bug (see the open question below),
+  and is untouched by this fix. Enums, being value types, were not a design question.
+
+  **Fix.** The relation is defined once, in the LIR generator
+  (`lir/generator/expressions.cpp`), over `GetTag` / `CmpEQ` / `CmpNEQ` / `GetPayload` — the
+  instructions `match` already depends on, so both backends already implement them faithfully
+  and no new LIR surface or backend change was needed (AGENTS.md: backends must not require
+  generator changes and must stay behaviorally equivalent). `==` answers `tagL == tagR` and,
+  only when that holds, `payloadL == payloadR`; `!=` short-circuits the other way. Operands of two
+  different enums answer statically, because `Color.Red` and `Status.Active` are both tag 0. An
+  enum whose variants carry no payload lowers to a single tag compare. Stage 0 gained enum values
+  (`constant_enums_`, `try_stage0_enum_value`) so `CURRENT_PLATFORM == TargetPlatform.Linux` folds
+  and `docs/staged.md` Example B strips its untaken branches and prints the Linux branch.
+  Two traps this ran into, worth remembering: the join must be a **jump**, not `And`/`Or` — those
+  LIR ops are bitwise and `as_i64(VAL_TRUE)` is `0` on the VM, so ANDing two bools silently
+  answers false; and a second, separate constant map is needed for enums rather than reusing
+  `constant_ints`, so `p == 0` cannot fold against a variant tag.
+  Regressions: `tests/types/enum_equality.lm`, `tests/staged/staged_enum_test.lm`.
+- **Native codegen loses a value that crosses a control-flow join.** *(fixed, Fyra)*
+  Found while exercising item 1's enum regression: natively, `assert` on a computed bool failed
+  while the VM passed. No enums required to reproduce — the minimal case was pure integer:
+  `fn intmerge(a: int, b: int): int { var r = a; if (a == 0) { r = b; } return r; }` answered `0`
+  for `intmerge(0, 5)`; `boolmerge`, `andf(true, true)` and `k1 == k2` for payload variants
+  (`Shape.Circle(3)`) all failed the same way. Two shapes, one cause.
+
+  **Root cause (Fyra, x64).** `X64Architecture::emitPhiCopies` emits the edge copies that place a
+  phi's incoming value before a predecessor jumps into the join. It skipped a copy when
+  `getValueAsOperand(incoming) == getValueAsOperand(phi)`, reading *"same spelling, so self-copy,
+  nothing to do"*. That inference is only valid on the text (`-S`) path, where a value's operand
+  **is** the physical register it was allocated to. The object path keeps every value in a
+  lazily-allocated frame slot (`emitStoreResult` always stores to `getStackOffset`) and ignores
+  physical registers entirely, while `getValueAsOperand` still reports the register the linear-scan
+  allocator handed out. Two unrelated values can therefore share a register spelling while living
+  in different slots — param `%1` and the merge phi both printed `rsi` but sat at `-0x78(%rbp)` and
+  `-0xa8(%rbp)`. The copy was dropped, the phi's slot was never written on the taken edge, and the
+  join read uninitialised stack.
+  Two traps that cost the most time here, worth remembering: **`-S` output is not evidence about the
+  object path** (it runs the register-materialising pipeline, so the same function looks correct
+  there — only `objdump` on the real `.exe` showed the empty block and the phi slot written on one
+  edge); and **the SSA construction was innocent** (the post-`PhiInsertion`/`SSARenamer` dump already
+  had both incoming values, which is why the search had to move into codegen).
+
+  **Fix** is one condition in `vendor/fyra/src/target/architecture/x64/X64Architecture.cpp`: the
+  skip applies only when `cg.getTextStream()`. On the object path the copy is always emitted — a
+  genuine self-copy is a harmless slot-to-itself load/store, and skipping it is what broke the join.
+  First attempt (comparing `getStackOffset` in both modes) had to be reverted: a phi's slot is
+  allocated lazily, so asking for it before emission throws *Missing stack slot*. Verified against
+  the VM at `-O0/-O1/-O2/-O3`, and natively for `tests/types/enum_equality.lm` and
+  `tests/staged/staged_enum_test.lm` (both previously failed natively). Per AGENTS.md this is a Fyra
+  repository change: commit Fyra first, then update the superproject gitlink.
+  Related design question, still open: should `==` on plain frames and collections be identity or
+  structural? Move-by-default semantics (`var m3 = m1` reports "use of moved binding") suggests
+  frames are resources, so structural frame equality may be deliberately out of scope; enums,
+  being value types, are not.
+- **Object literals are not checker-supported.** `Point { x: 1, y: 2 }` reports "Unknown
+  expression type" and a bogus type mismatch, independent of any staged code, so stage-0
+  structural types are exercised by passing field-compatible frames to annotated parameters.
+- **Reading a field of a folded structural type lowers only when an argument pins the
+  layout.** An uncalled function taking `IntResult` fails in LIR generation ("Unknown field or
+  method: is_ok"); the same function called with a matching frame works.
+- **`tests/negative/run_negative_tests.py` does not parse.** *(open, pre-existing, tooling)* Every
+  line's leading indentation was flattened to a single space, so `__init__`'s body sits at the same
+  level as its `def` and the script dies with `IndentationError: expected an indented block after
+  function definition on line 102`. The negative tree is therefore driven by
+  `tests/memory/run_negative_validation.py`, which walks the same directory and is stricter (it
+  rejects signal exits and sanitizer aborts); that is what the sandbox regressions above are
+  verified with, 87 passed. Repairing the dedicated runner is a mechanical re-indent of 431 lines
+  and deserves its own pass.
 
 ### 2. Seamless C interop — and foreign `.c/.cpp` source  [Capability]
 

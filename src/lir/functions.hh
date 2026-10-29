@@ -109,6 +109,9 @@ public:
         functions_.clear();
         initialized_ = false;
     }
+    // Mirrors FunctionRegistry::erase for the manager's own table; stage-0 registers a staged
+    // fn for the duration of one compile-time call and then drops it again.
+    void erase(const std::string& name) { functions_.erase(name); }
     
     // Function lookup
     std::shared_ptr<LIRFunction> getFunction(const std::string& name);

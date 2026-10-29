@@ -622,6 +622,15 @@ std::shared_ptr<LM::Frontend::AST::Expression> Parser::primary() {
     }
     if (isIdentifierLike(peek()) && peek().type != TokenType::FN && peek().type != TokenType::FUNCTION_TYPE && !parse_as_constructor) {
         auto token = advance();
+        if (token.lexeme == "type" && check(TokenType::LEFT_BRACE)) {
+            // `type { field: T, ... }`: stage-0 type constructor expression, valid inside
+            // a staged fn whose return annotation is `type` (folded by the type checker).
+            auto tle = std::make_shared<LM::Frontend::AST::TypeLiteralExpr>();
+            tle->line = token.line;
+            tle->annotation = parseTypeAnnotation();
+            if (!tle->annotation) { error("Expected a type after 'type' in type constructor expression."); return nullptr; }
+            return tle;
+        }
         if (token.lexeme == "self") {
             auto thisExpr = std::make_shared<LM::Frontend::AST::ThisExpr>();
             thisExpr->line = token.line; return thisExpr;

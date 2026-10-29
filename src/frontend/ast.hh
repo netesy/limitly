@@ -84,6 +84,7 @@ namespace AST {
     struct TypeAnnotation;
     struct FunctionTypeAnnotation;
     struct StructuralTypeField;
+    struct TypeLiteralExpr;
     struct TypeDeclaration;
     struct TraitDeclaration;
     struct MixinDeclaration;
@@ -254,6 +255,24 @@ namespace AST {
         // Error handling support
         bool isFallible = false;                                         // Whether this type can fail (Type?)
         std::vector<std::string> errorTypes;                             // Specific error types (Type?Error1, Error2)
+
+        // Stage-0 type constructor call (e.g., `nullable(int)` in a type position).
+        // Resolved by the staged evaluator to a concrete type during type checking.
+        bool isStagedCall = false;
+        std::string stagedCallName;                                      // staged fn name
+        std::vector<std::shared_ptr<TypeAnnotation>> stagedCallArgs;     // type arguments
+        // A literal value supplied as a staged-call argument in type position, e.g.
+        // `vector(8, int)`. Type annotations cannot carry constants, so the expression
+        // is kept here and folded into the staged environment as a value parameter.
+        std::shared_ptr<Expression> stagedCallValueArg = nullptr;
+    };
+
+    // Type-as-value expression: `type { field: T, ... }` or `T | nil` inside a staged fn
+    // body whose return annotation is `type`. Evaluated at stage 0; carries the resolved
+    // type after folding. Never reaches codegen outside a staged context.
+    struct TypeLiteralExpr : public Expression {
+        std::shared_ptr<TypeAnnotation> annotation;
+        TypePtr resolvedType = nullptr;                                  // filled by the staged fold
     };
 
     // Function type annotation with specific signature (e.g., fn(a: int, b: str): bool)
@@ -348,6 +367,9 @@ namespace AST {
         std::shared_ptr<Expression> callee;
         std::vector<std::shared_ptr<Expression>> arguments;
         std::unordered_map<std::string, std::shared_ptr<Expression>> namedArgs;
+        // When set, the call was folded to a compile-time constant (e.g. a staged fn
+        // call). The generator emits this literal instead of a runtime call.
+        std::shared_ptr<Expression> foldedConst = nullptr;
     };
 
     // Closure call (for calling closure variables)

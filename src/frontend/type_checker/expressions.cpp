@@ -12,6 +12,16 @@ TypePtr TypeChecker::check_expression(std::shared_ptr<LM::Frontend::AST::Express
     
     if (auto literal = std::dynamic_pointer_cast<LM::Frontend::AST::LiteralExpr>(expr)) {
         type = check_literal_expr(literal, expected_type);
+    } else if (auto typelit = std::dynamic_pointer_cast<LM::Frontend::AST::TypeLiteralExpr>(expr)) {
+        // `type { ... }` is a stage-0 construct: the fold executor consumes it inside a
+        // staged fn returning `type`. Anywhere else it has no runtime meaning.
+        if (typelit->resolvedType) {
+            expr->inferred_type = type_system.ANY_TYPE;
+            return type_system.ANY_TYPE;
+        }
+        add_error("type constructor expression is only valid inside a staged fn returning type", expr->line);
+        expr->inferred_type = type_system.ANY_TYPE;
+        return type_system.ANY_TYPE;
     } else if (auto call = std::dynamic_pointer_cast<LM::Frontend::AST::CallExpr>(expr)) {
         type = check_call_expr(call, expected_type);
     } else if (auto variable = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(expr)) {
@@ -354,6 +364,22 @@ TypePtr TypeChecker::check_variable_expr(std::shared_ptr<LM::Frontend::AST::Vari
         }
     }
 
+    // Bare user-defined type names used as values (e.g. `Money { cents: 1 }` object
+    // constructors, or a staged type constructor's frame argument). Frame lookups only
+    // run at check time, so the fold executor cannot see them; mirror it here.
+    if (!type) {
+        auto ct = constant_types_.find(expr->name);
+        if (ct != constant_types_.end()) {
+            expr->inferred_type = ct->second;
+            return ct->second;
+        }
+        if (const FrameInfo* fi = lookup_frame_info(expr->name)) {
+            type = type_system.createFrameType(fi->name);
+            expr->inferred_type = type;
+            return type;
+        }
+    }
+
     if (!type) {
         undefined_symbols.insert(expr->name);
         std::vector<std::string> candidates = get_visible_variables();
@@ -382,6 +408,41 @@ TypePtr TypeChecker::check_variable_expr(std::shared_ptr<LM::Frontend::AST::Vari
     
     expr->inferred_type = type;
     return type;
+}
+
+// Resolves a compile-time enum value. Stage 0 needs this because an enum variant is neither a
+// literal nor a numeric constant: without it `if (CURRENT_PLATFORM == TargetPlatform.Linux)` can
+// never fold, and the branch survives to the runtime it was supposed to be stripped for.
+bool TypeChecker::try_stage0_enum_value(const std::shared_ptr<LM::Frontend::AST::Expression>& e,
+                                        long long& out_tag, std::string& out_enum_name) {
+    if (!e) return false;
+    if (auto member = std::dynamic_pointer_cast<LM::Frontend::AST::MemberExpr>(e)) {
+        auto owner = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(member->object);
+        if (!owner) return false;
+        TypePtr enum_type = type_system.getType(owner->name);
+        if (!enum_type || enum_type->tag != ::TypeTag::Enum) return false;
+        auto* info = std::get_if<EnumType>(&enum_type->extra);
+        if (!info) return false;
+        // A variant with associated values is a constructor call, not a compile-time value.
+        auto arity = info->variantTypes.find(member->name);
+        if (arity != info->variantTypes.end() && !arity->second.empty()) return false;
+        for (size_t i = 0; i < info->values.size(); ++i) {
+            if (info->values[i] == member->name) {
+                out_tag = static_cast<long long>(i);
+                out_enum_name = info->name;
+                return true;
+            }
+        }
+        return false;
+    }
+    if (auto var = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(e)) {
+        auto it = constant_enums_.find(var->name);
+        if (it == constant_enums_.end()) return false;
+        out_tag = it->second.second;
+        out_enum_name = it->second.first;
+        return true;
+    }
+    return false;
 }
 
 bool evaluate_const_expr(std::shared_ptr<LM::Frontend::AST::Expression> expr, long long& out_int, double& out_double, bool& is_int, TypeChecker* checker) {
@@ -462,6 +523,23 @@ bool evaluate_const_expr(std::shared_ptr<LM::Frontend::AST::Expression> expr, lo
             }
         }
     } else if (auto binary = std::dynamic_pointer_cast<LM::Frontend::AST::BinaryExpr>(expr)) {
+        // Enum equality folds on enum identity -- same enum, same variant -- which mirrors the
+        // structural lowering the LIR generator emits for `==`/`!=` on enum operands. Deliberately
+        // narrow: mixed enum/int equality is not folded, because the runtime answers those by value
+        // kind and stage 0 must not invent a cheaper answer.
+        if (checker && (binary->op == TokenType::EQUAL_EQUAL || binary->op == TokenType::BANG_EQUAL)) {
+            long long left_tag = 0, right_tag = 0;
+            std::string left_enum, right_enum;
+            if (checker->try_stage0_enum_value(binary->left, left_tag, left_enum) &&
+                checker->try_stage0_enum_value(binary->right, right_tag, right_enum)) {
+                const bool same_variant = (left_tag == right_tag) && (left_enum == right_enum);
+                const bool want_eq = (binary->op == TokenType::EQUAL_EQUAL);
+                out_int = (want_eq == same_variant) ? 1 : 0;
+                is_int = true;
+                return true;
+            }
+        }
+
         long long left_int = 0, right_int = 0;
         double left_double = 0.0, right_double = 0.0;
         bool left_is_int = false, right_is_int = false;
@@ -978,6 +1056,126 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
 
     if (!target_name.empty()) {
         resolve_call_arguments(expr, target_name);
+    }
+
+    // --- staged fn: fold the call to a compile-time constant ---
+    if (!target_name.empty()) {
+        auto staged_it = staged_functions_.find(target_name);
+        // A staged call inside a body compiled for the stage-0 VM is a real call, not a fold:
+        // the arguments are values that only exist while the body runs, so there is nothing to
+        // fold, and a staged fn has no runtime symbol to call. Instead the callee is lowered and
+        // kept registered in the LIR FunctionRegistry by stage0_prepare_fn(), so the Call the
+        // generator emits resolves into it. That covers both self-recursion and nested staged
+        // calls, which is what lets a loop-shaped body use the same helpers as a foldable one.
+        if (checking_staged_body_ && staged_it != staged_functions_.end()) {
+            if (is_staged_type_fn(staged_it->second)) {
+                add_error("stage 0 VM: staged fn '" + target_name + "' returns type and cannot be "
+                          "called from a body compiled for the VM", expr->line);
+                expr->inferred_type = type_system.ANY_TYPE;
+                return type_system.ANY_TYPE;
+            }
+            TypePtr staged_callee_return = type_system.ANY_TYPE;
+            auto sig_it = function_signatures.find(target_name);
+            if (sig_it != function_signatures.end()) {
+                staged_callee_return = sig_it->second.return_type;
+                const size_t want = sig_it->second.param_types.size();
+                if (expr->namedArgs.empty() && want != expr->arguments.size()) {
+                    add_error("staged fn '" + target_name + "' expects " + std::to_string(want) +
+                              " argument(s), got " + std::to_string(expr->arguments.size()),
+                              expr->line);
+                }
+            }
+            expr->inferred_type = staged_callee_return;
+            return staged_callee_return;
+        }
+        if (staged_it != staged_functions_.end()) {
+            auto fn = staged_it->second;
+            if (is_staged_type_fn(fn)) {
+                // Type constructors are callable only from type positions (annotations);
+                // there is no runtime value to produce here.
+                add_error("staged fn '" + target_name + "' returns type and can only be used in a type position", expr->line);
+                expr->inferred_type = type_system.ANY_TYPE;
+                return type_system.ANY_TYPE;
+            }
+            TypePtr rt = type_system.ANY_TYPE;
+            auto sig_it = function_signatures.find(target_name);
+            if (sig_it != function_signatures.end()) rt = sig_it->second.return_type;
+
+            if (!expr->namedArgs.empty()) {
+                add_error("staged fn '" + target_name + "' must be called with positional arguments", expr->line);
+            } else if (expr->arguments.size() != fn->params.size()) {
+                add_error("staged fn '" + target_name + "' expects " + std::to_string(fn->params.size()) + " argument(s)", expr->line);
+            } else {
+                bool bind_ok = true;
+                auto saved_ints = constant_ints;
+                auto saved_doubles = constant_doubles;
+                auto saved_types = constant_types_;
+                auto saved_enums = constant_enums_;
+                for (size_t i = 0; i < fn->params.size(); ++i) {
+                    auto fa = fold_stage0_expr(expr->arguments[i], 0);
+                    expr->arguments[i] = fa;
+                    const std::string& pname = fn->params[i].first;
+                    // Enum arguments live in the enum environment, never as integers.
+                    long long etag = 0; std::string ename;
+                    if (try_stage0_enum_value(fa, etag, ename)) {
+                        constant_ints.erase(pname);
+                        constant_doubles.erase(pname);
+                        constant_enums_[pname] = {ename, etag};
+                        continue;
+                    }
+                    long long vi = 0; double vd = 0.0; bool is_int = false;
+                    if (!evaluate_const_expr(fa, vi, vd, is_int, this)) {
+                        add_error("staged fn '" + target_name + "' argument " + std::to_string(i + 1) + " must be a compile-time constant", expr->line);
+                        bind_ok = false;
+                        break;
+                    }
+                    constant_ints.erase(pname);
+                    constant_doubles.erase(pname);
+                    constant_enums_.erase(pname);
+                    if (is_int) constant_ints[pname] = vi; else constant_doubles[pname] = vd;
+                }
+                if (bind_ok) {
+                    long long oi = 0; double od = 0.0; bool oisint = false;
+                    TypePtr dummy;
+                    bool folded = fold_staged_body(fn, oi, od, oisint, dummy, false);
+                    constant_ints = saved_ints;
+                    constant_doubles = saved_doubles;
+                    constant_types_ = saved_types;
+                    constant_enums_ = saved_enums;
+                    if (folded) {
+                        auto lit = std::make_shared<LM::Frontend::AST::LiteralExpr>();
+                        lit->line = expr->line;
+                        if (oisint) {
+                            lit->value = std::to_string(oi);
+                            lit->literalType = TokenType::INT_LITERAL;
+                            lit->inferred_type = type_system.INT64_TYPE;
+                        } else {
+                            lit->value = std::to_string(od);
+                            lit->literalType = TokenType::FLOAT_LITERAL;
+                            lit->inferred_type = type_system.FLOAT64_TYPE;
+                        }
+                        // Preserve a declared decimal return type (d2/d4/d6) on the folded
+                        // constant so every downstream consumer boxes it exactly like a
+                        // literal initializer of that type (fixed-point scale, not float bits).
+                        if (rt && (rt->tag == ::TypeTag::Decimal2 || rt->tag == ::TypeTag::Decimal4 ||
+                                  rt->tag == ::TypeTag::Decimal6)) {
+                            lit->inferred_type = rt;
+                        }
+                        expr->foldedConst = lit;
+                        expr->inferred_type = rt;
+                        return rt;
+                    }
+                } else {
+                    constant_ints = saved_ints;
+                    constant_doubles = saved_doubles;
+                    constant_types_ = saved_types;
+                    constant_enums_ = saved_enums;
+                }
+            }
+            // Recorded an error above; still return the declared type to avoid cascades.
+            expr->inferred_type = rt;
+            return rt;
+        }
     }
 
     if (!in_unsafe_block && !target_name.empty()) {
@@ -2770,12 +2968,13 @@ TypePtr TypeChecker::check_staged_expr(std::shared_ptr<LM::Frontend::AST::Staged
 }
 
 std::shared_ptr<LM::Frontend::AST::Expression> TypeChecker::evaluate_staged_expression(std::shared_ptr<LM::Frontend::AST::Expression> expr, size_t depth) {
-    static const size_t MAX_RECURSION_DEPTH = 1000;
-    if (depth > MAX_RECURSION_DEPTH) {
-        add_error("staged evaluation error: maximum recursion depth (1000) exceeded", expr ? expr->line : 0);
+    if (!expr) return nullptr;
+    if (!stage0_charge(expr->line)) return expr;
+    if (depth >= STAGE0_MAX_DEPTH) {
+        add_error("staged evaluation error: maximum recursion depth exceeded (1000 nested nodes)", expr->line);
+        staged_budget_exhausted_ = true;
         return expr;
     }
-    if (!expr) return nullptr;
 
     if (auto lit = std::dynamic_pointer_cast<LM::Frontend::AST::LiteralExpr>(expr)) {
         return lit;
@@ -2788,6 +2987,7 @@ std::shared_ptr<LM::Frontend::AST::Expression> TypeChecker::evaluate_staged_expr
             lit->value = std::to_string(it_int->second);
             lit->literalType = TokenType::INT_LITERAL;
             lit->inferred_type = type_system.INT64_TYPE;
+            stage0_charge(var->line, 0, sizeof(LM::Frontend::AST::LiteralExpr));
             return lit;
         }
         auto it_dbl = constant_doubles.find(var->name);
@@ -2797,6 +2997,7 @@ std::shared_ptr<LM::Frontend::AST::Expression> TypeChecker::evaluate_staged_expr
             lit->value = std::to_string(it_dbl->second);
             lit->literalType = TokenType::FLOAT_LITERAL;
             lit->inferred_type = type_system.FLOAT64_TYPE;
+            stage0_charge(var->line, 0, sizeof(LM::Frontend::AST::LiteralExpr));
             return lit;
         }
         return var;
@@ -2819,6 +3020,7 @@ std::shared_ptr<LM::Frontend::AST::Expression> TypeChecker::evaluate_staged_expr
                 lit->literalType = TokenType::FLOAT_LITERAL;
                 lit->inferred_type = type_system.FLOAT64_TYPE;
             }
+            stage0_charge(bin->line, 0, sizeof(LM::Frontend::AST::LiteralExpr));
             return lit;
         }
         bin->left = left_eval;

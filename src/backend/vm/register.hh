@@ -24,6 +24,7 @@
 #include <queue>
 #include <chrono>
 #include <algorithm>
+#include <limits>
 #include <stdexcept>
 
 namespace LM {
@@ -134,7 +135,23 @@ public:
                                       const std::vector<RegisterValue>& args,
                                       bool propagate_errors = false);
 
+    // Runs one already-lowered function with `args` bound to registers 0..n-1 and returns
+    // registers[0]. Unlike invoke_for_callback this resolves nothing by name: the compile-time
+    // (stage-0) evaluator owns the LIR_Function for the duration of the call, so the same entry
+    // point stays usable whether or not the function is registered anywhere.
+    RegisterValue invoke_function(const LIR::LIR_Function* function,
+                                  const std::vector<RegisterValue>& args) {
+        return call_interpreted(function, args);
+    }
+
+    // Bounds compile-time execution. Stage 0 charges one count per executed instruction and
+    // throws once the budget is spent, so a runaway staged body cannot hang the compiler.
+    // The default (SIZE_MAX) disables the bound, leaving runtime execution unchecked.
+    void set_instruction_budget(size_t budget) { instruction_budget_ = budget; }
+
 private:
+    size_t instruction_budget_ = std::numeric_limits<size_t>::max();
+
     RegisterValue call_interpreted(const std::string& name,
                                    const std::vector<RegisterValue>& args);
     RegisterValue call_interpreted(const LIR::LIR_Function* function,
