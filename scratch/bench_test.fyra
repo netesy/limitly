@@ -1,0 +1,1577 @@
+global %str_hdr_62 = unsupported_global
+global %nl = unsupported_global
+global %str_hdr_98 = unsupported_global
+global %list_lbracket = unsupported_global
+global %list_comma = unsupported_global
+global %list_rbracket = unsupported_global
+function main() {
+@entry
+  %region_meta_0_26 = call %lymar_aot_call_enter : i64
+  %0 = call %lymar_aot_region_current : i64
+  %scalar_slot_r0 = alloc 8 : i64*
+  store 0 %scalar_slot_r0
+  %scalar_slot_r1 = alloc 8 : i64*
+  store 0 %scalar_slot_r1
+  %scalar_slot_r2 = alloc 8 : i64*
+  store 0 %scalar_slot_r2
+  %scalar_slot_r3 = alloc 8 : i64*
+  store 0 %scalar_slot_r3
+  %scalar_slot_r4 = alloc 8 : i64*
+  store 0 %scalar_slot_r4
+  %scalar_slot_r5 = alloc 8 : i64*
+  store 0 %scalar_slot_r5
+  %scalar_slot_r6 = alloc 8 : i64*
+  store 0 %scalar_slot_r6
+  %scalar_slot_r7 = alloc 8 : i64*
+  store 0 %scalar_slot_r7
+  %scalar_slot_r8 = alloc 8 : i64*
+  store 0 %scalar_slot_r8
+  %scalar_slot_r9 = alloc 8 : i64*
+  store 0 %scalar_slot_r9
+  %scalar_slot_r10 = alloc 8 : i64*
+  store 0 %scalar_slot_r10
+  %scalar_slot_r11 = alloc 8 : i64*
+  store 0 %scalar_slot_r11
+  jmp %block_0
+@block_0
+  call %lymar_aot_region_enter 1
+  %r0 = call %__user_main : i64
+  %region_meta_0_5 = call %lymar_aot_return_pointer : i64
+  store %r0 %scalar_slot_r0
+  call %lymar_aot_region_exit 1
+  call %lymar_aot_call_leave 0
+  ret 0
+}
+
+function swap(i64, i64, i64) {
+@entry
+  %region_meta_0_37 = call %lymar_aot_call_enter : i64
+  %region_meta_0_38 = call %lymar_aot_arg_kind 0 0 : i64
+  %region_meta_1_39 = call %lymar_aot_arg_kind 1 0 : i64
+  %region_meta_2_40 = call %lymar_aot_arg_kind 2 0 : i64
+  %3 = call %lymar_aot_region_current : i64
+  %slot_r0 = alloc 8 : i64*
+  store 0 %slot_r0
+  call %lymar_aot_edge %slot_r0 0 0
+  %scalar_slot_r1 = alloc 8 : i64*
+  store 0 %scalar_slot_r1
+  %scalar_slot_r2 = alloc 8 : i64*
+  store 0 %scalar_slot_r2
+  %scalar_slot_r3 = alloc 8 : i64*
+  store 0 %scalar_slot_r3
+  %scalar_slot_r4 = alloc 8 : i64*
+  store 0 %scalar_slot_r4
+  %scalar_slot_r5 = alloc 8 : i64*
+  store 0 %scalar_slot_r5
+  %scalar_slot_r6 = alloc 8 : i64*
+  store 0 %scalar_slot_r6
+  %scalar_slot_r7 = alloc 8 : i64*
+  store 0 %scalar_slot_r7
+  %scalar_slot_r8 = alloc 8 : i64*
+  store 0 %scalar_slot_r8
+  %scalar_slot_r9 = alloc 8 : i64*
+  store 0 %scalar_slot_r9
+  %scalar_slot_r10 = alloc 8 : i64*
+  store 0 %scalar_slot_r10
+  %scalar_slot_r11 = alloc 8 : i64*
+  store 0 %scalar_slot_r11
+  %scalar_slot_r12 = alloc 8 : i64*
+  store 0 %scalar_slot_r12
+  %scalar_slot_r13 = alloc 8 : i64*
+  store 0 %scalar_slot_r13
+  %scalar_slot_r14 = alloc 8 : i64*
+  store 0 %scalar_slot_r14
+  %scalar_slot_r15 = alloc 8 : i64*
+  store 0 %scalar_slot_r15
+  store %0 %slot_r0
+  call %lymar_aot_edge %slot_r0 %0 1
+  store %1 %scalar_slot_r1
+  store %2 %scalar_slot_r2
+  jmp %block_0
+@block_0
+  call %lymar_aot_region_enter 1
+  call %lymar_aot_region_enter 2
+  %load_r0_0 = loadl %slot_r0 : i64
+  %load_r1_1 = loadl %scalar_slot_r1 : i64
+  %26 = and %load_r0_0 18446744073709551608 : i64
+  %27 = add %26 8 : i64
+  %28 = loadl %27 : i64
+  %region_meta_6_42 = call %lymar_aot_slot_pointer %27 : i64
+  %29 = mul %load_r1_1 8 : i64
+  %30 = add %28 %29 : i64
+  %scalar_elem_2 = loadl %30 : i64
+  store %scalar_elem_2 %scalar_slot_r3
+  %load_r0_3 = loadl %slot_r0 : i64
+  %load_r2_4 = loadl %scalar_slot_r2 : i64
+  %32 = and %load_r0_3 18446744073709551608 : i64
+  %33 = add %32 8 : i64
+  %34 = loadl %33 : i64
+  %region_meta_12_43 = call %lymar_aot_slot_pointer %33 : i64
+  %35 = mul %load_r2_4 8 : i64
+  %36 = add %34 %35 : i64
+  %scalar_elem_5 = loadl %36 : i64
+  store %scalar_elem_5 %scalar_slot_r4
+  %load_r0_6 = loadl %slot_r0 : i64
+  %load_r1_7 = loadl %scalar_slot_r1 : i64
+  %load_r4_8 = loadl %scalar_slot_r4 : i64
+  %38 = and %load_r0_6 18446744073709551608 : i64
+  %39 = add %38 8 : i64
+  %40 = loadl %39 : i64
+  %region_meta_19_44 = call %lymar_aot_slot_pointer %39 : i64
+  %41 = mul %load_r1_7 8 : i64
+  %scalar_elem_9 = add %40 %41 : i64
+  store %load_r4_8 %scalar_elem_9
+  %load_r0_10 = loadl %slot_r0 : i64
+  %load_r2_11 = loadl %scalar_slot_r2 : i64
+  %load_r3_12 = loadl %scalar_slot_r3 : i64
+  %42 = and %load_r0_10 18446744073709551608 : i64
+  %43 = add %42 8 : i64
+  %44 = loadl %43 : i64
+  %region_meta_25_45 = call %lymar_aot_slot_pointer %43 : i64
+  %45 = mul %load_r2_11 8 : i64
+  %scalar_elem_13 = add %44 %45 : i64
+  store %load_r3_12 %scalar_elem_13
+  call %lymar_aot_region_exit 2
+  call %lymar_aot_region_exit 1
+  %48 = call %lymar_aot_nil : i64
+  call %lymar_aot_call_leave 1
+  ret %48
+}
+
+function quicksort(i64, i64, i64) {
+@entry
+  %region_meta_0_85 = call %lymar_aot_call_enter : i64
+  %region_meta_0_86 = call %lymar_aot_arg_kind 0 0 : i64
+  %region_meta_1_87 = call %lymar_aot_arg_kind 1 0 : i64
+  %region_meta_2_88 = call %lymar_aot_arg_kind 2 0 : i64
+  %3 = call %lymar_aot_region_current : i64
+  %slot_r0 = alloc 8 : i64*
+  store 0 %slot_r0
+  call %lymar_aot_edge %slot_r0 0 0
+  %scalar_slot_r1 = alloc 8 : i64*
+  store 0 %scalar_slot_r1
+  %scalar_slot_r2 = alloc 8 : i64*
+  store 0 %scalar_slot_r2
+  %scalar_slot_r3 = alloc 8 : i64*
+  store 0 %scalar_slot_r3
+  %scalar_slot_r4 = alloc 8 : i64*
+  store 0 %scalar_slot_r4
+  %scalar_slot_r5 = alloc 8 : i64*
+  store 0 %scalar_slot_r5
+  %scalar_slot_r6 = alloc 8 : i64*
+  store 0 %scalar_slot_r6
+  %scalar_slot_r7 = alloc 8 : i64*
+  store 0 %scalar_slot_r7
+  %scalar_slot_r8 = alloc 8 : i64*
+  store 0 %scalar_slot_r8
+  %scalar_slot_r9 = alloc 8 : i64*
+  store 0 %scalar_slot_r9
+  %scalar_slot_r10 = alloc 8 : i64*
+  store 0 %scalar_slot_r10
+  %scalar_slot_r11 = alloc 8 : i64*
+  store 0 %scalar_slot_r11
+  %scalar_slot_r12 = alloc 8 : i64*
+  store 0 %scalar_slot_r12
+  %scalar_slot_r13 = alloc 8 : i64*
+  store 0 %scalar_slot_r13
+  %scalar_slot_r14 = alloc 8 : i64*
+  store 0 %scalar_slot_r14
+  %slot_r15 = alloc 8 : i64*
+  store 0 %slot_r15
+  call %lymar_aot_edge %slot_r15 0 0
+  %scalar_slot_r16 = alloc 8 : i64*
+  store 0 %scalar_slot_r16
+  %scalar_slot_r17 = alloc 8 : i64*
+  store 0 %scalar_slot_r17
+  %scalar_slot_r18 = alloc 8 : i64*
+  store 0 %scalar_slot_r18
+  %scalar_slot_r19 = alloc 8 : i64*
+  store 0 %scalar_slot_r19
+  %slot_r20 = alloc 8 : i64*
+  store 0 %slot_r20
+  call %lymar_aot_edge %slot_r20 0 0
+  %scalar_slot_r21 = alloc 8 : i64*
+  store 0 %scalar_slot_r21
+  %scalar_slot_r22 = alloc 8 : i64*
+  store 0 %scalar_slot_r22
+  %scalar_slot_r23 = alloc 8 : i64*
+  store 0 %scalar_slot_r23
+  %scalar_slot_r24 = alloc 8 : i64*
+  store 0 %scalar_slot_r24
+  %slot_r25 = alloc 8 : i64*
+  store 0 %slot_r25
+  call %lymar_aot_edge %slot_r25 0 0
+  %scalar_slot_r26 = alloc 8 : i64*
+  store 0 %scalar_slot_r26
+  %scalar_slot_r27 = alloc 8 : i64*
+  store 0 %scalar_slot_r27
+  %slot_r28 = alloc 8 : i64*
+  store 0 %slot_r28
+  call %lymar_aot_edge %slot_r28 0 0
+  %scalar_slot_r29 = alloc 8 : i64*
+  store 0 %scalar_slot_r29
+  %scalar_slot_r30 = alloc 8 : i64*
+  store 0 %scalar_slot_r30
+  %scalar_slot_r31 = alloc 8 : i64*
+  store 0 %scalar_slot_r31
+  %scalar_slot_r32 = alloc 8 : i64*
+  store 0 %scalar_slot_r32
+  %scalar_slot_r33 = alloc 8 : i64*
+  store 0 %scalar_slot_r33
+  %scalar_slot_r34 = alloc 8 : i64*
+  store 0 %scalar_slot_r34
+  %scalar_slot_r35 = alloc 8 : i64*
+  store 0 %scalar_slot_r35
+  %scalar_slot_r36 = alloc 8 : i64*
+  store 0 %scalar_slot_r36
+  %scalar_slot_r37 = alloc 8 : i64*
+  store 0 %scalar_slot_r37
+  %scalar_slot_r38 = alloc 8 : i64*
+  store 0 %scalar_slot_r38
+  %scalar_slot_r39 = alloc 8 : i64*
+  store 0 %scalar_slot_r39
+  store %0 %slot_r0
+  call %lymar_aot_edge %slot_r0 %0 1
+  store %1 %scalar_slot_r1
+  store %2 %scalar_slot_r2
+  jmp %block_0
+@block_0
+  call %lymar_aot_region_enter 1
+  call %lymar_aot_region_enter 2
+  %load_r2_14 = loadl %scalar_slot_r2 : i64
+  %load_r1_15 = loadl %scalar_slot_r1 : i64
+  %50 = cslt %load_r1_15 %load_r2_14 : i32
+  %r3 = cast %50 : i64
+  store %r3 %scalar_slot_r3
+  %load_r3_16 = loadl %scalar_slot_r3 : i64
+  %52 = cne %load_r3_16 0 : i32
+  br %52 %block_4 %block_61
+@block_4
+  call %lymar_aot_region_enter 3
+  %load_r0_17 = loadl %slot_r0 : i64
+  %load_r2_18 = loadl %scalar_slot_r2 : i64
+  %55 = and %load_r0_17 18446744073709551608 : i64
+  %56 = add %55 8 : i64
+  %57 = loadl %56 : i64
+  %region_meta_10_19 = call %lymar_aot_slot_pointer %56 : i64
+  %58 = mul %load_r2_18 8 : i64
+  %59 = add %57 %58 : i64
+  %scalar_elem_19 = loadl %59 : i64
+  store %scalar_elem_19 %scalar_slot_r4
+  store 1 %scalar_slot_r5
+  %load_r5_20 = loadl %scalar_slot_r5 : i64
+  %load_r1_21 = loadl %scalar_slot_r1 : i64
+  %r6 = sub %load_r1_21 %load_r5_20 : i64
+  store %r6 %scalar_slot_r6
+  %load_r6_22 = loadl %scalar_slot_r6 : i64
+  store %load_r6_22 %scalar_slot_r7
+  call %lymar_aot_region_enter 4
+  jmp %block_14
+@block_14
+  %load_r1_23 = loadl %scalar_slot_r1 : i64
+  store %load_r1_23 %scalar_slot_r8
+  jmp %block_17
+@block_17
+  %load_r2_24 = loadl %scalar_slot_r2 : i64
+  %load_r8_25 = loadl %scalar_slot_r8 : i64
+  %68 = cslt %load_r8_25 %load_r2_24 : i32
+  %r10 = cast %68 : i64
+  store %r10 %scalar_slot_r10
+  %load_r10_26 = loadl %scalar_slot_r10 : i64
+  %70 = cne %load_r10_26 0 : i32
+  br %70 %block_19 %block_42
+@block_19
+  call %lymar_aot_region_enter 5
+  %load_r0_27 = loadl %slot_r0 : i64
+  %load_r8_28 = loadl %scalar_slot_r8 : i64
+  %73 = and %load_r0_27 18446744073709551608 : i64
+  %74 = add %73 8 : i64
+  %75 = loadl %74 : i64
+  %region_meta_24_18 = call %lymar_aot_slot_pointer %74 : i64
+  %76 = mul %load_r8_28 8 : i64
+  %77 = add %75 %76 : i64
+  %scalar_elem_29 = loadl %77 : i64
+  store %scalar_elem_29 %scalar_slot_r11
+  %load_r4_30 = loadl %scalar_slot_r4 : i64
+  %load_r11_31 = loadl %scalar_slot_r11 : i64
+  %79 = csle %load_r11_31 %load_r4_30 : i32
+  %r12 = cast %79 : i64
+  store %r12 %scalar_slot_r12
+  %load_r12_32 = loadl %scalar_slot_r12 : i64
+  %81 = cne %load_r12_32 0 : i32
+  br %81 %block_24 %block_34
+@block_24
+  call %lymar_aot_region_enter 6
+  store 1 %scalar_slot_r13
+  %load_r13_33 = loadl %scalar_slot_r13 : i64
+  %load_r7_34 = loadl %scalar_slot_r7 : i64
+  %r14 = add %load_r7_34 %load_r13_33 : i64
+  store %r14 %scalar_slot_r14
+  %load_r14_35 = loadl %scalar_slot_r14 : i64
+  store %load_r14_35 %scalar_slot_r7
+  %load_r0_36 = loadl %slot_r0 : i64
+  %load_r7_37 = loadl %scalar_slot_r7 : i64
+  %load_r8_38 = loadl %scalar_slot_r8 : i64
+  call %lymar_aot_arg_set 0 1
+  call %lymar_aot_arg_set 1 0
+  call %lymar_aot_arg_set 2 0
+  %r15 = call %swap %load_r0_36 %load_r7_37 %load_r8_38 : i64
+  %region_meta_38_20 = call %lymar_aot_return_pointer : i64
+  store %r15 %slot_r15
+  call %lymar_aot_edge %slot_r15 %r15 1
+  %load_r7_39 = loadl %scalar_slot_r7 : i64
+  call %lymar_aot_region_exit 6
+  jmp %block_34
+@block_34
+  %load_r7_40 = loadl %scalar_slot_r7 : i64
+  call %lymar_aot_region_exit 5
+  jmp %block_37
+@block_37
+  store 1 %scalar_slot_r16
+  %load_r16_41 = loadl %scalar_slot_r16 : i64
+  %load_r8_42 = loadl %scalar_slot_r8 : i64
+  %r17 = add %load_r8_42 %load_r16_41 : i64
+  store %r17 %scalar_slot_r17
+  %load_r17_43 = loadl %scalar_slot_r17 : i64
+  store %load_r17_43 %scalar_slot_r8
+  jmp %block_17
+@block_42
+  %load_r7_44 = loadl %scalar_slot_r7 : i64
+  call %lymar_aot_region_exit 4
+  store 1 %scalar_slot_r18
+  %load_r18_45 = loadl %scalar_slot_r18 : i64
+  %load_r7_46 = loadl %scalar_slot_r7 : i64
+  %r19 = add %load_r7_46 %load_r18_45 : i64
+  store %r19 %scalar_slot_r19
+  %load_r0_47 = loadl %slot_r0 : i64
+  %load_r19_48 = loadl %scalar_slot_r19 : i64
+  %load_r2_49 = loadl %scalar_slot_r2 : i64
+  call %lymar_aot_arg_set 0 1
+  call %lymar_aot_arg_set 1 0
+  call %lymar_aot_arg_set 2 0
+  %r20 = call %swap %load_r0_47 %load_r19_48 %load_r2_49 : i64
+  %region_meta_52_43 = call %lymar_aot_return_pointer : i64
+  store %r20 %slot_r20
+  call %lymar_aot_edge %slot_r20 %r20 1
+  store 1 %scalar_slot_r21
+  %load_r21_50 = loadl %scalar_slot_r21 : i64
+  %load_r7_51 = loadl %scalar_slot_r7 : i64
+  %r22 = add %load_r7_51 %load_r21_50 : i64
+  store %r22 %scalar_slot_r22
+  store 1 %scalar_slot_r23
+  %load_r23_52 = loadl %scalar_slot_r23 : i64
+  %load_r22_53 = loadl %scalar_slot_r22 : i64
+  %r24 = sub %load_r22_53 %load_r23_52 : i64
+  store %r24 %scalar_slot_r24
+  %load_r0_54 = loadl %slot_r0 : i64
+  %load_r1_55 = loadl %scalar_slot_r1 : i64
+  %load_r24_56 = loadl %scalar_slot_r24 : i64
+  call %lymar_aot_arg_set 0 1
+  call %lymar_aot_arg_set 1 0
+  call %lymar_aot_arg_set 2 0
+  %r25 = call %quicksort %load_r0_54 %load_r1_55 %load_r24_56 : i64
+  %region_meta_61_48 = call %lymar_aot_return_pointer : i64
+  store %r25 %slot_r25
+  call %lymar_aot_edge %slot_r25 %r25 1
+  store 1 %scalar_slot_r26
+  %load_r26_57 = loadl %scalar_slot_r26 : i64
+  %load_r22_58 = loadl %scalar_slot_r22 : i64
+  %r27 = add %load_r22_58 %load_r26_57 : i64
+  store %r27 %scalar_slot_r27
+  %load_r0_59 = loadl %slot_r0 : i64
+  %load_r27_60 = loadl %scalar_slot_r27 : i64
+  %load_r2_61 = loadl %scalar_slot_r2 : i64
+  call %lymar_aot_arg_set 0 1
+  call %lymar_aot_arg_set 1 0
+  call %lymar_aot_arg_set 2 0
+  %r28 = call %quicksort %load_r0_59 %load_r27_60 %load_r2_61 : i64
+  %region_meta_68_53 = call %lymar_aot_return_pointer : i64
+  store %r28 %slot_r28
+  call %lymar_aot_edge %slot_r28 %r28 1
+  call %lymar_aot_region_exit 3
+  jmp %block_61
+@block_61
+  call %lymar_aot_region_exit 2
+  call %lymar_aot_region_exit 1
+  %112 = call %lymar_aot_nil : i64
+  call %lymar_aot_call_leave 1
+  ret %112
+}
+
+function __user_main() {
+@entry
+  %region_meta_0_96 = call %lymar_aot_call_enter : i64
+  %0 = call %lymar_aot_region_current : i64
+  %slot_r0 = alloc 8 : i64*
+  store 0 %slot_r0
+  call %lymar_aot_edge %slot_r0 0 0
+  %scalar_slot_r1 = alloc 8 : i64*
+  store 0 %scalar_slot_r1
+  %slot_r2 = alloc 8 : i64*
+  store 0 %slot_r2
+  call %lymar_aot_edge %slot_r2 0 0
+  %scalar_slot_r3 = alloc 8 : i64*
+  store 0 %scalar_slot_r3
+  %scalar_slot_r4 = alloc 8 : i64*
+  store 0 %scalar_slot_r4
+  %scalar_slot_r5 = alloc 8 : i64*
+  store 0 %scalar_slot_r5
+  %scalar_slot_r6 = alloc 8 : i64*
+  store 0 %scalar_slot_r6
+  %scalar_slot_r7 = alloc 8 : i64*
+  store 0 %scalar_slot_r7
+  %scalar_slot_r8 = alloc 8 : i64*
+  store 0 %scalar_slot_r8
+  %scalar_slot_r9 = alloc 8 : i64*
+  store 0 %scalar_slot_r9
+  %scalar_slot_r10 = alloc 8 : i64*
+  store 0 %scalar_slot_r10
+  %scalar_slot_r11 = alloc 8 : i64*
+  store 0 %scalar_slot_r11
+  %scalar_slot_r12 = alloc 8 : i64*
+  store 0 %scalar_slot_r12
+  %scalar_slot_r13 = alloc 8 : i64*
+  store 0 %scalar_slot_r13
+  %scalar_slot_r14 = alloc 8 : i64*
+  store 0 %scalar_slot_r14
+  %scalar_slot_r15 = alloc 8 : i64*
+  store 0 %scalar_slot_r15
+  %scalar_slot_r16 = alloc 8 : i64*
+  store 0 %scalar_slot_r16
+  %scalar_slot_r17 = alloc 8 : i64*
+  store 0 %scalar_slot_r17
+  %scalar_slot_r18 = alloc 8 : i64*
+  store 0 %scalar_slot_r18
+  %scalar_slot_r19 = alloc 8 : i64*
+  store 0 %scalar_slot_r19
+  %scalar_slot_r20 = alloc 8 : i64*
+  store 0 %scalar_slot_r20
+  %slot_r21 = alloc 8 : i64*
+  store 0 %slot_r21
+  call %lymar_aot_edge %slot_r21 0 0
+  %scalar_slot_r22 = alloc 8 : i64*
+  store 0 %scalar_slot_r22
+  %scalar_slot_r23 = alloc 8 : i64*
+  store 0 %scalar_slot_r23
+  %slot_r24 = alloc 8 : i64*
+  store 0 %slot_r24
+  call %lymar_aot_edge %slot_r24 0 0
+  %scalar_slot_r25 = alloc 8 : i64*
+  store 0 %scalar_slot_r25
+  %scalar_slot_r26 = alloc 8 : i64*
+  store 0 %scalar_slot_r26
+  %scalar_slot_r27 = alloc 8 : i64*
+  store 0 %scalar_slot_r27
+  %scalar_slot_r28 = alloc 8 : i64*
+  store 0 %scalar_slot_r28
+  %scalar_slot_r29 = alloc 8 : i64*
+  store 0 %scalar_slot_r29
+  %scalar_slot_r30 = alloc 8 : i64*
+  store 0 %scalar_slot_r30
+  %scalar_slot_r31 = alloc 8 : i64*
+  store 0 %scalar_slot_r31
+  %scalar_slot_r32 = alloc 8 : i64*
+  store 0 %scalar_slot_r32
+  %slot_r33 = alloc 8 : i64*
+  store 0 %slot_r33
+  call %lymar_aot_edge %slot_r33 0 0
+  %scalar_slot_r34 = alloc 8 : i64*
+  store 0 %scalar_slot_r34
+  %scalar_slot_r35 = alloc 8 : i64*
+  store 0 %scalar_slot_r35
+  %scalar_slot_r36 = alloc 8 : i64*
+  store 0 %scalar_slot_r36
+  %scalar_slot_r37 = alloc 8 : i64*
+  store 0 %scalar_slot_r37
+  %scalar_slot_r38 = alloc 8 : i64*
+  store 0 %scalar_slot_r38
+  %scalar_slot_r39 = alloc 8 : i64*
+  store 0 %scalar_slot_r39
+  %scalar_slot_r40 = alloc 8 : i64*
+  store 0 %scalar_slot_r40
+  %scalar_slot_r41 = alloc 8 : i64*
+  store 0 %scalar_slot_r41
+  %scalar_slot_r42 = alloc 8 : i64*
+  store 0 %scalar_slot_r42
+  %scalar_slot_r43 = alloc 8 : i64*
+  store 0 %scalar_slot_r43
+  %scalar_slot_r44 = alloc 8 : i64*
+  store 0 %scalar_slot_r44
+  %scalar_slot_r45 = alloc 8 : i64*
+  store 0 %scalar_slot_r45
+  %scalar_slot_r46 = alloc 8 : i64*
+  store 0 %scalar_slot_r46
+  jmp %block_0
+@block_0
+  call %lymar_aot_region_enter 1
+  call %lymar_aot_region_enter 2
+  %r0 = call %lymar_aot_copy_constant %str_hdr_62 45 : i64
+  store %r0 %slot_r0
+  call %lymar_aot_edge %slot_r0 %r0 1
+  %load_r0_63 = loadl %slot_r0 : i64
+  call %lymar_aot_print_value %load_r0_63 1
+  %53 = add %nl 24 : i8*
+  %54 = extern io.write(i64 1, i8* %53, i64 1) : i64
+  store 0 %scalar_slot_r1
+  call %lymar_aot_arg_set 0 0
+  %r2 = call %lm_list_new 9 : i64
+  %region_meta_3_60 = call %lymar_aot_return_pointer : i64
+  store %r2 %slot_r2
+  call %lymar_aot_edge %slot_r2 %r2 1
+  store 5 %scalar_slot_r3
+  %load_r2_65 = loadl %slot_r2 : i64
+  %load_r3_66 = loadl %scalar_slot_r3 : i64
+  call %lymar_aot_arg_set 0 1
+  call %lymar_aot_arg_set 1 0
+  call %lm_list_append %load_r2_65 %load_r3_66
+  store 2 %scalar_slot_r5
+  %load_r2_67 = loadl %slot_r2 : i64
+  %load_r5_68 = loadl %scalar_slot_r5 : i64
+  call %lymar_aot_arg_set 0 1
+  call %lymar_aot_arg_set 1 0
+  call %lm_list_append %load_r2_67 %load_r5_68
+  store 8 %scalar_slot_r7
+  %load_r2_69 = loadl %slot_r2 : i64
+  %load_r7_70 = loadl %scalar_slot_r7 : i64
+  call %lymar_aot_arg_set 0 1
+  call %lymar_aot_arg_set 1 0
+  call %lm_list_append %load_r2_69 %load_r7_70
+  store 1 %scalar_slot_r9
+  %load_r2_71 = loadl %slot_r2 : i64
+  %load_r9_72 = loadl %scalar_slot_r9 : i64
+  call %lymar_aot_arg_set 0 1
+  call %lymar_aot_arg_set 1 0
+  call %lm_list_append %load_r2_71 %load_r9_72
+  store 9 %scalar_slot_r11
+  %load_r2_73 = loadl %slot_r2 : i64
+  %load_r11_74 = loadl %scalar_slot_r11 : i64
+  call %lymar_aot_arg_set 0 1
+  call %lymar_aot_arg_set 1 0
+  call %lm_list_append %load_r2_73 %load_r11_74
+  store 3 %scalar_slot_r13
+  %load_r2_75 = loadl %slot_r2 : i64
+  %load_r13_76 = loadl %scalar_slot_r13 : i64
+  call %lymar_aot_arg_set 0 1
+  call %lymar_aot_arg_set 1 0
+  call %lm_list_append %load_r2_75 %load_r13_76
+  store 7 %scalar_slot_r15
+  %load_r2_77 = loadl %slot_r2 : i64
+  %load_r15_78 = loadl %scalar_slot_r15 : i64
+  call %lymar_aot_arg_set 0 1
+  call %lymar_aot_arg_set 1 0
+  call %lm_list_append %load_r2_77 %load_r15_78
+  store 4 %scalar_slot_r17
+  %load_r2_79 = loadl %slot_r2 : i64
+  %load_r17_80 = loadl %scalar_slot_r17 : i64
+  call %lymar_aot_arg_set 0 1
+  call %lymar_aot_arg_set 1 0
+  call %lm_list_append %load_r2_79 %load_r17_80
+  store 6 %scalar_slot_r19
+  %load_r2_81 = loadl %slot_r2 : i64
+  %load_r19_82 = loadl %scalar_slot_r19 : i64
+  call %lymar_aot_arg_set 0 1
+  call %lymar_aot_arg_set 1 0
+  call %lm_list_append %load_r2_81 %load_r19_82
+  %load_r2_83 = loadl %slot_r2 : i64
+  store %load_r2_83 %slot_r21
+  call %lymar_aot_edge %slot_r21 %load_r2_83 1
+  store 0 %scalar_slot_r22
+  store 8 %scalar_slot_r23
+  %load_r21_84 = loadl %slot_r21 : i64
+  %load_r22_85 = loadl %scalar_slot_r22 : i64
+  %load_r23_86 = loadl %scalar_slot_r23 : i64
+  call %lymar_aot_arg_set 0 1
+  call %lymar_aot_arg_set 1 0
+  call %lymar_aot_arg_set 2 0
+  %r24 = call %quicksort %load_r21_84 %load_r22_85 %load_r23_86 : i64
+  %region_meta_26_84 = call %lymar_aot_return_pointer : i64
+  store %r24 %slot_r24
+  call %lymar_aot_edge %slot_r24 %r24 1
+  call %lymar_aot_region_enter 3
+  jmp %block_31
+@block_31
+  store 0 %scalar_slot_r25
+  jmp %block_34
+@block_34
+  store 9 %scalar_slot_r27
+  %load_r27_87 = loadl %scalar_slot_r27 : i64
+  %load_r25_88 = loadl %scalar_slot_r25 : i64
+  %84 = cslt %load_r25_88 %load_r27_87 : i32
+  %r28 = cast %84 : i64
+  store %r28 %scalar_slot_r28
+  %load_r28_89 = loadl %scalar_slot_r28 : i64
+  %86 = cne %load_r28_89 0 : i32
+  br %86 %block_37 %block_48
+@block_37
+  call %lymar_aot_region_enter 4
+  %load_r21_90 = loadl %slot_r21 : i64
+  %load_r25_91 = loadl %scalar_slot_r25 : i64
+  %89 = and %load_r21_90 18446744073709551608 : i64
+  %90 = add %89 8 : i64
+  %91 = loadl %90 : i64
+  %region_meta_34_17 = call %lymar_aot_slot_pointer %90 : i64
+  %92 = mul %load_r25_91 8 : i64
+  %93 = add %91 %92 : i64
+  %scalar_elem_92 = loadl %93 : i64
+  store %scalar_elem_92 %scalar_slot_r29
+  %load_r29_93 = loadl %scalar_slot_r29 : i64
+  call %lymar_aot_print_integer %load_r29_93 0
+  %96 = add %nl 24 : i8*
+  %97 = extern io.write(i64 1, i8* %96, i64 1) : i64
+  store 0 %scalar_slot_r30
+  call %lymar_aot_region_exit 4
+  jmp %block_43
+@block_43
+  store 1 %scalar_slot_r31
+  %load_r31_95 = loadl %scalar_slot_r31 : i64
+  %load_r25_96 = loadl %scalar_slot_r25 : i64
+  %r32 = add %load_r25_96 %load_r31_95 : i64
+  store %r32 %scalar_slot_r32
+  %load_r32_97 = loadl %scalar_slot_r32 : i64
+  store %load_r32_97 %scalar_slot_r25
+  jmp %block_34
+@block_48
+  call %lymar_aot_region_exit 3
+  %r33 = call %lymar_aot_copy_constant %str_hdr_98 29 : i64
+  store %r33 %slot_r33
+  call %lymar_aot_edge %slot_r33 %r33 1
+  %load_r33_99 = loadl %slot_r33 : i64
+  call %lymar_aot_print_value %load_r33_99 1
+  %108 = add %nl 24 : i8*
+  %109 = extern io.write(i64 1, i8* %108, i64 1) : i64
+  store 0 %scalar_slot_r34
+  store 0 %scalar_slot_r35
+  %load_r35_101 = loadl %scalar_slot_r35 : i64
+  call %lymar_aot_region_exit 2
+  call %lymar_aot_region_exit 1
+  %load_r35_102 = loadl %scalar_slot_r35 : i64
+  call %lymar_aot_call_leave 0
+  ret %load_r35_102
+}
+
+function lm_list_new(i64) {
+@entry
+  %region_meta_0_4 = call %lymar_aot_call_enter : i64
+  %region_meta_0_5 = call %lymar_aot_arg_kind 0 0 : i64
+  %1 = alloc 8 : i64*
+  store %0 %1
+  call %lymar_aot_edge %1 %0 %region_meta_0_5
+  %3 = csle %0 0 : i32
+  br %3 %def_cap %alloc
+@def_cap
+  store 8 %1
+  jmp %alloc
+@alloc
+  %7 = loadl %1 : i64
+  %region_meta_1_12 = call %lymar_aot_slot_pointer %1 : i64
+  %8 = call %lymar_aot_alloc 32 : i64
+  %9 = mul %7 8 : i64
+  %10 = call %lymar_aot_alloc %9 : i64
+  store 1 %8
+  %12 = add %8 16 : i64
+  store 0 %12
+  %14 = add %8 24 : i64
+  store %7 %14
+  call %lymar_aot_edge %14 %7 %region_meta_1_12
+  %16 = add %8 8 : i64
+  store %10 %16
+  call %lymar_aot_edge %16 %10 1
+  call %lymar_aot_call_leave 1
+  ret %8
+}
+
+function lm_list_append(i64, i64) {
+@entry
+  %region_meta_0_7 = call %lymar_aot_call_enter : i64
+  %region_meta_0_8 = call %lymar_aot_arg_kind 0 0 : i64
+  %region_meta_1_9 = call %lymar_aot_arg_kind 1 0 : i64
+  %2 = and %0 18446744073709551608 : i64
+  %3 = add %2 16 : i64
+  %4 = loadl %3 : i64
+  %region_meta_3_10 = call %lymar_aot_slot_pointer %3 : i64
+  %5 = add %2 24 : i64
+  %6 = loadl %5 : i64
+  %region_meta_5_11 = call %lymar_aot_slot_pointer %5 : i64
+  %7 = csge %4 %6 : i32
+  br %7 %realloc %insert
+@realloc
+  %9 = mul %6 2 : i64
+  %10 = mul %9 8 : i64
+  %11 = call %lymar_aot_alloc %10 : i64
+  %12 = add %2 8 : i64
+  %13 = loadl %12 : i64
+  %region_meta_8_8 = call %lymar_aot_slot_pointer %12 : i64
+  %14 = alloc 8 : i64*
+  store 0 %14
+  jmp %copy_loop
+@copy_loop
+  %17 = loadl %14 : i64
+  %region_meta_9_3 = call %lymar_aot_slot_pointer %14 : i64
+  %18 = cslt %17 %4 : i32
+  br %18 %copy_body %copy_done
+@copy_body
+  %20 = mul %17 8 : i64
+  %21 = add %13 %20 : i64
+  %22 = loadl %21 : i64
+  %region_meta_11_8 = call %lymar_aot_slot_pointer %21 : i64
+  %23 = add %11 %20 : i64
+  store %22 %23
+  call %lymar_aot_edge %23 %22 %region_meta_11_8
+  %25 = add %17 1 : i64
+  store %25 %14
+  call %lymar_aot_edge %14 %25 %region_meta_9_3
+  jmp %copy_loop
+@copy_done
+  store %9 %5
+  store %11 %12
+  call %lymar_aot_edge %12 %11 1
+  jmp %insert
+@insert
+  %31 = add %2 16 : i64
+  %32 = loadl %31 : i64
+  %region_meta_15_11 = call %lymar_aot_slot_pointer %31 : i64
+  %33 = add %2 8 : i64
+  %34 = loadl %33 : i64
+  %region_meta_17_12 = call %lymar_aot_slot_pointer %33 : i64
+  %35 = mul %32 8 : i64
+  %36 = add %34 %35 : i64
+  store %1 %36
+  call %lymar_aot_edge %36 %1 %region_meta_1_9
+  %38 = add %32 1 : i64
+  %39 = add %2 16 : i64
+  store %38 %39
+  call %lymar_aot_edge %39 %38 %region_meta_15_11
+  call %lymar_aot_call_leave 0
+  ret
+}
+
+function lm_list_len(i64) {
+@entry
+  %region_meta_0_4 = call %lymar_aot_call_enter : i64
+  %region_meta_0_5 = call %lymar_aot_arg_kind 0 0 : i64
+  %1 = and %0 18446744073709551608 : i64
+  %2 = add %1 16 : i64
+  %3 = loadl %2 : i64
+  %region_meta_2_6 = call %lymar_aot_slot_pointer %2 : i64
+  call %lymar_aot_call_leave %region_meta_2_6
+  ret %3
+}
+
+function lm_list_get(i64, i64) {
+@entry
+  %region_meta_0_7 = call %lymar_aot_call_enter : i64
+  %region_meta_0_8 = call %lymar_aot_arg_kind 0 0 : i64
+  %region_meta_1_9 = call %lymar_aot_arg_kind 1 0 : i64
+  %2 = and %0 18446744073709551608 : i64
+  %3 = add %2 8 : i64
+  %4 = loadl %3 : i64
+  %region_meta_3_10 = call %lymar_aot_slot_pointer %3 : i64
+  %5 = loadl %2 : i64
+  %region_meta_4_11 = call %lymar_aot_slot_pointer %2 : i64
+  %6 = and %5 4294967295 : i64
+  %7 = ceq %6 3 : i32
+  br %7 %get_tuple %get_list
+@get_list
+  %9 = mul %1 8 : i64
+  %10 = add %4 %9 : i64
+  %11 = loadl %10 : i64
+  %region_meta_6_4 = call %lymar_aot_slot_pointer %10 : i64
+  call %lymar_aot_call_leave %region_meta_6_4
+  ret %11
+@get_tuple
+  %13 = mul %1 8 : i64
+  %14 = add %4 %13 : i64
+  %15 = loadl %14 : i64
+  %region_meta_8_4 = call %lymar_aot_slot_pointer %14 : i64
+  call %lymar_aot_call_leave %region_meta_8_4
+  ret %15
+}
+
+function lm_list_set(i64, i64, i64) {
+@entry
+  %region_meta_0_7 = call %lymar_aot_call_enter : i64
+  %region_meta_0_8 = call %lymar_aot_arg_kind 0 0 : i64
+  %region_meta_1_9 = call %lymar_aot_arg_kind 1 0 : i64
+  %region_meta_2_10 = call %lymar_aot_arg_kind 2 0 : i64
+  %3 = and %0 18446744073709551608 : i64
+  %4 = add %3 16 : i64
+  %5 = loadl %4 : i64
+  %region_meta_4_11 = call %lymar_aot_slot_pointer %4 : i64
+  %6 = add %3 24 : i64
+  %7 = loadl %6 : i64
+  %region_meta_6_12 = call %lymar_aot_slot_pointer %6 : i64
+  %8 = csge %1 %7 : i32
+  br %8 %set_realloc %set_update_len
+@set_realloc
+  %10 = mul %7 2 : i64
+  %11 = add %1 1 : i64
+  %12 = csgt %10 %11 : i32
+  %13 = alloc 8 : i64*
+  store %10 %13
+  br %12 %cap_double %cap_idx
+@set_copy_loop
+  %16 = loadl %49 : i64
+  %region_meta_8_3 = call %lymar_aot_slot_pointer %49 : i64
+  %17 = cslt %16 %5 : i32
+  br %17 %set_copy_body %set_copy_done
+@set_copy_body
+  %19 = mul %16 8 : i64
+  %20 = add %48 %19 : i64
+  %21 = loadl %20 : i64
+  %region_meta_10_8 = call %lymar_aot_slot_pointer %20 : i64
+  %22 = add %46 %19 : i64
+  store %21 %22
+  call %lymar_aot_edge %22 %21 %region_meta_10_8
+  %24 = add %16 1 : i64
+  store %24 %49
+  call %lymar_aot_edge %49 %24 %region_meta_8_3
+  jmp %set_copy_loop
+@set_copy_done
+  store %44 %6
+  store %46 %47
+  jmp %set_update_len
+@set_update_len
+  %30 = add %3 16 : i64
+  %31 = loadl %30 : i64
+  %region_meta_14_5 = call %lymar_aot_slot_pointer %30 : i64
+  %32 = add %1 1 : i64
+  %33 = csge %1 %31 : i32
+  br %33 %do_update_len %set_store_elem
+@set_store_elem
+  %35 = add %3 8 : i64
+  %36 = loadl %35 : i64
+  %region_meta_17_6 = call %lymar_aot_slot_pointer %35 : i64
+  %37 = mul %1 8 : i64
+  %38 = add %36 %37 : i64
+  store %2 %38
+  call %lymar_aot_edge %38 %2 %region_meta_2_10
+  call %lymar_aot_call_leave 0
+  ret
+@cap_double
+  jmp %cap_done
+@cap_idx
+  store %11 %13
+  call %lymar_aot_edge %13 %11 %region_meta_1_9
+  jmp %cap_done
+@cap_done
+  %44 = loadl %13 : i64
+  %region_meta_19_8 = call %lymar_aot_slot_pointer %13 : i64
+  %45 = mul %44 8 : i64
+  %46 = call %lymar_aot_alloc %45 : i64
+  %47 = add %3 8 : i64
+  %48 = loadl %47 : i64
+  %region_meta_22_9 = call %lymar_aot_slot_pointer %47 : i64
+  %49 = alloc 8 : i64*
+  store 0 %49
+  jmp %set_copy_loop
+@do_update_len
+  %52 = add %3 16 : i64
+  store %32 %52
+  call %lymar_aot_edge %52 %32 %region_meta_1_9
+  jmp %set_store_elem
+}
+
+function lm_channel_pop(i64) {
+@entry
+  %region_meta_0_4 = call %lymar_aot_call_enter : i64
+  %region_meta_0_5 = call %lymar_aot_arg_kind 0 0 : i64
+  %1 = add %0 16 : i64
+  %2 = loadl %1 : i64
+  %region_meta_2_6 = call %lymar_aot_slot_pointer %1 : i64
+  %3 = csle %2 0 : i32
+  br %3 %empty %pop
+@empty
+  %5 = call %lymar_aot_nil : i64
+  call %lymar_aot_call_leave 1
+  ret %5
+@pop
+  %7 = add %0 8 : i64
+  %8 = loadl %7 : i64
+  %region_meta_5_9 = call %lymar_aot_slot_pointer %7 : i64
+  %9 = loadl %8 : i64
+  %region_meta_6_10 = call %lymar_aot_slot_pointer %8 : i64
+  %10 = sub %2 1 : i64
+  %11 = add %0 16 : i64
+  store %10 %11
+  %13 = alloc 8 : i64*
+  store 0 %13
+  jmp %shift_loop
+@shift_loop
+  %16 = loadl %13 : i64
+  %region_meta_8_3 = call %lymar_aot_slot_pointer %13 : i64
+  %17 = cslt %16 %10 : i32
+  br %17 %shift_body %shift_done
+@shift_body
+  %19 = add %16 1 : i64
+  %20 = mul %19 8 : i64
+  %21 = add %8 %20 : i64
+  %22 = loadl %21 : i64
+  %region_meta_11_10 = call %lymar_aot_slot_pointer %21 : i64
+  %23 = mul %16 8 : i64
+  %24 = add %8 %23 : i64
+  store %22 %24
+  call %lymar_aot_edge %24 %22 %region_meta_11_10
+  %26 = add %16 1 : i64
+  store %26 %13
+  call %lymar_aot_edge %13 %26 %region_meta_8_3
+  jmp %shift_loop
+@shift_done
+  call %lymar_aot_call_leave %region_meta_6_10
+  ret %9
+}
+
+function lm_list_to_str(i64) {
+@entry
+  %region_meta_0_10 = call %lymar_aot_call_enter : i64
+  %region_meta_0_11 = call %lymar_aot_arg_kind 0 0 : i64
+  %1 = alloc 8 : i64*
+  %2 = alloc 8 : i64*
+  %3 = alloc 8 : i64*
+  %4 = add %0 16 : i64
+  %5 = loadl %4 : i64
+  %region_meta_2_12 = call %lymar_aot_slot_pointer %4 : i64
+  %6 = add %0 8 : i64
+  %7 = loadl %6 : i64
+  %region_meta_4_13 = call %lymar_aot_slot_pointer %6 : i64
+  store %list_lbracket %1
+  call %lymar_aot_edge %1 %list_lbracket 1
+  store 0 %2
+  jmp %loop
+@loop
+  %11 = loadl %2 : i64
+  %region_meta_5_3 = call %lymar_aot_slot_pointer %2 : i64
+  %12 = cslt %11 %5 : i32
+  br %12 %body %done
+@body
+  %14 = ceq %11 0 : i32
+  br %14 %elem %sep
+@next
+  %16 = add %11 1 : i64
+  store %16 %2
+  call %lymar_aot_edge %2 %16 %region_meta_5_3
+  jmp %loop
+@done
+  %19 = loadl %1 : i64
+  %region_meta_7_3 = call %lymar_aot_slot_pointer %1 : i64
+  call %lymar_aot_arg_set 0 %region_meta_7_3
+  call %lymar_aot_arg_set 1 1
+  %20 = call %lm_str_concat %19 %list_rbracket : i8*
+  %region_meta_8_6 = call %lymar_aot_return_pointer : i64
+  call %lymar_aot_call_leave %region_meta_8_6
+  ret %20
+@sep
+  %22 = loadl %1 : i64
+  %region_meta_9_4 = call %lymar_aot_slot_pointer %1 : i64
+  call %lymar_aot_arg_set 0 %region_meta_9_4
+  call %lymar_aot_arg_set 1 1
+  %23 = call %lm_str_concat %22 %list_comma : i8*
+  %region_meta_10_7 = call %lymar_aot_return_pointer : i64
+  store %23 %1
+  call %lymar_aot_edge %1 %23 %region_meta_10_7
+  jmp %elem
+@elem
+  %26 = mul %11 8 : i64
+  %27 = add %7 %26 : i64
+  %28 = loadl %27 : i64
+  %region_meta_12_5 = call %lymar_aot_slot_pointer %27 : i64
+  %29 = call %lymar_aot_is_print_object %28 %region_meta_12_5 : i64
+  br %29 %e_ptr %e_num
+@e_num
+  %31 = call %lymar_aot_scalar_to_string %28 %region_meta_12_5 : i64
+  store %31 %3
+  call %lymar_aot_edge %3 %31 1
+  jmp %e_done
+@e_ptr
+  %34 = loadl %28 : i64
+  %region_meta_14_3 = call %lymar_aot_slot_pointer %28 : i64
+  %35 = ceq %34 1162761549 : i32
+  br %35 %e_enum %e_str
+@e_done
+  %37 = loadl %3 : i64
+  %region_meta_15_5 = call %lymar_aot_slot_pointer %3 : i64
+  %38 = loadl %1 : i64
+  %region_meta_16_6 = call %lymar_aot_slot_pointer %1 : i64
+  call %lymar_aot_arg_set 0 %region_meta_16_6
+  call %lymar_aot_arg_set 1 %region_meta_15_5
+  %39 = call %lm_str_concat %38 %37 : i8*
+  %region_meta_17_9 = call %lymar_aot_return_pointer : i64
+  store %39 %1
+  call %lymar_aot_edge %1 %39 %region_meta_17_9
+  jmp %next
+@e_enum
+  store %28 %3
+  call %lymar_aot_edge %3 %28 %region_meta_12_5
+  jmp %e_done
+@e_str
+  store %28 %3
+  call %lymar_aot_edge %3 %28 %region_meta_12_5
+  jmp %e_done
+}
+
+function lm_str_concat(i8*, i8*) {
+@entry
+  %region_meta_0_7 = call %lymar_aot_call_enter : i64
+  %region_meta_0_8 = call %lymar_aot_arg_kind 0 1 : i64
+  %region_meta_1_9 = call %lymar_aot_arg_kind 1 1 : i64
+  %2 = alloc 8 : i64*
+  %3 = alloc 8 : i64*
+  %4 = cuge %0 65536 : i32
+  %5 = shr %0 48 : i8*
+  %6 = ceq %5 0 : i32
+  %7 = and %4 %6 : i32
+  br %7 %cat_s1_str_1 %cat_s1_i_1
+@done
+  call %lymar_aot_call_leave 1
+  ret %86
+@cat_s1_chk_1
+  %10 = cuge %1 65536 : i32
+  %11 = shr %1 48 : i8*
+  %12 = ceq %11 0 : i32
+  %13 = and %10 %12 : i32
+  br %13 %cat_s2_str_1 %cat_s2_i_1
+@cat_s1_i_1
+  %15 = call %lymar_aot_alloc 64 : i64
+  store 11 %15
+  %17 = add %15 4 : i64
+  store 0 %17
+  %19 = add %15 63 : i64
+  storeb 0 %19
+  %21 = alloc 8 : i64*
+  store %19 %21
+  call %lymar_aot_edge %21 %19 1
+  %23 = alloc 8 : i64*
+  %24 = alloc 8 : i64*
+  %25 = cslt %0 0 : i32
+  br %25 %i2s_neg_1 %i2s_pos_1
+@cat_s1_str_1
+  store %0 %2
+  call %lymar_aot_edge %2 %0 %region_meta_0_8
+  jmp %cat_s1_chk_1
+@i2s_neg_1
+  store 1 %24
+  %30 = neg %0 : i8*
+  store %30 %23
+  call %lymar_aot_edge %23 %30 1
+  jmp %i2s_loop_1
+@i2s_pos_1
+  store 0 %24
+  store %0 %23
+  call %lymar_aot_edge %23 %0 %region_meta_0_8
+  jmp %i2s_loop_1
+@i2s_loop_1
+  %36 = loadl %23 : i64
+  %region_meta_5_11 = call %lymar_aot_slot_pointer %23 : i64
+  %37 = rem %36 10 : i64
+  %38 = div %36 10 : i64
+  store %38 %23
+  %40 = add %37 48 : i64
+  %41 = loadl %21 : i64
+  %region_meta_7_12 = call %lymar_aot_slot_pointer %21 : i64
+  %42 = sub %41 1 : i64
+  storeb %40 %42
+  store %42 %21
+  %45 = csge %36 10 : i32
+  br %45 %i2s_loop_1 %i2s_sign_1
+@i2s_sign_1
+  %47 = loadl %24 : i64
+  %region_meta_8_3 = call %lymar_aot_slot_pointer %24 : i64
+  %48 = ceq %47 1 : i32
+  br %48 %i2s_minus_1 %i2s_done_1
+@i2s_minus_1
+  %50 = loadl %21 : i64
+  %region_meta_9_5 = call %lymar_aot_slot_pointer %21 : i64
+  %51 = sub %50 1 : i64
+  storeb 45 %51
+  store %51 %21
+  jmp %i2s_done_1
+@i2s_done_1
+  %55 = loadl %21 : i64
+  %region_meta_10_11 = call %lymar_aot_slot_pointer %21 : i64
+  %56 = sub %19 %55 : i64
+  %57 = add %15 8 : i64
+  store %56 %57
+  %59 = add %15 16 : i64
+  store %56 %59
+  %61 = add %15 24 : i64
+  %62 = alloc 8 : i64*
+  store 0 %62
+  %64 = add %56 1 : i64
+  jmp %d2s_copy_loop_1
+@d2s_copy_loop_1
+  %66 = loadl %62 : i64
+  %region_meta_15_3 = call %lymar_aot_slot_pointer %62 : i64
+  %67 = cslt %66 %64 : i32
+  br %67 %d2s_copy_body_1 %d2s_copy_done_1
+@d2s_copy_body_1
+  %69 = add %55 %66 : i64
+  %70 = loadub %69 : i32
+  %71 = add %61 %66 : i64
+  storeb %70 %71
+  %73 = add %66 1 : i64
+  store %73 %62
+  call %lymar_aot_edge %62 %73 %region_meta_15_3
+  jmp %d2s_copy_loop_1
+@d2s_copy_done_1
+  store %15 %2
+  call %lymar_aot_edge %2 %15 1
+  jmp %cat_s1_chk_1
+@cat_s2_chk_1
+  %78 = loadl %2 : i64
+  %region_meta_19_20 = call %lymar_aot_slot_pointer %2 : i64
+  %79 = loadl %3 : i64
+  %region_meta_20_21 = call %lymar_aot_slot_pointer %3 : i64
+  %80 = add %78 8 : i64
+  %81 = loadl %80 : i64
+  %region_meta_22_22 = call %lymar_aot_slot_pointer %80 : i64
+  %82 = add %79 8 : i64
+  %83 = loadl %82 : i64
+  %region_meta_24_23 = call %lymar_aot_slot_pointer %82 : i64
+  %84 = add %81 %83 : i64
+  %85 = add %84 25 : i64
+  %86 = call %lymar_aot_alloc %85 : i8*
+  store 11 %86
+  %88 = add %86 8 : i8*
+  store %84 %88
+  call %lymar_aot_edge %88 %84 %region_meta_22_22
+  %90 = add %86 16 : i8*
+  store %84 %90
+  call %lymar_aot_edge %90 %84 %region_meta_22_22
+  %92 = add %86 24 : i8*
+  %93 = add %78 24 : i64
+  %94 = add %79 24 : i64
+  %95 = alloc 8 : i64*
+  store 0 %95
+  jmp %concat_c1_loop
+@cat_s2_i_1
+  %98 = call %lymar_aot_alloc 64 : i64
+  store 11 %98
+  %100 = add %98 4 : i64
+  store 0 %100
+  %102 = add %98 63 : i64
+  storeb 0 %102
+  %104 = alloc 8 : i64*
+  store %102 %104
+  call %lymar_aot_edge %104 %102 1
+  %106 = alloc 8 : i64*
+  %107 = alloc 8 : i64*
+  %108 = cslt %1 0 : i32
+  br %108 %i2s_neg_2 %i2s_pos_2
+@cat_s2_str_1
+  store %1 %3
+  call %lymar_aot_edge %3 %1 %region_meta_1_9
+  jmp %cat_s2_chk_1
+@i2s_neg_2
+  store 1 %107
+  %113 = neg %1 : i8*
+  store %113 %106
+  call %lymar_aot_edge %106 %113 1
+  jmp %i2s_loop_2
+@i2s_pos_2
+  store 0 %107
+  store %1 %106
+  call %lymar_aot_edge %106 %1 %region_meta_1_9
+  jmp %i2s_loop_2
+@i2s_loop_2
+  %119 = loadl %106 : i64
+  %region_meta_36_11 = call %lymar_aot_slot_pointer %106 : i64
+  %120 = rem %119 10 : i64
+  %121 = div %119 10 : i64
+  store %121 %106
+  %123 = add %120 48 : i64
+  %124 = loadl %104 : i64
+  %region_meta_38_12 = call %lymar_aot_slot_pointer %104 : i64
+  %125 = sub %124 1 : i64
+  storeb %123 %125
+  store %125 %104
+  %128 = csge %119 10 : i32
+  br %128 %i2s_loop_2 %i2s_sign_2
+@i2s_sign_2
+  %130 = loadl %107 : i64
+  %region_meta_39_3 = call %lymar_aot_slot_pointer %107 : i64
+  %131 = ceq %130 1 : i32
+  br %131 %i2s_minus_2 %i2s_done_2
+@i2s_minus_2
+  %133 = loadl %104 : i64
+  %region_meta_40_5 = call %lymar_aot_slot_pointer %104 : i64
+  %134 = sub %133 1 : i64
+  storeb 45 %134
+  store %134 %104
+  jmp %i2s_done_2
+@i2s_done_2
+  %138 = loadl %104 : i64
+  %region_meta_41_11 = call %lymar_aot_slot_pointer %104 : i64
+  %139 = sub %102 %138 : i64
+  %140 = add %98 8 : i64
+  store %139 %140
+  %142 = add %98 16 : i64
+  store %139 %142
+  %144 = add %98 24 : i64
+  %145 = alloc 8 : i64*
+  store 0 %145
+  %147 = add %139 1 : i64
+  jmp %d2s_copy_loop_2
+@d2s_copy_loop_2
+  %149 = loadl %145 : i64
+  %region_meta_46_3 = call %lymar_aot_slot_pointer %145 : i64
+  %150 = cslt %149 %147 : i32
+  br %150 %d2s_copy_body_2 %d2s_copy_done_2
+@d2s_copy_body_2
+  %152 = add %138 %149 : i64
+  %153 = loadub %152 : i32
+  %154 = add %144 %149 : i64
+  storeb %153 %154
+  %156 = add %149 1 : i64
+  store %156 %145
+  call %lymar_aot_edge %145 %156 %region_meta_46_3
+  jmp %d2s_copy_loop_2
+@d2s_copy_done_2
+  store %98 %3
+  call %lymar_aot_edge %3 %98 1
+  jmp %cat_s2_chk_1
+@concat_c1_loop
+  %161 = loadl %95 : i64
+  %region_meta_50_3 = call %lymar_aot_slot_pointer %95 : i64
+  %162 = cslt %161 %81 : i32
+  br %162 %concat_c1_body %concat_c1_done
+@concat_c1_body
+  %164 = add %93 %161 : i64
+  %165 = loadub %164 : i32
+  %166 = add %92 %161 : i8*
+  storeb %165 %166
+  %168 = add %161 1 : i64
+  store %168 %95
+  call %lymar_aot_edge %95 %168 %region_meta_50_3
+  jmp %concat_c1_loop
+@concat_c1_done
+  store 0 %95
+  jmp %concat_c2_loop
+@concat_c2_loop
+  %173 = loadl %95 : i64
+  %region_meta_54_3 = call %lymar_aot_slot_pointer %95 : i64
+  %174 = cslt %173 %83 : i32
+  br %174 %concat_c2_body %concat_c2_done
+@concat_c2_body
+  %176 = add %94 %173 : i64
+  %177 = loadub %176 : i32
+  %178 = add %81 %173 : i64
+  %179 = add %92 %178 : i8*
+  storeb %177 %179
+  %181 = add %173 1 : i64
+  store %181 %95
+  call %lymar_aot_edge %95 %181 %region_meta_54_3
+  jmp %concat_c2_loop
+@concat_c2_done
+  %184 = add %92 %84 : i8*
+  storeb 0 %184
+  jmp %done
+}
+
+function lymar_aot_library_open(i64) {
+}
+
+function lymar_aot_library_symbol(i64, i64) {
+}
+
+function lymar_aot_library_close(i64) {
+}
+
+function lymar_aot_foreign_call(i64, i64, i64, i64, i64, i64, i64) {
+}
+
+function lymar_aot_foreign_call_list(i64, i64, i64, i64, i64) {
+}
+
+function lymar_aot_callback_create(i64, i64, i64) {
+}
+
+function lymar_aot_callback_pointer(i64) {
+}
+
+function lymar_aot_callback_destroy(i64) {
+}
+
+function lymar_aot_ffi_register(i64, i64, i64, i64, i64) {
+}
+
+function lymar_aot_ffi_list_size(i64) {
+}
+
+function lymar_aot_ffi_list_integer(i64, i64) {
+}
+
+function lymar_aot_ffi_kind(i64, i64) {
+}
+
+function lymar_aot_ffi_infer_type(i64, i64) {
+}
+
+function lymar_aot_clock() {
+}
+
+function lymar_aot_time() {
+}
+
+function lymar_aot_frame_field_address(i64, i64) {
+}
+
+function lymar_aot_frame_matches(i64, i64, i64) {
+}
+
+function lymar_aot_atomic_load(i64, i64) {
+}
+
+function lymar_aot_atomic_store(i64, i64, i64, i64) {
+}
+
+function lymar_aot_atomic_update(i64, i64, i64, i64, i64) {
+}
+
+function lymar_aot_builtin_arity_error() {
+}
+
+function lymar_aot_ref_create(i64, i64) {
+}
+
+function lymar_aot_ref_create_checked(i64, i64, i64) {
+}
+
+function lymar_aot_nil() {
+}
+
+function lymar_aot_boolean(i64) {
+}
+
+function lymar_aot_print_float(f64) {
+}
+
+function lymar_aot_scalar_to_string(i64, i64) {
+}
+
+function lymar_aot_format_argument(i64, i64) {
+}
+
+function lymar_aot_print_value(i64, i64) {
+}
+
+function lymar_aot_mark_dictionary(i64) {
+}
+
+function lymar_aot_float_to_string(f64) {
+}
+
+function lymar_aot_float_bits_to_string(i64) {
+}
+
+function lymar_aot_tuple_length(i64, i64) {
+}
+
+function lymar_aot_string_hash(i64, i64) {
+}
+
+function lymar_aot_list_slice(i64, i64, i64, i64, i64, i64) {
+}
+
+function lymar_aot_box_float(f64) {
+}
+
+function lymar_aot_to_float(i64, i64) {
+}
+
+function lymar_aot_to_integer(i64, i64) {
+}
+
+function lymar_aot_float_to_integer(f64) {
+}
+
+function lymar_aot_to_boolean(i64, i64) {
+}
+
+function lymar_aot_value_equal(i64, i64, i64, i64) {
+}
+
+function lymar_aot_numeric_compare(i64, i64, i64, i64) {
+}
+
+function lymar_aot_length(i64, i64) {
+}
+
+function lymar_aot_numeric_binary(i64, i64, i64, i64, i64) {
+}
+
+function lymar_aot_is_print_object(i64, i64) {
+}
+
+function lymar_aot_is_nil(i64, i64) {
+}
+
+function lymar_aot_is_object(i64, i64) {
+}
+
+function lymar_aot_string_receiver(i64, i64) {
+}
+
+function lymar_aot_callable_receiver(i64, i64) {
+}
+
+function lymar_aot_string_index(i64, i64) {
+}
+
+function lymar_aot_print_integer(i64, i64) {
+}
+
+function lymar_aot_copy_constant(i64, i64) {
+}
+
+function lymar_aot_ref_resolve(i64, i64) {
+}
+
+function lymar_aot_ref_move(i64, i64, i64) {
+}
+
+function lymar_aot_ref_release(i64) {
+}
+
+function lymar_aot_ref_release_nullable(i64) {
+}
+
+function lymar_aot_consume(i64) {
+}
+
+function lymar_aot_call_enter() {
+}
+
+function lymar_aot_call_leave(i64) {
+}
+
+function lymar_aot_arg_set(i64, i64) {
+}
+
+function lymar_aot_arg_get(i64) {
+}
+
+function lymar_aot_arg_kind(i64, i64) {
+}
+
+function lymar_aot_return_pointer() {
+}
+
+function lymar_aot_param_push(i64, i64) {
+}
+
+function lymar_aot_param_pop(i64, i64) {
+}
+
+function lymar_aot_slot_pointer(i64) {
+}
+
+function lymar_aot_edge(i64, i64, i64) {
+}
+
+function lymar_aot_global_edge(i64, i64, i64) {
+}
+
+function lymar_aot_alloc(i64) {
+}
+
+function lymar_aot_free(i64) {
+}
+
+function lymar_aot_memory_load(i64, i64, i64) {
+}
+
+function lymar_aot_memory_load_kind(i64, i64, i64) {
+}
+
+function lymar_aot_memory_store(i64, i64, i64, i64, i64) {
+}
+
+function lymar_aot_raw_alloc(i64, i64) {
+}
+
+function lymar_aot_raw_free(i64, i64) {
+}
+
+function lymar_aot_raw_resize(i64, i64, i64, i64) {
+}
+
+function lymar_aot_raw_copy_checked(i64, i64, i64, i64, i64, i64) {
+}
+
+function lymar_aot_raw_fill_checked(i64, i64, i64, i64, i64, i64) {
+}
+
+function lymar_aot_raw_compare_checked(i64, i64, i64, i64, i64, i64) {
+}
+
+function lymar_aot_channel_length(i64, i64) {
+}
+
+function lymar_aot_assert(i64, i64) {
+}
+
+function lymar_aot_channel_new() {
+}
+
+function lymar_aot_channel_push(i64, i64, i64) {
+}
+
+function lymar_aot_channel_pop(i64) {
+}
+
+function lymar_aot_channel_has_data(i64) {
+}
+
+function lymar_aot_channel_close(i64) {
+}
+
+function lymar_aot_scheduler_new(i64, i64, i64) {
+}
+
+function lymar_aot_scheduler_run(i64) {
+}
+
+function lymar_aot_resize(i64, i64) {
+}
+
+function lymar_aot_copy(i64, i64, i64) {
+}
+
+function lymar_aot_raw_copy(i64, i64, i64) {
+}
+
+function lymar_aot_raw_fill(i64, i64, i64) {
+}
+
+function lymar_aot_raw_compare(i64, i64, i64) {
+}
+
+function lymar_aot_region_current() {
+}
+
+function lymar_aot_region_enter(i64) {
+}
+
+function lymar_aot_region_exit(i64) {
+}
+
+function lymar_aot_region_move(i64, i64, i64, i64) {
+}
+
+function lymar_aot_finalize(i64) {
+}
+
+function lymar_aot_set_finalizer(i64, i64) {
+}
+
+function lymar_aot_exit(i64) {
+}
+
+function lymar_aot_resource_create(i64, i64) {
+}
+
+function lymar_aot_resource_call(i64, i64, i64, i64) {
+}
+
+function lymar_aot_resource_destroy(i64) {
+}
+

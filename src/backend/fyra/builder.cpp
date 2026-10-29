@@ -616,6 +616,36 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
         param_idx++;
     }
 
+    auto is_typed_primitive_list = [&](uint32_t r) -> bool {
+        auto it = lir_func.register_language_types.find(r);
+        if (it != lir_func.register_language_types.end() && it->second && it->second->tag == ::TypeTag::List) {
+            auto* lt = std::get_if<ListType>(&it->second->extra);
+            if (lt && lt->elementType) {
+                auto etag = lt->elementType->tag;
+                if (etag != ::TypeTag::List && etag != ::TypeTag::String &&
+                    etag != ::TypeTag::Frame && etag != ::TypeTag::Dict &&
+                    etag != ::TypeTag::Tuple && etag != ::TypeTag::Any &&
+                    etag != ::TypeTag::Enum && etag != ::TypeTag::Trait &&
+                    etag != ::TypeTag::TraitObject) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    };
+
+    std::unordered_map<uint32_t, ir::Value*> hoisted_data_ptrs;
+    size_t num_params = main_fn->getParameters().size();
+    for (size_t p = 0; p < num_params; ++p) {
+        if (is_typed_primitive_list(p) && !reassigned_parameters.count(p)) {
+            ir::Value* p_val = regs[p];
+            ir::Value* unboxed = builder_->createAnd(p_val, context_->getConstantInt(context_->getIntegerType(64), ~7ULL));
+            ir::Instruction* dptr = builder_->createLoadl(builder_->createAdd(unboxed, context_->getConstantInt(context_->getIntegerType(64), 8)));
+            dptr->setName("hoisted_data_ptr_r" + std::to_string(p));
+            hoisted_data_ptrs[p] = dptr;
+        }
+    }
+
     if (main_fn->getName() == "main" && lir_func.name == "__top_level_wrapper__") {
         auto& registry = LIR::FunctionRegistry::getInstance();
         for (const auto& func_name : registry.getFunctionNames()) {
@@ -685,7 +715,10 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             v = builder_->createExternCall("lymar_aot_to_float", {v, context_->getConstantInt(context_->getIntegerType(64), 0)}, context_->getDoubleType());
         if (v && t == LIR::Type::Bool && !preserve_kind) {
             if (v->getType() != context_->getIntegerType(64)) v = builder_->createCast(v, context_->getIntegerType(64));
-            v = builder_->createExternCall("lymar_aot_boolean", {v}, context_->getIntegerType(64));
+            // Inlined lymar_aot_boolean (no external call or runtime mutex)
+        }
+        if (v && v->getType() && v->getType()->isInteger() && v->getType() != context_->getIntegerType(64)) {
+            v = builder_->createCast(v, context_->getIntegerType(64));
         }
         if (v) {
             if (v->getName().empty() && !dynamic_cast<ir::Constant*>(v)) {
@@ -1075,20 +1108,18 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     ir::BasicBlock* b_safe = builder_->createBasicBlock("div_safe_" + div_id, cur_fn);
                     ir::BasicBlock* b_zero = builder_->createBasicBlock("div_zero_" + div_id, cur_fn);
                     ir::BasicBlock* b_done = builder_->createBasicBlock("div_done_" + div_id, cur_fn);
-                    ir::Instruction* res_slot = entry_alloc();
 
                     builder_->createBr(is_zero, b_zero, b_safe);
 
                     builder_->setInsertPoint(b_zero);
-                    builder_->createStore(context_->getConstantInt(context_->getIntegerType(64), 0), res_slot);
+                    store_reg(inst.dst, context_->getConstantInt(context_->getIntegerType(64), 0), inst.result_type);
                     builder_->createJmp(b_done);
 
                     builder_->setInsertPoint(b_safe);
-                    builder_->createStore(builder_->createDiv(num, den), res_slot);
+                    store_reg(inst.dst, builder_->createDiv(num, den), inst.result_type);
                     builder_->createJmp(b_done);
 
                     builder_->setInsertPoint(b_done);
-                    store_reg(inst.dst, builder_->createLoadl(res_slot), inst.result_type);
                 }
                 break;
             case LIR::LIR_Op::Mod: {
@@ -1101,20 +1132,18 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 ir::BasicBlock* b_safe = builder_->createBasicBlock("mod_safe_" + mod_id, cur_fn);
                 ir::BasicBlock* b_zero = builder_->createBasicBlock("mod_zero_" + mod_id, cur_fn);
                 ir::BasicBlock* b_done = builder_->createBasicBlock("mod_done_" + mod_id, cur_fn);
-                ir::Instruction* res_slot = entry_alloc();
 
                 builder_->createBr(is_zero, b_zero, b_safe);
 
                 builder_->setInsertPoint(b_zero);
-                builder_->createStore(context_->getConstantInt(context_->getIntegerType(64), 0), res_slot);
+                store_reg(inst.dst, context_->getConstantInt(context_->getIntegerType(64), 0), inst.result_type);
                 builder_->createJmp(b_done);
 
                 builder_->setInsertPoint(b_safe);
-                builder_->createStore(builder_->createRem(num, den), res_slot);
+                store_reg(inst.dst, builder_->createRem(num, den), inst.result_type);
                 builder_->createJmp(b_done);
 
                 builder_->setInsertPoint(b_done);
-                store_reg(inst.dst, builder_->createLoadl(res_slot), inst.result_type);
                 break;
             }
             case LIR::LIR_Op::Neg:
@@ -1325,10 +1354,17 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                         block_map[i + 1] = fallthrough;
                     }
                     ir::Value* cond = load_reg(inst.a, inst.type_a);
-                    ir::Value* is_not_zero = builder_->createCne(cond, context_->getConstantInt(context_->getIntegerType(64), 0));
-                    ir::Value* is_not_vfalse = builder_->createCne(cond, context_->getConstantInt(context_->getIntegerType(64), VAL_FALSE));
-                    ir::Value* is_not_vnil = builder_->createCne(cond, context_->getConstantInt(context_->getIntegerType(64), VAL_NIL));
-                    ir::Value* is_truthy = builder_->createAnd(is_not_zero, builder_->createAnd(is_not_vfalse, is_not_vnil));
+                    ir::Value* is_truthy = nullptr;
+                    bool is_bool = (inst.type_a == LIR::Type::Bool ||
+                                    (reg_types.count(inst.a) && reg_types[inst.a] == LIR::Type::Bool));
+                    if (is_bool) {
+                        is_truthy = cond;
+                    } else {
+                        ir::Value* is_not_zero = builder_->createCne(cond, context_->getConstantInt(context_->getIntegerType(64), 0));
+                        ir::Value* is_not_vfalse = builder_->createCne(cond, context_->getConstantInt(context_->getIntegerType(64), VAL_FALSE));
+                        ir::Value* is_not_vnil = builder_->createCne(cond, context_->getConstantInt(context_->getIntegerType(64), VAL_NIL));
+                        is_truthy = builder_->createAnd(is_not_zero, builder_->createAnd(is_not_vfalse, is_not_vnil));
+                    }
 
                     if (inst.op == LIR::LIR_Op::JumpIfFalse) builder_->createBr(is_truthy, fallthrough, target);
                     else builder_->createBr(is_truthy, target, fallthrough);
@@ -2037,20 +2073,35 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 break;
             }
             case LIR::LIR_Op::ListIndex: {
+                ir::Value* list_val = load_reg(inst.a, inst.type_a);
+                ir::Value* idx_val = load_reg(inst.b, inst.type_b);
+                std::string lidx_id = std::to_string(label_counter_++);
+
+                if (hoisted_data_ptrs.count(inst.a) || is_typed_primitive_list(inst.a)) {
+                    ir::Value* data_ptr = nullptr;
+                    if (hoisted_data_ptrs.count(inst.a)) {
+                        data_ptr = hoisted_data_ptrs[inst.a];
+                    } else {
+                        ir::Value* unboxed = builder_->createAnd(list_val, context_->getConstantInt(context_->getIntegerType(64), ~7ULL));
+                        data_ptr = builder_->createLoadl(builder_->createAdd(unboxed, context_->getConstantInt(context_->getIntegerType(64), 8)));
+                    }
+                    ir::Value* offset = builder_->createMul(idx_val, context_->getConstantInt(context_->getIntegerType(64), 8));
+                    ir::Value* elem_addr = builder_->createAdd(data_ptr, offset);
+                    ir::Instruction* elem = builder_->createLoadl(elem_addr);
+                    elem->setName("scalar_elem_" + lidx_id);
+                    store_reg(inst.dst, elem, inst.result_type);
+                    break;
+                }
+
                 used_builtins_.insert("lm_list_get");
                 ir::Function* fn = current_module_->getFunction("lm_list_get");
                 if (!fn) fn = builder_->createFunction("lm_list_get", context_->getIntegerType(64), {context_->getIntegerType(64), context_->getIntegerType(64)});
 
-                ir::Value* list_val = load_reg(inst.a, inst.type_a);
-                ir::Value* idx_val = load_reg(inst.b, inst.type_b);
-
-                std::string lidx_id = std::to_string(label_counter_++);
                 ir::Function* cur_fn = builder_->getInsertPoint()->getParent();
                 ir::BasicBlock* b_chk_hdr = builder_->createBasicBlock("lidx_chk_hdr_" + lidx_id, cur_fn);
                 ir::BasicBlock* b_fast = builder_->createBasicBlock("lidx_fast_" + lidx_id, cur_fn);
                 ir::BasicBlock* b_slow = builder_->createBasicBlock("lidx_slow_" + lidx_id, cur_fn);
                 ir::BasicBlock* b_done = builder_->createBasicBlock("lidx_done_" + lidx_id, cur_fn);
-                ir::Instruction* res_slot = entry_alloc();
 
                 // Step 1: Check non-null and non-nil before unboxing pointer
                 ir::Value* is_not_null = builder_->createCne(list_val, context_->getConstantInt(context_->getIntegerType(64), 0));
@@ -2086,29 +2137,46 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 ir::Value* elem_addr = builder_->createAdd(data_ptr, offset);
                 ir::Instruction* elem = builder_->createLoadl(elem_addr);
                 elem->setName("lidx_elem_" + lidx_id);
-                builder_->createStore(elem, res_slot);
+                store_reg(inst.dst, elem, inst.result_type);
                 builder_->createJmp(b_done);
 
                 // Step 4: Slow path fallback
                 builder_->setInsertPoint(b_slow);
                 ir::Value* slow_res = builder_->createCall(fn, {list_val, idx_val});
-                builder_->createStore(slow_res, res_slot);
+                store_reg(inst.dst, slow_res, inst.result_type);
                 builder_->createJmp(b_done);
 
                 builder_->setInsertPoint(b_done);
-                store_reg(inst.dst, builder_->createLoadl(res_slot), inst.result_type);
                 break;
             }
             case LIR::LIR_Op::ListSet: {
+                ir::Value* list_val = load_reg(inst.dst, inst.result_type);
+                ir::Value* idx_val = load_reg(inst.a, inst.type_a);
+                ir::Value* elem_val = load_reg(inst.b, inst.type_b);
+                std::string lset_id = std::to_string(label_counter_++);
+
+                if (hoisted_data_ptrs.count(inst.dst) || is_typed_primitive_list(inst.dst)) {
+                    ir::Value* data_ptr = nullptr;
+                    if (hoisted_data_ptrs.count(inst.dst)) {
+                        data_ptr = hoisted_data_ptrs[inst.dst];
+                    } else {
+                        ir::Value* unboxed = builder_->createAnd(list_val, context_->getConstantInt(context_->getIntegerType(64), ~7ULL));
+                        data_ptr = builder_->createLoadl(builder_->createAdd(unboxed, context_->getConstantInt(context_->getIntegerType(64), 8)));
+                    }
+                    ir::Value* offset = builder_->createMul(idx_val, context_->getConstantInt(context_->getIntegerType(64), 8));
+                    ir::Value* elem_addr = builder_->createAdd(data_ptr, offset);
+                    if (auto* add_inst = dynamic_cast<ir::Instruction*>(elem_addr)) {
+                        add_inst->setName("scalar_elem_" + lset_id);
+                    }
+                    auto* store_inst = builder_->createStore(erased_word(elem_val), elem_addr);
+                    store_inst->setName("scalar_store_" + lset_id);
+                    break;
+                }
+
                 used_builtins_.insert("lm_list_set");
                 ir::Function* fn = current_module_->getFunction("lm_list_set");
                 if (!fn) fn = builder_->createFunction("lm_list_set", context_->getVoidType(), {context_->getIntegerType(64), context_->getIntegerType(64), context_->getIntegerType(64)});
 
-                ir::Value* list_val = load_reg(inst.dst, inst.result_type);
-                ir::Value* idx_val = load_reg(inst.a, inst.type_a);
-                ir::Value* elem_val = load_reg(inst.b, inst.type_b);
-
-                std::string lset_id = std::to_string(label_counter_++);
                 ir::Function* cur_fn = builder_->getInsertPoint()->getParent();
                 ir::BasicBlock* b_chk_hdr = builder_->createBasicBlock("lset_chk_hdr_" + lset_id, cur_fn);
                 ir::BasicBlock* b_fast = builder_->createBasicBlock("lset_fast_" + lset_id, cur_fn);

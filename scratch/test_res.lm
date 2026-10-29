@@ -1,0 +1,17 @@
+import std.resource as res;
+
+fn main(): int {
+    print("Testing create_memory...");
+    var mem = res.create_memory(64)? else {
+        print("Failed to create memory");
+        return 1;
+    };
+    print("Memory created!");
+    print("Calling mem.size()...");
+    var sz = mem.size();
+    print("Called mem.size(), sz is obtained!");
+    print(sz);
+    mem.close();
+    print("Done!");
+    return 0;
+}

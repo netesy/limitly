@@ -1,0 +1,56 @@
+// Lymar Application Benchmark (1,000,000 element Quicksort + Hash Reduction)
+
+import std.resource as res;
+
+fn measure_footprint_kb(footprint_bytes: int): int {
+    return footprint_bytes / 1024;
+}
+
+fn quicksort(arr: [int], left: int, right: int) {
+    var i = left;
+    var j = right;
+    var pivot = arr[(left + right) / 2];
+    while (i <= j) {
+        while (arr[i] < pivot) { i = i + 1; }
+        while (arr[j] > pivot) { j = j - 1; }
+        if (i <= j) {
+            var tmp = arr[i];
+            arr[i] = arr[j];
+            arr[j] = tmp;
+            i = i + 1;
+            j = j - 1;
+        }
+    }
+    if (left < j) { quicksort(arr, left, j); }
+    if (i < right) { quicksort(arr, i, right); }
+}
+
+fn main(): int {
+    var N = 1000000;
+    var data: [int] = [];
+    data.reserve(N);
+
+    var t0 = clock();
+
+    var seed = 12345;
+    for (var i = 0; i < N; i = i + 1) {
+        seed = (seed * 1103515245 + 12345) & 2147483647;
+        data.append(seed % 1000000);
+    }
+
+    quicksort(data, 0, N - 1);
+
+    var hash = 0;
+    for (var i = 0; i < N; i = i + 1) {
+        hash = (hash * 31 + data[i]) & 9223372036854775807;
+    }
+
+    var t1 = clock();
+    var dur_ms = (t1 - t0) * 1000.0;
+    var rss = measure_footprint_kb(len(data) * 8);
+
+    print("LYMAR_APP_RUNTIME_MS={dur_ms}");
+    print("LYMAR_APP_HASH={hash}");
+    print("LYMAR_APP_RSS_KB={rss}");
+    return 0;
+}

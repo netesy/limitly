@@ -1,0 +1,44 @@
+fn quicksort(arr: [int], left: int, right: int) {
+    var i = left;
+    var j = right;
+    var pivot = arr[(left + right) / 2];
+    while (i <= j) {
+        while (arr[i] < pivot) { i = i + 1; }
+        while (arr[j] > pivot) { j = j - 1; }
+        if (i <= j) {
+            var tmp = arr[i];
+            arr[i] = arr[j];
+            arr[j] = tmp;
+            i = i + 1;
+            j = j - 1;
+        }
+    }
+    if (left < j) { quicksort(arr, left, j); }
+    if (i < right) { quicksort(arr, i, right); }
+}
+
+fn main(): int {
+    var N = 10;
+    var data: [int] = [];
+    data.reserve(N);
+
+    var seed = 12345;
+    for (var i = 0; i < N; i = i + 1) {
+        seed = (seed * 1103515245 + 12345) & 2147483647;
+        data.append(seed % 1000000);
+    }
+
+    print("Before quicksort:");
+    for (var i = 0; i < N; i = i + 1) {
+        print(data[i]);
+    }
+
+    quicksort(data, 0, N - 1);
+
+    print("After quicksort:");
+    for (var i = 0; i < N; i = i + 1) {
+        print(data[i]);
+    }
+
+    return 0;
+}

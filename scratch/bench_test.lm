@@ -1,0 +1,33 @@
+fn swap(arr: [int], i: int, j: int) {
+    val temp = arr[i];
+    arr[i] = arr[j];
+    arr[j] = temp;
+}
+
+fn quicksort(arr: [int], low: int, high: int) {
+    if (low < high) {
+        val pivot = arr[high];
+        var i = low - 1;
+        for (var j = low; j < high; j = j + 1) {
+            if (arr[j] <= pivot) {
+                i = i + 1;
+                swap(arr, i, j);
+            }
+        }
+        swap(arr, i + 1, high);
+        val pi = i + 1;
+        quicksort(arr, low, pi - 1);
+        quicksort(arr, pi + 1, high);
+    }
+}
+
+fn main(): int {
+    print("Start quicksort test");
+    var data: [int] = [5, 2, 8, 1, 9, 3, 7, 4, 6];
+    quicksort(data, 0, 8);
+    for (var i = 0; i < 9; i = i + 1) {
+        print(data[i]);
+    }
+    print("Done");
+    return 0;
+}
