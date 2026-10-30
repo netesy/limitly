@@ -112,6 +112,10 @@ frame PriorityQueue {
     }
 }
 
+staged fn PriorityQueueOf(T: type): type {
+    return PriorityQueue;
+}
+
 pub fn PriorityQueueWrapper(comparator: any): PriorityQueue {
     return PriorityQueue(comparator);
 }

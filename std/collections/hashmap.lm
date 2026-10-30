@@ -136,6 +136,10 @@ frame HashMap {
     }
 }
 
+staged fn HashMapOf(K: type, V: type): type {
+    return HashMap;
+}
+
 pub fn hashmap(initial_cap: int = 16): HashMap {
     return HashMap(initial_cap);
 }

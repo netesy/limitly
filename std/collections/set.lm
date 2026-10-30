@@ -241,6 +241,10 @@ frame Set {
     }
 }
 
+staged fn SetOf(T: type): type {
+    return Set;
+}
+
 pub fn set_from_array(arr: [int]): Set {
     var s = Set(elements=[] as [int]);
     var i: int = 0;

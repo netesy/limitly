@@ -43,6 +43,10 @@ frame HashMapWrapper {
     }
 }
 
+staged fn MapOf(K: type, V: type): type {
+    return HashMapWrapper;
+}
+
 pub fn Map(): HashMapWrapper {
     return HashMapWrapper();
 }
