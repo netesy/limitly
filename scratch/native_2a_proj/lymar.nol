@@ -1,0 +1,6 @@
+[package]
+name: "native_2a_proj"
+version: "0.1.0"
+
+[native]
+sources: ["native_probe.c"]

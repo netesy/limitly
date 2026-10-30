@@ -64,6 +64,9 @@ tests/concurrency/concurrent_blocks.lm
 # FFI ABI and callback ownership
 tests/ffi/test_trampoline.lm
 tests/ffi/test_hardening.lm
+# Roadmap 2a: foreign source link integration (see tests/native/verify_native_link.py
+# for the artifact-level symbol check)
+tests/native/native_link_basic.lm
 # Stdlib - Core
 tests/stdlib/core/string_test.lm
 tests/stdlib/core/math_test.lm

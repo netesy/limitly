@@ -633,6 +633,7 @@ namespace AST {
         bool isStringLiteralPath = false;
         std::optional<std::string> alias;
         std::optional<ImportFilter> filter;
+        std::optional<std::string> fromLibrary;  // `from "..."` for c: scheme
     };
 
     // Enum declaration

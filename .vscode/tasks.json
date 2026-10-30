@@ -1,0 +1,20 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build Lymar",
+      "type": "shell",
+      "command": "make",
+      "args": ["-j8"],
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": ["$gcc"]
+    },
+    {
+      "label": "Run Lymar File",
+      "type": "shell",
+      "command": "${workspaceFolder}/bin/lymar${execExt}",
+      "args": ["run", "${file}"],
+      "group": "none"
+    }
+  ]
+}

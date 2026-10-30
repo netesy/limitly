@@ -314,14 +314,68 @@ it composes directly with `staged`.
   with the native toolchain and link, reusing the path `scripts/build_aot_runtime.py`
   already uses to build `liblymar_aot.a` and the existing `-c/-static/-shared` outputs. The
   foreign source is compiled by cc/clang, so this is link-time integration, not a single
-  LIR compilation unit.
+  LIR compilation unit. *(done)*
+
+  > **Build step 2a is done.** `lymar build` accepts repeatable `--native <file.c|.cpp>`
+  > (+ `--native-include/--native-cflag/--native-link`), and a project manifest's
+  > `[native] sources/include_dirs/cflags/link_libs` entries are merged automatically, so
+  > `lymar build` in a project "just works" with no flags. Each foreign source is compiled
+  > to a temporary object by the target toolchain (`gcc`/`g++`, cross-prefixed like the AOT
+  > driver table, overridable with `LYMAR_AOT_CC`/`LYMAR_AOT_CXX`) and then contributed to
+  > every link path: the Fyra internal linker via `BackendBuilder::addObject` (executables,
+  > shared images, and - since this step - static archives, which now store input objects as
+  > real members), the target-driver fallback (objects beside the program object, extra
+  > libraries after the runtime archive), and both host shared-module emitters. Proof:
+  > `tests/native/verify_native_link.py` (symbol present in the `--native` exe, absent in
+  > the plain exe, archive member in the `-static` artifact) plus
+  > `scratch/native_2a_proj`-style manifest builds. Calling into the linked code is 2b's
+  > job; today an *unreferenced* foreign object is dead-stripped from executables by the
+  > linker, which is expected archive semantics, not a gap.
 - **2b — Header → binding generation.** Parse `.h` and auto-emit the `declare(...)` /
   `ForeignCall` bindings as a Lymar namespace, so you call a pre-built/compiled C library
   without hand-writing decls. (Note: binding against a library ≠ compiling that library's
-  `.c` through Lymar.)
+  `.c` through Lymar.) *(done)*
+
+  > **Build step 2b is done.** `lymar run/build` accepts repeatable
+  > `--bind-header <file.h>` (+ `--bind-lib <path>` / `--bind-namespace <name>`), and
+  > a project manifest's `[native] headers/bind_libs` entries are merged automatically.
+  > A hand-written C declaration-subset parser (`src/backend/native/header_parser.cpp`)
+  > extracts function declarations (skipping preprocessor, comments, structs, enums,
+  > function-pointer params), maps C types to std.ffi typed call helpers, and emits a
+  > complete `.lm` module with lazy library load and per-function wrappers. The generated
+  > module is written to `.cache/bindings/<name>.lm` and that directory is added to the
+  > `ModuleManager` include path, so user code simply writes
+  > `import mylib; mylib.add(3, 4)`. Uses only existing std.ffi intrinsics
+  > (`library_load`/`library_get_symbol`/`call_i64_0/1/2`/`call_f64_2`/`call_void_1`/
+  > `foreign_call`) — no new LIR ops. Proof: `tests/native/verify_bind_header.py`
+  > (builds a shared lib from fixture `.c`, runs the generated binding via VM, asserts
+  > correct results for 0-arg/1-arg/2-arg/3-arg/float/void functions).
 - **2c — Comptime translation API.** Expose a `staged fn` hook so third parties can write
   translators (C, or other languages) that produce Lymar bindings at compile time. Depends
-  on item 1.
+  on item 1. *(done — realized as a declarative `import "c:..."` syntax instead of a
+  `staged fn` API, so no sandbox changes were required and the same 2b pipeline is
+  triggered automatically during module resolution.)*
+
+> **Build step 2c is done.** Users write
+> ```lymar
+> import "c:math_ops.h" from "libmath_ops" as math;              // full header
+> import "c:math_ops.h" from "libmath_ops" as math { add_points }; // cherry-pick
+> import "c:stdio.h" as cstdio;                                   // system header (empty lib path)
+> ```
+> The parser accepts a bare `STRING` after `import`, an optional `from "<lib>"` clause
+> (stored as `ImportStatement::fromLibrary`), an optional brace-select `{ IDENT, ... }`
+> filter (mapped to a `Show` filter), and existing `show/hide`/`as` forms. A new module
+> `src/frontend/cheader_import.{hh,cpp}` runs the 2b pipeline (`parse_header` +
+> `generate_bindings`) at compile time. `ModuleManager::extract_metadata` calls the
+> resolver before adding the dependency, rewrites `modulePath` to the resulting namespace,
+> and adds `.cache/bindings` to the include path so downstream resolution proceeds
+> through the ordinary Lymar module machinery. System headers (no `from` clause) emit
+> `ffi.library_load("")`, and `lymarrt_library_open("")` returns the process handle
+> (`GetModuleHandleA(NULL)` / `dlopen(NULL, RTLD_LAZY|RTLD_GLOBAL)`) to resolve CRT
+> symbols. Include dirs come from `--native-include`, the project manifest, `gcc -E -Wp,-v`
+> probing, `LYMAR_HOME/include`, and per-file source directory. Bindings are cached in
+> `.cache/bindings/<ns>.lm` and reused when the header mtime is older. Proof:
+> `tests/native/verify_cimport.py` (four variants + cache-reuse check).
 
 A true C→LIR source frontend (Lymar itself lowers C as one compilation unit, Zig-style) is
 **out of scope**: it is a large separate effort and would have to lower to LIR to satisfy

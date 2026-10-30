@@ -581,7 +581,8 @@ struct Emitter {
 } // namespace
 bool emit_shared_module(const LIR::LIR_Function &root,
                         const std::string &module, const std::string &output,
-                        int optimization, std::string &error) {
+                        int optimization, std::string &error,
+                        const std::vector<std::string> &native_objects) {
   std::string temporary;
   try {
     Emitter emitter;
@@ -733,8 +734,11 @@ int(*equal)(V,V); int(*compare)(V,V); bool(*truthy)(V); const char*(*string_data
     // system() uses cmd.exe even when Lymar was launched from MSYS2. Pass
     // arguments directly, preserving spaces and avoiding POSIX shell quoting.
     const std::string level = "-O" + std::to_string(std::clamp(optimization, 0, 3));
-    const std::vector<std::string> unquoted = {compiler, "-std=c++20", "-shared",
-        level, "-fvisibility=hidden", temporary, "-o", output};
+    std::vector<std::string> unquoted = {compiler, "-std=c++20", "-shared",
+        level, "-fvisibility=hidden", temporary};
+    // Foreign objects join the same link step as the generated module source.
+    for (const auto& object : native_objects) unquoted.push_back(object);
+    unquoted.insert(unquoted.end(), {"-o", output});
     std::vector<std::string> quoted;
     for (const auto& argument : unquoted)
       quoted.push_back(quote_windows_argument(argument));
@@ -743,10 +747,12 @@ int(*equal)(V,V); int(*compare)(V,V); bool(*truthy)(V); const char*(*string_data
     arguments.push_back(nullptr);
     const auto compilation_status = _spawnvp(_P_WAIT, compiler.c_str(), arguments.data());
 #else
+    std::string link_objects;
+    for (const auto& object : native_objects) link_objects += " " + shell_quote(object);
     const std::string command =
         shell_quote(compiler) + " -std=c++20 -shared -fPIC -O" +
         std::to_string(std::clamp(optimization, 0, 3)) +
-        " -fvisibility=hidden " + shell_quote(temporary) + " -o " +
+        " -fvisibility=hidden " + shell_quote(temporary) + link_objects + " -o " +
         shell_quote(output);
     // Explicit exported visibility is required despite hidden internal helpers.
     const auto compilation_status = std::system(command.c_str());

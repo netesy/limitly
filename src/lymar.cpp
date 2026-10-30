@@ -7,11 +7,15 @@
 #include "frontend/memory_checker.hh"
 #include "frontend/optimizer/stream_fusion.hh"
 #include "frontend/module_manager.hh"
+#include "frontend/cheader_import.hh"
 #include "memory/ownership.hh"
 #include "lir/generator.hh"
 #include "lir/functions.hh"
 #include "lir/cache_manager.hh"
 #include "backend/vm/register.hh"
+#include "backend/native/foreign_sources.hh"
+#include "backend/native/header_parser.hh"
+#include "backend/native/binding_generator.hh"
 #include "error/debugger.hh"
 #include "runtime/os_info.hh"
 #include "profiler.hh"
@@ -70,6 +74,40 @@ int Compiler::executeFile(const std::string& filename, const CompileOptions& opt
         }
 
         if (!loaded_from_cache) {
+            // Roadmap 2b: generate binding modules from C headers before compilation.
+            // Each parsed header produces a .lm file in .cache/bindings/ that the
+            // ModuleManager can resolve when user code writes `import <name>;`.
+            if (!options.bind_headers.empty()) {
+                namespace fs = std::filesystem;
+                fs::path bind_dir = ".cache/bindings";
+                fs::create_directories(bind_dir);
+                for (size_t bi = 0; bi < options.bind_headers.size(); ++bi) {
+                    const std::string& hdr = options.bind_headers[bi];
+                    std::string hdr_source;
+                    try { hdr_source = readFile(hdr); }
+                    catch (...) {
+                        std::cerr << "[WARN] Cannot read bind-header '" << hdr << "', skipping\n";
+                        continue;
+                    }
+                    std::vector<std::string> parse_warnings;
+                    auto decls = Backend::Native::parse_header(hdr_source, hdr, parse_warnings);
+                    for (const auto& w : parse_warnings) std::cerr << "[NOTE] " << w << "\n";
+                    std::string ns = (bi < options.bind_namespaces.size() && !options.bind_namespaces[bi].empty())
+                        ? options.bind_namespaces[bi]
+                        : Backend::Native::derive_namespace(hdr);
+                    std::string lib_path = (bi < options.bind_lib_paths.size())
+                        ? options.bind_lib_paths[bi]
+                        : std::string("./") + ns;
+                    std::string gen_source = Backend::Native::generate_bindings(decls, ns, lib_path);
+                    fs::path out_path = bind_dir / (ns + ".lm");
+                    std::ofstream ofs(out_path);
+                    if (ofs) { ofs << gen_source; ofs.close(); }
+                    else { std::cerr << "[ERROR] Cannot write binding module: " << out_path << "\n"; return 1; }
+                }
+                // Add the bindings directory so ModuleManager finds the generated modules
+                const_cast<CompileOptions&>(options).include_dirs.push_back(".cache/bindings");
+            }
+
             std::string source = readFile(filename);
             // A module library must be lowered in its module namespace, not as an
             // application root (whose uncalled functions are otherwise unreachable).
@@ -107,6 +145,7 @@ int Compiler::executeFile(const std::string& filename, const CompileOptions& opt
             auto t_parse = std::chrono::steady_clock::now();
 
             LM::Frontend::ModuleManager::getInstance().set_include_dirs(options.include_dirs);
+            LM::Frontend::set_c_header_extra_include_dirs(options.native_include_dirs);
 
             ast = LM::Frontend::AST::StreamFusionVisitor::optimizeProgram(ast);
             auto t_opt = std::chrono::steady_clock::now();
@@ -233,6 +272,39 @@ int Compiler::executeFile(const std::string& filename, const CompileOptions& opt
                     default:
                         fyra_options.artifact_kind = LM::Backend::Fyra::ArtifactKind::Executable;
                         break;
+                }
+
+                // Foreign .c/.cpp sources are compiled by the native toolchain
+                // before the artifact link runs; the resulting objects reach all
+                // three link paths (Fyra internal linker, target driver, host
+                // shared-module emitter) through the Fyra compile options.
+                if (!options.native_sources.empty()) {
+                    if (options.use_wasm || options.use_wasi) {
+                        std::cerr << "[WARN] --native sources are not linked into wasm targets and were skipped\n";
+                    } else {
+                        try {
+                            fyra_options.native_objects = LM::Backend::Native::compile_foreign_sources(
+                                options.native_sources, options.native_include_dirs, options.native_cflags,
+                                options.output_file, options.target, options.arch);
+                        } catch (const std::exception& e) {
+                            std::cerr << "[ERROR] Native source compilation failed: " << e.what() << std::endl;
+                            return 1;
+                        }
+                        fyra_options.native_link_libs = options.native_link_libs;
+                        struct CleanupNativeObjects {
+                            std::vector<std::string> objects;
+                            ~CleanupNativeObjects() { LM::Backend::Native::cleanup_foreign_objects(objects); }
+                        } cleanup_native{fyra_options.native_objects};
+                        auto result = fyra.compile(*lir_function, fyra_options);
+                        for (const auto& warning : result.warnings)
+                            std::cerr << "[WARN] " << warning << '\n';
+                        if (!result.success) {
+                            std::cerr << "[ERROR] AOT Compilation Failed" << std::endl;
+                            std::cerr << "  Message: " << result.error_message << std::endl;
+                            return 1;
+                        }
+                        return 0;
+                    }
                 }
 
                 if (options.print_fyra_ir) {

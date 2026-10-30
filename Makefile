@@ -99,7 +99,7 @@ FRONT_SRCS := src/frontend/scanner.cpp src/frontend/parser.cpp \
               src/frontend/parser/types.cpp src/frontend/parser/patterns.cpp \
               src/frontend/cst.cpp src/frontend/cst/printer.cpp src/frontend/cst/utils.cpp \
               src/frontend/ast/printer.cpp src/frontend/type_checker/core.cpp src/frontend/type_checker/expressions.cpp src/frontend/type_checker/statements.cpp src/frontend/type_checker/declarations.cpp src/frontend/type_checker/types.cpp src/frontend/type_checker/staged_vm.cpp src/frontend/type_checker/patterns.cpp src/frontend/type_checker/utils.cpp src/frontend/type_checker_factory.cpp src/frontend/memory_checker.cpp src/memory/ownership.cpp src/frontend/constraint_engine.cpp src/frontend/module_graph.cpp src/frontend/declaration_resolver.cpp \
-              src/frontend/ast/optimizer.cpp src/frontend/optimizer/stream_fusion.cpp src/frontend/module_manager.cpp
+              src/frontend/ast/optimizer.cpp src/frontend/optimizer/stream_fusion.cpp src/frontend/module_manager.cpp src/frontend/cheader_import.cpp
 
 # Recursive wildcard function for pure GNU Make file discovery
 rwildcard = $(foreach d,$(wildcard $(1:=/*)),$(call rwildcard,$d,$2) $(filter $(subst *,%,$2),$d))
@@ -124,7 +124,7 @@ LYRA_LIB_OBJS := $(patsubst $(LYRA_DIR)/src/%.cpp,$(OBJ_DIR)/lyra/%.o,$(LYRA_LIB
 LYRA_LIB := $(OBJ_DIR)/liblyra.a
 LYRA_BIN := $(BIN_DIR)/lyra$(EXE_EXT)
 
-REGISTER_SRCS := src/backend/native/abi.cpp src/backend/native/emitter.cpp src/backend/vm/resource_manager.cpp src/runtime/os_info.cpp src/runtime/sokol/sokol_app_runtime.cpp src/runtime/truetype.cpp src/runtime/lymarrt/lymarrt.cpp src/backend/vm/register.cpp src/backend/vm/ops/arithmetic.cpp src/backend/vm/ops/comparison.cpp src/backend/vm/ops/collections.cpp src/backend/vm/ops/frames.cpp src/backend/vm/ops/control_flow.cpp src/backend/vm/ops/io.cpp src/backend/vm/ops/bitwise.cpp src/backend/vm/ops/concurrency.cpp src/backend/vm/ops/modules.cpp src/backend/vm/ops/objects.cpp src/backend/vm/ops/vm_strings.cpp src/backend/vm/ops/vm_calls.cpp src/backend/vm/ops/vm_cast.cpp src/backend/vm/ops/memory.cpp src/backend/vm/ops/construction.cpp src/backend/vm/ops/marshal.cpp src/backend/vm/ops/ffi.cpp src/backend/vm/vm_dict.cpp src/backend/vm/vm_image.cpp src/backend/vm/vm_list.cpp src/backend/vm/vm_runtime.cpp src/backend/vm/vm_string.cpp src/backend/vm/vm_tuple.cpp src/backend/vm/vm_value.cpp
+REGISTER_SRCS := src/backend/native/abi.cpp src/backend/native/emitter.cpp src/backend/native/foreign_sources.cpp src/backend/native/header_parser.cpp src/backend/native/binding_generator.cpp src/backend/vm/resource_manager.cpp src/runtime/os_info.cpp src/runtime/sokol/sokol_app_runtime.cpp src/runtime/truetype.cpp src/runtime/lymarrt/lymarrt.cpp src/backend/vm/register.cpp src/backend/vm/ops/arithmetic.cpp src/backend/vm/ops/comparison.cpp src/backend/vm/ops/collections.cpp src/backend/vm/ops/frames.cpp src/backend/vm/ops/control_flow.cpp src/backend/vm/ops/io.cpp src/backend/vm/ops/bitwise.cpp src/backend/vm/ops/concurrency.cpp src/backend/vm/ops/modules.cpp src/backend/vm/ops/objects.cpp src/backend/vm/ops/vm_strings.cpp src/backend/vm/ops/vm_calls.cpp src/backend/vm/ops/vm_cast.cpp src/backend/vm/ops/memory.cpp src/backend/vm/ops/construction.cpp src/backend/vm/ops/marshal.cpp src/backend/vm/ops/ffi.cpp src/backend/vm/vm_dict.cpp src/backend/vm/vm_image.cpp src/backend/vm/vm_list.cpp src/backend/vm/vm_runtime.cpp src/backend/vm/vm_string.cpp src/backend/vm/vm_tuple.cpp src/backend/vm/vm_value.cpp
 
 LIR_CORE_SRCS := src/lir/lir.cpp src/lir/lir_utils.cpp src/lir/functions.cpp \
                  src/lir/builtin_functions.cpp src/lir/intrinsic_registry.cpp src/lir/verifier.cpp src/lir/lir_types.cpp src/lir/generator.cpp \
@@ -189,28 +189,28 @@ endif
 # Directories
 # =============================
 $(OBJ_DIR):
-	@mkdir -p $@
+	@mkdir -p $@ 2>/dev/null || true
 
 $(BIN_DIR):
-	@mkdir -p $@
+	@mkdir -p $@ 2>/dev/null || true
 
 $(RSP_DIR):
-	@mkdir -p $@
+	@mkdir -p $@ 2>/dev/null || true
 
 # =============================
 # Object compilation - C++ files
 # =============================
 $(OBJ_DIR)/%.o: %.cpp | $(OBJ_DIR)
-	@mkdir -p $(dir $@)
+	@mkdir -p $(dir $@) 2>/dev/null || true
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 # Exclude src/backend/fyra from general rule
 $(OBJ_DIR)/src/backend/fyra/%.o: src/backend/fyra/%.cpp | $(OBJ_DIR)
-	@mkdir -p $(dir $@)
+	@mkdir -p $(dir $@) 2>/dev/null || true
 	$(CXX) $(CXXFLAGS) --param ggc-min-expand=20 --param ggc-min-heapsize=32768 -c $< -o $@
 
 $(OBJ_DIR)/fyra/%.o: vendor/fyra/src/%.cpp | $(OBJ_DIR)
-	@mkdir -p $(dir $@)
+	@mkdir -p $(dir $@) 2>/dev/null || true
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 # =============================
@@ -224,13 +224,13 @@ FYRA_AVAILABLE := $(if $(wildcard $(FYRA_DIR)/include/ir/Module.h),yes,no)
 ifeq ($(FYRA_AVAILABLE),yes)
 $(FYRA_LIB): $(FYRA_OBJS)
 	@echo "[BUILD] Building Fyra library with Makefile..."
-	@mkdir -p $(dir $@)
+	@mkdir -p $(dir $@) 2>/dev/null || true
 	$(AR) rcs $@ $^
 	@echo "[OK] Fyra library built: $@"
 else
 $(FYRA_LIB):
 	@echo "[WARN]  Fyra not found at $(FYRA_DIR) - AOT/WASM compilation disabled"
-	@mkdir -p $(dir $@)
+	@mkdir -p $(dir $@) 2>/dev/null || true
 	@touch $@
 endif
 
@@ -239,7 +239,7 @@ endif
 # =============================
 $(LYRA_LIB): $(LYRA_LIB_OBJS)
 	@echo "[BUILD] Building Lyra static library ($@)..."
-	@mkdir -p $(dir $@)
+	@mkdir -p $(dir $@) 2>/dev/null || true
 	@rm -f $@
 	$(AR) rcs $@ $^
 	@echo "[OK] Lyra library built: $@"
@@ -250,7 +250,7 @@ $(LYRA_BIN): $(OBJ_DIR)/lyra/main.o $(LYRA_LIB) | $(BIN_DIR)
 	@echo "[OK] Lyra binary built: $@"
 
 $(OBJ_DIR)/lyra/%.o: $(LYRA_DIR)/src/%.cpp | $(OBJ_DIR)
-	@mkdir -p $(dir $@)
+	@mkdir -p $(dir $@) 2>/dev/null || true
 	$(CXX) $(CXXFLAGS) -I$(LYRA_DIR)/include -c $< -o $@
 
 # =============================
@@ -274,7 +274,7 @@ liblymar: $(OBJ_DIR)/liblymar.a $(LYRA_LIB)
 
 $(OBJ_DIR)/liblymar.a: $(LIB_LYMAR_OBJS) $(FYRA_LIB) $(LYRA_LIB)
 	@echo "[BUILD] Building liblymar.a ..."
-	@mkdir -p $(dir $@)
+	@mkdir -p $(dir $@) 2>/dev/null || true
 	@rm -f $@
 	$(AR) rcs $@ $(LIB_LYMAR_OBJS) $(LYRA_LIB_OBJS)
 

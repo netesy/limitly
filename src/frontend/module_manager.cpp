@@ -3,6 +3,8 @@
 #include "parser.hh"
 #include "type_checker.hh"
 #include "optimizer/stream_fusion.hh"
+#include "cheader_import.hh"
+#include "../backend/native/header_parser.hh"
 #include "../error/debugger.hh"
 #include "../lir/function_registry.hh"
 #include <fstream>
@@ -435,6 +437,16 @@ void ModuleManager::set_include_dirs(const std::vector<std::string>& dirs) {
     if (const char* home = std::getenv("LYMAR_HOME")) include_dirs_.push_back(home);
 }
 
+void ModuleManager::add_include_path(const std::string& dir) {
+    std::lock_guard<std::mutex> lock(modules_mutex_);
+    // Avoid duplicates
+    for (const auto& existing : include_dirs_) {
+        if (existing == dir) return;
+    }
+    include_dirs_.push_back(dir);
+    file_cache_.clear();
+}
+
 std::string ModuleManager::find_module_file(const std::string& module_path) {
     {
         std::lock_guard<std::mutex> lock(modules_mutex_);
@@ -719,6 +731,40 @@ void ModuleManager::extract_metadata(std::shared_ptr<Module> module) {
             // Type aliases are always public module-level symbols
             module->public_symbols.insert(type_decl->name);
         } else if (auto import_stmt = std::dynamic_pointer_cast<AST::ImportStatement>(stmt)) {
+            // Resolve `c:` scheme imports: generate FFI bindings once, then rewrite
+            // modulePath to the resulting namespace so downstream resolution + the
+            // dependency worklist see a normal Lymar module name.
+            if (import_stmt->modulePath.starts_with("c:")) {
+                static std::mutex c_import_mutex;
+                std::lock_guard<std::mutex> lock(c_import_mutex);
+                // Skip if already rewritten in a prior pass
+                std::string hdr = import_stmt->modulePath.substr(2);
+                std::string ns = import_stmt->alias.value_or(
+                    Backend::Native::derive_namespace(hdr));
+                auto include_dirs = collect_c_include_dirs();
+                if (!module->path.empty()) {
+                    auto parent = fs::path(module->path).parent_path().string();
+                    if (!parent.empty()) include_dirs.insert(include_dirs.begin(), parent);
+                }
+                CHeaderFilter chfilter;
+                if (import_stmt->filter &&
+                    import_stmt->filter->type == AST::ImportFilterType::Show) {
+                    chfilter.identifiers = import_stmt->filter->identifiers;
+                }
+                std::string err;
+                auto gen_path = resolve_c_header_import(hdr, import_stmt->fromLibrary,
+                                                        include_dirs, chfilter, ns, err);
+                if (gen_path.empty()) {
+                    std::string msg = "failed to resolve c: import: " + err;
+                    LM::Error::Debugger::error(msg, import_stmt->line, 1,
+                        InterpretationStage::SEMANTIC,
+                        module->source, module->path, "", "");
+                } else {
+                    import_stmt->modulePath = ns;
+                    // Ensure the bindings directory is searchable for the rewritten path
+                    add_include_path(".cache/bindings");
+                }
+            }
             module->dependencies.push_back(import_stmt->modulePath);
         }
     }

@@ -1,0 +1,117 @@
+{
+  "name": "lymar",
+  "displayName": "Lymar Language Support",
+  "description": "IntelliSense and debugging for the Lymar programming language.",
+  "version": "0.1.0",
+  "publisher": "lymar-internal",
+  "repository": { "type": "git", "url": "" },
+  "engines": { "vscode": "^1.75.0" },
+  "categories": ["Programming Languages", "Debuggers"],
+  "activationEvents": [
+    "onLanguage:lymar",
+    "onDebugResolve:lymar"
+  ],
+  "main": "./extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "lymar",
+        "aliases": ["Lymar", "lymar"],
+        "extensions": [".lm"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "lymar",
+        "scopeName": "source.lymar",
+        "path": "./syntaxes/lymar.tmLanguage.json"
+      }
+    ],
+    "breakpoints": [
+      { "language": "lymar" }
+    ],
+    "debuggers": [
+      {
+        "type": "lymar",
+        "label": "Lymar Debug",
+        "program": "",
+        "runtime": "node",
+        "configurationAttributes": {
+          "launch": {
+            "required": ["program"],
+            "properties": {
+              "program": {
+                "type": "string",
+                "description": "Absolute path to the .lm source file to debug.",
+                "default": "${file}"
+              },
+              "mode": {
+                "type": "string",
+                "enum": ["vm", "aot"],
+                "default": "vm",
+                "description": "Debug mode: vm (interpreter) or aot (native via lldb-dap)."
+              },
+              "stopOnEntry": {
+                "type": "boolean",
+                "default": true,
+                "description": "Automatically pause after launch."
+              },
+              "lymarPath": {
+                "type": "string",
+                "description": "Path to the lymar executable.",
+                "default": ""
+              }
+            }
+          }
+        },
+        "initialConfigurations": [
+          {
+            "type": "lymar",
+            "request": "launch",
+            "name": "Debug Lymar File",
+            "program": "${file}",
+            "mode": "vm",
+            "stopOnEntry": true
+          }
+        ],
+        "configurationSnippets": [
+          {
+            "label": "Lymar Debug: Launch",
+            "description": "Start debugging a Lymar source file",
+            "body": {
+              "type": "lymar",
+              "request": "launch",
+              "name": "Debug Lymar File",
+              "program": "^\"\\${file}\"",
+              "mode": "vm",
+              "stopOnEntry": true
+            }
+          }
+        ]
+      }
+    ],
+    "configuration": {
+      "title": "Lymar",
+      "properties": {
+        "lymar.serverPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the lymar executable (used for LSP and DAP). Falls back to 'lymar' on PATH or bin/lymar in the workspace."
+        },
+        "lymar.trace.server": {
+          "type": "string",
+          "enum": ["off", "messages", "verbose"],
+          "default": "off",
+          "description": "Traces LSP communication for debugging."
+        }
+      }
+    }
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.75.0"
+  }
+}

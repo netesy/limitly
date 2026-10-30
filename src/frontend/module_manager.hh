@@ -79,6 +79,8 @@ public:
 
     // Set search directories for module imports
     void set_include_dirs(const std::vector<std::string>& dirs);
+    // Add a single search directory (used by c: scheme binding generation)
+    void add_include_path(const std::string& dir);
 
     // Precompiled module discovery and registration
     const std::unordered_map<std::string, std::vector<CompiledModuleMeta>>& get_compiled_modules() const {

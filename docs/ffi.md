@@ -38,6 +38,123 @@ fn main() {
 }
 ```
 
+### Linking foreign native sources at build time
+
+A project can compile its own `.c`/`.cpp` sources with the native toolchain and link
+them into every AOT artifact, without any `dlopen` bookkeeping:
+
+```sh
+lymar build src/main.lm --native src/adapter.c \
+    --native-include src/native --native-cflag -DUSE_SSE --native-link -lm
+```
+
+In a project, the same configuration lives in the manifest and needs no flags:
+
+```nol
+[native]
+sources: ["src/adapter.c", "src/engine.cpp"]
+include_dirs: ["src/native"]
+link_libs: ["-lm"]
+```
+
+Each source is compiled with the target C/C++ driver (`gcc`/`g++`, cross-prefixed for
+non-host targets, overridable with `LYMAR_AOT_CC`/`LYMAR_AOT_CXX`) and its object joins
+the executable, static archive, shared library, or driver-mediated link. Note the
+sources are only consumed by `lymar build` (the interpreter ignores them), and calling
+a linked symbol from Lymar code still needs a binding (`declare`/`ForeignCall`, or the
+runtime `lib.func(...)` above against the built image); see
+[Automatic binding generation from headers](#automatic-binding-generation-from-headers)
+for the `--bind-header` workflow.
+
+### Automatic binding generation from headers
+
+`lymar run` and `lymar build` accept `--bind-header` to parse a C `.h` file and
+auto-generate an importable Lymar module with typed FFI wrappers:
+
+```sh
+lymar run src/main.lm \
+    --bind-header include/mylib.h \
+    --bind-lib ./libmylib.so
+```
+
+Or in the project manifest:
+
+```nol
+[native]
+headers: ["include/mylib.h"]
+bind_libs: ["./libmylib.so"]
+```
+
+The compiler writes a generated `.lm` to `.cache/bindings/mylib.lm` and adds that
+directory to the module search path. User code simply imports the namespace:
+
+```lymar
+import mylib;
+
+fn main() {
+    var result = mylib.add(10, 32);
+    print(result); // 42
+}
+```
+
+Generated wrappers use `ffi.library_load` / `ffi.library_get_symbol` / typed call
+helpers (`call_i64_0`/`1`/`2`, `call_f64_2`, `call_void_1`) for supported signatures,
+and fall back to `ffi.foreign_call` for functions with >2 parameters or mixed types.
+
+The parser handles function declarations, primitive C types (`int`, `float`, `double`,
+fixed-width `stdint` types, `size_t`), pointer types, and `const`/`unsigned` qualifiers.
+Struct/union/enum definitions, function-pointer parameters, and variadic functions are
+skipped with a warning. Reserved keywords used as C parameter names are auto-renamed
+with a `p_` prefix.
+
+### Declarative `c:` imports (recommended)
+
+The `--bind-header` workflow can be triggered directly from Lymar source with a
+`"c:<header>"` scheme on the `import` statement. The header is parsed and a binding
+module is generated at compile time, cached under `.cache/bindings/<ns>.lm`, and
+loaded through the ordinary module machinery. No CLI flags are needed.
+
+```lymar
+// Full header, linked against a shared library
+import "c:math_ops.h" from "libmath_ops" as math;
+
+// Cherry-pick individual symbols (brace-select is sugar for `show`)
+import "c:math_ops.h" from "libmath_ops" as math { Point2D, add_points };
+
+// Selective filter with the `show` clause
+import "c:math_ops.h" from "libmath_ops" as math show safe_divide;
+
+// System header: no `from` clause -> ffi.library_load("") resolves against the
+// process handle (GetModuleHandleA(NULL) / dlopen(NULL, ...)), which is enough
+// for CRT symbols in the linked executable.
+import "c:stdio.h" as cstdio;
+```
+
+Grammar (relative to the base `import` statement):
+
+```
+importStmt  ::= "import" ( IDENT ("." IDENT)* | STRING )
+                [ "from" STRING ]
+                [ "as" IDENT ]
+                [ ( "show"|"hide" IDENT ("," IDENT)* | "{" IDENT ("," IDENT)* "}" ) ]
+                [ ";" ] ;
+```
+
+Header lookup order:
+1. Directory of the importing source file.
+2. `--native-include` CLI paths and `[native].include_dirs` from the manifest.
+3. Directories reported by `gcc -E -Wp,-v -x c -` (when `gcc` is available).
+4. `LYMAR_HOME/include`, plus MinGW / `/usr/local/include` / `/usr/include` fallbacks.
+
+Bindings are regenerated only when the header's mtime is newer than the cached `.lm`,
+or when a symbol filter is applied (the filter result is not cached to keep the
+namespace mapping unambiguous). Cache invalidation matches the `--bind-header` 2b
+pipeline exactly, so mixing CLI `--bind-header` with `import "c:..."` on the same
+header yields a single shared `.cache/bindings/<ns>.lm`.
+
+Proof: `tests/native/verify_cimport.py` exercises the four variants above plus the
+cache-reuse guarantee.
+
 ---
 
 ## 3. ABI Type Mapping Table

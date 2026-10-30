@@ -1073,6 +1073,18 @@ static int find_block_end(const std::string& content, int start_line) {
     return start_line + 2;
 }
 
+// Returns the character offset just past the end of the given line in content.
+// Used to ensure DocumentSymbol range end encompasses selectionRange.
+static int line_length(const std::string& content, int line) {
+    std::istringstream iss(content);
+    std::string s;
+    int cur = 0;
+    while (std::getline(iss, s)) {
+        if (cur == line) return static_cast<int>(s.size()) + 1;
+        ++cur;
+    }
+    return 1;
+}
 // -----------------------------------------------------------------------------
 // Language Documentation & Metadata Tables
 // -----------------------------------------------------------------------------
@@ -2924,7 +2936,7 @@ static Json::Value handle_document_symbol(const Json::Value& params) {
             start["character"] = 0;
             Json::Value end = Json::Value::object();
             end["line"] = e_line;
-            end["character"] = 1;
+            end["character"] = line_length(content, e_line);
             range["start"] = start;
             range["end"] = end;
             sym["range"] = range;
@@ -2968,7 +2980,7 @@ static Json::Value handle_document_symbol(const Json::Value& params) {
                 Json::Value cstart = Json::Value::object();
                 cstart["line"] = il; cstart["character"] = 0;
                 Json::Value cend = Json::Value::object();
-                cend["line"] = i_end; cend["character"] = 1;
+                cend["line"] = i_end; cend["character"] = line_length(content, i_end);
                 crange["start"] = cstart; crange["end"] = cend;
                 child["range"] = crange;
                 Json::Value csel = Json::Value::object();
@@ -2991,7 +3003,7 @@ static Json::Value handle_document_symbol(const Json::Value& params) {
                 Json::Value cstart = Json::Value::object();
                 cstart["line"] = dl; cstart["character"] = 0;
                 Json::Value cend = Json::Value::object();
-                cend["line"] = d_end; cend["character"] = 1;
+                cend["line"] = d_end; cend["character"] = line_length(content, d_end);
                 crange["start"] = cstart; crange["end"] = cend;
                 child["range"] = crange;
                 Json::Value csel = Json::Value::object();
@@ -3014,7 +3026,7 @@ static Json::Value handle_document_symbol(const Json::Value& params) {
                 Json::Value cstart = Json::Value::object();
                 cstart["line"] = ml; cstart["character"] = 0;
                 Json::Value cend = Json::Value::object();
-                cend["line"] = m_end; cend["character"] = 1;
+                cend["line"] = m_end; cend["character"] = line_length(content, m_end);
                 crange["start"] = cstart; crange["end"] = cend;
                 child["range"] = crange;
                 Json::Value csel = Json::Value::object();
@@ -3039,7 +3051,7 @@ static Json::Value handle_document_symbol(const Json::Value& params) {
             Json::Value start = Json::Value::object();
             start["line"] = s_line; start["character"] = 0;
             Json::Value end = Json::Value::object();
-            end["line"] = e_line; end["character"] = 1;
+            end["line"] = e_line; end["character"] = line_length(content, e_line);
             range["start"] = start; range["end"] = end;
             sym["range"] = range;
             sym["selectionRange"] = range;
@@ -3074,7 +3086,7 @@ static Json::Value handle_document_symbol(const Json::Value& params) {
             Json::Value start = Json::Value::object();
             start["line"] = s_line; start["character"] = 0;
             Json::Value end = Json::Value::object();
-            end["line"] = e_line; end["character"] = 1;
+            end["line"] = e_line; end["character"] = line_length(content, e_line);
             range["start"] = start; range["end"] = end;
             sym["range"] = range;
 
@@ -3112,7 +3124,7 @@ static Json::Value handle_document_symbol(const Json::Value& params) {
             Json::Value start = Json::Value::object();
             start["line"] = s_line; start["character"] = 0;
             Json::Value end = Json::Value::object();
-            end["line"] = e_line; end["character"] = 1;
+            end["line"] = e_line; end["character"] = line_length(content, e_line);
             range["start"] = start; range["end"] = end;
             sym["range"] = range;
             sym["selectionRange"] = range;

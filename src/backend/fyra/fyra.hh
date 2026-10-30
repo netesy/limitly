@@ -62,6 +62,12 @@ struct FyraCompileOptions {
     bool dump_intermediate = false;  // Dump .s or .wat files
     bool strip = false;               // Omit symbol/string table from executable
     std::string triple;  // Target triple (e.g., "x86_64-pc-windows-gnu")
+    // Object files produced from foreign .c/.cpp sources by the native
+    // toolchain (roadmap item 2a). They are contributed to whichever link
+    // path materializes the artifact: the Fyra internal linker, the target
+    // C++ driver, or the host shared-module emitter.
+    std::vector<std::string> native_objects;
+    std::vector<std::string> native_link_libs;
 };
 
 struct CompileResult {

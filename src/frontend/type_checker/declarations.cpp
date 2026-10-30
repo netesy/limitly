@@ -1,5 +1,7 @@
 #include "../type_checker.hh"
 #include "../module_manager.hh"
+#include "../cheader_import.hh"
+#include "../../backend/native/header_parser.hh"
 #include <filesystem>
 #include <algorithm>
 #include <unordered_set>
@@ -965,6 +967,37 @@ static std::set<std::string> collect_all_dependencies(
 TypePtr TypeChecker::check_import_statement(std::shared_ptr<LM::Frontend::AST::ImportStatement> import_stmt) {
     if (!import_stmt) return nullptr;
     auto& manager = ModuleManager::getInstance();
+
+    // --- c: scheme: generate FFI bindings from C headers at compile time ---
+    if (import_stmt->modulePath.starts_with("c:")) {
+        std::string hdr = import_stmt->modulePath.substr(2);
+        std::string ns = import_stmt->alias.value_or(
+            Backend::Native::derive_namespace(hdr));
+        auto include_dirs = collect_c_include_dirs();
+        // Also add the directory of the current source file
+        if (!current_file_path.empty()) {
+            auto parent = std::filesystem::path(current_file_path).parent_path().string();
+            if (!parent.empty()) include_dirs.insert(include_dirs.begin(), parent);
+        }
+        CHeaderFilter chfilter;
+        if (import_stmt->filter &&
+            import_stmt->filter->type == AST::ImportFilterType::Show) {
+            chfilter.identifiers = import_stmt->filter->identifiers;
+        }
+        std::string err;
+        auto gen_path = resolve_c_header_import(hdr, import_stmt->fromLibrary,
+                                                include_dirs, chfilter, ns, err);
+        if (gen_path.empty()) {
+            add_error(err, import_stmt->line);
+            return nullptr;
+        }
+        // Replace the c: path with the generated namespace so normal resolution works
+        import_stmt->modulePath = ns;
+        // Ensure the bindings directory is searchable
+        manager.add_include_path(".cache/bindings");
+    }
+    // --- end c: scheme ---
+
     auto module = manager.load_module(import_stmt->modulePath);
     if (!module) {
         std::string mod_path = import_stmt->modulePath;

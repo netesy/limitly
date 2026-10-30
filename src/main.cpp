@@ -1,6 +1,7 @@
 #include "lymar.hh"
 #include "frontend/module_manager.hh"
 #include "lyra_api.hh"
+#include "config_parser.hh"
 #include "cli_update.hh"
 #include "linter.hh"
 #include "doc_generator.hh"
@@ -39,6 +40,13 @@ void printUsage(const char* programName) {
     std::cout << "        -S, --asm             Emit assembly source (.s/.wat)\n";
     std::cout << "        --exe                 Emit executable (default)\n";
     std::cout << "        -s, --strip           Strip symbol table and debug metadata\n";
+    std::cout << "        --native <file>       Compile/link foreign .c/.cpp source (repeatable)\n";
+    std::cout << "        --native-include <dir>  Include dir for native source compilation\n";
+    std::cout << "        --native-cflag <flag>   Extra flag for the native compiler (repeatable)\n";
+    std::cout << "        --native-link <lib>     Extra library for the native link (repeatable)\n";
+    std::cout << "        --bind-header <file.h>  Parse C header and generate FFI bindings (repeatable)\n";
+    std::cout << "        --bind-lib <path>       Library path for generated bindings (paired with --bind-header)\n";
+    std::cout << "        --bind-namespace <name> Override module name for generated bindings\n";
 #else
     std::cout << "    (AOT/WASM compilation disabled - Fyra backend not available)\n";
 #endif
@@ -167,6 +175,9 @@ int main(int argc, char* argv[]) {
             if (passthrough) { options.program_args.push_back(arg); continue; }
             if (arg == "--") { passthrough = true; continue; }
             if (arg == "-I" && i + 1 < argc) options.include_dirs.push_back(argv[++i]);
+            else if (arg == "--bind-header" && i + 1 < argc) options.bind_headers.push_back(argv[++i]);
+            else if (arg == "--bind-lib" && i + 1 < argc) options.bind_lib_paths.push_back(argv[++i]);
+            else if (arg == "--bind-namespace" && i + 1 < argc) options.bind_namespaces.push_back(argv[++i]);
             else if (arg == "--features" && i + 1 < argc) {
                 std::stringstream input(argv[++i]);
                 std::string feature;
@@ -197,6 +208,14 @@ int main(int argc, char* argv[]) {
         options.program_args.insert(options.program_args.begin(), trailing.begin(), trailing.end());
         if (source_file.empty() && std::filesystem::exists("lymar.nol")) source_file = "src/main.lm";
         if (source_file.empty()) return 1;
+        // Merge [native] bind headers from project manifest (run mode)
+        if (std::filesystem::exists("lymar.nol")) {
+            auto native_meta = ConfigParser::parse("lymar.nol");
+            options.bind_headers.insert(options.bind_headers.end(),
+                native_meta.bind_headers.begin(), native_meta.bind_headers.end());
+            options.bind_lib_paths.insert(options.bind_lib_paths.end(),
+                native_meta.bind_lib_paths.begin(), native_meta.bind_lib_paths.end());
+        }
         // In-process Lyra dependency resolution
         try {
             auto pkg_dirs = Lyra::resolve_package_include_dirs(".", package_features);
@@ -215,6 +234,13 @@ int main(int argc, char* argv[]) {
         for (int i = 2; i < argc; i++) {
             std::string arg = argv[i];
             if (arg == "-I" && i + 1 < argc) options.include_dirs.push_back(argv[++i]);
+            else if (arg == "--native" && i + 1 < argc) options.native_sources.push_back(argv[++i]);
+            else if (arg == "--native-include" && i + 1 < argc) options.native_include_dirs.push_back(argv[++i]);
+            else if (arg == "--native-cflag" && i + 1 < argc) options.native_cflags.push_back(argv[++i]);
+            else if (arg == "--native-link" && i + 1 < argc) options.native_link_libs.push_back(argv[++i]);
+            else if (arg == "--bind-header" && i + 1 < argc) options.bind_headers.push_back(argv[++i]);
+            else if (arg == "--bind-lib" && i + 1 < argc) options.bind_lib_paths.push_back(argv[++i]);
+            else if (arg == "--bind-namespace" && i + 1 < argc) options.bind_namespaces.push_back(argv[++i]);
             else if (arg == "--features" && i + 1 < argc) {
                 std::stringstream input(argv[++i]);
                 std::string feature;
@@ -251,6 +277,23 @@ int main(int argc, char* argv[]) {
             options.arch != "riscv64" && options.arch != "wasm32") {
             std::cerr << "Unsupported architecture: " << options.arch << '\n';
             return 1;
+        }
+        // Project builds pick up the manifest's [native] foreign sources and
+        // link options; explicit --native flags stay additive on top.
+        if (std::filesystem::exists("lymar.nol")) {
+            auto native_meta = ConfigParser::parse("lymar.nol");
+            options.native_sources.insert(options.native_sources.end(),
+                native_meta.native_sources.begin(), native_meta.native_sources.end());
+            options.native_include_dirs.insert(options.native_include_dirs.end(),
+                native_meta.native_include_dirs.begin(), native_meta.native_include_dirs.end());
+            options.native_cflags.insert(options.native_cflags.end(),
+                native_meta.native_cflags.begin(), native_meta.native_cflags.end());
+            options.native_link_libs.insert(options.native_link_libs.end(),
+                native_meta.native_link_libs.begin(), native_meta.native_link_libs.end());
+            options.bind_headers.insert(options.bind_headers.end(),
+                native_meta.bind_headers.begin(), native_meta.bind_headers.end());
+            options.bind_lib_paths.insert(options.bind_lib_paths.end(),
+                native_meta.bind_lib_paths.begin(), native_meta.bind_lib_paths.end());
         }
         // In-process Lyra dependency resolution
         try {

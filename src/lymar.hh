@@ -42,6 +42,18 @@ namespace LM {
         bool profile_json = false;
         bool no_cache = false;
         std::vector<std::string> include_dirs;
+        // Foreign .c/.cpp sources compiled by the native toolchain and linked
+        // into the produced artifact (roadmap item 2a). Unlike -I directories,
+        // these belong to the native compile, not the Lymar frontend.
+        std::vector<std::string> native_sources;
+        std::vector<std::string> native_include_dirs;
+        std::vector<std::string> native_cflags;
+        std::vector<std::string> native_link_libs;
+        // Header-to-binding generation (roadmap item 2b). Parsed .h files
+        // produce importable .lm binding modules written to .cache/bindings/.
+        std::vector<std::string> bind_headers;
+        std::vector<std::string> bind_lib_paths;
+        std::vector<std::string> bind_namespaces;
         // Arguments written after the script path (`lymar run app.lm -- --x`),
         // reported to the program by std.process.args().
         std::vector<std::string> program_args;

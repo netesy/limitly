@@ -1044,16 +1044,49 @@ std::shared_ptr<LM::Frontend::AST::Statement> Parser::importStatement() {
             if (isIdentifierLike(peek())) stmt->modulePath += "." + advance().lexeme;
             else { error("Expected module path component."); return nullptr; }
         }
+    } else if (match({TokenType::STRING})) {
+        // Bare string literal path: import "c:header.h" ...
+        stmt->isStringLiteralPath = true;
+        std::string raw = previous().lexeme;
+        if (raw.size() >= 2 && (raw.front() == '"' || raw.front() == '\'') && raw.front() == raw.back()) {
+            raw = raw.substr(1, raw.size() - 2);
+        }
+        stmt->modulePath = raw;
     } else if (match({TokenType::LEFT_PAREN})) {
         stmt->isStringLiteralPath = true;
-        stmt->modulePath = consume(TokenType::STRING, "Expected string literal for module path.").lexeme;
+        std::string raw = consume(TokenType::STRING, "Expected string literal for module path.").lexeme;
+        if (raw.size() >= 2 && (raw.front() == '"' || raw.front() == '\'') && raw.front() == raw.back()) {
+            raw = raw.substr(1, raw.size() - 2);
+        }
+        stmt->modulePath = raw;
         consume(TokenType::RIGHT_PAREN, "Expected ')' after module path string.");
     } else { error("Expected module path or string literal after 'import'."); return nullptr; }
+    // Optional `from "<library>"` clause (used by c: scheme)
+    if (match({TokenType::FROM})) {
+        std::string rawlib = consume(TokenType::STRING, "Expected library path after 'from' in import.").lexeme;
+        if (rawlib.size() >= 2 && (rawlib.front() == '"' || rawlib.front() == '\'') && rawlib.front() == rawlib.back()) {
+            rawlib = rawlib.substr(1, rawlib.size() - 2);
+        }
+        stmt->fromLibrary = rawlib;
+    }
     if (match({TokenType::AS})) {
         if (isIdentifierLike(peek())) stmt->alias = advance().lexeme;
         else { error("Expected alias name."); return nullptr; }
     }
-    if (match({TokenType::SHOW, TokenType::HIDE})) {
+    // Filter: show/hide keyword form, or brace-select sugar { IDENT, ... }
+    if (match({TokenType::LEFT_BRACE})) {
+        // Brace-select: import std.collections { List, Map };
+        LM::Frontend::AST::ImportFilter filter;
+        filter.type = LM::Frontend::AST::ImportFilterType::Show;
+        if (!check(TokenType::RIGHT_BRACE)) {
+            do {
+                if (isIdentifierLike(peek())) filter.identifiers.push_back(advance().lexeme);
+                else { error("Expected identifier in import selection list."); return nullptr; }
+            } while (match({TokenType::COMMA}));
+        }
+        consume(TokenType::RIGHT_BRACE, "Expected '}' after import selection list.");
+        stmt->filter = filter;
+    } else if (match({TokenType::SHOW, TokenType::HIDE})) {
         LM::Frontend::AST::ImportFilter filter;
         filter.type = previous().type == TokenType::SHOW ? LM::Frontend::AST::ImportFilterType::Show : LM::Frontend::AST::ImportFilterType::Hide;
         do {

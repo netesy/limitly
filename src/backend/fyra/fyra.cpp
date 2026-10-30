@@ -113,7 +113,8 @@ CompileResult FyraCompiler::compile(const LIR::LIR_Function& lir_func,
         !options.exported_module.empty() && options.triple.empty()) {
         CompileResult result;
         result.success = Native::emit_shared_module(lir_func, options.exported_module,
-            options.output_file, static_cast<int>(options.opt_level), result.error_message);
+            options.output_file, static_cast<int>(options.opt_level), result.error_message,
+            options.native_objects);
         return result;
     }
 #endif
@@ -157,6 +158,9 @@ CompileResult FyraCompiler::compile_module(std::shared_ptr<ir::Module> module,
         // Automatically link discovered precompiled static libraries
         const auto target_descriptor = target::TargetDescriptor::fromString(target_triple);
         if (!target_descriptor) throw std::runtime_error("Invalid target triple: " + target_triple);
+        bool is_wasm = (options.target == CompileTarget::WASM || options.target == CompileTarget::WASI ||
+                        options.arch == Architecture::WASM32 || options.platform == Platform::WASM ||
+                        target_triple.find("wasm") != std::string::npos);
         const std::string metadata_target =
             (target_descriptor->arch == target::Arch::X64 ? "x86_64" :
              target_descriptor->arch == target::Arch::AArch64 ? "aarch64" :
@@ -175,10 +179,12 @@ CompileResult FyraCompiler::compile_module(std::shared_ptr<ir::Module> module,
                 }
             }
         }
-
-        bool is_wasm = (options.target == CompileTarget::WASM || options.target == CompileTarget::WASI ||
-                        options.arch == Architecture::WASM32 || options.platform == Platform::WASM ||
-                        target_triple.find("wasm") != std::string::npos);
+        // Foreign toolchain objects (roadmap item 2a) join the Fyra internal
+        // link for every artifact kind that materializes an image here
+        // (executable, static archive, shared library, and the driver
+        // fallback re-emits them through the external command).
+        if (!is_wasm)
+            for (const auto& object : options.native_objects) backend.addObject(object);
 
         if (options.platform == Platform::Windows || target_triple.find("windows") != std::string::npos || target_triple.find("win") != std::string::npos) {
             backend.importSymbol("ExitProcess", "kernel32.dll");
@@ -237,6 +243,11 @@ CompileResult FyraCompiler::compile_module(std::shared_ptr<ir::Module> module,
                                 return result + "'";
                             };
                             const std::string command = "cc -shared -Wl,-z,noexecstack " + quote(temporary) +
+                                [&]() {
+                                    std::string objects;
+                                    for (const auto& object : options.native_objects) objects += " " + quote(object);
+                                    return objects;
+                                }() +
                                 " -o " + quote(options.output_file);
                             if (std::system(command.c_str()) != 0) {
                                 build_res.success = false;

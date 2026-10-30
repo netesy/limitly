@@ -137,6 +137,14 @@ uint32_t lymarrt_abi_version(void) {
 
 void* lymarrt_library_open(const char* path) {
     if (!path) return NULL;
+    // Empty path: return the process handle (gives access to CRT/libc symbols)
+    if (path[0] == '\0') {
+#ifdef _WIN32
+        return static_cast<void*>(GetModuleHandleA(NULL));
+#else
+        return dlopen(NULL, RTLD_LAZY | RTLD_GLOBAL);
+#endif
+    }
 #ifdef _WIN32
     void* handle = static_cast<void*>(LoadLibraryA(path));
 #else

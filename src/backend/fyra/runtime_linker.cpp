@@ -200,10 +200,15 @@ std::vector<std::string> windows_runtime_libraries() {
         command.push_back("-static-libstdc++");
     }
     command.push_back(temporary);
+    // Foreign toolchain objects (roadmap item 2a) sit next to the program
+    // object so the driver resolves program references against them, and
+    // any extra libraries they need follow after the archive ordering.
+    command.insert(command.end(), options.native_objects.begin(), options.native_objects.end());
     command.insert(command.end(), libraries.begin(), libraries.end());
     command.push_back(runtime.string());
+    command.insert(command.end(), options.native_link_libs.begin(), options.native_link_libs.end());
     if(target.os!=target::OS::WASI) {
-        if(target.os!=target::OS::Windows) command.push_back("-lffi");
+        command.push_back("-lffi");
         if(target.os!=target::OS::Windows && target.os!=target::OS::MacOS) command.push_back("-ldl");
     }
     // The standalone runtime archive bundles the sokol application member on

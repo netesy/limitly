@@ -1,0 +1,37 @@
+// bind_test.lm - Verifies that auto-generated FFI bindings from bind_fixture.h
+// produce a working importable module. Run via:
+//   gcc -shared -fPIC -o scratch/libbind_fixture.dll tests/native/bind_fixture.c
+//   lymar run tests/native/bind_test.lm --bind-header tests/native/bind_fixture.h --bind-lib scratch/libbind_fixture.dll
+
+import std.ffi as ffi;
+import bind_fixture;
+
+fn main() {
+    print("=== 2b Binding Generation Test ===");
+
+    // fixture_answer() -> 42
+    var ans = bind_fixture.fixture_answer();
+    assert(ans == 42, "fixture_answer failed");
+    print("fixture_answer() = ");
+    print(ans);
+
+    // fixture_add(10, 32) -> 42
+    var sum = bind_fixture.fixture_add(10, 32);
+    assert(sum == 42, "fixture_add failed");
+    print("fixture_add(10, 32) = ");
+    print(sum);
+
+    // fixture_multiply(3.5, 2.0) -> 7.0
+    var prod = bind_fixture.fixture_multiply(3.5, 2.0);
+    assert(prod == 7.0, "fixture_multiply failed");
+    print("fixture_multiply(3.5, 2.0) = ");
+    print(prod);
+
+    // fixture_clamp(0, 10, 15) -> 10  (generic fallback, 3 params)
+    var clamped = bind_fixture.fixture_clamp(0, 10, 15);
+    assert(clamped == 10, "fixture_clamp failed");
+    print("fixture_clamp(0, 10, 15) = ");
+    print(clamped);
+
+    print("=== 2b Binding Generation Test PASSED ===");
+}

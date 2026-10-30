@@ -46,6 +46,7 @@ set(FRONTEND_SOURCES
     src/frontend/ast/optimizer.cpp
     src/frontend/optimizer/stream_fusion.cpp
     src/frontend/module_manager.cpp
+    src/frontend/cheader_import.cpp
 )
 
 set(BACKEND_COMMON_SOURCES

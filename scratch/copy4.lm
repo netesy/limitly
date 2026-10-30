@@ -1,0 +1,6 @@
+// Roadmap item 2a: minimal program built together with a foreign C source.
+// The C object is compiled by the native toolchain and linked into this
+// artifact; calling into it is roadmap item 2b (header -> bindings).
+fn main() {
+    print("2a ok");
+}

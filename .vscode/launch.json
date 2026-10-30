@@ -2,30 +2,20 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Debug Lymar Program (Register VM)",
-      "type": "lymar-debug",
+      "type": "lymar",
       "request": "launch",
+      "name": "Debug Lymar (VM)",
       "program": "${file}",
       "mode": "vm",
-      "stopOnEntry": false,
-      "cwd": "${workspaceFolder}"
+      "stopOnEntry": true
     },
     {
-      "name": "Debug Lymar Program (AOT / Native)",
-      "type": "lymar-debug",
+      "type": "lymar",
       "request": "launch",
-      "program": "${fileDirname}/${fileBasenameNoExtension}",
-      "mode": "aot",
-      "stopOnEntry": false,
-      "cwd": "${workspaceFolder}"
-    },
-    {
-      "name": "Attach to Running Lymar VM",
-      "type": "lymar-debug",
-      "request": "attach",
+      "name": "Debug Lymar (AOT Native)",
       "program": "${file}",
-      "port": 4711,
-      "cwd": "${workspaceFolder}"
+      "mode": "aot",
+      "stopOnEntry": false
     }
   ]
 }

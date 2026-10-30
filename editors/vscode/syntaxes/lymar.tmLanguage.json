@@ -1,0 +1,60 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Lymar",
+  "scopeName": "source.lymar",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#strings" },
+    { "include": "#keywords" },
+    { "include": "#types" },
+    { "include": "#numbers" },
+    { "include": "#functions" },
+    { "include": "#modifiers" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        { "name": "comment.line.double-slash.lymar", "match": "//.*$" },
+        { "name": "comment.block.lymar", "begin": "/\\*", "end": "\\*/" }
+      ]
+    },
+    "strings": {
+      "name": "string.quoted.double.lymar",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        { "name": "constant.character.escape.lymar", "match": "\\\\." }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        { "name": "keyword.control.lymar", "match": "\\b(if|elif|else|while|for|iter|return|break|continue|match|in)\\b" },
+        { "name": "keyword.declaration.lymar", "match": "\\b(fn|var|val|const|type|trait|frame|enum|module|import|from|as|where|staged|unsafe|parallel|concurrent|task|worker|contract)\\b" },
+        { "name": "keyword.other.lymar", "match": "\\b(pub|prot|show|hide|embed|mixin|self|super|this)\\b" },
+        { "name": "constant.language.lymar", "match": "\\b(true|false|nil)\\b" },
+        { "name": "keyword.operator.logical.lymar", "match": "\\b(and|or|not)\\b" }
+      ]
+    },
+    "types": {
+      "name": "support.type.primitive.lymar",
+      "match": "\\b(int|float|str|bool|nil|any|channel|atomic)\\b"
+    },
+    "numbers": {
+      "patterns": [
+        { "name": "constant.numeric.hex.lymar", "match": "0[xX][0-9a-fA-F]+" },
+        { "name": "constant.numeric.bin.lymar", "match": "0[bB][01]+" },
+        { "name": "constant.numeric.lymar", "match": "\\b[0-9]+(\\.[0-9]+)?([eE][+-]?[0-9]+)?\\b" }
+      ]
+    },
+    "functions": {
+      "patterns": [
+        { "name": "entity.name.function.lymar", "match": "(?<=fn\\s)(\\w+)" },
+        { "name": "support.function.builtin.lymar", "match": "\\b(print|input|len|type|assert|panic|time|clock|random|sleep)\\b(?=\\s*\\()" }
+      ]
+    },
+    "modifiers": {
+      "name": "keyword.modifier.lymar",
+      "match": "\\b(init|deinit)\\b"
+    }
+  }
+}
