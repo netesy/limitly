@@ -209,6 +209,12 @@ Lymar does not use generic `Result` types. Instead, it uses fallible annotations
 - **Import Specific Symbols**: `import std.collections { List, Map };` (utilizes show filters under the hood).
 - **Import Alias**: Imports can be aliased with `as`. Qualified names are referenced as `alias.Symbol`.
 - **Import Visibility**: `import std.collections show Iterator;`
+- **Declarative C Header Import** (`c:` scheme): triggers the header→binding pipeline at compile time, no CLI flag required.
+ - Full header bound to a shared library: `import "c:math_ops.h" from "libmath_ops" as math;`
+ - Cherry-pick symbols (brace-select is sugar for `show`): `import "c:math_ops.h" from "libmath_ops" as math { add_points, sub_points };`
+ - `show` filter: `import "c:math_ops.h" from "libmath_ops" as math show safe_divide;`
+ - System header (empty library path — resolves CRT symbols via the process handle): `import "c:stdio.h" as cstdio;`
+ The binding is cached at `.cache/bindings/<ns>.lm` and reused when the header mtime is unchanged. See [docs/ffi.md](docs/ffi.md#declarative-c-imports-recommended) for the full grammar and lookup rules.
 
 ---
 

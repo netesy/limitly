@@ -915,6 +915,32 @@ greet(); // greet is imported
 // my_variable is not imported
 ```
 
+### Importing a C Header (`c:` scheme)
+
+Lymar also accepts a `"c:<header>"` path on the `import` statement to bind a C
+header directly at compile time. The compiler parses the header, generates a
+Lymar module using `std.ffi` typed call helpers, caches it under
+`.cache/bindings/<ns>.lm`, and loads it as if it were a normal module. No CLI
+flag is required.
+
+```lymar
+// Full header bound against a shared library
+import "c:math_ops.h" from "libmath_ops" as math;
+
+// Cherry-pick only the symbols you use (brace-select is sugar for `show`)
+import "c:math_ops.h" from "libmath_ops" as math { add_points, sub_points };
+
+// Explicit `show` filter
+import "c:math_ops.h" from "libmath_ops" as math show safe_divide;
+
+// System header: omit `from` so ffi.library_load("") resolves against the
+// process handle (works for CRT symbols such as puts/printf).
+import "c:stdio.h" as cstdio;
+```
+
+See [FFI § Declarative `c:` imports](ffi.md#declarative-c-imports-recommended)
+for the grammar, include-directory search order, and cache-invalidation rules.
+
 ### Module Declarations
 
 For more explicit control over what a module exposes, you can use a `module` block with `pub` and `prot` visibility keywords. By default, members are private.

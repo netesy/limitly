@@ -283,7 +283,10 @@ iter (key, value in dict) { body }            // dict (key and value)
 - `import module_name as alias;`
 - `import module_name show symbol1, symbol2;`
 - `import module_name hide symbol3;`
+- `import module_name { symbol1, symbol2 };` (brace-select sugar for `show`)
 - `from module_name import symbol;` (Python-style)
+- `import "c:<header>" [from "<lib>"] [as <ns>] [ { idents } | show idents ];` — declarative
+ C header binding, generates the FFI module at compile time (see [FFI](ffi.md#declarative-c-imports-recommended)).
 
 ### 5.2 Module Blocks
 

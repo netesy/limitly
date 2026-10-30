@@ -77,6 +77,40 @@ import utils.math as math show PI, E, square;
 import utils.string as str hide internal_function, debug_var;
 ```
 
+## Declarative C Header Imports (`c:` scheme)
+
+An `import` whose path begins with `c:` runs the header→binding pipeline at
+compile time (see [FFI § Declarative `c:` imports](ffi.md#declarative-c-imports-recommended))
+and loads the generated module through the ordinary machinery. No CLI flags
+are required.
+
+```lymar
+// Bind a full header against a shared library
+import "c:math_ops.h" from "libmath_ops" as math;
+
+// Cherry-pick individual symbols (brace-select sugar = `show` filter)
+import "c:math_ops.h" from "libmath_ops" as math { Point2D, add_points };
+
+// Explicit `show` filter
+import "c:math_ops.h" from "libmath_ops" as math show safe_divide;
+
+// System header: no `from` clause -> ffi.library_load("") resolves against
+// the process handle, giving access to CRT symbols.
+import "c:stdio.h" as cstdio;
+```
+
+Grammar additions relative to the plain module import:
+
+- Bare `"<path>"` string literal is accepted as the module path (in addition to the
+ existing `IDENT ("." IDENT)*` and `("<path>")` forms).
+- Optional `from "<library>"` clause (stored on the AST as `ImportStatement::fromLibrary`).
+- Optional brace-select `{ IDENT, ... }` filter (mapped to a `Show` filter).
+
+The generated binding is written to `.cache/bindings/<ns>.lm`, which is
+automatically added to the module search path. Cache invalidation compares the
+header mtime to the cached `.lm` mtime; filtered imports always regenerate so
+the namespace mapping stays unambiguous.
+
 ## Nested Directory Imports
 
 Modules can be organized in nested directories:
