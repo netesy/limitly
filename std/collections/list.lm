@@ -82,3 +82,7 @@ frame List : Collection, Indexable, Mutable {
         self.data = [] as [any];
     }
 }
+
+staged fn ListOf(T: type): type {
+    return List;
+}

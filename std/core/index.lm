@@ -1,6 +1,6 @@
 pub import std.core.error show Error;
-pub import std.core.option show Option, Some, None;
-pub import std.core.result show Result, Ok, Err;
+pub import std.core.option show Some, None;
+pub import std.core.result show Ok, Err;
 pub import std.core.comparable show Comparable;
 pub import std.core.disposable show Disposable;
 pub import std.core.cloneable show Cloneable;

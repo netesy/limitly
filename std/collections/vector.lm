@@ -146,6 +146,10 @@ frame Vector {
     }
 }
 
+staged fn VectorOf(T: type): type {
+    return Vector;
+}
+
 frame VectorIterator: Iterator {
     var data: [any];
     var size: int;
@@ -216,6 +220,10 @@ frame ArrayList {
     }
 }
 
+staged fn ArrayListOf(T: type): type {
+    return ArrayList;
+}
+
 frame RingBuffer {
     var data: [any];
     var capacity: int;
@@ -263,4 +271,8 @@ frame RingBuffer {
     pub fn size(): int {
         return self.count;
     }
+}
+
+staged fn RingBufferOf(T: type): type {
+    return RingBuffer;
 }

@@ -1,6 +1,6 @@
-// Standard Library Core Option Frame
+// Standard Library Core Option Module (using staged type functions)
 
-frame Option {
+frame OptionInstance {
     pub present: bool;
     pub value: any;
 
@@ -28,14 +28,14 @@ frame Option {
         return default_value;
     }
 
-    pub fn map(f: fn(any): any): Option {
+    pub fn map(f: fn(any): any): OptionInstance {
         if (self.present) {
             return Some(f(self.value));
         }
         return None();
     }
 
-    pub fn filter(predicate: fn(any): bool): Option {
+    pub fn filter(predicate: fn(any): bool): OptionInstance {
         if (self.present and predicate(self.value)) {
             return self;
         }
@@ -43,10 +43,14 @@ frame Option {
     }
 }
 
-pub fn Some(value: any): Option {
-    return Option(true, value);
+staged fn Option(T: type): type {
+    return OptionInstance;
 }
 
-pub fn None(): Option {
-    return Option(false, nil);
+pub fn Some(value: any): OptionInstance {
+    return OptionInstance(true, value);
+}
+
+pub fn None(): OptionInstance {
+    return OptionInstance(false, nil);
 }
