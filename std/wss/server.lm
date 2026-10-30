@@ -2,6 +2,7 @@
 
 import std.core as core;
 import std.resource as res;
+import std.result as result;
 
 frame WSConnection {
     pub var resource: res.Resource?;
@@ -31,28 +32,28 @@ frame WSConnection {
         self.id = "";
     }
 
-    pub fn send(message: str): core.ResultInt {
+    pub fn send(message: str): result.ResultInstance {
         match (self.writer) {
             val w => {
                 if (w.write(args=[message]) == true) {
-                    return core.ok_int(len(message));
+                    return result.Ok(len(message));
                 }
                 self.connected = false;
-                return core.err_int("send failed");
+                return result.Err("send failed");
             },
-            nil => return core.err_int("not connected")
+            nil => return result.Err("not connected")
         }
     }
 
-    pub fn recv(): core.ResultStr {
+    pub fn recv(): result.ResultInstance {
         match (self.reader) {
             val rd => {
                 var res_val = rd.read(args=[ []]);
-                if (res_val != nil) return core.ok_str(res_val as str);
+                if (res_val != nil) return result.Ok(res_val as str);
                 self.connected = false;
-                return core.err_str("connection closed");
+                return result.Err("connection closed");
             },
-            nil => return core.err_str("not connected")
+            nil => return result.Err("not connected")
         }
     }
 
@@ -77,7 +78,7 @@ frame WSConnection {
         }
     }
 
-    pub fn close(): core.ResultInt {
+    pub fn close(): result.ResultInstance {
         match (self.resource) {
             val r => {
                 r.close();
@@ -86,7 +87,7 @@ frame WSConnection {
         }
         self.connected = false;
         self.resource = nil;
-        return core.ok_int(0);
+        return result.Ok(0);
     }
 }
 
@@ -121,44 +122,44 @@ frame WSSServer {
     pub fn on_disconnection(handler: str): WSSServer { self.on_disconnect = handler; return self; }
 
     // Start the server (bind + listen)
-    pub fn start(): core.ResultInt {
+    pub fn start(): result.ResultInstance {
         match (res.create_socket()) {
             val r => {
                 var binder = res.Binder(r=r);
                 if (not binder.bind(args=[self.host, self.port])) {
                     r.close();
-                    return core.err_int("bind failed on " + self.host + ":" + self.port as str);
+                    return result.Err("bind failed on " + self.host + ":" + self.port as str);
                 }
 
                 var listener = res.Listener(r=r);
                 if (not listener.listen(args=[128])) {
                     r.close();
-                    return core.err_int("listen failed on port " + self.port as str);
+                    return result.Err("listen failed on port " + self.port as str);
                 }
 
                 self.running = true;
                 self.resource = r;
                 self.binder = binder;
                 self.listener = listener;
-                return core.ok_int(r._handle());
+                return result.Ok(r._handle());
             },
-            err e => return core.err_int("failed to create socket")
+            err e => return result.Err("failed to create socket")
         }
     }
 
     // Accept a new WebSocket connection (with HTTP upgrade)
-    pub fn accept(): core.ResultStr {
+    pub fn accept(): result.ResultInstance {
         match (res.create_websocket()) {
             val ws => {
                 ws.close();
-                return core.ok_str("ws_handle");
+                return result.Ok("ws_handle");
             },
-            err e => return core.err_str("failed to create WebSocket resource")
+            err e => return result.Err("failed to create WebSocket resource")
         }
     }
 
     // Broadcast a message to multiple client handles
-    pub fn broadcast(handles: [int], message: str): core.ResultInt {
+    pub fn broadcast(handles: [int], message: str): result.ResultInstance {
         var sent: int = 0;
         var failed: int = 0;
         var i: int = 0;
@@ -175,12 +176,12 @@ frame WSSServer {
             }
             i = i + 1;
         }
-        if (failed > 0) return core.err_int("broadcast: " + sent as str + " sent, " + failed as str + " failed");
-        return core.ok_int(sent);
+        if (failed > 0) return result.Err("broadcast: " + sent as str + " sent, " + failed as str + " failed");
+        return result.Ok(sent);
     }
 
     // Close the server
-    pub fn stop(): core.ResultInt {
+    pub fn stop(): result.ResultInstance {
         match (self.resource) {
             val r => {
                 r.close();
@@ -189,7 +190,7 @@ frame WSSServer {
         }
         self.resource = nil;
         self.running = false;
-        return core.ok_int(0);
+        return result.Ok(0);
     }
 
     pub fn select_subprotocol(requested: str, supported: [str]): str {
@@ -214,12 +215,12 @@ frame WSRoom {
         self.connections = {} as {str: WSConnection};
     }
 
-    pub fn join(id: str, conn: WSConnection): core.ResultInt {
+    pub fn join(id: str, conn: WSConnection): result.ResultInstance {
         self.connections[id] = conn;
-        return core.ok_int(len(self.connections));
+        return result.Ok(len(self.connections));
     }
 
-    pub fn leave(id: str): core.ResultInt {
+    pub fn leave(id: str): result.ResultInstance {
         var new_conns: {str: WSConnection} = {};
         iter (k in self.connections) {
             if (k != id) {
@@ -227,14 +228,14 @@ frame WSRoom {
             }
         }
         self.connections = new_conns;
-        return core.ok_int(len(self.connections));
+        return result.Ok(len(self.connections));
     }
 
     pub fn member_count(): int {
         return len(self.connections);
     }
 
-    pub fn broadcast(message: str): core.ResultInt {
+    pub fn broadcast(message: str): result.ResultInstance {
         var count = 0;
         iter (k in self.connections) {
             var conn = self.connections[k];
@@ -243,6 +244,6 @@ frame WSRoom {
                 count = count + 1;
             }
         }
-        return core.ok_int(count);
+        return result.Ok(count);
     }
 }

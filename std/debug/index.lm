@@ -1,14 +1,15 @@
 import std.core as core;
+import std.result as result;
 
 frame Debug {
-    pub fn assert(condition: bool, message: str): core.ResultInt {
-        if (!condition) return core.err_int(message);
-        return core.ok_int(1);
+    pub fn assert(condition: bool, message: str): result.ResultInstance {
+        if (!condition) return result.Err(message);
+        return result.Ok(1);
     }
 
-    pub fn assert_eq(left: str, right: str): core.ResultInt {
-        if (left == right) return core.ok_int(1);
-        return core.err_int("assert_eq failed");
+    pub fn assert_eq(left: str, right: str): result.ResultInstance {
+        if (left == right) return result.Ok(1);
+        return result.Err("assert_eq failed");
     }
 
     pub fn trace(message: str): nil {

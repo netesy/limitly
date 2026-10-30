@@ -3,9 +3,6 @@ import std.collections.index as collections;
 import std.iter as iter;
 import std.functional as functional;
 import std.math as math;
-// std.strings was removed: its `pub type String = s.String` alias collided with
-// std.string's own `String` frame and broke method dispatch for callers importing
-// both. std.string is the single string module and re-exports via `pub import`.
 pub import std.string show String;
 import std.option as option;
 import std.result as result;
@@ -21,8 +18,6 @@ import std.log as log;
 import std.path as path;
 import std.fs as fs;
 import std.env as env;
-// std.os answers the machine itself (environment, directories, platform); std.env
-// is the variable API on top of it, and std.process is the process as an entity.
 import std.os as os;
 import std.process as process;
 import std.testing as testing;
@@ -53,8 +48,6 @@ import std.app as app;
 
 var List = collections.List;
 var Error = core.Error;
-var OptionInt = core.OptionInt;
-var ResultInt = core.ResultInt;
 var Int = math.Int;
 var Float = math.Float;
 var Iterator = iter.Iterator;

@@ -2,14 +2,15 @@
 
 import std.core as core;
 import std.encoding as encoding;
+import std.result as result;
 
 frame Serialization {
     
     // JSON serialization
-    pub fn json_encode(value: str): core.ResultStr {
-        if (value == "") return core.ok_str("\"\"");
+    pub fn json_encode(value: str): result.ResultInstance {
+        if (value == "") return result.Ok("\"\"");
         
-        var result = "\"";
+        var res_str = "\"";
         var i: int = 0;
         var length: int = len(value);
         
@@ -17,34 +18,34 @@ frame Serialization {
             var ch = _builtin_substring(value, i, i + 1);
             
             if (ch == "\"") {
-                result = result + "\\\"";
+                res_str = res_str + "\\\"";
             } else if (ch == "\\") {
-                result = result + "\\\\";
+                res_str = res_str + "\\\\";
             } else if (ch == "\n") {
-                result = result + "\\n";
+                res_str = res_str + "\\n";
             } else if (ch == "\r") {
-                result = result + "\\r";
+                res_str = res_str + "\\r";
             } else if (ch == "\t") {
-                result = result + "\\t";
+                res_str = res_str + "\\t";
             } else {
-                result = result + ch;
+                res_str = res_str + ch;
             }
             
             i = i + 1;
         }
         
-        result = result + "\"";
-        return core.ok_str(result);
+        res_str = res_str + "\"";
+        return result.Ok(res_str);
     }
 
-    pub fn json_decode(value: str): core.ResultStr {
-        if (value == "") return core.ok_str("");
+    pub fn json_decode(value: str): result.ResultInstance {
+        if (value == "") return result.Ok("");
         var length: int = len(value);
         if (length < 2 or _builtin_substring(value, 0, 1) != "\"" or _builtin_substring(value, length - 1, length) != "\"") {
-            return core.err_str("Invalid JSON string");
+            return result.Err("Invalid JSON string");
         }
         
-        var result = "";
+        var res_str = "";
         var i: int = 1;
         
         while (i < length - 1) {
@@ -55,122 +56,122 @@ frame Serialization {
                     var next_ch = _builtin_substring(value, i + 1, i + 2);
                     
                     if (next_ch == "\"") {
-                        result = result + "\"";
+                        res_str = res_str + "\"";
                     } else if (next_ch == "\\") {
-                        result = result + "\\";
+                        res_str = res_str + "\\";
                     } else if (next_ch == "n") {
-                        result = result + "\n";
+                        res_str = res_str + "\n";
                     } else if (next_ch == "r") {
-                        result = result + "\r";
+                        res_str = res_str + "\r";
                     } else if (next_ch == "t") {
-                        result = result + "\t";
+                        res_str = res_str + "\t";
                     } else {
-                        result = result + next_ch;
+                        res_str = res_str + next_ch;
                     }
                     i = i + 1;
                 }
             } else {
-                result = result + ch;
+                res_str = res_str + ch;
             }
             
             i = i + 1;
         }
         
-        return core.ok_str(result);
+        return result.Ok(res_str);
     }
 
     // JSON object serialization (basic)
-    pub fn json_encode_object(obj: {str: str}): core.ResultStr {
+    pub fn json_encode_object(obj: {str: str}): result.ResultInstance {
         var d = obj;
-        var result = "{";
+        var res_str = "{";
         var first = true;
         
         iter (key in d) {
             var value = d[key];
             if (not first) {
-                result = result + ",";
+                res_str = res_str + ",";
             }
             var encoded_key = self.json_encode(key);
             var encoded_value = self.json_encode(value);
             if (encoded_key.is_ok() and encoded_value.is_ok()) {
-                result = result + encoded_key.unwrap() + ":" + encoded_value.unwrap();
+                res_str = res_str + (encoded_key.unwrap() as str) + ":" + (encoded_value.unwrap() as str);
                 first = false;
             }
         }
         
-        result = result + "}";
-        return core.ok_str(result);
+        res_str = res_str + "}";
+        return result.Ok(res_str);
     }
 
     // JSON array serialization (basic)
-    pub fn json_encode_array(arr: [str]): core.ResultStr {
-        if (len(arr) == 0) return core.ok_str("[]");
+    pub fn json_encode_array(arr: [str]): result.ResultInstance {
+        if (len(arr) == 0) return result.Ok("[]");
         
-        var result = "[";
+        var res_str = "[";
         var i: int = 0;
         
         while (i < len(arr)) {
-            if (i > 0) result = result + ",";
+            if (i > 0) res_str = res_str + ",";
             
             var encoded = self.json_encode(arr[i]);
             if (encoded.is_ok()) {
-                result = result + encoded.unwrap();
+                res_str = res_str + (encoded.unwrap() as str);
             }
             
             i = i + 1;
         }
         
-        result = result + "]";
-        return core.ok_str(result);
+        res_str = res_str + "]";
+        return result.Ok(res_str);
     }
 
     // Binary serialization (simple format)
-    pub fn binary_encode(value: str): core.ResultStr {
+    pub fn binary_encode(value: str): result.ResultInstance {
         var length = len(value);
         var length_bytes = self.int_to_bytes(length, 4);
         var data_bytes = value;
-        return core.ok_str(length_bytes + data_bytes);
+        return result.Ok(length_bytes + data_bytes);
     }
 
-    pub fn binary_decode(value: str): core.ResultStr {
+    pub fn binary_decode(value: str): result.ResultInstance {
         var vlen = len(value);
         if (vlen < 4) {
-            return core.err_str("Invalid binary data: too short");
+            return result.Err("Invalid binary data: too short");
         }
         
         var length_bytes = _builtin_substring(value, 0, 4);
         var length = self.bytes_to_int(length_bytes);
         
         if (vlen < 4 + length) {
-            return core.err_str("Invalid binary data: length mismatch");
+            return result.Err("Invalid binary data: length mismatch");
         }
         
         var data = _builtin_substring(value, 4, 4 + length);
-        return core.ok_str(data);
+        return result.Ok(data);
     }
 
     // Advanced binary serialization with type information
-    pub fn binary_encode_typed(data: str, type_id: int): core.ResultStr {
+    pub fn binary_encode_typed(data: str, type_id: int): result.ResultInstance {
         var type_byte = _builtin_string_from_bytes([type_id % 256]);
         var length_bytes = self.int_to_bytes(len(data), 4);
-        return core.ok_str(type_byte + length_bytes + data);
+        return result.Ok(type_byte + length_bytes + data);
     }
 
-    pub fn binary_decode_typed(value: str): core.ResultStr {
+    pub fn binary_decode_typed(value: str): result.ResultInstance {
         var vlen = len(value);
         if (vlen < 5) {
-            return core.err_str("Invalid typed binary data: too short");
+            return result.Err("Invalid typed binary data: too short");
         }
         
         var length_bytes = _builtin_substring(value, 1, 5);
         var length = self.bytes_to_int(length_bytes);
         
         if (vlen < 5 + length) {
-            return core.err_str("Invalid typed binary data: length mismatch");
+            return result.Err("Invalid typed binary data: length mismatch");
         }
         
         var data = _builtin_substring(value, 5, 5 + length);
-        return core.ok_str(data);
+        return result.Ok(data);
     }
 
     // Utility methods
@@ -191,16 +192,16 @@ frame Serialization {
         var blen = len(bytes);
         if (blen == 0) return 0;
         
-        var result = 0;
+        var res_int = 0;
         var i: int = 0;
         
         while (i < blen) {
             var byte = _builtin_string_byte_at(bytes, i);
-            result = (result << 8) | byte;
+            res_int = (res_int << 8) | byte;
             i = i + 1;
         }
         
-        return result;
+        return res_int;
     }
 
     fn get_dict_keys(dict: {str: str}): [str] {
@@ -214,32 +215,32 @@ frame Serialization {
 }
 
 // Utility functions
-pub fn json_encode(value: str): core.ResultStr {
+pub fn json_encode(value: str): result.ResultInstance {
     var s = Serialization();
     return s.json_encode(value);
 }
 
-pub fn json_decode(value: str): core.ResultStr {
+pub fn json_decode(value: str): result.ResultInstance {
     var s = Serialization();
     return s.json_decode(value);
 }
 
-pub fn binary_encode(value: str): core.ResultStr {
+pub fn binary_encode(value: str): result.ResultInstance {
     var s = Serialization();
     return s.binary_encode(value);
 }
 
-pub fn binary_decode(value: str): core.ResultStr {
+pub fn binary_decode(value: str): result.ResultInstance {
     var s = Serialization();
     return s.binary_decode(value);
 }
 
-pub fn json_encode_object(obj: {str: str}): core.ResultStr {
+pub fn json_encode_object(obj: {str: str}): result.ResultInstance {
     var s = Serialization();
     return s.json_encode_object(obj);
 }
 
-pub fn json_encode_array(arr: [str]): core.ResultStr {
+pub fn json_encode_array(arr: [str]): result.ResultInstance {
     var s = Serialization();
     return s.json_encode_array(arr);
 }

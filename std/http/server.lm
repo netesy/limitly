@@ -3,6 +3,7 @@
 
 import std.core as core;
 import std.resource as res;
+import std.result as result;
 
 frame ServerRequest {
     pub var method: str;
@@ -69,7 +70,7 @@ frame HTTPServer {
         self.accepter = nil;
     }
 
-    pub fn listen(host: str, port: int, backlog: int = 128): core.ResultInt {
+    pub fn listen(host: str, port: int, backlog: int = 128): result.ResultInstance {
         self.host = host;
         self.port = port;
 
@@ -78,13 +79,13 @@ frame HTTPServer {
                 var binder = res.Binder(r=r);
                 if (not binder.bind(args=[host, port])) {
                     r.close();
-                    return core.err_int("failed to bind to {host}:{port}");
+                    return result.Err("failed to bind to {host}:{port}");
                 }
 
                 var listener = res.Listener(r=r);
                 if (not listener.listen(args=[backlog])) {
                     r.close();
-                    return core.err_int("listen failed on port {port}");
+                    return result.Err("listen failed on port {port}");
                 }
 
                 self.resource = r;
@@ -93,9 +94,9 @@ frame HTTPServer {
                 self.accepter = res.Accepter(r=r);
                 self.handle = r._handle();
                 self.running = true;
-                return core.ok_int(self.handle);
+                return result.Ok(self.handle);
             },
-            err e => return core.err_int("failed to create socket")
+            err e => return result.Err("failed to create socket")
         }
     }
 
