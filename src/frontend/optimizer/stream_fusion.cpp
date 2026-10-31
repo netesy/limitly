@@ -750,16 +750,16 @@ std::shared_ptr<Expression> StreamFusionVisitor::tryFusePipeline(std::shared_ptr
             curr_item_name = next_item_name;
         } else if (t.kind == TransformerKind::Filter) {
             auto filter_eval = inlineUnaryLambdaOrCall(t.arg, curr_item_name, current_body, line);
-            auto not_filter = makeUnary(TokenType::BANG, filter_eval, line);
-            auto cont_stmt = std::make_shared<ContinueStatement>();
-            cont_stmt->line = line;
+            auto filter_body = std::make_shared<BlockStatement>();
+            filter_body->line = line;
 
-            auto if_not = std::make_shared<IfStatement>();
-            if_not->condition = not_filter;
-            if_not->thenBranch = cont_stmt;
-            if_not->line = line;
+            auto if_filter = std::make_shared<IfStatement>();
+            if_filter->condition = filter_eval;
+            if_filter->thenBranch = filter_body;
+            if_filter->line = line;
 
-            current_body->statements.push_back(if_not);
+            current_body->statements.push_back(if_filter);
+            current_body = filter_body;
         } else if (t.kind == TransformerKind::Take) {
             std::string take_cnt_name = "__stream_take_cnt" + id_str + "_" + std::to_string(trans_step);
             staged_block->statements.push_back(makeVarDecl(take_cnt_name, makeLiteralInt(0, line), line));

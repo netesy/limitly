@@ -23,9 +23,9 @@ what actually matters, and in what order to build it.
 | 1b | Staged frames — mint **new** named frames at comptime (done; `Option(T)` shipped, library Result deleted in favor of native fallibles) | Essential | No (stage 0 emits ordinary frame ASTs) | Med | 1; iter prerequisites (closed) |
 | 2 | Seamless C interop + foreign `.c/.cpp` linking | Capability | No (reuses existing FFI ops) | Med | 1 (comptime bindings) |
 | 3 | Generators (`yield`) over a coroutine substrate | Sugar | Fix existing effect ops | Med | — |
-| 4 | SIMD: auto-vectorize fused numeric streams | Capability | Phase 1: no; Phase 2: yes | Med–High | 3 (fusion input) |
-| 5 | Installer backends (`.msi` / `.deb`) | Tooling | No | Low | — |
-| 6 | Hot reload + LSP/build integration | Tooling | No | Med | 1 |
+| 4 | SIMD: auto-vectorize fused numeric streams (Phase 1 done) | Capability | Phase 1: no; Phase 2: yes | Med–High | 3 (fusion input) |
+| 5 | Installer backends (`.msi` / `.deb`) (done) | Tooling | No | Low | — |
+| 6 | Hot reload + LSP/build integration (done) | Tooling | No | Med | 1 |
 | 7 | GPU / shaders + unified GPU-CPU memory | Capability | Yes (new backend surface) | High | 1, 4 |
 
 **Deferred (by cost/need, revisit on request):** explicit SIMD vector *types* ·
@@ -593,11 +593,20 @@ element-wise numeric loops into vector operations.
   fused element-wise numeric loops over fixed-width arrays into vector ops. This is a
   *backend optimization*, invisible to LIR semantics and to the programmer, so there is
   **no conformance burden** — results must simply match the scalar path. Verify equivalence
-  on both VM and AOT and measure against current scalar benchmarks.
+  on both VM and AOT and measure against current scalar benchmarks. *(done)*
+
+  > **Build step 4 is done (Phase 1).** The `stream_fusion` AST pass lowers fused
+  > numeric streams (map, filter, fold) into straight-line, affine loop structures.
+  > Filter lowering emits reconvergent diamond branches (`if (cond) { ... }`)
+  > instead of multiple loop-header backedges, ensuring loops form natural SSA loops
+  > compatible with Fyra's `LoopVectorizer` and `LoopRotate` at `-O2`. The verification
+  > harness opt-out `LYMAR_NO_VECTORIZE=1` disables backend loop and SLP vectorization so
+  > the identical bytecode is emitted scalar. Proof: `tests/native/verify_simd.py`
+  > (exercises `tests/native/simd_stream_bench.lm` across VM, vectorized AOT at `-O2`,
+  > and scalar AOT with `LYMAR_NO_VECTORIZE=1`, asserting exact output equivalence and
+  > confirming assembly differences).
 - **Phase 2 — explicit vector types (`f32x4`, …) in the language.** Deferred: this adds
   LIR surface that every backend must implement. Revisit once Phase 1 demonstrates value.
-
-**Build:** prototype Phase 1 on one fused map→reduce benchmark over `[f32]`.
 
 ---
 
@@ -607,25 +616,36 @@ element-wise numeric loops into vector operations.
 
 `lymar pack` produces tarballs only. Emit a native installer from the built executable,
 completing the "package manager and compiler are one executable" story (Lyra already runs
-in-process under `lymar`). Zero LIR surface, so conformance is trivial.
+in-process under `lymar`). Zero LIR surface, so conformance is trivial. *(done)*
 
-**Build:**
-- `pack --deb`: an `ar` archive of `debian-binary` + `control.tar.gz` (from the
-  `lymar.nol` manifest) + `data.tar.gz` (the exe). Needs no external tools.
-- `pack --msi`: emit a WiX template (manifest + exe), probing for the WiX toolset the same
-  way `lyra doctor` probes for `git`.
-- Lyra is vendored: commit changes to the Lyra repo first, then bump the gitlink in the
-  superproject and verify git status in both.
+> **Build step 5 is done.** `lymar pack` / `lyra pack` supports `--deb` and `--msi`
+> targets alongside the default source tarball. `--deb` writes a fully self-contained
+> Unix `ar` archive containing `debian-binary` (`2.0\n`), `control.tar.gz` (populated from
+> `lymar.nol` package metadata, author/maintainer, description, and target architecture),
+> and `data.tar.gz` (installing the compiled executable to `/usr/local/bin/<name>`),
+> requiring zero external packaging tools and validated by `dpkg-deb`. `--msi` emits a WiX
+> XML definition template (`<name>.wxs`) and probes for the WiX toolset (`wix` or
+> `candle`/`light`) to invoke compilation when available, cleanly falling back to
+> template emission. Lyra submodule updated and committed in lock-step. Proof:
+> `tests/test_installer_pack.py` (creates a test package, verifies source packaging,
+> builds and inspects `.deb` structure with `ar` and `dpkg-deb`, and checks generated `.wxs`).
 
 ### 6. Hot reload + LSP/build integration  [Tooling]
 
 The LSP publishes diagnostics on editor-buffer changes; there is no filesystem watcher
 (`workspace/didChangeWatchedFiles`) and no rebuild-and-restart loop, so there is no hot
-reload. Same tooling class as installers (no LIR surface).
+reload. Same tooling class as installers (no LIR surface). *(done)*
 
-**Build:** add a watched-files capability to the LSP and a `--watch` rebuild loop on the
-CLI; wire a "reload" DAP request. A clean hot-reload boundary wants `staged` (item 1), so
-schedule it after.
+> **Build step 6 is done.** Added CLI `--watch` / `-w` flags for `lymar run` and
+> `lymar build` that monitor entry sources, project `src/` trees, and manifests,
+> triggering automatic rebuild and restart on change (honoring `LYMAR_WATCH_ONCE=1` for
+> automated testing). Extended the LSP server (`src/lsp.cpp`) to advertise the
+> `workspace.didChangeWatchedFiles` capability during `initialize`, invalidating dependency
+> graphs and updating diagnostics when external file modifications occur. Wired the custom
+> `reload` and `hotReload` request handler in the DAP server (`src/dap/dap_server.cpp`) to
+> facilitate hot reload under debugging sessions. Proof: `tests/test_hot_reload.py`
+> (verifies CLI `run --watch` and `build --watch`, LSP `workspace/didChangeWatchedFiles`
+> capability and notification handling, and DAP `reload` request processing).
 
 ---
 
