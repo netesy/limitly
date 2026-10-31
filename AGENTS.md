@@ -47,7 +47,9 @@ This document provides essential guidelines for AI agents generating code for th
 - **Loops**:
  - `while (cond) { ... }`
  - `for (var i = 0; i < 10; i = i + 1) { ... }`
- - `iter (item in collection) { ... }` (for lists, dicts, ranges)
+ - `iter (item in collection) { ... }` (for lists, ranges, channels)  
+   `iter (key, value in dict) { ... }` (**always this form for dictionaries** - the single-variable form type-checks as the key but holds the `(key, value)` pair at run time)  
+   `iter` inside a **frame method** aborts the compiler; loop in a free function instead. `in` is not an expression operator: test dictionary containment with `if (dict[key] != nil)`.
 - **Pattern Matching (Match)**: Uses block syntax `pattern => { statements }`.
  ```lymar
  match (value) {
@@ -64,7 +66,7 @@ This document provides essential guidelines for AI agents generating code for th
 - **Lists**: Homogeneous collection, shorthand: `[int]`. Literal: `[1, 2, 3]`.
 - **Dictionaries**: Shorthand: `{str: int}`. Literal: `{"a": 1, "b": 2}`. Bare identifiers are allowed as string keys: `{name: "John"}`.
 - **Tuples**: Shorthand: `(int, str)`. Literal: `(42, "hello")`. Indexed with dot notation: `tuple.0`.
-- **Objects**: Literal: `Point { x: 10, y: 20 }`.
+- **Objects (frames)**: Construct with the frame's constructor — `var p = Point();` then assign fields, or `Point(10, 20)` when the frame declares `init(x: int, y: int)`. The brace literal `Point { x: 10, y: 20 }` **parses but is rejected by the type checker** (`E003: Unknown expression type`, followed by a spurious `Type 'Nil' has no member ...`), so do not use it.
 - **Ranges**: `1..10` (inclusive).
 
 ---
@@ -182,12 +184,15 @@ c.rpm = 3000;             // promoted field, same storage the method reads
 #### **Fallible Types & Error Propagation**
 Lymar does not use generic `Result` types. Instead, it uses fallible annotations like `int?` (generic error) or `int?DivisionByZero` (specific error).
 
-- **Success/Error constructors**: Values must be returned using `ok(value)` or `err(ErrorType)` (or `err()` for generic fallible returns).
-- **Error construction syntax**:
- - Simple error type: `return err(DivisionByZero);`
+- **Success/Error constructors**: Values must be returned using `ok(value)` or `err(...)`.
+- **Error construction syntax** — exactly three shapes parse:
  - Generic error: `return err();`
- - Error with type and message: `return err("ValidationError", "Value cannot be negative");`
- - Error with struct fields: `return err(UnknownError { message = "Value cannot be negative" });`
+ - Typed error without a payload: `return err(DivisionByZero);` (a bare identifier; it feeds only the static error set named in `int?DivisionByZero` and carries nothing at runtime)
+ - Typed error with a payload: `return err(ValidationError("Value cannot be negative"));` (arguments are **positional**; the first is the runtime error value)
+- **Never write these** — they do not parse:
+ - `return err("ValidationError", "msg");` — a string cannot name an error type (`Expected error type name.`)
+ - `return err(UnknownError { message = "msg" });` — error constructors take parentheses, not braces
+ - `return err(UnknownError(message = "msg"));` — `name = expr` is a named argument only in an ordinary call; inside `err(...)` it parses as an assignment expression
 - **Propagator (`?`)**: Suffixing an expression with `?` will propagate the error up the call stack if it fails.
 - **Inline Handling (`? else`)**: You can handle errors inline with optional error variable capturing.
  ```lymar

@@ -39,6 +39,16 @@ of the grammar, because the compiler can already infer everything they would say
   meaning, so it is stage 0 by definition; this mirrors value position, where
   `val x = square(5);` folds with no prefix either.
 
+One restriction the grammar already implies but is easy to miss: `Stage0Arg ::= TypeAnnotation |
+Literal` means a **value** argument must be a literal. Only `INT` / `FLOAT` / `STRING` / `true` /
+`false` tokens take the value-argument path in `src/frontend/parser/types.cpp`; an identifier in
+that position is parsed as a type name instead. So with `const FLAG = 0;` and a
+`pick(flag: int, a: type, b: type)` constructor, `var x: pick(FLAG, A, B) = ...;` fails with
+*cannot find type `FLAG`* and then reports `pick`'s parameter as needing a `type` annotation.
+Write the literal (`pick(0, A, B)`). Regressions: `tests/staged/staged_type_fn_test.lm` (item 5,
+value-conditioned selection) and `tests/staged/staged_value_param_test.lm` (bool value argument,
+value-conditioned constructor nested inside a type-only one, alias of a `pick`, and this limit).
+
 ### AST Node Representations
 
 ```cpp

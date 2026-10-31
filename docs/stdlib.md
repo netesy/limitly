@@ -240,13 +240,16 @@ The collections index re-exports `Vector`, `ArrayList`, `LinkedList`, `Deque`, `
 
 ## 11. Additional Core Modules
 
-### `std.option`
+### `std.core.option`
 
-`std.option` provides `Option`, `Some(value)`, and `None()`. `Option` supports `is_some`, `is_none`, `unwrap`, `unwrap_or`, `map`, and `filter`.
+`std.core.option` provides `Option`, `Some(value)`, and `None()`. `Option` supports `is_some`, `is_none`, `unwrap`, `unwrap_or`, `map`, and `filter`.
 
-### `std.result`
+### `std.core.result`
 
-`std.result` provides `Result`, `Ok(value)`, and `Err(error)`. `Result` supports `is_ok`, `is_err`, `unwrap`, `unwrap_or`, `unwrap_err`, and `map`.
+`std.core.result` provides `Result`, `Ok(value)`, and `Err(error)`. `Result` supports `is_ok`, `is_err`, `unwrap`, `unwrap_or`, `unwrap_err`, and `map`.
+
+These are `any`-based containers for situations where a value must be stored and passed around dynamically. The language's own fallible types are preferred for everything else: declare `T?` or `T?Error` and construct with `ok(value)` / `err(Error(code=..., message=...))`. The old `std.option` and `std.result` module paths, together with the monomorphic `OptionInt` / `OptionStr` / `ResultInt` / `ResultStr` frames and the `ok_int` / `err_int` / `ok_str` / `err_str` / `ok_bool` helpers, were removed; `std.core` documents the migration map.
+
 
 ## 12. Standard Library Test Layout
 

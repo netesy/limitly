@@ -1,9 +1,8 @@
-import std.option as o;
-import std.result as r;
+import std.core as core;
 
 fn main(): int {
-    var some = o.Some(42);
-    var none = o.None();
+    var some = core.Some(42);
+    var none = core.None();
     
     assert(some.is_some(), "Some is_some fail");
     assert(none.is_none(), "None is_none fail");
@@ -13,13 +12,14 @@ fn main(): int {
     var mapped = some.map(fn(x: any): any { return (x as int) + 1; });
     assert(mapped.unwrap() == 43, "Option map fail");
     
-    var ok = r.Ok("success");
-    var err = r.Err("failure");
+    var res_ok = core.Ok("success");
+    var res_err = core.Err(core.Error(code="E500", message="failure"));
     
-    assert(ok.is_ok(), "Ok is_ok fail");
-    assert(err.is_err(), "Err is_err fail");
-    assert(ok.unwrap() == "success", "Ok unwrap fail");
-    assert(err.unwrap_error() == "failure", "Err unwrap_error fail");
+    assert(res_ok.is_ok(), "Ok is_ok fail");
+    assert(res_err.is_err(), "Err is_err fail");
+    assert(res_ok.unwrap() == "success", "Ok unwrap fail");
+    assert(res_err.unwrap_err().message == "failure", "Err unwrap_error fail");
+    assert(res_err.unwrap_err().code == "E500", "Err unwrap_error code fail");
     
     print("Option/Result tests passed!");
     return 0;

@@ -11,12 +11,13 @@ frame ZipIterator: it.Iterator {
         self.right = right;
     }
 
+    pub fn has_next(): bool {
+        return self.left.has_next() and self.right.has_next();
+    }
+
     pub fn next(): any {
         var a = self.left.next();
         var b = self.right.next();
-        if (a == nil or b == nil) {
-            return nil;
-        }
         return (a, b);
     }
 }

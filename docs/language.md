@@ -119,6 +119,8 @@ fn name([params])[: ReturnType] { body }
 - Supports optional parameters: `name: Type = default`
 - Function-level modifiers (parallel to visibility, not interchangeable): `static`.
 
+A function body reads module-level variables, but a store to one from inside a function does not land: the write is silently dropped and the global keeps its previous value, on every path. Only entry-scope code may assign a module-level variable. Pass the value in and return it, or hold the state in a frame.
+
 ### 3.3 Frames (Objects)
 
 Frames are the primary unit of data encapsulation and behavior.
@@ -258,9 +260,29 @@ match (expression) {
 Used for ranges and collection iteration.
 
 ```
-iter (name in iterable) { body }              // list, range, channel
-iter (key in dict) { body }                   // dict (key only)
-iter (key, value in dict) { body }            // dict (key and value)
+iter (name in iterable) { body }              // list, range, channel, string
+iter (key, value in dict) { body }            // dict
+```
+
+Two facts that bite in practice:
+
+- **Always use the two-variable form for dictionaries.** `iter (key in dict)`
+  type-checks the loop variable as the key, but at run time the variable holds
+  the `(key, value)` pair, so printing it yields `(a, 1)` instead of `a`. The
+  two-variable form is the only one that binds real keys and values.
+- **A string iterates as code points**, not characters: `iter (cp in "AB")`
+  yields `65`, `66`. Slice with `substring` when you want characters.
+
+`iter` over a dictionary must not appear inside a frame method - it aborts the
+compiler with an access violation. Iterate in a free function (or use an index
+`while` loop over `iter`'s result) and call that from the method.
+
+`in` is a keyword but **not an expression operator**: it only appears in the
+`iter`/`for` clauses. For dictionary containment, read the key and compare
+against `nil`, since a missing key reads back as `nil`:
+
+```
+if (states[key] != nil) { ... }
 ```
 
 ### 4.3 Other Loops
@@ -272,9 +294,13 @@ iter (key, value in dict) { body }            // dict (key and value)
 
 ### 4.4 Error Handling
 - `?`: Propagation operator. If expression returns an error, return error from current function.
-- `? else { ... }`: Inline error handling / default value.
+- `? else { ... }`: Inline error handling. The fallback block must end in `return <value>;` — its value comes through. A bare trailing expression (`? else { 0 }`) compiles and runs but is discarded, silently binding `nil` where the declared type was `int`.
 - `ok(value)`: Construct a success result.
 - `err(type)`: Construct an error result.
+
+A function declared `T?Error` must produce that error from its own body: propagating a callee's error with `?` is currently rejected with `Function 'f' declares error type 'Error' but function body cannot produce this error type`, so intermediate layers unwrap with `? else { return ...; }` or `match` and re-throw explicitly.
+
+`T?` does not model absence, it models failure. `ok(5)` matches `val x`; a fallible holding `nil` also matches `val x` and binds `nil`, because `nil` is a payload, not a missing value — a bare `return nil` is therefore a success carrying nil, and failures must use `err()`. Because a payload-less `err()` also matches a `nil` pattern, `err e` has to be written before `nil` in a `match`, or the nil arm swallows real errors. Test presence with equality (`v == nil`) rather than a `nil` arm.
 
 ## 5. Modules and Imports
 

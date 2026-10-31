@@ -1468,9 +1468,12 @@ public:
     
     // Create frame type (for OOP frames)
     TypePtr createFrameType(const std::string& frameName) {
-        // Check if frame type already exists
+        // Reuse the registered type only when it really is a frame. A trait (or any
+        // other kind) registered under the same name must not be handed back as a
+        // frame: two modules may each export a `Writer`, one as a frame and one as a
+        // trait, and the bare-name entry is whichever module was merged last.
         auto it = userDefinedTypes.find(frameName);
-        if (it != userDefinedTypes.end()) {
+        if (it != userDefinedTypes.end() && it->second && it->second->tag == TypeTag::Frame) {
             return it->second;
         }
         

@@ -24,6 +24,7 @@ core
 tags
 .cachez
 .cache/
+scratch/
 !.vscode/launch.json
 .DS_Store
 .directory

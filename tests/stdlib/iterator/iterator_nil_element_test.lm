@@ -1,0 +1,92 @@
+// Regression: nil is a legal element, not an end-of-stream marker.
+//
+// Before has_next() was introduced, collect()/map()/filter()/zip()/chain()
+// treated a nil element as termination and silently dropped the rest of the
+// sequence. These cases pin the corrected protocol.
+
+import std.collections as collections;
+import std.iterator as iter;
+import std.range as range;
+
+fn keep(x: any): any { return x; }
+fn not_nil(x: any): bool { return x != nil; }
+
+fn test_collect_preserves_nil(): int {
+    var items: [any] = [1, nil, 3];
+    var collected = iter.collect(iter.iterator(items));
+    assert(len(collected) == 3, "collect must yield 3 elements");
+    assert(collected[1] == nil, "collect must preserve the nil element");
+    assert(collected[2] == 3, "collect must continue past a nil element");
+    return 1;
+}
+
+fn test_map_preserves_nil(): int {
+    var items: [any] = [1, nil, 3];
+    var mapped = iter.map(iter.iterator(items), keep);
+    var collected = iter.collect(mapped);
+    assert(len(collected) == 3, "map must yield 3 elements");
+    return 1;
+}
+
+fn test_filter_keeps_scanning(): int {
+    var items: [any] = [1, nil, 2];
+    var filtered = iter.filter(iter.iterator(items), not_nil);
+    assert(filtered.has_next(), "filter must find a match");
+    assert(filtered.next() == 1, "filter must yield the first non-nil");
+    assert(filtered.has_next(), "filter must keep scanning past a nil element");
+    assert(filtered.next() == 2, "filter must yield the value after the nil");
+    assert(not filtered.has_next(), "filter must stop after the last match");
+    return 1;
+}
+
+fn test_zip_pairs_nil(): int {
+    var left: [any] = [1, nil];
+    var right: [any] = ["a", "b"];
+    var zipped = iter.zip(iter.iterator(left), iter.iterator(right));
+    var pairs = iter.collect(zipped);
+    assert(len(pairs) == 2, "zip must pair 2 elements");
+    return 1;
+}
+
+fn test_chain_crosses_nil(): int {
+    var left: [any] = [nil];
+    var right: [any] = [7];
+    var chained = iter.chain(iter.iterator(left), iter.iterator(right));
+    var collected = iter.collect(chained);
+    assert(len(collected) == 2, "chain must keep both sides");
+    assert(collected[1] == 7, "chain must not stop at the nil element");
+    return 1;
+}
+
+fn test_range_yields_plain_ints(): int {
+    var gen = range.exclusive(0, 3).iterator();
+    assert(gen.has_next(), "range iterator must not be empty");
+    var first = gen.next();
+    assert(first == 0, "range iterator must yield a plain int, not an ok() wrapper");
+    var all = iter.collect(range.exclusive(0, 3).iterator());
+    assert(len(all) == 3, "range must yield 3 values");
+    assert(all[2] == 2, "range tail value wrong");
+    return 1;
+}
+
+fn test_vector_iterator_observes_growth(): int {
+    var v = collections.Vector();
+    v.push(10);
+    var gen = v.iterator();
+    v.push(20);
+    var seen = iter.collect(gen);
+    assert(len(seen) == 2, "iterator must observe elements appended after creation");
+    return 1;
+}
+
+fn main(): int {
+    assert(test_collect_preserves_nil() == 1, "collect nil test failed");
+    assert(test_map_preserves_nil() == 1, "map nil test failed");
+    assert(test_filter_keeps_scanning() == 1, "filter nil test failed");
+    assert(test_zip_pairs_nil() == 1, "zip nil test failed");
+    assert(test_chain_crosses_nil() == 1, "chain nil test failed");
+    assert(test_range_yields_plain_ints() == 1, "range plain int test failed");
+    assert(test_vector_iterator_observes_growth() == 1, "live vector iterator test failed");
+    print("Iterator nil-element regressions passed.");
+    return 0;
+}

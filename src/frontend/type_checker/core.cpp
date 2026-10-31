@@ -232,7 +232,16 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
                             this->type_system.addUserDefinedType(name, type);
                         }
                         if (decl) {
-                            this->type_system.addUserDefinedType(path + "." + name, type);
+                            // Bare names are shared across every module in this checker, so the
+                            // entry under `name` may belong to a different module that declared a
+                            // same-named symbol (two modules may each export a `Writer`). The
+                            // frame/trait loops above already register `path.name` with this
+                            // module's own kind; re-keying a foreign entry here would clobber it.
+                            const std::string qname = path + "." + name;
+                            const auto& defined = this->type_system.getUserDefinedTypes();
+                            if (defined.find(qname) == defined.end()) {
+                                this->type_system.addUserDefinedType(qname, type);
+                            }
                         }
                     }
                 }

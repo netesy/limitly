@@ -31,10 +31,30 @@ fn divide(a: int, b: int): int?DivisionByZero {
 ```
 
 ### 1.2 Error Constructors
+
+The parser accepts exactly three shapes:
+
 - `ok(value)`: Wraps a successful result.
-- `err()`: Returns a generic error or absent value.
-- `err(ErrorType)`: Returns a typed error for specific domain errors.
-- `err("ErrorType", "Message")`: Returns a typed error with an explanatory message.
+- `err()`: Generic error or absent value. Carries no payload.
+- `err(ErrorType)`: Typed error for a specific domain. `ErrorType` must be a **bare identifier**; it is checked statically against a `T?ErrorType` return annotation and carries no runtime payload.
+- `err(ErrorType(arg))`: Same, plus a runtime payload. The arguments are **positional** — the first one is carried as the error value.
+
+```lymar
+fn load_config(path: str): str? {
+    if (len(path) == 0) {
+        return err(InvalidPath("path must not be empty")); // positional payload
+    }
+    return ok(read_all(path)?);
+}
+```
+
+> [!WARNING]
+> These three spellings are **rejected** and must not be used:
+> - `err("ErrorType", "Message")` — a string literal cannot name an error type. The parser reports `Expected error type name.`
+> - `err(ErrorType { field = value })` — error constructors take parentheses, not braces.
+> - `err(ErrorType(field = value))` — `name = expr` is a named argument only in an ordinary *call*. Inside `err(...)` it parses as an assignment expression, which is not an error payload.
+
+The `ErrorType` name is a static-only annotation: it lets a `T?ErrorType` return type be validated against the `err(...)` sites a function actually returns. Nothing about the name reaches runtime, so `err(DivisionByZero)` and `err()` produce equivalent values.
 
 ### 1.3 Propagation with the `?` Operator
 Suffixing any fallible expression with `?` automatically propagates errors up the call stack:

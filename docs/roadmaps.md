@@ -3,7 +3,8 @@
 What Lymar still needs to become the batteries-included systems language it aims to be,
 what actually matters, and in what order to build it.
 
-- Status verified against the codebase on 2026-10-29.
+- Status verified against the codebase on 2026-10-31 (test counts and trait signatures
+  re-measured by running the suites, not carried forward).
 - Ranked by **capability**: does it let you express something no existing mechanism can?
   Anything that only saves lines is implemented as sugar over the existing mechanism,
   never as a parallel one (AGENTS.md: no "thousand features doing the same thing").
@@ -30,9 +31,29 @@ what actually matters, and in what order to build it.
 first-class module values (functors) · reentrant/multi-shot continuations · a general
 algebraic-effect DSL.
 
-**Already strong (no work needed):** stdlib (~70+ modules) · Lyra package manager +
-git-sourced dependencies · LSP/DAP core · CLI `test`/`bench`/`lint`/`doc`/`profile` ·
-own-codegen (Fyra, no LLVM) · structured `parallel`/`concurrent`/`task`/`worker`.
+**Already strong (no work needed):** Lyra package manager + git-sourced dependencies ·
+LSP/DAP core · CLI `test`/`bench`/`lint`/`doc`/`profile` · own-codegen (Fyra, no LLVM) ·
+structured `parallel`/`concurrent`/`task`/`worker`.
+
+**The stdlib transition is complete as of 2026-10-31.** `std.option` and `std.result` are
+folded into `std.core`; the specialised `OptionInt`/`OptionStr`/`ResultInt`/`ResultStr`
+frames and the `ok_int`/`err_int`/`ok_str`/`err_str`/`ok_bool` helpers are deleted, and
+their former callers (serialization, http.server, wss.server, debug) now declare
+`T?`/`T?Error` and return `ok()`/`err(Error(...))`. `std.serialization` was rewritten as
+free functions over a `str`, which also removed the two `iter`-inside-a-frame-method
+sites that faulted with 0xC0000005.
+
+Verification: `python scripts/audit_stdlib.py` imports every module in `std/` and reports
+**322 modules, 322 OK, 0 FAIL** (two files were removed as misplaced or duplicated:
+`std/collections/collection_utils.lm`, which duplicated `iterator.collect`, and
+`std/crypto/random_test.lm`, a test living in the library). The positive suite is
+117/117, the memory negative tree is 90/90, and the staged parity harness matches
+byte-for-byte on all five staged tests.
+
+The two compiler defects this surfaced are still open, and both are worked around in the
+stdlib rather than fixed: `iter` inside a frame method aborts the compiler, and the
+single-variable `iter (key in dict)` binds the `(key, value)` pair at run time while
+type-checking as the key. See `docs/language.md` §4.2.
 
 ---
 
@@ -60,8 +81,9 @@ These facts shape items 1–4 and are the ground truth the plan assumes.
 - **Algebraic-effect ops (`EffectPerform`/`EffectHandle`/`EffectResume`) are inert:** on
   the VM they are guarded by the always-null fiber; on Fyra they only pass the payload
   through. The frontend never emits them.
-- **Lazy iteration already exists** as the `std.iterator.Iterator` trait (`next(): any`)
-  with `map/filter/take/skip/chain/zip/enumerate/flat_map` adapters.
+- **Lazy iteration already exists** as the `std.iterator.Iterator` trait — two members,
+  `has_next(): bool` and `next(): any` — with
+  `map/filter/take/skip/chain/zip/enumerate/flat_map` adapters.
 - **`staged` folds constant values** at type-check time and strips dead branches.
   `staged fn` folds value-returning calls with compile-time-constant arguments into
   literals (v1 subset: `val`/`var` constants, `if`/`elif`/`else`, nested staged calls,
@@ -91,7 +113,7 @@ These facts shape items 1–4 and are the ground truth the plan assumes.
 > `docs/staged.md` section 4 are enforced (depth / step / byte budgets, host-call refusal). Build
 > steps 4 and 5 are done: non-foldable staged bodies now run on an embedded Register VM behind a
 > fail-closed opcode allowlist and a call fence, and the two executors are reconciled by the
-> `LYMAR_STAGE0_FORCE_VM` parity harness plus the consolidated test set (114 positive / 90 negative).
+> `LYMAR_STAGE0_FORCE_VM` parity harness plus the consolidated test set (117 positive / 90 negative).
 
 Lymar has exactly **one** compile-time capability — `staged` — and comptime evaluation,
 generics, and "macros" are all things you do *with* it, not three systems. A macro
@@ -122,7 +144,14 @@ residual to LIR, so nothing here touches a backend.
    `type` return annotation and `: type` parameters, and is callable only from type
    positions — variable/parameter/type-alias annotations and staged bodies — never as a
    value expression. Annotation arguments may also be compile-time constants
-   (`vector(8, int)`), which is what lets a comptime `if` select the returned type.
+   (`vector(8, int)`), which is what lets a comptime `if` select the returned type. Those
+   value arguments must be **literals**: only `INT`/`FLOAT`/`STRING`/`true`/`false` tokens take
+   the value-argument path in `src/frontend/parser/types.cpp`, so an identifier in that position
+   is parsed as a type name — `const FLAG = 0; pick(FLAG, A, B)` fails with *cannot find type
+   `FLAG`* and then reports the parameter as needing a `type` annotation. Write the literal.
+   Regressions: `tests/staged/staged_type_fn_test.lm` (item 5, value-conditioned selection) and
+   `tests/staged/staged_value_param_test.lm` (bool value argument, a value-conditioned
+   constructor nested inside a type-only one, an alias of a `pick`, and the literal-only limit).
    Type parameters carry a **kind bound**: `: type` accepts any type, `: enum` and `: frame`
    accept only that kind and report a violation at the call site (`requires an enum type,
    found \`Frame<Money>\``). The meta names are rejected anywhere a runtime signature or
@@ -152,7 +181,7 @@ residual to LIR, so nothing here touches a backend.
      \`name\` at compile time*. A `staged { ... }` block inside a runtime function is unaffected:
      it decides a branch, and its residual statements are ordinary runtime code.
    Regressions: `tests/negative/staged/staged_{recursion_depth,instruction_limit,host_call}.lm`,
-   checked by `tests/memory/run_negative_validation.py` (87 passed).
+   checked by `tests/memory/run_negative_validation.py` (90 passed).
 4. *(done)* For staged bodies beyond the foldable subset, run their LIR on an embedded Register VM
    with the syscall fence and fold the result as `LoadConst`. The AST folder stays canonical — the
    type domain (`: type` params, type constructors, kind bounds) has no LIR representation, and a
@@ -206,7 +235,13 @@ residual to LIR, so nothing here touches a backend.
    one for each executor: the folder's `staged_{recursion_depth,instruction_limit,host_call}.lm` and
    the VM's `staged_vm_{opcode,host_call,instruction_budget}.lm` (all under `// @error:type_error`).
    `tests/memory/run_negative_validation.py` drives the negative tree (**90 passed**); the positive
-   manifest `tests/test.txt` runs all four staged tests in `run_tests.py` (**114 passed**).
+   manifest `tests/test.txt` (117 entries, five of them staged) runs in `run_tests.py`
+   (**117 passed** as of 2026-10-31).
+
+   **Caution — the positive suite is not deterministically green.** Four consecutive full runs
+   on 2026-10-31 gave three at `117 passed / 0 failed` and one at `116 passed / 1 failed`; the
+   failing file was not captured, so the flake is real but unidentified. Treat 117 as the
+   expected count, not a guarantee, and re-run before quoting a green result.
 
 **Defects found while exercising item 1 (pre-existing, outside `staged`):**
 
@@ -298,7 +333,7 @@ residual to LIR, so nothing here touches a backend.
   function definition on line 102`. The negative tree is therefore driven by
   `tests/memory/run_negative_validation.py`, which walks the same directory and is stricter (it
   rejects signal exits and sanitizer aborts); that is what the sandbox regressions above are
-  verified with, 87 passed. Repairing the dedicated runner is a mechanical re-indent of 431 lines
+  verified with, 90 passed. Repairing the dedicated runner is a mechanical re-indent of 431 lines
   and deserves its own pass.
 
 ### 2. Seamless C interop — and foreign `.c/.cpp` source  [Capability]

@@ -1,0 +1,61 @@
+// Dictionary iteration and containment.
+//
+// Pins the two-variable `iter (key, value in dict)` form. The single-variable
+// form type-checks the loop variable as the key but binds the (key, value) pair
+// at run time, so it must never be used.
+
+var text: {str: str} = {"a": "1", "b": "2"};
+
+var keys: [str] = [];
+var values: [str] = [];
+iter (k, v in text) {
+    keys.append(k);
+    values.append(v);
+}
+assert(len(keys) == 2, "both keys visited");
+assert(len(values) == 2, "both values visited");
+assert(keys[0] == "a" and keys[1] == "b", "keys keep insertion order");
+assert(values[0] == "1" and values[1] == "2", "values follow their keys");
+
+// The loop variable is statically the dictionary's value type, not `any`.
+var counts: {str: int} = {"x": 10, "y": 20};
+var total = 0;
+iter (k, v in counts) {
+    total = total + v;
+}
+assert(total == 30, "int values are usable arithmetically");
+
+// Absent keys read back as nil, which is how containment is tested: `in` is a
+// keyword in iter/for clauses only, not an operator.
+assert(counts["x"] != nil, "present key is not nil");
+assert(counts["missing"] == nil, "absent key is nil");
+
+// Iteration also works in a free function over a dictionary parameter.
+fn sum_values(d: {str: int}): int {
+    var out = 0;
+    iter (k, v in d) {
+        out = out + v;
+    }
+    return out;
+}
+assert(sum_values(counts) == 30, "dictionary parameter iterates");
+
+// An empty dictionary yields nothing.
+var empty: {str: str} = {};
+var seen = 0;
+iter (k, v in empty) {
+    seen = seen + 1;
+}
+assert(seen == 0, "empty dictionary yields no entries");
+
+// A string iterates as code points, not characters. The iterable must be a
+// variable: LIR generation rejects a string literal in the `iter` clause.
+var letters = "AB";
+var codepoints: [int] = [];
+iter (cp in letters) {
+    codepoints.append(cp);
+}
+assert(len(codepoints) == 2, "two code points");
+assert(codepoints[0] == 65 and codepoints[1] == 66, "code points of AB");
+
+print("dict iteration tests passed");

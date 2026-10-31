@@ -46,7 +46,7 @@ This document tracks traceability and consistency between learning materials (`l
 - **Structured Scope Lifetimes**: Parser and LIR generator enforce that all parallel and concurrent tasks are lexical scope-bound.
 
 ### 2.5 Teaching Inconsistencies
-- **Native Fallible Constructors vs Stdlib Wrappers**: Clear distinction established between native compiler `Type?` constructors (`ok()`, `err()`) and standard library wrapper structs in `std.result` (`Ok`, `Err`).
+- **Native Fallible Constructors vs Stdlib Wrappers**: Clear distinction established between native compiler `Type?` constructors (`ok()`, `err()`) and the `any`-based wrapper frames in `std.core.result` (`Ok`, `Err`).
 
 ---
 

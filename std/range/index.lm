@@ -30,35 +30,30 @@ frame RangeIterator : Iterator {
     pub init(start: int, stop: int, step: int = 1, inclusive: bool = false, infinite: bool = false) {
         self.current = start;
         self.stop = stop;
-        self.step = step;
+        if (step == 0) { self.step = 1; } else { self.step = step; }
         self.inclusive = inclusive;
         self.infinite = infinite;
     }
 
-    pub fn next(): int? {
-        if (not self.infinite) {
-            if (self.step > 0) {
-                if (self.inclusive) {
-                    if (self.current > self.stop) {
-                        return nil;
-                    }
-                } else {
-                    if (self.current >= self.stop) {
-                        return nil;
-                    }
-                }
-            } else {
-                if (self.inclusive) {
-                    if (self.current < self.stop) {
-                        return nil;
-                    }
-                } else {
-                    if (self.current <= self.stop) {
-                        return nil;
-                    }
-                }
-            }
+    pub fn has_next(): bool {
+        if (self.infinite) {
+            return true;
         }
+        if (self.step > 0) {
+            if (self.inclusive) {
+                return self.current <= self.stop;
+            }
+            return self.current < self.stop;
+        }
+        if (self.inclusive) {
+            return self.current >= self.stop;
+        }
+        return self.current > self.stop;
+    }
+
+    // Yields a plain int. The previous `int?` return type leaked `ok(...)`
+    // wrappers into every consumer's element stream.
+    pub fn next(): any {
         var value = self.current;
         self.current = self.current + self.step;
         return value;

@@ -5,40 +5,72 @@ frame FlatMapIterator: it.Iterator {
     pub source: it.Iterator;
     pub f: fn(any): any;
     pub inner_iter: any;
+    pub has_inner: bool;
+    pub ready: bool;
+    pub pending: any;
 
     pub init(source: it.Iterator, f: fn(any): any) {
         self.source = source;
         self.f = f;
         self.inner_iter = nil;
+        self.has_inner = false;
+        self.ready = false;
+        self.pending = nil;
     }
 
-    pub fn next(): any {
+    // Walks outer/inner sources until one element is buffered; the buffered
+    // element is what has_next() reports and next() returns.
+    fn _advance(): bool {
         while (true) {
-            if (self.inner_iter != nil) {
+            if (self.has_inner) {
                 var inner_it = self.inner_iter as it.Iterator;
-                var item = inner_it.next();
-                if (item != nil) {
-                    return item;
+                if (inner_it.has_next()) {
+                    self.pending = inner_it.next();
+                    self.ready = true;
+                    return true;
                 }
+                self.has_inner = false;
                 self.inner_iter = nil;
             }
 
-            var next_outer = self.source.next();
-            if (next_outer == nil) {
-                return nil;
+            if (not self.source.has_next()) {
+                self.ready = false;
+                return false;
             }
 
-            var inner_obj = self.f(next_outer);
+            var outer = self.source.next();
+            var inner_obj = self.f(outer);
             if (inner_obj == nil) {
-                // Skip nil inner
-            } elif (inner_obj as it.Iterator != nil) {
-                self.inner_iter = inner_obj;
+                // An empty mapping contributes nothing.
+                continue;
+            }
+
+            var as_iter = inner_obj as it.Iterator;
+            if (as_iter != nil) {
+                self.inner_iter = as_iter;
             } else {
-                // If list of elements
                 self.inner_iter = it.iterator(inner_obj as [any]);
             }
+            self.has_inner = true;
         }
-        return nil;
+        return false;
+    }
+
+    pub fn has_next(): bool {
+        if (not self.ready) {
+            self._advance();
+        }
+        return self.ready;
+    }
+
+    pub fn next(): any {
+        if (not self.has_next()) {
+            return nil;
+        }
+        var out = self.pending;
+        self.pending = nil;
+        self.ready = false;
+        return out;
     }
 }
 

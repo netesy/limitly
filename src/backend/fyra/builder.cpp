@@ -2070,6 +2070,10 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 ir::Function* fn = current_module_->getFunction("lm_list_append");
                 if (!fn) fn = builder_->createFunction("lm_list_append", context_->getVoidType(), {context_->getIntegerType(64), context_->getIntegerType(64)});
                 builder_->createCall(fn, {load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)});
+                // Append can reallocate `data`, invalidating any cached data_ptr
+                // for the receiver. Drop it so a subsequent ListIndex re-loads
+                // the current pointer.
+                hoisted_data_ptrs.erase(inst.a);
                 break;
             }
             case LIR::LIR_Op::ListIndex: {
@@ -2077,10 +2081,25 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 ir::Value* idx_val = load_reg(inst.b, inst.type_b);
                 std::string lidx_id = std::to_string(label_counter_++);
 
+                // Bound-proven hint (stream_fusion scope): lazily cache the
+                // unboxed data pointer for this register so subsequent in-loop
+                // accesses reuse it and Fyra's LoopVectorizer sees a single
+                // affine load per iteration instead of the CFG-wrapped check.
+                // The hint is only set inside a synthesized stream-fusion block,
+                // which rejects pipelines whose body would grow/shrink the
+                // source; the append/set handlers below still drop the cache on
+                // mutation as a defense in depth.
+                const bool bound_proven = (inst.imm & 0x1u) != 0u;
                 if (hoisted_data_ptrs.count(inst.a) || is_typed_primitive_list(inst.a)) {
                     ir::Value* data_ptr = nullptr;
                     if (hoisted_data_ptrs.count(inst.a)) {
                         data_ptr = hoisted_data_ptrs[inst.a];
+                    } else if (bound_proven) {
+                        ir::Value* unboxed = builder_->createAnd(list_val, context_->getConstantInt(context_->getIntegerType(64), ~7ULL));
+                        ir::Instruction* dptr = builder_->createLoadl(builder_->createAdd(unboxed, context_->getConstantInt(context_->getIntegerType(64), 8)));
+                        dptr->setName("hoisted_data_ptr_r" + std::to_string(inst.a) + "_lazy");
+                        hoisted_data_ptrs[inst.a] = dptr;
+                        data_ptr = dptr;
                     } else {
                         ir::Value* unboxed = builder_->createAnd(list_val, context_->getConstantInt(context_->getIntegerType(64), ~7ULL));
                         data_ptr = builder_->createLoadl(builder_->createAdd(unboxed, context_->getConstantInt(context_->getIntegerType(64), 8)));
@@ -2154,6 +2173,10 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 ir::Value* idx_val = load_reg(inst.a, inst.type_a);
                 ir::Value* elem_val = load_reg(inst.b, inst.type_b);
                 std::string lset_id = std::to_string(label_counter_++);
+                // Set may fall through to lm_list_set which reallocates; drop any
+                // cached data_ptr for this register so a subsequent ListIndex
+                // re-loads from the (possibly new) header.
+                hoisted_data_ptrs.erase(inst.dst);
 
                 if (hoisted_data_ptrs.count(inst.dst) || is_typed_primitive_list(inst.dst)) {
                     ir::Value* data_ptr = nullptr;

@@ -1,0 +1,107 @@
+// std.serialization: JSON escaping and length-prefixed binary framing.
+//
+// Pins the free-function API (no Serialization frame) and the `str?Error`
+// error path. Dictionaries are walked with `iter (key, value in dict)`.
+
+import std.serialization as ser;
+
+// `err e` binds the error without a static type (member access on `e` is
+// rejected as `Nil`), so failures are compared through their rendering.
+fn describe(failed: str?Error): str {
+    match (failed) {
+        val v => { return "ok"; },
+        err e => { return "{e}"; }
+    }
+    return "unreachable";
+}
+
+fn describe_int(failed: int?Error): str {
+    match (failed) {
+        val v => { return "ok"; },
+        err e => { return "{e}"; }
+    }
+    return "unreachable";
+}
+
+// Unwrapping with `? else { return; }` would exit the script instead of failing,
+// and `? else { <expression> }` silently binds nil, so success is extracted by
+// match: an unexpected error yields a sentinel that cannot satisfy the assert.
+fn must_str(result: str?Error): str {
+    match (result) {
+        val v => { return v; },
+        err e => { print("unexpected failure: {e}"); return "<<error>>"; }
+    }
+    return "<<error>>";
+}
+
+fn must_int(result: int?Error): int {
+    match (result) {
+        val v => { return v; },
+        err e => { print("unexpected failure: {e}"); return -9999; }
+    }
+    return -9999;
+}
+
+// --- JSON strings ---------------------------------------------------------
+
+assert(ser.json_encode("") == "\"\"", "empty string encodes");
+assert(ser.json_encode("abc") == "\"abc\"", "plain string encodes");
+assert(ser.json_encode("a\"b") == "\"a\\\"b\"", "quote is escaped");
+assert(ser.json_encode("a\\b") == "\"a\\\\b\"", "backslash is escaped");
+assert(ser.json_encode("a\nb") == "\"a\\nb\"", "newline is escaped");
+
+// json_encode and json_decode round-trip through every escape.
+var samples: [str] = ["", "plain", "quote:\"", "backslash:\\", "tab:\t", "newline:\n"];
+var i: int = 0;
+while (i < len(samples)) {
+    var original = samples[i];
+    var encoded = ser.json_encode(original);
+    var decoded = must_str(ser.json_decode(encoded));
+    assert(decoded == original, "round-trip sample {i}");
+    i = i + 1;
+}
+
+// Unquoted input is rejected with a diagnostic code, not a sentinel value.
+assert(describe(ser.json_decode("not quoted")) == "DecodeError", "unquoted input reports DecodeError");
+
+// --- JSON objects and arrays ---------------------------------------------
+//
+// A `{...}` pair written inside one string literal is an interpolation
+// template, so expected JSON text is assembled from a brace and a body.
+var lbrace = "{";
+var rbrace = "}";
+
+var obj: {str: str} = {"k": "v"};
+assert(ser.json_encode_object(obj) == lbrace + "\"k\":\"v\"" + rbrace, "single-entry object");
+
+var empty_obj: {str: str} = {};
+assert(ser.json_encode_object(empty_obj) == lbrace + rbrace, "empty object");
+
+var pairs: {str: str} = {"a": "1", "b": "2"};
+assert(ser.json_encode_object(pairs) == lbrace + "\"a\":\"1\",\"b\":\"2\"" + rbrace, "object covers every entry");
+
+var empty_arr: [str] = [];
+assert(ser.json_encode_array(empty_arr) == "[]", "empty array");
+assert(ser.json_encode_array(["a", "b"]) == "[\"a\",\"b\"]", "two-element array");
+
+// --- Binary framing ------------------------------------------------------
+
+var framed = ser.binary_encode("hello");
+assert(len(framed) == 9, "4-byte length prefix plus 5 bytes of payload");
+assert(must_str(ser.binary_decode(framed)) == "hello", "binary round-trip");
+
+assert(describe(ser.binary_decode("ab")) == "DecodeError", "truncated frame reports DecodeError");
+
+var oversized = ser.binary_encode("hi");
+var truncated = substring(oversized, 0, 5);
+assert(describe(ser.binary_decode(truncated)) == "DecodeError", "length mismatch reports DecodeError");
+
+// Typed frames: type id, length, payload.
+var typed = ser.binary_encode_typed("payload", 7);
+assert(must_int(ser.binary_type_of(typed)) == 7, "type id survives");
+assert(must_str(ser.binary_decode_typed(typed)) == "payload", "typed payload survives");
+assert(len(typed) == 12, "1-byte type id plus 4-byte length plus 7 bytes");
+
+assert(describe_int(ser.binary_type_of("")) == "DecodeError", "empty typed frame reports DecodeError");
+
+print("std.serialization tests passed");

@@ -14,11 +14,12 @@ frame MapIterator: it.Iterator {
         self.f = f;
     }
 
+    pub fn has_next(): bool {
+        return self.source.has_next();
+    }
+
     pub fn next(): any {
         var item = self.source.next();
-        if (item == nil) {
-            return nil;
-        }
         return self.f(item);
     }
 }

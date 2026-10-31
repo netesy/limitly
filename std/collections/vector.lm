@@ -142,23 +142,27 @@ frame Vector {
     }
 
     pub fn iterator(): Iterator {
-        return VectorIterator(self.data, self.size);
+        return VectorIterator(self.data);
     }
 }
 
 frame VectorIterator: Iterator {
     var data: [any];
-    var size: int;
     var index: int;
 
-    pub init(data: [any], size: int) {
+    pub init(data: [any]) {
         self.data = data;
-        self.size = size;
         self.index = 0;
     }
 
+    // The list handle is shared with the owning Vector, so the length is read
+    // on each query: growth is observed instead of frozen at construction time.
+    pub fn has_next(): bool {
+        return self.index < len(self.data);
+    }
+
     pub fn next(): any {
-        if (self.index >= self.size) {
+        if (self.index >= len(self.data)) {
             return nil;
         }
         var item = self.data[self.index];

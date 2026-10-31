@@ -383,6 +383,13 @@ private:
         Reg result_register = UINT32_MAX;  // Register to store the result value
     };
     ElseBlockContext else_context_;
+
+    // Depth counter for synthesized StagedExpr scopes produced by stream_fusion.
+    // While > 0, IndexExpr lowering emits ListIndex with `imm |= 0x1` to mark
+    // the access as bound-proven. Incremented on entry to a StagedExpr whose
+    // `synthesized` flag is set, decremented on exit; nested synthesized blocks
+    // keep the counter positive until every enclosing scope has unwound.
+    int synthesized_fused_depth_ = 0;
     
     // Function symbol table for visibility control
     struct FunctionInfo {

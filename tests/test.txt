@@ -35,6 +35,7 @@ tests/types/enums.lm
 tests/types/enum_equality.lm
 tests/types/refined_types.lm
 tests/types/structural_type_tests.lm
+tests/types/dict_iter_test.lm
 # Modules
 tests/modules/basic_import_test.lm
 tests/modules/comprehensive_module_test.lm
@@ -67,6 +68,9 @@ tests/ffi/test_hardening.lm
 # Roadmap 2a: foreign source link integration (see tests/native/verify_native_link.py
 # for the artifact-level symbol check)
 tests/native/native_link_basic.lm
+# Fallible types - `? else` fallback and pattern discrimination
+# (the rest of tests/error_handling/ is not wired into this manifest)
+tests/error_handling/fallback_test.lm
 # Stdlib - Core
 tests/stdlib/core/string_test.lm
 tests/stdlib/core/math_test.lm
@@ -85,6 +89,7 @@ tests/stdlib/collections_module_test.lm
 tests/stdlib/algorithm_module_test.lm
 # Stdlib - Iterator
 tests/stdlib/iterator/iterator_test.lm
+tests/stdlib/iterator/iterator_nil_element_test.lm
 tests/stdlib/iterator_module_test.lm
 # Stdlib - Math
 tests/stdlib/math_module_test.lm
@@ -124,6 +129,8 @@ tests/stdlib/mime_test.lm
 tests/stdlib/uuid_test.lm
 # Stdlib - Crypto
 tests/stdlib/crypto/hash_test.lm
+# Stdlib - Serialization
+tests/stdlib/serialization_test.lm
 # Stdlib - Net
 tests/stdlib/net/net_test.lm
 # Regression - Type Ownership Refactor
@@ -157,3 +164,5 @@ tests/staged/staged_fn_test.lm
 tests/staged/staged_type_fn_test.lm
 tests/staged/staged_enum_test.lm
 tests/staged/staged_vm_test.lm
+# Staged fn compile-time VALUE parameters (previously uncovered)
+tests/staged/staged_value_param_test.lm

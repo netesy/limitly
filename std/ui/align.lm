@@ -1,20 +1,22 @@
-// std/ui/align - Alignment and justification control
+// std/ui/align - Alignment and justification control.
+//
+// The three alignment values are declared once in std.ui.types; this module
+// re-publishes them and adds the layout helper that applies one to a widget.
+//
+// They are re-published as `var` bindings rather than as wrapper functions:
+// a local function named `align_center` shadows the qualified lookup of
+// `ui_types.align_center`, so `ui_types.align_center` resolves to the wrapper
+// itself and the module fails to type check.
+
 import std.ui.types as ui_types;
 
-pub fn align_start(): ui_types.Alignment {
-    return ui_types.align_start;
-}
+pub var align_start = ui_types.align_start;
+pub var align_center = ui_types.align_center;
+pub var align_end = ui_types.align_end;
 
-pub fn align_center(): ui_types.Alignment {
-    return ui_types.align_center;
-}
-
-pub fn align_end(): ui_types.Alignment {
-    return ui_types.align_end;
-}
-
+// Wrap `child` in a column centred on the cross axis.
 pub fn center(child: ui_types.Widget): ui_types.Widget {
     var w = ui_types.column([child]);
-    w.align_val = ui_types.align_center.align_type;
-    return w;
+    var centered = w.align(ui_types.align_center);
+    return centered;
 }

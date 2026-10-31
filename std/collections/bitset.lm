@@ -13,6 +13,10 @@ frame BitSetIterator : Iterator {
         self.yielded = 0;
     }
 
+    pub fn has_next(): bool {
+        return self.yielded < self.bitset.count();
+    }
+
     pub fn next(): any {
         if (self.yielded >= self.bitset.count()) {
             return nil;

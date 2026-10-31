@@ -831,6 +831,13 @@ namespace AST {
     struct StagedExpr : public Expression {
         std::shared_ptr<Expression> expression;
         std::shared_ptr<BlockStatement> block;
+        // Set by the stream_fusion pass when it rewrites a `.iter().map(...).fold(...)`
+        // pipeline into a synthesized while-loop block. The LIR generator uses this
+        // marker to emit ListIndex with a bound-proven hint (`imm & 0x1`), letting
+        // the Fyra backend lower a straight-line, vectorizable loop body instead of
+        // the safety CFG. Hand-written `staged { ... }` blocks leave it false and
+        // keep the checked path unchanged.
+        bool synthesized = false;
     };
 
     struct StagedParam {

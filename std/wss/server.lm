@@ -1,6 +1,9 @@
 // Provides WebSocket server utilities built on the raw WebSocket client module.
+//
+// Operations that can fail return `T?Error` and carry a diagnostic code; the
+// ones that cannot (`join`, `leave`, `broadcast` on a room) just return a count.
 
-import std.core as core;
+import std.core show Error;
 import std.resource as res;
 
 frame WSConnection {
@@ -31,28 +34,28 @@ frame WSConnection {
         self.id = "";
     }
 
-    pub fn send(message: str): core.ResultInt {
+    pub fn send(message: str): int?Error {
         match (self.writer) {
             val w => {
                 if (w.write(args=[message]) == true) {
-                    return core.ok_int(len(message));
+                    return ok(len(message));
                 }
                 self.connected = false;
-                return core.err_int("send failed");
+                return err(Error(code="SendError", message="write failed"));
             },
-            nil => return core.err_int("not connected")
+            nil => return err(Error(code="NotConnected", message="no writer attached"))
         }
     }
 
-    pub fn recv(): core.ResultStr {
+    pub fn recv(): str?Error {
         match (self.reader) {
             val rd => {
-                var res_val = rd.read(args=[ []]);
-                if (res_val != nil) return core.ok_str(res_val as str);
+                var payload = rd.read(args=[]);
+                if (payload != nil) return ok(payload as str);
                 self.connected = false;
-                return core.err_str("connection closed");
+                return err(Error(code="ConnectionClosed", message="peer closed the connection"));
             },
-            nil => return core.err_str("not connected")
+            nil => return err(Error(code="NotConnected", message="no reader attached"))
         }
     }
 
@@ -77,7 +80,7 @@ frame WSConnection {
         }
     }
 
-    pub fn close(): core.ResultInt {
+    pub fn close(): nil?Error {
         match (self.resource) {
             val r => {
                 r.close();
@@ -86,7 +89,7 @@ frame WSConnection {
         }
         self.connected = false;
         self.resource = nil;
-        return core.ok_int(0);
+        return ok(nil);
     }
 }
 
@@ -121,44 +124,44 @@ frame WSSServer {
     pub fn on_disconnection(handler: str): WSSServer { self.on_disconnect = handler; return self; }
 
     // Start the server (bind + listen)
-    pub fn start(): core.ResultInt {
+    pub fn start(): int?Error {
         match (res.create_socket()) {
             val r => {
                 var binder = res.Binder(r=r);
                 if (not binder.bind(args=[self.host, self.port])) {
                     r.close();
-                    return core.err_int("bind failed on " + self.host + ":" + self.port as str);
+                    return err(Error(code="BindError", message="failed to bind " + self.host + ":" + (self.port as str)));
                 }
 
                 var listener = res.Listener(r=r);
                 if (not listener.listen(args=[128])) {
                     r.close();
-                    return core.err_int("listen failed on port " + self.port as str);
+                    return err(Error(code="ListenError", message="listen failed on port " + (self.port as str)));
                 }
 
                 self.running = true;
                 self.resource = r;
                 self.binder = binder;
                 self.listener = listener;
-                return core.ok_int(r._handle());
+                return ok(r._handle());
             },
-            err e => return core.err_int("failed to create socket")
+            err e => return err(Error(code="SocketError", message="failed to create socket"))
         }
     }
 
     // Accept a new WebSocket connection (with HTTP upgrade)
-    pub fn accept(): core.ResultStr {
+    pub fn accept(): str?Error {
         match (res.create_websocket()) {
             val ws => {
                 ws.close();
-                return core.ok_str("ws_handle");
+                return ok("ws_handle");
             },
-            err e => return core.err_str("failed to create WebSocket resource")
+            err e => return err(Error(code="UpgradeError", message="failed to create WebSocket resource"))
         }
     }
 
     // Broadcast a message to multiple client handles
-    pub fn broadcast(handles: [int], message: str): core.ResultInt {
+    pub fn broadcast(handles: [int], message: str): int?Error {
         var sent: int = 0;
         var failed: int = 0;
         var i: int = 0;
@@ -175,12 +178,14 @@ frame WSSServer {
             }
             i = i + 1;
         }
-        if (failed > 0) return core.err_int("broadcast: " + sent as str + " sent, " + failed as str + " failed");
-        return core.ok_int(sent);
+        if (failed > 0) {
+            return err(Error(code="PartialSend", message="broadcast: " + (sent as str) + " sent, " + (failed as str) + " failed"));
+        }
+        return ok(sent);
     }
 
     // Close the server
-    pub fn stop(): core.ResultInt {
+    pub fn stop(): nil?Error {
         match (self.resource) {
             val r => {
                 r.close();
@@ -189,7 +194,7 @@ frame WSSServer {
         }
         self.resource = nil;
         self.running = false;
-        return core.ok_int(0);
+        return ok(nil);
     }
 
     pub fn select_subprotocol(requested: str, supported: [str]): str {
@@ -214,35 +219,54 @@ frame WSRoom {
         self.connections = {} as {str: WSConnection};
     }
 
-    pub fn join(id: str, conn: WSConnection): core.ResultInt {
+    pub fn join(id: str, conn: WSConnection): int {
         self.connections[id] = conn;
-        return core.ok_int(len(self.connections));
+        return len(self.connections);
     }
 
-    pub fn leave(id: str): core.ResultInt {
-        var new_conns: {str: WSConnection} = {};
-        iter (k in self.connections) {
+    pub fn leave(id: str): int {
+        var new_conns: {str: WSConnection} = {} as {str: WSConnection};
+        var keys = __room_keys(self.connections);
+        var i: int = 0;
+        while (i < len(keys)) {
+            var k = keys[i];
             if (k != id) {
                 new_conns[k] = self.connections[k];
             }
+            i = i + 1;
         }
         self.connections = new_conns;
-        return core.ok_int(len(self.connections));
+        return len(self.connections);
     }
 
     pub fn member_count(): int {
         return len(self.connections);
     }
 
-    pub fn broadcast(message: str): core.ResultInt {
+    pub fn broadcast(message: str): int {
         var count = 0;
-        iter (k in self.connections) {
-            var conn = self.connections[k];
+        var keys = __room_keys(self.connections);
+        var i: int = 0;
+        while (i < len(keys)) {
+            var conn = self.connections[keys[i]];
             if (conn.connected) {
-                conn.send(message);
+                var _sent = conn.send(message);
                 count = count + 1;
             }
+            i = i + 1;
         }
-        return core.ok_int(count);
+        return count;
     }
+}
+
+// Keys of a connection table. `iter` inside a frame method aborts the compiler,
+// so the loop lives in this free function and the methods walk the resulting
+// list with a while loop. Dictionaries are walked with the two-variable form,
+// `iter (key, value in dict)`.
+fn __room_keys(connections: {str: WSConnection}): [str] {
+    var keys: [str] = [];
+    iter (id, conn in connections) {
+        keys.append(id);
+    }
+    return keys;
 }

@@ -1,0 +1,113 @@
+// Fallible unwrapping: the `? else` fallback and `T?` / `T?Error` discrimination.
+//
+// This pins the shapes that actually work, because the failure mode is silent:
+// a fallback block whose last statement is a bare expression compiles, runs and
+// binds nil, so an `int` binding quietly holds nil. Only a `return` inside the
+// block carries a value out. That bare-expression form is deliberately not
+// asserted here - it is a missing-diagnostic defect, not the intended language.
+
+import std.core show Error;
+
+fn checked_divide(a: int, b: int): int?Error {
+    if (b == 0) {
+        return err(Error(code="DivByZero", message="divisor is zero"));
+    }
+    return ok(a / b);
+}
+
+fn optional_divide(a: int, b: int): int? {
+    if (b == 0) {
+        return err();
+    }
+    return ok(a / b);
+}
+
+// --- `? else { return ...; }` ---------------------------------------------
+
+fn with_default_declared(a: int, b: int): int {
+    var v = checked_divide(a, b)? else {
+        return -1;
+    };
+    return v;
+}
+
+fn with_default_generic(a: int, b: int): int {
+    var v = optional_divide(a, b)? else {
+        return -2;
+    };
+    return v;
+}
+
+assert(with_default_declared(6, 2) == 3, "success path yields the value");
+assert(with_default_declared(6, 0) == -1, "declared-error failure yields the fallback");
+assert(with_default_generic(6, 2) == 3, "generic success path yields the value");
+assert(with_default_generic(6, 0) == -2, "generic failure yields the fallback");
+
+// The fallback block may bind locals before returning. (A side effect on an
+// entry-scope global is not asserted here: a function body cannot write an
+// entry global at all, on any path, so it would test that limitation instead.)
+fn with_local_computation(a: int, b: int): int {
+    var v = checked_divide(a, b)? else {
+        var computed = a + b;
+        return computed;
+    };
+    return v;
+}
+assert(with_local_computation(6, 0) == 6, "fallback computes before returning");
+assert(with_local_computation(6, 3) == 2, "local-binding fallback leaves the success path alone");
+
+// --- What `T?` actually discriminates ----------------------------------------
+//
+// `nil` is a payload, not absence: a fallible holding nil matches `val v` and
+// binds v = nil. Only `err()` is a failure, and a failure with no payload also
+// matches a `nil` pattern - so `err e` must come before `nil`, otherwise the nil
+// arm swallows real errors.
+
+fn classify(value: int?): str {
+    match (value) {
+        val v => { return "value:{v}"; },
+        err e => { return "error"; },
+        _ => { return "other"; }
+    }
+    return "unreachable";
+}
+
+fn classify_nil_first(value: int?): str {
+    match (value) {
+        val v => { return "value:{v}"; },
+        nil => { return "nil"; },
+        err e => { return "error"; },
+        _ => { return "other"; }
+    }
+    return "unreachable";
+}
+
+var present: int? = ok(5);
+var nilpayload: int? = nil;
+var failed: int? = optional_divide(6, 0);
+assert(classify(present) == "value:5", "ok binds through val");
+assert(classify(nilpayload) == "value:nil", "nil is a payload and binds through val");
+assert(classify(failed) == "error", "err() is the failure path");
+assert(classify_nil_first(nilpayload) == "value:nil", "nil arm is unreachable for a nil payload");
+assert(classify_nil_first(failed) == "nil", "a nil arm before err swallows a payload-less failure");
+
+// Equality still tells presence and absence apart directly.
+assert(nilpayload == nil, "nil payload compares equal to nil");
+assert(present? != nil, "an int payload is not nil");
+
+// --- Declared errors carry their code -------------------------------------
+
+fn code_of(result: int?Error): str {
+    match (result) {
+        val v => { return "ok"; },
+        // The bound error has no static type, so member access on `e` is
+        // rejected; the code is read through the rendering.
+        err e => { return "{e}"; }
+    }
+    return "unreachable";
+}
+
+assert(code_of(checked_divide(6, 2)) == "ok", "success reports no code");
+assert(code_of(checked_divide(6, 0)) == "DivByZero", "declared code reaches the caller");
+
+print("fallible fallback tests passed");

@@ -218,6 +218,18 @@ Reg Generator::emit_expr_impl(LM::Frontend::AST::Expression& expr) {
     } else if (auto frame_inst = dynamic_cast<LM::Frontend::AST::FrameInstantiationExpr*>(&expr)) {
         return emit_frame_instantiation_expr(*frame_inst);
     } else if (auto staged_expr = dynamic_cast<LM::Frontend::AST::StagedExpr*>(&expr)) {
+        // Stream-fusion synthesized blocks mark their inner ListIndex ops as
+        // bound-proven (imm & 0x1) so the Fyra backend can lower a straight-line
+        // vectorizable body instead of the safety CFG. Hand-written `staged { ... }`
+        // blocks leave the flag false, so nothing changes for them.
+        const bool entered_synthesized = staged_expr->synthesized;
+        if (entered_synthesized) synthesized_fused_depth_++;
+        struct ScopeGuard {
+            int& counter;
+            bool active;
+            ~ScopeGuard() { if (active) counter--; }
+        } guard{synthesized_fused_depth_, entered_synthesized};
+
         if (staged_expr->expression) {
             return emit_expr(*staged_expr->expression);
         }
@@ -249,7 +261,7 @@ Reg Generator::emit_expr_impl(LM::Frontend::AST::Expression& expr) {
     } else if (auto channel_recv = dynamic_cast<LM::Frontend::AST::ChannelRecvExpr*>(&expr)) {
         return emit_channel_recv_expr(*channel_recv);
     } else {
-        report_error("Unknown expression type");
+        report_error("Unknown expression type at line " + std::to_string(expr.line));
         return 0;
     }
     return 0;
@@ -2654,7 +2666,12 @@ Reg Generator::emit_index_expr(LM::Frontend::AST::IndexExpr& expr) {
         // Use ListIndex for lists and other types
         Reg result_reg = allocate_register();
         Type abi_type = language_type_to_abi_type(result_type);
-        emit_instruction(LIR_Inst(LIR_Op::ListIndex, abi_type, result_reg, object_reg, index_reg));
+        // imm & 0x1 = bound-proven hint set inside a stream_fusion synthesized
+        // block; the Fyra backend uses it to emit a straight-line direct-load
+        // instead of the safety CFG. VM ignores the hint and still bounds-checks.
+        uint32_t hint = (synthesized_fused_depth_ > 0) ? 1u : 0u;
+        LIR_Inst inst(LIR_Op::ListIndex, abi_type, result_reg, object_reg, index_reg, hint);
+        emit_instruction(inst);
         set_register_type(result_reg, result_type);
         set_register_language_type(result_reg, result_type);  // Ensure language type is set
         return result_reg;

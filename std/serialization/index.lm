@@ -1,245 +1,211 @@
-// Serialization module - JSON and binary data serialization
+// Serialization: JSON string escaping and length-prefixed binary framing.
+//
+// Both halves are pure functions over a `str`, so this module exports free
+// functions rather than a frame that holds no state and only exists to let its
+// methods call one another. Operations that can reject their input return
+// `str?Error`; unwrap with `?`, `? else { return ...; }` or
+// `match (v) { val x => ..., err e => ... }`.
+//
+// The binary format is deliberately minimal: a payload is prefixed with its
+// byte length as a big-endian 32-bit value, and the typed variant adds a
+// one-byte type id in front of that length.
 
-import std.core as core;
-import std.encoding as encoding;
+import std.core show Error;
 
-frame Serialization {
-    
-    // JSON serialization
-    pub fn json_encode(value: str): core.ResultStr {
-        if (value == "") return core.ok_str("\"\"");
-        
-        var result = "\"";
-        var i: int = 0;
-        var length: int = len(value);
-        
-        while (i < length) {
-            var ch = _builtin_substring(value, i, i + 1);
-            
-            if (ch == "\"") {
-                result = result + "\\\"";
-            } else if (ch == "\\") {
-                result = result + "\\\\";
-            } else if (ch == "\n") {
-                result = result + "\\n";
-            } else if (ch == "\r") {
-                result = result + "\\r";
-            } else if (ch == "\t") {
-                result = result + "\\t";
-            } else {
-                result = result + ch;
-            }
-            
-            i = i + 1;
+// ---------------------------------------------------------------------------
+// JSON strings
+// ---------------------------------------------------------------------------
+
+// Escape `value` and wrap the result in double quotes. Never fails.
+pub fn json_encode(value: str): str {
+    var result = "\"";
+    var i: int = 0;
+    var length: int = len(value);
+
+    while (i < length) {
+        var ch = _builtin_substring(value, i, i + 1);
+
+        if (ch == "\"") {
+            result = result + "\\\"";
+        } else if (ch == "\\") {
+            result = result + "\\\\";
+        } else if (ch == "\n") {
+            result = result + "\\n";
+        } else if (ch == "\r") {
+            result = result + "\\r";
+        } else if (ch == "\t") {
+            result = result + "\\t";
+        } else {
+            result = result + ch;
         }
-        
-        result = result + "\"";
-        return core.ok_str(result);
+
+        i = i + 1;
     }
 
-    pub fn json_decode(value: str): core.ResultStr {
-        if (value == "") return core.ok_str("");
-        var length: int = len(value);
-        if (length < 2 or _builtin_substring(value, 0, 1) != "\"" or _builtin_substring(value, length - 1, length) != "\"") {
-            return core.err_str("Invalid JSON string");
-        }
-        
-        var result = "";
-        var i: int = 1;
-        
-        while (i < length - 1) {
-            var ch = _builtin_substring(value, i, i + 1);
-            
-            if (ch == "\\") {
-                if (i + 1 < length - 1) {
-                    var next_ch = _builtin_substring(value, i + 1, i + 2);
-                    
-                    if (next_ch == "\"") {
-                        result = result + "\"";
-                    } else if (next_ch == "\\") {
-                        result = result + "\\";
-                    } else if (next_ch == "n") {
-                        result = result + "\n";
-                    } else if (next_ch == "r") {
-                        result = result + "\r";
-                    } else if (next_ch == "t") {
-                        result = result + "\t";
-                    } else {
-                        result = result + next_ch;
-                    }
-                    i = i + 1;
+    return result + "\"";
+}
+
+// Undo json_encode. Rejects input that is not wrapped in double quotes, which
+// is what an unquoted JSON scalar or an empty string looks like here.
+pub fn json_decode(value: str): str?Error {
+    var length: int = len(value);
+    if (length < 2) {
+        return err(Error(code="DecodeError", message="not a JSON string: too short"));
+    }
+    if (_builtin_substring(value, 0, 1) != "\""
+        or _builtin_substring(value, length - 1, length) != "\"") {
+        return err(Error(code="DecodeError", message="not a JSON string: missing quotes"));
+    }
+
+    var result = "";
+    var i: int = 1;
+
+    while (i < length - 1) {
+        var ch = _builtin_substring(value, i, i + 1);
+
+        if (ch == "\\") {
+            if (i + 1 < length - 1) {
+                var next_ch = _builtin_substring(value, i + 1, i + 2);
+
+                if (next_ch == "\"") {
+                    result = result + "\"";
+                } else if (next_ch == "\\") {
+                    result = result + "\\";
+                } else if (next_ch == "n") {
+                    result = result + "\n";
+                } else if (next_ch == "r") {
+                    result = result + "\r";
+                } else if (next_ch == "t") {
+                    result = result + "\t";
+                } else {
+                    result = result + next_ch;
                 }
-            } else {
-                result = result + ch;
+                i = i + 1;
             }
-            
-            i = i + 1;
+        } else {
+            result = result + ch;
         }
-        
-        return core.ok_str(result);
+
+        i = i + 1;
     }
 
-    // JSON object serialization (basic)
-    pub fn json_encode_object(obj: {str: str}): core.ResultStr {
-        var d = obj;
-        var result = "{";
-        var first = true;
-        
-        iter (key in d) {
-            var value = d[key];
-            if (not first) {
-                result = result + ",";
-            }
-            var encoded_key = self.json_encode(key);
-            var encoded_value = self.json_encode(value);
-            if (encoded_key.is_ok() and encoded_value.is_ok()) {
-                result = result + encoded_key.unwrap() + ":" + encoded_value.unwrap();
-                first = false;
-            }
-        }
-        
-        result = result + "}";
-        return core.ok_str(result);
-    }
-
-    // JSON array serialization (basic)
-    pub fn json_encode_array(arr: [str]): core.ResultStr {
-        if (len(arr) == 0) return core.ok_str("[]");
-        
-        var result = "[";
-        var i: int = 0;
-        
-        while (i < len(arr)) {
-            if (i > 0) result = result + ",";
-            
-            var encoded = self.json_encode(arr[i]);
-            if (encoded.is_ok()) {
-                result = result + encoded.unwrap();
-            }
-            
-            i = i + 1;
-        }
-        
-        result = result + "]";
-        return core.ok_str(result);
-    }
-
-    // Binary serialization (simple format)
-    pub fn binary_encode(value: str): core.ResultStr {
-        var length = len(value);
-        var length_bytes = self.int_to_bytes(length, 4);
-        var data_bytes = value;
-        return core.ok_str(length_bytes + data_bytes);
-    }
-
-    pub fn binary_decode(value: str): core.ResultStr {
-        var vlen = len(value);
-        if (vlen < 4) {
-            return core.err_str("Invalid binary data: too short");
-        }
-        
-        var length_bytes = _builtin_substring(value, 0, 4);
-        var length = self.bytes_to_int(length_bytes);
-        
-        if (vlen < 4 + length) {
-            return core.err_str("Invalid binary data: length mismatch");
-        }
-        
-        var data = _builtin_substring(value, 4, 4 + length);
-        return core.ok_str(data);
-    }
-
-    // Advanced binary serialization with type information
-    pub fn binary_encode_typed(data: str, type_id: int): core.ResultStr {
-        var type_byte = _builtin_string_from_bytes([type_id % 256]);
-        var length_bytes = self.int_to_bytes(len(data), 4);
-        return core.ok_str(type_byte + length_bytes + data);
-    }
-
-    pub fn binary_decode_typed(value: str): core.ResultStr {
-        var vlen = len(value);
-        if (vlen < 5) {
-            return core.err_str("Invalid typed binary data: too short");
-        }
-        
-        var length_bytes = _builtin_substring(value, 1, 5);
-        var length = self.bytes_to_int(length_bytes);
-        
-        if (vlen < 5 + length) {
-            return core.err_str("Invalid typed binary data: length mismatch");
-        }
-        
-        var data = _builtin_substring(value, 5, 5 + length);
-        return core.ok_str(data);
-    }
-
-    // Utility methods
-    fn int_to_bytes(value: int, num_bytes: int): str {
-        var bytes: [int] = [];
-        var i: int = 0;
-        
-        while (i < num_bytes) {
-            var b = (value >> ((num_bytes - 1 - i) * 8)) & 0xFF;
-            bytes.append(b);
-            i = i + 1;
-        }
-        
-        return _builtin_string_from_bytes(bytes);
-    }
-
-    fn bytes_to_int(bytes: str): int {
-        var blen = len(bytes);
-        if (blen == 0) return 0;
-        
-        var result = 0;
-        var i: int = 0;
-        
-        while (i < blen) {
-            var byte = _builtin_string_byte_at(bytes, i);
-            result = (result << 8) | byte;
-            i = i + 1;
-        }
-        
-        return result;
-    }
-
-    fn get_dict_keys(dict: {str: str}): [str] {
-        var keys: [str] = [];
-        var d = dict;
-        iter (k in d) {
-            keys.append(k);
-        }
-        return keys;
-    }
+    return ok(result);
 }
 
-// Utility functions
-pub fn json_encode(value: str): core.ResultStr {
-    var s = Serialization();
-    return s.json_encode(value);
+// `{"key":value,...}` in dictionary iteration order. Dictionaries are walked
+// with the two-variable form, `iter (key, value in dict)`.
+pub fn json_encode_object(obj: {str: str}): str {
+    var result = "{";
+    var first = true;
+
+    iter (key, value in obj) {
+        if (not first) {
+            result = result + ",";
+        }
+        result = result + json_encode(key) + ":" + json_encode(value);
+        first = false;
+    }
+
+    return result + "}";
 }
 
-pub fn json_decode(value: str): core.ResultStr {
-    var s = Serialization();
-    return s.json_decode(value);
+// `[value,...]` in list order.
+pub fn json_encode_array(arr: [str]): str {
+    var result = "[";
+    var i: int = 0;
+
+    while (i < len(arr)) {
+        if (i > 0) {
+            result = result + ",";
+        }
+        result = result + json_encode(arr[i]);
+        i = i + 1;
+    }
+
+    return result + "]";
 }
 
-pub fn binary_encode(value: str): core.ResultStr {
-    var s = Serialization();
-    return s.binary_encode(value);
+// ---------------------------------------------------------------------------
+// Binary framing
+// ---------------------------------------------------------------------------
+
+pub fn binary_encode(value: str): str {
+    return int_to_bytes(len(value), 4) + value;
 }
 
-pub fn binary_decode(value: str): core.ResultStr {
-    var s = Serialization();
-    return s.binary_decode(value);
+pub fn binary_decode(value: str): str?Error {
+    var vlen = len(value);
+    if (vlen < 4) {
+        return err(Error(code="DecodeError", message="binary frame: too short for a length prefix"));
+    }
+
+    var length = bytes_to_int(_builtin_substring(value, 0, 4));
+    if (length < 0 or vlen < 4 + length) {
+        return err(Error(code="DecodeError", message="binary frame: length prefix exceeds payload"));
+    }
+
+    return ok(_builtin_substring(value, 4, 4 + length));
 }
 
-pub fn json_encode_object(obj: {str: str}): core.ResultStr {
-    var s = Serialization();
-    return s.json_encode_object(obj);
+// `[type_id:1][length:4][payload]`.
+pub fn binary_encode_typed(data: str, type_id: int): str {
+    var type_byte = _builtin_string_from_bytes([type_id % 256]);
+    return type_byte + int_to_bytes(len(data), 4) + data;
 }
 
-pub fn json_encode_array(arr: [str]): core.ResultStr {
-    var s = Serialization();
-    return s.json_encode_array(arr);
+pub fn binary_decode_typed(value: str): str?Error {
+    var vlen = len(value);
+    if (vlen < 5) {
+        return err(Error(code="DecodeError", message="typed binary frame: too short for a header"));
+    }
+
+    var length = bytes_to_int(_builtin_substring(value, 1, 5));
+    if (length < 0 or vlen < 5 + length) {
+        return err(Error(code="DecodeError", message="typed binary frame: length prefix exceeds payload"));
+    }
+
+    return ok(_builtin_substring(value, 5, 5 + length));
+}
+
+// The type id stored by binary_encode_typed, so a decoder can dispatch on it
+// before reading the payload.
+pub fn binary_type_of(value: str): int?Error {
+    if (len(value) < 1) {
+        return err(Error(code="DecodeError", message="typed binary frame: empty"));
+    }
+    return ok(_builtin_string_byte_at(value, 0));
+}
+
+// ---------------------------------------------------------------------------
+// Internals
+// ---------------------------------------------------------------------------
+
+// Big-endian, most significant byte first.
+fn int_to_bytes(value: int, num_bytes: int): str {
+    var bytes: [int] = [];
+    var i: int = 0;
+
+    while (i < num_bytes) {
+        var b = (value >> ((num_bytes - 1 - i) * 8)) & 0xFF;
+        bytes.append(b);
+        i = i + 1;
+    }
+
+    return _builtin_string_from_bytes(bytes);
+}
+
+fn bytes_to_int(bytes: str): int {
+    var blen = len(bytes);
+    if (blen == 0) return 0;
+
+    var result = 0;
+    var i: int = 0;
+
+    while (i < blen) {
+        var byte = _builtin_string_byte_at(bytes, i);
+        result = (result << 8) | byte;
+        i = i + 1;
+    }
+
+    return result;
 }

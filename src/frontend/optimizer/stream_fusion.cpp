@@ -964,6 +964,11 @@ std::shared_ptr<Expression> StreamFusionVisitor::tryFusePipeline(std::shared_ptr
     auto staged_expr = std::make_shared<StagedExpr>();
     staged_expr->block = staged_block;
     staged_expr->line = line;
+    // Signal to the LIR generator that every ListIndex inside this block is
+    // provably in-bounds (stream_fusion emits `while (idx < len(src))` and
+    // rejects pipelines whose body would grow/shrink `src`), so the backend
+    // can lower a straight-line, vectorizable loop body.
+    staged_expr->synthesized = true;
 
     return staged_expr;
 }

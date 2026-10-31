@@ -1,10 +1,12 @@
 // Standard Library Core Traits
-// These traits define shared capabilities for stdlib abstractions
+// These traits define shared capabilities for stdlib abstractions.
+//
+// The Iterator contract lives next to its adapters in std.iterator and is
+// re-exported here: the two hand-written copies that used to exist accepted the
+// same call shape but were distinct nominal traits, so iterators produced by one
+// module could not be handed to consumers in the other.
 
-// Iterator trait for types that can produce a sequence of values
-trait Iterator {
-    fn next(): any;
-}
+pub import std.iterator.iterator show Iterator;
 
 // Iterable trait for types that can create an iterator
 trait Iterable {

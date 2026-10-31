@@ -11,6 +11,10 @@ frame TakeIterator: it.Iterator {
         self.remaining = count;
     }
 
+    pub fn has_next(): bool {
+        return self.remaining > 0 and self.source.has_next();
+    }
+
     pub fn next(): any {
         if (self.remaining <= 0) {
             return nil;

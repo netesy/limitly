@@ -11,14 +11,15 @@ frame EnumerateIterator: it.Iterator {
         self.index = 0;
     }
 
+    pub fn has_next(): bool {
+        return self.source.has_next();
+    }
+
     pub fn next(): any {
+        var index = self.index;
         var item = self.source.next();
-        if (item == nil) {
-            return nil;
-        }
-        var pair = (self.index, item);
         self.index = self.index + 1;
-        return pair;
+        return (index, item);
     }
 }
 

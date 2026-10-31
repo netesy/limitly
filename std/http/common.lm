@@ -157,15 +157,17 @@ fn get_header(headers: [str], name: str): str? {
     var i: int = 0;
     while (i < len(headers)) {
         var header = headers[i];
-        var colon_idx = __http_find(header, ":");
-        if (colon_idx != nil) {
-            var hname = __http_to_lower(substring(header, 0, colon_idx));
-            var hval = __http_trim(substring(header, colon_idx + 1, len(header)));
-            if (hname == lower_name) { return hval; }
+        match (__http_find(header, ":")) {
+            val colon_idx => {
+                var hname = __http_to_lower(substring(header, 0, colon_idx));
+                var hval = __http_trim(substring(header, colon_idx + 1, len(header)));
+                if (hname == lower_name) { return ok(hval); }
+            },
+            err e => { }
         }
         i = i + 1;
     }
-    return nil;
+    return err();
 }
 
 // --- Build a headers block string from a list of "Name: Value" strings ---
@@ -189,19 +191,21 @@ fn build_request(method: str, host: str, path: str, headers: [str], body: str): 
     var i: int = 0;
     while (i < len(headers)) {
         var h = headers[i];
-        var ci = __http_find(h, ":");
-        if (ci != nil) {
-            var hn = __http_to_lower(substring(h, 0, ci));
-            if (hn == "host") { has_host = true; }
-            if (hn == "connection") { has_conn = true; }
-            if (hn == "content-length") { has_cl = true; }
+        match (__http_find(h, ":")) {
+            val ci => {
+                var hn = __http_to_lower(substring(h, 0, ci));
+                if (hn == "host") { has_host = true; }
+                if (hn == "connection") { has_conn = true; }
+                if (hn == "content-length") { has_cl = true; }
+            },
+            err e => { }
         }
         req = req + h + "\r\n";
         i = i + 1;
     }
     if (!has_host) { req = req + "Host: " + host + "\r\n"; }
     if (!has_conn) { req = req + "Connection: close\r\n"; }
-    if (!has_cl and body != "") { req = req + "Content-Length: " + len(body) as str + "\r\n"; }
+    if (!has_cl and body != "") { req = req + "Content-Length: " + (len(body) as str) + "\r\n"; }
     req = req + "\r\n";
     req = req + body;
     return req;
@@ -252,7 +256,8 @@ fn __http_to_lower(s: str): str {
     while (i < len(s)) {
         var ch = substring(s, i, i + 1);
         if (ch >= "A" and ch <= "Z") {
-            r = r + (ch as int + 32) as str;
+            var code: int = (ch as int) + 32;
+            r = r + (code as str);
         } else {
             r = r + ch;
         }

@@ -11,14 +11,20 @@ frame SkipIterator: it.Iterator {
         self.remaining = count;
     }
 
-    pub fn next(): any {
-        while (self.remaining > 0) {
-            var skipped = self.source.next();
-            if (skipped == nil) {
-                return nil;
-            }
+    fn _drain() {
+        while (self.remaining > 0 and self.source.has_next()) {
+            self.source.next();
             self.remaining = self.remaining - 1;
         }
+    }
+
+    pub fn has_next(): bool {
+        self._drain();
+        return self.source.has_next();
+    }
+
+    pub fn next(): any {
+        self._drain();
         return self.source.next();
     }
 }

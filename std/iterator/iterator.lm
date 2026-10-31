@@ -1,6 +1,12 @@
 // Standard Library Iterator Trait and Common Implementations
+//
+// Termination is out-of-band: `has_next()` reports whether a value remains and
+// `next()` yields it. The earlier in-band `next() == nil` protocol silently
+// truncated iteration at the first nil element, because nil is a legal value in
+// an [any] sequence. Consumers must ask `has_next()` before calling `next()`.
 
 trait Iterator {
+    fn has_next(): bool;
     fn next(): any;
 }
 
@@ -11,6 +17,12 @@ frame ListIterator: Iterator {
     pub init(items: [any]) {
         self.items = items;
         self.index = 0;
+    }
+
+    // `items` is a shared list handle, so the length is re-read on every query:
+    // elements appended after iterator creation are observed and nothing is copied.
+    pub fn has_next(): bool {
+        return self.index < len(self.items);
     }
 
     pub fn next(): any {
@@ -25,24 +37,41 @@ frame ListIterator: Iterator {
 
 frame PeekableIterator: Iterator {
     pub cached: any;
+    pub has_cached: bool;
     pub source: Iterator;
 
     pub init(source: Iterator) {
         self.source = source;
         self.cached = nil;
+        self.has_cached = false;
     }
 
+    // A separate flag is required: a cached nil is a real element, so
+    // `cached != nil` cannot distinguish "buffered" from "empty".
     pub fn peek(): any {
-        if (self.cached == nil) {
-            self.cached = self.source.next();
+        if (self.has_cached) {
+            return self.cached;
         }
+        if (not self.source.has_next()) {
+            return nil;
+        }
+        self.cached = self.source.next();
+        self.has_cached = true;
         return self.cached;
     }
 
+    pub fn has_next(): bool {
+        if (self.has_cached) {
+            return true;
+        }
+        return self.source.has_next();
+    }
+
     pub fn next(): any {
-        if (self.cached != nil) {
+        if (self.has_cached) {
             var item = self.cached;
             self.cached = nil;
+            self.has_cached = false;
             return item;
         }
         return self.source.next();
@@ -55,28 +84,25 @@ pub fn iterator(items: [any]): Iterator {
 
 pub fn collect(it: Iterator): [any] {
     var res: [any] = [];
-    var item = it.next();
-    while (item != nil) {
-        res.append(item);
-        item = it.next();
+    while (it.has_next()) {
+        res.append(it.next());
     }
     return res;
 }
 
 pub fn collect_dict(it: Iterator): {any: any} {
     var res: {any: any} = {};
-    var item = it.next();
-    while (item != nil) {
+    while (it.has_next()) {
+        var item = it.next();
         res[item.0] = item.1;
-        item = it.next();
     }
     return res;
 }
 
 pub fn to_dict(it: Iterator, key_fn: fn(any): any = nil, val_fn: fn(any): any = nil): {any: any} {
     var res: {any: any} = {};
-    var item = it.next();
-    while (item != nil) {
+    while (it.has_next()) {
+        var item = it.next();
         if (key_fn != nil and val_fn != nil) {
             res[key_fn(item)] = val_fn(item);
         } elif (key_fn != nil) {
@@ -85,7 +111,6 @@ pub fn to_dict(it: Iterator, key_fn: fn(any): any = nil, val_fn: fn(any): any = 
         } else {
             res[item.0] = item.1;
         }
-        item = it.next();
     }
     return res;
 }
@@ -93,20 +118,45 @@ pub fn to_dict(it: Iterator, key_fn: fn(any): any = nil, val_fn: fn(any): any = 
 frame ChunkIterator: Iterator {
     pub size: int;
     pub source: Iterator;
-    pub init(source: Iterator, size: int) { self.source = source; self.size = size; }
-    pub fn next(): any {
+    pub ready: bool;
+    pub pending: [any];
+
+    pub init(source: Iterator, size: int) {
+        self.source = source;
+        self.size = size;
+        if (self.size < 1) { self.size = 1; }
+        self.ready = false;
+        self.pending = [] as [any];
+    }
+
+    // A chunk is materialised on the first query and handed out by next(), so
+    // has_next() and next() never disagree about the same chunk.
+    pub fn has_next(): bool {
+        if (self.ready) {
+            return true;
+        }
+        if (not self.source.has_next()) {
+            return false;
+        }
         var chunk: [any] = [];
         var i = 0;
-        while (i < self.size) {
-            var item = self.source.next();
-            if (item == nil) {
-                if (len(chunk) == 0) { return nil; }
-                return chunk;
-            }
-            chunk.append(item);
+        while (i < self.size and self.source.has_next()) {
+            chunk.append(self.source.next());
             i = i + 1;
         }
-        return chunk;
+        self.pending = chunk;
+        self.ready = true;
+        return true;
+    }
+
+    pub fn next(): any {
+        if (not self.has_next()) {
+            return nil;
+        }
+        var out = self.pending;
+        self.pending = [] as [any];
+        self.ready = false;
+        return out;
     }
 }
 
@@ -114,6 +164,10 @@ frame CycleIterator: Iterator {
     pub index: int;
     pub items: [any];
     pub init(items: [any]) { self.items = items; self.index = 0; }
+    // A cycle over an empty sequence is empty, not infinite.
+    pub fn has_next(): bool {
+        return len(self.items) > 0;
+    }
     pub fn next(): any {
         if (len(self.items) == 0) { return nil; }
         var item = self.items[self.index];
@@ -125,13 +179,16 @@ frame CycleIterator: Iterator {
 frame StepByIterator: Iterator {
     pub source: Iterator;
     pub step: int;
-    pub init(source: Iterator, step: int) { self.source = source; self.step = step; }
+    pub init(source: Iterator, step: int) { self.source = source; if (step < 1) { self.step = 1; } else { self.step = step; } }
+    pub fn has_next(): bool {
+        return self.source.has_next();
+    }
     pub fn next(): any {
+        if (not self.source.has_next()) { return nil; }
         var item = self.source.next();
         var i = 1;
-        while (i < self.step) {
-            var skipped = self.source.next();
-            if (skipped == nil) { return item; }
+        while (i < self.step and self.source.has_next()) {
+            self.source.next();
             i = i + 1;
         }
         return item;

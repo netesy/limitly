@@ -1,5 +1,5 @@
-// Standard Library WSS (WebSocket Secure) Module (Index)
-// Re-exports WebSocket client and server submodules.
+// WebSocket umbrella: re-exports the client and server submodules plus the
+// RFC 6455 close codes as module-level constants.
 //
 // Usage:
 //   import std.wss as wss;
@@ -11,20 +11,20 @@
 pub import std.wss.client as client;
 pub import std.wss.server as server;
 
-pub import std.wss.client show WebSocketClient, WebSocketServer, WSFrame;
+pub import std.wss.client show WebSocketClient;
 pub import std.wss.server show WSSServer, WSConnection, WSRoom;
 
-// Re-export WebSocket close code constants
-pub var WS_CLOSE_NORMAL: int = client.WS_CLOSE_NORMAL;
-pub var WS_CLOSE_GOING_AWAY: int = client.WS_CLOSE_GOING_AWAY;
-pub var WS_CLOSE_PROTOCOL_ERROR: int = client.WS_CLOSE_PROTOCOL_ERROR;
-pub var WS_CLOSE_UNSUPPORTED_DATA: int = client.WS_CLOSE_UNSUPPORTED_DATA;
-pub var WS_CLOSE_NO_STATUS: int = client.WS_CLOSE_NO_STATUS;
-pub var WS_CLOSE_ABNORMAL: int = client.WS_CLOSE_ABNORMAL;
-pub var WS_CLOSE_INVALID_PAYLOAD: int = client.WS_CLOSE_INVALID_PAYLOAD;
-pub var WS_CLOSE_POLICY_VIOLATION: int = client.WS_CLOSE_POLICY_VIOLATION;
-pub var WS_CLOSE_MESSAGE_TOO_BIG: int = client.WS_CLOSE_MESSAGE_TOO_BIG;
-pub var WS_CLOSE_MANDATORY_EXT: int = client.WS_CLOSE_MANDATORY_EXT;
-pub var WS_CLOSE_INTERNAL_ERROR: int = client.WS_CLOSE_INTERNAL_ERROR;
-pub var WS_CLOSE_SERVICE_RESTART: int = client.WS_CLOSE_SERVICE_RESTART;
-pub var WS_CLOSE_TRY_AGAIN_LATER: int = client.WS_CLOSE_TRY_AGAIN_LATER;
+// Close codes, RFC 6455 section 7.4.1.
+pub var WS_CLOSE_NORMAL: int = 1000;
+pub var WS_CLOSE_GOING_AWAY: int = 1001;
+pub var WS_CLOSE_PROTOCOL_ERROR: int = 1002;
+pub var WS_CLOSE_UNSUPPORTED_DATA: int = 1003;
+pub var WS_CLOSE_NO_STATUS: int = 1005;
+pub var WS_CLOSE_ABNORMAL: int = 1006;
+pub var WS_CLOSE_INVALID_PAYLOAD: int = 1007;
+pub var WS_CLOSE_POLICY_VIOLATION: int = 1008;
+pub var WS_CLOSE_MESSAGE_TOO_BIG: int = 1009;
+pub var WS_CLOSE_MANDATORY_EXT: int = 1010;
+pub var WS_CLOSE_INTERNAL_ERROR: int = 1011;
+pub var WS_CLOSE_SERVICE_RESTART: int = 1012;
+pub var WS_CLOSE_TRY_AGAIN_LATER: int = 1013;

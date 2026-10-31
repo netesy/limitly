@@ -20,7 +20,7 @@ fn test_iterator_basics(): int {
     assert(it.next() == 1, "next failed");
     assert(it.next() == 2, "next failed");
     assert(it.next() == 3, "next failed");
-    assert(it.next() == nil, "next past end failed");
+    assert(not it.has_next(), "next past end failed");
 
     var it2 = iter.iterator(items);
     var collected = iter.collect(it2);
@@ -38,7 +38,7 @@ fn test_map(): int {
     assert(mapped.next() == 1, "map 1 failed");
     assert(mapped.next() == 4, "map 2 failed");
     assert(mapped.next() == 9, "map 3 failed");
-    assert(mapped.next() == nil, "map past end failed");
+    assert(not mapped.has_next(), "map past end failed");
     return 1;
 }
 
@@ -51,7 +51,7 @@ fn test_filter(): int {
     assert(filtered.next() == 1, "filter 1 failed");
     assert(filtered.next() == 3, "filter 3 failed");
     assert(filtered.next() == 5, "filter 5 failed");
-    assert(filtered.next() == nil, "filter past end failed");
+    assert(not filtered.has_next(), "filter past end failed");
     return 1;
 }
 
@@ -64,7 +64,7 @@ fn test_take(): int {
     assert(taken.next() == 1, "take 1 failed");
     assert(taken.next() == 2, "take 2 failed");
     assert(taken.next() == 3, "take 3 failed");
-    assert(taken.next() == nil, "take past limit failed");
+    assert(not taken.has_next(), "take past limit failed");
     return 1;
 }
 
@@ -77,7 +77,7 @@ fn test_skip(): int {
     assert(skipped.next() == 3, "skip 1 failed");
     assert(skipped.next() == 4, "skip 2 failed");
     assert(skipped.next() == 5, "skip 3 failed");
-    assert(skipped.next() == nil, "skip past end failed");
+    assert(not skipped.has_next(), "skip past end failed");
     return 1;
 }
 
@@ -97,7 +97,7 @@ fn test_zip(): int {
     assert(pair2[0] == 2, "zip pair 2 left failed");
     assert(pair2[1] == "b", "zip pair 2 right failed");
 
-    assert(zipped.next() == nil, "zip past end failed");
+    assert(not zipped.has_next(), "zip past end failed");
     return 1;
 }
 
@@ -113,7 +113,7 @@ fn test_chain(): int {
     assert(chained.next() == 2, "chain 2 failed");
     assert(chained.next() == 3, "chain 3 failed");
     assert(chained.next() == 4, "chain 4 failed");
-    assert(chained.next() == nil, "chain past end failed");
+    assert(not chained.has_next(), "chain past end failed");
     return 1;
 }
 
@@ -131,7 +131,7 @@ fn test_enumerate(): int {
     assert(pair2[0] == 1, "enumerate 2 index failed");
     assert(pair2[1] == "b", "enumerate 2 val failed");
 
-    assert(enumerated.next() == nil, "enumerate past end failed");
+    assert(not enumerated.has_next(), "enumerate past end failed");
     return 1;
 }
 

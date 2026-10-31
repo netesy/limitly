@@ -96,6 +96,7 @@ void Generator::lower_function_bodies(const LM::Frontend::TypeCheckResult& type_
         for (const auto& stmt : module->ast->statements) {
             if (!stmt) continue;
             if (auto func_stmt = dynamic_cast<LM::Frontend::AST::FunctionDeclaration*>(stmt.get())) {
+                if (func_stmt->isStaged) continue;  // staged fns are compile-time only
                 std::string original_name = func_stmt->name;
                 std::string qname = path + "." + original_name;
                 if (!function_table_.count(qname)) {
@@ -115,6 +116,7 @@ void Generator::lower_function_bodies(const LM::Frontend::TypeCheckResult& type_
         for (const auto& stmt : module->ast->statements) {
             if (!stmt) continue;
             if (auto func_stmt = dynamic_cast<LM::Frontend::AST::FunctionDeclaration*>(stmt.get())) {
+                if (func_stmt->isStaged) continue;  // staged fns are compile-time only
                 std::string original_name = func_stmt->name;
                 std::string qname = path + "." + original_name;
                 func_stmt->name = qname;

@@ -1,0 +1,77 @@
+// =============================================================================
+// staged fn compile-time VALUE parameters.
+//
+// A stage-0 parameter may bind a constant instead of a type: `pick(0, A, B)`.
+// The constant is folded into the stage-0 environment and drives a compile-time
+// `if`, so a single constructor yields a different concrete TYPE per call.
+//
+// This is the capability docs/staged.md section 1 spells `vector(8, int)` -- the
+// generics-shaped feature the stdlib does not use. Nothing in the suite covered
+// it before this file.
+//
+// Every shape below is deliberately copied from a test that already passes:
+//   pick(flag: int, a: type, b: type)  -> staged_type_fn_test.lm item 5
+//   bool literal value argument        -> parser/types.cpp TRUE/FALSE path
+//   nullable(T) = T | nil              -> staged_type_fn_test.lm item 1
+// =============================================================================
+
+frame Small { pub var tag: str; }
+frame Large { pub var tag: str; }
+
+// 1. An int value parameter selects which TYPE the constructor returns.
+staged fn pick(flag: int, a: type, b: type): type {
+    if (flag == 0) {
+        return a;
+    }
+    return b;
+}
+
+var sm: pick(0, Small, Large) = Small();
+sm.tag = "small";
+assert(sm.tag == "small");
+
+var lg: pick(1, Small, Large) = Large();
+lg.tag = "large";
+assert(lg.tag == "large");
+
+// 2. The fold is deterministic: the same value argument yields the same type,
+//    so an alias and an inline annotation are interchangeable.
+type SmallAlias = pick(0, Small, Large);
+var sm2: SmallAlias = Small();
+sm2.tag = "alias";
+assert(sm2.tag == "alias");
+
+// 3. Composes with a type-only constructor: the value argument folds inside out.
+staged fn nullable(T: type): type {
+    return T | nil;
+}
+
+var maybe: nullable(pick(1, int, str)) = "text";
+assert(maybe == "text");
+var absent: nullable(pick(1, int, str)) = nil;
+assert(absent == nil);
+
+// 4. A bool literal is a valid stage-0 value argument.
+//
+// LIMIT (measured): value arguments must be LITERALS. `pick(0, A, B)` folds, but
+// `const FLAG = 0; pick(FLAG, A, B)` does not -- an identifier in that position
+// is parsed as a type name ("cannot find type `FLAG`") and the constructor then
+// reports that its parameter must be annotated 'type'. Only INT / FLOAT / STRING
+// / TRUE / FALSE tokens take the value-argument path
+// (src/frontend/parser/types.cpp). Derive nothing; write the literal.
+staged fn by_flag(enabled: bool, a: type, b: type): type {
+    if (enabled) {
+        return a;
+    }
+    return b;
+}
+
+var on: by_flag(true, Large, Small) = Large();
+on.tag = "on";
+assert(on.tag == "on");
+
+var off: by_flag(false, Large, Small) = Small();
+off.tag = "off";
+assert(off.tag == "off");
+
+print("staged value param OK");

@@ -155,6 +155,15 @@ CompileResult FyraCompiler::compile_module(std::shared_ptr<ir::Module> module,
         }
         backend.optimize(opt_level);
 
+        // Verification harness opt-out for SIMD Phase 1: setting LYMAR_NO_VECTORIZE=1
+        // disables Fyra's loop/SLP vectorizers so the same program is emitted scalar.
+        // tests/native/verify_simd.py runs both variants and asserts the vectorized
+        // assembly differs from the scalar one and both produce the same result.
+        if (const char* novec = std::getenv("LYMAR_NO_VECTORIZE"); novec && *novec && std::string(novec) != "0") {
+            backend.enableLoopVectorization(false);
+            backend.enableSLP(false);
+        }
+
         // Automatically link discovered precompiled static libraries
         const auto target_descriptor = target::TargetDescriptor::fromString(target_triple);
         if (!target_descriptor) throw std::runtime_error("Invalid target triple: " + target_triple);

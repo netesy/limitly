@@ -54,10 +54,13 @@ pub fn detect_pan(child: ui_types.Widget, on_pan: any): ui_types.Widget {
     return child;
 }
 
-// Update gesture state based on pointer down event
+// Update gesture state based on pointer down event.
+//
+// `key in dict` is not an operator in Lymar - `in` only appears in `iter` and
+// `for` clauses. A missing key reads back as nil, so presence is a nil check.
 pub fn update_gesture_on_pointer_down(gesture_key: str, x: float, y: float, current_time: float): nil {
     var state = GestureState();
-    if (gesture_key in gesture_states) {
+    if (gesture_states[gesture_key] != nil) {
         state = gesture_states[gesture_key];
     }
     
@@ -79,7 +82,7 @@ pub fn update_gesture_on_pointer_down(gesture_key: str, x: float, y: float, curr
 
 // Update gesture state based on pointer move (for swipe/pan detection)
 pub fn update_gesture_on_pointer_move(gesture_key: str, x: float, y: float): float {
-    if (gesture_key in gesture_states) {
+    if (gesture_states[gesture_key] != nil) {
         var state = gesture_states[gesture_key];
         var dx = x - state.pointer_down_x;
         var dy = y - state.pointer_down_y;
@@ -93,7 +96,7 @@ pub fn update_gesture_on_pointer_move(gesture_key: str, x: float, y: float): flo
 
 // Update gesture state based on pointer up (for long press and tap)
 pub fn update_gesture_on_pointer_up(gesture_key: str, current_time: float): int {
-    if (gesture_key in gesture_states) {
+    if (gesture_states[gesture_key] != nil) {
         var state = gesture_states[gesture_key];
         var hold_time = current_time - state.pointer_down_time;
         
@@ -111,7 +114,7 @@ pub fn update_gesture_on_pointer_up(gesture_key: str, current_time: float): int 
 
 // Get last detected gesture type
 pub fn get_last_gesture(gesture_key: str): str {
-    if (gesture_key in gesture_states) {
+    if (gesture_states[gesture_key] != nil) {
         var state = gesture_states[gesture_key];
         if (state.is_long_press_active == 1) {
             return "long_press";

@@ -10,6 +10,10 @@ import time
 
 lymar_path = os.path.abspath(os.environ.get("LYMAR_EXECUTABLE", "bin/lymar.exe" if os.name == "nt" else "bin/lymar"))
 
+# LYMAR_NO_CACHE=1 compiles every test cold. A cached artifact can make a broken
+# source file look green, so use this when std/ or the compiler changed.
+no_cache = os.environ.get("LYMAR_NO_CACHE", "") == "1"
+
 def load_tests_from_file(file_path):
     test_files = []
     if not os.path.exists(file_path):
@@ -61,11 +65,15 @@ if __name__ == "__main__":
             print(f"Skipping {test_path} (does not exist)")
             continue
 
-        timeout = (25.0 if test in slow_tests else 3.0) * float(os.environ.get("LYMAR_TEST_TIMEOUT_SCALE", "1"))
+        timeout = (25.0 if test in slow_tests else 3.0) * float(os.environ.get(
+            "LYMAR_TEST_TIMEOUT_SCALE", "8" if no_cache else "1"))
+        cmd = [lymar_path, "run", test_path]
+        if no_cache:
+            cmd.append("--no-cache")
         start_time = time.time()
         try:
             res = subprocess.run(
-                [lymar_path, "run", test_path],
+                cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,

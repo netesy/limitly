@@ -374,18 +374,29 @@ print_option(Option.Some(10)); // Output: Value is 10
 print_option(Option.None); // Output: No value
 ```
 
-You can also destructure records or objects with a similar syntax:
+A record type can be declared, and the pattern parses, but the value cannot be built with a
+brace literal: at a call site `{name: "Alice", age: 30}` is a **dictionary literal**
+(`Dict<String, Any>`), so the annotation is rejected with
+
+```text
+type mismatch: expected `{ name: String, age: Int64 }`, found `Dict<String, Any>`
+```
+
+so this shape does not compile end to end. Use a frame for named-field structs:
 
 ```lymar
-type Person = {name: str, age: int};
-
-fn greet(p: Person) {
- match (p) {
- {name: n, age: a} => { print("{n} is {a} years old."); }
- }
+frame Person {
+ pub name: str;
+ pub age: int;
+ pub init(n: str, a: int) { self.name = n; self.age = a; }
 }
 
-greet({name: "Alice", age: 30}); // Output: Alice is 30 years old.
+fn greet(p: Person) {
+ print(p.name);
+ print(p.age);
+}
+
+greet(Person("Alice", 30)); // Output: Alice / 30
 ```
 
 #### Destructuring Dictionaries
@@ -502,9 +513,10 @@ print(person[0]); // Output: Alice
 print(person[1]); // Output: 30
 ```
 
-### Object Literals
+### Enum Payload Construction
 
-Object literals provide a way to create instances of user-defined types, like frames or enums, with a specific structure. This is especially useful for enums with associated data.
+Enums with associated data are constructed through the variant, which is the one value-shaped
+construction form that lowers today:
 
 ```lymar
 enum Option {
@@ -512,8 +524,13 @@ enum Option {
  None
 }
 
-var my_option = Option.Some(42);
+var my_option = Option.Some(42); // prints Some(42)
 ```
+
+There is no brace object literal for frames or records. `Point { x: 1, y: 2 }` parses but is
+rejected by the type checker with `E003: Unknown expression type`, followed by a spurious
+`Type 'Nil' has no member ...`. Construct frames through their constructor instead — `Point()`
+then field assignment, or `Point(1, 2)` when the frame declares `init(x: int, y: int)`.
 
 ## Functions
 

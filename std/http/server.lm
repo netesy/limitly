@@ -2,6 +2,7 @@
 // Built on the standard resource abstraction.
 
 import std.core as core;
+import std.core show Error;
 import std.resource as res;
 
 frame ServerRequest {
@@ -69,7 +70,7 @@ frame HTTPServer {
         self.accepter = nil;
     }
 
-    pub fn listen(host: str, port: int, backlog: int = 128): core.ResultInt {
+    pub fn listen(host: str, port: int, backlog: int = 128): int?Error {
         self.host = host;
         self.port = port;
 
@@ -78,13 +79,13 @@ frame HTTPServer {
                 var binder = res.Binder(r=r);
                 if (not binder.bind(args=[host, port])) {
                     r.close();
-                    return core.err_int("failed to bind to {host}:{port}");
+                    return err(Error(code="BindError", message="failed to bind to {host}:{port}"));
                 }
 
                 var listener = res.Listener(r=r);
                 if (not listener.listen(args=[backlog])) {
                     r.close();
-                    return core.err_int("listen failed on port {port}");
+                    return err(Error(code="ListenError", message="listen failed on port {port}"));
                 }
 
                 self.resource = r;
@@ -93,9 +94,9 @@ frame HTTPServer {
                 self.accepter = res.Accepter(r=r);
                 self.handle = r._handle();
                 self.running = true;
-                return core.ok_int(self.handle);
+                return ok(self.handle);
             },
-            err e => return core.err_int("failed to create socket")
+            err e => return err(Error(code="SocketError", message="failed to create socket"))
         }
     }
 
@@ -127,10 +128,7 @@ frame HTTPServer {
     pub fn send_response(client: res.Resource, resp: ServerResponse): bool {
         var writer = res.Writer(r=client);
         var raw = "HTTP/1.1 " + (resp.status as str) + " OK\r\n";
-        var resp_headers = resp.headers;
-        iter (k in resp_headers) {
-            raw = raw + k + ": " + resp_headers[k] + "\r\n";
-        }
+        raw = raw + render_headers(resp.headers);
         raw = raw + "\r\n" + resp.body;
         
         var bytes: [int] = [];
@@ -161,6 +159,16 @@ frame HTTPServer {
             nil => return false
         }
     }
+}
+
+// `Name: value\r\n` for every header. `iter` cannot appear inside a frame
+// method; dictionaries are walked with the two-variable form.
+fn render_headers(headers: {str: str}): str {
+    var out = "";
+    iter (name, value in headers) {
+        out = out + name + ": " + value + "\r\n";
+    }
+    return out;
 }
 
 fn parse_server_request(raw: str): ServerRequest {
@@ -303,17 +311,17 @@ fn hex_digit_val(ch: str): int {
 }
 
 fn parse_hex(s: str): int {
-    var val = 0;
+    var value = 0;
     var i = 0;
     while (i < len(s)) {
         var ch = substring(s, i, i + 1);
         if (ch == ";" or ch == " " or ch == "\r" or ch == "\n") {
-            return val;
+            return value;
         }
-        val = val * 16 + hex_digit_val(ch);
+        value = value * 16 + hex_digit_val(ch);
         i = i + 1;
     }
-    return val;
+    return value;
 }
 
 fn substring(s: str, start: int, end: int): str {

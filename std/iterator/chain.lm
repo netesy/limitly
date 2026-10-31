@@ -13,13 +13,22 @@ frame ChainIterator: it.Iterator {
         self.on_left = true;
     }
 
-    pub fn next(): any {
-        if (self.on_left == true) {
-            var a = self.left.next();
-            if (a != nil) {
-                return a;
+    pub fn has_next(): bool {
+        if (self.on_left) {
+            if (self.left.has_next()) {
+                return true;
             }
             self.on_left = false;
+        }
+        return self.right.has_next();
+    }
+
+    pub fn next(): any {
+        if (not self.has_next()) {
+            return nil;
+        }
+        if (self.on_left) {
+            return self.left.next();
         }
         return self.right.next();
     }

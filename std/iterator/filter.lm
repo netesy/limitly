@@ -5,23 +5,44 @@ import std.iterator.iterator as it;
 frame FilterIterator: it.Iterator {
     pub p: fn(any): bool;
     pub source: it.Iterator;
+    pub ready: bool;
+    pub pending: any;
 
     pub init(source: it.Iterator, p: fn(any): bool) {
         self.source = source;
         self.p = p;
+        self.ready = false;
+        self.pending = nil;
+    }
+
+    // The first match is buffered so has_next() can answer without consuming.
+    fn _fill() {
+        while (self.source.has_next()) {
+            var item = self.source.next();
+            if (self.p(item)) {
+                self.pending = item;
+                self.ready = true;
+                return;
+            }
+        }
+        self.ready = false;
+    }
+
+    pub fn has_next(): bool {
+        if (not self.ready) {
+            self._fill();
+        }
+        return self.ready;
     }
 
     pub fn next(): any {
-        while (true) {
-            var item = self.source.next();
-            if (item == nil) {
-                return nil;
-            }
-            if (self.p(item)) {
-                return item;
-            }
+        if (not self.has_next()) {
+            return nil;
         }
-        return nil;
+        var out = self.pending;
+        self.pending = nil;
+        self.ready = false;
+        return out;
     }
 }
 

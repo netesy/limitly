@@ -19,6 +19,10 @@ frame LinkedListIterator : Iterator {
         self.current = head;
     }
 
+    pub fn has_next(): bool {
+        return self.current != nil;
+    }
+
     pub fn next(): any {
         if (self.current == nil) {
             return nil;
