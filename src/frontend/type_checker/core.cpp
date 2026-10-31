@@ -408,6 +408,15 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
                 info.methodSignatures[m->name] = sig.return_type;
             }
             type_system.registerTrait(name, info);
+            // Also populate the conformance registry here: PASS 2 resolves global var
+            // annotations, and a staged frame instantiated from one may carry a `: Trait`
+            // clause whose conformance is verified inline -- before PASS 3's
+            // check_trait_declaration would otherwise register it.
+            TraitInfo chk_ti;
+            chk_ti.name = name;
+            chk_ti.extends = trait_decl->extends;
+            chk_ti.declaration = trait_decl;
+            trait_declarations[name] = chk_ti;
         } else if (auto func_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(stmt)) {
             if (function_signatures.count(name) && function_signatures[name].return_type && function_signatures[name].return_type->tag != TypeTag::Any) {
                 return;

@@ -6,6 +6,10 @@ import std.math as math;
 // std.string's own `String` frame and broke method dispatch for callers importing
 // both. std.string is the single string module and re-exports via `pub import`.
 pub import std.string show String;
+// Option is a staged frame template, not a frame: it must travel through `pub import`
+// (which registers the template under its import spellings), never a `var` alias -- an
+// alias would bind the name to an ordinary frame and lose the type-position request.
+pub import std.core.option show Option;
 import std.sort as sort;
 import std.search as search;
 import std.algorithm as algorithm;
@@ -89,10 +93,4 @@ var MIMEType = mime.MIMEType;
 var MIMEParams = mime.MIMEParams;
 var UUID = uuid.UUID;
 var Debug = debug.Debug;
-var Option = core.Option;
-var Some = core.Some;
-var None = core.None;
-var Result = core.Result;
-var Ok = core.Ok;
-var Err = core.Err;
 var Range = range.Range;

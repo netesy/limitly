@@ -1844,9 +1844,11 @@ TypePtr TypeChecker::instantiate_staged_frame(const std::shared_ptr<LM::Frontend
         args.push_back(t);
     }
 
-    // Mangle: the template's request spelling plus one fragment per argument. Nominal
-    // identity falls out of the cache key -- Option(int) is always Option_int.
-    std::string base = sf_sanitize(template_key);
+    // Mangle: the template's declared name plus one fragment per argument. Identity is
+    // keyed on the template itself, not the request spelling -- the same import registers
+    // a template under several names (`Option`, `core.Option`), and every spelling must
+    // mint the same frame: Option(int) is always Option_int, never core_Option_int.
+    std::string base = sf_sanitize(tmpl->name);
     std::string mangled = base;
     for (const auto& a : args) {
         std::string m = staged_frame_mangle(a);
@@ -1921,6 +1923,7 @@ TypePtr TypeChecker::instantiate_staged_frame(const std::shared_ptr<LM::Frontend
         return type_system.NIL_TYPE;
     }
     gen->isGenerated = true;
+    gen->implements = tmpl->implements;
 
     // Adopt: exactly the registration a hand-written frame receives in passes 1-3, in the
     // order the checker performs them, then into the program AST for codegen.

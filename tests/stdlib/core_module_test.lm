@@ -1,8 +1,11 @@
 // Test Suite for Standard Library Core Module
 
-import std.core.error as error;
-import std.core.option as option;
-import std.core.result as result;
+import std.core.error as errmod;
+// NOT `as option`: the scanner reserves the bare word `option` as the OPTION_TYPE
+// keyword, so a lowercase `option.` prefix never parses as a qualified name.
+import std.core.option as opt;
+// std.core.result is gone: fallible paths use the language's native error types
+// (T? / T?Error, ok/err, `?`, `? else`, match). Migration map: std/core/index.lm.
 import std.core.comparable as comparable;
 import std.core.disposable as disposable;
 import std.core.cloneable as cloneable;
@@ -69,7 +72,7 @@ fn test_error(): int {
     print("Testing Error frame...");
 
     // Test direct frame
-    var error_instance = error.Error("E101", "Database offline");
+    var error_instance = errmod.Error("E101", "Database offline");
     assert(error_instance.code == "E101", "error_instance.code should be E101");
     assert(error_instance.message == "Database offline", "error_instance.message mismatch");
     assert(error_instance.to_string() == "[E101] Database offline", "error_instance.to_string() incorrect");
@@ -83,102 +86,105 @@ fn test_error(): int {
     return 1;
 }
 
-fn map_string_len(input_value: any): any {
-    // Length of string
-    return len(input_value);
+fn shout(input_value: str): str {
+    return input_value;
 }
 
-fn is_positive_int(input_value: any): bool {
+fn is_positive_int(input_value: int): bool {
     return input_value > 0;
 }
 
 fn test_option(): int {
-    print("Testing Option frame...");
+    print("Testing staged Option template...");
 
-    // Test direct Option - Some
-    var opt_some = option.Some("hello");
-    assert(opt_some.is_some() == true, "opt_some should be Some");
-    assert(opt_some.is_none() == false, "opt_some should not be None");
+    // Option(T) is a template, not a frame: the type position requests the
+    // instantiation and the constructor is steered to the generated frame.
+    var opt_some: opt.Option(str) = opt.Option(true, "hello");
+    assert(opt_some.is_some() == true, "opt_some should be some");
+    assert(opt_some.is_none() == false, "opt_some should not be none");
     assert(opt_some.unwrap() == "hello", "opt_some unwrap failed");
     assert(opt_some.unwrap_or("fallback") == "hello", "opt_some unwrap_or failed");
 
-    // Test direct Option - None
-    var opt_none = option.None();
-    assert(opt_none.is_some() == false, "opt_none should not be Some");
-    assert(opt_none.is_none() == true, "opt_none should be None");
+    var opt_none: opt.Option(str) = opt.Option(false, nil);
+    assert(opt_none.is_some() == false, "opt_none should not be some");
+    assert(opt_none.is_none() == true, "opt_none should be none");
     assert(opt_none.unwrap_or("fallback") == "fallback", "opt_none unwrap_or fallback failed");
 
-    // Test Option.map
-    var opt_mapped = opt_some.map(map_string_len);
-    assert(opt_mapped.is_some() == true, "opt_mapped should be Some");
-    assert(opt_mapped.unwrap() == 5, "opt_mapped value should be 5");
+    // Test Option.map -- typed: fn(T): T, so a str Option maps to a str Option.
+    var opt_for_map: opt.Option(str) = opt.Option(true, "hi");
+    var opt_mapped = opt_for_map.map(shout);
+    assert(opt_mapped.is_some() == true, "opt_mapped should be some");
+    assert(opt_mapped.unwrap() == "hi", "opt_mapped value should be hi");
 
-    var opt_none_mapped = opt_none.map(map_string_len);
-    assert(opt_none_mapped.is_none() == true, "mapped opt_none should be None");
+    var opt_none_mapped = opt_none.map(shout);
+    assert(opt_none_mapped.is_none() == true, "mapped opt_none should be none");
 
-    // Test Option.filter
-    var opt_int_some = option.Some(10);
+    // Test Option.filter on the int instantiation
+    var opt_int_some: opt.Option(int) = opt.Option(true, 10);
     var opt_filtered_true = opt_int_some.filter(is_positive_int);
-    assert(opt_filtered_true.is_some() == true, "opt_filtered_true should be Some");
+    assert(opt_filtered_true.is_some() == true, "opt_filtered_true should be some");
     assert(opt_filtered_true.unwrap() == 10, "opt_filtered_true value incorrect");
 
-    var opt_int_neg = option.Some(-5);
+    var opt_int_neg: opt.Option(int) = opt.Option(true, -5);
     var opt_filtered_false = opt_int_neg.filter(is_positive_int);
-    assert(opt_filtered_false.is_none() == true, "opt_filtered_false should be None");
+    assert(opt_filtered_false.is_none() == true, "opt_filtered_false should be none");
 
-    // Test index Option aliases
-    var idx_some = core.Some(42);
-    assert(idx_some.is_some() == true, "idx_some should be Some");
+    // Index alias: core.Option(int) and opt.Option(int) are the SAME frame --
+    // nominal identity is keyed on the template, not the import spelling.
+    var idx_some: core.Option(int) = core.Option(true, 42);
+    assert(idx_some.is_some() == true, "idx_some should be some");
     assert(idx_some.unwrap() == 42, "idx_some value incorrect");
+    var cross: opt.Option(int) = idx_some;
+    assert(cross.unwrap_or(0) == 42, "alias instantiations must interoperate");
 
-    var idx_none = core.None();
-    assert(idx_none.is_none() == true, "idx_none should be None");
+    var idx_none: core.Option(int) = core.Option(false, nil);
+    assert(idx_none.is_none() == true, "idx_none should be none");
 
-    print("Option frame tests passed!");
+    print("Option staged template tests passed!");
     return 1;
 }
 
-fn add_one(input_value: any): any {
-    return input_value + 1;
+// The library Result frame is gone; this now exercises the native fallible
+// machinery that replaced it (T?Error + ok/err/? + match), per the migration
+// map in std/core/index.lm.
+fn checked_fetch(should_fail: bool): int?Error {
+    if (should_fail) {
+        // err(...) takes a bare error-type identifier; the alias-qualified form
+        // (`errmod.Error(...)`) does not parse. `Error` itself is imported bare.
+        return err(Error("E500", "Server Timeout"));
+    }
+    return ok(100);
+}
+
+fn propagate_fetch(): int? {
+    var v = checked_fetch(false)?;
+    return ok(v + 1);
 }
 
 fn test_result(): int {
-    print("Testing Result frame...");
+    print("Testing native fallibles...");
 
-    // Test direct Result - Ok
-    var res_ok_val = result.Ok(100);
-    assert(res_ok_val.is_ok() == true, "res_ok_val should be Ok");
-    assert(res_ok_val.is_err() == false, "res_ok_val should not be Err");
-    assert(res_ok_val.unwrap() == 100, "res_ok_val unwrap failed");
-    assert(res_ok_val.unwrap_or(200) == 100, "res_ok_val unwrap_or failed");
+    // Success path unwinds through `? else`.
+    var fetched = checked_fetch(false)? else {
+        return 0;
+    };
+    assert(fetched == 100, "fetched should be 100");
 
-    // Test direct Result - Err
-    var error_obj = error.Error("E500", "Server Timeout");
-    var res_err_val = result.Err(error_obj);
-    assert(res_err_val.is_ok() == false, "res_err_val should not be Ok");
-    assert(res_err_val.is_err() == true, "res_err_val should be Err");
-    assert(res_err_val.unwrap_or(200) == 200, "res_err_val unwrap_or fallback failed");
+    // Failure path reaches the match arm; the declared code survives.
+    // (Arms must agree in type, so both end in assert -- same shape as
+    // tests/error_handling/fallback_test.lm.)
+    match (checked_fetch(true)) {
+        val v => { assert(false, "checked_fetch(true) should fail"); },
+        err e => { assert("{e}" == "E500", "declared error code reaches the caller"); }
+    }
 
-    var unwrapped_error = res_err_val.unwrap_err() as error.Error;
-    assert(unwrapped_error.code == "E500", "res_err_val unwrap_err code incorrect");
+    // Propagation through a bare `?` in a fallible function.
+    var propagated = propagate_fetch()? else {
+        return 0;
+    };
+    assert(propagated == 101, "propagation through ? should carry the value");
 
-    // Test Result.map
-    var res_mapped = res_ok_val.map(add_one);
-    assert(res_mapped.is_ok() == true, "res_mapped should be Ok");
-    assert(res_mapped.unwrap() == 101, "res_mapped value should be 101");
-
-    var res_err_mapped = res_err_val.map(add_one);
-    assert(res_err_mapped.is_err() == true, "res_err_mapped should be Err");
-
-    // Test index Result aliases
-    var idx_ok_val = core.Ok("success");
-    assert(idx_ok_val.is_ok() == true, "idx_ok_val should be Ok");
-    assert(idx_ok_val.unwrap() == "success", "idx_ok_val unwrap failed");
-
-    var idx_err_val2 = core.Err(error.Error("E404", "Not Found"));
-    assert(idx_err_val2.is_err() == true, "idx_err_val2 should be Err");
-
-    print("Result frame tests passed!");
+    print("Native fallible tests passed!");
     return 1;
 }
 

@@ -391,3 +391,73 @@ likewise refused rather than silently read from uninitialised registers.
   `tests/negative/staged/staged_vm_{host_call,opcode,instruction_budget}.lm`. Under
   `LYMAR_STAGE0_FORCE_VM=1` `tests/staged/staged_enum_test.lm` folds its enum-valued arguments on the
   VM and prints the same result the folder produces.
+
+## 6. Staged frames — generating named types
+
+> **Implemented.** Roadmaps item 1b. `staged frame` extends staging from *selecting*
+> types (item 1's `staged fn : type`) to *minting* them: a template that answers an
+> instantiation request with a real, ordinary, nominal frame.
+
+**Grammar.** `staged frame Name(P: type, Q: enum, F: frame) { ... }` — a frame body
+whose field types, `init` and method signatures may mention the meta-parameters. The
+kind-bound spellings are the same three tokens item 1 step 2 established for staged fn
+parameters; they are *category constraints on a type slot*, not OOP annotations, and
+they reject a wrong kind (`Wrapper(E: enum)` given a frame argument) at the request
+site instead of inside the synthesized body. The template body is never checked as
+written — it mentions unbound meta-parameters — and contributes no frame of its own.
+
+**Requests come from type positions only.** `Option(int)` in an annotation (field,
+parameter, return, `type` alias) is the instantiation request, reusing item 1's
+`isStagedCall` annotation path: one compile-time spelling, no `<T>`, no second
+mechanism. Instantiation is demand-driven and cached by mangled name, so repeated
+requests share one frame — and a request raised *while checking a generated body*
+(self-reference, e.g. `map(): Option(T)`) hits the cache before the body is checked,
+which is what makes recursive generic shapes terminate. The mangle is keyed on the
+template's declared name, so every import spelling of the same template (`Option`,
+`core.Option`, `option.Option`) mints the same frame: nominal identity is identity of
+the template plus the argument tuple, never of the request spelling.
+
+**Synthesis is token-level.** The parser captures the template body's raw tokens; at
+instantiation the checker replaces each identifier equal to a meta-parameter with the
+argument type's token spelling, wraps the result in `frame Mangled { ... }`, and
+re-parses it through the ordinary `Scanner`/`Parser`. The output is a plain
+`FrameDeclaration` (`isGenerated = true`) adopted into the program before codegen:
+signature collection, body check, trait-conformance verification (the header's
+`: Trait` clause lives outside the captured body tokens and is carried over
+explicitly) all run the standard pipeline. The template's `: Trait` clause is
+carried onto every instance, so a generated frame conforms like any hand-written
+one. Downstream, every consumer of frame declarations skips the `isStaged` template
+(checker passes, LIR collect/lower, ownership); only the generated instances are
+runtime entities. This is why **no new LIR surface exists** and backend conformance
+is by construction: AOT and VM execute byte-identical programs because the stage-0
+output *is* an ordinary program.
+
+**Construction is steered, not special.** `var b: Box(int) = Box(42);` writes the
+template name as the callee; the checker resolves the annotation first (which
+instantiates), then rewrites the callee to the generated frame's real name. A
+`return Box(...)` inside a template method takes the same route through the
+enclosing method's declared return type. A construction with no type context —
+`var b = Box(42);` — is rejected: the bare template is not constructible, by
+design, because there is no argument tuple to mint a frame from.
+
+**Guards.** Reuse of the stage-0 sandbox accounting (`stage0_charge`), a nesting
+cap of 64 instantiation frames and a 512-frame generated ceiling; arity, kind-bound
+and unknown-template violations are compile errors with the request site named.
+
+**What staged frames are *not*.** They do not replace fallible types: the language's
+native `T?` / `T?Error` + `ok`/`err`/`?`/`match` is the Result, with real stack
+propagation, and stdlib carries no library Result for the same reason "no parallel
+mechanisms" bans a second one. They are for the shapes fallible types cannot
+express — `Option(T)`'s typed combinators (`map`/`filter`/`unwrap_or` chaining) need
+per-`T` frames, because `T | nil` alone cannot carry them generically.
+
+- **Regressions:** `tests/staged/staged_frame_test.lm` (single/two/nested parameters,
+  frame-kind argument, trait conformance of a generated frame, cache reuse) and
+  `tests/negative/staged/staged_frame_{arity,kind_bound,unknown,bare_construct}.lm`.
+  Stdlib consumer: `std/core/option.lm` + `tests/stdlib/core_module_test.lm` and
+  `tests/stdlib/core/option_result_test.lm`.
+- **Known pre-existing defect inherited by generated methods:** AOT mis-compiles
+  calls to an `fn`-typed parameter (see `docs/roadmaps.md` item 1b notes), so
+  `Option.map`/`filter` are correct on VM and wrong on AOT exactly as a
+  hand-written frame of the same shape would be. This is a backend indirect-call
+  defect, not staged-frame semantics.

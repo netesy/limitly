@@ -1003,8 +1003,13 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
         if (!frame_declarations.count(target_name) && staged_frame_templates_.count(target_name)) {
             const std::string tmpl_name = target_name;
             bool steered = false;
-            if (expected_type && expected_type->tag == TypeTag::Frame) {
-                if (const auto* fd = std::get_if<FrameType>(&expected_type->extra)) {
+            // Prefer the call's expected type; when a construction sits in a `return`
+            // (which checks its value without an expected type) fall back to the
+            // enclosing method/function's declared return type. Both name the frame the
+            // template is being asked to instantiate.
+            TypePtr steer_hint = expected_type ? expected_type : current_return_type;
+            if (steer_hint && steer_hint->tag == TypeTag::Frame) {
+                if (const auto* fd = std::get_if<FrameType>(&steer_hint->extra)) {
                     auto gen_it = frame_declarations.find(fd->name);
                     if (gen_it != frame_declarations.end() && gen_it->second.declaration &&
                         gen_it->second.declaration->isGenerated) {
@@ -1059,6 +1064,34 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
                 auto frame_it = frame_declarations.find(qualified);
                 if (frame_it != frame_declarations.end()) {
                     target_name = qualified + ".init";
+                } else if (staged_frame_templates_.count(qualified)) {
+                    // Qualified construction from a staged frame template, e.g.
+                    // `var x: core.Option(int) = core.Option(true, 4);`. Same steering as the
+                    // bare-name path: the annotation already requested the instantiation, so
+                    // swap the callee for the generated frame's real (mangled) name and let
+                    // the ordinary frame-constructor machinery take over.
+                    const std::string tmpl_name = qualified;
+                    bool steered = false;
+                    TypePtr steer_hint = expected_type ? expected_type : current_return_type;
+                    if (steer_hint && steer_hint->tag == TypeTag::Frame) {
+                        if (const auto* fd = std::get_if<FrameType>(&steer_hint->extra)) {
+                            auto gen_it = frame_declarations.find(fd->name);
+                            if (gen_it != frame_declarations.end() && gen_it->second.declaration &&
+                                gen_it->second.declaration->isGenerated) {
+                                auto rewritten = std::make_shared<LM::Frontend::AST::VariableExpr>();
+                                rewritten->name = fd->name;
+                                rewritten->line = expr->line;
+                                expr->callee = rewritten;
+                                target_name = fd->name + ".init";
+                                steered = true;
+                            }
+                        }
+                    }
+                    if (!steered) {
+                        add_error("frame template '" + tmpl_name + "' is not constructible; request an instantiation in a type position, e.g. '" + tmpl_name + "(int)'", expr->line);
+                        expr->inferred_type = type_system.ANY_TYPE;
+                        return type_system.ANY_TYPE;
+                    }
                 } else {
                     if (variable_types.count(qualified)) {
                         TypePtr var_type = variable_types[qualified];

@@ -166,3 +166,5 @@ tests/staged/staged_enum_test.lm
 tests/staged/staged_vm_test.lm
 # Staged fn compile-time VALUE parameters (previously uncovered)
 tests/staged/staged_value_param_test.lm
+# Staged frames (roadmap 1b): frame templates minting named frames per type tuple
+tests/staged/staged_frame_test.lm

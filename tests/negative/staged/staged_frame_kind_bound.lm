@@ -1,0 +1,11 @@
+// @error:type_error
+// Staged frame (1b): a kind bound (`: enum`) restricts the argument shape. Passing
+// a frame where an enum is required is rejected before any synthesis happens.
+frame Foo { pub var x: int; }
+
+staged frame Wrapper(E: enum) {
+    pub var tag: E;
+}
+
+var w: Wrapper(Foo);
+print("unreachable");

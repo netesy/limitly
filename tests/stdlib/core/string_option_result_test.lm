@@ -1,20 +1,39 @@
-import std.string as string;
-import std.core as core;
+// String + staged Option chaining, and native fallibles in place of the
+// removed library Result frame (migration map: std/core/index.lm).
 
-fn twice(x: any): any { return x * 2; }
-fn positive(x: any): bool { return x > 0; }
+import std.string as string;
+import std.core show Error, Option;
+
+fn twice(x: int): int { return x * 2; }
+fn positive(x: int): bool { return x > 0; }
+
+fn half(n: int): int?Error {
+    if (n % 2 != 0) {
+        return err(Error(code="OddInput", message="value is odd"));
+    }
+    return ok(n / 2);
+}
 
 fn main(): int {
     if (string.length("abc") != 3) { return 1; }
     if (not string.starts_with("abc", "a")) { return 2; }
     if (string.uppercase("a") != "A") { return 3; }
-    var some = core.Some(2).map(twice).filter(positive);
+
+    var maybe: Option(int) = Option(true, 2);
+    var some = maybe.map(twice).filter(positive);
     if (some.unwrap() != 4) { return 4; }
-    var none = core.None();
+
+    var none: Option(int) = Option(false, nil);
     if (none.unwrap_or(9) != 9) { return 5; }
-    var res_ok = core.Ok(3).map(twice);
-    if (res_ok.unwrap() != 6) { return 6; }
-    var res_err = core.Err(core.Error(code="E1", message="bad"));
-    if (not res_err.is_err()) { return 7; }
+
+    var halved = half(6)? else {
+        return 6;
+    };
+    if (halved != 3) { return 6; }
+
+    match (half(5)) {
+        val v => { assert(false, "half(5) should have failed"); },
+        err e => { assert("{e}" == "OddInput", "declared error code fail"); }
+    }
     return 0;
 }

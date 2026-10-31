@@ -1,0 +1,106 @@
+// =============================================================================
+// staged frame (roadmap 1b): frame TEMPLATES that mint real named frames per
+// argument tuple. Type positions are instantiation requests; distinct tuples are
+// distinct nominal frames; generated methods are ordinary methods (init, fields,
+// dispatch, trait conformance, nesting) and must agree across VM and AOT.
+// =============================================================================
+
+// 1. Single type parameter: fields, init, and a method all mention T.
+staged frame Box(T: type) {
+    pub var value: T;
+
+    pub init(v: T) {
+        self.value = v;
+    }
+
+    pub fn get(): T {
+        return self.value;
+    }
+
+    pub fn set(v: T) {
+        self.value = v;
+    }
+}
+
+// Construction written with the template name is steered to the instantiation
+// carried by the annotation's expected type.
+var bi: Box(int) = Box(42);
+assert(bi.get() == 42);
+bi.set(7);
+assert(bi.value == 7);
+
+var bs: Box(str) = Box("hello");
+assert(bs.get() == "hello");
+
+// Nominal identity: Box(int) and Box(str) are unrelated frames.
+assert(bi.get() == 7);
+assert(bs.get() == "hello");
+
+// 2. Two type parameters.
+staged frame Pair(A: type, B: type) {
+    pub var first: A;
+    pub var second: B;
+
+    pub init(a: A, b: B) {
+        self.first = a;
+        self.second = b;
+    }
+
+    pub fn describe(): str {
+        return "pair";
+    }
+}
+
+var p: Pair(int, str) = Pair(1, "one");
+assert(p.first == 1);
+assert(p.second == "one");
+assert(p.describe() == "pair");
+
+var q: Pair(str, int) = Pair("two", 2);
+assert(q.first == "two");
+assert(q.second == 2);
+
+// 3. Nested instantiation: Box(Pair(int, str)).
+var nested: Box(Pair(int, str)) = Box(p);
+assert(nested.get().first == 1);
+assert(nested.get().second == "one");
+
+// 4. A frame-kind type argument (T bounded to `frame`).
+frame Money {
+    pub var cents: int;
+    pub init(c: int) { self.cents = c; }
+}
+
+staged frame Holder(F: frame) {
+    pub var item: F;
+    pub init(f: F) { self.item = f; }
+    pub fn cents(): int { return self.item.cents; }
+}
+
+var h: Holder(Money) = Holder(Money(250));
+assert(h.cents() == 250);
+
+// 5. Trait conformance of a generated frame: the template implements a trait,
+// so every instantiation satisfies the contract with no extra work.
+trait Showable {
+    fn display(): str;
+}
+
+staged frame Labelled(T: type): Showable {
+    pub var text: T;
+    pub init(t: T) { self.text = t; }
+    pub fn display(): str { return "labelled"; }
+}
+
+var lab: Labelled(int) = Labelled(9);
+assert(lab.display() == "labelled");
+assert(lab.text == 9);
+
+// 6. The same template at two instantiations is cached per distinct tuple, and
+// reuse of an identical tuple yields the SAME frame (no duplicate mint).
+var a1: Box(int) = Box(1);
+var a2: Box(int) = Box(2);
+assert(a1.get() == 1);
+assert(a2.get() == 2);
+
+print("staged frame OK");

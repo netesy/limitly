@@ -1,0 +1,10 @@
+// @error:type_error
+// Staged frame (1b): a request whose argument count differs from the template's
+// parameter count is rejected at the instantiation site.
+staged frame Box(T: type) {
+    pub var value: T;
+    pub init(v: T) { self.value = v; }
+}
+
+var b: Box(int, str) = Box(1);
+print(b.value);

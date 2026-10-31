@@ -1,0 +1,10 @@
+// @error:type_error
+// Staged frame (1b): a template is not a frame. It cannot be constructed by its
+// bare name; an instantiation must be requested in a type position first.
+staged frame Box(T: type) {
+    pub var value: T;
+    pub init(v: T) { self.value = v; }
+}
+
+var b = Box(42);
+print(b.value);

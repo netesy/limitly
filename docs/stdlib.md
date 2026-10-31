@@ -73,44 +73,37 @@ The `MEMORY` (11) resource is a byte buffer with measurement: `OP_OPEN` (0) allo
 
 ## 2. Core Module (`std/core.lm`)
 
-The core module defines the fundamental frames used for safe error handling and optionality. All frames use `pub` visibility for their members; `self` is the instance reference.
+The core module defines the fundamental error frame, the staged `Option(T)` template, and the marker traits. Fallibility itself is a language feature, not a library type: declare `T?` / `T?Error` and construct with `ok(value)` / `err(Error(code=..., message=...))`; unwrap with `?`, `? else { return ...; }` or `match (v) { val x => ..., err e => ... }`. `std/core/index.lm` carries the migration map for the retired `OptionInt` / `ResultInt` / `Ok` / `Err` wrappers.
 
 ### 2.1 `Error`
 A basic frame for error representation.
 - `pub var code: str`
 - `pub var message: str`
 
-### 2.2 `OptionInt` / `OptionStr`
-Used to represent optional values for primitive types.
-- `pub var has_value: bool`
-- `pub var value: T` (int or str)
-- `pub fn is_some(): bool`: Returns true if value is present.
-- `pub fn is_none(): bool`: Returns true if no value is present.
-- `pub fn unwrap(): T`: Returns the value or a default (0 / "").
-- `pub fn unwrap_or(default_value: T): T`: Returns the value or the provided default.
+### 2.2 `Option(T)` — staged frame template
+`staged frame Option(T: type)` mints a real nominal frame per type argument. Use it
+in a type position and construct through that annotation (the bare template name is
+not constructible):
 
-### 2.3 `ResultInt` / `ResultStr`
-Used for fallible operations.
-- `pub var success: bool`
-- `pub var value: T` (int or str)
-- `pub var error_info: Error`
-- `pub fn is_ok(): bool`: Returns true if operation succeeded.
-- `pub fn is_err(): bool`: Returns true if operation failed.
-- `pub fn unwrap(): T`: Returns the value or a default (0 / "").
-- `pub fn unwrap_or(default_value: T): T`: Returns the value or the provided default.
-- `pub fn map(f: fn(T): T): Result`: Applies `f` to the ok value (if any), returning a new Result.
-- `pub fn map_err(f: fn(str): str): Result`: Applies `f` to the error message (if err), returning a new Result.
+```lymar
+var found: Option(int) = Option(true, 42);
+var empty: Option(int) = Option(false, nil);
+var doubled = found.map(fn(x: int): int { return x * 2; });
+```
 
-### 2.4 Constructor helpers
-- `pub fn some_int(value: int): int`: Returns the value (simplified version).
-- `pub fn some_str(value: str): str`: Returns the value (simplified version).
-- `pub fn ok_int(v: int): ResultInt`: Creates a successful ResultInt.
-- `pub fn err_int(e: str): ResultInt`: Creates a failed ResultInt with error message.
-- `pub fn make_err_int(e: str): ResultInt`: Alias for err_int.
-- `pub fn ok_str(v: str): ResultStr`: Creates a successful ResultStr.
-- `pub fn err_str(e: str): ResultStr`: Creates a failed ResultStr with error message.
-- `pub fn make_err_str(e: str): ResultStr`: Alias for err_str.
-- `pub fn ok_bool(v: bool): ResultInt`: Creates a ResultInt with 1 for true, 0 for false.
+- `pub fn is_some(): bool` / `pub fn is_none(): bool`
+- `pub fn unwrap(): T`
+- `pub fn unwrap_or(default_value: T): T`
+- `pub fn map(f: fn(T): T): Option(T)`
+- `pub fn filter(predicate: fn(T): bool): Option(T)`
+
+Plain absence prefers `T?` / `T | nil`; reach for `Option(T)` when you want the
+typed combinators. (Known defect: `map`/`filter` mis-behave under AOT because of a
+pre-existing indirect-call backend bug — see `docs/roadmaps.md` item 1b notes.)
+
+### 2.3 Marker traits
+`Comparable`, `Disposable`, `Cloneable`, `Hashable` — behavioural contracts for
+frames; see `std/core/index.lm`.
 
 ## 3. Communication
 
@@ -155,8 +148,8 @@ The string module provides comprehensive string manipulation functions using onl
 
 ### `Parse` frame
 Pure-Lymar string parsers.
-- `Parse.int(s: str): ResultInt`: Parses a base-10 integer with optional leading `+`/`-`. Returns `err_int` on invalid input.
-- `Parse.float(s: str): ResultStr`: Returns the input string wrapped in `ok_str` (placeholder).
+- `Parse.int(s: str): int?Error`: Parses a base-10 integer with optional leading `+`/`-`; returns `err` on invalid input.
+- `Parse.float(s: str): str?Error`: Returns the input string wrapped in `ok` (placeholder).
 - `Parse.bool(s: str): bool`: Recognises `"true"`/`"1"` as true; everything else is false.
 
 ## 6. Encoding (`std/encoding.lm`)
@@ -242,13 +235,18 @@ The collections index re-exports `Vector`, `ArrayList`, `LinkedList`, `Deque`, `
 
 ### `std.core.option`
 
-`std.core.option` provides `Option`, `Some(value)`, and `None()`. `Option` supports `is_some`, `is_none`, `unwrap`, `unwrap_or`, `map`, and `filter`.
+`std.core.option` provides the staged frame template `Option(T: type)` (see §2.2).
+`Some(value)` / `None()` constructors do not exist — construct through a type-
+position request: `var x: Option(int) = Option(true, 5);` or `Option(false, nil)`.
 
-### `std.core.result`
-
-`std.core.result` provides `Result`, `Ok(value)`, and `Err(error)`. `Result` supports `is_ok`, `is_err`, `unwrap`, `unwrap_or`, `unwrap_err`, and `map`.
-
-These are `any`-based containers for situations where a value must be stored and passed around dynamically. The language's own fallible types are preferred for everything else: declare `T?` or `T?Error` and construct with `ok(value)` / `err(Error(code=..., message=...))`. The old `std.option` and `std.result` module paths, together with the monomorphic `OptionInt` / `OptionStr` / `ResultInt` / `ResultStr` frames and the `ok_int` / `err_int` / `ok_str` / `err_str` / `ok_bool` helpers, were removed; `std.core` documents the migration map.
+There is no `std.core.result`: the library `Result` / `Ok` / `Err` frames duplicated
+the language's native fallible machinery with a weaker, non-propagating mechanism and
+were deleted. Fallible code uses `T?` / `T?Error` with `ok(value)` /
+`err(Error(code=..., message=...))`; `std/core/index.lm` documents the migration map
+(`r.is_ok()` → `match`, `r.unwrap()` → `r?`, `r.unwrap_or(d)` → `r? else { return d; }`).
+The old `std.option` and `std.result` module paths, the monomorphic `OptionInt` /
+`OptionStr` / `ResultInt` / `ResultStr` frames and the `ok_int` / `err_int` /
+`ok_str` / `err_str` / `ok_bool` helpers remain removed.
 
 
 ## 12. Standard Library Test Layout

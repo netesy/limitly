@@ -1,12 +1,26 @@
-// Standard Library Core Option Frame
+// Standard Library Core Option — a staged frame template (roadmaps.md item 1b).
+//
+// `Option(T: type)` is a template, not a frame: each type argument mints a real,
+// nominal frame (`Option(int)`, `Option(str)`, ...) on first request. Use it in a
+// type position and construct through that annotation:
+//
+//   var found: Option(int) = Option(true, 42);
+//   var empty: Option(int) = Option(false, nil);
+//
+// The bare template name is not constructible on its own — `Option(true, 42)`
+// without a type context is a compile error, by design: an untyped Option would
+// collapse back onto `any`.
+//
+// Absence without combinators is still just `T?` / `T | nil`; reach for Option
+// when you want map/filter/unwrap_or chaining over a typed value.
 
-frame Option {
-    pub present: bool;
-    pub value: any;
+staged frame Option(T: type) {
+    pub var present: bool;
+    pub var value: T | nil;
 
-    pub init(present: bool, value: any) {
-        self.present = present;
-        self.value = value;
+    pub init(p: bool, v: T | nil) {
+        self.present = p;
+        self.value = v;
     }
 
     pub fn is_some(): bool {
@@ -17,36 +31,28 @@ frame Option {
         return not self.present;
     }
 
-    pub fn unwrap(): any {
-        return self.value;
+    pub fn unwrap(): T {
+        return self.value as T;
     }
 
-    pub fn unwrap_or(default_value: any): any {
+    pub fn unwrap_or(default_value: T): T {
         if (self.present) {
-            return self.value;
+            return self.value as T;
         }
         return default_value;
     }
 
-    pub fn map(f: fn(any): any): Option {
+    pub fn map(f: fn(T): T): Option(T) {
         if (self.present) {
-            return Some(f(self.value));
+            return Option(true, f(self.value as T));
         }
-        return None();
+        return self;
     }
 
-    pub fn filter(predicate: fn(any): bool): Option {
-        if (self.present and predicate(self.value)) {
+    pub fn filter(predicate: fn(T): bool): Option(T) {
+        if (self.present and predicate(self.value as T)) {
             return self;
         }
-        return None();
+        return Option(false, nil);
     }
-}
-
-pub fn Some(value: any): Option {
-    return Option(true, value);
-}
-
-pub fn None(): Option {
-    return Option(false, nil);
 }
