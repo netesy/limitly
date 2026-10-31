@@ -54,6 +54,17 @@ std::shared_ptr<LM::Frontend::AST::Statement> Parser::declaration() {
             return decl;
         }
         if (match({TokenType::STAGED})) {
+            if (match({TokenType::FRAME})) {
+                // Staged frame template (roadmaps.md item 1b): `staged frame Name(T: type) { ... }`.
+                auto decl = frameDeclaration(true);
+                if (decl) {
+                    decl->annotations = annotations;
+                    decl->isStaged = true;
+                    decl->visibility = visibility;
+                    decl->hasExplicitVisibility = hasExplicitVisibility;
+                }
+                return decl;
+            }
             if (match({TokenType::FN})) {
                 auto decl = function("function");
                 if (decl) {
@@ -687,11 +698,31 @@ void Parser::parseConcurrencyParams(std::string& channel, std::string& mode, std
     }
 }
 
-std::shared_ptr<LM::Frontend::AST::FrameDeclaration> Parser::frameDeclaration() {
+std::shared_ptr<LM::Frontend::AST::FrameDeclaration> Parser::frameDeclaration(bool staged) {
     auto frameDecl = createNodeWithContext<LM::Frontend::AST::FrameDeclaration>();
     frameDecl->line = previous().line;
     Token name = consume(TokenType::IDENTIFIER, "Expected frame name.");
     frameDecl->name = name.lexeme;
+    if (staged) {
+        // Meta-parameter list: `(T: type, E: frame, ...)`. Every parameter must carry a
+        // stage-0 kind bound; value parameters are not supported for templates (an
+        // instantiation is a pure substitution, it never runs stage-0 control flow).
+        if (!check(TokenType::LEFT_PAREN)) {
+            error("staged frame requires a template parameter list, e.g. `staged frame Option(T: type) { ... }`");
+        } else {
+            consume(TokenType::LEFT_PAREN, "Expected '(' after staged frame name.");
+            if (!check(TokenType::RIGHT_PAREN)) {
+                do {
+                    Token pname = consume(TokenType::IDENTIFIER, "Expected template parameter name.");
+                    consume(TokenType::COLON, "Expected ':' after template parameter name.");
+                    auto pbound = parseTypeAnnotation();
+                    if (!pbound) { error("Expected kind bound ('type', 'enum', or 'frame') for staged frame parameter."); break; }
+                    frameDecl->templateParams.push_back({pname.lexeme, pbound});
+                } while (match({TokenType::COMMA}));
+            }
+            consume(TokenType::RIGHT_PAREN, "Expected ')' after staged frame parameters.");
+        }
+    }
     if (match({TokenType::COLON})) {
         do {
             std::string traitName;
@@ -706,6 +737,9 @@ std::shared_ptr<LM::Frontend::AST::FrameDeclaration> Parser::frameDeclaration() 
     }
     Token leftBrace = consume(TokenType::LEFT_BRACE, "Expected '{' before frame body.");
     pushBlockContext("frame", leftBrace);
+    // Template capture window: every token between the braces is preserved verbatim so the
+    // type checker can substitute type arguments for meta-parameters and re-parse.
+    const size_t body_begin = current;
     while (!check(TokenType::RIGHT_BRACE) && !isAtEnd()) {
         LM::Frontend::AST::VisibilityLevel visibility = LM::Frontend::AST::VisibilityLevel::Private;
         bool memberStatic = false;
@@ -866,6 +900,16 @@ std::shared_ptr<LM::Frontend::AST::FrameDeclaration> Parser::frameDeclaration() 
         }
     }
     consume(TokenType::RIGHT_BRACE, "Expected '}' after frame body.");
+    if (staged && !hadError()) {
+        const auto& all = scanner.getTokens();
+        for (size_t ti = body_begin; ti + 1 < current; ++ti) {
+            const Token& t = all[ti];
+            if (t.type == TokenType::WHITESPACE || t.type == TokenType::NEWLINE ||
+                t.type == TokenType::COMMENT_LINE || t.type == TokenType::COMMENT_BLOCK)
+                continue;
+            frameDecl->templateBodyTokens.push_back(t);
+        }
+    }
     popBlockContext();
     if (cstMode && !cstContextStack.empty()) popCSTContext();
     return frameDecl;

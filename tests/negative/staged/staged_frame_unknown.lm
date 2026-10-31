@@ -1,0 +1,5 @@
+// @error:type_error
+// Staged frame (1b): a type-position request naming no registered template falls
+// through to the staged-fn type-constructor lookup and reports it is unknown.
+var u: NoSuchTemplate(int);
+print("unreachable");

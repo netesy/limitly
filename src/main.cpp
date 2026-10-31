@@ -14,6 +14,75 @@
 #include <string>
 #include <vector>
 #include <algorithm>
+#include <thread>
+#include <chrono>
+#include <functional>
+#include <map>
+
+static std::map<std::string, std::filesystem::file_time_type> collect_file_mtimes(const std::string& entry_file) {
+    std::map<std::string, std::filesystem::file_time_type> mtimes;
+    std::error_code ec;
+    if (std::filesystem::exists(entry_file, ec)) {
+        mtimes[entry_file] = std::filesystem::last_write_time(entry_file, ec);
+    }
+    auto watch_dir = [&](const std::filesystem::path& dir) {
+        if (!std::filesystem::exists(dir, ec)) return;
+        for (const auto& entry : std::filesystem::recursive_directory_iterator(dir, std::filesystem::directory_options::skip_permission_denied, ec)) {
+            if (entry.is_regular_file()) {
+                auto ext = entry.path().extension().string();
+                if (ext == ".lm" || ext == ".c" || ext == ".cpp" || ext == ".h" || ext == ".nol") {
+                    mtimes[entry.path().string()] = entry.last_write_time(ec);
+                }
+            }
+        }
+    };
+    if (std::filesystem::exists("src", ec)) watch_dir("src");
+    if (std::filesystem::exists("lymar.nol", ec)) mtimes["lymar.nol"] = std::filesystem::last_write_time("lymar.nol", ec);
+    return mtimes;
+}
+
+static int run_watch_loop(const std::function<int()>& execute_step, const std::string& entry_file, const std::string& action_label) {
+    int res = execute_step();
+    std::cout << "[WATCH] Watching for file changes (press Ctrl+C to exit)...\n";
+    std::cout.flush();
+
+    auto last_mtimes = collect_file_mtimes(entry_file);
+    const bool once = (std::getenv("LYMAR_WATCH_ONCE") != nullptr);
+    if (once) {
+        std::cout << "[WATCH] LYMAR_WATCH_ONCE set, exiting watch loop.\n";
+        return res;
+    }
+
+    while (true) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(250));
+        auto current_mtimes = collect_file_mtimes(entry_file);
+        bool changed = false;
+        std::string changed_file;
+
+        for (const auto& [file, time] : current_mtimes) {
+            auto it = last_mtimes.find(file);
+            if (it == last_mtimes.end() || it->second != time) {
+                changed = true;
+                changed_file = file;
+                break;
+            }
+        }
+        if (!changed && current_mtimes.size() != last_mtimes.size()) {
+            changed = true;
+            changed_file = "files modified";
+        }
+
+        if (changed) {
+            std::cout << "\n[WATCH] Change detected (" << changed_file << "), " << action_label << "...\n";
+            std::cout.flush();
+            res = execute_step();
+            last_mtimes = current_mtimes;
+            std::cout << "[WATCH] Watching for file changes (press Ctrl+C to exit)...\n";
+            std::cout.flush();
+        }
+    }
+    return res;
+}
 
 void printUsage(const char* programName) {
     std::cout << "Lymar Programming Language\n";
@@ -169,12 +238,14 @@ int main(int argc, char* argv[]) {
         // arguments that look like compiler flags. Before `--`, the first
         // non-flag token is the script and later ones are program arguments.
         bool passthrough = false;
+        bool watch_mode = false;
         std::vector<std::string> trailing;
         for (int i = 2; i < argc; i++) {
             std::string arg = argv[i];
             if (passthrough) { options.program_args.push_back(arg); continue; }
             if (arg == "--") { passthrough = true; continue; }
-            if (arg == "-I" && i + 1 < argc) options.include_dirs.push_back(argv[++i]);
+            if (arg == "--watch" || arg == "-w") watch_mode = true;
+            else if (arg == "-I" && i + 1 < argc) options.include_dirs.push_back(argv[++i]);
             else if (arg == "--bind-header" && i + 1 < argc) options.bind_headers.push_back(argv[++i]);
             else if (arg == "--bind-lib" && i + 1 < argc) options.bind_lib_paths.push_back(argv[++i]);
             else if (arg == "--bind-namespace" && i + 1 < argc) options.bind_namespaces.push_back(argv[++i]);
@@ -225,15 +296,22 @@ int main(int argc, char* argv[]) {
             return 1;
         }
 
+        if (watch_mode) {
+            return run_watch_loop([&]() {
+                return LM::Compiler::executeFile(source_file, options);
+            }, source_file, "restarting");
+        }
         return LM::Compiler::executeFile(source_file, options);
     }
 
     if (command == "build") {
 #ifdef FYRA_AVAILABLE
         options.use_aot = true;
+        bool watch_mode = false;
         for (int i = 2; i < argc; i++) {
             std::string arg = argv[i];
-            if (arg == "-I" && i + 1 < argc) options.include_dirs.push_back(argv[++i]);
+            if (arg == "--watch" || arg == "-w") watch_mode = true;
+            else if (arg == "-I" && i + 1 < argc) options.include_dirs.push_back(argv[++i]);
             else if (arg == "--native" && i + 1 < argc) options.native_sources.push_back(argv[++i]);
             else if (arg == "--native-include" && i + 1 < argc) options.native_include_dirs.push_back(argv[++i]);
             else if (arg == "--native-cflag" && i + 1 < argc) options.native_cflags.push_back(argv[++i]);
@@ -332,48 +410,55 @@ int main(int argc, char* argv[]) {
                     break;
             }
         }
-        int result = LM::Compiler::executeFile(source_file, options);
-        std::cout << "Build result: " << result << std::endl;
-        if (result == 0) {
-            std::string label = "Executable";
-            switch (options.artifact_type) {
-                case LM::ArtifactType::Object: label = "Object file"; break;
-                case LM::ArtifactType::StaticLibrary: label = "Static library"; break;
-                case LM::ArtifactType::SharedLibrary: label = "Shared library"; break;
-                case LM::ArtifactType::Assembly: label = "Assembly file"; break;
-                default: label = "Executable"; break;
-            }
-            std::cout << label << " built successfully: " << options.output_file << std::endl;
-
-            // Automatically output precompiled metadata file if building a library
-            if (options.artifact_type == LM::ArtifactType::StaticLibrary || options.artifact_type == LM::ArtifactType::SharedLibrary) {
-                std::string mod_name = source_file;
-                size_t dot = mod_name.rfind(".lm");
-                if (dot != std::string::npos) mod_name.erase(dot);
-                std::replace(mod_name.begin(), mod_name.end(), '/', '.');
-
-                auto mod = LM::Frontend::ModuleManager::getInstance().get_module(mod_name);
-                if (!mod) {
-                    mod = LM::Frontend::ModuleManager::getInstance().load_module(mod_name);
+        auto do_build = [&]() -> int {
+            int result = LM::Compiler::executeFile(source_file, options);
+            std::cout << "Build result: " << result << std::endl;
+            if (result == 0) {
+                std::string label = "Executable";
+                switch (options.artifact_type) {
+                    case LM::ArtifactType::Object: label = "Object file"; break;
+                    case LM::ArtifactType::StaticLibrary: label = "Static library"; break;
+                    case LM::ArtifactType::SharedLibrary: label = "Shared library"; break;
+                    case LM::ArtifactType::Assembly: label = "Assembly file"; break;
+                    default: label = "Executable"; break;
                 }
+                std::cout << label << " built successfully: " << options.output_file << std::endl;
 
-                std::string kind = (options.artifact_type == LM::ArtifactType::SharedLibrary) ? "shared" : "static";
-                LM::Frontend::CompiledModuleMeta meta = LM::Frontend::ModuleManager::getInstance().generate_metadata(
-                    mod, options.target, options.arch, kind, options.output_file
-                );
+                // Automatically output precompiled metadata file if building a library
+                if (options.artifact_type == LM::ArtifactType::StaticLibrary || options.artifact_type == LM::ArtifactType::SharedLibrary) {
+                    std::string mod_name = source_file;
+                    size_t dot = mod_name.rfind(".lm");
+                    if (dot != std::string::npos) mod_name.erase(dot);
+                    std::replace(mod_name.begin(), mod_name.end(), '/', '.');
 
-                std::string meta_path = options.output_file + ".meta";
-                std::ofstream meta_file(meta_path);
-                if (meta_file.is_open()) {
-                    meta_file << meta.serialize();
-                    meta_file.close();
-                    std::cout << "Metadata emitted to: " << meta_path << std::endl;
+                    auto mod = LM::Frontend::ModuleManager::getInstance().get_module(mod_name);
+                    if (!mod) {
+                        mod = LM::Frontend::ModuleManager::getInstance().load_module(mod_name);
+                    }
+
+                    std::string kind = (options.artifact_type == LM::ArtifactType::SharedLibrary) ? "shared" : "static";
+                    LM::Frontend::CompiledModuleMeta meta = LM::Frontend::ModuleManager::getInstance().generate_metadata(
+                        mod, options.target, options.arch, kind, options.output_file
+                    );
+
+                    std::string meta_path = options.output_file + ".meta";
+                    std::ofstream meta_file(meta_path);
+                    if (meta_file.is_open()) {
+                        meta_file << meta.serialize();
+                        meta_file.close();
+                        std::cout << "Metadata emitted to: " << meta_path << std::endl;
+                    }
                 }
+            } else {
+                std::cout << "Build failed" << std::endl;
             }
-        } else {
-            std::cout << "Build failed" << std::endl;
+            return result;
+        };
+
+        if (watch_mode) {
+            return run_watch_loop(do_build, source_file, "rebuilding");
         }
-        return result;
+        return do_build();
 #else
         std::cerr << "Error: 'build' command requires Fyra backend (not available).\n";
         std::cerr << "Please use 'run' command with the register VM instead.\n";

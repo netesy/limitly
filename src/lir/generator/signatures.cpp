@@ -51,6 +51,7 @@ void Generator::lower_function_bodies(const LM::Frontend::TypeCheckResult& type_
             } else if (auto trait_stmt = dynamic_cast<LM::Frontend::AST::TraitDeclaration*>(stmt.get())) {
                 lower_trait_declaration(*trait_stmt);
             } else if (auto frame_stmt = dynamic_cast<LM::Frontend::AST::FrameDeclaration*>(stmt.get())) {
+                if (frame_stmt->isStaged) continue;  // staged frame templates are compile-time only
                 lowered_frames_.insert(frame_stmt->name);
                 lower_frame_methods(*frame_stmt);
             }
@@ -123,6 +124,7 @@ void Generator::lower_function_bodies(const LM::Frontend::TypeCheckResult& type_
                 generate_function(*func_stmt);
                 func_stmt->name = original_name;
             } else if (auto frame_stmt = dynamic_cast<LM::Frontend::AST::FrameDeclaration*>(stmt.get())) {
+                if (frame_stmt->isStaged) continue;  // staged frame templates are compile-time only
                 std::string original_name = frame_stmt->name;
                 std::string qname = path + "." + original_name;
                 if (lowered_frames_.count(qname)) continue;
@@ -357,6 +359,7 @@ void Generator::collect_frame_signatures(LM::Frontend::AST::Program& program) {
 
 void Generator::collect_frame_signature(std::shared_ptr<LM::Frontend::AST::FrameDeclaration> frame_decl, const std::string& name_override) {
     if (!frame_decl) return;
+    if (frame_decl->isStaged) return;  // staged frame templates are compile-time only
 
     std::string frame_name = name_override.empty() ? frame_decl->name : name_override;
 

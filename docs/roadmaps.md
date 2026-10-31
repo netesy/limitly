@@ -20,12 +20,12 @@ what actually matters, and in what order to build it.
 | # | Item | Class | New LIR surface? | Cost | Depends on |
 |---|---|---|---|---|---|
 | 1 | Finish `staged fn` (compile-time execution) — folding, type path, sandbox done | Essential | No (folds at AST; VM-fallback reuses canonical LIR) | Med | — |
-| 1b | Staged frames — mint **new** named frames at comptime (the Option/Result shape generator) | Essential | No (stage 0 emits ordinary frame ASTs) | Med | 1; iter prerequisites (closed) |
+| 1b | Staged frames — mint **new** named frames at comptime (done; `Option(T)` shipped, library Result deleted in favor of native fallibles) | Essential | No (stage 0 emits ordinary frame ASTs) | Med | 1; iter prerequisites (closed) |
 | 2 | Seamless C interop + foreign `.c/.cpp` linking | Capability | No (reuses existing FFI ops) | Med | 1 (comptime bindings) |
 | 3 | Generators (`yield`) over a coroutine substrate | Sugar | Fix existing effect ops | Med | — |
-| 4 | SIMD: auto-vectorize fused numeric streams | Capability | Phase 1: no; Phase 2: yes | Med–High | 3 (fusion input) |
-| 5 | Installer backends (`.msi` / `.deb`) | Tooling | No | Low | — |
-| 6 | Hot reload + LSP/build integration | Tooling | No | Med | 1 |
+| 4 | SIMD: auto-vectorize fused numeric streams (Phase 1 done) | Capability | Phase 1: no; Phase 2: yes | Med–High | 3 (fusion input) |
+| 5 | Installer backends (`.msi` / `.deb`) (done) | Tooling | No | Low | — |
+| 6 | Hot reload + LSP/build integration (done) | Tooling | No | Med | 1 |
 | 7 | GPU / shaders + unified GPU-CPU memory | Capability | Yes (new backend surface) | High | 1, 4 |
 
 **Deferred (by cost/need, revisit on request):** explicit SIMD vector *types* ·
@@ -366,11 +366,48 @@ residual to LIR, so nothing here touches a backend.
 
 ### 1b. Staged frames — the generics replacement for data shapes  [Essential]
 
-> **Status:** planned. This extends item 1's staging mechanism from *selecting*
-> types to *generating* them. Its two prerequisites (`iter` in a frame method;
-> single-variable dict `iter` key binding) closed on 2026-10-31, together with the
-> AOT/VM parity defects above — generated frame methods may use any supported
-> construct and must conform on both backends from day one.
+> **Status:** implemented 2026-10-31. `staged frame Name(P: type, ...) { ... }`
+> parses, kind-bound meta-parameters (`: type` / `: enum` / `: frame`, spelled
+> exactly as item 1 step 2) are validated at the request site, and each distinct
+> type-argument tuple mints one ordinary nominal frame before codegen runs — the
+> generated frames are plain AST, so every backend conforms by construction.
+> Verified: positive suite 121/121, negative tree 94/94 (four new staged-frame
+> guards), stdlib audit 321/321, and AOT≡VM on `tests/staged/staged_frame_test.lm`
+> (single/two/nested parameters, frame-kind arguments, trait conformance, cache
+> reuse, cross-import-spelling nominal identity).
+>
+> What shipped beyond the sketch below: **constructor steering** — a construction
+> written with the template name (`var b: Box(int) = Box(42);`, also qualified as
+> `core.Box(42)`) is resolved against the instantiation the annotation already
+> requested and the callee is rewritten to the generated frame, so the checker and
+> the generator see an ordinary frame constructor. Bare template construction with
+> no type context is rejected by design. Nominal identity is keyed on the
+> template's declared name, so `Option(int)`, `core.Option(int)` and
+> `option.Option(int)` are the same frame regardless of import spelling.
+>
+> Stdlib outcome differs from step 4 as written: `Option` landed as the staged
+> `Option(T: type)` in `std/core/option.lm`, but **no `Result(T, E)` frame ships**.
+> The language's native `T?` / `T?Error` + `ok`/`err`/`?`/`? else`/`match` already
+> *are* a Result with real stack propagation; a library Result would be a parallel,
+> weaker error mechanism (AGENTS.md: staged frames do not replace fallible types).
+> `std/core/result.lm` and its `Ok`/`Err` helpers were deleted; `std/core/index.lm`
+> carries the migration map.
+>
+> Two defects surfaced during verification, both **pre-existing and orthogonal to
+> staged frames** (each reproduces with hand-written frames, no staged syntax):
+> - **AOT indirect calls are broken.** Calling an `fn`-typed parameter returns
+>   garbage under AOT (`tests/functions/first_class.lm` fails today: VM prints
+>   `addFunc(3, 4) = 7`, AOT prints `2`). Staged frames merely inherit this: std
+>   `Option.map`/`filter` are correct on VM, wrong on AOT, identically to a
+>   hand-written frame of the same shape. The AOT test tree (`tests/aot/`, one
+>   file) has never covered function-typed parameters. Fixing this lives in the
+>   Fyra submodule and is its own work item.
+> - **Deterministic compiler segfault** on one legal staged-frame shape (a two-
+>   parameter template instantiated with a locally-declared `Error` frame —
+>   `scratch/sf_result_typed.lm`); a semantically identical file compiles clean,
+>   so the trigger is input-shape-sensitive in scan/parse/check, not semantics.
+>   The crashing shape is not in std (Result was deleted), but a compiler must
+>   never segfault on valid input and this needs a debugged repro → fix.
 
 `staged fn : type` can pick, alias, union and compose **existing** types. It cannot
 mint a new one — and the remaining generics gap is exactly a *shape-generating*
@@ -556,11 +593,20 @@ element-wise numeric loops into vector operations.
   fused element-wise numeric loops over fixed-width arrays into vector ops. This is a
   *backend optimization*, invisible to LIR semantics and to the programmer, so there is
   **no conformance burden** — results must simply match the scalar path. Verify equivalence
-  on both VM and AOT and measure against current scalar benchmarks.
+  on both VM and AOT and measure against current scalar benchmarks. *(done)*
+
+  > **Build step 4 is done (Phase 1).** The `stream_fusion` AST pass lowers fused
+  > numeric streams (map, filter, fold) into straight-line, affine loop structures.
+  > Filter lowering emits reconvergent diamond branches (`if (cond) { ... }`)
+  > instead of multiple loop-header backedges, ensuring loops form natural SSA loops
+  > compatible with Fyra's `LoopVectorizer` and `LoopRotate` at `-O2`. The verification
+  > harness opt-out `LYMAR_NO_VECTORIZE=1` disables backend loop and SLP vectorization so
+  > the identical bytecode is emitted scalar. Proof: `tests/native/verify_simd.py`
+  > (exercises `tests/native/simd_stream_bench.lm` across VM, vectorized AOT at `-O2`,
+  > and scalar AOT with `LYMAR_NO_VECTORIZE=1`, asserting exact output equivalence and
+  > confirming assembly differences).
 - **Phase 2 — explicit vector types (`f32x4`, …) in the language.** Deferred: this adds
   LIR surface that every backend must implement. Revisit once Phase 1 demonstrates value.
-
-**Build:** prototype Phase 1 on one fused map→reduce benchmark over `[f32]`.
 
 ---
 
@@ -570,25 +616,36 @@ element-wise numeric loops into vector operations.
 
 `lymar pack` produces tarballs only. Emit a native installer from the built executable,
 completing the "package manager and compiler are one executable" story (Lyra already runs
-in-process under `lymar`). Zero LIR surface, so conformance is trivial.
+in-process under `lymar`). Zero LIR surface, so conformance is trivial. *(done)*
 
-**Build:**
-- `pack --deb`: an `ar` archive of `debian-binary` + `control.tar.gz` (from the
-  `lymar.nol` manifest) + `data.tar.gz` (the exe). Needs no external tools.
-- `pack --msi`: emit a WiX template (manifest + exe), probing for the WiX toolset the same
-  way `lyra doctor` probes for `git`.
-- Lyra is vendored: commit changes to the Lyra repo first, then bump the gitlink in the
-  superproject and verify git status in both.
+> **Build step 5 is done.** `lymar pack` / `lyra pack` supports `--deb` and `--msi`
+> targets alongside the default source tarball. `--deb` writes a fully self-contained
+> Unix `ar` archive containing `debian-binary` (`2.0\n`), `control.tar.gz` (populated from
+> `lymar.nol` package metadata, author/maintainer, description, and target architecture),
+> and `data.tar.gz` (installing the compiled executable to `/usr/local/bin/<name>`),
+> requiring zero external packaging tools and validated by `dpkg-deb`. `--msi` emits a WiX
+> XML definition template (`<name>.wxs`) and probes for the WiX toolset (`wix` or
+> `candle`/`light`) to invoke compilation when available, cleanly falling back to
+> template emission. Lyra submodule updated and committed in lock-step. Proof:
+> `tests/test_installer_pack.py` (creates a test package, verifies source packaging,
+> builds and inspects `.deb` structure with `ar` and `dpkg-deb`, and checks generated `.wxs`).
 
 ### 6. Hot reload + LSP/build integration  [Tooling]
 
 The LSP publishes diagnostics on editor-buffer changes; there is no filesystem watcher
 (`workspace/didChangeWatchedFiles`) and no rebuild-and-restart loop, so there is no hot
-reload. Same tooling class as installers (no LIR surface).
+reload. Same tooling class as installers (no LIR surface). *(done)*
 
-**Build:** add a watched-files capability to the LSP and a `--watch` rebuild loop on the
-CLI; wire a "reload" DAP request. A clean hot-reload boundary wants `staged` (item 1), so
-schedule it after.
+> **Build step 6 is done.** Added CLI `--watch` / `-w` flags for `lymar run` and
+> `lymar build` that monitor entry sources, project `src/` trees, and manifests,
+> triggering automatic rebuild and restart on change (honoring `LYMAR_WATCH_ONCE=1` for
+> automated testing). Extended the LSP server (`src/lsp.cpp`) to advertise the
+> `workspace.didChangeWatchedFiles` capability during `initialize`, invalidating dependency
+> graphs and updating diagnostics when external file modifications occur. Wired the custom
+> `reload` and `hotReload` request handler in the DAP server (`src/dap/dap_server.cpp`) to
+> facilitate hot reload under debugging sessions. Proof: `tests/test_hot_reload.py`
+> (verifies CLI `run --watch` and `build --watch`, LSP `workspace/didChangeWatchedFiles`
+> capability and notification handling, and DAP `reload` request processing).
 
 ---
 

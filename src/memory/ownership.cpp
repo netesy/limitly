@@ -232,6 +232,7 @@ class Analyzer {
             register_callable(*f, prefix + f->name, p, f->body);
             if (f->body) for (const auto& child : f->body->statements) collect(child);
         } else if (auto f = std::dynamic_pointer_cast<A::FrameDeclaration>(s)) {
+            if (f->isStaged) return;  // staged frame templates carry no runtime semantics
             frame_names.insert(prefix + f->name);
             constructors[identity(*f)] = f->init ? identity(*f->init) : 0;
             constructor_names[prefix + f->name] = identity(*f);

@@ -18,6 +18,7 @@
 #include <regex>
 #include <functional>
 #include <filesystem>
+#include <fstream>
 
 #ifdef _WIN32
 #include <fcntl.h>
@@ -3350,6 +3351,12 @@ void LSP::run() {
                 caps["workspaceSymbolProvider"] = true;
                 caps["documentFormattingProvider"] = true;
 
+                Json::Value ws = Json::Value::object();
+                Json::Value didChangeWatchedFiles = Json::Value::object();
+                didChangeWatchedFiles["dynamicRegistration"] = true;
+                ws["didChangeWatchedFiles"] = didChangeWatchedFiles;
+                caps["workspace"] = ws;
+
                 Json::Value server_info = Json::Value::object();
                 server_info["name"] = "lymar-lsp";
                 server_info["version"] = "0.0.1";
@@ -3396,6 +3403,40 @@ void LSP::run() {
             } else if (method == "textDocument/didClose") {
                 std::string uri = msg["params"]["textDocument"]["uri"].as_string();
                 send_publish_diagnostics(uri, -1, {});
+            } else if (method == "workspace/didChangeWatchedFiles") {
+                const auto& params = msg["params"];
+                if (params.has("changes") && params["changes"].is_array()) {
+                    for (size_t i = 0; i < params["changes"].size(); ++i) {
+                        const auto& change = params["changes"][i];
+                        std::string uri = change["uri"].as_string();
+                        int type = static_cast<int>(change["type"].as_int(2)); // 1=Created, 2=Changed, 3=Deleted
+                        g_dependency_graph.invalidate(uri, g_document_snapshots);
+                        if (type == 3) {
+                            g_document_snapshots.erase(uri);
+                            send_publish_diagnostics(uri, -1, {});
+                        } else {
+                            std::string file_path = uri;
+                            if (file_path.rfind("file://", 0) == 0) {
+                                file_path = file_path.substr(7);
+#ifdef _WIN32
+                                if (!file_path.empty() && file_path[0] == '/' && file_path.size() > 2 && file_path[2] == ':') {
+                                    file_path = file_path.substr(1);
+                                }
+#endif
+                            }
+                            if (std::filesystem::exists(file_path)) {
+                                std::ifstream ifs(file_path);
+                                if (ifs.is_open()) {
+                                    std::string new_text((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
+                                    auto& snap = g_document_snapshots[uri];
+                                    snap.uri = uri;
+                                    snap.update_full(new_text);
+                                    send_publish_diagnostics(uri, snap.version, snap.diagnostics);
+                                }
+                            }
+                        }
+                    }
+                }
             } else if (method == "textDocument/completion") {
                 Json::Value res = Json::Value::object();
                 res["jsonrpc"] = "2.0";
