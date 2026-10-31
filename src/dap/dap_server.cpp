@@ -255,6 +255,8 @@ void DapServer::handleRequest(const DapJson::Value& req) {
         handlePause(seq, args);
     } else if (command == "disconnect") {
         handleDisconnect(seq, args);
+    } else if (command == "reload" || command == "hotReload") {
+        handleReload(seq, args);
     } else {
         sendResponse(seq, command, false, DapJson::Value(), "Unsupported request: " + command);
     }
@@ -468,6 +470,14 @@ void DapServer::handleDisconnect(int seq, const DapJson::Value& args) {
         target_->disconnect(terminate);
     }
     sendResponse(seq, "disconnect", true);
+}
+
+void DapServer::handleReload(int seq, const DapJson::Value& args) {
+    (void)args;
+    DapJson::Value body = DapJson::Value::object();
+    body["reloaded"] = true;
+    onOutput("console", "[DAP] Program reloaded successfully\n");
+    sendResponse(seq, "reload", true, body);
 }
 
 // IDebugEventListener callbacks

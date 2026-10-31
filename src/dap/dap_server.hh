@@ -51,6 +51,7 @@ private:
     void handleStepOut(int seq, const DapJson::Value& args);
     void handlePause(int seq, const DapJson::Value& args);
     void handleDisconnect(int seq, const DapJson::Value& args);
+    void handleReload(int seq, const DapJson::Value& args);
 
     std::unique_ptr<IDebugTarget> target_;
     std::atomic<int> sequence_number_{1};
