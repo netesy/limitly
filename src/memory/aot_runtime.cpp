@@ -721,6 +721,30 @@ uint64_t lymar_aot_frame_matches(uint64_t pointer, uint64_t expected, uint64_t l
         throw std::runtime_error("Invalid frame name");
     return read_word(name, 8) == length && std::memcmp(reinterpret_cast<void*>(name + 24), reinterpret_cast<void*>(expected + 24), length) == 0;
 }
+// Indirect-call dispatch compares a runtime function-name receiver (a heap
+// Lymar string) against a compile-time candidate-name blob that
+// get_or_create_global_str emits into .data. lymar_aot_value_equal cannot see
+// the .data operand because its object classifier requires a heap allocation,
+// so it silently rejected every candidate and every indirect call through an
+// fn-typed value returned nil. Both sides share the LmStringHeader layout
+// (type_id@0, len@8, data@24), so compare by shape and bytes without demanding
+// the candidate global be heap-tracked.
+uint64_t lymar_aot_string_name_eq(uint64_t string_ptr, uint64_t name_global, uint64_t length) {
+    try {
+    RuntimeGuard runtime_guard;
+
+    if (string_ptr <= 4096) return 0;
+    if ((read_word(string_ptr) & 0xffffffff) != 11) return 0;   // receiver must be a string
+    if (read_word(string_ptr, 8) != length) return 0;           // byte length must match the candidate
+    return std::memcmp(reinterpret_cast<const void*>(string_ptr + 24),
+                       reinterpret_cast<const void*>(name_global + 24), length) == 0 ? 1 : 0;
+
+    } catch (const std::exception& failure) {
+        if (runtime_lock_depth && heap().worker) throw;
+        if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
+        return 0;
+    }
+}
 uint64_t lymar_aot_atomic_load(uint64_t pointer, uint64_t index) {
     try {
     RuntimeGuard runtime_guard;
@@ -883,7 +907,16 @@ uint64_t lymar_aot_callable_receiver(uint64_t value, uint64_t kind) {
     try {
     RuntimeGuard runtime_guard;
 
-    if (!lymar_aot_is_object(value, kind)) return 0;
+    // The kind sidecar is a compile-time hint. Values reloaded from a closure
+    // capture reach this boundary as erased i64 words with kind==0 even when
+    // they are genuine heap objects (a captured fn-name string, for example),
+    // because the region pass derives the flag from the IR type and tuple
+    // elements are i64. A callable receiver must be a real allocation, so
+    // validate against the allocator instead of trusting the lossy sidecar
+    // alone; true scalars are never tracked and are still rejected.
+    bool object = lymar_aot_is_object(value, kind) ||
+                  (value > 4096 && heap().allocations.find(value) != heap().allocations.end());
+    if (!object) return 0;
     auto type = read_word(value) & 0xffffffff;
     if (type == 11) return value; // canonical function-name string
     auto& h = heap();

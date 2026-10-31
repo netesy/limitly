@@ -97,6 +97,7 @@ void lower_region_ownership(ir::Module& module, const std::unordered_map<std::st
     declare("lymar_aot_is_object", 2, i64);
     declare("lymar_aot_string_receiver", 2, i64);
     declare("lymar_aot_callable_receiver", 2, i64);
+    declare("lymar_aot_string_name_eq", 3, i64);
     declare("lymar_aot_string_index", 2, i64);
     declare("lymar_aot_print_integer", 2, void_type);
     declare("lymar_aot_copy_constant", 2, i64);

@@ -1621,10 +1621,6 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 if (!fn_tget) fn_tget = builder_->createFunction("lm_tuple_get", context_->getIntegerType(64), {context_->getIntegerType(64), context_->getIntegerType(64)});
                 ir::Value* fn_obj = builder_->createCall(fn_tget, {callee, context_->getConstantInt(context_->getIntegerType(64), 0)});
 
-                used_builtins_.insert("lm_key_eq");
-                ir::Function* fn_eq = current_module_->getFunction("lm_key_eq");
-                if (!fn_eq) fn_eq = builder_->createFunction("lm_key_eq", context_->getIntegerType(64), {context_->getIntegerType(64), context_->getIntegerType(64)});
-
                 std::vector<ir::Function*> cand_funcs;
                 for (const auto& f : current_module_->getFunctions()) {
                     // A source callable name cannot grant access to linker or
@@ -1645,14 +1641,14 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
 
                     builder_->setInsertPoint(cur_cls_chk);
                     ir::GlobalVariable* gv_fname = FyraBuiltinFunctions::get_or_create_global_str(current_module_.get(), builder_.get(), "cls_str_" + f_name + "_" + cid, f_name);
-                    ir::Value* eq_res = builder_->createCall(fn_eq, {fn_obj, gv_fname});
+                    ir::Value* eq_res = builder_->createExternCall("lymar_aot_string_name_eq", {fn_obj, gv_fname, context_->getConstantInt(context_->getIntegerType(64), f_name.size())}, context_->getIntegerType(64));
                     ir::Value* is_match = builder_->createCne(eq_res, context_->getConstantInt(context_->getIntegerType(64), 0));
 
                     size_t dot_p = f_name.rfind('.');
                     if (dot_p != std::string::npos) {
                         std::string unq_name = f_name.substr(dot_p + 1);
                         ir::GlobalVariable* gv_unq = FyraBuiltinFunctions::get_or_create_global_str(current_module_.get(), builder_.get(), "cls_unq_" + unq_name + "_" + cid + "_" + std::to_string(fi), unq_name);
-                        ir::Value* unq_eq = builder_->createCall(fn_eq, {fn_obj, gv_unq});
+                        ir::Value* unq_eq = builder_->createExternCall("lymar_aot_string_name_eq", {fn_obj, gv_unq, context_->getConstantInt(context_->getIntegerType(64), unq_name.size())}, context_->getIntegerType(64));
                         ir::Value* unq_match = builder_->createCne(unq_eq, context_->getConstantInt(context_->getIntegerType(64), 0));
                         is_match = builder_->createOr(is_match, unq_match);
                     }
@@ -1706,14 +1702,14 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
 
                     builder_->setInsertPoint(cur_check_bb);
                     ir::GlobalVariable* gv_fname = FyraBuiltinFunctions::get_or_create_global_str(current_module_.get(), builder_.get(), "fn_str_" + f_name + "_" + cid, f_name);
-                    ir::Value* eq_res = builder_->createCall(fn_eq, {callee, gv_fname});
+                    ir::Value* eq_res = builder_->createExternCall("lymar_aot_string_name_eq", {callee, gv_fname, context_->getConstantInt(context_->getIntegerType(64), f_name.size())}, context_->getIntegerType(64));
                     ir::Value* is_match = builder_->createCne(eq_res, context_->getConstantInt(context_->getIntegerType(64), 0));
 
                     size_t dot_p = f_name.rfind('.');
                     if (dot_p != std::string::npos) {
                         std::string unq_name = f_name.substr(dot_p + 1);
                         ir::GlobalVariable* gv_unq = FyraBuiltinFunctions::get_or_create_global_str(current_module_.get(), builder_.get(), "fn_unq_" + unq_name + "_" + cid + "_" + std::to_string(fi), unq_name);
-                        ir::Value* unq_eq = builder_->createCall(fn_eq, {callee, gv_unq});
+                        ir::Value* unq_eq = builder_->createExternCall("lymar_aot_string_name_eq", {callee, gv_unq, context_->getConstantInt(context_->getIntegerType(64), unq_name.size())}, context_->getIntegerType(64));
                         ir::Value* unq_match = builder_->createCne(unq_eq, context_->getConstantInt(context_->getIntegerType(64), 0));
                         is_match = builder_->createOr(is_match, unq_match);
                     }
