@@ -132,6 +132,12 @@ public:
 
     // Staged functions ('staged fn'): registered for compile-time call folding.
     std::unordered_map<std::string, std::shared_ptr<LM::Frontend::AST::FunctionDeclaration>> staged_functions_;
+    // Staged frame templates ('staged frame'): declared templates and their synthesized frames.
+    std::unordered_map<std::string, std::shared_ptr<LM::Frontend::AST::FrameDeclaration>> staged_frame_templates_;
+    std::unordered_map<std::string, TypePtr> generated_staged_frames_;   // mangled name -> frame type
+    size_t staged_frame_depth_ = 0;                                      // nested instantiation guard
+    static constexpr size_t STAGED_FRAME_MAX_DEPTH = 64;                 // nested template instantiations
+    static constexpr size_t STAGED_FRAME_MAX_GENERATED = 512;            // synthesized frames per compilation
     int staged_fold_depth_ = 0;
     // Set while check_staged_body_for_vm() checks a body that the stage-0 VM will execute.
     // A staged call is not folded there (the callee's arguments are runtime values, not
@@ -271,6 +277,25 @@ private:
     TypePtr resolve_staged_type_expr(std::shared_ptr<LM::Frontend::AST::Expression> e, int depth);
     // Resolves a staged constructor call appearing in a type annotation, e.g. `nullable(int)`.
     TypePtr resolve_staged_call_annotation(std::shared_ptr<LM::Frontend::AST::TypeAnnotation> annotation);
+    // --- staged frame templates (roadmaps.md item 1b: the generics replacement) ---
+    // Registers `staged frame Name(T: type)` as a template (validates its kind bounds).
+    void register_staged_frame_template(const std::string& name,
+                                       const std::shared_ptr<LM::Frontend::AST::FrameDeclaration>& decl);
+    // Answers a type-position request `Name(args)` against a registered template: substitutes
+    // the type arguments into the captured body tokens, re-parses them into a plain frame
+    // declaration, and adopts it (name registration, signature resolution, body check) before
+    // codegen ever runs. Cached by mangled name, so repeated requests share one frame.
+    TypePtr instantiate_staged_frame(const std::shared_ptr<LM::Frontend::AST::TypeAnnotation>& annotation,
+                                     const std::string& template_key, int line);
+    // Pass-2 frame signature resolution, extracted so synthesized frames can be adopted
+    // mid-check with the exact same registration a hand-written frame receives.
+    void register_frame_signature(const std::string& name,
+                                  const std::shared_ptr<LM::Frontend::AST::FrameDeclaration>& frame_decl);
+    // Re-parseable token spelling of a resolved type, used to substitute meta-parameters.
+    // Empty vector = the kind cannot cross into a template argument in v1.
+    static std::vector<LM::Frontend::Token> staged_frame_type_tokens(const TypePtr& t);
+    // Stable, unique identifier fragment for a type argument (mangles '.' etc.). Empty = unsupported.
+    static std::string staged_frame_mangle(const TypePtr& t);
     // Stage-0 meta type names usable as staged type parameters: `type` and the kind bounds.
     static bool is_stage0_meta_name(const std::string& name);
     // Kind bounds for staged type parameters. `: type` binds any type, while `: enum` and

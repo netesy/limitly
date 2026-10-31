@@ -416,6 +416,13 @@ TypePtr TypeChecker::check_frame_declaration(std::shared_ptr<LM::Frontend::AST::
 TypePtr TypeChecker::check_frame_declaration_with_name(const std::string& name, std::shared_ptr<LM::Frontend::AST::FrameDeclaration> frame) {
     if (!frame) return nullptr;
 
+    if (frame->isStaged) {
+        // Template declaration: registered, never body-checked as written (the member
+        // annotations mention unbound meta-parameters). Instances are checked on adoption.
+        register_staged_frame_template(name, frame);
+        return nullptr;
+    }
+
     if (frame->hasExplicitVisibility) {
         add_error("`frame` declarations cannot have a visibility modifier (`frame` is already public by default)", frame->line);
     }
@@ -1321,6 +1328,16 @@ TypePtr TypeChecker::check_import_statement(std::shared_ptr<LM::Frontend::AST::I
                 }
             }
         } else if (fr) {
+            if (fr->isStaged) {
+                // Staged frame template (roadmaps.md item 1b): register it under every import
+                // spelling so `Name(args)` requests resolve, and stop -- its members carry
+                // unbound meta-parameters and must not be signature-resolved here.
+                auto fr_tmpl = std::dynamic_pointer_cast<AST::FrameDeclaration>(stmt);
+                for (const auto& qname : targets) {
+                    register_staged_frame_template(qname, fr_tmpl);
+                }
+                return;
+            }
             std::vector<std::pair<std::string, TypePtr>> resolved_fields;
             resolved_fields.reserve(fr->fields.size());
             for (const auto& field : fr->fields) {

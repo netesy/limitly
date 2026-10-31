@@ -996,6 +996,30 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
     std::string target_name = "";
     if (auto var_expr = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(expr->callee)) {
         target_name = var_expr->name;
+        // Staged frames (roadmap 1b): a construction written with the template name,
+        // `var b: Box(int) = Box(42);`, is steered to the instantiation the annotation
+        // already produced. The callee is rewritten in place so the checker and the
+        // generator both see an ordinary frame constructor for the generated frame.
+        if (!frame_declarations.count(target_name) && staged_frame_templates_.count(target_name)) {
+            const std::string tmpl_name = target_name;
+            bool steered = false;
+            if (expected_type && expected_type->tag == TypeTag::Frame) {
+                if (const auto* fd = std::get_if<FrameType>(&expected_type->extra)) {
+                    auto gen_it = frame_declarations.find(fd->name);
+                    if (gen_it != frame_declarations.end() && gen_it->second.declaration &&
+                        gen_it->second.declaration->isGenerated) {
+                        var_expr->name = fd->name;
+                        target_name = fd->name;
+                        steered = true;
+                    }
+                }
+            }
+            if (!steered) {
+                add_error("frame template '" + tmpl_name + "' is not constructible; request an instantiation in a type position, e.g. '" + tmpl_name + "(int)'", expr->line);
+                expr->inferred_type = type_system.ANY_TYPE;
+                return type_system.ANY_TYPE;
+            }
+        }
         auto frame_it = frame_declarations.find(target_name);
         if (frame_it != frame_declarations.end()) {
             target_name = target_name + ".init";

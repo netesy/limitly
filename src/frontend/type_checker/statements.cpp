@@ -1,4 +1,5 @@
 #include "../type_checker.hh"
+#include "../parser.hh"
 
 using namespace LM::Frontend;
 
@@ -1478,6 +1479,14 @@ bool TypeChecker::bind_staged_type_arg(const std::string& ctor_name, const std::
 
 TypePtr TypeChecker::resolve_staged_call_annotation(std::shared_ptr<LM::Frontend::AST::TypeAnnotation> annotation) {
     if (!stage0_charge(0)) return type_system.NIL_TYPE;
+    // Staged frame templates (roadmaps.md item 1b) claim the request first: `Name(args)` on a
+    // registered `staged frame` synthesizes a frame instead of folding to an existing type.
+    {
+        auto tf = staged_frame_templates_.find(annotation->stagedCallName);
+        if (tf != staged_frame_templates_.end()) {
+            return instantiate_staged_frame(annotation, annotation->stagedCallName, annotation->line);
+        }
+    }
     auto it = staged_functions_.find(annotation->stagedCallName);
     if (it == staged_functions_.end() || !is_staged_type_fn(it->second)) {
         add_error("cannot find staged type constructor '" + annotation->stagedCallName + "'");
@@ -1558,6 +1567,374 @@ TypePtr TypeChecker::resolve_staged_call_annotation(std::shared_ptr<LM::Frontend
         return type_system.NIL_TYPE;
     }
     return result;
+}
+
+// =============================================================================
+// Staged frame templates -- roadmaps.md item 1b, the generics replacement for
+// data shapes. A `staged frame Name(T: type)` declaration contributes no frame
+// of its own: a type-position request `Name(args)` substitutes concrete type
+// tokens for the meta-parameters, re-parses the substituted token stream into
+// a plain FrameDeclaration, and adopts it (name registration, signature
+// resolution, body check) into the current program before codegen runs. The
+// instances are ordinary nominal frames, so every backend conforms by
+// construction -- exactly the contract item 1 set for staged fns.
+// =============================================================================
+namespace {
+
+// Identifier-safe spelling of a name: module dots and other punctuation fold to '_'.
+std::string sf_sanitize(const std::string& in) {
+    std::string out;
+    out.reserve(in.size());
+    for (char c : in) {
+        if (std::isalnum(static_cast<unsigned char>(c)) || c == '_') out.push_back(c);
+        else out.push_back('_');
+    }
+    return out;
+}
+
+// Primitive type -> single annotation token. Round-trips through parseBasicType.
+bool sf_primitive_token(const TypePtr& t, Token& out_tok) {
+    struct Row { TypeTag tag; TokenType tt; const char* lx; };
+    static const Row rows[] = {
+        {TypeTag::Nil, TokenType::NIL_TYPE, "nil"},
+        {TypeTag::Bool, TokenType::BOOL_TYPE, "bool"},
+        {TypeTag::Int, TokenType::INT_TYPE, "int"},
+        {TypeTag::Int8, TokenType::INT8_TYPE, "i8"},
+        {TypeTag::Int16, TokenType::INT16_TYPE, "i16"},
+        {TypeTag::Int32, TokenType::INT32_TYPE, "i32"},
+        {TypeTag::Int64, TokenType::INT64_TYPE, "i64"},
+        {TypeTag::Int128, TokenType::INT128_TYPE, "i128"},
+        {TypeTag::UInt, TokenType::UINT_TYPE, "uint"},
+        {TypeTag::UInt8, TokenType::UINT8_TYPE, "u8"},
+        {TypeTag::UInt16, TokenType::UINT16_TYPE, "u16"},
+        {TypeTag::UInt32, TokenType::UINT32_TYPE, "u32"},
+        {TypeTag::UInt64, TokenType::UINT64_TYPE, "u64"},
+        {TypeTag::UInt128, TokenType::UINT128_TYPE, "u128"},
+        {TypeTag::Float32, TokenType::FLOAT32_TYPE, "f32"},
+        {TypeTag::Float64, TokenType::FLOAT_TYPE, "float"},
+        {TypeTag::Decimal2, TokenType::D2_TYPE, "d2"},
+        {TypeTag::Decimal4, TokenType::D4_TYPE, "d4"},
+        {TypeTag::Decimal6, TokenType::D6_TYPE, "d6"},
+        {TypeTag::String, TokenType::STR_TYPE, "str"},
+        {TypeTag::Any, TokenType::ANY_TYPE, "any"},
+        {TypeTag::Channel, TokenType::CHANNEL_TYPE, "channel"},
+    };
+    for (const auto& r : rows) {
+        if (t->tag == r.tag) { out_tok = Token(r.tt, r.lx, 0); return true; }
+    }
+    return false;
+}
+
+// Named (nominal) types carry their identity as one identifier token; a module-
+// qualified lexeme ("core.Point") is a single token that parseBasicType accepts
+// and the checker resolves through import_aliases exactly like a hand-written
+// annotation would.
+bool sf_named_token(const TypePtr& t, Token& out_tok) {
+    if (t->tag == TypeTag::Frame) {
+        if (const auto* f = std::get_if<FrameType>(&t->extra); f && !f->name.empty()) {
+            out_tok = Token(TokenType::IDENTIFIER, f->name, 0); return true;
+        }
+    } else if (t->tag == TypeTag::Enum) {
+        if (const auto* e = std::get_if<EnumType>(&t->extra); e && !e->name.empty()) {
+            out_tok = Token(TokenType::IDENTIFIER, e->name, 0); return true;
+        }
+    } else if (t->tag == TypeTag::Trait) {
+        if (const auto* tr = std::get_if<TraitType>(&t->extra); tr && !tr->name.empty()) {
+            out_tok = Token(TokenType::IDENTIFIER, tr->name, 0); return true;
+        }
+    }
+    return false;
+}
+
+// Re-parseable token spelling of a resolved type (substitution payload).
+bool sf_type_tokens_rec(const TypePtr& t, std::vector<Token>& out) {
+    if (!t) return false;
+    Token single;
+    if (sf_primitive_token(t, single) || sf_named_token(t, single)) { out.push_back(single); return true; }
+    switch (t->tag) {
+        case TypeTag::List: {
+            const auto* lt = std::get_if<ListType>(&t->extra);
+            if (!lt || !lt->elementType) return false;
+            out.push_back(Token(TokenType::LEFT_BRACKET, "[", 0));
+            if (!sf_type_tokens_rec(lt->elementType, out)) return false;
+            out.push_back(Token(TokenType::RIGHT_BRACKET, "]", 0));
+            return true;
+        }
+        case TypeTag::Dict: {
+            const auto* dt = std::get_if<DictType>(&t->extra);
+            if (!dt || !dt->keyType || !dt->valueType) return false;
+            out.push_back(Token(TokenType::LEFT_BRACE, "{", 0));
+            if (!sf_type_tokens_rec(dt->keyType, out)) return false;
+            out.push_back(Token(TokenType::COLON, ":", 0));
+            if (!sf_type_tokens_rec(dt->valueType, out)) return false;
+            out.push_back(Token(TokenType::RIGHT_BRACE, "}", 0));
+            return true;
+        }
+        case TypeTag::Tuple: {
+            const auto* tt = std::get_if<TupleType>(&t->extra);
+            if (!tt || tt->elementTypes.empty()) return false;
+            out.push_back(Token(TokenType::LEFT_PAREN, "(", 0));
+            bool first = true;
+            for (const auto& e : tt->elementTypes) {
+                if (!first) out.push_back(Token(TokenType::COMMA, ",", 0));
+                first = false;
+                if (!sf_type_tokens_rec(e, out)) return false;
+            }
+            out.push_back(Token(TokenType::RIGHT_PAREN, ")", 0));
+            return true;
+        }
+        case TypeTag::Union: {
+            // `A | B` is parseable wherever an annotation is; no parentheses (the grammar
+            // reserves '(' for tuples and function types in annotation position).
+            const auto* ut = std::get_if<UnionType>(&t->extra);
+            if (!ut || ut->types.empty()) return false;
+            bool first = true;
+            for (const auto& m : ut->types) {
+                if (!first) out.push_back(Token(TokenType::PIPE, "|", 0));
+                first = false;
+                if (!sf_type_tokens_rec(m, out)) return false;
+            }
+            return true;
+        }
+        default:
+            return false;
+    }
+}
+
+// Stable identifier fragment for cache/mangle keys (distinct per type spelling).
+bool sf_type_mangle_rec(const TypePtr& t, std::string& out) {
+    if (!t) return false;
+    switch (t->tag) {
+        case TypeTag::Frame:
+        case TypeTag::Enum:
+        case TypeTag::Trait: {
+            Token tok;
+            if (!sf_named_token(t, tok)) return false;
+            out += sf_sanitize(tok.lexeme);
+            return true;
+        }
+        case TypeTag::List: {
+            const auto* lt = std::get_if<ListType>(&t->extra);
+            if (!lt || !lt->elementType) return false;
+            out += "List_of_";
+            return sf_type_mangle_rec(lt->elementType, out);
+        }
+        case TypeTag::Dict: {
+            const auto* dt = std::get_if<DictType>(&t->extra);
+            if (!dt || !dt->keyType || !dt->valueType) return false;
+            out += "Dict_of_";
+            if (!sf_type_mangle_rec(dt->keyType, out)) return false;
+            out += "_to_";
+            return sf_type_mangle_rec(dt->valueType, out);
+        }
+        case TypeTag::Tuple: {
+            const auto* tt = std::get_if<TupleType>(&t->extra);
+            if (!tt || tt->elementTypes.empty()) return false;
+            out += "Tuple_of_";
+            for (size_t i = 0; i < tt->elementTypes.size(); ++i) {
+                if (i) out += "_";
+                if (!sf_type_mangle_rec(tt->elementTypes[i], out)) return false;
+            }
+            return true;
+        }
+        case TypeTag::Union: {
+            const auto* ut = std::get_if<UnionType>(&t->extra);
+            if (!ut || ut->types.empty()) return false;
+            out += "Union_of_";
+            for (size_t i = 0; i < ut->types.size(); ++i) {
+                if (i) out += "_";
+                if (!sf_type_mangle_rec(ut->types[i], out)) return false;
+            }
+            return true;
+        }
+        default:
+            break;
+    }
+    Token prim;
+    if (sf_primitive_token(t, prim)) { out += prim.lexeme; return true; }
+    return false;
+}   // namespace-open helpers end
+
+} // namespace
+
+void TypeChecker::register_staged_frame_template(const std::string& name,
+                                                 const std::shared_ptr<LM::Frontend::AST::FrameDeclaration>& decl) {
+    if (!decl) return;
+    auto prev = staged_frame_templates_.find(name);
+    if (prev != staged_frame_templates_.end()) {
+        if (prev->second.get() != decl.get())
+            add_error("duplicate staged frame template '" + name + "'", decl->line);
+        return;
+    }
+    // Validate the meta-parameters now, not per request: a template can never be
+    // instantiated if a bound is missing (a bad declaration is one precise error).
+    for (const auto& p : decl->templateParams) {
+        bool is_bound = false;
+        staged_kind_bound(p.bound, is_bound);
+        if (!is_bound) {
+            add_error("staged frame '" + name + "' parameter '" + p.name +
+                      "' must be bound to a stage-0 kind (`type`, `enum`, or `frame`)", decl->line);
+        }
+    }
+    staged_frame_templates_[name] = decl;
+}
+
+std::vector<LM::Frontend::Token> TypeChecker::staged_frame_type_tokens(const TypePtr& t) {
+    std::vector<Token> out;
+    if (!sf_type_tokens_rec(t, out)) return {};
+    return out;
+}
+
+std::string TypeChecker::staged_frame_mangle(const TypePtr& t) {
+    std::string out;
+    if (!sf_type_mangle_rec(t, out)) return "";
+    return out;
+}
+
+TypePtr TypeChecker::instantiate_staged_frame(const std::shared_ptr<LM::Frontend::AST::TypeAnnotation>& annotation,
+                                              const std::string& template_key, int line) {
+    auto tmpl_it = staged_frame_templates_.find(template_key);
+    if (tmpl_it == staged_frame_templates_.end()) {
+        add_error("cannot find staged frame template '" + template_key + "'", line);
+        return type_system.NIL_TYPE;
+    }
+    auto tmpl = tmpl_it->second;
+    if (!stage0_charge(line, 1, sizeof(LM::Frontend::AST::FrameDeclaration))) return type_system.NIL_TYPE;
+    if (tmpl->templateBodyTokens.empty()) {
+        add_error("staged frame '" + template_key + "' has no body to instantiate", tmpl->line);
+        return type_system.NIL_TYPE;
+    }
+    if (annotation->stagedCallArgs.size() != tmpl->templateParams.size()) {
+        add_error("staged frame '" + template_key + "' expects " + std::to_string(tmpl->templateParams.size()) +
+                  " type argument(s), got " + std::to_string(annotation->stagedCallArgs.size()), line);
+        return type_system.NIL_TYPE;
+    }
+    if (++staged_frame_depth_ > STAGED_FRAME_MAX_DEPTH) {
+        --staged_frame_depth_;
+        add_error("staged frame instantiation error: maximum nesting depth exceeded (" +
+                  std::to_string(STAGED_FRAME_MAX_DEPTH) + " nested instantiations)", line);
+        return type_system.NIL_TYPE;
+    }
+    struct Restore { std::unordered_map<std::string, TypePtr>* d; ~Restore() { (void)d; } };
+    // Resolve and kind-check every argument (nested requests recurse here).
+    std::vector<TypePtr> args;
+    args.reserve(annotation->stagedCallArgs.size());
+    for (size_t i = 0; i < annotation->stagedCallArgs.size(); ++i) {
+        const auto& argann = annotation->stagedCallArgs[i];
+        const std::string& pn = tmpl->templateParams[i].name;
+        if (!argann || argann->stagedCallValueArg) {
+            add_error("staged frame '" + template_key + "' parameter '" + pn + "' takes a type argument, not a value", line);
+            --staged_frame_depth_;
+            return type_system.NIL_TYPE;
+        }
+        TypePtr t = resolve_type_annotation(argann);
+        if (!t) {
+            --staged_frame_depth_;
+            return type_system.NIL_TYPE;
+        }
+        bool is_bound = false;
+        auto required = staged_kind_bound(tmpl->templateParams[i].bound, is_bound);
+        if (required && t->tag != *required) {
+            add_error("staged frame '" + template_key + "' parameter '" + pn + "' requires " +
+                      std::string(kind_article(tmpl->templateParams[i].bound->typeName)) + " " +
+                      tmpl->templateParams[i].bound->typeName + " type, found `" + t->toString() + "`", line);
+            --staged_frame_depth_;
+            return type_system.NIL_TYPE;
+        }
+        args.push_back(t);
+    }
+
+    // Mangle: the template's request spelling plus one fragment per argument. Nominal
+    // identity falls out of the cache key -- Option(int) is always Option_int.
+    std::string base = sf_sanitize(template_key);
+    std::string mangled = base;
+    for (const auto& a : args) {
+        std::string m = staged_frame_mangle(a);
+        if (m.empty()) {
+            add_error("staged frame '" + template_key + "': type argument `" + a->toString() +
+                      "` is not a supported instantiation argument", line);
+            --staged_frame_depth_;
+            return type_system.NIL_TYPE;
+        }
+        mangled += "_" + m;
+    }
+    if (auto hit = generated_staged_frames_.find(mangled); hit != generated_staged_frames_.end()) {
+        --staged_frame_depth_;
+        return hit->second;   // cached (possibly still under construction -- a self-reference
+                              // through another template resolves exactly like a frame field
+                              // referring to its own frame)
+    }
+    if (generated_staged_frames_.size() >= STAGED_FRAME_MAX_GENERATED) {
+        --staged_frame_depth_;
+        add_error("staged frame instantiation error: frame limit exceeded (" +
+                  std::to_string(STAGED_FRAME_MAX_GENERATED) + " synthesized frames)", line);
+        return type_system.NIL_TYPE;
+    }
+
+    // Substitute meta-parameters at the token level: an identifier equal to a parameter
+    // name is replaced by the argument's annotation tokens, everything else is copied.
+    std::vector<Token> toks;
+    toks.reserve(tmpl->templateBodyTokens.size() + 4 + args.size());
+    toks.push_back(Token(TokenType::FRAME, "frame", tmpl->line));
+    toks.push_back(Token(TokenType::IDENTIFIER, mangled, tmpl->line));
+    toks.push_back(Token(TokenType::LEFT_BRACE, "{", tmpl->line));
+    bool subst_ok = true;
+    for (const auto& bt : tmpl->templateBodyTokens) {
+        int slot = -1;
+        if (bt.type == TokenType::IDENTIFIER) {
+            for (size_t i = 0; i < tmpl->templateParams.size(); ++i) {
+                if (tmpl->templateParams[i].name == bt.lexeme) { slot = (int)i; break; }
+            }
+        }
+        if (slot < 0) { toks.push_back(bt); continue; }
+        auto repl = staged_frame_type_tokens(args[(size_t)slot]);
+        if (repl.empty()) { subst_ok = false; break; }
+        for (auto& rt : repl) { rt.line = bt.line; }
+        toks.insert(toks.end(), repl.begin(), repl.end());
+    }
+    if (!subst_ok) {
+        add_error("staged frame '" + template_key + "': type argument `" + args[0]->toString() +
+                  "` is not a supported instantiation argument", line);
+        --staged_frame_depth_;
+        return type_system.NIL_TYPE;
+    }
+    toks.push_back(Token(TokenType::RIGHT_BRACE, "}", tmpl->line));
+    toks.push_back(Token(TokenType::EOF_TOKEN, "", tmpl->line));
+
+    // Re-parse the substituted stream. Trivia-free by construction, so the frame body
+    // grammar needs the semicolons it always had -- this is the same token stream a
+    // hand-written frame produces.
+    std::shared_ptr<LM::Frontend::AST::FrameDeclaration> gen;
+    try {
+        Scanner synth_scanner(toks);
+        Parser synth_parser(synth_scanner, false);
+        auto synth_program = synth_parser.parse();
+        if (!synth_parser.hadError() && synth_program && synth_program->statements.size() == 1) {
+            gen = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(synth_program->statements[0]);
+        }
+    } catch (const std::runtime_error&) {
+        gen = nullptr;
+    }
+    if (!gen) {
+        add_error("failed to synthesize staged frame '" + mangled + "' from template '" + template_key + "'", line);
+        --staged_frame_depth_;
+        return type_system.NIL_TYPE;
+    }
+    gen->isGenerated = true;
+
+    // Adopt: exactly the registration a hand-written frame receives in passes 1-3, in the
+    // order the checker performs them, then into the program AST for codegen.
+    type_system.addUserDefinedType(mangled, type_system.createFrameType(mangled));
+    TypePtr frame_type = type_system.getUserDefinedType(mangled);
+    if (!frame_type) frame_type = type_system.createFrameType(mangled);
+    generated_staged_frames_[mangled] = frame_type;   // before body check: requests raised
+                                                      // inside re-enter on this same frame
+    register_frame_signature(mangled, gen);
+    check_frame_declaration_with_name(mangled, gen);
+    if (current_program_) current_program_->statements.push_back(gen);
+    stage0_charge(line, 0, toks.size() * sizeof(Token));
+    --staged_frame_depth_;
+    return frame_type;
 }
 
 } // namespace Frontend

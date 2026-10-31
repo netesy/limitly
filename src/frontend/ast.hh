@@ -247,6 +247,7 @@ namespace AST {
         std::vector<StructuralTypeField> structuralFields;              // Fields in a structural type
         
         std::shared_ptr<Expression> refinementCondition = nullptr;      // For refined types (e.g., int where value > 0)
+        int line = 0;                                                    // Source line of the annotation's first token
         std::shared_ptr<TypeAnnotation> returnType = nullptr;           // Return type for function types
         std::shared_ptr<TypeAnnotation> elementType = nullptr;          // Element type for list types (e.g., [int])
         std::shared_ptr<TypeAnnotation> keyType = nullptr;              // Key type for dictionary types (e.g., {str: int})
@@ -785,6 +786,20 @@ namespace AST {
         std::vector<std::string> mixins;       // Mixins injected into frame
         std::shared_ptr<FrameMethod> init;    // Optional init() method
         std::shared_ptr<FrameMethod> deinit;  // Optional deinit() method
+
+        // --- staged frame template (roadmaps.md item 1b) ---
+        // `staged frame Name(T: type) { ... }` declares a template, not a frame. The parser
+        // keeps the raw body tokens; the type checker substitutes type arguments for the
+        // meta-parameters and re-parses them into a plain FrameDeclaration (isGenerated),
+        // which every downstream consumer treats exactly like a hand-written frame.
+        struct TemplateParam {
+            std::string name;                          // meta-parameter name (e.g. "T")
+            std::shared_ptr<TypeAnnotation> bound;     // kind bound: `type` / `enum` / `frame`
+        };
+        bool isStaged = false;                         // template declaration (skipped by codegen)
+        bool isGenerated = false;                      // synthesized instance; body already checked
+        std::vector<TemplateParam> templateParams;
+        std::vector<LM::Frontend::Token> templateBodyTokens;  // body tokens between the braces
 
         FrameDeclaration() : init(nullptr), deinit(nullptr) {}
     };

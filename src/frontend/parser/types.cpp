@@ -109,6 +109,7 @@ std::shared_ptr<LM::Frontend::AST::TypeAnnotation> Parser::parseBasicType() {
             advance();
             type->isStagedCall = true;
             type->stagedCallName = type->typeName;
+            type->line = (int)previous().line;   // diagnostics for staged frame instantiation
             type->isUserDefined = false;
             if (!check(TokenType::RIGHT_PAREN)) {
                 do {

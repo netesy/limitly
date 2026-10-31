@@ -145,7 +145,7 @@ public:
     std::shared_ptr<LM::Frontend::AST::Statement> continueStatement();
     std::shared_ptr<LM::Frontend::AST::FunctionDeclaration> function(const std::string &kind);
     std::shared_ptr<LM::Frontend::AST::Statement> returnStatement();
-    std::shared_ptr<LM::Frontend::AST::FrameDeclaration> frameDeclaration();
+    std::shared_ptr<LM::Frontend::AST::FrameDeclaration> frameDeclaration(bool staged = false);
     std::shared_ptr<LM::Frontend::AST::MixinDeclaration> mixinDeclaration();
     std::shared_ptr<LM::Frontend::AST::Statement> parallelStatement();
     std::shared_ptr<LM::Frontend::AST::Statement> concurrentStatement();

@@ -20,6 +20,75 @@ namespace LM {
 namespace Frontend {
 using namespace LM::Error;
 
+// Pass-2 frame signature resolution, extracted from check_program's resolve_sig so staged
+// frame instances (roadmaps.md item 1b) can be adopted mid-check with identical registration.
+void TypeChecker::register_frame_signature(const std::string& name,
+                                           const std::shared_ptr<LM::Frontend::AST::FrameDeclaration>& frame_decl) {
+    if (!frame_decl) return;
+    TypeSystem::FrameInfo info;
+    info.name = name;
+    info.declaration = frame_decl;
+    info.implements = frame_decl->implements;
+    info.hasInit = (frame_decl->init != nullptr);
+    info.hasDeinit = (frame_decl->deinit != nullptr);
+
+    size_t offset = 0;
+    for (const auto& field : frame_decl->fields) {
+        TypePtr field_type = field->type ? resolve_type_annotation(field->type) : type_system.ANY_TYPE;
+        info.fields.push_back({field->name, field_type});
+        info.fieldVisibilities[field->name] = field->visibility;
+        info.fieldOffsets[field->name] = offset++;
+    }
+    info.totalFieldSize = offset;
+
+    auto& fd = frame_declarations[name];
+    fd.name = name;
+    fd.declaration = frame_decl;
+    fd.fields = info.fields;
+    fd.field_has_default.clear();
+    for (const auto& field : frame_decl->fields) {
+        fd.field_has_default.push_back({field->name, field->defaultValue != nullptr});
+    }
+
+    if (frame_decl->init) {
+        std::string init_name = name + ".init";
+        FunctionSignature sig;
+        sig.name = init_name;
+        sig.declaration = frame_decl->init;
+        sig.return_type = type_system.NIL_TYPE;
+        sig.param_types.push_back(type_system.createFrameType(name));
+        for (const auto& p : frame_decl->init->parameters) sig.param_types.push_back(resolve_type_annotation(p.second));
+        for (const auto& op : frame_decl->init->optionalParams) sig.param_types.push_back(resolve_type_annotation(op.second.first));
+        function_signatures[init_name] = sig;
+    }
+    for (const auto& m : frame_decl->methods) {
+        std::string m_name = name + "." + m->name;
+        FunctionSignature sig;
+        sig.name = m_name;
+        sig.declaration = m;
+        sig.return_type = m->returnType ? resolve_type_annotation(m->returnType) : type_system.NIL_TYPE;
+        sig.param_types.push_back(type_system.createFrameType(name));
+        for (const auto& p : m->parameters) sig.param_types.push_back(resolve_type_annotation(p.second));
+        for (const auto& op : m->optionalParams) sig.param_types.push_back(resolve_type_annotation(op.second.first));
+        function_signatures[m_name] = sig;
+        info.methodSignatures[m->name] = sig.return_type;
+    }
+    if (frame_decl->deinit) {
+        std::string deinit_name = name + ".deinit";
+        FunctionSignature sig;
+        sig.name = deinit_name;
+        sig.declaration = frame_decl->deinit;
+        sig.return_type = type_system.NIL_TYPE;
+        sig.param_types.push_back(type_system.createFrameType(name));
+        function_signatures[deinit_name] = sig;
+    }
+
+    type_system.registerFrame(name, info);
+    frame_declarations[name].name = info.name;
+    frame_declarations[name].declaration = frame_decl;
+    frame_declarations[name].fields = info.fields;
+}
+
 bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> program) {
     if (!program) {
         add_error("Null program provided");
@@ -34,6 +103,18 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
     for (const auto& st : program->statements) {
         if (auto fd = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(st)) {
             if (fd->isStaged) staged_functions_[fd->name] = fd;
+        }
+    }
+
+    // Pre-register staged frame templates (roadmaps.md item 1b) so a type-position request
+    // `Name(args)` resolves even when the template is declared later in program order.
+    // Instances from a previous check must not leak: this checker may be re-run on a re-parsed AST.
+    staged_frame_templates_.clear();
+    generated_staged_frames_.clear();
+    staged_frame_depth_ = 0;
+    for (const auto& st : program->statements) {
+        if (auto fr = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(st)) {
+            if (fr->isStaged) register_staged_frame_template(fr->name, fr);
         }
     }
     
@@ -89,6 +170,12 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
             // Type declarations are aliases and should not be pre-registered as Any.
             // They will be resolved to their concrete underlying type in Pass 2.
         } else if (auto frame_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) {
+            // A staged frame template is not a frame: the name becomes usable only through
+            // instantiation requests (`Name(args)`), never as a bare type.
+            if (frame_decl->isStaged) {
+                register_staged_frame_template(name, frame_decl);
+                return;
+            }
             type_system.addUserDefinedType(name, type_system.createFrameType(name));
         }
     };
@@ -275,6 +362,11 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
     // PASS 1: Name Registration (including inlined symbols)
     auto register_name = [&](const std::string& name, const std::shared_ptr<LM::Frontend::AST::Statement>& stmt) {
         if (auto frame_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) {
+            if (frame_decl->isStaged) {
+                // Imported templates become requestable under their qualified name too.
+                register_staged_frame_template(name, frame_decl);
+                return;
+            }
             type_system.addUserDefinedType(name, type_system.createFrameType(name));
         } else if (auto trait_decl = std::dynamic_pointer_cast<LM::Frontend::AST::TraitDeclaration>(stmt)) {
             TypePtr trait_type = std::make_shared<::Type>(TypeTag::Trait, TraitType{name, {}, {}});
@@ -296,68 +388,9 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
     // PASS 2: Signature Resolution (including inlined symbols)
     auto resolve_sig = [&](const std::string& name, const std::shared_ptr<LM::Frontend::AST::Statement>& stmt) {
         if (auto frame_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) {
-            TypeSystem::FrameInfo info;
-            info.name = name;
-            info.declaration = frame_decl;
-            info.implements = frame_decl->implements;
-            info.hasInit = (frame_decl->init != nullptr);
-            info.hasDeinit = (frame_decl->deinit != nullptr);
-
-            size_t offset = 0;
-            for (const auto& field : frame_decl->fields) {
-                TypePtr field_type = field->type ? resolve_type_annotation(field->type) : type_system.ANY_TYPE;
-                info.fields.push_back({field->name, field_type});
-                info.fieldVisibilities[field->name] = field->visibility;
-                info.fieldOffsets[field->name] = offset++;
-            }
-            info.totalFieldSize = offset;
-
-            auto& fd = frame_declarations[name];
-            fd.name = name;
-            fd.declaration = frame_decl;
-            fd.fields = info.fields;
-            fd.field_has_default.clear();
-            for (const auto& field : frame_decl->fields) {
-                fd.field_has_default.push_back({field->name, field->defaultValue != nullptr});
-            }
-
-            if (frame_decl->init) {
-                std::string init_name = name + ".init";
-                FunctionSignature sig;
-                sig.name = init_name;
-                sig.declaration = frame_decl->init;
-                sig.return_type = type_system.NIL_TYPE;
-                sig.param_types.push_back(type_system.createFrameType(name));
-                for (const auto& p : frame_decl->init->parameters) sig.param_types.push_back(resolve_type_annotation(p.second));
-                for (const auto& op : frame_decl->init->optionalParams) sig.param_types.push_back(resolve_type_annotation(op.second.first));
-                function_signatures[init_name] = sig;
-            }
-            for (const auto& m : frame_decl->methods) {
-                std::string m_name = name + "." + m->name;
-                FunctionSignature sig;
-                sig.name = m_name;
-                sig.declaration = m;
-                sig.return_type = m->returnType ? resolve_type_annotation(m->returnType) : type_system.NIL_TYPE;
-                sig.param_types.push_back(type_system.createFrameType(name));
-                for (const auto& p : m->parameters) sig.param_types.push_back(resolve_type_annotation(p.second));
-                for (const auto& op : m->optionalParams) sig.param_types.push_back(resolve_type_annotation(op.second.first));
-                function_signatures[m_name] = sig;
-                info.methodSignatures[m->name] = sig.return_type;
-            }
-            if (frame_decl->deinit) {
-                std::string deinit_name = name + ".deinit";
-                FunctionSignature sig;
-                sig.name = deinit_name;
-                sig.declaration = frame_decl->deinit;
-                sig.return_type = type_system.NIL_TYPE;
-                sig.param_types.push_back(type_system.createFrameType(name));
-                function_signatures[deinit_name] = sig;
-            }
-
-            type_system.registerFrame(name, info);
-            frame_declarations[name].name = info.name;
-            frame_declarations[name].declaration = frame_decl;
-            frame_declarations[name].fields = info.fields;
+            // Templates carry unbound meta-parameters: there is no signature to resolve.
+            if (frame_decl->isStaged) return;
+            register_frame_signature(name, frame_decl);
 
         } else if (auto trait_decl = std::dynamic_pointer_cast<LM::Frontend::AST::TraitDeclaration>(stmt)) {
             TypeSystem::TraitInfo info;
@@ -463,7 +496,13 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
     // PASS 3: Body Verification (local and inlined symbols)
     // We only verify statements in the current program.
     // Imported symbols were already verified in their own module's type-check pass.
-    for (const auto& stmt : program->statements) {
+    // Index-based: answering a staged frame request (item 1b) appends the synthesized frame
+    // to `statements` mid-pass; those carry isGenerated and were fully checked on adoption.
+    for (size_t si = 0; si < program->statements.size(); ++si) {
+        auto stmt = program->statements[si];
+        if (auto fr = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) {
+            if (fr->isGenerated) continue;
+        }
         check_statement(stmt);
     }
     
