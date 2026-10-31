@@ -19,6 +19,41 @@ namespace LM {
 namespace LIR {
 
 namespace {
+// Integer-family language types are stored as raw unboxed words inside typed
+// lists and dictionaries. An iter binding over such a container must carry
+// that concrete type: stamping it `any` (abi Ptr) makes the AOT value-kind
+// consumers read a small int as an object pointer, which renders 1 as
+// "true", 2 as "nil", and corrupts arithmetic through the join.
+bool is_raw_int_tag(TypeTag tag) {
+    switch (tag) {
+        case TypeTag::Int: case TypeTag::Int8: case TypeTag::Int16:
+        case TypeTag::Int32: case TypeTag::Int64:
+        case TypeTag::UInt: case TypeTag::UInt8: case TypeTag::UInt16:
+        case TypeTag::UInt32: case TypeTag::UInt64:
+            return true;
+        default:
+            return false;
+    }
+}
+
+// part: 0 = list element, 1 = dict key, 2 = dict value. Returns the concrete
+// integer language type, or nullptr when the part is not statically a raw
+// integer (callers then keep the previous `any`/Ptr behavior).
+TypePtr raw_int_iter_type(const TypePtr& container, int part) {
+    if (!container) return nullptr;
+    if (part == 0 && container->tag == TypeTag::List) {
+        if (auto* lt = std::get_if<ListType>(&container->extra);
+            lt && lt->elementType && is_raw_int_tag(lt->elementType->tag))
+            return lt->elementType;
+    } else if (container->tag == TypeTag::Dict && part != 0) {
+        if (auto* dt = std::get_if<DictType>(&container->extra); dt) {
+            const TypePtr& sel = (part == 1) ? dt->keyType : dt->valueType;
+            if (sel && is_raw_int_tag(sel->tag)) return sel;
+        }
+    }
+    return nullptr;
+}
+
 bool is_variable_alias_expr(LM::Frontend::AST::Expression* expr) {
     if (!expr) return false;
     if (dynamic_cast<LM::Frontend::AST::VariableExpr*>(expr)) return true;
@@ -1055,6 +1090,15 @@ void Generator::emit_staged_block(LM::Frontend::AST::StagedBlockStatement& stmt)
 
 
 void Generator::emit_iter_stmt(LM::Frontend::AST::IterStatement& stmt) {
+    // Frame methods (and other linear-mode bodies) lower with building_cfg off;
+    // create_basic_block refuses there and used to return nullptr, which the
+    // CFG-only iter paths dereferenced as header_block->id (0xC0000005). Route
+    // those bodies to the label-based lowering instead.
+    if (!cfg_context_.building_cfg) {
+        emit_iter_stmt_linear(stmt);
+        return;
+    }
+
     auto range_expr = dynamic_cast<LM::Frontend::AST::RangeExpr*>(stmt.iterable.get());
     auto var_expr = dynamic_cast<LM::Frontend::AST::VariableExpr*>(stmt.iterable.get());
     auto list_expr = dynamic_cast<LM::Frontend::AST::ListExpr*>(stmt.iterable.get());
@@ -1158,8 +1202,33 @@ void Generator::emit_iter_stmt(LM::Frontend::AST::IterStatement& stmt) {
             return;
         }
 
-        // Check if it's a list, dict, tuple, or channel
-        if (iterable_type->tag == TypeTag::List) {
+        emit_iter_over_value(stmt, iterable_reg, iterable_type);
+
+    } else {
+        // Any other iterable expression - member access (self.items), a call
+        // returning a container, an index - previously fell into the refusal
+        // below and aborted LIR generation. Evaluate it once, then dispatch on
+        // the resulting type exactly like the variable form.
+        Reg iterable_reg = emit_expr(*stmt.iterable);
+        TypePtr iterable_type = get_register_type(iterable_reg);
+        if (!iterable_type) {
+            iterable_type = get_register_language_type(iterable_reg);
+        }
+        if (!iterable_type) {
+            iterable_type = stmt.iterable->inferred_type;
+        }
+        if (!iterable_type) {
+            report_error("Cannot determine type of iter expression");
+            return;
+        }
+        emit_iter_over_value(stmt, iterable_reg, iterable_type);
+    }
+}
+
+
+void Generator::emit_iter_over_value(LM::Frontend::AST::IterStatement& stmt, Reg iterable_reg, TypePtr iterable_type) {
+    // Dispatch on the iterable's type: list, string, dict, tuple, else channel.
+    if (iterable_type->tag == TypeTag::List) {
             emit_list_var_iter_stmt(stmt, iterable_reg);
             
         } else if (iterable_type->tag == TypeTag::String) {
@@ -1245,9 +1314,6 @@ void Generator::emit_iter_stmt(LM::Frontend::AST::IterStatement& stmt) {
             exit_scope();
         }
         
-    } else {
-        report_error("iter statement supports range expressions, lists, dicts, tuples, and channel variables");
-    }
 }
 
 
@@ -1404,12 +1470,13 @@ void Generator::emit_list_iter_stmt(LM::Frontend::AST::IterStatement& stmt, LM::
     
     // Get element at current index
     Reg elem_reg = allocate_register();
-    emit_instruction(LIR_Inst(LIR_Op::ListIndex, Type::Ptr, elem_reg, list_reg, index_reg));
-    set_register_type(elem_reg, std::make_shared<::Type>(::TypeTag::Any));
+    TypePtr raw_elem = raw_int_iter_type(get_register_type(list_reg), 0);
+    emit_instruction(LIR_Inst(LIR_Op::ListIndex, raw_elem ? Type::I64 : Type::Ptr, elem_reg, list_reg, index_reg));
+    set_register_type(elem_reg, raw_elem ? raw_elem : std::make_shared<::Type>(::TypeTag::Any));
     
     // Move element to loop variable
     emit_instruction(LIR_Inst(LIR_Op::Mov, loop_var_reg, elem_reg, 0));
-    set_register_type(loop_var_reg, std::make_shared<::Type>(::TypeTag::Any));
+    set_register_type(loop_var_reg, raw_elem ? raw_elem : std::make_shared<::Type>(::TypeTag::Any));
     
     // Execute loop body
     if (stmt.body) {
@@ -1577,6 +1644,11 @@ void Generator::emit_dict_var_iter_stmt(LM::Frontend::AST::IterStatement& stmt, 
         add_block_edge(header_block, exit_block);
 
         set_current_block(body_block);
+        // Raw-integer dict parts keep their concrete type through the unpack
+        // (see raw_int_iter_type): `any`/Ptr would misread small ints in AOT.
+        TypePtr dict_lang_type = get_register_type(dict_reg);
+        TypePtr raw_key = raw_int_iter_type(dict_lang_type, 1);
+        TypePtr raw_val = raw_int_iter_type(dict_lang_type, 2);
         // Get the (k, v) tuple at index
         Reg tuple_reg = allocate_register();
         emit_instruction(LIR_Inst(LIR_Op::ListIndex, Type::Ptr, tuple_reg, items_reg, index_reg));
@@ -1586,14 +1658,88 @@ void Generator::emit_dict_var_iter_stmt(LM::Frontend::AST::IterStatement& stmt, 
         Reg idx0 = allocate_register();
         emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, idx0, make_i64(0)));
         set_register_type(idx0, int_type);
-        emit_instruction(LIR_Inst(LIR_Op::TupleGet, Type::Ptr, key_reg, tuple_reg, idx0));
-        set_register_type(key_reg, std::make_shared<::Type>(::TypeTag::Any));
+        emit_instruction(LIR_Inst(LIR_Op::TupleGet, raw_key ? Type::I64 : Type::Ptr, key_reg, tuple_reg, idx0));
+        set_register_type(key_reg, raw_key ? raw_key : std::make_shared<::Type>(::TypeTag::Any));
 
         Reg idx1 = allocate_register();
         emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, idx1, make_i64(1)));
         set_register_type(idx1, int_type);
-        emit_instruction(LIR_Inst(LIR_Op::TupleGet, Type::Ptr, val_reg, tuple_reg, idx1));
-        set_register_type(val_reg, std::make_shared<::Type>(::TypeTag::Any));
+        emit_instruction(LIR_Inst(LIR_Op::TupleGet, raw_val ? Type::I64 : Type::Ptr, val_reg, tuple_reg, idx1));
+        set_register_type(val_reg, raw_val ? raw_val : std::make_shared<::Type>(::TypeTag::Any));
+
+        // Body
+        if (stmt.body) {
+            emit_stmt(*stmt.body);
+        }
+
+        // index++
+        Reg one_reg = allocate_register();
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, one_reg, make_i64(1)));
+        set_register_type(one_reg, int_type);
+        Reg next_reg = allocate_register();
+        emit_instruction(LIR_Inst(LIR_Op::Add, Type::I64, next_reg, index_reg, one_reg));
+        set_register_type(next_reg, int_type);
+        emit_instruction(LIR_Inst(LIR_Op::Mov, index_reg, next_reg, 0));
+
+        emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, header_block->id));
+        add_block_edge(get_current_block(), header_block);
+
+        set_current_block(exit_block);
+        exit_loop();
+        exit_scope();
+    } else if (stmt.loopVars.size() == 1) {
+        // Single loop variable: bind the KEY, matching what the type checker
+        // declares for this form (element_type = key_type). The previous path
+        // ran emit_list_var_iter_stmt over the items list, which handed the
+        // whole (key, value) tuple to the body.
+        const std::string& key_var = stmt.loopVars[0];
+
+        LIR_BasicBlock* header_block = create_basic_block("dict_key_iter_header");
+        LIR_BasicBlock* body_block = create_basic_block("dict_key_iter_body");
+        LIR_BasicBlock* exit_block = create_basic_block("dict_key_iter_exit");
+
+        enter_scope();
+        enter_loop();
+        set_loop_labels(header_block->id, exit_block->id, 0);
+
+        Reg key_reg = allocate_register();
+        bind_variable(key_var, key_reg);
+
+        // index = 0
+        Reg index_reg = allocate_register();
+        auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, index_reg, make_i64(0)));
+        set_register_type(index_reg, int_type);
+
+        emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, header_block->id));
+        add_block_edge(get_current_block(), header_block);
+
+        set_current_block(header_block);
+        Reg len_reg = allocate_register();
+        emit_instruction(LIR_Inst(LIR_Op::ListLen, Type::I64, len_reg, items_reg));
+        set_register_type(len_reg, int_type);
+
+        Reg cmp_reg = allocate_register();
+        emit_instruction(LIR_Inst(LIR_Op::CmpLT, cmp_reg, index_reg, len_reg));
+        set_register_type(cmp_reg, std::make_shared<::Type>(::TypeTag::Bool));
+
+        emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, cmp_reg, 0, exit_block->id));
+        add_block_edge(header_block, body_block);
+        add_block_edge(header_block, exit_block);
+
+        set_current_block(body_block);
+        // Get the (k, v) tuple at index and unpack only the key.
+        TypePtr dict_lang_type = get_register_type(dict_reg);
+        TypePtr raw_key = raw_int_iter_type(dict_lang_type, 1);
+        Reg tuple_reg = allocate_register();
+        emit_instruction(LIR_Inst(LIR_Op::ListIndex, Type::Ptr, tuple_reg, items_reg, index_reg));
+        set_register_type(tuple_reg, std::make_shared<::Type>(::TypeTag::Any));
+
+        Reg idx0 = allocate_register();
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, idx0, make_i64(0)));
+        set_register_type(idx0, int_type);
+        emit_instruction(LIR_Inst(LIR_Op::TupleGet, raw_key ? Type::I64 : Type::Ptr, key_reg, tuple_reg, idx0));
+        set_register_type(key_reg, raw_key ? raw_key : std::make_shared<::Type>(::TypeTag::Any));
 
         // Body
         if (stmt.body) {
@@ -1616,8 +1762,7 @@ void Generator::emit_dict_var_iter_stmt(LM::Frontend::AST::IterStatement& stmt, 
         exit_loop();
         exit_scope();
     } else {
-        // Single loop variable: iterate items list, each item is a (k, v) tuple.
-        emit_list_var_iter_stmt(stmt, items_reg);
+        report_error("dict iteration supports one or two loop variables");
     }
 }
 
@@ -1679,16 +1824,17 @@ void Generator::emit_list_var_iter_stmt(LM::Frontend::AST::IterStatement& stmt, 
     
     // Get element at current index
     Reg elem_reg = allocate_register();
+    TypePtr raw_elem = is_tuple ? nullptr : raw_int_iter_type(iterable_type, 0);
     if (is_tuple) {
         emit_instruction(LIR_Inst(LIR_Op::TupleGet, Type::Ptr, elem_reg, list_reg, index_reg));
     } else {
-        emit_instruction(LIR_Inst(LIR_Op::ListIndex, Type::Ptr, elem_reg, list_reg, index_reg));
+        emit_instruction(LIR_Inst(LIR_Op::ListIndex, raw_elem ? Type::I64 : Type::Ptr, elem_reg, list_reg, index_reg));
     }
-    set_register_type(elem_reg, std::make_shared<::Type>(::TypeTag::Any));
+    set_register_type(elem_reg, raw_elem ? raw_elem : std::make_shared<::Type>(::TypeTag::Any));
     
     // Move element to loop variable
     emit_instruction(LIR_Inst(LIR_Op::Mov, loop_var_reg, elem_reg, 0));
-    set_register_type(loop_var_reg, std::make_shared<::Type>(::TypeTag::Any));
+    set_register_type(loop_var_reg, raw_elem ? raw_elem : std::make_shared<::Type>(::TypeTag::Any));
     
     // Execute loop body
     if (stmt.body) {
@@ -1884,6 +2030,544 @@ void Generator::emit_tuple_var_iter_stmt(LM::Frontend::AST::IterStatement& stmt,
 }
 
 
+// Linear-mode iter driver. Frame methods lower with building_cfg off (see
+// lower_frame_method), so control flow uses instruction-index labels patched
+// in place, exactly like emit_while_stmt_linear/emit_for_stmt_linear.
+// Shape:
+//   prologue
+//   header_pc: advance; cond -> <exit_jump> end_pc; body_pre; <body stmts>; jump header_pc
+//   end_pc:
+// `continue` targets header_pc, which is why the caller's step (advance) runs
+// before the condition rather than at the tail of the body - a continue must
+// never skip it. `break` cannot use a raw index: end_pc is unknown while the
+// body lowers, and a trampoline slot before the header would be fallen
+// through into. Instead the exit is a symbolic label (resolve_linear_labels
+// patches it at function close) and header_pc carries a real Label
+// instruction, which also stops remove_unreachable_code from eating the loop
+// body after a break's unconditional Jump.
+void Generator::emit_linear_iter_loop(LM::Frontend::AST::IterStatement& stmt,
+                                      const std::function<void()>& prologue,
+                                      const std::function<void()>& advance,
+                                      const std::function<Reg()>& cond,
+                                      const std::function<void()>& body_pre,
+                                      LIR_Op exit_jump) {
+    enter_scope();
+    enter_loop();
+
+    const uint32_t exit_label_id = generate_label();
+    loop_stack_.back().end_label = exit_label_id;
+    loop_stack_.back().symbolic_labels = true;
+
+    prologue();
+
+    Imm header_pc = static_cast<Imm>(current_function_->instructions.size());
+    place_label(header_pc);
+    set_loop_labels(static_cast<uint32_t>(header_pc), exit_label_id, static_cast<uint32_t>(header_pc));
+
+    advance();
+
+    Reg cond_reg = cond();
+    size_t patch_pc = current_function_->instructions.size();
+    emit_instruction(LIR_Inst(exit_jump, Type::Void, 0, cond_reg, 0, 0));  // placeholder target
+
+    body_pre();
+    if (stmt.body) {
+        emit_stmt(*stmt.body);
+    }
+
+    emit_instruction(LIR_Inst(LIR_Op::Jump, Type::Void, 0, 0, 0, header_pc));
+
+    Imm end_pc = static_cast<Imm>(current_function_->instructions.size());
+    current_function_->instructions[patch_pc].imm = end_pc;
+
+    // The loop exit is reachable even when the body ends in a return.
+    m_is_terminated = false;
+
+    // Materialise the break target here: place_label records the position and
+    // emits the Label; resolve_linear_labels rewrites every break's Jump imm.
+    place_label(exit_label_id);
+    exit_loop();
+    exit_scope();
+}
+
+
+void Generator::emit_iter_stmt_linear(LM::Frontend::AST::IterStatement& stmt) {
+    auto range_expr = dynamic_cast<LM::Frontend::AST::RangeExpr*>(stmt.iterable.get());
+    auto var_expr = dynamic_cast<LM::Frontend::AST::VariableExpr*>(stmt.iterable.get());
+    auto list_expr = dynamic_cast<LM::Frontend::AST::ListExpr*>(stmt.iterable.get());
+    auto dict_expr = dynamic_cast<LM::Frontend::AST::DictExpr*>(stmt.iterable.get());
+    auto tuple_expr = dynamic_cast<LM::Frontend::AST::TupleExpr*>(stmt.iterable.get());
+
+    auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
+    auto bool_type = std::make_shared<::Type>(::TypeTag::Bool);
+    auto any_type = std::make_shared<::Type>(::TypeTag::Any);
+    auto str_type = std::make_shared<::Type>(::TypeTag::String);
+
+    if (range_expr) {
+        if (stmt.loopVars.size() != 1) {
+            report_error("iter statement currently supports only one loop variable");
+            return;
+        }
+        Reg loop_var_reg = 0;
+        Reg step_reg = 0;
+        emit_linear_iter_loop(
+            stmt,
+            [&]() {
+                loop_var_reg = allocate_register();
+                bind_variable(stmt.loopVars[0], loop_var_reg);
+                Reg start_reg = emit_expr(*range_expr->start);
+                emit_instruction(LIR_Inst(LIR_Op::Mov, loop_var_reg, start_reg, 0));
+                set_register_type(loop_var_reg, get_register_type(start_reg));
+                if (range_expr->step) {
+                    step_reg = emit_expr(*range_expr->step);
+                } else {
+                    step_reg = allocate_register();
+                    emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, step_reg, make_i64(1)));
+                    set_register_type(step_reg, int_type);
+                }
+                // Pre-subtract one step: the header advances before the first test,
+                // so the first iteration sees exactly `start`.
+                Reg pre = allocate_register();
+                emit_instruction(LIR_Inst(LIR_Op::Sub, pre, loop_var_reg, step_reg));
+                emit_instruction(LIR_Inst(LIR_Op::Mov, loop_var_reg, pre, 0));
+            },
+            [&]() {
+                Reg next = allocate_register();
+                emit_instruction(LIR_Inst(LIR_Op::Add, next, loop_var_reg, step_reg));
+                emit_instruction(LIR_Inst(LIR_Op::Mov, loop_var_reg, next, 0));
+            },
+            [&]() -> Reg {
+                // The CFG header re-evaluates `end` per iteration; mirror that.
+                Reg end_reg = emit_expr(*range_expr->end);
+                Reg cmp = allocate_register();
+                emit_instruction(LIR_Inst(LIR_Op::CmpLT, cmp, loop_var_reg, end_reg));
+                set_register_type(cmp, bool_type);
+                return cmp;
+            },
+            []() {});
+        return;
+    }
+
+    if (list_expr) {
+        if (stmt.loopVars.size() != 1) {
+            report_error("list iteration currently supports only one loop variable");
+            return;
+        }
+        Reg list_reg = 0, loop_var_reg = 0, index_reg = 0, one_reg = 0;
+        int64_t len = static_cast<int64_t>(list_expr->elements.size());
+        emit_linear_iter_loop(
+            stmt,
+            [&]() {
+                list_reg = emit_list_expr(*list_expr);
+                loop_var_reg = allocate_register();
+                bind_variable(stmt.loopVars[0], loop_var_reg);
+                index_reg = allocate_register();
+                emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, index_reg, make_i64(-1)));
+                set_register_type(index_reg, int_type);
+                one_reg = allocate_register();
+                emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, one_reg, make_i64(1)));
+                set_register_type(one_reg, int_type);
+            },
+            [&]() {
+                Reg next = allocate_register();
+                emit_instruction(LIR_Inst(LIR_Op::Add, next, index_reg, one_reg));
+                emit_instruction(LIR_Inst(LIR_Op::Mov, index_reg, next, 0));
+            },
+            [&]() -> Reg {
+                Reg len_reg = allocate_register();
+                emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, len_reg, make_i64(len)));
+                set_register_type(len_reg, int_type);
+                Reg cmp = allocate_register();
+                emit_instruction(LIR_Inst(LIR_Op::CmpLT, cmp, index_reg, len_reg));
+                set_register_type(cmp, bool_type);
+                return cmp;
+            },
+            [&]() {
+                Reg elem = allocate_register();
+                TypePtr raw_elem = raw_int_iter_type(get_register_type(list_reg), 0);
+                emit_instruction(LIR_Inst(LIR_Op::ListIndex, raw_elem ? Type::I64 : Type::Ptr, elem, list_reg, index_reg));
+                set_register_type(elem, raw_elem ? raw_elem : any_type);
+                emit_instruction(LIR_Inst(LIR_Op::Mov, loop_var_reg, elem, 0));
+                set_register_type(loop_var_reg, raw_elem ? raw_elem : any_type);
+            });
+        return;
+    }
+
+    if (dict_expr) {
+        if (stmt.loopVars.size() != 1) {
+            report_error("dict iteration currently supports only one loop variable");
+            return;
+        }
+        Reg dict_reg = 0, loop_var_reg = 0, index_reg = 0, one_reg = 0;
+        int64_t len = static_cast<int64_t>(dict_expr->entries.size());
+        emit_linear_iter_loop(
+            stmt,
+            [&]() {
+                dict_reg = emit_dict_expr(*dict_expr);
+                loop_var_reg = allocate_register();
+                bind_variable(stmt.loopVars[0], loop_var_reg);
+                index_reg = allocate_register();
+                emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, index_reg, make_i64(-1)));
+                set_register_type(index_reg, int_type);
+                one_reg = allocate_register();
+                emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, one_reg, make_i64(1)));
+                set_register_type(one_reg, int_type);
+            },
+            [&]() {
+                Reg next = allocate_register();
+                emit_instruction(LIR_Inst(LIR_Op::Add, next, index_reg, one_reg));
+                emit_instruction(LIR_Inst(LIR_Op::Mov, index_reg, next, 0));
+            },
+            [&]() -> Reg {
+                Reg len_reg = allocate_register();
+                emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, len_reg, make_i64(len)));
+                set_register_type(len_reg, int_type);
+                Reg cmp = allocate_register();
+                emit_instruction(LIR_Inst(LIR_Op::CmpLT, cmp, index_reg, len_reg));
+                set_register_type(cmp, bool_type);
+                return cmp;
+            },
+            [&]() {
+                // Same simplified key-per-index form as emit_dict_iter_stmt.
+                Reg key_reg = allocate_register();
+                LIR_Inst items_inst(LIR_Op::DictItems, Type::Ptr, key_reg, 0, 0);
+                items_inst.call_args = {dict_reg, index_reg};
+                emit_instruction(items_inst);
+                set_register_type(key_reg, str_type);
+                emit_instruction(LIR_Inst(LIR_Op::Mov, loop_var_reg, key_reg, 0));
+                set_register_type(loop_var_reg, str_type);
+            });
+        return;
+    }
+
+    if (tuple_expr) {
+        if (stmt.loopVars.size() != 1) {
+            report_error("tuple iteration currently supports only one loop variable");
+            return;
+        }
+        Reg tuple_reg = 0, loop_var_reg = 0, index_reg = 0, one_reg = 0;
+        int64_t len = static_cast<int64_t>(tuple_expr->elements.size());
+        emit_linear_iter_loop(
+            stmt,
+            [&]() {
+                tuple_reg = emit_tuple_expr(*tuple_expr);
+                loop_var_reg = allocate_register();
+                bind_variable(stmt.loopVars[0], loop_var_reg);
+                index_reg = allocate_register();
+                emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, index_reg, make_i64(-1)));
+                set_register_type(index_reg, int_type);
+                one_reg = allocate_register();
+                emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, one_reg, make_i64(1)));
+                set_register_type(one_reg, int_type);
+            },
+            [&]() {
+                Reg next = allocate_register();
+                emit_instruction(LIR_Inst(LIR_Op::Add, next, index_reg, one_reg));
+                emit_instruction(LIR_Inst(LIR_Op::Mov, index_reg, next, 0));
+            },
+            [&]() -> Reg {
+                Reg len_reg = allocate_register();
+                emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, len_reg, make_i64(len)));
+                set_register_type(len_reg, int_type);
+                Reg cmp = allocate_register();
+                emit_instruction(LIR_Inst(LIR_Op::CmpLT, cmp, index_reg, len_reg));
+                set_register_type(cmp, bool_type);
+                return cmp;
+            },
+            [&]() {
+                Reg elem = allocate_register();
+                emit_instruction(LIR_Inst(LIR_Op::TupleGet, Type::Ptr, elem, tuple_reg, index_reg));
+                set_register_type(elem, any_type);
+                emit_instruction(LIR_Inst(LIR_Op::Mov, loop_var_reg, elem, 0));
+                set_register_type(loop_var_reg, any_type);
+            });
+        return;
+    }
+
+    // Variable or general-expression iterable: resolve the register once, then
+    // dispatch on its type like emit_iter_over_value does in CFG mode.
+    Reg iterable_reg = UINT32_MAX;
+    TypePtr iterable_type = nullptr;
+    if (var_expr) {
+        iterable_reg = resolve_variable(var_expr->name);
+        if (iterable_reg == UINT32_MAX) {
+            report_error("Undefined variable: " + var_expr->name);
+            return;
+        }
+        iterable_type = get_register_type(iterable_reg);
+        if (!iterable_type) {
+            iterable_type = get_register_language_type(iterable_reg);
+        }
+        if (!iterable_type) {
+            iterable_type = var_expr->inferred_type;
+        }
+    } else {
+        iterable_reg = emit_expr(*stmt.iterable);
+        iterable_type = get_register_type(iterable_reg);
+        if (!iterable_type) {
+            iterable_type = get_register_language_type(iterable_reg);
+        }
+        if (!iterable_type) {
+            iterable_type = stmt.iterable->inferred_type;
+        }
+    }
+    if (!iterable_type) {
+        report_error("Cannot determine type of iter expression");
+        return;
+    }
+
+    if (iterable_type->tag == TypeTag::List) {
+        if (stmt.loopVars.size() != 1) {
+            report_error("list iteration currently supports only one loop variable");
+            return;
+        }
+        // Mirror the tuple fallback in emit_list_var_iter_stmt.
+        TypePtr reg_type = get_register_type(iterable_reg);
+        bool use_tuple_get = reg_type && reg_type->tag == TypeTag::Tuple;
+        Reg loop_var_reg = 0, index_reg = 0, one_reg = 0;
+        emit_linear_iter_loop(
+            stmt,
+            [&]() {
+                loop_var_reg = allocate_register();
+                bind_variable(stmt.loopVars[0], loop_var_reg);
+                index_reg = allocate_register();
+                emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, index_reg, make_i64(-1)));
+                set_register_type(index_reg, int_type);
+                one_reg = allocate_register();
+                emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, one_reg, make_i64(1)));
+                set_register_type(one_reg, int_type);
+            },
+            [&]() {
+                Reg next = allocate_register();
+                emit_instruction(LIR_Inst(LIR_Op::Add, next, index_reg, one_reg));
+                emit_instruction(LIR_Inst(LIR_Op::Mov, index_reg, next, 0));
+            },
+            [&]() -> Reg {
+                // Header: ListLen re-read per iteration, like the CFG version.
+                Reg len_reg = allocate_register();
+                emit_instruction(LIR_Inst(LIR_Op::ListLen, Type::I64, len_reg, iterable_reg));
+                set_register_type(len_reg, int_type);
+                Reg cmp = allocate_register();
+                emit_instruction(LIR_Inst(LIR_Op::CmpLT, cmp, index_reg, len_reg));
+                set_register_type(cmp, bool_type);
+                return cmp;
+            },
+            [&]() {
+                Reg elem = allocate_register();
+                TypePtr raw_elem = use_tuple_get ? nullptr : raw_int_iter_type(iterable_type, 0);
+                if (use_tuple_get) {
+                    emit_instruction(LIR_Inst(LIR_Op::TupleGet, Type::Ptr, elem, iterable_reg, index_reg));
+                } else {
+                    emit_instruction(LIR_Inst(LIR_Op::ListIndex, raw_elem ? Type::I64 : Type::Ptr, elem, iterable_reg, index_reg));
+                }
+                set_register_type(elem, raw_elem ? raw_elem : any_type);
+                emit_instruction(LIR_Inst(LIR_Op::Mov, loop_var_reg, elem, 0));
+                set_register_type(loop_var_reg, raw_elem ? raw_elem : any_type);
+            });
+        return;
+    }
+
+    if (iterable_type->tag == TypeTag::String) {
+        if (stmt.loopVars.size() != 1) {
+            report_error("string iteration supports exactly one loop variable");
+            return;
+        }
+        Reg offset_reg = 0, len_reg = 0, loop_var_reg = 0;
+        emit_linear_iter_loop(
+            stmt,
+            [&]() {
+                offset_reg = allocate_register();
+                emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, offset_reg, make_i64(0)));
+                set_register_type(offset_reg, int_type);
+                len_reg = allocate_register();
+                emit_instruction(LIR_Inst(LIR_Op::CallBuiltin, len_reg, "_builtin_string_byte_len", {iterable_reg}));
+                set_register_type(len_reg, int_type);
+                loop_var_reg = allocate_register();
+                set_register_type(loop_var_reg, int_type);
+                bind_variable(stmt.loopVars[0], loop_var_reg);
+            },
+            []() {},
+            [&]() -> Reg {
+                Reg cmp = allocate_register();
+                set_register_type(cmp, bool_type);
+                emit_instruction(LIR_Inst(LIR_Op::CmpLT, cmp, offset_reg, len_reg));
+                return cmp;
+            },
+            [&]() {
+                // Decode the next codepoint and advance the offset, as in
+                // emit_string_var_iter_stmt. The advance happens before the body
+                // statements, so `continue` (header = re-test offset < len) is safe.
+                Reg res_reg = allocate_register();
+                emit_instruction(LIR_Inst(LIR_Op::CallBuiltin, res_reg, "_builtin_string_decode_next", {iterable_reg, offset_reg}));
+
+                Reg shift_const = allocate_register();
+                emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, shift_const, make_i64(8)));
+                emit_instruction(LIR_Inst(LIR_Op::Shr, loop_var_reg, res_reg, shift_const));
+
+                Reg consumed_reg = allocate_register();
+                Reg mask_const = allocate_register();
+                emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, mask_const, make_i64(0xFF)));
+                emit_instruction(LIR_Inst(LIR_Op::And, consumed_reg, res_reg, mask_const));
+
+                Reg next_offset = allocate_register();
+                set_register_type(next_offset, int_type);
+                emit_instruction(LIR_Inst(LIR_Op::Add, next_offset, offset_reg, consumed_reg));
+                emit_instruction(LIR_Inst(LIR_Op::Mov, offset_reg, next_offset, 0));
+            });
+        return;
+    }
+
+    if (iterable_type->tag == TypeTag::Dict) {
+        if (stmt.loopVars.size() != 1 && stmt.loopVars.size() != 2) {
+            report_error("dict iteration supports one or two loop variables");
+            return;
+        }
+        Reg items_reg = 0, index_reg = 0, one_reg = 0, key_reg = 0, val_reg = 0;
+        bool two_vars = stmt.loopVars.size() == 2;
+        emit_linear_iter_loop(
+            stmt,
+            [&]() {
+                // Same DictItems materialization as emit_dict_var_iter_stmt.
+                items_reg = allocate_register();
+                emit_instruction(LIR_Inst(LIR_Op::DictItems, Type::Ptr, items_reg, iterable_reg));
+
+                index_reg = allocate_register();
+                emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, index_reg, make_i64(-1)));
+                set_register_type(index_reg, int_type);
+                one_reg = allocate_register();
+                emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, one_reg, make_i64(1)));
+                set_register_type(one_reg, int_type);
+
+                key_reg = allocate_register();
+                bind_variable(stmt.loopVars[0], key_reg);
+                if (two_vars) {
+                    val_reg = allocate_register();
+                    bind_variable(stmt.loopVars[1], val_reg);
+                }
+            },
+            [&]() {
+                Reg next = allocate_register();
+                emit_instruction(LIR_Inst(LIR_Op::Add, next, index_reg, one_reg));
+                emit_instruction(LIR_Inst(LIR_Op::Mov, index_reg, next, 0));
+            },
+            [&]() -> Reg {
+                Reg len_reg = allocate_register();
+                emit_instruction(LIR_Inst(LIR_Op::ListLen, Type::I64, len_reg, items_reg));
+                set_register_type(len_reg, int_type);
+                Reg cmp = allocate_register();
+                emit_instruction(LIR_Inst(LIR_Op::CmpLT, cmp, index_reg, len_reg));
+                set_register_type(cmp, bool_type);
+                return cmp;
+            },
+            [&]() {
+                // Raw-integer dict parts keep their concrete type (see
+                // raw_int_iter_type): `any`/Ptr misreads small ints in AOT.
+                TypePtr raw_key = raw_int_iter_type(iterable_type, 1);
+                TypePtr raw_val = raw_int_iter_type(iterable_type, 2);
+                Reg tuple_reg = allocate_register();
+                emit_instruction(LIR_Inst(LIR_Op::ListIndex, Type::Ptr, tuple_reg, items_reg, index_reg));
+                set_register_type(tuple_reg, any_type);
+
+                Reg idx0 = allocate_register();
+                emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, idx0, make_i64(0)));
+                set_register_type(idx0, int_type);
+                emit_instruction(LIR_Inst(LIR_Op::TupleGet, raw_key ? Type::I64 : Type::Ptr, key_reg, tuple_reg, idx0));
+                set_register_type(key_reg, raw_key ? raw_key : any_type);
+
+                if (two_vars) {
+                    Reg idx1 = allocate_register();
+                    emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, idx1, make_i64(1)));
+                    set_register_type(idx1, int_type);
+                    emit_instruction(LIR_Inst(LIR_Op::TupleGet, raw_val ? Type::I64 : Type::Ptr, val_reg, tuple_reg, idx1));
+                    set_register_type(val_reg, raw_val ? raw_val : any_type);
+                }
+            });
+        return;
+    }
+
+    if (iterable_type->tag == TypeTag::Tuple) {
+        if (stmt.loopVars.size() != 1) {
+            report_error("tuple iteration currently supports only one loop variable");
+            return;
+        }
+        int64_t tuple_len = 0;
+        auto* tuple_type_ptr = std::get_if<TupleType>(&iterable_type->extra);
+        if (tuple_type_ptr) {
+            tuple_len = static_cast<int64_t>(tuple_type_ptr->elementTypes.size());
+        }
+        Reg loop_var_reg = 0, index_reg = 0, one_reg = 0;
+        emit_linear_iter_loop(
+            stmt,
+            [&]() {
+                loop_var_reg = allocate_register();
+                bind_variable(stmt.loopVars[0], loop_var_reg);
+                index_reg = allocate_register();
+                emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, index_reg, make_i64(-1)));
+                set_register_type(index_reg, int_type);
+                one_reg = allocate_register();
+                emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, one_reg, make_i64(1)));
+                set_register_type(one_reg, int_type);
+            },
+            [&]() {
+                Reg next = allocate_register();
+                emit_instruction(LIR_Inst(LIR_Op::Add, next, index_reg, one_reg));
+                emit_instruction(LIR_Inst(LIR_Op::Mov, index_reg, next, 0));
+            },
+            [&]() -> Reg {
+                Reg len_reg = allocate_register();
+                emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, len_reg, make_i64(tuple_len)));
+                set_register_type(len_reg, int_type);
+                Reg cmp = allocate_register();
+                emit_instruction(LIR_Inst(LIR_Op::CmpLT, cmp, index_reg, len_reg));
+                set_register_type(cmp, bool_type);
+                return cmp;
+            },
+            [&]() {
+                Reg elem = allocate_register();
+                emit_instruction(LIR_Inst(LIR_Op::TupleGet, Type::Ptr, elem, iterable_reg, index_reg));
+                set_register_type(elem, any_type);
+                emit_instruction(LIR_Inst(LIR_Op::Mov, loop_var_reg, elem, 0));
+                set_register_type(loop_var_reg, any_type);
+            });
+        return;
+    }
+
+    // Channel iteration (matches the CFG channel path: exit when poll yields nil).
+    if (stmt.loopVars.size() != 1) {
+        report_error("channel iteration requires exactly one loop variable");
+        return;
+    }
+    Reg loop_var_reg = 0, poll_reg = 0;
+    auto nil_type = std::make_shared<::Type>(::TypeTag::Nil);
+    emit_linear_iter_loop(
+        stmt,
+        [&]() {
+            loop_var_reg = allocate_register();
+            bind_variable(stmt.loopVars[0], loop_var_reg);
+        },
+        []() {},
+        [&]() -> Reg {
+            poll_reg = allocate_register();
+            emit_instruction(LIR_Inst(LIR_Op::ChannelPoll, poll_reg, iterable_reg, 0));
+            set_register_type(poll_reg, any_type);
+
+            Reg nil_reg = allocate_register();
+            emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Void, nil_reg, VAL_NIL));
+            set_register_type(nil_reg, nil_type);
+
+            Reg is_nil_reg = allocate_register();
+            emit_instruction(LIR_Inst(LIR_Op::CmpEQ, is_nil_reg, poll_reg, nil_reg));
+            set_register_type(is_nil_reg, bool_type);
+            return is_nil_reg;
+        },
+        [&]() {
+            emit_instruction(LIR_Inst(LIR_Op::Mov, loop_var_reg, poll_reg, 0));
+            set_register_type(loop_var_reg, any_type);
+        },
+        LIR_Op::JumpIf);
+}
+
+
 void Generator::emit_break_stmt(LM::Frontend::AST::BreakStatement& stmt) {
     uint32_t break_label = get_break_label();
     if (break_label != INVALID_LOOP_LABEL) {
@@ -1896,11 +2580,17 @@ void Generator::emit_break_stmt(LM::Frontend::AST::BreakStatement& stmt) {
             for (size_t i = generator_region_stack_.size(); i > depth; --i)
                 emit_instruction(LIR_Inst(LIR_Op::RegionExit, Type::Void, 0, 0, 0, generator_region_stack_[i - 1]));
         }
-        emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, break_label));
-        // Add edge to break target block
-        LIR_BasicBlock* break_target = current_function_->cfg->get_block(break_label);
-        if (break_target) {
-            add_block_edge(get_current_block(), break_target);
+        if (!loop_stack_.empty() && loop_stack_.back().symbolic_labels) {
+            // Linear iter loop: end_label is a symbolic id resolved at function
+            // close, not an instruction index.
+            emit_label_jump(LIR_Op::Jump, 0, break_label);
+        } else {
+            emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, break_label));
+            // Add edge to break target block
+            LIR_BasicBlock* break_target = current_function_->cfg->get_block(break_label);
+            if (break_target) {
+                add_block_edge(get_current_block(), break_target);
+            }
         }
         // Mark current block as terminated to prevent further instruction generation
         if (get_current_block()) {
@@ -1923,10 +2613,12 @@ void Generator::emit_continue_stmt(LM::Frontend::AST::ContinueStatement& stmt) {
                 emit_instruction(LIR_Inst(LIR_Op::RegionExit, Type::Void, 0, 0, 0, generator_region_stack_[i - 1]));
         }
         emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, continue_label));
-        // Add edge to continue target block
-        LIR_BasicBlock* continue_target = current_function_->cfg->get_block(continue_label);
-        if (continue_target) {
-            add_block_edge(get_current_block(), continue_target);
+        // Add edge to continue target block (raw block ids exist in CFG mode only).
+        if (cfg_context_.building_cfg) {
+            LIR_BasicBlock* continue_target = current_function_->cfg->get_block(continue_label);
+            if (continue_target) {
+                add_block_edge(get_current_block(), continue_target);
+            }
         }
         // Mark current block as terminated to prevent further instruction generation
         if (get_current_block()) {

@@ -652,6 +652,25 @@ TypePtr TypeChecker::check_iter_statement(std::shared_ptr<LM::Frontend::AST::Ite
                 key_type = element_type;
                 recognized = true;
                 break;
+            case TypeTag::Tuple: {
+                // Heterogeneous tuples iterate as any; homogeneous tuples bind
+                // to the shared element type.
+                auto* tt = std::get_if<TupleType>(&iterable_type->extra);
+                if (tt && !tt->elementTypes.empty()) {
+                    bool homogeneous = true;
+                    for (size_t i = 1; i < tt->elementTypes.size(); ++i) {
+                        if (!tt->elementTypes[i] ||
+                            tt->elementTypes[i]->toString() != tt->elementTypes[0]->toString()) {
+                            homogeneous = false;
+                            break;
+                        }
+                    }
+                    if (homogeneous) element_type = tt->elementTypes[0];
+                }
+                key_type = element_type;
+                recognized = true;
+                break;
+            }
             case TypeTag::Channel:
                 // Channels currently carry no typed element info; default to any.
                 element_type = type_system.ANY_TYPE;

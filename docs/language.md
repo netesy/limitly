@@ -266,16 +266,16 @@ iter (key, value in dict) { body }            // dict
 
 Two facts that bite in practice:
 
-- **Always use the two-variable form for dictionaries.** `iter (key in dict)`
-  type-checks the loop variable as the key, but at run time the variable holds
-  the `(key, value)` pair, so printing it yields `(a, 1)` instead of `a`. The
-  two-variable form is the only one that binds real keys and values.
+- **Dictionaries.** `iter (key in dict)` binds the **key** (matching its
+  type-check); use the two-variable form `iter (key, value in dict)` to reach
+  values. (Earlier builds bound the whole `(key, value)` pair for the
+  single-variable form and aborted the compiler when `iter` appeared inside a
+  frame method; both defects were fixed on 2026-10-31, verified on VM and AOT.)
 - **A string iterates as code points**, not characters: `iter (cp in "AB")`
   yields `65`, `66`. Slice with `substring` when you want characters.
 
-`iter` over a dictionary must not appear inside a frame method - it aborts the
-compiler with an access violation. Iterate in a free function (or use an index
-`while` loop over `iter`'s result) and call that from the method.
+`iter` works inside frame methods — list, dict, range and string iteration all
+lower correctly in linear (method) mode and match the VM at every opt level.
 
 `in` is a keyword but **not an expression operator**: it only appears in the
 `iter`/`for` clauses. For dictionary containment, read the key and compare

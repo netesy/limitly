@@ -48,8 +48,8 @@ This document provides essential guidelines for AI agents generating code for th
  - `while (cond) { ... }`
  - `for (var i = 0; i < 10; i = i + 1) { ... }`
  - `iter (item in collection) { ... }` (for lists, ranges, channels)  
-   `iter (key, value in dict) { ... }` (**always this form for dictionaries** - the single-variable form type-checks as the key but holds the `(key, value)` pair at run time)  
-   `iter` inside a **frame method** aborts the compiler; loop in a free function instead. `in` is not an expression operator: test dictionary containment with `if (dict[key] != nil)`.
+   `iter (key, value in dict) { ... }` (two-variable form unpacks pairs; the single-variable form `iter (key in dict)` binds the **key**)  
+   `iter` works inside **frame methods**. `in` is not an expression operator: test dictionary containment with `if (dict[key] != nil)`.
 - **Pattern Matching (Match)**: Uses block syntax `pattern => { statements }`.
  ```lymar
  match (value) {

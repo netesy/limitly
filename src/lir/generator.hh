@@ -14,6 +14,7 @@
 #include <unordered_set>
 #include <optional>
 #include <variant>
+#include <functional>
 
 namespace LM {
 namespace LIR {
@@ -277,6 +278,14 @@ private:
     void emit_concurrent_worker_init(LM::Frontend::AST::WorkerStatement& worker, size_t worker_id, Reg scheduler_reg, Reg channel_reg);
     void emit_worker_stmt(LM::Frontend::AST::WorkerStatement& stmt);
     void emit_iter_stmt(LM::Frontend::AST::IterStatement& stmt);
+    void emit_iter_stmt_linear(LM::Frontend::AST::IterStatement& stmt);
+    void emit_linear_iter_loop(LM::Frontend::AST::IterStatement& stmt,
+                               const std::function<void()>& prologue,
+                               const std::function<void()>& advance,
+                               const std::function<Reg()>& cond,
+                               const std::function<void()>& body_pre,
+                               LIR_Op exit_jump = LIR_Op::JumpIfFalse);
+    void emit_iter_over_value(LM::Frontend::AST::IterStatement& stmt, Reg iterable_reg, TypePtr iterable_type);
     void emit_dict_iter_stmt(LM::Frontend::AST::IterStatement& stmt, LM::Frontend::AST::DictExpr& dict_expr);
     void emit_list_iter_stmt(LM::Frontend::AST::IterStatement& stmt, LM::Frontend::AST::ListExpr& list_expr);
     void emit_tuple_iter_stmt(LM::Frontend::AST::IterStatement& stmt, LM::Frontend::AST::TupleExpr& tuple_expr);
@@ -316,6 +325,11 @@ private:
         uint32_t end_label;
         uint32_t continue_label;
         size_t region_depth;
+        // Linear-mode iter loops wire break/continue through symbolic labels
+        // (place_label/emit_label_jump) because the exit position is unknown
+        // while the body is being lowered. CFG and legacy linear loops keep
+        // using raw instruction indices.
+        bool symbolic_labels = false;
     };
 
     struct CFGContext {

@@ -663,7 +663,8 @@ uint32_t Generator::generate_label() {
 
 
 void Generator::enter_loop() {
-    loop_stack_.push_back({INVALID_LOOP_LABEL, INVALID_LOOP_LABEL, INVALID_LOOP_LABEL, generator_region_stack_.size()}); // Placeholder, will be set by set_loop_labels
+    LoopContext ctx{INVALID_LOOP_LABEL, INVALID_LOOP_LABEL, INVALID_LOOP_LABEL, generator_region_stack_.size(), false}; // Placeholder, will be set by set_loop_labels
+    loop_stack_.push_back(ctx);
 }
 
 

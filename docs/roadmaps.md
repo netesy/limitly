@@ -20,6 +20,7 @@ what actually matters, and in what order to build it.
 | # | Item | Class | New LIR surface? | Cost | Depends on |
 |---|---|---|---|---|---|
 | 1 | Finish `staged fn` (compile-time execution) — folding, type path, sandbox done | Essential | No (folds at AST; VM-fallback reuses canonical LIR) | Med | — |
+| 1b | Staged frames — mint **new** named frames at comptime (the Option/Result shape generator) | Essential | No (stage 0 emits ordinary frame ASTs) | Med | 1; iter prerequisites (closed) |
 | 2 | Seamless C interop + foreign `.c/.cpp` linking | Capability | No (reuses existing FFI ops) | Med | 1 (comptime bindings) |
 | 3 | Generators (`yield`) over a coroutine substrate | Sugar | Fix existing effect ops | Med | — |
 | 4 | SIMD: auto-vectorize fused numeric streams | Capability | Phase 1: no; Phase 2: yes | Med–High | 3 (fusion input) |
@@ -50,10 +51,12 @@ Verification: `python scripts/audit_stdlib.py` imports every module in `std/` an
 117/117, the memory negative tree is 90/90, and the staged parity harness matches
 byte-for-byte on all five staged tests.
 
-The two compiler defects this surfaced are still open, and both are worked around in the
-stdlib rather than fixed: `iter` inside a frame method aborts the compiler, and the
-single-variable `iter (key in dict)` binds the `(key, value)` pair at run time while
-type-checking as the key. See `docs/language.md` §4.2.
+The two compiler defects this surfaced are **fixed as of 2026-10-31**: `iter`
+inside a frame method now compiles (linear-mode loop lowering for methods), and
+the single-variable `iter (key in dict)` binds the key, matching what the type
+checker declares. Both were verified on VM **and** AOT (item 1b prerequisites,
+below); the stdlib workarounds can be retired on the next std pass.
+`docs/language.md` §4.2 and AGENTS.md document the supported behavior.
 
 ---
 
@@ -335,6 +338,104 @@ residual to LIR, so nothing here touches a backend.
   rejects signal exits and sanitizer aborts); that is what the sandbox regressions above are
   verified with, 90 passed. Repairing the dedicated runner is a mechanical re-indent of 431 lines
   and deserves its own pass.
+- **AOT/VM divergence in `iter` loops, surfaced while verifying the item-1b
+  prerequisites.** *(fixed, both backends verified at -O0/-O1/-O2)* Two distinct causes, one
+  in Fyra, one in the LIR→Fyra lowering:
+  - **Fyra O2 `LoopRotate` broke `break`-inside-`iter`.** Its exit-phi machinery only ever
+    gives the exit block the incoming pair `{preheader-init, latch}`. A `break` edge reaches
+    the loop exit from a block that is **not part of the natural loop** (the backward walk
+    from the latch never reaches a block that only flows to the exit), so rotation left that
+    edge without a phi incoming and `emitPhiCopies` silently dropped the copy — the join
+    read an uninitialized slot (`0` / garbage at -O2 only, correct at -O0/-O1). Fix: refuse
+    rotation when the exit block has any predecessor outside `{header, latch}` —
+    conservative, in keeping with the pass's other bail-outs (`vendor/fyra`
+    `src/transforms/LoopRotate.cpp`). A Fyra-repo change: commit Fyra first, then bump the
+    superproject gitlink.
+  - **Raw small ints travelled with object-pointer value kinds.** `iter` bindings were
+    stamped `any`/`Ptr` at every generator site, and the typed-primitive list fast path
+    loads the **raw unboxed word**, so AOT consumers applied the object-kind model to plain
+    integers: `1` printed as `true`, `2` as `nil`, and dict-value sums went wrong — at
+    **every** opt level, linear and CFG modes alike. Fix at the source: the LIR generator
+    stamps the iter binding with the container's concrete integer element/key/value
+    language type when one is known (`raw_int_iter_type`,
+    `src/lir/generator/statements.cpp`), and the Fyra builder propagates it (the
+    `ListIndex` fast path retypes the load to `I64`; `Mov` keeps a concrete scalar kind
+    into an `any` binding instead of forcing `Ptr`). The VM path is untouched; AOT output
+    is now byte-identical to the VM for `break`-in-`iter`, list-`iter` and dict-`iter`
+    probes.
+
+### 1b. Staged frames — the generics replacement for data shapes  [Essential]
+
+> **Status:** planned. This extends item 1's staging mechanism from *selecting*
+> types to *generating* them. Its two prerequisites (`iter` in a frame method;
+> single-variable dict `iter` key binding) closed on 2026-10-31, together with the
+> AOT/VM parity defects above — generated frame methods may use any supported
+> construct and must conform on both backends from day one.
+
+`staged fn : type` can pick, alias, union and compose **existing** types. It cannot
+mint a new one — and the remaining generics gap is exactly a *shape-generating*
+need: `Option(T)` and `Result(T, E)` are per-`T` **frames** with fields, an `init`,
+constructors (`Some(v)`, `Ok(v)`) and methods (`.map()`, `.unwrap()`). A staged fn
+returns the annotation but no constructor and no methods; the only escape hatch is
+hand-declaring a monomorphic frame per `T` (what `tests/staged/staged_type_fn_test.lm`
+does), which is more code than `any` and is the layer the stdlib transition just
+deleted. Staged frames make that layer generated instead of hand-written.
+
+Design intent — `staged frame` is a frame **template**, instantiated on demand:
+
+```lymar
+staged frame Option(T: type) {
+    pub var tag: int;               // 0 = None, 1 = Some
+    pub var value: T;
+
+    pub fn unwrap(): T {
+        if (self.tag == 0) { return err(); }
+        return self.value;
+    }
+}
+
+var x: Option(int);                 // type position = instantiation request
+```
+
+- **Demand-driven monomorphization.** A use of `Option(int)` in a type position
+  registers the request; each distinct argument tuple generates exactly one real
+  frame, cached. The generated artifact is an *ordinary* frame — same fields,
+  `init`/`deinit` lifecycle, same vtable dispatch, lowered through the existing
+  frame path. **No new LIR surface**, so VM and AOT conform by construction
+  (Backend Conformance rule: the generator must not change for a backend).
+- **Nominal identity.** `Option(int)` and `Option(str)` are distinct, unrelated
+  frames; there is no runtime type-erasure tag on the value, no `any` in the
+  representation. Kind bounds (`: type`, `: enum`, `: frame`) carry over from
+  item 1 step 2, so a template only accepts the kinds its body can actually use.
+- **No `<T>` syntax.** `Name(args)` in type position reuses the parser path that
+  item 1 step 2 established for annotation arguments like `vector(8, int)` — one
+  compile-time spelling, per the "no parallel mechanisms" rule. If `<T>` sugar ever
+  ships it must desugar to this, never to a second instantiation machinery.
+
+**Build:**
+1. Frontend: parse `staged frame Name(P: type, ...) { ... }` — a frame body whose
+   field types, `init` and method signatures may mention the meta-parameters.
+   Kind-bound spelling identical to item 1 step 2; reject instantiation *inside* a
+   `staged frame` body (recursion is guarded centrally in step 2, not per-template).
+2. Checker: instantiation requests. Resolve `Name(args)` in annotation/parameter/
+   alias positions against registered templates; canonicalize the argument tuple
+   (type identity, not spelling); one generated frame per distinct tuple; depth and
+   count caps charged through `TypeChecker::stage0_charge` so `Option(Option(Option(…)))`
+   runaway fails closed with the documented sandbox errors.
+3. Synthesis: substitute meta-arguments into field types, `init`, and method
+   bodies, then register the result as a regular `frame` **before** codegen runs.
+   Generated methods are ordinary methods — `iter` (including inside frame methods,
+   now that the prerequisite is fixed), fallible returns, trait conformance all work
+   with no special cases.
+4. Stdlib: express `Option`/`Result` shapes in `std.core` as staged frames and
+   delete the remaining hand-written per-type wrappers; `T?` / `T?Error` sugar
+   stays the preferred spelling where it suffices (AGENTS.md: staged frames do not
+   replace fallible types, they generate the shapes fallible types cannot).
+5. Tests: positives (nominal identity, nested instantiation, method dispatch,
+   trait conformance of a generated frame, AOT≡VM parity at -O0/-O1/-O2), negatives
+   (kind-bound violation at the request site, over-depth runaway, unknown
+   template), and the staged-parity harness extended to drive every generated
+   body through `LYMAR_STAGE0_FORCE_VM`-style reconciliation.
 
 ### 2. Seamless C interop — and foreign `.c/.cpp` source  [Capability]
 

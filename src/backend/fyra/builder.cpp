@@ -827,8 +827,16 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 if (reg_types.count(inst.a)) reg_types[inst.dst] = reg_types[inst.a];
                 else if (inst.type_a != LIR::Type::Void) reg_types[inst.dst] = inst.type_a;
                 auto destination_type = reg_types.count(inst.dst) ? reg_types[inst.dst] : inst.result_type;
-                if (auto info = lir_func.register_language_types.find(inst.dst); info != lir_func.register_language_types.end() && info->second && info->second->tag == ::TypeTag::Any)
-                    destination_type = LIR::Type::Ptr;
+                if (auto info = lir_func.register_language_types.find(inst.dst); info != lir_func.register_language_types.end() && info->second && info->second->tag == ::TypeTag::Any) {
+                    // An `any` binding must still carry the dynamic kind of a
+                    // concrete scalar source (e.g. a typed-list iter element):
+                    // the raw word is not a pointer, and object-kind consumers
+                    // would misread it. Erase to Ptr only for non-scalar sources.
+                    auto src = reg_types.find(inst.a);
+                    const bool src_is_scalar = src != reg_types.end() &&
+                        src->second != LIR::Type::Ptr && src->second != LIR::Type::Void;
+                    if (!src_is_scalar) destination_type = LIR::Type::Ptr;
+                }
                 // A move copies the value and its dynamic kind. In particular,
                 // a missing typed-container lookup remains nil through aliases.
                 store_reg(inst.dst, load_reg(inst.a, inst.type_a), destination_type, true);
@@ -2108,7 +2116,29 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     ir::Value* elem_addr = builder_->createAdd(data_ptr, offset);
                     ir::Instruction* elem = builder_->createLoadl(elem_addr);
                     elem->setName("scalar_elem_" + lidx_id);
-                    store_reg(inst.dst, elem, inst.result_type);
+                    // The typed-primitive fast path loads the raw unboxed word.
+                    // Stamp the destination with the element's real scalar kind
+                    // so downstream consumers (print, arithmetic) do not treat
+                    // an integer word as an object pointer and misclassify it
+                    // (e.g. value 1 rendering as "true", 2 as "nil").
+                    LIR::Type elem_type = inst.result_type;
+                    auto lit = lir_func.register_language_types.find(inst.a);
+                    if (lit != lir_func.register_language_types.end() && lit->second &&
+                        lit->second->tag == ::TypeTag::List) {
+                        if (auto* lt = std::get_if<ListType>(&lit->second->extra); lt && lt->elementType) {
+                            switch (lt->elementType->tag) {
+                                case ::TypeTag::Int:
+                                case ::TypeTag::Int8: case ::TypeTag::Int16:
+                                case ::TypeTag::Int32: case ::TypeTag::Int64:
+                                case ::TypeTag::UInt:
+                                case ::TypeTag::UInt8: case ::TypeTag::UInt16:
+                                case ::TypeTag::UInt32: case ::TypeTag::UInt64:
+                                    elem_type = LIR::Type::I64; break;
+                                default: break;
+                            }
+                        }
+                    }
+                    store_reg(inst.dst, elem, elem_type);
                     break;
                 }
 
