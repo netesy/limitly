@@ -1085,8 +1085,22 @@ int64_t lymar_aot_numeric_compare(uint64_t left, uint64_t right, uint64_t left_k
         auto a = *integer_number(left, left_kind), b = *integer_number(right, right_kind);
         return a < b ? -1 : a > b ? 1 : 0;
     }
-    // Match the VM's tagged ordering for nonnumeric immediates. Object
-    // ordering remains identity ordering, as in numeric_compare in the VM.
+    // Lexicographic string ordering (type-id 11): length at +8, bytes at +24.
+    // Mirrors numeric_compare in the VM so relational operators on str are
+    // equivalent across the VM, native, AOT and Fyra backends.
+    if (ltype == 11 && rtype == 11) {
+        auto la = read_word(left, 8), lb = read_word(right, 8);
+        auto n = la < lb ? la : lb;
+        int c = n ? std::memcmp(reinterpret_cast<void*>(left + 24),
+                                reinterpret_cast<void*>(right + 24), n) : 0;
+        if (c < 0) return -1;
+        if (c > 0) return 1;
+        if (la < lb) return -1;
+        if (la > lb) return 1;
+        return 0;
+    }
+    // Match the VM's tagged ordering for nonnumeric, non-string immediates.
+    // Object ordering remains identity ordering, as in numeric_compare in the VM.
     auto tagged = [&](Word value, Word kind) -> Word {
         if (kind == 0) return (value << 3) | 1;
         if (kind == boolean_kind) return value ? 18 : 10;

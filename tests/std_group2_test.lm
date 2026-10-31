@@ -15,6 +15,13 @@ fn descending_compare(a: any, b: any): int {
     return 0;
 }
 
+// Min-heap comparator for PriorityQueue(int).
+fn ascending_int(a: int, b: int): int {
+    if (a < b) return -1;
+    if (a > b) return 1;
+    return 0;
+}
+
 fn is_even(value: any): bool {
     return value % 2 == 0;
 }
@@ -73,23 +80,23 @@ fn main(): int {
     var r = range.inclusive(1, 3).iterator();
     var first = r.next();
 
-    var vector = collections.Vector();
+    var vector: collections.Vector(int) = collections.Vector();
     vector.push(1);
-    var deque = collections.Deque();
+    var deque: collections.Deque(int) = collections.Deque();
     deque.push_back(1);
-    var queue = collections.Queue();
+    var queue: collections.Queue(int) = collections.Queue();
     queue.enqueue(1);
-    var stack = collections.Stack();
+    var stack: collections.Stack(int) = collections.Stack();
     stack.push(1);
-    var pq = collections.PriorityQueue();
+    var pq: collections.PriorityQueue(int) = collections.PriorityQueue(ascending_int);
     pq.push(1);
     var bitset = collections.BitSet(128);
     bitset.set(4);
-    var tree = collections.TreeMap();
+    var tree = collections.BTreeMap();
     tree.put(1, 2);
-    var set = collections.TreeSet();
+    var set = collections.BTreeSet();
     set.add(1);
-    var linked = collections.LinkedList();
+    var linked: collections.LinkedList(int) = collections.LinkedList();
     linked.push_front(1);
 
     return 0;

@@ -1,0 +1,27 @@
+// Regression: relational operators on str must be lexicographic.
+// Historically numeric_compare() (VM/native) and lymar_aot_numeric_compare()
+// (AOT/Fyra) fell through to tagged-pointer identity ordering for strings,
+// so `>`/`<` depended on allocation address instead of character content.
+print("=== String Comparison Tests ===");
+
+assert("pear" > "apple", "\"pear\" > \"apple\"");
+assert("zoo" > "apple", "\"zoo\" > \"apple\"");
+assert("apple" < "pear", "\"apple\" < \"pear\"");
+assert("a" < "b", "\"a\" < \"b\"");
+assert("ab" < "b", "prefix order: \"ab\" < \"b\"");
+assert("abc" < "abd", "\"abc\" < \"abd\"");
+assert("abc" < "abcd", "shorter prefix sorts first");
+assert("" < "a", "empty string sorts first");
+assert(not ("abc" > "abc"), "equal strings: not greater");
+assert(not ("abc" < "abc"), "equal strings: not less");
+assert("b" >= "a", "\"b\" >= \"a\"");
+assert("a" <= "a", "\"a\" <= \"a\"");
+
+// Same values via variables and mixed literal/variable operands.
+var x = "banana";
+var y = "cherry";
+assert(y > x, "variables: \"cherry\" > \"banana\"");
+assert("cherry" > x, "mixed: literal > variable");
+assert(y > "banana", "mixed: variable > literal");
+
+print("All string comparison tests passed");

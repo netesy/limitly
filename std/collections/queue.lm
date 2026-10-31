@@ -1,28 +1,33 @@
 // Standard Library Queue Collection
-pub import std.collections.stack show Stack;
-pub import std.collections.bitset show BitSet, BitSetIterator;
 
-frame Queue {
-    pub items: [any];
+staged frame Queue(T: type) {
+    pub items: [T];
 
     pub init() {
         self.items = [];
     }
 
-    pub fn enqueue(item: any) {
-        self.items.append(item);
+    pub fn enqueue(item: T) {
+        self.items[len(self.items)] = item;
     }
 
-    pub fn dequeue(): any {
+    pub fn dequeue(): T | nil {
         if (len(self.items) == 0) {
             return nil;
         }
         var first = self.items[0];
-        self.items = _builtin_list_slice(self.items, 1, len(self.items));
+        var n = len(self.items);
+        var rest: [T] = [];
+        var i = 1;
+        while (i < n) {
+            rest[i - 1] = self.items[i];
+            i = i + 1;
+        }
+        self.items = rest;
         return first;
     }
 
-    pub fn peek(): any {
+    pub fn peek(): T | nil {
         if (len(self.items) == 0) {
             return nil;
         }

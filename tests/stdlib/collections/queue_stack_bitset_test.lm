@@ -1,13 +1,13 @@
-import std.collections.queue as collections;
+import std.collections as collections;
 
 fn main(): int {
-    var q = collections.Queue();
+    var q: collections.Queue(int) = collections.Queue();
     q.enqueue(1);
     q.enqueue(2);
     if (q.peek() != 1) { return 1; }
     if (q.dequeue() != 1) { return 2; }
 
-    var s = collections.Stack();
+    var s: collections.Stack(int) = collections.Stack();
     s.push(3);
     s.push(4);
     if (s.peek() != 4) { return 3; }

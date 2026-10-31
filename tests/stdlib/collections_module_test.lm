@@ -40,7 +40,7 @@ fn test_list(): int {
 
 fn test_deque(): int {
     print("Testing Deque...");
-    var deque_val = collections.Deque() as deque_col.Deque;
+    var deque_val: deque_col.Deque(str) = deque_col.Deque();
     assert(deque_val.length() == 0, "Deque should be empty initially");
 
     deque_val.push_back("back1");
@@ -61,7 +61,7 @@ fn test_deque(): int {
 
 fn test_linked_list(): int {
     print("Testing LinkedList...");
-    var ll_val = collections.LinkedList() as linked_list_col.LinkedList;
+    var ll_val: linked_list_col.LinkedList(str) = linked_list_col.LinkedList();
     print("LinkedList instantiated");
     assert(ll_val.length() == 0, "LinkedList should be empty");
 
@@ -130,29 +130,27 @@ fn test_sets(): int {
 
 fn test_queue_stack(): int {
     print("Testing Queue and Stack...");
-    var q_val = collections.Queue() as queue_col.Queue;
+    var q_val: queue_col.Queue(str) = queue_col.Queue();
     q_val.enqueue("q1");
     assert(q_val.peek() == "q1", "Queue peek incorrect");
     assert(q_val.dequeue() == "q1", "Queue dequeue incorrect");
 
-    var s_val = collections.Stack() as stack_col.Stack;
+    var s_val: stack_col.Stack(str) = stack_col.Stack();
     s_val.push("s1");
     assert(s_val.peek() == "s1", "Stack peek incorrect");
     assert(s_val.pop() == "s1", "Stack pop incorrect");
     return 1;
 }
 
-fn compare_ints(left: any, right: any): int {
-    var l = left as int;
-    var r = right as int;
-    if (l < r) return -1;
-    if (l > r) return 1;
+fn compare_ints(left: int, right: int): int {
+    if (left < right) return -1;
+    if (left > right) return 1;
     return 0;
 }
 
 fn test_priority_queue(): int {
     print("Testing PriorityQueue...");
-    var pq_val = collections.PriorityQueue(compare_ints) as pq_col.PriorityQueue;
+    var pq_val: pq_col.PriorityQueue(int) = pq_col.PriorityQueue(compare_ints);
     pq_val.push(5);
     pq_val.push(3);
     pq_val.push(10);

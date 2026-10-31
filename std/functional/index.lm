@@ -1,40 +1,40 @@
-frame FunctionInt {
-    var fn_ref: fn(int): int;
+staged frame Function1(T: type) {
+    var fn_ref: fn(T): T;
 
-    pub init(fn_ref: fn(int): int) {
+    pub init(fn_ref: fn(T): T) {
         self.fn_ref = fn_ref;
     }
 
-    pub fn call(value: int): int {
+    pub fn call(value: T): T {
         return self.fn_ref(value);
     }
 
-    pub fn compose(other: FunctionInt): FunctionInt {
-        return FunctionInt(fn_ref=fn(x: int): int {
+    pub fn compose(other: Function1(T)): Function1(T) {
+        return Function1(fn_ref=fn(x: T): T {
             return self.call(other.call(x));
         });
     }
 
-    pub fn and_then(other: FunctionInt): FunctionInt {
+    pub fn and_then(other: Function1(T)): Function1(T) {
         return self.compose(other);
     }
 
-    pub fn memoize(): FunctionInt {
-        var cache: {int: int} = {};
-        
-        return FunctionInt(fn_ref=fn(x: int): int {
+    pub fn memoize(): Function1(T) {
+        var cache: {T: T} = {};
+
+        return Function1(fn_ref=fn(x: T): T {
             if (cache[x] != nil) {
                 return cache[x];
             }
-            
+
             var result = self.call(x);
             cache[x] = result;
             return result;
         });
     }
 
-    pub fn repeat(n: int): FunctionInt {
-        return FunctionInt(fn_ref=fn(x: int): int {
+    pub fn repeat(n: int): Function1(T) {
+        return Function1(fn_ref=fn(x: T): T {
             var result = x;
             var i: int = 0;
             while (i < n) {
@@ -46,64 +46,32 @@ frame FunctionInt {
     }
 }
 
-frame FunctionIntBool {
-    var fn_ref: fn(int): bool;
+staged frame Predicate(T: type) {
+    var fn_ref: fn(T): bool;
 
-    pub init(fn_ref: fn(int): bool) {
+    pub init(fn_ref: fn(T): bool) {
         self.fn_ref = fn_ref;
     }
 
-    pub fn call(value: int): bool {
+    pub fn call(value: T): bool {
         return self.fn_ref(value);
     }
 
-    pub fn negate(): FunctionIntBool {
-        return FunctionIntBool(fn_ref=fn(x: int): bool {
-            return !self.call(x);
+    pub fn negate(): Predicate(T) {
+        return Predicate(fn_ref=fn(x: T): bool {
+            return not self.call(x);
         });
     }
 
-    pub fn and_fn(other: FunctionIntBool): FunctionIntBool {
-        return FunctionIntBool(fn_ref=fn(x: int): bool {
+    pub fn and_fn(other: Predicate(T)): Predicate(T) {
+        return Predicate(fn_ref=fn(x: T): bool {
             return self.call(x) and other.call(x);
         });
     }
 
-    pub fn or_fn(other: FunctionIntBool): FunctionIntBool {
-        return FunctionIntBool(fn_ref=fn(x: int): bool {
+    pub fn or_fn(other: Predicate(T)): Predicate(T) {
+        return Predicate(fn_ref=fn(x: T): bool {
             return self.call(x) or other.call(x);
-        });
-    }
-}
-
-frame FunctionStrStr {
-    var fn_ref: fn(str): str;
-
-    pub init(fn_ref: fn(str): str) {
-        self.fn_ref = fn_ref;
-    }
-
-    pub fn call(value: str): str {
-        return self.fn_ref(value);
-    }
-
-    pub fn compose(other: FunctionStrStr): FunctionStrStr {
-        return FunctionStrStr(fn_ref=fn(x: str): str {
-            return self.call(other.call(x));
-        });
-    }
-
-    pub fn memoize(): FunctionStrStr {
-        var cache: {str: str} = {};
-        
-        return FunctionStrStr(fn_ref=fn(x: str): str {
-            if (cache[x] != nil) {
-                return cache[x];
-            }
-            
-            var result = self.call(x);
-            cache[x] = result;
-            return result;
         });
     }
 }

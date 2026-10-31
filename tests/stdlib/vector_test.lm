@@ -1,7 +1,7 @@
 import std.collections as collections;
 
 fn main(): int {
-    var v = collections.Vector();
+    var v: collections.Vector(int) = collections.Vector();
     v.push(1);
     v.append(2);
     v.insert(1, 9);

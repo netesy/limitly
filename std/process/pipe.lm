@@ -16,6 +16,40 @@ frame PipeReader {
         return result as str;
     }
 
+    pub fn read_all(): str {
+        var total = "";
+        var keep_reading = true;
+        while (self.is_open() and keep_reading) {
+            var chunk = self.read(4096);
+            if (len(chunk) == 0) {
+                keep_reading = false;
+            } else {
+                total = total + chunk;
+            }
+        }
+        return total;
+    }
+
+    pub fn read_line(): str {
+        var line = "";
+        var keep_reading = true;
+        while (self.is_open() and keep_reading) {
+            var ch = self.read(1);
+            if (len(ch) == 0 or ch == "\n") {
+                keep_reading = false;
+            } else {
+                if (ch != "\r") {
+                    line = line + ch;
+                }
+            }
+        }
+        return line;
+    }
+
+    pub fn is_open(): bool {
+        return self.resource.is_open();
+    }
+
     pub fn close(): nil {
         if (self.resource.is_open()) {
             self.resource.close();
@@ -34,6 +68,20 @@ frame PipeWriter {
         if (!self.resource.is_open()) return false;
         var result = res._call(self.resource.handle, res.OP_WRITE, [content]);
         return (result == true);
+    }
+
+    pub fn write_line(line: str): bool {
+        return self.write(line + "\n");
+    }
+
+    pub fn flush(): bool {
+        if (!self.resource.is_open()) return false;
+        var result = res._call(self.resource.handle, res.OP_FLUSH, []);
+        return (result == true);
+    }
+
+    pub fn is_open(): bool {
+        return self.resource.is_open();
     }
 
     pub fn close(): nil {
@@ -56,8 +104,24 @@ frame PipePair {
         return self.writer.write(content);
     }
 
+    pub fn write_line(line: str): bool {
+        return self.writer.write_line(line);
+    }
+
     pub fn read(buffer_size: int = 1024): str {
         return self.reader.read(buffer_size);
+    }
+
+    pub fn read_all(): str {
+        return self.reader.read_all();
+    }
+
+    pub fn read_line(): str {
+        return self.reader.read_line();
+    }
+
+    pub fn is_open(): bool {
+        return self.reader.is_open() or self.writer.is_open();
     }
 
     pub fn close(): nil {
@@ -80,8 +144,24 @@ frame Pipe {
         return self.writer.write(content);
     }
 
+    pub fn write_line(line: str): bool {
+        return self.writer.write_line(line);
+    }
+
     pub fn read(buffer_size: int = 1024): str {
         return self.reader.read(buffer_size);
+    }
+
+    pub fn read_all(): str {
+        return self.reader.read_all();
+    }
+
+    pub fn read_line(): str {
+        return self.reader.read_line();
+    }
+
+    pub fn is_open(): bool {
+        return self.reader.is_open() or self.writer.is_open();
     }
 
     pub fn close(): nil {

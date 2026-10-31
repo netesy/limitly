@@ -1,7 +1,7 @@
 import std.collections.linkedlist as linked_list;
 
 fn main(): int {
-    var l = linked_list.LinkedList();
+    var l: linked_list.LinkedList(int) = linked_list.LinkedList();
     l.push_back(1);
     l.push_back(2);
     l.push_front(0);

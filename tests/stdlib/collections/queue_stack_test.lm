@@ -1,7 +1,7 @@
-import std.collections.queue as q;
+import std.collections as q;
 
 fn main(): int {
-    var queue = q.Queue();
+    var queue: q.Queue(int) = q.Queue();
     queue.enqueue(1);
     queue.enqueue(2);
     
@@ -11,7 +11,7 @@ fn main(): int {
     assert(queue.dequeue() == 2, "Dequeue should return 2");
     assert(queue.dequeue() == nil, "Dequeue on empty queue should return nil");
     
-    var stack = q.Stack();
+    var stack: q.Stack(int) = q.Stack();
     stack.push(1);
     stack.push(2);
     

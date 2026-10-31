@@ -1,38 +1,127 @@
 // std/process/command.lm
 //
-// Builder for one child process invocation. Arguments are kept as a vector, so
+// Builder for child process invocations. Arguments are kept as a vector, so
 // values containing spaces survive intact - unlike process.run(), which splits a
-// command line on whitespace.
+// command line on whitespace. Supports setting environment variables and
+// working directory with restoration on completion.
 
 import std.process.service as service;
 import std.internal.runtime as rt;
+import std.os as os;
+
+frame ProcessOutput {
+    pub var status: int;
+    pub var stdout: str;
+    pub var stderr: str;
+
+    pub init(status: int = 0, stdout: str = "", stderr: str = "") {
+        self.status = status;
+        self.stdout = stdout;
+        self.stderr = stderr;
+    }
+
+    pub fn is_success(): bool {
+        return self.status == 0;
+    }
+}
 
 frame Command {
     pub var program: str;
     pub var args: [str];
+    pub var env_vars: {str: str};
+    pub var working_dir: str;
 
     pub init(program: str) {
         self.program = program;
         self.args = [] as [str];
+        self.env_vars = {} as {str: str};
+        self.working_dir = "";
     }
 
-    pub fn arg(s: str) {
+    pub fn arg(s: str): Command {
         self.args.append(s);
+        return self;
     }
 
-    pub fn with_args(values: [str]) {
-        // while, not iter: iter over a list-typed parameter inside a frame
-        // method is not supported by the compiler.
+    pub fn args_list(values: [str]): Command {
         var i: int = 0;
         while (i < len(values)) {
             self.args.append(values[i]);
             i = i + 1;
         }
+        return self;
+    }
+
+    pub fn with_args(values: [str]): Command {
+        var i: int = 0;
+        while (i < len(values)) {
+            self.args.append(values[i]);
+            i = i + 1;
+        }
+        return self;
+    }
+
+    pub fn env(key: str, value: str): Command {
+        self.env_vars[key] = value;
+        return self;
+    }
+
+    pub fn envs(vars: {str: str}): Command {
+        iter (k, v in vars) {
+            self.env_vars[k] = v;
+        }
+        return self;
+    }
+
+    pub fn cwd(dir: str): Command {
+        self.working_dir = dir;
+        return self;
+    }
+
+    pub fn current_dir(dir: str): Command {
+        self.working_dir = dir;
+        return self;
+    }
+
+    pub fn to_string(): str {
+        var res = self.program;
+        var i: int = 0;
+        while (i < len(self.args)) {
+            var a = self.args[i];
+            if (has_space(a)) {
+                res = res + " \"" + a + "\"";
+            } else {
+                res = res + " " + a;
+            }
+            i = i + 1;
+        }
+        return res;
     }
 
     // Run to completion and return the child's exit code, or -1 if it could not
     // be started.
     pub fn execute(): int {
+        var prev_cwd = "";
+        var has_cwd_change = false;
+        if (self.working_dir != "") {
+            prev_cwd = os.cwd();
+            has_cwd_change = os.chdir(self.working_dir);
+        }
+
+        // Apply temporary environment variables
+        var restored_env: {str: str} = {};
+        var unset_keys: [str] = [];
+        iter (k, v in self.env_vars) {
+            var old_val = os.getenv(k)? else {
+                unset_keys.append(k);
+                "";
+            };
+            if (old_val != "") {
+                restored_env[k] = old_val;
+            }
+            os.setenv(k, v);
+        }
+
         var argv = [] as [any];
         argv.append(self.program);
         var i: int = 0;
@@ -41,7 +130,42 @@ frame Command {
             i = i + 1;
         }
         var result = service.request_with(rt.OP_SPAWN, argv);
+
+        // Restore environment variables
+        iter (k, v in restored_env) {
+            os.setenv(k, v);
+        }
+        var u = 0;
+        while (u < len(unset_keys)) {
+            os.unsetenv(unset_keys[u]);
+            u = u + 1;
+        }
+
+        // Restore working directory
+        if (has_cwd_change and prev_cwd != "") {
+            os.chdir(prev_cwd);
+        }
+
         if (result == nil) return -1;
         return result as int;
     }
+
+    pub fn status(): int {
+        return self.execute();
+    }
+
+    pub fn output(): ProcessOutput {
+        var exit_code = self.execute();
+        return ProcessOutput(status=exit_code, stdout="", stderr="");
+    }
+}
+
+fn has_space(s: str): bool {
+    var i = 0;
+    while (i < len(s)) {
+        var ch = _builtin_substring(s, i, i + 1);
+        if (ch == " " or ch == "\t") return true;
+        i = i + 1;
+    }
+    return false;
 }

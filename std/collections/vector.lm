@@ -1,10 +1,10 @@
-// Standard Library Vector, Deque, ArrayList, and RingBuffer Collections
+// Standard Library Vector, ArrayList, and RingBuffer Collections
 
 import std.iterator as iterator;
 import std.iterator show Iterator;
 
-frame Vector {
-    pub var data: [any];
+staged frame Vector(T: type) {
+    pub var data: [T];
     var size: int;
     var capacity: int;
 
@@ -17,8 +17,8 @@ frame Vector {
         }
     }
 
-    fn _copy_without(index_to_skip: int): [any] {
-        var out: [any] = [];
+    fn _copy_without(index_to_skip: int): [T] {
+        var out: [T] = [];
         var i = 0;
         var j = 0;
         while (i < self.size) {
@@ -40,17 +40,17 @@ frame Vector {
         }
     }
 
-    pub fn append(item: any) {
+    pub fn append(item: T) {
         self.push(item);
     }
 
-    pub fn push(item: any) {
+    pub fn push(item: T) {
         self._grow_for(self.size + 1);
         self.data[self.size] = item;
         self.size = self.size + 1;
     }
 
-    pub fn insert(index: int, item: any) {
+    pub fn insert(index: int, item: T) {
         if (index < 0) {
             index = 0;
         }
@@ -67,7 +67,7 @@ frame Vector {
         self.size = self.size + 1;
     }
 
-    pub fn remove(index: int): any {
+    pub fn remove(index: int): T | nil {
         if (index < 0 or index >= self.size) {
             return nil;
         }
@@ -77,18 +77,18 @@ frame Vector {
         return item;
     }
 
-    pub fn pop(): any {
+    pub fn pop(): T | nil {
         return self.remove(self.size - 1);
     }
 
-    pub fn get(index: int): any {
+    pub fn get(index: int): T | nil {
         if (index < 0 or index >= self.size) {
             return nil;
         }
         return self.data[index];
     }
 
-    pub fn set(index: int, item: any): bool {
+    pub fn set(index: int, item: T): bool {
         if (index < 0 or index >= self.size) {
             return false;
         }
@@ -96,7 +96,7 @@ frame Vector {
         return true;
     }
 
-    pub fn peek(): any {
+    pub fn peek(): T | nil {
         return self.get(self.size - 1);
     }
 
@@ -122,7 +122,7 @@ frame Vector {
         }
     }
 
-    pub fn resize(new_size: int, fill: any = nil) {
+    pub fn resize(new_size: int, fill: T) {
         if (new_size < 0) {
             new_size = 0;
         }
@@ -142,15 +142,16 @@ frame Vector {
     }
 
     pub fn iterator(): Iterator {
-        return VectorIterator(self.data);
+        var it: VectorIterator(T) = VectorIterator(self.data);
+        return it;
     }
 }
 
-frame VectorIterator: Iterator {
-    var data: [any];
+staged frame VectorIterator(T: type): Iterator {
+    var data: [T];
     var index: int;
 
-    pub init(data: [any]) {
+    pub init(data: [T]) {
         self.data = data;
         self.index = 0;
     }
@@ -172,34 +173,35 @@ frame VectorIterator: Iterator {
 }
 
 
-frame ArrayList {
-    var data: Vector;
+staged frame ArrayList(T: type) {
+    var data: Vector(T);
 
     pub init() {
-        self.data = Vector();
+        var v: Vector(T) = Vector();
+        self.data = v;
     }
 
-    pub fn push(item: any) {
+    pub fn push(item: T) {
         self.data.push(item);
     }
 
-    pub fn pop(): any {
+    pub fn pop(): T | nil {
         return self.data.pop();
     }
 
-    pub fn remove(index: int): any {
+    pub fn remove(index: int): T | nil {
         return self.data.remove(index);
     }
 
-    pub fn resize(new_size: int, fill: any = nil) {
+    pub fn resize(new_size: int, fill: T) {
         self.data.resize(new_size, fill);
     }
 
-    pub fn get(index: int): any {
+    pub fn get(index: int): T | nil {
         return self.data.get(index);
     }
 
-    pub fn set(index: int, item: any): bool {
+    pub fn set(index: int, item: T): bool {
         return self.data.set(index, item);
     }
 
@@ -220,8 +222,8 @@ frame ArrayList {
     }
 }
 
-frame RingBuffer {
-    var data: [any];
+staged frame RingBuffer(T: type) {
+    var data: [T];
     var capacity: int;
     var start: int;
     var count: int;
@@ -236,7 +238,7 @@ frame RingBuffer {
         self.count = 0;
     }
 
-    pub fn push(item: any) {
+    pub fn push(item: T) {
         if (self.count < self.capacity) {
             self.data[self.count] = item;
             self.count = self.count + 1;
@@ -246,7 +248,7 @@ frame RingBuffer {
         }
     }
 
-    pub fn pop(): any {
+    pub fn pop(): T | nil {
         if (self.count == 0) {
             return nil;
         }

@@ -1,9 +1,9 @@
 // std/env/index.lm
-// Public facade for std.env: environment variables only.
+// Public facade for std.env: environment variables.
 //
 // No implementation lives here. Program arguments are std.process.args(); the
 // working directory is std.os.cwd(); the raw getenv/setenv surface is std.os.
-// This module exists as the conventional `KEY=VALUE` variable API and as the
-// frame-style accessor used by std.config.
+// This module provides the conventional `KEY=VALUE` variable API, typed getters,
+// dictionary representation, and .env file parsing.
 
-pub import std.env.variables show Env, get, get_or, set, unset, vars;
+pub import std.env.variables show Env, get, get_or, get_int, get_bool, has, contains, set, unset, vars, to_dict, keys, values, parse_env, load_dotenv, load_file;

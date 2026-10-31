@@ -1,2 +1,2 @@
 // Compatibility redirect for std.collections.linkedlist
-pub import std.collections.linked_list show Node, LinkedListIterator, LinkedList, DLL;
+pub import std.collections.linked_list show Node, LinkedListIterator, LinkedList;

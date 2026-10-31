@@ -3,7 +3,7 @@ import std.collections.vector as collections;
 
 fn main(): int {
     print("Step 1: creating Vector...");
-    var v = collections.Vector();
+    var v: collections.Vector(int) = collections.Vector();
     print("Vector created successfully");
 
     print("Step 2: push(1)...");

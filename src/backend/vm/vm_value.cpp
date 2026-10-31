@@ -177,6 +177,43 @@ RUNTIME_API int numeric_compare(LmValue a, LmValue b) {
             return 0;
         }
     }
+    // Lexicographic ordering for strings (raw TYPE_STRING or boxed LM_BOX_STRING).
+    // Without this, relational operators on strings fell through to the tagged
+    // pointer comparison below -- identity ordering, which the language does not
+    // define and which made `>`/`<` depend on allocation address. Mirrored in the
+    // AOT runtime's lymar_aot_numeric_compare to keep backends equivalent.
+    auto string_bytes = [](LmValue v, const char*& data, size_t& len) -> bool {
+        if (!IS_PTR(v)) return false;
+        ObjHeader* h = (ObjHeader*)UNBOX_PTR(v);
+        if (!h) return false;
+        if (h->type_id == TYPE_STRING) {
+            LmStringHeader* s = (LmStringHeader*)h;
+            data = (const char*)s->data;
+            len = (size_t)s->len;
+            return true;
+        }
+        if (h->type_id == TYPE_BOX) {
+            LmBox* box = (LmBox*)h;
+            if (box->type == LM_BOX_STRING) {
+                data = (const char*)box->value.as_ptr;
+                len = data ? std::strlen(data) : 0;
+                return true;
+            }
+        }
+        return false;
+    };
+    const char* pa = nullptr;
+    const char* pb = nullptr;
+    size_t la = 0, lb = 0;
+    if (string_bytes(a, pa, la) && string_bytes(b, pb, lb)) {
+        size_t n = la < lb ? la : lb;
+        int c = (n && pa && pb) ? std::memcmp(pa, pb, n) : 0;
+        if (c < 0) return -1;
+        if (c > 0) return 1;
+        if (la < lb) return -1;
+        if (la > lb) return 1;
+        return 0;
+    }
     return (a < b) ? -1 : 1;
 }
 

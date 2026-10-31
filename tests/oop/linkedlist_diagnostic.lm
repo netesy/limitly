@@ -6,7 +6,7 @@ print("=== LinkedList Diagnostic Test ===");
 
 // Test 1: Construction
 print("\nTest 1: Construction");
-var list = ll.LinkedList();
+var list: ll.LinkedList(int) = ll.LinkedList();
 print("list created: {list != nil}");
 print("list.size: {list.size}");
 

@@ -7,14 +7,16 @@
 // directory, home/temp locations, platform identity - belong to std.os.
 
 import std.process.process as proc;
-pub import std.process.command show Command;
-pub import std.process.pipe show Pipe;
+pub import std.process.command show Command, ProcessOutput;
+pub import std.process.pipe show Pipe, PipeReader, PipeWriter, PipePair, create_pipe;
 
 frame Process {
     pub init() {}
     pub fn exit(code: int): nil { return proc.exit(code); }
     pub fn run(cmd_str: str): int { return proc.run(cmd_str); }
+    pub fn exec(program: str, arguments: [str]): int { return proc.exec(program, arguments); }
     pub fn id(): int { return proc.id(); }
+    pub fn pid(): int { return proc.pid(); }
     pub fn args(): [str] { return proc.args(); }
     pub fn command(): str { return proc.command(); }
     pub fn memory(): int { return proc.memory(); }
@@ -37,6 +39,10 @@ pub fn exec(program: str, arguments: [str]): int {
 
 pub fn id(): int {
     return proc.id();
+}
+
+pub fn pid(): int {
+    return proc.pid();
 }
 
 pub fn args(): [str] {

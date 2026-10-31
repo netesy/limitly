@@ -1,92 +1,91 @@
 // Standard Library Deque Collection
 
-frame Deque {
-    pub var data: [any];
+staged frame Deque(T: type) {
+    pub var data: [T];
+    var size: int;
 
     pub init() {
         self.data = [];
+        self.size = 0;
     }
 
-    pub fn push_back(item: any): Deque {
-        self.data.append(item);
-        return self;
+    fn _copy_range(lo: int, hi: int): [T] {
+        var out: [T] = [];
+        var j = 0;
+        var i = lo;
+        while (i < hi) {
+            out[j] = self.data[i];
+            j = j + 1;
+            i = i + 1;
+        }
+        return out;
     }
 
-    pub fn push_front(item: any): Deque {
-        var new_data: [any] = [];
-        new_data.append(item);
+    pub fn push_back(item: T) {
+        self.data[self.size] = item;
+        self.size = self.size + 1;
+    }
+
+    pub fn push_front(item: T) {
+        var new_data: [T] = [];
+        new_data[0] = item;
         var i = 0;
-        while (i < len(self.data)) {
-            new_data.append(self.data[i]);
+        while (i < self.size) {
+            new_data[i + 1] = self.data[i];
             i = i + 1;
         }
         self.data = new_data;
-        return self;
+        self.size = self.size + 1;
     }
 
-    pub fn peek_back(): any {
-        var n = len(self.data);
-        if (n == 0) {
+    pub fn peek_back(): T | nil {
+        if (self.size == 0) {
             return nil;
         }
-        return self.data[n - 1];
+        return self.data[self.size - 1];
     }
 
-    pub fn peek_front(): any {
-        if (len(self.data) == 0) {
+    pub fn peek_front(): T | nil {
+        if (self.size == 0) {
             return nil;
         }
         return self.data[0];
     }
 
-    pub fn pop_back(): any {
-        var n = len(self.data);
-        if (n == 0) {
+    pub fn pop_back(): T | nil {
+        if (self.size == 0) {
             return nil;
         }
-        var item = self.data[n - 1];
-        var new_data: [any] = [];
-        var i = 0;
-        while (i < n - 1) {
-            new_data.append(self.data[i]);
-            i = i + 1;
-        }
-        self.data = new_data;
+        var item = self.data[self.size - 1];
+        self.data = self._copy_range(0, self.size - 1);
+        self.size = self.size - 1;
         return item;
     }
 
-    pub fn pop_front(): any {
-        if (len(self.data) == 0) {
+    pub fn pop_front(): T | nil {
+        if (self.size == 0) {
             return nil;
         }
         var item = self.data[0];
-        var new_data: [any] = [];
-        var i = 1;
-        while (i < len(self.data)) {
-            new_data.append(self.data[i]);
-            i = i + 1;
-        }
-        self.data = new_data;
+        self.data = self._copy_range(1, self.size);
+        self.size = self.size - 1;
         return item;
     }
 
     pub fn length(): int {
-        return len(self.data);
+        return self.size;
     }
 
     pub fn len(): int {
-        return len(self.data);
+        return self.size;
     }
 
     pub fn is_empty(): bool {
-        return len(self.data) == 0;
+        return self.size == 0;
     }
 
     pub fn clear() {
         self.data = [];
+        self.size = 0;
     }
-}
-
-pub fn DoubleEndedQueue(): Deque {
-    return Deque();
 }

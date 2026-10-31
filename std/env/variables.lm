@@ -2,11 +2,11 @@
 //
 // Environment variables, delegated to std.os (which owns the RT_OS resource).
 //
-// std.env is deliberately narrow: variables only. Program arguments moved to
-// std.process.args() and the working directory to std.os.cwd(), because they are
-// not environment variables in the `KEY=VALUE` sense.
+// std.env is deliberately focused on environment variables: get, set, unset,
+// inspection, conversions (int, bool), dictionary view, and .env file loading.
 
 import std.os as os;
+import std.io as io;
 
 // Returns nil when the variable is unset. Unwrap the payload with `?` or with
 // `match (value) { val v => ... }`; `value as str` does NOT unwrap, it produces
@@ -22,6 +22,51 @@ pub fn get_or(key: str, fallback: str): str {
     return os.getenv_or(key, fallback);
 }
 
+// Check whether an environment variable exists.
+pub fn has(key: str): bool {
+    var val_opt = os.getenv(key);
+    return val_opt != nil;
+}
+
+// Alias for has.
+pub fn contains(key: str): bool {
+    return has(key);
+}
+
+// Parse integer environment variable or fallback if absent / invalid.
+pub fn get_int(key: str, fallback: int = 0): int {
+    var raw = get_or(key, "");
+    if (raw == "") return fallback;
+    // Check if numeric
+    var i = 0;
+    var start = 0;
+    if (len(raw) > 0 and _builtin_substring(raw, 0, 1) == "-") {
+        start = 1;
+        i = 1;
+    }
+    if (i >= len(raw)) return fallback;
+    while (i < len(raw)) {
+        var ch = _builtin_substring(raw, i, i + 1);
+        if (ch < "0" or ch > "9") return fallback;
+        i = i + 1;
+    }
+    return raw as int;
+}
+
+// Parse boolean environment variable or fallback. Recognizes "1", "true", "yes", "on".
+pub fn get_bool(key: str, fallback: bool = false): bool {
+    var raw = get_or(key, "");
+    if (raw == "") return fallback;
+    var lower = _builtin_string_to_lower(raw);
+    if (lower == "1" or lower == "true" or lower == "yes" or lower == "on") {
+        return true;
+    }
+    if (lower == "0" or lower == "false" or lower == "no" or lower == "off") {
+        return false;
+    }
+    return fallback;
+}
+
 pub fn set(key: str, value: str): bool {
     return os.setenv(key, value);
 }
@@ -35,27 +80,203 @@ pub fn vars(): [str] {
     return os.env_vars();
 }
 
+// Parses all environment variables into a dictionary mapping {KEY: VALUE}.
+pub fn to_dict(): {str: str} {
+    var all = vars();
+    var dict: {str: str} = {};
+    var i = 0;
+    while (i < len(all)) {
+        var entry = all[i];
+        var eq_idx = find_char(entry, "=");
+        if (eq_idx > 0) {
+            var k = _builtin_substring(entry, 0, eq_idx);
+            var v = _builtin_substring(entry, eq_idx + 1, len(entry));
+            dict[k] = v;
+        }
+        i = i + 1;
+    }
+    return dict;
+}
+
+// Returns a list of all variable names.
+pub fn keys(): [str] {
+    var all = vars();
+    var result: [str] = [];
+    var i = 0;
+    while (i < len(all)) {
+        var entry = all[i];
+        var eq_idx = find_char(entry, "=");
+        if (eq_idx > 0) {
+            result.append(_builtin_substring(entry, 0, eq_idx));
+        }
+        i = i + 1;
+    }
+    return result;
+}
+
+// Returns a list of all variable values.
+pub fn values(): [str] {
+    var all = vars();
+    var result: [str] = [];
+    var i = 0;
+    while (i < len(all)) {
+        var entry = all[i];
+        var eq_idx = find_char(entry, "=");
+        if (eq_idx >= 0) {
+            result.append(_builtin_substring(entry, eq_idx + 1, len(entry)));
+        }
+        i = i + 1;
+    }
+    return result;
+}
+
+// Parse a .env formatted string into a dictionary.
+pub fn parse_env(content: str): {str: str} {
+    var result: {str: str} = {};
+    var lines: [str] = [];
+    var curr = "";
+    var i = 0;
+    while (i < len(content)) {
+        var ch = _builtin_substring(content, i, i + 1);
+        if (ch == "\n") {
+            lines.append(curr);
+            curr = "";
+        } else {
+            if (ch != "\r") {
+                curr = curr + ch;
+            }
+        }
+        i = i + 1;
+    }
+    if (len(curr) > 0) lines.append(curr);
+
+    var idx = 0;
+    while (idx < len(lines)) {
+        var line = _builtin_string_trim(lines[idx]);
+        if (len(line) > 0 and _builtin_substring(line, 0, 1) != "#") {
+            var eq = find_char(line, "=");
+            if (eq > 0) {
+                var k = _builtin_string_trim(_builtin_substring(line, 0, eq));
+                var v = _builtin_string_trim(_builtin_substring(line, eq + 1, len(line)));
+                // Strip surrounding quotes if present
+                if (len(v) >= 2) {
+                    var q1 = _builtin_substring(v, 0, 1);
+                    var q2 = _builtin_substring(v, len(v) - 1, len(v));
+                    if ((q1 == "\"" and q2 == "\"") or (q1 == "'" and q2 == "'")) {
+                        v = _builtin_substring(v, 1, len(v) - 1);
+                    }
+                }
+                if (len(k) > 0) {
+                    result[k] = v;
+                }
+            }
+        }
+        idx = idx + 1;
+    }
+    return result;
+}
+
+// Load .env content into the process environment. Returns count loaded.
+pub fn load_dotenv(content: str): int {
+    var parsed = parse_env(content);
+    var count = 0;
+    iter (k, v in parsed) {
+        if (set(k, v)) {
+            count = count + 1;
+        }
+    }
+    return count;
+}
+
+// Read and load a .env file from disk. Returns count loaded, or 0 if unreadable.
+pub fn load_file(path: str): int {
+    var f_res = io.open(path, "r");
+    match (f_res) {
+        val file_obj => {
+            var f = file_obj as io.File;
+            var r = f.read([]);
+            f.close();
+            match (r) {
+                val data => {
+                    return load_dotenv(data as str);
+                },
+                err e => return 0
+            }
+        },
+        err e => return 0
+    }
+}
+
+fn find_char(s: str, needle: str): int {
+    var i = 0;
+    while (i <= len(s) - len(needle)) {
+        if (_builtin_substring(s, i, i + len(needle)) == needle) return i;
+        i = i + 1;
+    }
+    return -1;
+}
+
 frame Env {
     pub init() {}
 
     pub fn get(key: str): str? {
-        return os.getenv(key);
+        return get(key);
     }
 
     pub fn get_or(key: str, fallback: str): str {
-        return os.getenv_or(key, fallback);
+        return get_or(key, fallback);
+    }
+
+    pub fn get_int(key: str, fallback: int = 0): int {
+        return get_int(key, fallback);
+    }
+
+    pub fn get_bool(key: str, fallback: bool = false): bool {
+        return get_bool(key, fallback);
+    }
+
+    pub fn has(key: str): bool {
+        return has(key);
+    }
+
+    pub fn contains(key: str): bool {
+        return has(key);
     }
 
     pub fn set(key: str, value: str): bool {
-        return os.setenv(key, value);
+        return set(key, value);
     }
 
     pub fn unset(key: str): bool {
-        return os.unsetenv(key);
+        return unset(key);
     }
 
     pub fn vars(): [str] {
-        return os.env_vars();
+        return vars();
+    }
+
+    pub fn to_dict(): {str: str} {
+        return to_dict();
+    }
+
+    pub fn keys(): [str] {
+        return keys();
+    }
+
+    pub fn values(): [str] {
+        return values();
+    }
+
+    pub fn parse_env(content: str): {str: str} {
+        return parse_env(content);
+    }
+
+    pub fn load_dotenv(content: str): int {
+        return load_dotenv(content);
+    }
+
+    pub fn load_file(path: str): int {
+        return load_file(path);
     }
 
     // Read PATH, or fallback when it is unset. PATH is an environment variable,
@@ -63,6 +284,6 @@ frame Env {
     // platform/arch identity live in std.os (home_dir/temp_dir/platform/arch);
     // they are not environment variables and are intentionally not re-exported here.
     pub fn path(fallback: str): str {
-        return os.getenv_or("PATH", fallback);
+        return get_or("PATH", fallback);
     }
 }

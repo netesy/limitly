@@ -12,6 +12,7 @@ tests/expressions/logical.lm
 tests/expressions/ranges.lm
 tests/expressions/scientific_notation.lm
 tests/expressions/large_literals.lm
+tests/expressions/string_comparison.lm
 # Strings
 tests/strings/interpolation.lm
 tests/strings/operations.lm

@@ -2,17 +2,17 @@
 
 import std.traits show Iterator;
 
-frame Node {
-    pub var value: any;
+staged frame Node(T: type) {
+    pub var value: T;
     pub var next: any;
 
-    pub init(value: any) {
+    pub init(value: T) {
         self.value = value;
         self.next = nil;
     }
 }
 
-frame LinkedListIterator : Iterator {
+staged frame LinkedListIterator(T: type): Iterator {
     var current: any;
 
     pub init(head: any) {
@@ -27,14 +27,14 @@ frame LinkedListIterator : Iterator {
         if (self.current == nil) {
             return nil;
         }
-        var node: Node = self.current;
+        var node: Node(T) = self.current;
         var vals = node.value;
         self.current = node.next;
         return vals;
     }
 }
 
-frame LinkedList {
+staged frame LinkedList(T: type) {
     pub var head: any;
     pub var tail: any;
     pub var size: int;
@@ -45,21 +45,21 @@ frame LinkedList {
         self.size = 0;
     }
 
-    pub fn push_back(value: any) {
-        var node = Node(value);
+    pub fn push_back(value: T) {
+        var node: Node(T) = Node(value);
         if (self.tail == nil) {
             self.head = node;
             self.tail = node;
         } else {
-            var last_node: Node = self.tail;
+            var last_node: Node(T) = self.tail;
             last_node.next = node;
             self.tail = node;
         }
         self.size = self.size + 1;
     }
 
-    pub fn push_front(value: any) {
-        var node = Node(value);
+    pub fn push_front(value: T) {
+        var node: Node(T) = Node(value);
         if (self.head == nil) {
             self.head = node;
             self.tail = node;
@@ -70,10 +70,10 @@ frame LinkedList {
         self.size = self.size + 1;
     }
 
-    pub fn pop_back(): any {
+    pub fn pop_back(): T | nil {
         if (self.tail == nil) return nil;
         if (self.head == self.tail) {
-            var node: Node = self.head;
+            var node: Node(T) = self.head;
             var vals = node.value;
             self.head = nil;
             self.tail = nil;
@@ -81,11 +81,11 @@ frame LinkedList {
             return vals;
         }
 
-        var curr: Node = self.head;
+        var curr: Node(T) = self.head;
         while (curr.next != self.tail) {
             curr = curr.next;
         }
-        var last_node: Node = self.tail;
+        var last_node: Node(T) = self.tail;
         var vals = last_node.value;
         curr.next = nil;
         self.tail = curr;
@@ -93,9 +93,9 @@ frame LinkedList {
         return vals;
     }
 
-    pub fn pop_front(): any {
+    pub fn pop_front(): T | nil {
         if (self.head == nil) return nil;
-        var node: Node = self.head;
+        var node: Node(T) = self.head;
         var vals = node.value;
         self.head = node.next;
         if (self.head == nil) {
@@ -108,12 +108,9 @@ frame LinkedList {
     pub fn len(): int { return self.size; }
     pub fn length(): int { return self.size; }
     pub fn is_empty(): bool { return self.size == 0; }
-    
-    pub fn iterator(): LinkedListIterator {
-        return LinkedListIterator(self.head);
-    }
-}
 
-pub fn DLL(): LinkedList {
-    return LinkedList();
+    pub fn iterator(): LinkedListIterator(T) {
+        var it: LinkedListIterator(T) = LinkedListIterator(self.head);
+        return it;
+    }
 }

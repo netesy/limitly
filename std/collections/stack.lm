@@ -1,23 +1,23 @@
 // Stack Frame - LIFO (Last In, First Out) implementation
 
 
-frame Stack {
-    pub data: [any];
+staged frame Stack(T: type) {
+    pub data: [T];
 
     pub init() {
-        self.data = [] as [any];
+        self.data = [];
     }
 
-    pub fn push(value: any) {
-        self.data.append(value);
+    pub fn push(value: T) {
+        self.data[len(self.data)] = value;
     }
 
-    pub fn pop(): any {
+    pub fn pop(): T | nil {
         var n = len(self.data);
         if (n == 0) return nil;
         var value = self.data[n - 1];
-        
-        var new_data = [] as [any];
+
+        var new_data: [T] = [];
         var i = 0;
         while (i < n - 1) {
             new_data[i] = self.data[i];
@@ -27,7 +27,7 @@ frame Stack {
         return value;
     }
 
-    pub fn peek(): any {
+    pub fn peek(): T | nil {
         if (len(self.data) == 0) return nil;
         return self.data[len(self.data) - 1];
     }
@@ -45,6 +45,6 @@ frame Stack {
     }
 
     pub fn clear() {
-        self.data = [] as [any];
+        self.data = [];
     }
 }

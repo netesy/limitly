@@ -246,7 +246,7 @@ $(LYRA_LIB): $(LYRA_LIB_OBJS)
 
 $(LYRA_BIN): $(OBJ_DIR)/lyra/main.o $(LYRA_LIB) | $(BIN_DIR)
 	@echo "[BUILD] Building thin Lyra CLI binary..."
-	$(CXX) $(CXXFLAGS) $< $(LYRA_LIB) -o $@ -lssl -lcrypto -lpthread
+	$(CXX) $(CXXFLAGS) $< $(LYRA_LIB) -o $@ -lssl -lcrypto -lz -lpthread
 	@echo "[OK] Lyra binary built: $@"
 
 $(OBJ_DIR)/lyra/%.o: $(LYRA_DIR)/src/%.cpp | $(OBJ_DIR)
@@ -280,7 +280,7 @@ $(OBJ_DIR)/liblymar.a: $(LIB_LYMAR_OBJS) $(FYRA_LIB) $(LYRA_LIB)
 
 windows: $(BIN_DIR) $(MAIN_RSP) liblymar ssl-lib $(LYRA_BIN) $(BIN_DIR)/liblymar_aot.a
 	@echo "[BUILD] Linking lymar.exe ..."
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) @$(MAIN_RSP) $(OBJ_DIR)/liblymar.a $(FYRA_LIB) $(LYRA_LIB) -o $(BIN_DIR)/lymar$(EXE_EXT) $(LIBS) -lssl -lcrypto
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) @$(MAIN_RSP) $(OBJ_DIR)/liblymar.a $(FYRA_LIB) $(LYRA_LIB) -o $(BIN_DIR)/lymar$(EXE_EXT) $(LIBS) -lssl -lcrypto -lz
 	@echo "[OK] lymar.exe built."
 
 linux: $(BIN_DIR) $(MAIN_RSP) liblymar ssl-lib $(LYRA_BIN) $(BIN_DIR)/liblymar_aot.a

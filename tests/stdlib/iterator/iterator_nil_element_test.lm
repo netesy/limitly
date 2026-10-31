@@ -70,7 +70,7 @@ fn test_range_yields_plain_ints(): int {
 }
 
 fn test_vector_iterator_observes_growth(): int {
-    var v = collections.Vector();
+    var v: collections.Vector(int) = collections.Vector();
     v.push(10);
     var gen = v.iterator();
     v.push(20);

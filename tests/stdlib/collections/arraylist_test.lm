@@ -1,7 +1,7 @@
 import std.collections.vector as collections;
 
 fn main(): int {
-    var arr_list = collections.ArrayList();
+    var arr_list: collections.ArrayList(str) = collections.ArrayList();
     arr_list.push("a");
     arr_list.push("b");
     if (arr_list.len() != 2) { return 1; }

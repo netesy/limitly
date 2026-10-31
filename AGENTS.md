@@ -21,6 +21,11 @@ This document provides essential guidelines for AI agents generating code for th
 - [x] **Use `append(list, item)`** instead to add a single item to a list.
 - [x] **Use `append(list, other_list)`** to append all elements from another list.
 
+### **Module Re-export via `var` Aliases**
+- [ ] **DO NOT re-export another module's symbols with `var X = mod.Symbol;`** (the old `std/std.lm` facade style). A `var` binding captures only a *runtime value*; it does **not** register the name in type position. So `var Option = core.option.Option;` leaves `Option` unusable as a type or staged-frame template and silently breaks annotations such as `var o: Option(int)`.
+- [ ] **DO NOT use a `var` alias to rename an export** (e.g. `var TCP = tcp.TCPClient;`, `var Hash = crypto_hash.Hasher;`). `pub import ... show` re-exports a symbol **under the source module's declared name** and offers no rename facility; renaming files does not change the exported name either. If a friendlier or collision-free name is genuinely required, rename the symbol inside its own module.
+- [x] **Use `pub import <module> show <Symbol, ...>;`** to re-export. This is the only pattern that propagates frames, enums, traits, and staged-frame templates through a facade module and keeps them valid in both value and type positions.
+
 ---
 
 ## **USE - Supported Features**
@@ -230,6 +235,7 @@ Lymar does not use generic `Result` types. Instead, it uses fallible annotations
 - [x] **Stdlib provides behavior only.** Stdlib modules implement functionality using compiler-defined types.
 
 #### **Stdlib Implementation Rules**
+- [ ] **Do not re-export with `var` aliases.** Facade/index modules must propagate symbols with `pub import <module> show <Symbol, ...>;`, never `var X = mod.Symbol;` — a `var` alias binds a runtime value only and is invisible in type position (see *Module Re-export via `var` Aliases*).
 - [ ] **Do not define fake replacement types for compiler collections.** Stdlib should not redefine types like `List`, `Dict`, `Array` as type aliases.
 - [ ] **Do not solve missing typing by changing everything to `any`.** The `any` type is a dynamic escape hatch, not a replacement for real types.
 - [x] **Use current supported mechanisms for generic-like behavior:**
