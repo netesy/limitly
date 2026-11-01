@@ -103,4 +103,24 @@ var a2: Box(int) = Box(2);
 assert(a1.get() == 1);
 assert(a2.get() == 2);
 
+// 7. Recursive staged frame with optional self-reference (Template(T)?)
+staged frame ChainNode(T: type) {
+    pub var item: T;
+    pub var next: ChainNode(T)?;
+
+    pub init(v: T) {
+        self.item = v;
+        self.next = nil;
+    }
+}
+
+var head: ChainNode(int) = ChainNode(10);
+assert(head.item == 10);
+assert(head.next == nil);
+
+var tail: ChainNode(int) = ChainNode(20);
+head.next = tail;
+assert(head.next != nil);
+assert((head.next as ChainNode(int)).item == 20);
+
 print("staged frame OK");

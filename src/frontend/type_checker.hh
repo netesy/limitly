@@ -375,6 +375,7 @@ private:
     TypePtr check_module_declaration(std::shared_ptr<LM::Frontend::AST::ModuleDeclaration> module_decl);
     TypePtr check_import_statement(std::shared_ptr<LM::Frontend::AST::ImportStatement> import_stmt);
     const FrameInfo* lookup_frame_info(const std::string& name) const;
+    std::shared_ptr<LM::Frontend::AST::MixinDeclaration> lookup_mixin_declaration(const std::string& name) const;
 
     // Type annotation resolution
     TypePtr resolve_type_annotation(std::shared_ptr<LM::Frontend::AST::TypeAnnotation> annotation);

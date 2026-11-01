@@ -68,7 +68,7 @@ fn test_shared_semantics() {
     app.ui(root);
     app.run_frame_step();
 
-    app.push_event(app.Event(event_type=app.EVENT_MOUSE_DOWN, x=108, y=128));
+    app.push_event(app.Event(event_type=app.EventType.MouseDown, x=108, y=128));
     app.run_frame_step();
 
     var root_w = ui_context.global_ui_context.current_widget;

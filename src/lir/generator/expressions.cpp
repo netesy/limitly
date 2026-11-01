@@ -46,6 +46,11 @@ bool resolve_enum_variant_info(TypeSystem* type_system,
                                size_t& out_arity) {
     TypePtr enum_type = enum_type_hint;
     std::string variant_name = variant_ref;
+    std::string bare_variant = variant_ref;
+    size_t last_dot = variant_ref.rfind('.');
+    if (last_dot != std::string::npos) {
+        bare_variant = variant_ref.substr(last_dot + 1);
+    }
 
     // 1. Try directly in enum_type_hint
     if (enum_type && (enum_type->tag == TypeTag::Enum || enum_type->tag == TypeTag::UserDefined || enum_type->tag == TypeTag::Frame)) {
@@ -53,11 +58,9 @@ bool resolve_enum_variant_info(TypeSystem* type_system,
             // Try as is (qualified or not)
             auto it = std::find(enum_info->values.begin(), enum_info->values.end(), variant_name);
             
-            // Try unqualified
+            // Try unqualified (bare variant name after last dot)
             if (it == enum_info->values.end()) {
-                std::string unqualified = variant_name;
-                if (unqualified.find('.') != std::string::npos) unqualified = unqualified.substr(unqualified.find('.') + 1);
-                it = std::find(enum_info->values.begin(), enum_info->values.end(), unqualified);
+                it = std::find(enum_info->values.begin(), enum_info->values.end(), bare_variant);
             }
             
             if (it != enum_info->values.end()) {
@@ -70,15 +73,21 @@ bool resolve_enum_variant_info(TypeSystem* type_system,
     }
 
     // 2. Try via qualified name
-    auto dot_pos = variant_ref.find('.');
-    if (dot_pos != std::string::npos) {
-        std::string enum_name = variant_ref.substr(0, dot_pos);
-        variant_name = variant_ref.substr(dot_pos + 1);
-        if (type_system) {
-            auto found = type_system->getType(enum_name);
+    if (last_dot != std::string::npos && type_system) {
+        std::string enum_name = variant_ref.substr(0, last_dot);
+        std::vector<std::string> candidates = {enum_name};
+        size_t first_dot = enum_name.find('.');
+        if (first_dot != std::string::npos) {
+            candidates.push_back(enum_name.substr(first_dot + 1));
+        }
+        for (const auto& cand : candidates) {
+            auto found = type_system->getType(cand);
             if (found && (found->tag == TypeTag::Enum || found->tag == TypeTag::UserDefined || found->tag == TypeTag::Frame)) {
                 if (auto* enum_info = std::get_if<EnumType>(&found->extra)) {
-                    auto it = std::find(enum_info->values.begin(), enum_info->values.end(), variant_name);
+                    auto it = std::find(enum_info->values.begin(), enum_info->values.end(), bare_variant);
+                    if (it == enum_info->values.end()) {
+                        it = std::find(enum_info->values.begin(), enum_info->values.end(), variant_ref);
+                    }
                     if (it != enum_info->values.end()) {
                         out_tag = static_cast<int64_t>(std::distance(enum_info->values.begin(), it));
                         auto arity_it = enum_info->variantTypes.find(*it);
@@ -2685,16 +2694,27 @@ Reg Generator::emit_member_expr(LM::Frontend::AST::MemberExpr& expr) {
         return 0;
     }
 
-    // Enum unit variant access: EnumName.Variant
-    if (auto enum_obj = dynamic_cast<LM::Frontend::AST::VariableExpr*>(expr.object.get())) {
-        int64_t tag = 0;
-        size_t expected_arity = 0;
-        std::string qualified_variant = enum_obj->name + "." + expr.name;
+    // Enum unit variant access: EnumName.Variant or alias.EnumName.Variant
+    std::string enum_path = get_expr_qualified_path(expr.object.get());
+    if (!enum_path.empty()) {
+        std::string qualified_variant = enum_path + "." + expr.name;
         TypePtr enum_hint = expr.object->inferred_type;
         if ((!enum_hint || enum_hint->tag != TypeTag::Enum) && type_system_) {
-            enum_hint = type_system_->getType(enum_obj->name);
+            enum_hint = type_system_->getType(enum_path);
+            if (!enum_hint || enum_hint->tag != TypeTag::Enum) {
+                size_t dot_pos = enum_path.find('.');
+                if (dot_pos != std::string::npos) {
+                    std::string alias = enum_path.substr(0, dot_pos);
+                    std::string rest = enum_path.substr(dot_pos + 1);
+                    auto it = import_aliases_.find(alias);
+                    if (it != import_aliases_.end()) {
+                        enum_hint = type_system_->getType(it->second + "." + rest);
+                    }
+                }
+            }
         }
-
+        int64_t tag = 0;
+        size_t expected_arity = 0;
         if (resolve_enum_variant_info(type_system_.get(), enum_hint, qualified_variant, tag, expected_arity) && expected_arity == 0) {
             Reg result = allocate_register();
             LIR_Inst inst(LIR_Op::MakeEnum, Type::Ptr, result, UINT32_MAX, 0, static_cast<uint32_t>(tag));

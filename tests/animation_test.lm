@@ -7,10 +7,10 @@ import std.graphics.shadow show Shadow;
 fn test_time_based_property_animation(): nil {
     print("Testing PropertyAnimation easing and time-based progression...");
 
-    var p_anim = anim.PropertyAnimation(0.0, 100.0, 1.0, anim.EASE_OUT);
+    var p_anim = anim.PropertyAnimation(0.0, 100.0, 1.0, anim.Easing.Out);
     p_anim.play();
 
-    assert(p_anim.state == anim.STATE_RUNNING, "state running");
+    assert(p_anim.state == anim.AnimationState.Running, "state running");
 
     // Advance 0.5s
     var v1 = p_anim.update(0.5);
@@ -19,7 +19,7 @@ fn test_time_based_property_animation(): nil {
     // Advance to 1.0s (completion)
     var v2 = p_anim.update(0.5);
     assert(v2 == 100.0, "completed value");
-    assert(p_anim.state == anim.STATE_COMPLETED, "state completed");
+    assert(p_anim.state == anim.AnimationState.Completed, "state completed");
 
     print("PropertyAnimation test passed.");
 }
@@ -27,7 +27,7 @@ fn test_time_based_property_animation(): nil {
 fn test_interruptible_target_changes(): nil {
     print("Testing interruptible target changes...");
 
-    var anim_inst = anim.PropertyAnimation(0.0, 100.0, 1.0, anim.EASE_LINEAR);
+    var anim_inst = anim.PropertyAnimation(0.0, 100.0, 1.0, anim.Easing.Linear);
     anim_inst.play();
 
     // Advance 0.5s -> value is 50
@@ -70,13 +70,13 @@ fn test_imgui_animation_store(): nil {
     var btn_id = "main_menu/start_btn";
 
     var st = store.get_or_create(btn_id);
-    var initial_val = st.animate_property("hover_t", 0.0, 0.1, anim.EASE_OUT, 0.05);
+    var initial_val = st.animate_property("hover_t", 0.0, 0.1, anim.Easing.Out, 0.05);
     assert(initial_val == 0.0, "initial unhovered value is 0.0 without flashing");
 
-    var t1 = st.animate_property("hover_t", 1.0, 0.1, anim.EASE_OUT, 0.05);
+    var t1 = st.animate_property("hover_t", 1.0, 0.1, anim.Easing.Out, 0.05);
     assert(t1 > 0.0 and t1 < 1.0, "imgui animated transition in progress");
 
-    var t2 = st.animate_property("hover_t", 1.0, 0.1, anim.EASE_OUT, 0.1);
+    var t2 = st.animate_property("hover_t", 1.0, 0.1, anim.Easing.Out, 0.1);
     assert(t2 == 1.0, "imgui animated transition completed");
 
     print("IMGUI Animation Store test passed.");
@@ -90,7 +90,7 @@ fn test_retained_ui_animation_modifiers(): nil {
         .opacity(0.8)
         .scale(1.1)
         .shadow(sh_inst)
-        .animate(0.2, anim.EASE_OUT)
+        .animate(0.2, anim.Easing.Out)
         .spring(200.0, 15.0)
         .transition(anim.Transition().fade(0.0, 1.0, 0.2));
 
@@ -132,13 +132,13 @@ fn test_keyframes_and_controls(): nil {
     assert(kf.evaluate(0.25) == 50.0, "kf quarter lerp");
     assert(kf.evaluate(1.0) == 50.0, "kf end");
 
-    var p_anim = anim.PropertyAnimation(0.0, 100.0, 2.0, anim.EASE_LINEAR);
+    var p_anim = anim.PropertyAnimation(0.0, 100.0, 2.0, anim.Easing.Linear);
     p_anim.play();
     p_anim.seek(0.5);
     assert(p_anim.current_val == 50.0, "seek 50%");
 
     p_anim.reset();
-    assert(p_anim.current_val == 0.0 and p_anim.state == anim.STATE_IDLE, "reset");
+    assert(p_anim.current_val == 0.0 and p_anim.state == anim.AnimationState.Idle, "reset");
 
     print("Keyframes and controls test passed.");
 }
@@ -148,11 +148,11 @@ fn test_reduced_motion(): nil {
 
     anim.global_animation_preferences.reduce_motion = true;
 
-    var p_anim = anim.PropertyAnimation(0.0, 100.0, 1.0, anim.EASE_OUT);
+    var p_anim = anim.PropertyAnimation(0.0, 100.0, 1.0, anim.Easing.Out);
     p_anim.play();
 
     assert(p_anim.current_val == 100.0, "reduced motion instant jump");
-    assert(p_anim.state == anim.STATE_COMPLETED, "reduced motion immediate completion");
+    assert(p_anim.state == anim.AnimationState.Completed, "reduced motion immediate completion");
 
     // Restore default
     anim.global_animation_preferences.reduce_motion = false;

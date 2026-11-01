@@ -1,0 +1,21 @@
+import tests.modules.mixin_lib show Timestampable, Identifiable;
+
+frame Article {
+    mixin Timestampable;
+    mixin Identifiable;
+    pub title: str;
+}
+
+var a = Article();
+a.id = 42;
+a.title = "Lymar Architecture";
+a.created_at = 1000;
+a.updated_at = 2000;
+
+assert(a.id == 42);
+assert(a.title == "Lymar Architecture");
+assert(a.created_at == 1000);
+assert(a.updated_at == 2000);
+
+print("mixin import test OK");
+

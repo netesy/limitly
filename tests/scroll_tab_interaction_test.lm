@@ -62,8 +62,8 @@ fn run_scroll_tab_tests() {
     assert(sld_b.slider_val == 75.0, "Tab B slider initially 75.0");
 
     // 2. Scroll Tab A by wheel
-    app.push_event(app.Event(event_type=app.EVENT_MOUSE_MOVE, x=100, y=100));
-    app.push_event(app.Event(event_type=app.EVENT_MOUSE_WHEEL, y=-160));
+    app.push_event(app.Event(event_type=app.EventType.MouseMove, x=100, y=100));
+    app.push_event(app.Event(event_type=app.EventType.MouseWheel, y=-160));
     app.process_events();
     assert(scr_a.scroll_y > 0.0, "Scroll offset should increase after wheel scroll");
     var saved_scroll_y = scr_a.scroll_y;
@@ -81,31 +81,31 @@ fn run_scroll_tab_tests() {
 
     // 4. Switch to Tab B
     // Tab B header item is around x=130, y=30
-    app.push_event(app.Event(event_type=app.EVENT_MOUSE_DOWN, x=130, y=30));
-    app.push_event(app.Event(event_type=app.EVENT_MOUSE_UP, x=130, y=30));
+    app.push_event(app.Event(event_type=app.EventType.MouseDown, x=130, y=30));
+    app.push_event(app.Event(event_type=app.EventType.MouseUp, x=130, y=30));
     app.process_events();
     assert(tv.active_tab == 1, "Active tab should switch to Tab B (1)");
     app.present_frame();
 
     // Inactive Tab A elements should NOT receive input or clicks
     assert(btn_scrolled.click_count == 0, "Initial click count should be 0");
-    app.push_event(app.Event(event_type=app.EVENT_MOUSE_DOWN, x=100, y=100));
-    app.push_event(app.Event(event_type=app.EVENT_MOUSE_UP, x=100, y=100));
+    app.push_event(app.Event(event_type=app.EventType.MouseDown, x=100, y=100));
+    app.push_event(app.Event(event_type=app.EventType.MouseUp, x=100, y=100));
     app.process_events();
     assert(btn_scrolled.click_count == 0, "Inactive Tab A must not receive clicks");
     print("Pass: Inactive tab content isolated from input");
 
     // 5. Switch back to Tab A
     // Tab A header item is around x=50, y=30
-    app.push_event(app.Event(event_type=app.EVENT_MOUSE_DOWN, x=50, y=30));
-    app.push_event(app.Event(event_type=app.EVENT_MOUSE_UP, x=50, y=30));
+    app.push_event(app.Event(event_type=app.EventType.MouseDown, x=50, y=30));
+    app.push_event(app.Event(event_type=app.EventType.MouseUp, x=50, y=30));
     app.process_events();
     assert(tv.active_tab == 0, "Active tab should switch back to Tab A (0)");
     assert(scr_a.scroll_y == saved_scroll_y, "Tab A scroll offset must be preserved across tab switches");
     print("Pass: Tab A scroll offset persisted across tab switch");
 
     // 6. Window Resize must preserve semantic states
-    app.push_event(app.Event(event_type=app.EVENT_RESIZE, x=1024, y=768));
+    app.push_event(app.Event(event_type=app.EventType.Resize, x=1024, y=768));
     app.process_events();
     app.present_frame();
 
@@ -124,13 +124,13 @@ fn run_scroll_tab_tests() {
 
     // In Tab A, tab header is 32px + 8px gap = 40px down, ScrollView starts at y=60
     // btn1 is y=66..106, spacer1 is 60px, inp1 is at y=166..196
-    app.push_event(app.Event(event_type=app.EVENT_MOUSE_DOWN, x=100, y=175));
-    app.push_event(app.Event(event_type=app.EVENT_MOUSE_UP, x=100, y=175));
+    app.push_event(app.Event(event_type=app.EventType.MouseDown, x=100, y=175));
+    app.push_event(app.Event(event_type=app.EventType.MouseUp, x=100, y=175));
     app.process_events();
     assert(inp1.is_focused == 1, "Input inside ScrollView should become focused");
 
     // Type text into input
-    app.push_event(app.Event(event_type=app.EVENT_CHAR, key_code=65)); // 'A'
+    app.push_event(app.Event(event_type=app.EventType.Char, key_code=65)); // 'A'
     app.process_events();
     assert(inp1.text_val == "initial_textA", "Input inside ScrollView accepts text input");
     print("Pass: Input inside ScrollView hit testing and text entry verified");

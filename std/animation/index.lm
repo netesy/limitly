@@ -4,22 +4,28 @@
 
 pub import std.graphics.shadow show Shadow, shadow, lerp_shadow;
 
-// Easing Curve Type Identifiers
-pub var EASE_LINEAR: int = 0;
-pub var EASE_IN: int = 1;
-pub var EASE_OUT: int = 2;
-pub var EASE_IN_OUT: int = 3;
-pub var EASE_BOUNCE: int = 4;
-pub var EASE_ELASTIC: int = 5;
-pub var EASE_CUBIC: int = 6;
-pub var EASE_BACK: int = 7;
+// Easing Curve Type Enumeration
+enum Easing {
+    Linear,
+    In,
+    Out,
+    InOut,
+    Bounce,
+    Elastic,
+    Cubic,
+    Back
+}
 
-// Animation Lifecycle States
-pub var STATE_IDLE: int = 0;
-pub var STATE_RUNNING: int = 1;
-pub var STATE_PAUSED: int = 2;
-pub var STATE_COMPLETED: int = 3;
-pub var STATE_CANCELLED: int = 4;
+// Animation Lifecycle State Enumeration
+enum AnimationState {
+    Idle,
+    Running,
+    Paused,
+    Completed,
+    Cancelled
+}
+
+// Easing & Animation Lifecycle enums used directly throughout std.animation
 
 // ── Global Preferences & Accessibility ────────────────────────────────────
 
@@ -39,41 +45,48 @@ pub var global_animation_preferences: AnimationPreferences = AnimationPreference
 
 // ── Easing Resolver ─────────────────────────────────────────────────────────
 
-pub fn apply_easing(t: float, type_val: int): float {
+pub fn apply_easing(t: float, easing: Easing): float {
     var progress = t;
     if (progress < 0.0) progress = 0.0;
     if (progress > 1.0) progress = 1.0;
 
-    if (type_val == EASE_LINEAR) {
-        return progress;
-    } elif (type_val == EASE_IN) {
-        return progress * progress;
-    } elif (type_val == EASE_OUT) {
-        return progress * (2.0 - progress);
-    } elif (type_val == EASE_IN_OUT) {
-        if (progress < 0.5) {
-            return 2.0 * progress * progress;
-        }
-        return -1.0 + (4.0 - 2.0 * progress) * progress;
-    } elif (type_val == EASE_CUBIC) {
-        return progress * progress * progress;
-    } elif (type_val == EASE_BOUNCE) {
-        if (progress < 0.363) {
-            return 7.5625 * progress * progress;
-        } elif (progress < 0.727) {
-            var p2 = progress - 0.545;
-            return 7.5625 * p2 * p2 + 0.75;
-        } elif (progress < 0.909) {
-            var p3 = progress - 0.818;
-            return 7.5625 * p3 * p3 + 0.9375;
-        }
-        var p4 = progress - 0.954;
-        return 7.5625 * p4 * p4 + 0.984375;
-    } elif (type_val == EASE_BACK) {
-        var s = 1.70158;
-        return progress * progress * ((s + 1.0) * progress - s);
+    match (easing) {
+        Easing.Linear => { return progress; },
+        Easing.In => { return progress * progress; },
+        Easing.Out => { return progress * (2.0 - progress); },
+        Easing.InOut => {
+            if (progress < 0.5) {
+                return 2.0 * progress * progress;
+            }
+            return -1.0 + (4.0 - 2.0 * progress) * progress;
+        },
+        Easing.Cubic => { return progress * progress * progress; },
+        Easing.Bounce => {
+            if (progress < 0.363) {
+                return 7.5625 * progress * progress;
+            } elif (progress < 0.727) {
+                var p2 = progress - 0.545;
+                return 7.5625 * p2 * p2 + 0.75;
+            } elif (progress < 0.909) {
+                var p3 = progress - 0.818;
+                return 7.5625 * p3 * p3 + 0.9375;
+            }
+            var p4 = progress - 0.954;
+            return 7.5625 * p4 * p4 + 0.984375;
+        },
+        Easing.Elastic => {
+            return progress;
+        },
+        Easing.Back => {
+            var s = 1.70158;
+            return progress * progress * ((s + 1.0) * progress - s);
+        },
+        _ => { return progress; }
     }
-    return progress;
+}
+
+pub fn apply_easing_curve(t: float, easing: Easing): float {
+    return apply_easing(t, easing);
 }
 
 // ── Spring Physics Model ───────────────────────────────────────────────────
@@ -185,23 +198,23 @@ frame PropertyAnimation {
     pub var duration: float;
     pub var elapsed: float;
     pub var delay: float;
-    pub var easing_type: int;
-    pub var state: int;
+    pub var easing: Easing;
+    pub var state: AnimationState;
     pub var is_spring: bool;
     pub var is_repeat: bool;
     pub var is_reverse: bool;
     pub var spring_model: Spring;
     pub var keyframes_model: Keyframes;
 
-    pub init(start_v: float = 0.0, target_v: float = 1.0, dur: float = 0.25, easing: int = 0) {
+    pub init(start_v: float = 0.0, target_v: float = 1.0, dur: float = 0.25, easing: Easing = Easing.Linear) {
         self.start_val = start_v;
         self.target_val = target_v;
         self.current_val = start_v;
         self.duration = dur;
         self.elapsed = 0.0;
         self.delay = 0.0;
-        self.easing_type = easing;
-        self.state = STATE_IDLE;
+        self.easing = easing;
+        self.state = AnimationState.Idle;
         self.is_spring = false;
         self.is_repeat = false;
         self.is_reverse = false;
@@ -212,31 +225,31 @@ frame PropertyAnimation {
     pub fn play(): nil {
         if (not global_animation_preferences.enabled or global_animation_preferences.reduce_motion) {
             self.current_val = self.target_val;
-            self.state = STATE_COMPLETED;
+            self.state = AnimationState.Completed;
             return;
         }
-        self.state = STATE_RUNNING;
+        self.state = AnimationState.Running;
     }
 
     pub fn pause(): nil {
-        self.state = STATE_PAUSED;
+        self.state = AnimationState.Paused;
     }
 
     pub fn resume(): nil {
-        if (self.state == STATE_PAUSED) {
-            self.state = STATE_RUNNING;
+        if (self.state == AnimationState.Paused) {
+            self.state = AnimationState.Running;
         }
     }
 
     pub fn stop(): nil {
-        self.state = STATE_COMPLETED;
+        self.state = AnimationState.Completed;
         self.current_val = self.target_val;
     }
 
     pub fn reset(): nil {
         self.elapsed = 0.0;
         self.current_val = self.start_val;
-        self.state = STATE_IDLE;
+        self.state = AnimationState.Idle;
     }
 
     pub fn set_delay(d: float): PropertyAnimation {
@@ -263,7 +276,7 @@ frame PropertyAnimation {
         if (p < 0.0) p = 0.0;
         if (p > 1.0) p = 1.0;
         self.elapsed = p * self.duration;
-        var eased_t = apply_easing(p, self.easing_type);
+        var eased_t = apply_easing(p, self.easing);
         self.current_val = lerp_float(self.start_val, self.target_val, eased_t);
         return self.current_val;
     }
@@ -273,18 +286,18 @@ frame PropertyAnimation {
             self.start_val = self.current_val; // Interruptible: continue from current visual position!
             self.target_val = new_target;
             self.elapsed = 0.0;
-            self.state = STATE_RUNNING;
+            self.state = AnimationState.Running;
         }
     }
 
     pub fn update(dt: float): float {
         if (not global_animation_preferences.enabled or global_animation_preferences.reduce_motion) {
             self.current_val = self.target_val;
-            self.state = STATE_COMPLETED;
+            self.state = AnimationState.Completed;
             return self.current_val;
         }
 
-        if (self.state != STATE_RUNNING) {
+        if (self.state != AnimationState.Running) {
             return self.current_val;
         }
 
@@ -301,7 +314,7 @@ frame PropertyAnimation {
             self.current_val = self.spring_model.update(self.current_val, self.target_val, dt);
             if (self.spring_model.is_at_rest(self.current_val, self.target_val)) {
                 self.current_val = self.target_val;
-                self.state = STATE_COMPLETED;
+                self.state = AnimationState.Completed;
             }
         } else {
             self.elapsed = self.elapsed + dt;
@@ -311,7 +324,7 @@ frame PropertyAnimation {
                 } else {
                     self.current_val = self.target_val;
                 }
-                self.state = STATE_COMPLETED;
+                self.state = AnimationState.Completed;
             } else {
                 var progress = self.elapsed / effective_dur;
                 if (progress >= 1.0) {
@@ -329,13 +342,13 @@ frame PropertyAnimation {
                         } else {
                             self.current_val = self.target_val;
                         }
-                        self.state = STATE_COMPLETED;
+                        self.state = AnimationState.Completed;
                     }
                 } else {
                     if (len(self.keyframes_model.frames) > 0) {
                         self.current_val = self.keyframes_model.evaluate(progress);
                     } else {
-                        var eased_t = apply_easing(progress, self.easing_type);
+                        var eased_t = apply_easing(progress, self.easing);
                         self.current_val = lerp_float(self.start_val, self.target_val, eased_t);
                     }
                 }
@@ -367,11 +380,11 @@ frame AnimationSequence {
             return 0.0;
         }
         var cur = self.anims[self.current_idx];
-        if (cur.state == STATE_IDLE) {
+        if (cur.state == AnimationState.Idle) {
             cur.play();
         }
         var v_out = cur.update(dt);
-        if (cur.state == STATE_COMPLETED) {
+        if (cur.state == AnimationState.Completed) {
             self.current_idx = self.current_idx + 1;
         }
         return v_out;
@@ -401,7 +414,7 @@ frame AnimationParallel {
         var i = 0;
         while (i < len(self.anims)) {
             var a = self.anims[i];
-            if (a.state == STATE_IDLE) {
+            if (a.state == AnimationState.Idle) {
                 a.play();
             }
             a.update(dt);
@@ -412,7 +425,7 @@ frame AnimationParallel {
     pub fn is_completed(): bool {
         var i = 0;
         while (i < len(self.anims)) {
-            if (self.anims[i].state != STATE_COMPLETED) {
+            if (self.anims[i].state != AnimationState.Completed) {
                 return false;
             }
             i = i + 1;
@@ -438,10 +451,10 @@ frame Transition {
     pub var active: bool;
 
     pub init() {
-        self.opacity_anim = PropertyAnimation(0.0, 1.0, 0.25, EASE_OUT);
-        self.scale_anim = PropertyAnimation(0.9, 1.0, 0.25, EASE_OUT);
-        self.slide_x_anim = PropertyAnimation(0.0, 0.0, 0.25, EASE_OUT);
-        self.slide_y_anim = PropertyAnimation(20.0, 0.0, 0.25, EASE_OUT);
+        self.opacity_anim = PropertyAnimation(0.0, 1.0, 0.25, Easing.Out);
+        self.scale_anim = PropertyAnimation(0.9, 1.0, 0.25, Easing.Out);
+        self.slide_x_anim = PropertyAnimation(0.0, 0.0, 0.25, Easing.Out);
+        self.slide_y_anim = PropertyAnimation(20.0, 0.0, 0.25, Easing.Out);
         self.active = true;
     }
 
@@ -455,17 +468,17 @@ frame Transition {
     }
 
     pub fn fade(start_a: float = 0.0, end_a: float = 1.0, dur: float = 0.25): Transition {
-        self.opacity_anim = PropertyAnimation(start_a, end_a, dur, EASE_OUT);
+        self.opacity_anim = PropertyAnimation(start_a, end_a, dur, Easing.Out);
         return self;
     }
 
     pub fn scale(start_s: float = 0.9, end_s: float = 1.0, dur: float = 0.25): Transition {
-        self.scale_anim = PropertyAnimation(start_s, end_s, dur, EASE_OUT);
+        self.scale_anim = PropertyAnimation(start_s, end_s, dur, Easing.Out);
         return self;
     }
 
     pub fn slide(start_y: float = 20.0, end_y: float = 0.0, dur: float = 0.25): Transition {
-        self.slide_y_anim = PropertyAnimation(start_y, end_y, dur, EASE_OUT);
+        self.slide_y_anim = PropertyAnimation(start_y, end_y, dur, Easing.Out);
         return self;
     }
 
@@ -500,7 +513,7 @@ frame AnimationManager {
         while (i < len(self.active_animations)) {
             var anim = self.active_animations[i];
             anim.update(dt);
-            if (anim.state == STATE_RUNNING or anim.state == STATE_PAUSED) {
+            if (anim.state == AnimationState.Running or anim.state == AnimationState.Paused) {
                 remaining.append(anim);
             }
             i = i + 1;
@@ -522,12 +535,12 @@ frame IMGUIAnimationState {
         self.last_used_frame = 0;
     }
 
-    pub fn animate_property(prop_name: str, target: float, dur: float = 0.15, easing: int = 2, dt: float = 0.016): float {
+    pub fn animate_property(prop_name: str, target: float, dur: float = 0.15, easing: Easing = Easing.Out, dt: float = 0.016): float {
         var anim = self.float_anims[prop_name] as PropertyAnimation;
         if (anim == nil) {
             anim = PropertyAnimation(target, target, dur, easing);
             anim.current_val = target;
-            anim.state = STATE_COMPLETED;
+            anim.state = AnimationState.Completed;
             self.float_anims[prop_name] = anim;
             return target;
         }

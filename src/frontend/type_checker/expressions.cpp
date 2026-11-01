@@ -2227,13 +2227,23 @@ TypePtr TypeChecker::check_member_expr(std::shared_ptr<LM::Frontend::AST::Member
         }
     }
     
-    // Handle enum variant access: Color.Red
+    // Handle enum variant access: Color.Red or alias.Enum.Variant
     if (object_type && object_type->tag == TypeTag::Enum) {
-        if (auto var_obj = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(expr->object)) {
-            std::string qualified = var_obj->name + "." + expr->name;
-            if (variable_types.count(qualified)) {
-                TypePtr variantType = variable_types[qualified];
-                return wrap_result(variantType);
+        auto* enumData = std::get_if<EnumType>(&object_type->extra);
+        std::string enum_name = enumData ? enumData->name : "";
+        std::string qualified = enum_name + "." + expr->name;
+        if (variable_types.count(qualified)) {
+            return wrap_result(variable_types[qualified]);
+        }
+        if (variable_types.count(expr->name)) {
+            return wrap_result(variable_types[expr->name]);
+        }
+        size_t last_dot = enum_name.rfind('.');
+        if (last_dot != std::string::npos) {
+            std::string bare_enum = enum_name.substr(last_dot + 1);
+            std::string bare_qual = bare_enum + "." + expr->name;
+            if (variable_types.count(bare_qual)) {
+                return wrap_result(variable_types[bare_qual]);
             }
         }
     }
@@ -2303,6 +2313,14 @@ TypePtr TypeChecker::check_member_expr(std::shared_ptr<LM::Frontend::AST::Member
             if (!target_mod.empty() && frame_declarations.count(target_mod + "." + member_name)) {
                 TypePtr ft = type_system.createFrameType(target_mod + "." + member_name);
                 return wrap_result(ft);
+            }
+            // Check for enums
+            std::string enum_full = target_mod.empty() ? qualified_name : (target_mod + "." + member_name);
+            TypePtr et = type_system.getType(enum_full);
+            if (!et || et->tag == TypeTag::Nil) et = type_system.getType(qualified_name);
+            if (!et || et->tag == TypeTag::Nil) et = type_system.getType(member_name);
+            if (et && et->tag == TypeTag::Enum) {
+                return wrap_result(et);
             }
         }
 

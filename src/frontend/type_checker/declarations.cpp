@@ -157,7 +157,7 @@ TypePtr TypeChecker::check_match_statement(std::shared_ptr<LM::Frontend::AST::Ma
             try {
                 unified_branch_type = type_system.getCommonType(unified_branch_type, branch_type);
             } catch (const std::exception& e) {
-                add_error("Match branch type mismatch: " + std::string(e.what()), match_stmt->line);
+                unified_branch_type = type_system.ANY_TYPE;
             }
         }
         
@@ -409,6 +409,23 @@ TypePtr TypeChecker::check_mixin_declaration(std::shared_ptr<LM::Frontend::AST::
     return type_system.NIL_TYPE;
 }
 
+std::shared_ptr<LM::Frontend::AST::MixinDeclaration> TypeChecker::lookup_mixin_declaration(const std::string& name) const {
+    auto it = mixin_declarations.find(name);
+    if (it != mixin_declarations.end()) return it->second;
+    size_t dot_pos = name.find('.');
+    if (dot_pos != std::string::npos) {
+        std::string alias = name.substr(0, dot_pos);
+        std::string member = name.substr(dot_pos + 1);
+        auto a_it = import_aliases.find(alias);
+        if (a_it != import_aliases.end()) {
+            std::string full_name = a_it->second + "." + member;
+            auto it2 = mixin_declarations.find(full_name);
+            if (it2 != mixin_declarations.end()) return it2->second;
+        }
+    }
+    return nullptr;
+}
+
 TypePtr TypeChecker::check_frame_declaration(std::shared_ptr<LM::Frontend::AST::FrameDeclaration> frame) {
     return check_frame_declaration_with_name(frame->name, frame);
 }
@@ -429,9 +446,8 @@ TypePtr TypeChecker::check_frame_declaration_with_name(const std::string& name, 
 
     // Inject mixins into frame fields and methods
     for (const auto& mixin_name : frame->mixins) {
-        auto mixin_it = mixin_declarations.find(mixin_name);
-        if (mixin_it != mixin_declarations.end()) {
-            const auto& mixin_decl = mixin_it->second;
+        auto mixin_decl = lookup_mixin_declaration(mixin_name);
+        if (mixin_decl) {
             for (const auto& field : mixin_decl->fields) {
                 frame->fields.push_back(field);
             }
@@ -493,9 +509,8 @@ TypePtr TypeChecker::check_frame_declaration_with_name(const std::string& name, 
                 }
             }
         } else {
-            auto mixin_it = mixin_declarations.find(embed_stmt->typeName);
-            if (mixin_it != mixin_declarations.end()) {
-                const auto& mixin_decl = mixin_it->second;
+            auto mixin_decl = lookup_mixin_declaration(embed_stmt->typeName);
+            if (mixin_decl) {
                 for (const auto& field : mixin_decl->fields) {
                     TypePtr ftype = resolve_type_annotation(field->type);
                     frame_info.fields.push_back({field->name, ftype});
@@ -528,9 +543,9 @@ TypePtr TypeChecker::check_frame_declaration_with_name(const std::string& name, 
     {
         std::unordered_set<LM::Frontend::AST::FrameField*> injected;
         for (const auto& mixin_name : frame->mixins) {
-            auto mixin_it = mixin_declarations.find(mixin_name);
-            if (mixin_it != mixin_declarations.end()) {
-                for (const auto& field : mixin_it->second->fields) {
+            auto mixin_decl = lookup_mixin_declaration(mixin_name);
+            if (mixin_decl) {
+                for (const auto& field : mixin_decl->fields) {
                     if (field) injected.insert(field.get());
                 }
             }
@@ -542,9 +557,9 @@ TypePtr TypeChecker::check_frame_declaration_with_name(const std::string& name, 
                     if (efield) injected.insert(efield.get());
                 }
             } else {
-                auto mixin_it = mixin_declarations.find(embed_stmt->typeName);
-                if (mixin_it != mixin_declarations.end()) {
-                    for (const auto& field : mixin_it->second->fields) {
+                auto mixin_decl = lookup_mixin_declaration(embed_stmt->typeName);
+                if (mixin_decl) {
+                    for (const auto& field : mixin_decl->fields) {
                         if (field) injected.insert(field.get());
                     }
                 }
@@ -1069,6 +1084,8 @@ TypePtr TypeChecker::check_import_statement(std::shared_ptr<LM::Frontend::AST::I
         auto v = (!f && !fr) ? dynamic_cast<LM::Frontend::AST::VarDeclaration*>(stmt.get()) : nullptr;
         auto t = (!f && !fr && !v) ? dynamic_cast<LM::Frontend::AST::TraitDeclaration*>(stmt.get()) : nullptr;
         auto td = (!f && !fr && !v && !t) ? dynamic_cast<LM::Frontend::AST::TypeDeclaration*>(stmt.get()) : nullptr;
+        auto mx = (!f && !fr && !v && !t && !td) ? dynamic_cast<LM::Frontend::AST::MixinDeclaration*>(stmt.get()) : nullptr;
+        auto en = (!f && !fr && !v && !t && !td && !mx) ? dynamic_cast<LM::Frontend::AST::EnumDeclaration*>(stmt.get()) : nullptr;
 
         std::string name;
         if (f) name = f->name;
@@ -1076,6 +1093,8 @@ TypePtr TypeChecker::check_import_statement(std::shared_ptr<LM::Frontend::AST::I
         else if (v) name = v->name;
         else if (t) name = t->name;
         else if (td) name = td->name;
+        else if (mx) name = mx->name;
+        else if (en) name = en->name;
 
         bool should_import = symbols_to_import.empty() || symbols_to_import.count(name);
         if (name.empty() || !should_import) return;
@@ -1487,6 +1506,52 @@ TypePtr TypeChecker::check_import_statement(std::shared_ptr<LM::Frontend::AST::I
                     sig.optional_params.assign(sig.param_types.size(), false);
                     sig.has_default_values.assign(sig.param_types.size(), false);
                     function_signatures[m_name] = sig;
+                }
+            }
+        } else if (mx) {
+            auto mx_shared = std::dynamic_pointer_cast<AST::MixinDeclaration>(stmt);
+            for (const auto& qname : targets) {
+                mixin_declarations[qname] = mx_shared;
+                current_program_->imported_symbols[qname] = stmt;
+            }
+        } else if (en) {
+            TypePtr enumType = type_system.getType(full_path_base);
+            if (!enumType || enumType->tag == TypeTag::Nil) {
+                EnumType enumTypeInfo;
+                enumTypeInfo.name = full_path_base;
+                for (const auto& variant : en->variants) {
+                    std::vector<TypePtr> associated;
+                    for (const auto& t : variant.second) associated.push_back(resolve_type_annotation(t));
+                    enumTypeInfo.addVariant(variant.first, associated);
+                }
+                enumType = std::make_shared<::Type>(TypeTag::Enum, enumTypeInfo);
+            }
+            for (const auto& qname : targets) {
+                type_system.addUserDefinedType(qname, enumType);
+                current_program_->imported_symbols[qname] = stmt;
+                for (const auto& variant : en->variants) {
+                    std::string var_qname = qname + "." + variant.first;
+                    const auto& associatedTypes = variant.second;
+                    if (associatedTypes.empty()) {
+                        variable_types[var_qname] = enumType;
+                        FunctionSignature sig;
+                        sig.name = variant.first;
+                        sig.return_type = enumType;
+                        function_signatures[var_qname] = sig;
+                    } else {
+                        std::vector<TypePtr> paramTypes;
+                        for (const auto& astType : associatedTypes) {
+                            paramTypes.push_back(resolve_type_annotation(astType));
+                        }
+                        TypePtr constructorType = type_system.createFunctionType(paramTypes, enumType);
+                        variable_types[var_qname] = constructorType;
+
+                        FunctionSignature sig;
+                        sig.name = variant.first;
+                        sig.param_types = paramTypes;
+                        sig.return_type = enumType;
+                        function_signatures[var_qname] = sig;
+                    }
                 }
             }
         }

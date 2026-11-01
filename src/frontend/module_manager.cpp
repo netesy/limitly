@@ -730,6 +730,9 @@ void ModuleManager::extract_metadata(std::shared_ptr<Module> module) {
         } else if (auto type_decl = std::dynamic_pointer_cast<AST::TypeDeclaration>(stmt)) {
             // Type aliases are always public module-level symbols
             module->public_symbols.insert(type_decl->name);
+        } else if (auto mixin_decl = std::dynamic_pointer_cast<AST::MixinDeclaration>(stmt)) {
+            // Mandate: Mixins are always public module-level symbols.
+            module->public_symbols.insert(mixin_decl->name);
         } else if (auto import_stmt = std::dynamic_pointer_cast<AST::ImportStatement>(stmt)) {
             // Resolve `c:` scheme imports: generate FFI bindings once, then rewrite
             // modulePath to the resulting namespace so downstream resolution + the
@@ -785,6 +788,7 @@ void ModuleManager::expand_reexports(std::shared_ptr<Module> module) {
         if (auto t = dynamic_cast<const AST::TraitDeclaration*>(stmt)) return t->name;
         if (auto e = dynamic_cast<const AST::EnumDeclaration*>(stmt)) return e->name;
         if (auto td = dynamic_cast<const AST::TypeDeclaration*>(stmt)) return td->name;
+        if (auto mx = dynamic_cast<const AST::MixinDeclaration*>(stmt)) return mx->name;
         return "";
     };
 

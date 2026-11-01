@@ -716,7 +716,7 @@ frame Widget : WidgetTrait {
     pub fn opacity(o: float): Widget { self.opacity_val = o; return self; }
     pub fn scale(s: float): Widget { self.scale_val = s; return self; }
     pub fn shadow(s: shadow.Shadow): Widget { self.shadow_val = s; return self; }
-    pub fn animate(dur: float = 0.25, easing: int = 0): Widget {
+    pub fn animate(dur: float = 0.25, easing: anim.Easing = anim.Easing.Linear): Widget {
         self.anim_property = anim.PropertyAnimation(0.0, 1.0, dur, easing);
         return self;
     }

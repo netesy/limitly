@@ -128,7 +128,6 @@ std::shared_ptr<LM::Frontend::AST::TypeAnnotation> Parser::parseBasicType() {
                 } while (match({TokenType::COMMA}));
             }
             consume(TokenType::RIGHT_PAREN, "Expected ')' after staged type constructor arguments.");
-            return type;
         }
     } else if (match({TokenType::INT_TYPE})) { type->typeName = "int"; type->isPrimitive = true; }
     else if (match({TokenType::INT8_TYPE})) { type->typeName = "i8"; type->isPrimitive = true; }

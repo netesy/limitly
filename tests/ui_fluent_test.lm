@@ -136,7 +136,7 @@ fn test_retained_lifecycle_and_callback(): int {
     assert(btn.is_pressed == 0, "initial is_pressed must be 0");
 
     // Frame 2: Mouse down on button at (x=50, y=50) -> pressed visual
-    app.push_event(app.Event(event_type=app.EVENT_MOUSE_DOWN, x=50, y=50));
+    app.push_event(app.Event(event_type=app.EventType.MouseDown, x=50, y=50));
     app.run_frame_step();
     var p2 = gg.readback_pixel(50, 50);
     assert(p2 != nil, "frame 2 readback failed");
@@ -144,7 +144,7 @@ fn test_retained_lifecycle_and_callback(): int {
     assert(btn.is_pressed == 1, "button is_pressed must be 1 on mouse down");
 
     // Frame 3: Mouse up on button -> fires callback and resets pressed state
-    app.push_event(app.Event(event_type=app.EVENT_MOUSE_UP, x=50, y=50));
+    app.push_event(app.Event(event_type=app.EventType.MouseUp, x=50, y=50));
     app.run_frame_step();
     assert(btn.click_count == 1, "button click_count was not incremented");
     assert(btn.is_pressed == 0, "button is_pressed must be 0 after mouse up");

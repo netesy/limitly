@@ -12,15 +12,15 @@ bool TypeChecker::is_stage0_meta_name(const std::string& name) {
 TypePtr TypeChecker::resolve_type_annotation(std::shared_ptr<LM::Frontend::AST::TypeAnnotation> annotation) {
     if (!annotation) return nullptr;
 
-    // Stage-0 type constructor call in a type position, e.g. `var v: nullable(int) = ...`.
-    if (annotation->isStagedCall) {
-        return resolve_staged_call_annotation(annotation);
-    }
-
     TypePtr base_type = nullptr;
 
+    // Stage-0 type constructor call in a type position, e.g. `var v: nullable(int) = ...`.
+    if (annotation->isStagedCall) {
+        base_type = resolve_staged_call_annotation(annotation);
+        if (!base_type || base_type->tag == TypeTag::Nil) return base_type;
+    }
     // Handle structural types
-    if (annotation->isStructural && !annotation->structuralFields.empty()) {
+    else if (annotation->isStructural && !annotation->structuralFields.empty()) {
         std::vector<std::pair<std::string, TypePtr>> fields;
         for (const auto& field : annotation->structuralFields) {
             fields.push_back({field.name, resolve_type_annotation(field.type)});

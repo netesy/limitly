@@ -1,0 +1,10 @@
+// Mixin library for module export testing
+pub mixin Timestampable {
+    pub created_at: int;
+    pub updated_at: int;
+}
+
+pub mixin Identifiable {
+    pub id: int;
+}
+

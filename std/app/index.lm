@@ -6,16 +6,33 @@ import std.ui.types as ui_types;
 import std.gg as gg;
 import std.os as os;
 
-// Event type constants
-pub var EVENT_QUIT: int = 0;
-pub var EVENT_RESIZE: int = 1;
-pub var EVENT_KEY_DOWN: int = 2;
-pub var EVENT_KEY_UP: int = 3;
-pub var EVENT_MOUSE_DOWN: int = 4;
-pub var EVENT_MOUSE_UP: int = 5;
-pub var EVENT_MOUSE_MOVE: int = 6;
-pub var EVENT_CHAR: int = 7;
-pub var EVENT_MOUSE_WHEEL: int = 8;
+// Event type enumeration
+enum EventType {
+    Quit,
+    Resize,
+    KeyDown,
+    KeyUp,
+    MouseDown,
+    MouseUp,
+    MouseMove,
+    Char,
+    MouseWheel
+}
+
+fn event_type_from_int(code: int): EventType {
+    match (code) {
+        0 => { return EventType.Quit; },
+        1 => { return EventType.Resize; },
+        2 => { return EventType.KeyDown; },
+        3 => { return EventType.KeyUp; },
+        4 => { return EventType.MouseDown; },
+        5 => { return EventType.MouseUp; },
+        6 => { return EventType.MouseMove; },
+        7 => { return EventType.Char; },
+        8 => { return EventType.MouseWheel; },
+        _ => { return EventType.Quit; }
+    }
+}
 
 // Modifier key flags
 pub var MOD_SHIFT: int = 1;
@@ -25,43 +42,44 @@ pub var MOD_SUPER: int = 8;
 
 // Event frame
 frame Event {
-    pub var event_type: int;
+    pub var event_type: EventType;
     pub var timestamp: int;
     pub var window_id: int;
     pub var x: int;
     pub var y: int;
     pub var key_code: int;
+    pub var xdest: int;
+    pub var ydest: int;
 
-    pub init(event_type: int = 0, timestamp: int = 0, window_id: int = 0, x: int = 0, y: int = 0, key_code: int = 0) {
+    pub init(event_type: EventType = EventType.Quit, timestamp: int = 0, window_id: int = 0, x: int = 0, y: int = 0, key_code: int = 0, xdest: int = 0, ydest: int = 0) {
         self.event_type = event_type;
         self.timestamp = timestamp;
         self.window_id = window_id;
         self.x = x;
         self.y = y;
         self.key_code = key_code;
+        self.xdest = xdest;
+        self.ydest = ydest;
     }
 }
 
 // Key event frame
 frame KeyEvent {
-    pub var base: Event;
-    pub var key_code: int;
+    embed Event;
     pub var modifiers: int;
     pub var repeat: int;
 }
 
 // Mouse event frame
 frame MouseEvent {
-    pub var base: Event;
-    pub var x: int;
-    pub var y: int;
+    embed Event;
     pub var button: int;
     pub var modifiers: int;
 }
 
 // Resize event frame
 frame ResizeEvent {
-    pub var base: Event;
+    embed Event;
     pub var width: int;
     pub var height: int;
     pub var framebuffer_width: int;
@@ -113,7 +131,7 @@ frame AppState {
 }
 
 fn make_default_event(): Event {
-    return Event(event_type=0, timestamp=0, window_id=0, x=0, y=0, key_code=0);
+    return Event(event_type=EventType.Quit, timestamp=0, window_id=0, x=0, y=0, key_code=0);
 }
 
 // Global application state
@@ -259,10 +277,11 @@ pub fn process_events(): nil {
         var i: int = 0;
         var num_events = len(native_events);
         while (i + 3 < num_events) {
-            var ev_type: int = native_events[i];
+            var ev_code: int = native_events[i];
             var ev_x: int = native_events[i + 1];
             var ev_y: int = native_events[i + 2];
             var ev_k: int = native_events[i + 3];
+            var ev_type: EventType = event_type_from_int(ev_code);
             push_event(Event(event_type=ev_type, timestamp=0, window_id=1, x=ev_x, y=ev_y, key_code=ev_k));
             i = i + 4;
         }
@@ -274,45 +293,48 @@ pub fn process_events(): nil {
     var q_idx = 0;
     while (q_idx < len(q)) {
         var ev = q[q_idx];
-        if (ev.event_type == EVENT_QUIT) {
+        match (ev.event_type) {
+            EventType.Quit => {
             global_app_state.is_running = 0;
-        }
-        if (ev.event_type == EVENT_RESIZE) {
+            },
+            EventType.Resize => {
             global_app_state.width = ev.x;
             global_app_state.height = ev.y;
             global_app_state.framebuffer_width = ev.x;
             global_app_state.framebuffer_height = ev.y;
             ui_context.set_viewport_size(ev.x as float, ev.y as float);
-        }
-        if (ev.event_type == EVENT_MOUSE_DOWN) {
+            },
+            EventType.MouseDown => {
             ui_context.dispatch_pointer_down(ev.x as float, ev.y as float);
-        }
-        if (ev.event_type == EVENT_MOUSE_UP) {
+            },
+            EventType.MouseUp => {
             ui_context.dispatch_pointer_up(ev.x as float, ev.y as float);
-        }
-        if (ev.event_type == EVENT_MOUSE_MOVE) {
+            },
+            EventType.MouseMove => {
             ui_context.dispatch_pointer_move(ev.x as float, ev.y as float);
-        }
-        if (ev.event_type == EVENT_KEY_DOWN) {
+            },
+            EventType.KeyDown => {
             ui_context.dispatch_key_down(ev.key_code);
-        }
-        if (ev.event_type == EVENT_CHAR) {
+            },
+            EventType.Char => {
             ui_context.dispatch_char_input(ev.key_code);
-        }
-        if (ev.event_type == EVENT_MOUSE_WHEEL) {
+            },
+            EventType.MouseWheel => {
             ui_context.dispatch_mouse_wheel(ev.y as float);
+            },
+            _ => {}
         }
         q_idx = q_idx + 1;
     }
 }
 
 pub fn push_mouse_click(x: int, y: int): nil {
-    push_event(Event(event_type=EVENT_MOUSE_DOWN, timestamp=0, window_id=1, x=x, y=y, key_code=0));
-    push_event(Event(event_type=EVENT_MOUSE_UP, timestamp=0, window_id=1, x=x, y=y, key_code=0));
+    push_event(Event(event_type=EventType.MouseDown, timestamp=0, window_id=1, x=x, y=y, key_code=0));
+    push_event(Event(event_type=EventType.MouseUp, timestamp=0, window_id=1, x=x, y=y, key_code=0));
 }
 
 pub fn push_quit_event(): nil {
-    push_event(Event(event_type=EVENT_QUIT, timestamp=0, window_id=1, x=0, y=0));
+    push_event(Event(event_type=EventType.Quit, timestamp=0, window_id=1, x=0, y=0));
 }
 
 pub fn push_event(event: Event): nil {

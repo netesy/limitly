@@ -2,14 +2,18 @@
 
 import std.json.parser as parser;
 import std.json.writer as writer;
-pub import std.json.value show JSONValue;
+pub import std.json.value show JSONValue, JSONType, make_string, make_number, make_bool, make_null, make_array, make_object;
 
-pub fn parse(text: str): any {
-    return parser.parse(text);
+pub fn parse(text: str): JSONValue? {
+    var res: any = parser.parse(text);
+    if (res == nil) {
+        return err();
+    }
+    return ok(res as JSONValue);
 }
 
-pub fn stringify(val_any: any): str {
-    return writer.stringify(val_any);
+pub fn stringify(val_obj: JSONValue): str {
+    return writer.stringify(val_obj);
 }
 
 pub fn encode_pair(key: str, val_str: str): str {

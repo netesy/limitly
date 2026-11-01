@@ -31,7 +31,7 @@ fn test_resize() {
 
     // Simulate EVENT_RESIZE from native window manager (e.g., resized to 1280x720)
     app.push_event(app.Event(
-        event_type=app.EVENT_RESIZE,
+        event_type=app.EventType.Resize,
         timestamp=0,
         window_id=1,
         x=1280,

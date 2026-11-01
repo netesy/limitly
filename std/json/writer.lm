@@ -8,46 +8,55 @@ pub fn stringify(val_any: any): str {
         return "null";
     }
 
-    if (jval.type_tag == "string") {
-        return "\"" + jval.str_val + "\"";
-    } elif (jval.type_tag == "number") {
-        var num = jval.num_val;
-        return "{num}";
-    } elif (jval.type_tag == "bool") {
-        if (jval.bool_val == true) {
-            return "true";
-        }
-        return "false";
-    } elif (jval.type_tag == "null") {
-        return "null";
-    } elif (jval.type_tag == "array") {
-        var res = "[";
-        var i = 0;
-        var list_len = len(jval.list_val);
-        while (i < list_len) {
-            res = res + stringify(jval.list_val[i]);
-            if (i < list_len - 1) {
-                res = res + ",";
+    match (jval.kind) {
+        value.JSONType.String => {
+            return "\"" + jval.str_val + "\"";
+        },
+        value.JSONType.Number => {
+            var num = jval.num_val;
+            return "{num}";
+        },
+        value.JSONType.Bool => {
+            if (jval.bool_val == true) {
+                return "true";
             }
-            i = i + 1;
-        }
-        res = res + "]";
-        return res;
-    } elif (jval.type_tag == "object") {
-        var res = "{";
-        var i = 0;
-        var keys_len = len(jval.obj_keys);
-        while (i < keys_len) {
-            res = res + "\"" + jval.obj_keys[i] + "\":" + stringify(jval.obj_vals[i]);
-            if (i < keys_len - 1) {
-                res = res + ",";
+            return "false";
+        },
+        value.JSONType.Null => {
+            return "null";
+        },
+        value.JSONType.Array => {
+            var res = "[";
+            var i = 0;
+            var list_len = len(jval.list_val);
+            while (i < list_len) {
+                res = res + stringify(jval.list_val[i]);
+                if (i < list_len - 1) {
+                    res = res + ",";
+                }
+                i = i + 1;
             }
-            i = i + 1;
+            res = res + "]";
+            return res;
+        },
+        value.JSONType.Object => {
+            var res = "{";
+            var i = 0;
+            var keys_len = len(jval.obj_keys);
+            while (i < keys_len) {
+                res = res + "\"" + jval.obj_keys[i] + "\":" + stringify(jval.obj_vals[i]);
+                if (i < keys_len - 1) {
+                    res = res + ",";
+                }
+                i = i + 1;
+            }
+            res = res + "}";
+            return res;
+        },
+        _ => {
+            return "null";
         }
-        res = res + "}";
-        return res;
     }
-    return "null";
 }
 
 pub fn encode_pair(key: str, val_str: str): str {
