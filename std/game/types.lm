@@ -200,96 +200,97 @@ pub fn rect(x: float, y: float, w: float, h: float): Rect {
     return Rect(x=x, y=y, w=w, h=h);
 }
 
-frame Color {
-    pub var r: float;
-    pub var g: float;
-    pub var b: float;
-    pub var a: float;
-
-    pub init(r: float = 0.0, g: float = 0.0, b: float = 0.0, a: float = 1.0) {
-        self.r = r;
-        self.g = g;
-        self.b = b;
-        self.a = a;
-    }
-}
+// ── Canonical Game Color (Re-exported from std.color) ─────────────────────────
+import std.color as color;
+pub import std.color show Color;
 
 pub fn rgb(r: int, g: int, b: int): Color {
-    return Color(r=(r as float) / 255.0, g=(g as float) / 255.0, b=(b as float) / 255.0, a=1.0);
+    return color.rgb(r, g, b);
 }
 
 pub fn rgba(r: int, g: int, b: int, a: float): Color {
-    return Color(r=(r as float) / 255.0, g=(g as float) / 255.0, b=(b as float) / 255.0, a=a);
+    return color.rgba(r, g, b, a);
 }
 
 pub fn hex(c: int, a: float = 1.0): Color {
-    var r = (c >> 16) & 255;
-    var g = (c >> 8) & 255;
-    var b = c & 255;
-    return Color(r=(r as float) / 255.0, g=(g as float) / 255.0, b=(b as float) / 255.0, a=a);
+    return color.hex(c, a);
 }
 
-// Built-in standard game palette
-pub var white: Color       = Color(r=1.0, g=1.0, b=1.0, a=1.0);
-pub var black: Color       = Color(r=0.0, g=0.0, b=0.0, a=1.0);
-pub var transparent: Color = Color(r=0.0, g=0.0, b=0.0, a=0.0);
-pub var red: Color         = Color(r=0.92, g=0.25, b=0.25, a=1.0);
-pub var green: Color       = Color(r=0.25, g=0.85, b=0.35, a=1.0);
-pub var blue: Color        = Color(r=0.25, g=0.55, b=0.95, a=1.0);
-pub var yellow: Color      = Color(r=0.95, g=0.85, b=0.20, a=1.0);
-pub var cyan: Color        = Color(r=0.20, g=0.85, b=0.90, a=1.0);
+pub fn lerp(c1: Color, c2: Color, t: float): Color {
+    return color.lerp(c1, c2, t);
+}
+
+pub const white: Color = color.white;
+pub const black: Color = color.black;
+pub const transparent: Color = color.transparent;
+pub const red: Color = color.red;
+pub const green: Color = color.green;
+pub const blue: Color = color.blue;
+pub const yellow: Color = color.yellow;
+pub const cyan: Color = color.cyan;
+
+// Style Color Role Enum
+enum ColorRole {
+    WindowBg,
+    WindowTitle,
+    PanelBg,
+    Text,
+    TextMuted,
+    Accent,
+    Button,
+    ButtonHover,
+    ButtonActive,
+    SliderTrack,
+    SliderThumb,
+    CheckboxBorder,
+    CheckboxCheck,
+    Separator,
+    FrameBg,
+    FrameBgHover,
+    FrameBgActive,
+    Tab,
+    TabActive,
+    PlotLines,
+    PlotHistogram
+}
+
+// Style Variable Enum
+enum StyleVar {
+    Padding,
+    Spacing,
+    ItemHeight,
+    Rounding
+}
 
 // Style Color Indices for Moddable Stack
-pub var COLOR_WINDOW_BG: int = 0;
-pub var COLOR_WINDOW_TITLE: int = 1;
-pub var COLOR_PANEL_BG: int = 2;
-pub var COLOR_TEXT: int = 3;
-pub var COLOR_TEXT_MUTED: int = 4;
-pub var COLOR_ACCENT: int = 5;
-pub var COLOR_BUTTON: int = 6;
-pub var COLOR_BUTTON_HOVER: int = 7;
-pub var COLOR_BUTTON_ACTIVE: int = 8;
-pub var COLOR_SLIDER_TRACK: int = 9;
-pub var COLOR_SLIDER_THUMB: int = 10;
-pub var COLOR_CHECKBOX_BORDER: int = 11;
-pub var COLOR_CHECKBOX_CHECK: int = 12;
-pub var COLOR_SEPARATOR: int = 13;
-pub var COLOR_FRAME_BG: int = 14;
-pub var COLOR_FRAME_BG_HOVER: int = 15;
-pub var COLOR_FRAME_BG_ACTIVE: int = 16;
-pub var COLOR_TAB: int = 17;
-pub var COLOR_TAB_ACTIVE: int = 18;
-pub var COLOR_PLOT_LINES: int = 19;
-pub var COLOR_PLOT_HISTOGRAM: int = 20;
+pub const COLOR_WINDOW_BG: int = 0;
+pub const COLOR_WINDOW_TITLE: int = 1;
+pub const COLOR_PANEL_BG: int = 2;
+pub const COLOR_TEXT: int = 3;
+pub const COLOR_TEXT_MUTED: int = 4;
+pub const COLOR_ACCENT: int = 5;
+pub const COLOR_BUTTON: int = 6;
+pub const COLOR_BUTTON_HOVER: int = 7;
+pub const COLOR_BUTTON_ACTIVE: int = 8;
+pub const COLOR_SLIDER_TRACK: int = 9;
+pub const COLOR_SLIDER_THUMB: int = 10;
+pub const COLOR_CHECKBOX_BORDER: int = 11;
+pub const COLOR_CHECKBOX_CHECK: int = 12;
+pub const COLOR_SEPARATOR: int = 13;
+pub const COLOR_FRAME_BG: int = 14;
+pub const COLOR_FRAME_BG_HOVER: int = 15;
+pub const COLOR_FRAME_BG_ACTIVE: int = 16;
+pub const COLOR_TAB: int = 17;
+pub const COLOR_TAB_ACTIVE: int = 18;
+pub const COLOR_PLOT_LINES: int = 19;
+pub const COLOR_PLOT_HISTOGRAM: int = 20;
 
 // Style Var Indices
-pub var VAR_PADDING: int = 0;
-pub var VAR_SPACING: int = 1;
-pub var VAR_ITEM_HEIGHT: int = 2;
-pub var VAR_ROUNDING: int = 3;
+pub const VAR_PADDING: int = 0;
+pub const VAR_SPACING: int = 1;
+pub const VAR_ITEM_HEIGHT: int = 2;
+pub const VAR_ROUNDING: int = 3;
 
-var _th_bg_window: Color          = hex(0x181a1f, 0.95);
-var _th_bg_window_title: Color    = hex(0x21252b, 1.0);
-var _th_bg_panel: Color           = hex(0x282c34, 0.90);
-var _th_text: Color               = hex(0xabb2bf, 1.0);
-var _th_text_muted: Color         = hex(0x5c6370, 1.0);
-var _th_accent: Color             = hex(0x61afef, 1.0);
-var _th_btn_normal: Color         = hex(0x2c313a, 1.0);
-var _th_btn_hover: Color          = hex(0x3e4451, 1.0);
-var _th_btn_active: Color         = hex(0x4b5263, 1.0);
-var _th_slider_track: Color       = hex(0x1e2227, 1.0);
-var _th_slider_thumb: Color       = hex(0x61afef, 1.0);
-var _th_slider_thumb_hover: Color = hex(0x98c379, 1.0);
-var _th_checkbox_border: Color    = hex(0x4b5263, 1.0);
-var _th_checkbox_check: Color     = hex(0x98c379, 1.0);
-var _th_separator: Color          = hex(0x3e4451, 0.6);
-var _th_frame_bg: Color           = hex(0x21252b, 1.0);
-var _th_frame_bg_hover: Color     = hex(0x2c313a, 1.0);
-var _th_frame_bg_active: Color    = hex(0x3e4451, 1.0);
-var _th_tab_normal: Color         = hex(0x21252b, 1.0);
-var _th_tab_active: Color         = hex(0x61afef, 1.0);
-var _th_plot_lines: Color         = hex(0x98c379, 1.0);
-var _th_plot_histogram: Color     = hex(0xe5c07b, 1.0);
 
 frame GUITheme {
     pub var bg_window: Color;
@@ -329,28 +330,28 @@ frame GUITheme {
 
     pub init() {
         // Modern game engine slate/dark palette
-        self.bg_window          = _th_bg_window;
-        self.bg_window_title    = _th_bg_window_title;
-        self.bg_panel           = _th_bg_panel;
-        self.text               = _th_text;
-        self.text_muted         = _th_text_muted;
-        self.accent             = _th_accent;
-        self.btn_normal         = _th_btn_normal;
-        self.btn_hover          = _th_btn_hover;
-        self.btn_active         = _th_btn_active;
-        self.slider_track       = _th_slider_track;
-        self.slider_thumb       = _th_slider_thumb;
-        self.slider_thumb_hover = _th_slider_thumb_hover;
-        self.checkbox_border    = _th_checkbox_border;
-        self.checkbox_check     = _th_checkbox_check;
-        self.separator          = _th_separator;
-        self.frame_bg           = _th_frame_bg;
-        self.frame_bg_hover     = _th_frame_bg_hover;
-        self.frame_bg_active    = _th_frame_bg_active;
-        self.tab_normal         = _th_tab_normal;
-        self.tab_active         = _th_tab_active;
-        self.plot_lines         = _th_plot_lines;
-        self.plot_histogram     = _th_plot_histogram;
+        self.bg_window          = hex(0x181a1f, 0.95);
+        self.bg_window_title    = hex(0x21252b, 1.0);
+        self.bg_panel           = hex(0x282c34, 0.90);
+        self.text               = hex(0xabb2bf, 1.0);
+        self.text_muted         = hex(0x5c6370, 1.0);
+        self.accent             = hex(0x61afef, 1.0);
+        self.btn_normal         = hex(0x2c313a, 1.0);
+        self.btn_hover          = hex(0x3e4451, 1.0);
+        self.btn_active         = hex(0x4b5263, 1.0);
+        self.slider_track       = hex(0x1e2227, 1.0);
+        self.slider_thumb       = hex(0x61afef, 1.0);
+        self.slider_thumb_hover = hex(0x98c379, 1.0);
+        self.checkbox_border    = hex(0x4b5263, 1.0);
+        self.checkbox_check     = hex(0x98c379, 1.0);
+        self.separator          = hex(0x3e4451, 0.6);
+        self.frame_bg           = hex(0x21252b, 1.0);
+        self.frame_bg_hover     = hex(0x2c313a, 1.0);
+        self.frame_bg_active    = hex(0x3e4451, 1.0);
+        self.tab_normal         = hex(0x21252b, 1.0);
+        self.tab_active         = hex(0x61afef, 1.0);
+        self.plot_lines         = hex(0x98c379, 1.0);
+        self.plot_histogram     = hex(0xe5c07b, 1.0);
         self.padding            = 10.0;
         self.spacing            = 6.0;
         self.item_height        = 24.0;

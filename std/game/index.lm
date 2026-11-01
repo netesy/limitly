@@ -82,43 +82,43 @@ pub fn cyberpunk_theme(): types.GUITheme { return types.cyberpunk_theme(); }
 pub fn retro_theme(): types.GUITheme { return types.retro_theme(); }
 
 // Style Color Indices
-pub var COLOR_WINDOW_BG: int       = types.COLOR_WINDOW_BG;
-pub var COLOR_WINDOW_TITLE: int    = types.COLOR_WINDOW_TITLE;
-pub var COLOR_PANEL_BG: int        = types.COLOR_PANEL_BG;
-pub var COLOR_TEXT: int            = types.COLOR_TEXT;
-pub var COLOR_TEXT_MUTED: int      = types.COLOR_TEXT_MUTED;
-pub var COLOR_ACCENT: int          = types.COLOR_ACCENT;
-pub var COLOR_BUTTON: int          = types.COLOR_BUTTON;
-pub var COLOR_BUTTON_HOVER: int    = types.COLOR_BUTTON_HOVER;
-pub var COLOR_BUTTON_ACTIVE: int   = types.COLOR_BUTTON_ACTIVE;
-pub var COLOR_SLIDER_TRACK: int    = types.COLOR_SLIDER_TRACK;
-pub var COLOR_SLIDER_THUMB: int    = types.COLOR_SLIDER_THUMB;
-pub var COLOR_CHECKBOX_BORDER: int = types.COLOR_CHECKBOX_BORDER;
-pub var COLOR_CHECKBOX_CHECK: int  = types.COLOR_CHECKBOX_CHECK;
-pub var COLOR_SEPARATOR: int       = types.COLOR_SEPARATOR;
-pub var COLOR_FRAME_BG: int        = types.COLOR_FRAME_BG;
-pub var COLOR_FRAME_BG_HOVER: int  = types.COLOR_FRAME_BG_HOVER;
-pub var COLOR_FRAME_BG_ACTIVE: int = types.COLOR_FRAME_BG_ACTIVE;
-pub var COLOR_TAB: int             = types.COLOR_TAB;
-pub var COLOR_TAB_ACTIVE: int      = types.COLOR_TAB_ACTIVE;
-pub var COLOR_PLOT_LINES: int      = types.COLOR_PLOT_LINES;
-pub var COLOR_PLOT_HISTOGRAM: int  = types.COLOR_PLOT_HISTOGRAM;
+pub const COLOR_WINDOW_BG: int       = types.COLOR_WINDOW_BG;
+pub const COLOR_WINDOW_TITLE: int    = types.COLOR_WINDOW_TITLE;
+pub const COLOR_PANEL_BG: int        = types.COLOR_PANEL_BG;
+pub const COLOR_TEXT: int            = types.COLOR_TEXT;
+pub const COLOR_TEXT_MUTED: int      = types.COLOR_TEXT_MUTED;
+pub const COLOR_ACCENT: int          = types.COLOR_ACCENT;
+pub const COLOR_BUTTON: int          = types.COLOR_BUTTON;
+pub const COLOR_BUTTON_HOVER: int    = types.COLOR_BUTTON_HOVER;
+pub const COLOR_BUTTON_ACTIVE: int   = types.COLOR_BUTTON_ACTIVE;
+pub const COLOR_SLIDER_TRACK: int    = types.COLOR_SLIDER_TRACK;
+pub const COLOR_SLIDER_THUMB: int    = types.COLOR_SLIDER_THUMB;
+pub const COLOR_CHECKBOX_BORDER: int = types.COLOR_CHECKBOX_BORDER;
+pub const COLOR_CHECKBOX_CHECK: int  = types.COLOR_CHECKBOX_CHECK;
+pub const COLOR_SEPARATOR: int       = types.COLOR_SEPARATOR;
+pub const COLOR_FRAME_BG: int        = types.COLOR_FRAME_BG;
+pub const COLOR_FRAME_BG_HOVER: int  = types.COLOR_FRAME_BG_HOVER;
+pub const COLOR_FRAME_BG_ACTIVE: int = types.COLOR_FRAME_BG_ACTIVE;
+pub const COLOR_TAB: int             = types.COLOR_TAB;
+pub const COLOR_TAB_ACTIVE: int      = types.COLOR_TAB_ACTIVE;
+pub const COLOR_PLOT_LINES: int      = types.COLOR_PLOT_LINES;
+pub const COLOR_PLOT_HISTOGRAM: int  = types.COLOR_PLOT_HISTOGRAM;
 
 // Style Var Indices
-pub var VAR_PADDING: int           = types.VAR_PADDING;
-pub var VAR_SPACING: int           = types.VAR_SPACING;
-pub var VAR_ITEM_HEIGHT: int       = types.VAR_ITEM_HEIGHT;
-pub var VAR_ROUNDING: int          = types.VAR_ROUNDING;
+pub const VAR_PADDING: int           = types.VAR_PADDING;
+pub const VAR_SPACING: int           = types.VAR_SPACING;
+pub const VAR_ITEM_HEIGHT: int       = types.VAR_ITEM_HEIGHT;
+pub const VAR_ROUNDING: int          = types.VAR_ROUNDING;
 
 // Built-in Colors
-pub var white: types.Color         = types.white;
-pub var black: types.Color         = types.black;
-pub var transparent: types.Color   = types.transparent;
-pub var red: types.Color           = types.red;
-pub var green: types.Color         = types.green;
-pub var blue: types.Color          = types.blue;
-pub var yellow: types.Color        = types.yellow;
-pub var cyan: types.Color          = types.cyan;
+pub const white: types.Color = types.white;
+pub const black: types.Color = types.black;
+pub const transparent: types.Color = types.transparent;
+pub const red: types.Color = types.red;
+pub const green: types.Color = types.green;
+pub const blue: types.Color = types.blue;
+pub const yellow: types.Color = types.yellow;
+pub const cyan: types.Color = types.cyan;
 
 // ── 2D Camera ──────────────────────────────────────────────────────────────
 pub fn Camera(target: any = nil, offset: any = nil, zoom: float = 1.0): camera.Camera2D {
@@ -175,41 +175,41 @@ pub fn InputManager(): input.InputManager {
 }
 
 // Key constants
-pub var KEY_SPACE: int         = input.KEY_SPACE;
-pub var KEY_ENTER: int         = input.KEY_ENTER;
-pub var KEY_ESCAPE: int        = input.KEY_ESCAPE;
-pub var KEY_LEFT: int          = input.KEY_LEFT;
-pub var KEY_RIGHT: int         = input.KEY_RIGHT;
-pub var KEY_UP: int            = input.KEY_UP;
-pub var KEY_DOWN: int          = input.KEY_DOWN;
-pub var KEY_W: int             = input.KEY_W;
-pub var KEY_A: int             = input.KEY_A;
-pub var KEY_S: int             = input.KEY_S;
-pub var KEY_D: int             = input.KEY_D;
-pub var KEY_F: int             = input.KEY_F;
-pub var KEY_H: int             = input.KEY_H;
-pub var KEY_F3: int            = input.KEY_F3;
-pub var KEY_TAB: int           = input.KEY_TAB;
-pub var KEY_BACKSPACE: int     = input.KEY_BACKSPACE;
+pub const KEY_SPACE: int         = input.KEY_SPACE;
+pub const KEY_ENTER: int         = input.KEY_ENTER;
+pub const KEY_ESCAPE: int        = input.KEY_ESCAPE;
+pub const KEY_LEFT: int          = input.KEY_LEFT;
+pub const KEY_RIGHT: int         = input.KEY_RIGHT;
+pub const KEY_UP: int            = input.KEY_UP;
+pub const KEY_DOWN: int          = input.KEY_DOWN;
+pub const KEY_W: int             = input.KEY_W;
+pub const KEY_A: int             = input.KEY_A;
+pub const KEY_S: int             = input.KEY_S;
+pub const KEY_D: int             = input.KEY_D;
+pub const KEY_F: int             = input.KEY_F;
+pub const KEY_H: int             = input.KEY_H;
+pub const KEY_F3: int            = input.KEY_F3;
+pub const KEY_TAB: int           = input.KEY_TAB;
+pub const KEY_BACKSPACE: int     = input.KEY_BACKSPACE;
 
-pub var MOUSE_LEFT: int        = input.MOUSE_LEFT;
-pub var MOUSE_RIGHT: int       = input.MOUSE_RIGHT;
-pub var MOUSE_MIDDLE: int      = input.MOUSE_MIDDLE;
+pub const MOUSE_LEFT: int        = input.MOUSE_LEFT;
+pub const MOUSE_RIGHT: int       = input.MOUSE_RIGHT;
+pub const MOUSE_MIDDLE: int      = input.MOUSE_MIDDLE;
 
 // Key Modifiers
-pub var KEY_MOD_NONE: int      = 0;
-pub var KEY_MOD_SHIFT: int     = input.MOD_SHIFT;
-pub var KEY_MOD_CTRL: int      = input.MOD_CONTROL;
-pub var KEY_MOD_CONTROL: int   = input.MOD_CONTROL;
-pub var KEY_MOD_ALT: int       = input.MOD_ALT;
-pub var KEY_MOD_SUPER: int     = input.MOD_SUPER;
+pub const KEY_MOD_NONE: int      = 0;
+pub const KEY_MOD_SHIFT: int     = input.MOD_SHIFT;
+pub const KEY_MOD_CTRL: int      = input.MOD_CONTROL;
+pub const KEY_MOD_CONTROL: int   = input.MOD_CONTROL;
+pub const KEY_MOD_ALT: int       = input.MOD_ALT;
+pub const KEY_MOD_SUPER: int     = input.MOD_SUPER;
 
-pub var MOD_NONE: int          = 0;
-pub var MOD_SHIFT: int         = input.MOD_SHIFT;
-pub var MOD_CTRL: int          = input.MOD_CONTROL;
-pub var MOD_CONTROL: int       = input.MOD_CONTROL;
-pub var MOD_ALT: int           = input.MOD_ALT;
-pub var MOD_SUPER: int         = input.MOD_SUPER;
+pub const MOD_NONE: int          = 0;
+pub const MOD_SHIFT: int         = input.MOD_SHIFT;
+pub const MOD_CTRL: int          = input.MOD_CONTROL;
+pub const MOD_CONTROL: int       = input.MOD_CONTROL;
+pub const MOD_ALT: int           = input.MOD_ALT;
+pub const MOD_SUPER: int         = input.MOD_SUPER;
 pub var input: input.InputManager = input.default_input;
 
 // ── IMGUI Engine ───────────────────────────────────────────────────────────

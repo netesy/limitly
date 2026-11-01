@@ -1128,7 +1128,7 @@ frame GUI {
         if (is_focused) {
             bg = self.get_style_color(types.COLOR_FRAME_BG_ACTIVE);
 
-            var MOD_CTRL = 2; // MOD_CONTROL
+            const MOD_CTRL = 2; // MOD_CONTROL
 
             if (self.typed_chars != nil) {
                 var ch_i = 0;

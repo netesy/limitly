@@ -19,19 +19,19 @@ pub fn algo_name(algo: any): str {
 }
 
 // ── Shared OpenSSL library loader ──────────────────────────────────────────
-pub var _LIB_PATH: str = "";
-pub var _LIB_HANDLE: any = nil;
+var _lib_path: str = "";
+var _lib_handle: any = nil;
 
 pub fn _open_lib(): any {
     unsafe {
-        if (_LIB_HANDLE != nil and _LIB_HANDLE != 0) {
-            return _LIB_HANDLE;
+        if (_lib_handle != nil and _lib_handle != 0) {
+            return _lib_handle;
         }
 
-        if (_LIB_PATH != "") {
-            var h = ffi.library_load(_LIB_PATH);
+        if (_lib_path != "") {
+            var h = ffi.library_load(_lib_path);
             if (h != 0 and h != nil) {
-                _LIB_HANDLE = h;
+                _lib_handle = h;
                 return h;
             }
         }
@@ -48,17 +48,13 @@ pub fn _open_lib(): any {
             "liblymar_ssl.dylib"
         ];
 
-        var i: int = 0;
-        var count: int = len(candidates);
-        while (i < count) {
-            var c: str = candidates[i];
+        iter (c in candidates) {
             var h2 = ffi.library_load(c);
             if (h2 != 0 and h2 != nil) {
-                _LIB_PATH = c;
-                _LIB_HANDLE = h2;
+                _lib_path = c;
+                _lib_handle = h2;
                 return h2;
             }
-            i = i + 1;
         }
 
         return nil;

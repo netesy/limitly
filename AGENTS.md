@@ -30,6 +30,37 @@ This document provides essential guidelines for AI agents generating code for th
 - [ ] **DO NOT use a `var` alias to rename an export** (e.g. `var TCP = tcp.TCPClient;`, `var Hash = crypto_hash.Hasher;`). `pub import ... show` re-exports a symbol **under the source module's declared name** and offers no rename facility; renaming files does not change the exported name either. If a friendlier or collision-free name is genuinely required, rename the symbol inside its own module.
 - [x] **Use `pub import <module> show <Symbol, ...>;`** to re-export. This is the only pattern that propagates frames, enums, traits, and staged-frame templates through a facade module and keeps them valid in both value and type positions.
 
+### **`pub var` for Module Constants (Anti-Pattern)**
+- [ ] **DO NOT use `pub var` or `var` for constants** (e.g., `pub var METHOD_GET = "GET";`, `pub var STATUS_OK = 200;`, `pub var PI = 3.14;`, `pub var RT_FILE = 0;`). `pub var` creates a mutable global variable, allowing accidental mutation, disabling compiler immutability guarantees, preventing stage-0 constant folding, and forcing defensive runtime `Mov` register copying in the VM.
+- [x] **Use `pub const` for module-level constants**: `pub const METHOD_GET = "GET";`, `pub const STATUS_OK = 200;`, `pub const PI = 3.14159;`. The compiler enforces immutability (`error[E003]: Cannot reassign to immutable variable`) and folds accesses at compile time.
+
+### **`var` for Single-Assignment Locals**
+- [ ] **DO NOT declare local variables that are never mutated with `var`** (e.g., `var client = Client();`, `var doc = parse(text);`). Overusing `var` signals intent to mutate and disables compiler immutable register optimizations.
+- [x] **Use `val` for immutable local bindings**: `val client = Client();`, `val result = compute();`. Reserve `var` strictly for loop counters and variables whose values are reassigned.
+
+### **Flat Integer Magic Constants (C-Style Enum Anti-Pattern)**
+- [ ] **DO NOT declare groups of integer constants to represent states, modes, tags, or roles** (e.g. `pub const COLOR_BG = 0; pub const COLOR_TEXT = 1;` or `pub const STATE_IDLE = 0; pub const STATE_RUNNING = 1;`) coupled with 20-line `if (x == COLOR_BG) elif (x == COLOR_TEXT) ...` ladders.
+- [x] **Use `enum` and `match`**: Declare `enum ColorRole { Bg, Text }` or `enum State { Idle, Running }` and dispatch with `match (role) { ColorRole.Bg => { ... }, ... }`. Enums provide compile-time exhaustiveness checks, eliminate sentinel bounds bugs, and cast cleanly to strings (`role as str`).
+
+### **C-Style Index Loops over Collections**
+- [ ] **DO NOT write manual indexing loops over lists or dictionaries** (e.g. `var i = 0; while (i < len(list)) { var item = list[i]; i = i + 1; }`). Manual indexing generates bounds checking overhead on every iteration and introduces off-by-one errors.
+- [x] **Use native `iter`**:
+  * Lists: `iter (item in list) { ... }`
+  * Dictionaries: `iter (key, value in dict) { ... }`
+  * Ranges: `iter (i in 0..10) { ... }`
+
+### **C-Style Sentinel Error Return Values**
+- [ ] **DO NOT return `-1`, `nil`, or integer error codes to signify failure** (e.g. `fn find(): int` returning `-1`).
+- [x] **Use Lymar fallible types**: Annotate functions with `T?` or `T?ErrorType`, construct return values with `ok(value)` or `err(ErrorType(...))`, and propagate errors using `?` or handle them inline using `? else { ... }`.
+
+### **Untyped Dictionaries / Parallel Arrays for Domain Models**
+- [ ] **DO NOT use `{str: any}` or parallel lists (`keys: [str]`, `vals: [str]`) to model structured domain data**. Loose string dictionaries lack schema validation, degrade performance, and lose static type safety.
+- [x] **Use nominal `frame` declarations**: Declare structured models with fields, default values, and methods: `frame User { pub id: int; pub name: str; }`.
+
+### **Transitive Re-export Pollution (God Modules)**
+- [ ] **DO NOT re-export another foundational domain's primitive types from a client library** (e.g. `ui` or `game` re-exporting `Color`, `hex`, `rgb` and redefining shadow copies of `white`, `black`, `red`). Re-exporting cross-domain constants causes runtime nil-pointer lookup bugs in bytecode, leads to cyclic dependencies, and muddies call-site imports.
+- [x] **Consume domain types directly**: Code requiring colors should `import std.color as color;` and use `color.white` or `color.indigo(600)`. Each module stays within its own architectural boundary.
+
 ---
 
 ## **USE - Supported Features**

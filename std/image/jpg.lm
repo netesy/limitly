@@ -4,7 +4,7 @@
 import std.ffi as ffi;
 import std.image.index as image;
 
-pub var DEFAULT_QUALITY: int = 90;
+pub const DEFAULT_QUALITY: int = 90;
 
 pub fn load(path: str): image.Image? {
     return image.load(path);

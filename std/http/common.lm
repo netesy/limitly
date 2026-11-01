@@ -31,6 +31,72 @@ pub const METHOD_OPTIONS = "OPTIONS";
 pub const METHOD_TRACE = "TRACE";
 pub const METHOD_CONNECT = "CONNECT";
 
+// --- HTTP Status Enumeration ---
+enum Status {
+    Continue,
+    SwitchingProtocols,
+    Ok,
+    Created,
+    Accepted,
+    NoContent,
+    MovedPermanently,
+    Found,
+    SeeOther,
+    NotModified,
+    TemporaryRedirect,
+    PermanentRedirect,
+    BadRequest,
+    Unauthorized,
+    Forbidden,
+    NotFound,
+    MethodNotAllowed,
+    RequestTimeout,
+    Conflict,
+    Gone,
+    PayloadTooLarge,
+    UnsupportedMediaType,
+    TooManyRequests,
+    InternalServerError,
+    NotImplemented,
+    BadGateway,
+    ServiceUnavailable,
+    GatewayTimeout
+}
+
+pub fn status_code(s: Status): int {
+    match (s) {
+        Status.Continue => { return 100; },
+        Status.SwitchingProtocols => { return 101; },
+        Status.Ok => { return 200; },
+        Status.Created => { return 201; },
+        Status.Accepted => { return 202; },
+        Status.NoContent => { return 204; },
+        Status.MovedPermanently => { return 301; },
+        Status.Found => { return 302; },
+        Status.SeeOther => { return 303; },
+        Status.NotModified => { return 304; },
+        Status.TemporaryRedirect => { return 307; },
+        Status.PermanentRedirect => { return 308; },
+        Status.BadRequest => { return 400; },
+        Status.Unauthorized => { return 401; },
+        Status.Forbidden => { return 403; },
+        Status.NotFound => { return 404; },
+        Status.MethodNotAllowed => { return 405; },
+        Status.RequestTimeout => { return 408; },
+        Status.Conflict => { return 409; },
+        Status.Gone => { return 410; },
+        Status.PayloadTooLarge => { return 413; },
+        Status.UnsupportedMediaType => { return 415; },
+        Status.TooManyRequests => { return 429; },
+        Status.InternalServerError => { return 500; },
+        Status.NotImplemented => { return 501; },
+        Status.BadGateway => { return 502; },
+        Status.ServiceUnavailable => { return 503; },
+        Status.GatewayTimeout => { return 504; },
+        _ => { return 200; }
+    }
+}
+
 // --- HTTP Status codes ---
 pub const STATUS_CONTINUE = 100;
 pub const STATUS_SWITCHING_PROTOCOLS = 101;
@@ -92,6 +158,19 @@ pub const HTTP_1_0 = "HTTP/1.0";
 pub const HTTP_1_1 = "HTTP/1.1";
 pub const HTTP_2_0 = "HTTP/2.0";
 pub const HTTP_3_0 = "HTTP/3.0";
+
+// --- HTTP/2 Frame Type enumeration ---
+enum FrameType {
+    Data,
+    Headers,
+    Priority,
+    RstStream,
+    Settings,
+    PushPromise,
+    Ping,
+    Goaway,
+    WindowUpdate
+}
 
 // --- HTTP/2 Frame Type constants ---
 pub const FRAME_DATA = 0;

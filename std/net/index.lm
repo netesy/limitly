@@ -26,4 +26,3 @@ pub import std.net.tls show TLSConfig, TLSSocket;
 pub fn TLSConfig(): tls.TLSConfig { return tls.TLSConfig(); }
 pub fn connect_tls(host: str, port: int, cfg: any = nil): any { return tls.connect(host, port, cfg); }
 
-pub var DNS = dns;

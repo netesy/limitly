@@ -28,6 +28,19 @@ type fnptr = int;
 type c_bool = int;
 type c_void = int;
 
+// Alignment Types
+enum Alignment {
+    Char,
+    Short,
+    Int,
+    Long,
+    LongLong,
+    Ptr,
+    Float,
+    Double,
+    Max
+}
+
 // Alignment constants
 pub const ALIGNMENT_CHAR: int = 1;
 pub const ALIGNMENT_SHORT: int = 2;
@@ -40,6 +53,22 @@ pub const ALIGNMENT_DOUBLE: int = 8;
 pub const ALIGNMENT_MAX: int = 8;
 
 // Clean FFI Type Identifiers
+enum TypeId {
+    I8,
+    U8,
+    I16,
+    U16,
+    I32,
+    U32,
+    I64,
+    U64,
+    F32,
+    F64,
+    Ptr,
+    CString,
+    Void
+}
+
 pub const TYPE_I8: int = 0;
 pub const TYPE_U8: int = 1;
 pub const TYPE_I16: int = 2;

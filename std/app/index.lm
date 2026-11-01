@@ -35,6 +35,14 @@ fn event_type_from_int(code: int): EventType {
 }
 
 // Modifier key flags
+// Key Modifier Flags
+enum KeyModifier {
+    Shift,
+    Control,
+    Alt,
+    Super
+}
+
 pub const MOD_SHIFT: int = 1;
 pub const MOD_CONTROL: int = 2;
 pub const MOD_ALT: int = 4;

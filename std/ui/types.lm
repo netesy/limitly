@@ -178,54 +178,27 @@ mixin Accessibility {
     pub var is_a11y_hidden: bool;
 }
 
-// ── Canonical Retained UI Color ──────────────────────────────────────────────
-frame Color {
-    pub var r: float;
-    pub var g: float;
-    pub var b: float;
-    pub var a: float;
+// ── Canonical Retained UI Color (Re-exported from std.color) ────────────────
+import std.color as color;
+pub import std.color show Color, rgb, rgba, hex, color_rgb, color_rgba, lerp;
 
-    pub init(r: float = 0.0, g: float = 0.0, b: float = 0.0, a: float = 1.0) {
-        self.r = r;
-        self.g = g;
-        self.b = b;
-        self.a = a;
-    }
-}
-
-pub fn rgb(r: int, g: int, b: int): Color {
-    return Color(r=(r as float) / 255.0, g=(g as float) / 255.0, b=(b as float) / 255.0, a=1.0);
-}
-
-pub fn rgba(r: int, g: int, b: int, a: float): Color {
-    return Color(r=(r as float) / 255.0, g=(g as float) / 255.0, b=(b as float) / 255.0, a=a);
-}
-
-pub fn color_rgb(r: float, g: float, b: float): Color {
-    return Color(r=r, g=g, b=b, a=1.0);
-}
-
-pub fn color_rgba(r: float, g: float, b: float, a: float): Color {
-    return Color(r=r, g=g, b=b, a=a);
-}
-
-pub var white: Color = Color(r=1.0, g=1.0, b=1.0, a=1.0);
-pub var black: Color = Color(r=0.0, g=0.0, b=0.0, a=1.0);
-pub var red: Color = Color(r=0.9, g=0.2, b=0.2, a=1.0);
-pub var green: Color = Color(r=0.2, g=0.8, b=0.3, a=1.0);
-pub var blue: Color = Color(r=0.2, g=0.6, b=0.95, a=1.0);
-pub var indigo: Color = Color(r=0.35, g=0.35, b=0.9, a=1.0);
-pub var yellow: Color = Color(r=0.95, g=0.8, b=0.15, a=1.0);
-pub var gray: Color = Color(r=0.55, g=0.55, b=0.55, a=1.0);
-pub var dark_gray: Color = Color(r=0.15, g=0.15, b=0.18, a=1.0);
-pub var light_gray: Color = Color(r=0.85, g=0.85, b=0.88, a=1.0);
-pub var transparent: Color = Color(r=0.0, g=0.0, b=0.0, a=0.0);
+pub const white: Color = color.white;
+pub const black: Color = color.black;
+pub const red: Color = color.red;
+pub const green: Color = color.green;
+pub const blue: Color = color.blue;
+pub const indigo: Color = color.indigo;
+pub const yellow: Color = color.yellow;
+pub const gray: Color = color.gray;
+pub const dark_gray: Color = color.dark_gray;
+pub const light_gray: Color = color.light_gray;
+pub const transparent: Color = color.transparent;
 
 // ── Widget Lifecycle States ──────────────────────────────────────────────────
-pub var LIFECYCLE_ENTERING = LifecycleState.Entering;
-pub var LIFECYCLE_ACTIVE = LifecycleState.Active;
-pub var LIFECYCLE_EXITING = LifecycleState.Exiting;
-pub var LIFECYCLE_REMOVED = LifecycleState.Removed;
+pub const LIFECYCLE_ENTERING = LifecycleState.Entering;
+pub const LIFECYCLE_ACTIVE = LifecycleState.Active;
+pub const LIFECYCLE_EXITING = LifecycleState.Exiting;
+pub const LIFECYCLE_REMOVED = LifecycleState.Removed;
 
 frame Point {
     pub var x: float;
@@ -260,8 +233,8 @@ frame Axis {
     pub var is_vertical: int;
 }
 
-pub var AXIS_HORIZONTAL: Axis = Axis(is_vertical=0);
-pub var AXIS_VERTICAL: Axis = Axis(is_vertical=1);
+pub const AXIS_HORIZONTAL: Axis = Axis(is_vertical=0);
+pub const AXIS_VERTICAL: Axis = Axis(is_vertical=1);
 
 frame Alignment {
     pub var align_type: int;
@@ -417,56 +390,56 @@ pub fn style(): Style {
     return Style();
 }
 
-pub var KIND_CONTAINER = WidgetKind.Container;
-pub var KIND_TEXT = WidgetKind.Text;
-pub var KIND_BUTTON = WidgetKind.Button;
-pub var KIND_SPACER = WidgetKind.Spacer;
-pub var KIND_IMAGE = WidgetKind.Image;
-pub var KIND_INPUT = WidgetKind.Input;
-pub var KIND_CHECKBOX = WidgetKind.Checkbox;
-pub var KIND_SLIDER = WidgetKind.Slider;
-pub var KIND_TABS = WidgetKind.Tabs;
-pub var KIND_SCROLL = WidgetKind.Scroll;
-pub var KIND_BADGE = WidgetKind.Badge;
-pub var KIND_SELECT = WidgetKind.Select;
-pub var KIND_TEXTAREA = WidgetKind.Textarea;
-pub var KIND_TOGGLE = WidgetKind.Toggle;
-pub var KIND_STEPPER = WidgetKind.Stepper;
-pub var KIND_PLOT_LINES = WidgetKind.PlotLines;
-pub var KIND_PLOT_HISTOGRAM = WidgetKind.PlotHistogram;
-pub var KIND_TREE_NODE = WidgetKind.TreeNode;
-pub var KIND_COLOR_PICKER = WidgetKind.ColorPicker;
-pub var KIND_TABLE = WidgetKind.Table;
-pub var KIND_ACCORDION = WidgetKind.Accordion;
-pub var KIND_ALERT = WidgetKind.Alert;
-pub var KIND_CALENDAR = WidgetKind.Calendar;
-pub var KIND_CARD = WidgetKind.Card;
-pub var KIND_DIFF = WidgetKind.Diff;
-pub var KIND_DOCK = WidgetKind.Dock;
-pub var KIND_FILE_INPUT = WidgetKind.FileInput;
-pub var KIND_FILTER = WidgetKind.Filter;
-pub var KIND_INDICATOR = WidgetKind.Indicator;
-pub var KIND_JOIN = WidgetKind.Join;
-pub var KIND_LINK = WidgetKind.Link;
-pub var KIND_LIST = WidgetKind.List;
-pub var KIND_PROGRESS = WidgetKind.Progress;
-pub var KIND_RANGE_SLIDER = WidgetKind.RangeSlider;
-pub var KIND_STAT = WidgetKind.Stat;
-pub var KIND_TIMELINE = WidgetKind.Timeline;
-pub var KIND_TOOLTIP = WidgetKind.Tooltip;
-pub var KIND_TOAST = WidgetKind.Toast;
-pub var KIND_STEPS = WidgetKind.Steps;
-pub var KIND_MASK = WidgetKind.Mask;
-pub var KIND_BAR_CHART = WidgetKind.BarChart;
-pub var KIND_BUBBLE_CHART = WidgetKind.BubbleChart;
-pub var KIND_DOUGHNUT_CHART = WidgetKind.DoughnutChart;
-pub var KIND_LINE_CHART = WidgetKind.LineChart;
-pub var KIND_POLAR_AREA_CHART = WidgetKind.PolarAreaChart;
-pub var KIND_RADAR_CHART = WidgetKind.RadarChart;
-pub var KIND_SCATTER_CHART = WidgetKind.ScatterChart;
-pub var KIND_PIE_CHART = WidgetKind.PieChart;
-pub var KIND_OVERLAY = WidgetKind.Overlay;
-pub var KIND_FORM_FIELD = WidgetKind.FormField;
+pub const KIND_CONTAINER = WidgetKind.Container;
+pub const KIND_TEXT = WidgetKind.Text;
+pub const KIND_BUTTON = WidgetKind.Button;
+pub const KIND_SPACER = WidgetKind.Spacer;
+pub const KIND_IMAGE = WidgetKind.Image;
+pub const KIND_INPUT = WidgetKind.Input;
+pub const KIND_CHECKBOX = WidgetKind.Checkbox;
+pub const KIND_SLIDER = WidgetKind.Slider;
+pub const KIND_TABS = WidgetKind.Tabs;
+pub const KIND_SCROLL = WidgetKind.Scroll;
+pub const KIND_BADGE = WidgetKind.Badge;
+pub const KIND_SELECT = WidgetKind.Select;
+pub const KIND_TEXTAREA = WidgetKind.Textarea;
+pub const KIND_TOGGLE = WidgetKind.Toggle;
+pub const KIND_STEPPER = WidgetKind.Stepper;
+pub const KIND_PLOT_LINES = WidgetKind.PlotLines;
+pub const KIND_PLOT_HISTOGRAM = WidgetKind.PlotHistogram;
+pub const KIND_TREE_NODE = WidgetKind.TreeNode;
+pub const KIND_COLOR_PICKER = WidgetKind.ColorPicker;
+pub const KIND_TABLE = WidgetKind.Table;
+pub const KIND_ACCORDION = WidgetKind.Accordion;
+pub const KIND_ALERT = WidgetKind.Alert;
+pub const KIND_CALENDAR = WidgetKind.Calendar;
+pub const KIND_CARD = WidgetKind.Card;
+pub const KIND_DIFF = WidgetKind.Diff;
+pub const KIND_DOCK = WidgetKind.Dock;
+pub const KIND_FILE_INPUT = WidgetKind.FileInput;
+pub const KIND_FILTER = WidgetKind.Filter;
+pub const KIND_INDICATOR = WidgetKind.Indicator;
+pub const KIND_JOIN = WidgetKind.Join;
+pub const KIND_LINK = WidgetKind.Link;
+pub const KIND_LIST = WidgetKind.List;
+pub const KIND_PROGRESS = WidgetKind.Progress;
+pub const KIND_RANGE_SLIDER = WidgetKind.RangeSlider;
+pub const KIND_STAT = WidgetKind.Stat;
+pub const KIND_TIMELINE = WidgetKind.Timeline;
+pub const KIND_TOOLTIP = WidgetKind.Tooltip;
+pub const KIND_TOAST = WidgetKind.Toast;
+pub const KIND_STEPS = WidgetKind.Steps;
+pub const KIND_MASK = WidgetKind.Mask;
+pub const KIND_BAR_CHART = WidgetKind.BarChart;
+pub const KIND_BUBBLE_CHART = WidgetKind.BubbleChart;
+pub const KIND_DOUGHNUT_CHART = WidgetKind.DoughnutChart;
+pub const KIND_LINE_CHART = WidgetKind.LineChart;
+pub const KIND_POLAR_AREA_CHART = WidgetKind.PolarAreaChart;
+pub const KIND_RADAR_CHART = WidgetKind.RadarChart;
+pub const KIND_SCATTER_CHART = WidgetKind.ScatterChart;
+pub const KIND_PIE_CHART = WidgetKind.PieChart;
+pub const KIND_OVERLAY = WidgetKind.Overlay;
+pub const KIND_FORM_FIELD = WidgetKind.FormField;
 pub var _shared_empty_style: Style = Style();
 pub var _shared_empty_shadow: shadow.Shadow = shadow.Shadow();
 pub var _shared_empty_trans: anim.Transition = anim.Transition();

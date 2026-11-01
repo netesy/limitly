@@ -1,110 +1,125 @@
+// Mouse Button Enumeration
+enum MouseButton {
+    Left,
+    Right,
+    Middle
+}
+
+// Key Modifier Enumeration
+enum KeyModifier {
+    None,
+    Shift,
+    Control,
+    Alt,
+    Super
+}
 // std/game/input.lm
 // Comprehensive input management, event capture, and action mapping for std.game
 
 import std.game.types as types;
 
 // Common Key Code Constants
-pub var KEY_SPACE: int         = 32;
-pub var KEY_APOSTROPHE: int    = 39;
-pub var KEY_COMMA: int         = 44;
-pub var KEY_MINUS: int         = 45;
-pub var KEY_PERIOD: int        = 46;
-pub var KEY_SLASH: int         = 47;
-pub var KEY_0: int             = 48;
-pub var KEY_1: int             = 49;
-pub var KEY_2: int             = 50;
-pub var KEY_3: int             = 51;
-pub var KEY_4: int             = 52;
-pub var KEY_5: int             = 53;
-pub var KEY_6: int             = 54;
-pub var KEY_7: int             = 55;
-pub var KEY_8: int             = 56;
-pub var KEY_9: int             = 57;
-pub var KEY_SEMICOLON: int     = 59;
-pub var KEY_EQUAL: int         = 61;
-pub var KEY_A: int             = 65;
-pub var KEY_B: int             = 66;
-pub var KEY_C: int             = 67;
-pub var KEY_D: int             = 68;
-pub var KEY_E: int             = 69;
-pub var KEY_F: int             = 70;
-pub var KEY_G: int             = 71;
-pub var KEY_H: int             = 72;
-pub var KEY_I: int             = 73;
-pub var KEY_J: int             = 74;
-pub var KEY_K: int             = 75;
-pub var KEY_L: int             = 76;
-pub var KEY_M: int             = 77;
-pub var KEY_N: int             = 78;
-pub var KEY_O: int             = 79;
-pub var KEY_P: int             = 80;
-pub var KEY_Q: int             = 81;
-pub var KEY_R: int             = 82;
-pub var KEY_S: int             = 83;
-pub var KEY_T: int             = 84;
-pub var KEY_U: int             = 85;
-pub var KEY_V: int             = 86;
-pub var KEY_W: int             = 87;
-pub var KEY_X: int             = 88;
-pub var KEY_Y: int             = 89;
-pub var KEY_Z: int             = 90;
-pub var KEY_LEFT_BRACKET: int  = 91;
-pub var KEY_BACKSLASH: int     = 92;
-pub var KEY_RIGHT_BRACKET: int = 93;
-pub var KEY_GRAVE_ACCENT: int  = 96;
+pub const KEY_SPACE: int         = 32;
+pub const KEY_APOSTROPHE: int    = 39;
+pub const KEY_COMMA: int         = 44;
+pub const KEY_MINUS: int         = 45;
+pub const KEY_PERIOD: int        = 46;
+pub const KEY_SLASH: int         = 47;
+pub const KEY_0: int             = 48;
+pub const KEY_1: int             = 49;
+pub const KEY_2: int             = 50;
+pub const KEY_3: int             = 51;
+pub const KEY_4: int             = 52;
+pub const KEY_5: int             = 53;
+pub const KEY_6: int             = 54;
+pub const KEY_7: int             = 55;
+pub const KEY_8: int             = 56;
+pub const KEY_9: int             = 57;
+pub const KEY_SEMICOLON: int     = 59;
+pub const KEY_EQUAL: int         = 61;
+pub const KEY_A: int             = 65;
+pub const KEY_B: int             = 66;
+pub const KEY_C: int             = 67;
+pub const KEY_D: int             = 68;
+pub const KEY_E: int             = 69;
+pub const KEY_F: int             = 70;
+pub const KEY_G: int             = 71;
+pub const KEY_H: int             = 72;
+pub const KEY_I: int             = 73;
+pub const KEY_J: int             = 74;
+pub const KEY_K: int             = 75;
+pub const KEY_L: int             = 76;
+pub const KEY_M: int             = 77;
+pub const KEY_N: int             = 78;
+pub const KEY_O: int             = 79;
+pub const KEY_P: int             = 80;
+pub const KEY_Q: int             = 81;
+pub const KEY_R: int             = 82;
+pub const KEY_S: int             = 83;
+pub const KEY_T: int             = 84;
+pub const KEY_U: int             = 85;
+pub const KEY_V: int             = 86;
+pub const KEY_W: int             = 87;
+pub const KEY_X: int             = 88;
+pub const KEY_Y: int             = 89;
+pub const KEY_Z: int             = 90;
+pub const KEY_LEFT_BRACKET: int  = 91;
+pub const KEY_BACKSLASH: int     = 92;
+pub const KEY_RIGHT_BRACKET: int = 93;
+pub const KEY_GRAVE_ACCENT: int  = 96;
 
-pub var KEY_ESCAPE: int        = 256;
-pub var KEY_ENTER: int         = 257;
-pub var KEY_TAB: int           = 258;
-pub var KEY_BACKSPACE: int     = 259;
-pub var KEY_INSERT: int        = 260;
-pub var KEY_DELETE: int        = 261;
-pub var KEY_RIGHT: int         = 262;
-pub var KEY_LEFT: int          = 263;
-pub var KEY_DOWN: int          = 264;
-pub var KEY_UP: int            = 265;
-pub var KEY_PAGE_UP: int       = 266;
-pub var KEY_PAGE_DOWN: int     = 267;
-pub var KEY_HOME: int          = 268;
-pub var KEY_END: int           = 269;
-pub var KEY_CAPS_LOCK: int     = 280;
-pub var KEY_SCROLL_LOCK: int   = 281;
-pub var KEY_NUM_LOCK: int      = 282;
-pub var KEY_PRINT_SCREEN: int  = 283;
-pub var KEY_PAUSE: int         = 284;
+pub const KEY_ESCAPE: int        = 256;
+pub const KEY_ENTER: int         = 257;
+pub const KEY_TAB: int           = 258;
+pub const KEY_BACKSPACE: int     = 259;
+pub const KEY_INSERT: int        = 260;
+pub const KEY_DELETE: int        = 261;
+pub const KEY_RIGHT: int         = 262;
+pub const KEY_LEFT: int          = 263;
+pub const KEY_DOWN: int          = 264;
+pub const KEY_UP: int            = 265;
+pub const KEY_PAGE_UP: int       = 266;
+pub const KEY_PAGE_DOWN: int     = 267;
+pub const KEY_HOME: int          = 268;
+pub const KEY_END: int           = 269;
+pub const KEY_CAPS_LOCK: int     = 280;
+pub const KEY_SCROLL_LOCK: int   = 281;
+pub const KEY_NUM_LOCK: int      = 282;
+pub const KEY_PRINT_SCREEN: int  = 283;
+pub const KEY_PAUSE: int         = 284;
 
-pub var KEY_F1: int            = 290;
-pub var KEY_F2: int            = 291;
-pub var KEY_F3: int            = 292;
-pub var KEY_F4: int            = 293;
-pub var KEY_F5: int            = 294;
-pub var KEY_F6: int            = 295;
-pub var KEY_F7: int            = 296;
-pub var KEY_F8: int            = 297;
-pub var KEY_F9: int            = 298;
-pub var KEY_F10: int           = 299;
-pub var KEY_F11: int           = 300;
-pub var KEY_F12: int           = 301;
+pub const KEY_F1: int            = 290;
+pub const KEY_F2: int            = 291;
+pub const KEY_F3: int            = 292;
+pub const KEY_F4: int            = 293;
+pub const KEY_F5: int            = 294;
+pub const KEY_F6: int            = 295;
+pub const KEY_F7: int            = 296;
+pub const KEY_F8: int            = 297;
+pub const KEY_F9: int            = 298;
+pub const KEY_F10: int           = 299;
+pub const KEY_F11: int           = 300;
+pub const KEY_F12: int           = 301;
 
-pub var KEY_LEFT_SHIFT: int    = 340;
-pub var KEY_LEFT_CONTROL: int  = 341;
-pub var KEY_LEFT_ALT: int      = 342;
-pub var KEY_LEFT_SUPER: int    = 343;
-pub var KEY_RIGHT_SHIFT: int   = 344;
-pub var KEY_RIGHT_CONTROL: int = 345;
-pub var KEY_RIGHT_ALT: int     = 346;
-pub var KEY_RIGHT_SUPER: int   = 347;
+pub const KEY_LEFT_SHIFT: int    = 340;
+pub const KEY_LEFT_CONTROL: int  = 341;
+pub const KEY_LEFT_ALT: int      = 342;
+pub const KEY_LEFT_SUPER: int    = 343;
+pub const KEY_RIGHT_SHIFT: int   = 344;
+pub const KEY_RIGHT_CONTROL: int = 345;
+pub const KEY_RIGHT_ALT: int     = 346;
+pub const KEY_RIGHT_SUPER: int   = 347;
 
 // Mouse Buttons
-pub var MOUSE_LEFT: int   = 0;
-pub var MOUSE_RIGHT: int  = 1;
-pub var MOUSE_MIDDLE: int = 2;
+pub const MOUSE_LEFT: int   = 0;
+pub const MOUSE_RIGHT: int  = 1;
+pub const MOUSE_MIDDLE: int = 2;
 
 // Modifier Bitflags
-pub var MOD_SHIFT: int   = 1;
-pub var MOD_CONTROL: int = 2;
-pub var MOD_ALT: int     = 4;
-pub var MOD_SUPER: int   = 8;
+pub const MOD_SHIFT: int   = 1;
+pub const MOD_CONTROL: int = 2;
+pub const MOD_ALT: int     = 4;
+pub const MOD_SUPER: int   = 8;
 
 frame InputManager {
     // Mouse tracking

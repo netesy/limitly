@@ -2,24 +2,24 @@
 import std.ui.types as ui_types;
 
 // Common icon symbols (Unicode)
-pub var ICON_CLOSE: str = "✕";
-pub var ICON_MENU: str = "☰";
-pub var ICON_HOME: str = "🏠";
-pub var ICON_SETTINGS: str = "⚙";
-pub var ICON_STAR: str = "★";
-pub var ICON_HEART: str = "♥";
-pub var ICON_ALERT: str = "⚠";
-pub var ICON_CHECK: str = "✓";
-pub var ICON_CROSS: str = "✗";
-pub var ICON_ARROW_UP: str = "▲";
-pub var ICON_ARROW_DOWN: str = "▼";
-pub var ICON_ARROW_LEFT: str = "◀";
-pub var ICON_ARROW_RIGHT: str = "▶";
-pub var ICON_SEARCH: str = "🔍";
-pub var ICON_LOCK: str = "🔒";
-pub var ICON_USER: str = "👤";
-pub var ICON_TRASH: str = "🗑";
-pub var ICON_EDIT: str = "✎";
+pub const ICON_CLOSE: str = "✕";
+pub const ICON_MENU: str = "☰";
+pub const ICON_HOME: str = "🏠";
+pub const ICON_SETTINGS: str = "⚙";
+pub const ICON_STAR: str = "★";
+pub const ICON_HEART: str = "♥";
+pub const ICON_ALERT: str = "⚠";
+pub const ICON_CHECK: str = "✓";
+pub const ICON_CROSS: str = "✗";
+pub const ICON_ARROW_UP: str = "▲";
+pub const ICON_ARROW_DOWN: str = "▼";
+pub const ICON_ARROW_LEFT: str = "◀";
+pub const ICON_ARROW_RIGHT: str = "▶";
+pub const ICON_SEARCH: str = "🔍";
+pub const ICON_LOCK: str = "🔒";
+pub const ICON_USER: str = "👤";
+pub const ICON_TRASH: str = "🗑";
+pub const ICON_EDIT: str = "✎";
 
 // Create an icon widget
 pub fn icon(glyph: str, size: float = 24.0, color: ui_types.Color = ui_types.white): ui_types.Widget {

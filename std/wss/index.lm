@@ -14,6 +14,42 @@ pub import std.wss.server as server;
 pub import std.wss.client show Client;
 pub import std.wss.server show Server, Connection, Room;
 
+// WebSocket Close Code Enumeration (RFC 6455 section 7.4.1)
+enum CloseCode {
+    Normal,
+    GoingAway,
+    ProtocolError,
+    UnsupportedData,
+    NoStatus,
+    Abnormal,
+    InvalidPayload,
+    PolicyViolation,
+    MessageTooBig,
+    MandatoryExt,
+    InternalError,
+    ServiceRestart,
+    TryAgainLater
+}
+
+pub fn close_code_value(code: CloseCode): int {
+    match (code) {
+        CloseCode.Normal => { return 1000; },
+        CloseCode.GoingAway => { return 1001; },
+        CloseCode.ProtocolError => { return 1002; },
+        CloseCode.UnsupportedData => { return 1003; },
+        CloseCode.NoStatus => { return 1005; },
+        CloseCode.Abnormal => { return 1006; },
+        CloseCode.InvalidPayload => { return 1007; },
+        CloseCode.PolicyViolation => { return 1008; },
+        CloseCode.MessageTooBig => { return 1009; },
+        CloseCode.MandatoryExt => { return 1010; },
+        CloseCode.InternalError => { return 1011; },
+        CloseCode.ServiceRestart => { return 1012; },
+        CloseCode.TryAgainLater => { return 1013; },
+        _ => { return 1000; }
+    }
+}
+
 // Close codes, RFC 6455 section 7.4.1.
 pub const WS_CLOSE_NORMAL: int = 1000;
 pub const WS_CLOSE_GOING_AWAY: int = 1001;

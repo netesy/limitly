@@ -5,11 +5,19 @@
 
 import std.ffi as ffi;
 
+// ── Channel format enumeration ──────────────────────────────────────────────
+enum ChannelFormat {
+    Grey,
+    GreyAlpha,
+    Rgb,
+    Rgba
+}
+
 // ── Channel count constants ───────────────────────────────────────────────
-pub var CHANNELS_GREY:       int = 1;
-pub var CHANNELS_GREY_ALPHA: int = 2;
-pub var CHANNELS_RGB:        int = 3;
-pub var CHANNELS_RGBA:       int = 4;
+pub const CHANNELS_GREY:       int = 1;
+pub const CHANNELS_GREY_ALPHA: int = 2;
+pub const CHANNELS_RGB:        int = 3;
+pub const CHANNELS_RGBA:       int = 4;
 
 // ── Pixel value frame ─────────────────────────────────────────────────────
 frame Pixel {
@@ -81,13 +89,13 @@ frame Info {
 }
 
 // ── Internal: shared library path & cross-platform loader ───────────────────
-pub var _LIB_PATH: str = "";
+var _lib_path: str = "";
 
 pub fn _open_lib(): int {
     unsafe {
         // 1. If explicit user path was configured, try it first
-        if (_LIB_PATH != "") {
-            var h: int = ffi.library_load(_LIB_PATH);
+        if (_lib_path != "") {
+            var h: int = ffi.library_load(_lib_path);
             if (h != 0 and h != nil) {
                 return h;
             }
@@ -119,16 +127,12 @@ pub fn _open_lib(): int {
             "tests/ffi/libstb_image.dylib"
         ];
 
-        var i: int = 0;
-        var count: int = len(candidates);
-        while (i < count) {
-            var c: str = candidates[i];
+        iter (c in candidates) {
             var h2: int = ffi.library_load(c);
             if (h2 != 0 and h2 != nil) {
-                _LIB_PATH = c;
+                _lib_path = c;
                 return h2;
             }
-            i = i + 1;
         }
 
         return 0;

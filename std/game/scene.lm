@@ -7,8 +7,13 @@ import std.game.types as types;
 import std.game.traits as gtraits;
 
 // Transition modes
-pub var TRANSITION_NONE: int = 0;
-pub var TRANSITION_FADE: int = 1;
+enum Transition {
+    None,
+    Fade
+}
+
+pub const TRANSITION_NONE: int = 0;
+pub const TRANSITION_FADE: int = 1;
 
 // ── Scene Base ────────────────────────────────────────────────────────────────
 

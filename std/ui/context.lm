@@ -2366,7 +2366,7 @@ fn send_key_down_to_widget(w: ui.Widget, key_code: int, mods: int): int {
         if (w.text_editor_state == nil) { w.text_editor_state = text_ctrl.EditorController(w.text_val); }
         var ctrl = w.text_editor_state as text_ctrl.EditorController;
 
-        var MOD_CTRL = 2; // Assuming MOD_CONTROL is 2
+        val MOD_CTRL = 2; // Assuming MOD_CONTROL is 2
 
         if (key_code == 8) { // Backspace
             ctrl.backspace();

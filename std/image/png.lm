@@ -4,8 +4,8 @@
 import std.ffi as ffi;
 import std.image.index as image;
 
-pub var CHANNELS_RGB:  int = 3;
-pub var CHANNELS_RGBA: int = 4;
+pub const CHANNELS_RGB:  int = 3;
+pub const CHANNELS_RGBA: int = 4;
 
 pub fn load(path: str): image.Image? {
     return image.load(path);
