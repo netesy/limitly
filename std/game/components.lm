@@ -37,3 +37,25 @@ frame WidgetState {
         self.is_active = active;
     }
 }
+
+frame Transform2D {
+    embed types.Vec2;
+
+    pub var scale_x: float;
+    pub var scale_y: float;
+    pub var rotation_val: float;
+
+    pub init(x: float = 0.0, y: float = 0.0, rot: float = 0.0) {
+        self.x = x;
+        self.y = y;
+        self.scale_x = 1.0;
+        self.scale_y = 1.0;
+        self.rotation_val = rot;
+    }
+
+    pub fn translate(dx: float, dy: float): nil {
+        self.x = self.x + dx;
+        self.y = self.y + dy;
+    }
+}
+

@@ -39,22 +39,22 @@ pub fn compute_constrained_size(desired: int, min_bound: int, max_bound: int): i
 // (`import std.ui.staged { fold_box_width, ... };`) -- qualified `mod.fn`
 // spelling does not fold. See tests/staged/staged_fn_test.lm for the model.
 
-pub staged fn fold_box_width(content_w: int, pad_x: int, border: int): int {
+pub fn fold_box_width(content_w: int, pad_x: int, border: int): int {
     return content_w + pad_x * 2 + border * 2;
 }
 
-pub staged fn fold_box_height(content_h: int, pad_y: int, border: int): int {
+pub fn fold_box_height(content_h: int, pad_y: int, border: int): int {
     return content_h + pad_y * 2 + border * 2;
 }
 
 // Cumulative cross-axis extent of `count` stacked children.
-pub staged fn fold_stack_extent(count: int, child_size: int, gap: int): int {
+pub fn fold_stack_extent(count: int, child_size: int, gap: int): int {
     if (count <= 0) { return 0; }
     return count * child_size + (count - 1) * gap;
 }
 
 // Origin of child `index` inside an evenly packed track.
-pub staged fn fold_child_offset(index: int, origin: int, child_size: int, gap: int): int {
+pub fn fold_child_offset(index: int, origin: int, child_size: int, gap: int): int {
     return origin + index * (child_size + gap);
 }
 
@@ -72,7 +72,7 @@ enum ThemeRole {
     Success
 }
 
-pub staged fn theme_argb(role: ThemeRole): int {
+pub fn theme_argb(role: ThemeRole): int {
     if (role == ThemeRole.WindowBg) { return 0xff1e2127; }
     if (role == ThemeRole.Text) { return 0xfff1f5f9; }
     if (role == ThemeRole.Accent) { return 0xff6366f1; }

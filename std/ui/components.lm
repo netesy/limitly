@@ -294,6 +294,10 @@ frame Slider: Fluent {
     // Clamped write + change notification in one fluent step. The invoke
     // logic is inlined here: nested fallible (`?`) calls of promoted methods
     // would propagate through the host frame, so the slot is fired directly.
+    pub fn set_value(v: float): Slider {
+        return self.value_of(v);
+    }
+
     pub fn value_of(v: float): Slider {
         self.value = math.clamp(v, self.min_val, self.max_val);
         var slot = self.on_change_action;
@@ -475,3 +479,39 @@ frame Container: Fluent {
         return self;
     }
 }
+
+frame Spacer: Fluent {
+    embed LayoutMetrics;
+
+    pub init(flex: float = 1.0) {
+        self.flex_val = flex;
+    }
+
+    pub fn kind_name(): str { return "Spacer"; }
+
+    pub fn flex(f: float): Spacer {
+        self.flex_val = f;
+        return self;
+    }
+}
+
+pub fn column(children: [any] = []): Container {
+    var c = Container(true);
+    var i = 0;
+    while (i < len(children)) {
+        c.add(children[i] as Fluent);
+        i = i + 1;
+    }
+    return c;
+}
+
+pub fn row(children: [any] = []): Container {
+    var c = Container(false);
+    var i = 0;
+    while (i < len(children)) {
+        c.add(children[i] as Fluent);
+        i = i + 1;
+    }
+    return c;
+}
+

@@ -286,7 +286,14 @@ mixin Accessibility {
 
 // ── Canonical Retained UI Color (Re-exported from std.color) ────────────────
 import std.color as color;
-pub import std.color show Color, rgb, rgba, hex, color_rgb, color_rgba, lerp;
+pub import std.color show Color;
+
+pub fn rgb(r: int, g: int, b: int): Color { return color.rgb(r, g, b); }
+pub fn rgba(r: int, g: int, b: int, a: float): Color { return color.rgba(r, g, b, a); }
+pub fn hex(h: int): Color { return color.hex(h); }
+pub fn color_rgb(r: float, g: float, b: float): Color { return color.color_rgb(r, g, b); }
+pub fn color_rgba(r: float, g: float, b: float, a: float): Color { return color.color_rgba(r, g, b, a); }
+pub fn lerp(c1: Color, c2: Color, t: float): Color { return color.lerp(c1, c2, t); }
 
 pub const white: Color = color.white;
 pub const black: Color = color.black;
@@ -1086,7 +1093,7 @@ pub fn container_data(axis: Axis): ContainerData {
         axis=axis,
         spacing=0.0,
         padding=rect(0.0, 0.0, 0.0, 0.0),
-        background=color_rgba(0.0, 0.0, 0.0, 0.0)
+        background=color.color_rgba(0.0, 0.0, 0.0, 0.0)
     );
 }
 
@@ -1098,7 +1105,7 @@ frame TextData {
 }
 
 pub fn text_data(content: str): TextData {
-    return TextData(content=content, font_size=14.0, color=color_rgb(1.0, 1.0, 1.0), font_weight=400);
+    return TextData(content=content, font_size=14.0, color=color.color_rgb(1.0, 1.0, 1.0), font_weight=400);
 }
 
 frame ButtonData {
@@ -1221,7 +1228,7 @@ pub fn select(options: [str], selected_idx: int = 0, on_change: any = nil): Widg
     w.selected_idx = selected_idx;
     w.on_change_action = on_change;
     w.is_open = 0;
-    w.background_color = rgb(28, 30, 38);
+    w.background_color = color.rgb(28, 30, 38);
     w.foreground_color = white;
     w.height_val = 28.0;
     w.width_val = 180.0;
@@ -1238,7 +1245,7 @@ pub fn link(text_val: str, url: str): Widget {
     var w = Widget(KIND_LINK);
     w.text_val = text_val;
     w.placeholder_val = url;
-    w.foreground_color = rgb(100, 180, 255);
+    w.foreground_color = color.rgb(100, 180, 255);
     w.height_val = 20.0;
     return w;
 }
@@ -1249,7 +1256,7 @@ pub fn pie_chart(label: str, values: [float], labels: [str] = [] as [str]): Widg
     w.tab_titles = labels;
     w.height_val = 120.0;
     w.width_val = 120.0;
-    w.background_color = rgb(24, 26, 34);
+    w.background_color = color.rgb(24, 26, 34);
     w.text_editor_state = values;
     w.payload_role = Role.ChartValues;
     return w;
@@ -1258,7 +1265,7 @@ pub fn pie_chart(label: str, values: [float], labels: [str] = [] as [str]): Widg
 pub fn table(headers: [str], rows: [[Widget]]): Widget {
     var w = Widget(KIND_TABLE);
     w.tab_titles = headers;
-    w.background_color = rgb(24, 26, 34);
+    w.background_color = color.rgb(24, 26, 34);
     w.foreground_color = white;
     w.text_editor_state = rows;
     w.payload_role = Role.Rows;
@@ -1277,20 +1284,20 @@ pub fn alert_k(message: str, kind: AlertKind): Widget {
     w.placeholder_val = alert_kind_name(kind);
     match (kind) {
         AlertKind.Danger => {
-            w.background_color = rgb(80, 25, 30);
-            w.foreground_color = rgb(255, 120, 130);
+            w.background_color = color.rgb(80, 25, 30);
+            w.foreground_color = color.rgb(255, 120, 130);
         },
         AlertKind.Warning => {
-            w.background_color = rgb(70, 55, 20);
-            w.foreground_color = rgb(255, 210, 90);
+            w.background_color = color.rgb(70, 55, 20);
+            w.foreground_color = color.rgb(255, 210, 90);
         },
         AlertKind.Success => {
-            w.background_color = rgb(25, 65, 35);
-            w.foreground_color = rgb(100, 230, 140);
+            w.background_color = color.rgb(25, 65, 35);
+            w.foreground_color = color.rgb(100, 230, 140);
         },
         AlertKind.Info => {
-            w.background_color = rgb(30, 45, 70);
-            w.foreground_color = rgb(120, 180, 255);
+            w.background_color = color.rgb(30, 45, 70);
+            w.foreground_color = color.rgb(120, 180, 255);
         }
     }
     w.height_val = 36.0;
@@ -1302,7 +1309,7 @@ pub fn accordion(title: str, content: Widget, default_open: bool = false): Widge
     w.text_val = title;
     w.children = [content];
     if (default_open) w.is_open = 1; else w.is_open = 0;
-    w.background_color = rgb(28, 30, 40);
+    w.background_color = color.rgb(28, 30, 40);
     w.foreground_color = white;
     return w;
 }
@@ -1313,8 +1320,8 @@ pub fn bar_chart(label: str, values: [float], labels: [str] = [] as [str]): Widg
     w.tab_titles = labels;
     w.height_val = 100.0;
     w.width_val = 200.0;
-    w.background_color = rgb(24, 26, 34);
-    w.foreground_color = rgb(80, 180, 255);
+    w.background_color = color.rgb(24, 26, 34);
+    w.foreground_color = color.rgb(80, 180, 255);
     w.text_editor_state = values;
     w.payload_role = Role.ChartValues;
     return w;
@@ -1334,8 +1341,8 @@ pub fn plot_histogram(label: str, values: [float], min_val: float = 0.0, max_val
     w.slider_max = max_val;
     w.height_val = 50.0;
     w.width_val = 180.0;
-    w.background_color = rgb(24, 26, 34);
-    w.foreground_color = rgb(80, 220, 130);
+    w.background_color = color.rgb(24, 26, 34);
+    w.foreground_color = color.rgb(80, 220, 130);
     w.text_editor_state = values;
     w.payload_role = Role.ChartValues;
     return w;
@@ -1346,7 +1353,7 @@ pub fn stat(title: str, value: str, desc: str = ""): Widget {
     w.text_val = title;
     w.placeholder_val = value;
     w.focus_key = desc;
-    w.background_color = rgb(24, 26, 34);
+    w.background_color = color.rgb(24, 26, 34);
     w.foreground_color = white;
     w.height_val = 70.0;
     w.width_val = 160.0;
@@ -1360,7 +1367,7 @@ pub fn timeline(events: [Widget]): Widget {
 }
 
 pub fn color_rgb8(r: int, g: int, b: int): Color {
-    return rgb(r, g, b);
+    return color.rgb(r, g, b);
 }
 
 pub fn range_slider(low: float = 20.0, high: float = 80.0, min_val: float = 0.0, max_val: float = 100.0): Widget {
@@ -1372,8 +1379,8 @@ pub fn range_slider(low: float = 20.0, high: float = 80.0, min_val: float = 0.0,
     w.payload_role = Role.High;
     w.height_val = 24.0;
     w.width_val = 160.0;
-    w.background_color = rgb(35, 38, 48);
-    w.foreground_color = rgb(100, 180, 255);
+    w.background_color = color.rgb(35, 38, 48);
+    w.foreground_color = color.rgb(100, 180, 255);
     return w;
 }
 
@@ -1398,7 +1405,7 @@ pub fn stepper(value: int = 0, step: int = 1, min_val: int = 0, max_val: int = 1
     w.on_change_action = on_change;
     w.height_val = 28.0;
     w.width_val = 120.0;
-    w.background_color = rgb(28, 30, 38);
+    w.background_color = color.rgb(28, 30, 38);
     w.foreground_color = white;
     return w;
 }
@@ -1406,7 +1413,7 @@ pub fn stepper(value: int = 0, step: int = 1, min_val: int = 0, max_val: int = 1
 pub fn calendar(selected_date: str = "2025-01-01"): Widget {
     var w = Widget(KIND_CALENDAR);
     w.text_val = selected_date;
-    w.background_color = rgb(24, 26, 34);
+    w.background_color = color.rgb(24, 26, 34);
     w.foreground_color = white;
     w.height_val = 180.0;
     w.width_val = 220.0;
@@ -1417,12 +1424,12 @@ pub fn toggle(enabled: bool = false, on_change: any = nil): Widget {
     var w = Widget(KIND_TOGGLE);
     if (enabled) {
         w.is_checked = 1;
-        w.foreground_color = rgb(80, 220, 130);
+        w.foreground_color = color.rgb(80, 220, 130);
     } else {
         w.is_checked = 0;
         w.foreground_color = gray;
     }
-    w.background_color = rgb(35, 38, 48);
+    w.background_color = color.rgb(35, 38, 48);
     w.height_val = 22.0;
     w.width_val = 44.0;
     w.on_change_action = on_change;
@@ -1434,8 +1441,8 @@ pub fn line_chart(label: str, values: [float]): Widget {
     w.text_val = label;
     w.height_val = 100.0;
     w.width_val = 200.0;
-    w.background_color = rgb(24, 26, 34);
-    w.foreground_color = rgb(100, 220, 160);
+    w.background_color = color.rgb(24, 26, 34);
+    w.foreground_color = color.rgb(100, 220, 160);
     w.text_editor_state = values;
     w.payload_role = Role.ChartValues;
     return w;
@@ -1462,8 +1469,8 @@ pub fn progress(fraction: float = 0.0, width_val: float = 160.0): Widget {
     w.slider_val = fraction;
     w.width_val = width_val;
     w.height_val = 16.0;
-    w.background_color = rgb(35, 38, 48);
-    w.foreground_color = rgb(80, 180, 255);
+    w.background_color = color.rgb(35, 38, 48);
+    w.foreground_color = color.rgb(80, 180, 255);
     return w;
 }
 
@@ -1495,8 +1502,8 @@ pub fn radar_chart(label: str, values: [float], labels: [str] = [] as [str]): Wi
     w.tab_titles = labels;
     w.height_val = 120.0;
     w.width_val = 120.0;
-    w.background_color = rgb(24, 26, 34);
-    w.foreground_color = rgb(100, 200, 255);
+    w.background_color = color.rgb(24, 26, 34);
+    w.foreground_color = color.rgb(100, 200, 255);
     w.text_editor_state = values;
     w.payload_role = Role.ChartValues;
     return w;
@@ -1537,7 +1544,7 @@ pub fn file_input(label: str = "Choose File...", on_select: any = nil): Widget {
     var w = Widget(KIND_FILE_INPUT);
     w.text_val = label;
     w.on_change_action = on_select;
-    w.background_color = rgb(35, 40, 52);
+    w.background_color = color.rgb(35, 40, 52);
     w.foreground_color = white;
     w.height_val = 32.0;
     w.width_val = 220.0;
@@ -1561,7 +1568,7 @@ pub fn toast_k(message: str, kind: AlertKind): Widget {
     w.text_val = message;
     w.alert_kind = kind;
     w.placeholder_val = alert_kind_name(kind);
-    w.background_color = rgb(28, 30, 42);
+    w.background_color = color.rgb(28, 30, 42);
     w.foreground_color = white;
     w.height_val = 36.0;
     w.width_val = 240.0;
@@ -1573,7 +1580,7 @@ pub fn filter(query: str = "", placeholder: str = "Filter...", on_change: any = 
     w.text_val = query;
     w.placeholder_val = placeholder;
     w.on_change_action = on_change;
-    w.background_color = rgb(20, 22, 28);
+    w.background_color = color.rgb(20, 22, 28);
     w.foreground_color = white;
     w.height_val = 28.0;
     w.width_val = 180.0;
@@ -1584,7 +1591,7 @@ pub fn card(title: str, content: Widget): Widget {
     var w = Widget(KIND_CARD);
     w.text_val = title;
     w.children = [content];
-    w.background_color = rgb(24, 26, 34);
+    w.background_color = color.rgb(24, 26, 34);
     w.foreground_color = white;
     w.padding_left = 12.0;
     w.padding_top = 12.0;
@@ -1598,7 +1605,7 @@ pub fn scroll(content: Widget): Widget {
     w.children = [content];
     w.height_val = 0.0;
     w.scroll_y = 0.0;
-    w.background_color = rgb(20, 22, 28);
+    w.background_color = color.rgb(20, 22, 28);
     return w;
 }
 
@@ -1609,8 +1616,8 @@ pub fn plot_lines(label: str, values: [float], min_val: float = 0.0, max_val: fl
     w.slider_max = max_val;
     w.height_val = 50.0;
     w.width_val = 180.0;
-    w.background_color = rgb(24, 26, 34);
-    w.foreground_color = rgb(100, 180, 255);
+    w.background_color = color.rgb(24, 26, 34);
+    w.foreground_color = color.rgb(100, 180, 255);
     w.text_editor_state = values;
     w.payload_role = Role.ChartValues;
     return w;
@@ -1623,7 +1630,7 @@ pub fn text_area(value: str = "", placeholder: str = "Type here...", on_change: 
     w.on_change_action = on_change;
     w.text_editor_state = text_ctrl.EditorController(value);
     w.focus_key = "ta_default";
-    w.background_color = rgb(20, 22, 28);
+    w.background_color = color.rgb(20, 22, 28);
     w.foreground_color = white;
     w.height_val = 120.0;
     w.width_val = 300.0;
@@ -1651,7 +1658,7 @@ pub fn polar_area_chart(label: str, values: [float], labels: [str] = [] as [str]
     w.tab_titles = labels;
     w.height_val = 120.0;
     w.width_val = 120.0;
-    w.background_color = rgb(24, 26, 34);
+    w.background_color = color.rgb(24, 26, 34);
     w.text_editor_state = values;
     w.payload_role = Role.ChartValues;
     return w;
@@ -1667,7 +1674,7 @@ pub fn join(items: [Widget]): Widget {
 pub fn dock(items: [Widget]): Widget {
     var w = Widget(KIND_DOCK);
     w.children = items;
-    w.background_color = rgb(28, 30, 40);
+    w.background_color = color.rgb(28, 30, 40);
     w.height_val = 48.0;
     return w;
 }
@@ -1677,8 +1684,8 @@ pub fn bubble_chart(label: str, values: [float]): Widget {
     w.text_val = label;
     w.height_val = 100.0;
     w.width_val = 180.0;
-    w.background_color = rgb(24, 26, 34);
-    w.foreground_color = rgb(255, 180, 90);
+    w.background_color = color.rgb(24, 26, 34);
+    w.foreground_color = color.rgb(255, 180, 90);
     w.text_editor_state = values;
     w.payload_role = Role.ChartValues;
     return w;
@@ -1689,8 +1696,8 @@ pub fn scatter_chart(label: str, values: [float]): Widget {
     w.text_val = label;
     w.height_val = 100.0;
     w.width_val = 180.0;
-    w.background_color = rgb(24, 26, 34);
-    w.foreground_color = rgb(220, 120, 255);
+    w.background_color = color.rgb(24, 26, 34);
+    w.foreground_color = color.rgb(220, 120, 255);
     w.text_editor_state = values;
     w.payload_role = Role.ChartValues;
     return w;
@@ -1702,7 +1709,7 @@ pub fn doughnut_chart(label: str, values: [float], labels: [str] = [] as [str]):
     w.tab_titles = labels;
     w.height_val = 120.0;
     w.width_val = 120.0;
-    w.background_color = rgb(24, 26, 34);
+    w.background_color = color.rgb(24, 26, 34);
     w.text_editor_state = values;
     w.payload_role = Role.ChartValues;
     return w;
@@ -1722,7 +1729,7 @@ pub fn diff(old_text: str, new_text: str): Widget {
     var w = Widget(KIND_DIFF);
     w.text_val = old_text;
     w.placeholder_val = new_text;
-    w.background_color = rgb(20, 22, 28);
+    w.background_color = color.rgb(20, 22, 28);
     return w;
 }
 
@@ -1731,13 +1738,13 @@ pub fn checkbox(checked: bool = false, on_change: any = nil): Widget {
     if (checked) {
         w.is_checked = 1;
         w.text_val = "[X]";
-        w.foreground_color = rgb(80, 220, 130);
+        w.foreground_color = color.rgb(80, 220, 130);
     } else {
         w.is_checked = 0;
         w.text_val = "[ ]";
         w.foreground_color = gray;
     }
-    w.background_color = rgb(35, 38, 48);
+    w.background_color = color.rgb(35, 38, 48);
     w.height_val = 26.0;
     w.width_val = 42.0;
     w.on_change_action = on_change;
@@ -1755,9 +1762,9 @@ pub fn indicator_k(status: DotState, label: str = ""): Widget {
     w.placeholder_val = dot_state_name(status);
     w.text_val = label;
     match (status) {
-        DotState.Online => { w.foreground_color = rgb(80, 220, 130); },
-        DotState.Busy => { w.foreground_color = rgb(255, 200, 80); },
-        DotState.Offline => { w.foreground_color = rgb(150, 155, 170); }
+        DotState.Online => { w.foreground_color = color.rgb(80, 220, 130); },
+        DotState.Busy => { w.foreground_color = color.rgb(255, 200, 80); },
+        DotState.Offline => { w.foreground_color = color.rgb(150, 155, 170); }
     }
     w.height_val = 20.0;
     return w;
@@ -1771,8 +1778,8 @@ pub fn slider(value: float = 50.0, min_val: float = 0.0, max_val: float = 100.0,
     w.on_change_action = on_change;
     w.height_val = 24.0;
     w.width_val = 140.0;
-    w.background_color = rgb(35, 38, 48);
-    w.foreground_color = rgb(100, 180, 255);
+    w.background_color = color.rgb(35, 38, 48);
+    w.foreground_color = color.rgb(100, 180, 255);
     return w;
 }
 
@@ -1781,7 +1788,7 @@ pub fn input(value: str = "", placeholder: str = "Type here...", on_change: any 
     w.text_val = value;
     w.placeholder_val = placeholder;
     w.on_change_action = on_change;
-    w.background_color = rgb(20, 22, 28);
+    w.background_color = color.rgb(20, 22, 28);
     w.foreground_color = white;
     w.height_val = 28.0;
     w.width_val = 220.0;

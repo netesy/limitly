@@ -7,6 +7,7 @@
 // 4. Nominal enum event routing with fallible results (EventResult?nil)
 // 5. IMGUI embedded geometry with promoted contains() method
 // 6. ColorRole native pattern matching
+// 7. Clean domain imports from std.color and std.math
 
 import std.ui as ui;
 import std.ui.components as comp;
@@ -17,6 +18,7 @@ import std.game.components as gcomp;
 import std.game.types as gtypes;
 import std.color as color;
 import std.color.palette as palette;
+import std.math as math;
 
 fn test_embedded_ui_components() {
     print("=== Testing Embedded UI Components ===");
@@ -34,6 +36,35 @@ fn test_embedded_ui_components() {
     assert(lbl.text == "Dashboard", "Label text mismatch");
     assert(lbl.font_size_val == 20.0, "Label font size mismatch");
     assert(lbl.is_bold == true, "Label bold flag mismatch");
+
+    // Slider component with embedded LayoutMetrics, VisualStyle, and Changeable
+    var sld = comp.Slider(50.0, 0.0, 100.0);
+    sld.set_value(75.0);
+    assert(sld.value == 75.0, "Slider value mismatch");
+    assert(sld.ratio() == 0.75, "Slider ratio mismatch");
+
+    // Checkbox component with embedded LayoutMetrics, VisualStyle, Clickable, Changeable
+    var chk = comp.Checkbox("Remember me", false);
+    chk.toggle();
+    assert(chk.is_checked == true, "Checkbox toggle mismatch");
+
+    // TextInput component with embedded Focusable
+    var txt = comp.TextInput("hello world");
+    txt.focus();
+    assert(txt.is_focused == true, "TextInput focus mismatch");
+
+    // ProgressBar component
+    var pb = comp.ProgressBar(40.0, 100.0);
+    assert(pb.ratio() == 0.4, "ProgressBar ratio mismatch");
+
+    // Container & Spacer composition
+    var sp = comp.Spacer(2.0);
+    assert(sp.flex_val == 2.0, "Spacer flex mismatch");
+
+    var col = comp.column([btn, lbl, sp]);
+    assert(col.is_vertical() == true, "Column is_vertical mismatch");
+    assert(len(col.children) == 3, "Column children count mismatch");
+
     print("[PASS] Embedded UI Components");
 }
 
@@ -44,6 +75,15 @@ fn test_staged_and_generic_bindings() {
 
     val col_w = staged_ui.compute_grid_column_width(1000, 4, 10);
     assert(col_w == 242, "Column width computation mismatch");
+
+    val folded_w = staged_ui.fold_box_width(100, 10, 2);
+    assert(folded_w == 124, "Folded box width mismatch");
+
+    val folded_h = staged_ui.fold_box_height(50, 5, 1);
+    assert(folded_h == 62, "Folded box height mismatch");
+
+    val bg_argb = staged_ui.theme_argb(staged_ui.ThemeRole.WindowBg);
+    assert(bg_argb != 0, "Theme ARGB token mismatch");
 
     var state: staged_ui.Binding(int) = staged_ui.Binding(42);
     assert(state.get() == 42, "Initial binding value mismatch");
@@ -63,12 +103,30 @@ fn test_nominal_event_and_fallible_dispatch() {
     };
     assert(res as str == "Handled", "Event result mismatch");
 
+    // Test fire_action with nil and valid callbacks fallibly
+    var executed: staged_ui.Binding(bool) = staged_ui.Binding(false);
+    var act_res = event.fire_action(fn(): nil {
+        executed.set(true);
+    })? else {
+        assert(false, "fire_action unexpectedly failed");
+        event.EventResult.Ignored
+    };
+    assert(executed.get() == true, "fire_action did not invoke callback");
+    assert(act_res as str == "Handled", "fire_action result mismatch");
+
+    // Nil action returns Ignored without crashing or throwing
+    var nil_res = event.fire_action(nil)? else {
+        assert(false, "nil action failed");
+        event.EventResult.Unhandled
+    };
+    assert(nil_res as str == "Ignored", "nil action should be Ignored");
+
     // Invalid target produces fallible error
     var invalid_evt = event.make_click_event("", 0.0, 0.0);
     var errored = false;
     var res2 = event.dispatch_event(invalid_evt)? else {
         errored = true;
-        EventResult.Ignored
+        event.EventResult.Ignored
     };
     assert(errored == true, "Empty target should produce fallible error");
     print("[PASS] Nominal Enums & Fallible Event Dispatch");
@@ -86,6 +144,15 @@ fn test_game_embedded_geometry() {
 
     ws.update_hover(50.0, 50.0);
     assert(ws.is_hot == true, "Widget should be hot when hovered");
+
+    // Transform2D with embedded Vec2
+    var tf = gcomp.Transform2D(10.0, 20.0, 0.0);
+    assert(tf.x == 10.0, "Promoted x from Vec2 mismatch");
+    assert(tf.y == 20.0, "Promoted y from Vec2 mismatch");
+    tf.translate(5.0, -2.0);
+    assert(tf.x == 15.0, "Translated x mismatch");
+    assert(tf.y == 18.0, "Translated y mismatch");
+
     print("[PASS] Game IMGUI Embedded Geometry");
 }
 
@@ -96,6 +163,9 @@ fn test_game_color_role_matching() {
     assert(btn_c.r > 0.0, "Button role color should be initialized");
     var win_c = gui.get_color_role(gtypes.ColorRole.WindowBg);
     assert(win_c.a > 0.0, "WindowBg role color should have alpha");
+
+    var pad = gui.get_var_type(gtypes.StyleVar.Padding, 8.0);
+    assert(pad >= 0.0, "StyleVar padding should return value");
     print("[PASS] ColorRole Native Match");
 }
 
@@ -107,4 +177,3 @@ test_game_color_role_matching();
 print("========================================");
 print("All Modern UI & Game Architecture Tests Passed 100%!");
 print("========================================");
-
