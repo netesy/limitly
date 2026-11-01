@@ -121,13 +121,41 @@ void printUsage(const char* programName) {
 #endif
     std::cout << "\n  Package Management (Lyra):\n";
     std::cout << "    " << programName << " init                 Initialize a new package\n";
+    std::cout << "    " << programName << " new <name> [-t TPL]  Create project from template (cli, web, wasm, lib, native)\n";
     std::cout << "    " << programName << " update               Update package dependencies and lockfile\n";
     std::cout << "    " << programName << " add <pkg>            Add a package dependency\n";
+    std::cout << "    " << programName << " link <path>          Link a local package as a dependency\n";
     std::cout << "    " << programName << " publish              Publish package to index\n";
-    std::cout << "    " << programName << " pack                 Package project into tarball\n";
+    std::cout << "    " << programName << " pack [options]       Package project (source tarball, --deb, --msi, --zip)\n";
     std::cout << "    " << programName << " install <tarball>    Install package tarball\n";
+    std::cout << "    " << programName << " search <query>       Search package index\n";
+    std::cout << "    " << programName << " info <pkg>           Show package details from index\n";
     std::cout << "    " << programName << " deps / tree / why   Display dependency analysis\n";
-    std::cout << "    " << programName << " doctor / env / audit Diagnostics and audit\n";
+    std::cout << "    " << programName << " vendor               Vendor all dependencies into local vendor/ directory\n";
+    std::cout << "\n  Packaging & Installers:\n";
+    std::cout << "    " << programName << " deb [-o file.deb]    Create a Debian (.deb) installer package\n";
+    std::cout << "    " << programName << " msi [-o file.msi]    Create a Windows Installer (.msi) package\n";
+    std::cout << "    " << programName << " zip [-o file.zip]    Create a Windows portable standalone zip archive\n";
+    std::cout << "    " << programName << " appimage             Create a Linux AppImage package\n";
+    std::cout << "    " << programName << " snap                 Create a Snap package\n";
+    std::cout << "    " << programName << " flatpak              Create a Flatpak bundle\n";
+    std::cout << "    " << programName << " dmg                  Create a macOS disk image / pkg\n";
+    std::cout << "\n  Security, Compliance & Signing:\n";
+    std::cout << "    " << programName << " audit                Audit dependencies for security vulnerabilities\n";
+    std::cout << "    " << programName << " license [--allow=..] Audit dependency licenses against allowlist\n";
+    std::cout << "    " << programName << " sbom [--format=..]   Generate Software Bill of Materials (SPDX / CycloneDX)\n";
+    std::cout << "    " << programName << " keygen [-n name]     Generate Ed25519 cryptographic signing keypair\n";
+    std::cout << "    " << programName << " sign <tarball>       Sign package tarball with private key\n";
+    std::cout << "    " << programName << " verify <tarball>     Verify package tarball signature\n";
+    std::cout << "\n  Environment & Maintenance:\n";
+    std::cout << "    " << programName << " repl                 Start interactive Lymar REPL prompt\n";
+    std::cout << "    " << programName << " expand [file]        View desugared AST and expanded directives\n";
+    std::cout << "    " << programName << " watch [subcommand]   Watch files and continuously re-run/re-build/re-test\n";
+    std::cout << "    " << programName << " doctor               Check environment and compiler health\n";
+    std::cout << "    " << programName << " env                  Show Lyra and Lymar environment paths\n";
+    std::cout << "    " << programName << " toolchain <cmd>      Manage compiler toolchains (list, install, use, update)\n";
+    std::cout << "    " << programName << " clean                Clean build and package artifacts\n";
+    std::cout << "    " << programName << " cache                Clear package index and download caches\n";
     std::cout << "\n  Tooling:\n";
     std::cout << "    " << programName << " test [options] [filter] Run project tests (parallel, filtered)\n";
     std::cout << "    " << programName << " lint [options] [files]  Run linter & static analysis\n";
@@ -150,9 +178,7 @@ void printUsage(const char* programName) {
 
 int main(int argc, char* argv[]) {
     if (argc < 2) {
-        // Default to REPL if no arguments provided
-        std::cout << "Lymar Programming Language REPL (planned feature)\n";
-        return 0;
+        return Lyra::handle_repl(argc, argv);
     }
     
     std::string command = argv[1];
@@ -210,25 +236,51 @@ int main(int argc, char* argv[]) {
     if (command == "profile" || command == "-profile") return LM::Profiler::run(argc, argv);
 
     try {
-    // Package management subcommands forwarded in-process to Lyra
+    // Comprehensive package management & tooling forwarded in-process to Lyra
     if (command == "init") return Lyra::handle_init();
+    if (command == "new") return Lyra::handle_new(argc, argv);
+    if (command == "repl") return Lyra::handle_repl(argc, argv);
+    if (command == "expand") return Lyra::handle_expand(argc, argv);
     if (command == "update") return Lyra::handle_update(argc, argv);
     if (command == "add") return Lyra::handle_add(argc, argv);
     if (command == "link") return Lyra::handle_link(argc, argv);
     if (command == "publish") return Lyra::handle_publish(argc, argv);
     if (command == "pack") return Lyra::handle_pack(argc, argv);
-    if (command == "deb") return Lyra::handle_deb(argc, argv);
-    if (command == "msi") return Lyra::handle_msi(argc, argv);
     if (command == "install") return Lyra::handle_install(argc, argv);
     if (command == "search") return Lyra::handle_search(argc, argv);
     if (command == "info") return Lyra::handle_info(argc, argv);
     if (command == "deps") return Lyra::handle_deps(argc, argv);
     if (command == "tree") return Lyra::handle_tree(argc, argv);
     if (command == "why") return Lyra::handle_why(argc, argv);
+    if (command == "vendor") return Lyra::handle_vendor(argc, argv);
+
+    // Packaging & Installers
+    if (command == "deb") return Lyra::handle_deb(argc, argv);
+    if (command == "msi") return Lyra::handle_msi(argc, argv);
+    if (command == "appimage") return Lyra::handle_appimage(argc, argv);
+    if (command == "snap") return Lyra::handle_snap(argc, argv);
+    if (command == "flatpak") return Lyra::handle_flatpak(argc, argv);
+    if (command == "zip") return Lyra::handle_zip(argc, argv);
+    if (command == "dmg" || command == "pkg") return Lyra::handle_dmg(argc, argv);
+
+    // Cryptography & Signing
+    if (command == "sign") return Lyra::handle_sign(argc, argv);
+    if (command == "verify") return Lyra::handle_verify(argc, argv);
+    if (command == "keygen") return Lyra::handle_keygen(argc, argv);
+
+    // Security & Compliance
+    if (command == "audit") return Lyra::handle_audit(argc, argv);
+    if (command == "license") return Lyra::handle_license(argc, argv);
+    if (command == "sbom") return Lyra::handle_sbom(argc, argv);
+
+    // Maintenance & Toolchain
+    if (command == "clean") return Lyra::handle_clean();
+    if (command == "cache") return Lyra::handle_cache_clear();
     if (command == "doctor") return Lyra::handle_doctor();
     if (command == "env") return Lyra::handle_env();
-    if (command == "audit") return Lyra::handle_audit(argc, argv);
-    if (command == "clean") return Lyra::handle_clean();
+    if (command == "toolchain") return Lyra::handle_toolchain(argc, argv);
+    if (command == "watch") return Lyra::handle_watch(argc, argv);
+    if (command == "fmt") return Lyra::handle_fmt(argc, argv);
 
     } catch (const std::exception& error) {
         std::cerr << "Package command failed: " << error.what() << '\n';

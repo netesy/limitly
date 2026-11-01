@@ -13,23 +13,20 @@ frame Vec2 {
         self.y = y;
     }
 
-    pub fn add(other: any): Vec2 {
-        var o = other as Vec2;
-        return Vec2(x=self.x + o.x, y=self.y + o.y);
+    pub fn add(other: Vec2): Vec2 {
+        return Vec2(x=self.x + other.x, y=self.y + other.y);
     }
 
-    pub fn sub(other: any): Vec2 {
-        var o = other as Vec2;
-        return Vec2(x=self.x - o.x, y=self.y - o.y);
+    pub fn sub(other: Vec2): Vec2 {
+        return Vec2(x=self.x - other.x, y=self.y - other.y);
     }
 
     pub fn scale(s: float): Vec2 {
         return Vec2(x=self.x * s, y=self.y * s);
     }
 
-    pub fn mul(other: any): Vec2 {
-        var o = other as Vec2;
-        return Vec2(x=self.x * o.x, y=self.y * o.y);
+    pub fn mul(other: Vec2): Vec2 {
+        return Vec2(x=self.x * other.x, y=self.y * other.y);
     }
 
     pub fn div(s: float): Vec2 {
@@ -37,14 +34,12 @@ frame Vec2 {
         return Vec2(x=self.x / s, y=self.y / s);
     }
 
-    pub fn dot(other: any): float {
-        var o = other as Vec2;
-        return self.x * o.x + self.y * o.y;
+    pub fn dot(other: Vec2): float {
+        return self.x * other.x + self.y * other.y;
     }
 
-    pub fn cross(other: any): float {
-        var o = other as Vec2;
-        return self.x * o.y - self.y * o.x;
+    pub fn cross(other: Vec2): float {
+        return self.x * other.y - self.y * other.x;
     }
 
     pub fn mag_sq(): float {
@@ -69,22 +64,20 @@ frame Vec2 {
         return self.scale(1.0 / m);
     }
 
-    pub fn dist_sq(other: any): float {
-        var o = other as Vec2;
-        var dx = self.x - o.x;
-        var dy = self.y - o.y;
+    pub fn dist_sq(other: Vec2): float {
+        var dx = self.x - other.x;
+        var dy = self.y - other.y;
         return dx * dx + dy * dy;
     }
 
-    pub fn dist(other: any): float {
+    pub fn dist(other: Vec2): float {
         return math.sqrt(self.dist_sq(other));
     }
 
-    pub fn lerp(target: any, t: float): Vec2 {
-        var tgt = target as Vec2;
+    pub fn lerp(target: Vec2, t: float): Vec2 {
         return Vec2(
-            x=self.x + (tgt.x - self.x) * t,
-            y=self.y + (tgt.y - self.y) * t
+            x=self.x + (target.x - self.x) * t,
+            y=self.y + (target.y - self.y) * t
         );
     }
 
@@ -105,10 +98,9 @@ frame Vec2 {
         return Vec2(x=-self.y, y=self.x);
     }
 
-    pub fn reflect(normal: any): Vec2 {
-        var n = normal as Vec2;
-        var d = self.dot(n) * 2.0;
-        return self.sub(n.scale(d));
+    pub fn reflect(normal: Vec2): Vec2 {
+        var d = self.dot(normal) * 2.0;
+        return self.sub(normal.scale(d));
     }
 
     pub fn clamp_length(max_len: float): Vec2 {
@@ -141,37 +133,33 @@ frame Rect {
         return px >= self.x and px <= (self.x + self.w) and py >= self.y and py <= (self.y + self.h);
     }
 
-    pub fn contains_vec(p: any): bool {
-        var pt = p as Vec2;
-        return self.contains(pt.x, pt.y);
+    pub fn contains_vec(p: Vec2): bool {
+        return self.contains(p.x, p.y);
     }
 
-    pub fn intersects(other: any): bool {
-        var o = other as Rect;
-        return not (self.x + self.w < o.x or
-                    o.x + o.w < self.x or
-                    self.y + self.h < o.y or
-                    o.y + o.h < self.y);
+    pub fn intersects(other: Rect): bool {
+        return not (self.x + self.w < other.x or
+                    other.x + other.w < self.x or
+                    self.y + self.h < other.y or
+                    other.y + other.h < self.y);
     }
 
-    pub fn intersection(other: any): Rect {
-        var o = other as Rect;
-        var ix = math.max(self.x, o.x);
-        var iy = math.max(self.y, o.y);
-        var rx = math.min(self.x + self.w, o.x + o.w);
-        var by = math.min(self.y + self.h, o.y + o.h);
+    pub fn intersection(other: Rect): Rect {
+        var ix = math.max(self.x, other.x);
+        var iy = math.max(self.y, other.y);
+        var rx = math.min(self.x + self.w, other.x + other.w);
+        var by = math.min(self.y + self.h, other.y + other.h);
         if (rx > ix and by > iy) {
             return Rect(x=ix, y=iy, w=rx - ix, h=by - iy);
         }
         return Rect();
     }
 
-    pub fn union_rect(other: any): Rect {
-        var o = other as Rect;
-        var min_x = math.min(self.x, o.x);
-        var min_y = math.min(self.y, o.y);
-        var max_x = math.max(self.x + self.w, o.x + o.w);
-        var max_y = math.max(self.y + self.h, o.y + o.h);
+    pub fn union_rect(other: Rect): Rect {
+        var min_x = math.min(self.x, other.x);
+        var min_y = math.min(self.y, other.y);
+        var max_x = math.max(self.x + self.w, other.x + other.w);
+        var max_y = math.max(self.y + self.h, other.y + other.h);
         return Rect(x=min_x, y=min_y, w=max_x - min_x, h=max_y - min_y);
     }
 
@@ -188,10 +176,9 @@ frame Rect {
         );
     }
 
-    pub fn clamp_point(p: any): Vec2 {
-        var pt = p as Vec2;
-        var cx = math.clamp(pt.x, self.x, self.x + self.w);
-        var cy = math.clamp(pt.y, self.y, self.y + self.h);
+    pub fn clamp_point(p: Vec2): Vec2 {
+        var cx = math.clamp(p.x, self.x, self.x + self.w);
+        var cy = math.clamp(p.y, self.y, self.y + self.h);
         return Vec2(x=cx, y=cy);
     }
 }
@@ -362,9 +349,9 @@ frame GUITheme {
     pub var press_duration: float;
     pub var enter_duration: float;
     pub var exit_duration: float;
-    pub var button_shadow: any;
-    pub var window_shadow: any;
-    pub var popup_shadow: any;
+    pub var button_shadow: Shadow?;
+    pub var window_shadow: Shadow?;
+    pub var popup_shadow: Shadow?;
 
     pub init() {
         // Modern game engine slate/dark palette
