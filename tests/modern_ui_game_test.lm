@@ -95,13 +95,13 @@ fn test_staged_and_generic_bindings() {
 fn test_nominal_event_and_fallible_dispatch() {
     print("=== Testing Nominal Enums & Fallible Event Dispatch ===");
     var evt = event.make_click_event("submit_button", 120.0, 45.0);
-    assert(evt.kind as str == "Click", "Event kind string reflection mismatch");
+    assert(evt.kind == event.EventKind.Click, "Event kind mismatch");
 
     var res = event.dispatch_event(evt)? else {
         assert(false, "Event dispatch failed unexpectedly");
         return;
     };
-    assert(res as str == "Handled", "Event result mismatch");
+    assert(res == event.EventResult.Handled, "Event result mismatch");
 
     // Test fire_action with nil and valid callbacks fallibly
     var executed: staged_ui.Binding(bool) = staged_ui.Binding(false);
@@ -112,14 +112,14 @@ fn test_nominal_event_and_fallible_dispatch() {
         event.EventResult.Ignored
     };
     assert(executed.get() == true, "fire_action did not invoke callback");
-    assert(act_res as str == "Handled", "fire_action result mismatch");
+    assert(act_res == event.EventResult.Handled, "fire_action result mismatch");
 
     // Nil action returns Ignored without crashing or throwing
     var nil_res = event.fire_action(nil)? else {
         assert(false, "nil action failed");
         event.EventResult.Unhandled
     };
-    assert(nil_res as str == "Ignored", "nil action should be Ignored");
+    assert(nil_res == event.EventResult.Ignored, "nil action should be Ignored");
 
     // Invalid target produces fallible error
     var invalid_evt = event.make_click_event("", 0.0, 0.0);

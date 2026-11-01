@@ -35,13 +35,24 @@ frame Color {
 }
 
 fn hex_digit(v: int): str {
-    if (v < 10) return v as str;
-    if (v == 10) return "a";
-    if (v == 11) return "b";
-    if (v == 12) return "c";
-    if (v == 13) return "d";
-    if (v == 14) return "e";
-    return "f";
+    match (v) {
+        0 => { return "0"; },
+        1 => { return "1"; },
+        2 => { return "2"; },
+        3 => { return "3"; },
+        4 => { return "4"; },
+        5 => { return "5"; },
+        6 => { return "6"; },
+        7 => { return "7"; },
+        8 => { return "8"; },
+        9 => { return "9"; },
+        10 => { return "a"; },
+        11 => { return "b"; },
+        12 => { return "c"; },
+        13 => { return "d"; },
+        14 => { return "e"; },
+        _ => { return "f"; }
+    }
 }
 
 fn hex_byte(v: int): str {
