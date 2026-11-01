@@ -2193,6 +2193,8 @@ TypePtr TypeChecker::check_member_expr(std::shared_ptr<LM::Frontend::AST::Member
             std::string alias = fData->name;
             std::string target_mod = import_aliases[alias];
             auto find_member = [&](const std::string& qname) -> TypePtr {
+                TypePtr found = lookup_variable(qname);
+                if (found) return found;
                 if (variable_types.count(qname)) return variable_types[qname];
                 std::string q_low = qname; for(char& c : q_low) c = std::tolower(c);
                 for (const auto& kv : variable_types) {
@@ -2204,7 +2206,14 @@ TypePtr TypeChecker::check_member_expr(std::shared_ptr<LM::Frontend::AST::Member
             TypePtr res = find_member(alias + "." + member_name);
             if (!res && !target_mod.empty()) res = find_member(target_mod + "." + member_name);
             if (!res) res = find_member(member_name);
-            if (!res) for (const auto& kv : variable_types) if (kv.first.ends_with("." + member_name)) { res = kv.second; break; }
+            if (!res && !target_mod.empty()) {
+                for (const auto& kv : variable_types) {
+                    if (kv.first.starts_with(target_mod + ".") && kv.first.ends_with("." + member_name)) {
+                        res = kv.second;
+                        break;
+                    }
+                }
+            }
             if (res) return wrap_result(res);
         }
     }

@@ -1,7 +1,8 @@
 // std/color/index.lm
-// Canonical Color frame, constructors, operations, palettes, and Tailwind integration.
+// Canonical Color frame, constructors, operations, palettes, and palette integration.
+
 // Color Palette Integration
-pub import std.color.tailwind show Shades, slate, zinc, orange, amber, lime, emerald, teal, sky, violet, purple, fuchsia, pink, rose, tw_red, tw_gray, tw_yellow, tw_green, tw_blue, tw_indigo, tw;
+pub import std.color.palette show Shades, shade, palette, slate, zinc, neutral, stone, orange, amber, lime, emerald, teal, sky, violet, purple, fuchsia, pink, rose, crimson, cool_gray, warm_gray, tw;
 
 import std.math as math;
 
@@ -137,8 +138,3 @@ pub const cyan: Color        = Color(r=0.20, g=0.85, b=0.90, a=1.0);
 pub const gray: Color        = Color(r=0.55, g=0.55, b=0.55, a=1.0);
 pub const dark_gray: Color   = Color(r=0.15, g=0.15, b=0.18, a=1.0);
 pub const light_gray: Color  = Color(r=0.85, g=0.85, b=0.88, a=1.0);
-
-
-
-// Tailwind CSS Palette Integration
-pub import std.color.tailwind show Shades, slate, zinc, orange, amber, lime, emerald, teal, sky, violet, purple, fuchsia, pink, rose, tw_red, tw_gray, tw_yellow, tw_green, tw_blue, tw_indigo, tw;

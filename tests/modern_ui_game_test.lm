@@ -16,16 +16,19 @@ import std.game as game;
 import std.game.components as gcomp;
 import std.game.types as gtypes;
 import std.color as color;
+import std.color.palette as palette;
 
 fn test_embedded_ui_components() {
     print("=== Testing Embedded UI Components ===");
     var btn = comp.Button("Submit");
-    btn.background(color.tw_indigo(600)).padding(12.0).corner_radius(6.0);
+    btn.background(palette.indigo(600)).padding(12.0).corner_radius(6.0);
 
     assert(btn.label == "Submit", "Button label mismatch");
     assert(btn.pad_l == 12.0, "Button pad_l mismatch");
     assert(btn.radius == 6.0, "Button corner radius mismatch");
     assert(btn.bg.to_hex() == "#4f46e5", "Button background hex mismatch");
+    assert(color.shade("indigo", 600).to_hex() == "#4f46e5", "color.shade mismatch");
+    assert(palette.red(500).to_hex() == "#ef4444", "palette.red mismatch");
 
     var lbl = comp.Label("Dashboard").color(color.white).font_size(20.0).bold();
     assert(lbl.text == "Dashboard", "Label text mismatch");

@@ -187,7 +187,7 @@ frame Slider {
         self.max_val = max_v;
         self.height_val = 20.0;
         self.bg = color.slate(800);
-        self.fg = color.tw_indigo(600);
+        self.fg = color.shade("indigo", 600);
     }
 
     pub fn set_range(min_v: float, max_v: float): Slider {
