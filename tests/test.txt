@@ -46,6 +46,7 @@ tests/modules/module_caching_test.lm
 tests/modules/function_params_test.lm
 tests/modules/alias_import_test.lm
 tests/modules/multiple_imports_test.lm
+tests/modules/enum_match_import_test.lm
 # LIR
 tests/lir/devirtualization_lir_test.lm
 # Optimizer
@@ -134,6 +135,10 @@ tests/stdlib/crypto/hash_test.lm
 tests/stdlib/serialization_test.lm
 # Stdlib - Net
 tests/stdlib/net/net_test.lm
+# Stdlib - Archive
+tests/stdlib/archive_test.lm
+# Stdlib - HTTP
+tests/stdlib/http_test.lm
 # Regression - Type Ownership Refactor
 tests/regression/ownership_refactor_test.lm
 # Regression - Trait Dispatch

@@ -74,9 +74,9 @@ bool resolve_match_variant_info(TypeSystem* type_system,
     // 1. Try to find variant directly in the provided match_type
     if (enum_type && (enum_type->tag == TypeTag::Enum || enum_type->tag == TypeTag::UserDefined || enum_type->tag == TypeTag::Frame)) {
         if (auto* enum_info = std::get_if<EnumType>(&enum_type->extra)) {
-            // Try unqualified name
+            // Try unqualified name (strip any `Alias.Enum.` prefix, keeping the trailing variant).
             std::string unqualified = variant_name;
-            if (unqualified.find('.') != std::string::npos) unqualified = unqualified.substr(unqualified.find('.') + 1);
+            if (unqualified.find_last_of('.') != std::string::npos) unqualified = unqualified.substr(unqualified.find_last_of('.') + 1);
             
             auto it = std::find(enum_info->values.begin(), enum_info->values.end(), unqualified);
             if (it != enum_info->values.end()) {

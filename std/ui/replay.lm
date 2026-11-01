@@ -12,28 +12,41 @@ pub fn replay(draw_list: dl.DrawList): nil {
     var n = len(draw_list.cmds);
     while (i < n) {
         var cmd = draw_list.cmds[i];
-        if (cmd.kind == dl.DCMD_RECT or cmd.kind == dl.DCMD_RECT_ROUNDED) {
-            // gg has no native rounded rect — use plain rect (visual parity to come when gg gains it)
-            gg.draw_rect_primitive(cmd.x, cmd.y, cmd.w, cmd.h, cmd.r, cmd.g, cmd.b, cmd.a);
-        } elif (cmd.kind == dl.DCMD_TEXT) {
-            var scale_i: int = 1;
-            if (cmd.font_scale >= 1.5) { scale_i = 2; }
-            gg.draw_text(cmd.text, cmd.x, cmd.y, cmd.r, cmd.g, cmd.b, cmd.a, scale_i);
-        } elif (cmd.kind == dl.DCMD_LINE) {
-            // Approximate line as a thin rect
-            var dx = cmd.x2 - cmd.x;
-            var dy = cmd.y2 - cmd.y;
-            if (dx < 0.0) { dx = -dx; }
-            if (dy < 0.0) { dy = -dy; }
-            if (dx > dy) {
-                gg.draw_rect_primitive(cmd.x, cmd.y, dx, 1.0, cmd.r, cmd.g, cmd.b, cmd.a);
-            } else {
-                gg.draw_rect_primitive(cmd.x, cmd.y, 1.0, dy, cmd.r, cmd.g, cmd.b, cmd.a);
-            }
-        } elif (cmd.kind == dl.DCMD_CLIP_PUSH) {
-            gg.push_clip(cmd.x, cmd.y, cmd.w, cmd.h);
-        } elif (cmd.kind == dl.DCMD_CLIP_POP) {
-            gg.pop_clip();
+        // Enum-valued dispatch via `match` (tag compare lowered over the DrawCmdKind
+        // variants). Qualified arms on an imported enum resolve against the scrutinee's
+        // own enum type, so no `==` fallback is needed here.
+        match (cmd.kind) {
+            dl.DrawCmdKind.Rect => {
+                gg.draw_rect_primitive(cmd.x, cmd.y, cmd.w, cmd.h, cmd.r, cmd.g, cmd.b, cmd.a);
+            },
+            dl.DrawCmdKind.RectRounded => {
+                // gg has no native rounded rect — use plain rect (visual parity to come when gg gains it)
+                gg.draw_rect_primitive(cmd.x, cmd.y, cmd.w, cmd.h, cmd.r, cmd.g, cmd.b, cmd.a);
+            },
+            dl.DrawCmdKind.Text => {
+                var scale_i: int = 1;
+                if (cmd.font_scale >= 1.5) { scale_i = 2; }
+                gg.draw_text(cmd.text, cmd.x, cmd.y, cmd.r, cmd.g, cmd.b, cmd.a, scale_i);
+            },
+            dl.DrawCmdKind.Line => {
+                // Approximate line as a thin rect
+                var dx = cmd.x2 - cmd.x;
+                var dy = cmd.y2 - cmd.y;
+                if (dx < 0.0) { dx = -dx; }
+                if (dy < 0.0) { dy = -dy; }
+                if (dx > dy) {
+                    gg.draw_rect_primitive(cmd.x, cmd.y, dx, 1.0, cmd.r, cmd.g, cmd.b, cmd.a);
+                } else {
+                    gg.draw_rect_primitive(cmd.x, cmd.y, 1.0, dy, cmd.r, cmd.g, cmd.b, cmd.a);
+                }
+            },
+            dl.DrawCmdKind.ClipPush => {
+                gg.push_clip(cmd.x, cmd.y, cmd.w, cmd.h);
+            },
+            dl.DrawCmdKind.ClipPop => {
+                gg.pop_clip();
+            },
+            _ => { }
         }
         i = i + 1;
     }

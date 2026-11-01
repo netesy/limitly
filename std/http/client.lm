@@ -5,6 +5,7 @@ import std.core show Error;
 import std.url.index as url;
 import std.net.dns as dns;
 import std.net.tcp as tcp;
+import std.http.common as common;
 
 // ---- HTTP Request / Response frames ----
 
@@ -14,27 +15,51 @@ frame HTTPRequest {
     pub var headers: {str: str};
     pub var body: str;
 
-    pub fn init(method: str, url_str: str) {
-        self.method = method;
+    pub init(method: str = "GET", url_str: str = "") {
+        self.method = _builtin_string_to_upper(method);
         self.url_str = url_str;
         self.headers = {} as {str: str};
         self.body = "";
-        // Set default headers
-        self.headers["User-Agent"] = "LymarHTTP/1.0";
-        self.headers["Accept"] = "*/*";
-        self.headers["Connection"] = "close";
+        // Default standard headers
+        self.headers["user-agent"] = common.DEFAULT_USER_AGENT;
+        self.headers["accept"] = "*/*";
+        self.headers["connection"] = "close";
     }
 
     pub fn set_header(name: str, value: str): HTTPRequest {
-        self.headers[name] = value;
+        var lower_name = _builtin_string_to_lower(_builtin_string_trim(name));
+        self.headers[lower_name] = value;
         return self;
     }
 
-    pub fn set_body(body: str, content_type: str): HTTPRequest {
+    pub fn header(name: str): str {
+        var lower_name = _builtin_string_to_lower(name);
+        if (self.headers[lower_name] != nil) {
+            return self.headers[lower_name];
+        }
+        return "";
+    }
+
+    pub fn set_body(body: str, content_type: str = ""): HTTPRequest {
         self.body = body;
-        if (content_type != "") self.headers["Content-Type"] = content_type;
-        self.headers["Content-Length"] = (len(body) as str);
+        if (content_type != "") {
+            self.set_header("content-type", content_type);
+        }
+        self.set_header("content-length", len(body) as str);
         return self;
+    }
+
+    pub fn set_json(json_str: str): HTTPRequest {
+        return self.set_body(json_str, common.MIME_APPLICATION_JSON);
+    }
+
+    pub fn set_form(params: {str: str}): HTTPRequest {
+        var form_body = common.build_query_string(params);
+        return self.set_body(form_body, common.MIME_APPLICATION_FORM);
+    }
+
+    pub fn set_bearer_token(token: str): HTTPRequest {
+        return self.set_header("authorization", "Bearer " + token);
     }
 }
 
@@ -45,11 +70,11 @@ frame HTTPResponse {
     pub var body: str;
     pub var protocol: str;
 
-    pub fn init() {
-        self.status_code = 0;
-        self.status_text = "";
+    pub init(status: int = 200, text: str = "OK", body_str: str = "") {
+        self.status_code = status;
+        self.status_text = text;
         self.headers = {} as {str: str};
-        self.body = "";
+        self.body = body_str;
         self.protocol = "HTTP/1.1";
     }
 
@@ -61,8 +86,44 @@ frame HTTPResponse {
         return self.status_code >= 300 and self.status_code < 400;
     }
 
-    pub fn header(name: str): str {
-        return self.headers[to_lower_header(name)];
+    pub fn is_error(): bool {
+        return self.status_code >= 400;
+    }
+
+    pub fn header(name: str, fallback: str = ""): str {
+        var lower_name = _builtin_string_to_lower(name);
+        if (self.headers[lower_name] != nil) {
+            return self.headers[lower_name];
+        }
+        return fallback;
+    }
+
+    pub fn content_type(): str {
+        return self.header("content-type", "");
+    }
+
+    pub fn content_length(): int {
+        var cl = self.header("content-length", "0");
+        return cl as int;
+    }
+
+    pub fn cookies(): {str: str} {
+        var cookie_hdr = self.header("set-cookie", "");
+        return common.parse_cookies(cookie_hdr);
+    }
+
+    pub fn cookie(name: str): str {
+        var c = self.cookies();
+        if (c[name] != nil) return c[name];
+        return "";
+    }
+
+    pub fn text(): str {
+        return self.body;
+    }
+
+    pub fn json(): str {
+        return self.body;
     }
 }
 
@@ -71,63 +132,121 @@ frame HTTPResponse {
 frame HTTPClient {
     pub var follow_redirects: bool;
     pub var max_redirects: int;
+    pub var default_headers: {str: str};
 
-    pub fn init() {
+    pub init() {
         self.follow_redirects = true;
         self.max_redirects = 10;
+        self.default_headers = {} as {str: str};
     }
 
-    pub fn get(url_str: str): HTTPResponse?core.Error {
+    pub fn set_header(name: str, value: str): HTTPClient {
+        var lower = _builtin_string_to_lower(name);
+        self.default_headers[lower] = value;
+        return self;
+    }
+
+    pub fn get(url_str: str): HTTPResponse?Error {
         var req = HTTPRequest("GET", url_str);
         return self.execute(req);
     }
 
-    pub fn post(url_str: str, body: str, content_type: str): HTTPResponse?core.Error {
+    pub fn post(url_str: str, body: str, content_type: str = "application/json"): HTTPResponse?Error {
         var req = HTTPRequest("POST", url_str);
         req.set_body(body, content_type);
         return self.execute(req);
     }
 
-    pub fn execute(req: HTTPRequest): HTTPResponse?core.Error {
+    pub fn put(url_str: str, body: str, content_type: str = "application/json"): HTTPResponse?Error {
+        var req = HTTPRequest("PUT", url_str);
+        req.set_body(body, content_type);
+        return self.execute(req);
+    }
+
+    pub fn delete(url_str: str): HTTPResponse?Error {
+        var req = HTTPRequest("DELETE", url_str);
+        return self.execute(req);
+    }
+
+    pub fn patch(url_str: str, body: str, content_type: str = "application/json"): HTTPResponse?Error {
+        var req = HTTPRequest("PATCH", url_str);
+        req.set_body(body, content_type);
+        return self.execute(req);
+    }
+
+    pub fn head(url_str: str): HTTPResponse?Error {
+        var req = HTTPRequest("HEAD", url_str);
+        return self.execute(req);
+    }
+
+    pub fn execute(req: HTTPRequest): HTTPResponse?Error {
         var redirect_count = 0;
         var current_req = req;
 
         while (redirect_count <= self.max_redirects) {
             var resp = self.execute_single(current_req)?;
             if (self.follow_redirects and resp.is_redirect()) {
-                var location = resp.header("Location");
+                var location = resp.header("location", "");
                 if (location == "") return ok(resp);
 
-                // Simple redirect handling
                 current_req = HTTPRequest(current_req.method, location);
                 redirect_count = redirect_count + 1;
             } else {
                 return ok(resp);
             }
         }
-        return err(Error(code="ERR", message="too many redirects"));
+        return err(Error(code="RedirectError", message="too many redirects"));
     }
 
-    fn execute_single(req: HTTPRequest): HTTPResponse?core.Error {
+    fn execute_single(req: HTTPRequest): HTTPResponse?Error {
         var parsed = url.URL(req.url_str);
-        if (not parsed.is_valid) return err(Error(code="ERR", message="invalid URL"));
+        if (not parsed.is_valid) return err(Error(code="URLError", message="invalid URL"));
 
-        var d = dns.DNS();
-        var host = d.resolve_or_passthrough(parsed.host)?;
+        var host_ip = dns.resolve_or_passthrough(parsed.host)?;
+
+        var port = parsed.port;
+        if (port <= 0) {
+            if (parsed.scheme == "https") {
+                port = 443;
+            } else {
+                port = 80;
+            }
+        }
 
         var client = tcp.TCPClient();
-        client.connect(host, parsed.port)?;
+        client.connect(host_ip, port)?;
 
-        // Build request
-        var full_request = req.method + " " + parsed.path;
+        // Apply client default headers to request
+        iter (dk, dv in self.default_headers) {
+            if (req.headers[dk] == nil) {
+                req.headers[dk] = dv;
+            }
+        }
+
+        // Build request line
+        var path_str = parsed.path;
+        if (path_str == "") path_str = "/";
+        var full_request = req.method + " " + path_str;
         if (parsed.query != "") full_request = full_request + "?" + parsed.query;
         full_request = full_request + " HTTP/1.1\r\n";
         
-        full_request = full_request + "Host: " + parsed.host + "\r\n";
-        // Serialize other headers...
-        full_request = full_request + "Connection: close\r\n";
-        if (len(req.body) > 0) {
-            full_request = full_request + "Content-Length: " + (len(req.body) as str) + "\r\n";
+        // Host header
+        full_request = full_request + "Host: " + parsed.host;
+        if (parsed.port > 0 and parsed.port != 80 and parsed.port != 443) {
+            full_request = full_request + ":" + (parsed.port as str);
+        }
+        full_request = full_request + "\r\n";
+
+        // Serialize all request headers
+        iter (hname, hval in req.headers) {
+            if (hname != "host") {
+                full_request = full_request + hname + ": " + hval + "\r\n";
+            }
+        }
+
+        // Content-Length for body if not set
+        if (len(req.body) > 0 and req.headers["content-length"] == nil) {
+            full_request = full_request + "content-length: " + (len(req.body) as str) + "\r\n";
         }
         full_request = full_request + "\r\n" + req.body;
 
@@ -141,7 +260,11 @@ frame HTTPClient {
                 "";
             };
             if (reading) {
-                response_data = response_data + chunk;
+                if (len(chunk) == 0) {
+                    reading = false;
+                } else {
+                    response_data = response_data + chunk;
+                }
             }
         }
         client.close()?;
@@ -150,83 +273,88 @@ frame HTTPClient {
     }
 }
 
-fn parse_http_response(raw: str): HTTPResponse {
+pub fn parse_http_response(raw: str): HTTPResponse {
     var resp = HTTPResponse();
-    var header_end = index_of_str(raw, "\r\n\r\n");
-    if (header_end == -1) return resp;
-
-    var header_section = substring(raw, 0, header_end);
-    resp.body = substring(raw, header_end + 4, len(raw));
-
-    var lines = split_str_simple(header_section, "\r\n");
-    if (len(lines) > 0) {
-        var parts = split_str_simple(lines[0], " ");
-        if (len(parts) >= 3) {
-            resp.protocol = parts[0];
-            resp.status_code = parts[1] as int;
-            resp.status_text = parts[2];
+    var header_end = _builtin_string_index_of(raw, "\r\n\r\n");
+    if (header_end == -1) {
+        header_end = _builtin_string_index_of(raw, "\n\n");
+        if (header_end == -1) {
+            resp.body = raw;
+            return resp;
         }
+        var header_sec = _builtin_substring(raw, 0, header_end);
+        resp.body = _builtin_substring(raw, header_end + 2, len(raw));
+        populate_response_headers(resp, header_sec);
+        return resp;
     }
 
-    for (var i = 1; i < len(lines); i = i + 1) {
-        var line = lines[i];
-        var colon = index_of_str(line, ":");
-        if (colon != -1) {
-            var name = to_lower_header(substring(line, 0, colon));
-            var value = trim_str(substring(line, colon + 1, len(line)));
-            resp.headers[name] = value;
-        }
-    }
-
+    var header_section = _builtin_substring(raw, 0, header_end);
+    resp.body = _builtin_substring(raw, header_end + 4, len(raw));
+    populate_response_headers(resp, header_section);
     return resp;
 }
 
-fn to_lower_header(s: str): str {
-    var res = "";
-    for (var i = 0; i < len(s); i = i + 1) {
-        var ch = substring(s, i, i + 1);
-        if (ch >= "A" and ch <= "Z") {
-            // Approximation for lowercasing
-            res = res + ch; // Should be proper lowercase
-        } else {
-            res = res + ch;
-        }
-    }
-    return res;
-}
-
-fn trim_str(s: str): str {
-    var start = 0;
-    while (start < len(s) and substring(s, start, start + 1) == " ") start = start + 1;
-    var end = len(s) - 1;
-    while (end >= start and substring(s, end, end + 1) == " ") end = end - 1;
-    if (start > end) return "";
-    return substring(s, start, end + 1);
-}
-
-fn index_of_str(s: str, pattern: str): int {
-    for (var i = 0; i <= len(s) - len(pattern); i = i + 1) {
-        if (substring(s, i, i + len(pattern)) == pattern) return i;
-    }
-    return -1;
-}
-
-fn split_str_simple(s: str, delimiter: str): [str] {
-    var parts: [str] = [];
-    var current = "";
+fn populate_response_headers(resp: HTTPResponse, header_section: str) {
+    var lines: [str] = [];
+    var curr = "";
     var i = 0;
-    while (i < len(s)) {
-        if (i <= len(s) - len(delimiter) and substring(s, i, i + len(delimiter)) == delimiter) {
-            parts = parts + [current];
-            current = "";
-            i = i + len(delimiter);
+    while (i < len(header_section)) {
+        var ch = _builtin_substring(header_section, i, i + 1);
+        if (ch == "\n") {
+            if (len(curr) > 0 and _builtin_substring(curr, len(curr) - 1, len(curr)) == "\r") {
+                curr = _builtin_substring(curr, 0, len(curr) - 1);
+            }
+            lines.append(curr);
+            curr = "";
         } else {
-            current = current + substring(s, i, i + 1);
-            i = i + 1;
+            curr = curr + ch;
         }
+        i = i + 1;
     }
-    parts = parts + [current];
-    return parts;
+    if (len(curr) > 0) lines.append(curr);
+
+    if (len(lines) > 0) {
+        var status_parts = common.parse_status_line(lines[0]);
+        if (len(status_parts) >= 1) resp.protocol = status_parts[0];
+        if (len(status_parts) >= 2) resp.status_code = status_parts[1] as int;
+        if (len(status_parts) >= 3) resp.status_text = status_parts[2];
+    }
+
+    var idx = 1;
+    while (idx < len(lines)) {
+        var line = lines[idx];
+        var colon = _builtin_string_index_of(line, ":");
+        if (colon > 0) {
+            var name = _builtin_string_to_lower(_builtin_string_trim(_builtin_substring(line, 0, colon)));
+            var value = _builtin_string_trim(_builtin_substring(line, colon + 1, len(line)));
+            resp.headers[name] = value;
+        }
+        idx = idx + 1;
+    }
+}
+
+pub fn get(url_str: str): HTTPResponse?Error {
+    if (url_str == "") return err(Error(code="URLError", message="empty URL"));
+    var client = HTTPClient();
+    return client.get(url_str);
+}
+
+pub fn post(url_str: str, body: str, content_type: str = "application/json"): HTTPResponse?Error {
+    if (url_str == "") return err(Error(code="URLError", message="empty URL"));
+    var client = HTTPClient();
+    return client.post(url_str, body, content_type);
+}
+
+pub fn put(url_str: str, body: str, content_type: str = "application/json"): HTTPResponse?Error {
+    if (url_str == "") return err(Error(code="URLError", message="empty URL"));
+    var client = HTTPClient();
+    return client.put(url_str, body, content_type);
+}
+
+pub fn delete(url_str: str): HTTPResponse?Error {
+    if (url_str == "") return err(Error(code="URLError", message="empty URL"));
+    var client = HTTPClient();
+    return client.delete(url_str);
 }
 
 frame HTTP2Stream {
@@ -243,7 +371,9 @@ frame HTTP2Stream {
     }
 
     pub fn send_headers(headers: {str: str}): bool {
-        self.headers = headers;
+        iter (k, v in headers) {
+            self.headers[k] = v;
+        }
         return true;
     }
 
@@ -251,6 +381,10 @@ frame HTTP2Stream {
         self.body = self.body + data;
         if (end_stream) self.state = "half_closed";
         return true;
+    }
+
+    pub fn close(): nil {
+        self.state = "closed";
     }
 }
 
@@ -270,14 +404,16 @@ frame HTTP3Client {
         return true;
     }
 
-    pub fn request(req: HTTPRequest): HTTPResponse?core.Error {
+    pub fn request(req: HTTPRequest): HTTPResponse?Error {
         if (!self.is_quic_connected) {
             self.connect();
         }
-        var resp = HTTPResponse();
+        var resp = HTTPResponse(200, "OK", "");
         resp.protocol = "HTTP/3.0";
-        resp.status_code = 200;
-        resp.status_text = "OK";
         return ok(resp);
+    }
+
+    pub fn close(): nil {
+        self.is_quic_connected = false;
     }
 }

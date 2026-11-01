@@ -1,0 +1,14 @@
+// tests/modules/enum_kind_lib.lm
+// Helper module for cross-module enum `match` regression testing.
+enum Shape {
+    Circle,
+    Square,
+    Rect(int, int),
+    Point
+}
+
+// Factories so the consumer can obtain enum values without re-deriving the
+// construction path (this test targets `match` pattern resolution, not builders).
+pub fn make_circle(): Shape { return Shape.Circle; }
+pub fn make_square(): Shape { return Shape.Square; }
+pub fn make_rect(w: int, h: int): Shape { return Shape.Rect(w, h); }

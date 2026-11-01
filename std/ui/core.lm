@@ -2,9 +2,7 @@
 import std.ui.types as ui_types;
 
 // Re-export fundamental types
-pub var Widget = ui_types.Widget;
-pub var Style = ui_types.Style;
-pub var Color = ui_types.Color;
+pub import std.ui.types show Widget, Style, Color;
 
 // Core utility functions
 pub fn style(): ui_types.Style {

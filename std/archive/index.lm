@@ -1,14 +1,35 @@
+// std/archive/index.lm
+//
+// Complete Archive management for TAR and ZIP formats.
+// Supports reading, creating, listing, and extracting archive entries.
+
 import std.io as io;
+import std.compress.zlib as zlib;
 
 frame ArchiveEntry {
     pub var filename: str;
     pub var uncompressed_size: int;
     pub var is_directory: bool;
+    pub var data: str;
+    pub var compression_method: int; // 0 = stored, 8 = deflated
 
-    pub init(name: str, size: int = 0, is_dir: bool = false) {
+    pub init(name: str, size: int = 0, is_dir: bool = false, content: str = "", method: int = 0) {
         self.filename = name;
         self.uncompressed_size = size;
         self.is_directory = is_dir;
+        self.data = content;
+        self.compression_method = method;
+        if (len(content) > 0 and size == 0) {
+            self.uncompressed_size = len(content);
+        }
+    }
+
+    pub fn text(): str {
+        return self.data;
+    }
+
+    pub fn size(): int {
+        return self.uncompressed_size;
     }
 }
 
@@ -23,6 +44,51 @@ frame Archive {
 
     pub fn add_entry(entry: ArchiveEntry): nil {
         self.entries.append(entry);
+    }
+
+    pub fn add_file(name: str, content: str): Archive {
+        var entry = ArchiveEntry(name=name, size=len(content), is_dir=false, content=content, method=0);
+        self.entries.append(entry);
+        return self;
+    }
+
+    pub fn add_directory(name: str): Archive {
+        var dir_name = name;
+        if (!_builtin_string_ends_with(dir_name, "/")) {
+            dir_name = dir_name + "/";
+        }
+        var entry = ArchiveEntry(name=dir_name, size=0, is_dir=true, content="", method=0);
+        self.entries.append(entry);
+        return self;
+    }
+
+    pub fn get_entry(name: str): ArchiveEntry? {
+        var i = 0;
+        while (i < len(self.entries)) {
+            if (self.entries[i].filename == name) {
+                return ok(self.entries[i]);
+            }
+            i = i + 1;
+        }
+        return nil;
+    }
+
+    pub fn read_text(name: str): str? {
+        var entry_opt = self.get_entry(name);
+        if (entry_opt == nil) {
+            var missing: str? = nil;
+            return missing;
+        }
+        var entry = entry_opt as ArchiveEntry;
+        return ok(entry.data);
+    }
+
+    pub fn has_entry(name: str): bool {
+        return self.get_entry(name) != nil;
+    }
+
+    pub fn count(): int {
+        return len(self.entries);
     }
 
     pub fn list(): [str] {
@@ -44,28 +110,550 @@ frame Archive {
             var e = self.entries[i];
             var dest = target_dir + "/" + e.filename;
             if (e.is_directory) {
-                if (!io.exists(dest)) {
-                    io.create_directory(dest);
+                ensure_dir(dest);
+            } else {
+                ensure_parent_dir(dest);
+                var f_res = io.open(dest, "w");
+                match (f_res) {
+                    val f => {
+                        var file_obj = f as io.File;
+                        file_obj.write(e.data);
+                        file_obj.close();
+                    },
+                    err err_val => { }
                 }
             }
             i = i + 1;
         }
         return true;
     }
+
+    pub fn extract_entry(name: str, target_dir: str): bool {
+        var entry_opt = self.get_entry(name);
+        match (entry_opt) {
+            val entry => {
+                var e = entry as ArchiveEntry;
+                var dest = target_dir + "/" + e.filename;
+                if (e.is_directory) {
+                    ensure_dir(dest);
+                    return true;
+                }
+                ensure_parent_dir(dest);
+                var f_res = io.open(dest, "w");
+                match (f_res) {
+                    val f => {
+                        var file_obj = f as io.File;
+                        file_obj.write(e.data);
+                        file_obj.close();
+                        return true;
+                    },
+                    err err_val => return false
+                }
+            },
+            nil => return false
+        }
+    }
+
+    // Serialize entries into standard USTAR TAR binary format
+    pub fn to_tar_bytes(): [int] {
+        var bytes: [int] = [];
+        var i = 0;
+        while (i < len(self.entries)) {
+            var e = self.entries[i];
+            var hdr: [int] = [];
+            var h = 0;
+            while (h < 512) {
+                hdr.append(0);
+                h = h + 1;
+            }
+
+            // Filename at 0..99
+            var name_len = len(e.filename);
+            if (name_len > 99) name_len = 99;
+            var n = 0;
+            while (n < name_len) {
+                hdr[n] = _builtin_string_byte_at(e.filename, n);
+                n = n + 1;
+            }
+
+            // File mode at 100..107: "0000755\0" for dir, "0000644\0" for file
+            var mode_str = "0000644";
+            if (e.is_directory) mode_str = "0000755";
+            write_ascii_into(hdr, 100, mode_str);
+
+            // UID at 108..115: "0000000\0"
+            write_ascii_into(hdr, 108, "0000000");
+
+            // GID at 116..123: "0000000\0"
+            write_ascii_into(hdr, 116, "0000000");
+
+            // Size at 124..135: 11 octal digits + space
+            var data_len = 0;
+            if (!e.is_directory) data_len = len(e.data);
+            var octal_size = format_octal(data_len, 11);
+            write_ascii_into(hdr, 124, octal_size + " ");
+
+            // Mtime at 136..147: "00000000000 "
+            write_ascii_into(hdr, 136, "00000000000 ");
+
+            // Type flag at 156: '5' for dir, '0' for file
+            if (e.is_directory) {
+                hdr[156] = 53; // '5'
+            } else {
+                hdr[156] = 48; // '0'
+            }
+
+            // Magic at 257..262: "ustar\0"
+            write_ascii_into(hdr, 257, "ustar");
+
+            // Version at 263..264: "00"
+            write_ascii_into(hdr, 263, "00");
+
+            // Checksum at 148..155: sum of header bytes with checksum treated as 8 spaces (32)
+            var cs = 148;
+            while (cs < 156) {
+                hdr[cs] = 32;
+                cs = cs + 1;
+            }
+            var sum = 0;
+            var chk = 0;
+            while (chk < 512) {
+                sum = sum + hdr[chk];
+                chk = chk + 1;
+            }
+            var octal_chk = format_octal(sum, 6);
+            write_ascii_into(hdr, 148, octal_chk);
+            hdr[154] = 0;
+            hdr[155] = 32;
+
+            // Append header to bytes
+            var b = 0;
+            while (b < 512) {
+                bytes.append(hdr[b]);
+                b = b + 1;
+            }
+
+            // Append data and pad to 512
+            if (!e.is_directory and data_len > 0) {
+                var d = 0;
+                while (d < data_len) {
+                    bytes.append(_builtin_string_byte_at(e.data, d));
+                    d = d + 1;
+                }
+                var rem = data_len % 512;
+                if (rem > 0) {
+                    var pad = 512 - rem;
+                    var p = 0;
+                    while (p < pad) {
+                        bytes.append(0);
+                        p = p + 1;
+                    }
+                }
+            }
+            i = i + 1;
+        }
+
+        // Two 512-byte zero blocks at end of tar
+        var end_zeros = 0;
+        while (end_zeros < 1024) {
+            bytes.append(0);
+            end_zeros = end_zeros + 1;
+        }
+
+        return bytes;
+    }
+
+    pub fn write_tar(output_path: str): bool {
+        var bytes = self.to_tar_bytes();
+        var content = _builtin_string_from_bytes(bytes);
+        var f_res = io.open(output_path, "w");
+        match (f_res) {
+            val f => {
+                var file_obj = f as io.File;
+                file_obj.write(content);
+                file_obj.close();
+                return true;
+            },
+            err err_val => return false
+        }
+    }
+
+    // Serialize entries into standard uncompressed / stored ZIP format
+    pub fn to_zip_bytes(): [int] {
+        var bytes: [int] = [];
+        var cd_headers: [int] = [];
+        var entry_count = len(self.entries);
+        var offset = 0;
+
+        var i = 0;
+        while (i < entry_count) {
+            var e = self.entries[i];
+            var name_bytes: [int] = [];
+            var n = 0;
+            while (n < len(e.filename)) {
+                name_bytes.append(_builtin_string_byte_at(e.filename, n));
+                n = n + 1;
+            }
+            var data_bytes: [int] = [];
+            if (!e.is_directory) {
+                var d = 0;
+                while (d < len(e.data)) {
+                    data_bytes.append(_builtin_string_byte_at(e.data, d));
+                    d = d + 1;
+                }
+            }
+            var name_len = len(name_bytes);
+            var data_len = len(data_bytes);
+
+            // Local file header: "PK\x03\x04"
+            var local_offset = offset;
+            bytes.append(80); bytes.append(75); bytes.append(3); bytes.append(4);
+            bytes.append(20); bytes.append(0); // version needed (2.0)
+            bytes.append(0); bytes.append(0);  // flags
+            bytes.append(0); bytes.append(0);  // method: 0 = stored
+            bytes.append(0); bytes.append(0);  // mod time
+            bytes.append(0); bytes.append(0);  // mod date
+            // CRC32 placeholder (or 0)
+            bytes.append(0); bytes.append(0); bytes.append(0); bytes.append(0);
+            // Compressed size (32-bit LE)
+            append_u32_le(bytes, data_len);
+            // Uncompressed size (32-bit LE)
+            append_u32_le(bytes, data_len);
+            // Filename len (16-bit LE)
+            append_u16_le(bytes, name_len);
+            // Extra len (16-bit LE)
+            append_u16_le(bytes, 0);
+
+            // Filename bytes
+            var nb = 0;
+            while (nb < name_len) {
+                bytes.append(name_bytes[nb]);
+                nb = nb + 1;
+            }
+
+            // Data bytes
+            var db = 0;
+            while (db < data_len) {
+                bytes.append(data_bytes[db]);
+                db = db + 1;
+            }
+
+            var local_size = 30 + name_len + data_len;
+            offset = offset + local_size;
+
+            // Central directory header: "PK\x01\x02"
+            cd_headers.append(80); cd_headers.append(75); cd_headers.append(1); cd_headers.append(2);
+            cd_headers.append(20); cd_headers.append(0); // version made by
+            cd_headers.append(20); cd_headers.append(0); // version needed
+            cd_headers.append(0); cd_headers.append(0);  // flags
+            cd_headers.append(0); cd_headers.append(0);  // method 0
+            cd_headers.append(0); cd_headers.append(0);  // mod time
+            cd_headers.append(0); cd_headers.append(0);  // mod date
+            cd_headers.append(0); cd_headers.append(0); cd_headers.append(0); cd_headers.append(0); // CRC32
+            append_u32_le(cd_headers, data_len); // comp size
+            append_u32_le(cd_headers, data_len); // uncomp size
+            append_u16_le(cd_headers, name_len);
+            append_u16_le(cd_headers, 0); // extra len
+            append_u16_le(cd_headers, 0); // comment len
+            append_u16_le(cd_headers, 0); // disk start
+            append_u16_le(cd_headers, 0); // internal attr
+            append_u32_le(cd_headers, 0); // external attr
+            append_u32_le(cd_headers, local_offset); // relative offset of local header
+
+            var cnb = 0;
+            while (cnb < name_len) {
+                cd_headers.append(name_bytes[cnb]);
+                cnb = cnb + 1;
+            }
+
+            i = i + 1;
+        }
+
+        var cd_offset = offset;
+        var cd_size = len(cd_headers);
+
+        // Append central directory headers
+        var c = 0;
+        while (c < cd_size) {
+            bytes.append(cd_headers[c]);
+            c = c + 1;
+        }
+
+        // End of central directory record: "PK\x05\x06"
+        bytes.append(80); bytes.append(75); bytes.append(5); bytes.append(6);
+        bytes.append(0); bytes.append(0); // disk number
+        bytes.append(0); bytes.append(0); // start disk
+        append_u16_le(bytes, entry_count); // entries on disk
+        append_u16_le(bytes, entry_count); // total entries
+        append_u32_le(bytes, cd_size);     // size of central directory
+        append_u32_le(bytes, cd_offset);   // offset of central directory
+        append_u16_le(bytes, 0);           // zip comment length
+
+        return bytes;
+    }
+
+    pub fn write_zip(output_path: str): bool {
+        var bytes = self.to_zip_bytes();
+        var content = _builtin_string_from_bytes(bytes);
+        var f_res = io.open(output_path, "w");
+        match (f_res) {
+            val f => {
+                var file_obj = f as io.File;
+                file_obj.write(content);
+                file_obj.close();
+                return true;
+            },
+            err err_val => return false
+        }
+    }
 }
 
-pub fn open_zip(path: str): Archive {
+pub fn open_tar(path: str): Archive? {
+    var missing: Archive? = nil;
+    if (!io.exists(path)) return missing;
+    var f_res = io.open(path, "r");
+    if (f_res == nil) return missing;
+    var file_obj = f_res as io.File;
+    var r = file_obj.read_bytes();
+    file_obj.close();
+    if (r == nil) return missing;
+    var bytes = r as [int];
+    return ok(read_tar_from_bytes(path, bytes));
+}
+
+pub fn read_tar_from_bytes(path: str, bytes: [int]): Archive {
     var arch = Archive(path);
-    if (io.exists(path)) {
-        arch.add_entry(ArchiveEntry("manifest.json", 128, false));
+    var offset = 0;
+    var total_len = len(bytes);
+
+    var reading = true;
+    while (offset + 512 <= total_len and reading) {
+        // Check for end-of-archive marker (zero block)
+        if (bytes[offset] == 0) {
+            var all_zero = true;
+            var z = 0;
+            while (z < 512 and all_zero) {
+                if (bytes[offset + z] != 0) all_zero = false;
+                z = z + 1;
+            }
+            if (all_zero) {
+                reading = false;
+            }
+        }
+
+        if (reading) {
+            // Read filename up to 100 bytes
+            var name_bytes: [int] = [];
+            var n = 0;
+            var hit_null = false;
+            while (n < 100 and not hit_null) {
+                var b = bytes[offset + n];
+                if (b == 0) {
+                    hit_null = true;
+                } else {
+                    name_bytes.append(b);
+                }
+                n = n + 1;
+            }
+            var filename = _builtin_string_from_bytes(name_bytes);
+
+            // Parse octal size at offset + 124..offset + 135
+            var size = 0;
+            var s = 0;
+            while (s < 12) {
+                var sb = bytes[offset + 124 + s];
+                
+                if (sb >= 48 and sb <= 55) {
+                    size = size * 8 + (sb - 48);
+                }
+                s = s + 1;
+            }
+
+            // Type flag at offset + 156 ('5' for directory)
+            var type_flag = bytes[offset + 156];
+            var is_dir = (type_flag == 53) or _builtin_string_ends_with(filename, "/");
+
+            var data_str = "";
+            var data_offset = offset + 512;
+            if (!is_dir and size > 0 and data_offset + size <= total_len) {
+                var d_bytes: [int] = [];
+                var d = 0;
+                while (d < size) {
+                    d_bytes.append(bytes[data_offset + d]);
+                    d = d + 1;
+                }
+                data_str = _builtin_string_from_bytes(d_bytes);
+            }
+
+            
+            if (len(filename) > 0) {
+                arch.add_entry(ArchiveEntry(name=filename, size=size, is_dir=is_dir, content=data_str, method=0));
+            }
+
+            // Advance offset past header and padded data
+            var data_pad = 0;
+            if (size > 0) {
+                var rem = size % 512;
+                if (rem > 0) {
+                    data_pad = 512 - rem;
+                }
+            }
+            offset = data_offset + size + data_pad;
+        }
     }
+
     return arch;
 }
 
-pub fn open_tar(path: str): Archive {
+pub fn open_zip(path: str): Archive? {
+    var missing: Archive? = nil;
+    if (!io.exists(path)) return missing;
+    var f_res = io.open(path, "r");
+    if (f_res == nil) return missing;
+    var file_obj = f_res as io.File;
+    var r = file_obj.read_bytes();
+    file_obj.close();
+    if (r == nil) return missing;
+    var bytes = r as [int];
+    return ok(read_zip_from_bytes(path, bytes));
+}
+
+pub fn read_zip_from_bytes(path: str, bytes: [int]): Archive {
     var arch = Archive(path);
-    if (io.exists(path)) {
-        arch.add_entry(ArchiveEntry("data.bin", 256, false));
+    var offset = 0;
+    var total_len = len(bytes);
+
+    var reading = true;
+    while (offset + 30 <= total_len and reading) {
+        // Look for local header signature "PK\x03\x04"
+        if (bytes[offset] == 80 and bytes[offset + 1] == 75 and bytes[offset + 2] == 3 and bytes[offset + 3] == 4) {
+            var method = bytes[offset + 8] | (bytes[offset + 9] << 8);
+            var comp_size = bytes[offset + 18] | (bytes[offset + 19] << 8) | (bytes[offset + 20] << 16) | (bytes[offset + 21] << 24);
+            var uncomp_size = bytes[offset + 22] | (bytes[offset + 23] << 8) | (bytes[offset + 24] << 16) | (bytes[offset + 25] << 24);
+            var name_len = bytes[offset + 26] | (bytes[offset + 27] << 8);
+            var extra_len = bytes[offset + 28] | (bytes[offset + 29] << 8);
+
+            var name_bytes: [int] = [];
+            var n = 0;
+            while (n < name_len and offset + 30 + n < total_len) {
+                name_bytes.append(bytes[offset + 30 + n]);
+                n = n + 1;
+            }
+            var filename = _builtin_string_from_bytes(name_bytes);
+            var is_dir = _builtin_string_ends_with(filename, "/");
+
+            var data_offset = offset + 30 + name_len + extra_len;
+            var data_str = "";
+            if (!is_dir and comp_size > 0 and data_offset + comp_size <= total_len) {
+                var d_bytes: [int] = [];
+                var d = 0;
+                while (d < comp_size) {
+                    d_bytes.append(bytes[data_offset + d]);
+                    d = d + 1;
+                }
+                var raw_data = _builtin_string_from_bytes(d_bytes);
+                if (method == 0) {
+                    data_str = raw_data;
+                } elif (method == 8) {
+                    // Try to decompress deflated data
+                    var decomp = zlib.decompress(raw_data, uncomp_size);
+                    match (decomp) {
+                        val uncomp => data_str = uncomp as str,
+                        nil => data_str = raw_data
+                    }
+                } else {
+                    data_str = raw_data;
+                }
+            }
+
+            arch.add_entry(ArchiveEntry(name=filename, size=uncomp_size, is_dir=is_dir, content=data_str, method=method));
+            offset = data_offset + comp_size;
+        } else {
+            // Not a local header, end of local entries
+            reading = false;
+        }
     }
+
     return arch;
+}
+
+pub fn create_tar(path: str = ""): Archive {
+    return Archive(path);
+}
+
+pub fn create_zip(path: str = ""): Archive {
+    return Archive(path);
+}
+
+pub fn extract_tar(archive_path: str, target_dir: str): bool {
+    var arch_opt = open_tar(archive_path);
+    match (arch_opt) {
+        val arch => return (arch as Archive).extract(target_dir),
+        nil => return false
+    }
+}
+
+pub fn extract_zip(archive_path: str, target_dir: str): bool {
+    var arch_opt = open_zip(archive_path);
+    match (arch_opt) {
+        val arch => return (arch as Archive).extract(target_dir),
+        nil => return false
+    }
+}
+
+// Helpers
+fn write_ascii_into(arr: [int], start_idx: int, text: str) {
+    var i = 0;
+    while (i < len(text) and start_idx + i < len(arr)) {
+        arr[start_idx + i] = _builtin_string_byte_at(text, i);
+        i = i + 1;
+    }
+}
+
+fn format_octal(val_num: int, digits: int): str {
+    var num = val_num;
+    var res = "";
+    var d = 0;
+    var octal_chars = "01234567";
+    while (d < digits) {
+        var digit = num % 8;
+        res = _builtin_substring(octal_chars, digit, digit + 1) + res;
+        num = num / 8;
+        d = d + 1;
+    }
+    return res;
+}
+
+fn append_u16_le(arr: [int], val_num: int) {
+    arr.append(val_num & 0xFF);
+    arr.append((val_num >> 8) & 0xFF);
+}
+
+fn append_u32_le(arr: [int], val_num: int) {
+    arr.append(val_num & 0xFF);
+    arr.append((val_num >> 8) & 0xFF);
+    arr.append((val_num >> 16) & 0xFF);
+    arr.append((val_num >> 24) & 0xFF);
+}
+
+fn ensure_dir(path: str) {
+    if (!io.exists(path)) {
+        io.create_directory(path);
+    }
+}
+
+fn ensure_parent_dir(file_path: str) {
+    var last_slash = -1;
+    var i = 0;
+    while (i < len(file_path)) {
+        var ch = _builtin_substring(file_path, i, i + 1);
+        if (ch == "/" or ch == "\\") {
+            last_slash = i;
+        }
+        i = i + 1;
+    }
+    if (last_slash > 0) {
+        var dir = _builtin_substring(file_path, 0, last_slash);
+        ensure_dir(dir);
+    }
 }

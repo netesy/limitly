@@ -1,0 +1,60 @@
+// Archive test
+import std.archive as archive;
+import std.io as io;
+
+print("=== Archive Tests ===");
+
+var arch = archive.Archive("test.tar");
+arch.add_file("hello.txt", "Hello, Lymar World!");
+arch.add_file("subdir/test.txt", "status: ok");
+arch.add_directory("emptydir/");
+
+assert(arch.count() == 3, "count is 3");
+assert(arch.has_entry("hello.txt"), "has hello.txt");
+assert(arch.has_entry("subdir/test.txt"), "has subdir/test.txt");
+assert(arch.has_entry("emptydir/"), "has emptydir/");
+
+var names = arch.list();
+assert(len(names) == 3, "list len is 3");
+
+var entry_opt = arch.get_entry("hello.txt");
+assert(entry_opt != nil, "get_entry returned non-nil");
+match (entry_opt) {
+    val e => {
+        var entry = e as archive.ArchiveEntry;
+        assert(entry.text() == "Hello, Lymar World!", "entry content matches");
+        assert(entry.size() == 19, "entry size matches");
+    },
+    nil => assert(false, "entry was nil")
+}
+
+// Test tar bytes generation and round-trip
+var tar_bytes = arch.to_tar_bytes();
+assert(len(tar_bytes) >= 512 * 4, "tar bytes has at least 4 blocks");
+
+var parsed_tar = archive.read_tar_from_bytes("memory.tar", tar_bytes);
+assert(parsed_tar.count() == 3, "parsed tar count is 3");
+assert(parsed_tar.has_entry("hello.txt"), "parsed tar has hello.txt");
+match (parsed_tar.get_entry("hello.txt")) {
+    val e => {
+        var entry = e as archive.ArchiveEntry;
+        assert(entry.text() == "Hello, Lymar World!", "parsed tar content matches");
+    },
+    nil => assert(false, "parsed entry was nil")
+}
+
+// Test zip bytes generation and round-trip
+var zip_bytes = arch.to_zip_bytes();
+assert(len(zip_bytes) > 100, "zip bytes generated");
+var parsed_zip = archive.read_zip_from_bytes("memory.zip", zip_bytes);
+assert(parsed_zip.count() == 3, "parsed zip count is 3");
+assert(parsed_zip.has_entry("hello.txt"), "parsed zip has hello.txt");
+match (parsed_zip.get_entry("hello.txt")) {
+    val e => {
+        var entry = e as archive.ArchiveEntry;
+        assert(entry.text() == "Hello, Lymar World!", "parsed zip content matches");
+    },
+    nil => assert(false, "parsed zip entry was nil")
+}
+
+print("Archive tests passed!");

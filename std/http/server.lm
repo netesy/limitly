@@ -4,11 +4,13 @@
 import std.core as core;
 import std.core show Error;
 import std.resource as res;
+import std.http.common as common;
 
 frame ServerRequest {
     pub var method: str;
     pub var path: str;
     pub var query_string: str;
+    pub var query_params: {str: str};
     pub var version: str;
     pub var headers: {str: str};
     pub var body: str;
@@ -16,38 +18,136 @@ frame ServerRequest {
     pub var client_resource: res.Resource?;
 
     pub init(method: str = "GET", path: str = "/", query_string: str = "", version: str = "HTTP/1.1", headers: {str: str}? = nil, body: str = "", remote_addr: str = "", client_resource: res.Resource? = nil) {
-        self.method = method;
+        self.method = _builtin_string_to_upper(method);
         self.path = path;
         self.query_string = query_string;
+        self.query_params = common.parse_query_string(query_string);
         self.version = version;
         if (headers != nil) {
             self.headers = headers as {str: str};
         } else {
-            self.headers = {};
+            self.headers = {} as {str: str};
         }
         self.body = body;
         self.remote_addr = remote_addr;
         self.client_resource = client_resource;
     }
+
+    pub fn header(name: str, fallback: str = ""): str {
+        var lower = _builtin_string_to_lower(name);
+        if (self.headers[lower] != nil) {
+            return self.headers[lower];
+        }
+        return fallback;
+    }
+
+    pub fn query(name: str, fallback: str = ""): str {
+        if (self.query_params[name] != nil) {
+            return self.query_params[name];
+        }
+        return fallback;
+    }
+
+    pub fn is_json(): bool {
+        var ct = self.header("content-type", "");
+        return _builtin_string_contains(ct, "json");
+    }
+
+    pub fn cookies(): {str: str} {
+        var cookie_hdr = self.header("cookie", "");
+        return common.parse_cookies(cookie_hdr);
+    }
+
+    pub fn cookie(name: str): str {
+        var c = self.cookies();
+        if (c[name] != nil) return c[name];
+        return "";
+    }
 }
 
 frame ServerResponse {
     pub var status: int;
+    pub var status_text: str;
     pub var headers: {str: str};
     pub var body: str;
 
-    pub init(status: int = 200, headers: {str: str}? = nil, body: str = "") {
+    pub init(status: int = 200, headers: {str: str}? = nil, body: str = "", text: str = "") {
         self.status = status;
+        if (text != "") {
+            self.status_text = text;
+        } else {
+            self.status_text = common.status_text(status);
+        }
         if (headers != nil) {
             self.headers = headers as {str: str};
         } else {
-            self.headers = {};
+            self.headers = {} as {str: str};
         }
         self.body = body;
     }
+
+    pub fn set_header(name: str, value: str): ServerResponse {
+        var lower = _builtin_string_to_lower(_builtin_string_trim(name));
+        self.headers[lower] = value;
+        return self;
+    }
+
+    pub fn set_cookie(name: str, value: str, path: str = "/"): ServerResponse {
+        var cookie_val = name + "=" + value + "; Path=" + path;
+        self.set_header("set-cookie", cookie_val);
+        return self;
+    }
+
+    pub fn header(name: str, fallback: str = ""): str {
+        var lower = _builtin_string_to_lower(name);
+        if (self.headers[lower] != nil) {
+            return self.headers[lower];
+        }
+        return fallback;
+    }
+
+    pub fn text(status: int = 200, content: str = ""): ServerResponse {
+        self.status = status;
+        self.status_text = common.status_text(status);
+        self.body = content;
+        self.set_header("content-type", common.MIME_TEXT_PLAIN);
+        self.set_header("content-length", len(content) as str);
+        return self;
+    }
+
+    pub fn json(status: int = 200, json_str: str = ""): ServerResponse {
+        self.status = status;
+        self.status_text = common.status_text(status);
+        self.body = json_str;
+        self.set_header("content-type", common.MIME_APPLICATION_JSON);
+        self.set_header("content-length", len(json_str) as str);
+        return self;
+    }
+
+    pub fn html(status: int = 200, html_str: str = ""): ServerResponse {
+        self.status = status;
+        self.status_text = common.status_text(status);
+        self.body = html_str;
+        self.set_header("content-type", common.MIME_TEXT_HTML);
+        self.set_header("content-length", len(html_str) as str);
+        return self;
+    }
+
+    pub fn redirect(location: str, status: int = 302): ServerResponse {
+        self.status = status;
+        self.status_text = common.status_text(status);
+        self.body = "";
+        self.set_header("location", location);
+        self.set_header("content-length", "0");
+        return self;
+    }
+
+    pub fn not_found(message: str = "404 Not Found"): ServerResponse {
+        return self.text(404, message);
+    }
 }
 
-pub type ResultServerRequest = ServerRequest | str; // Simplified Result pattern
+pub type ResultServerRequest = ServerRequest | str;
 
 frame HTTPServer {
     pub var host: str;
@@ -79,13 +179,13 @@ frame HTTPServer {
                 var binder = res.Binder(r=r);
                 if (not binder.bind(args=[host, port])) {
                     r.close();
-                    return err(Error(code="BindError", message="failed to bind to {host}:{port}"));
+                    return err(Error(code="BindError", message="failed to bind to " + host + ":" + (port as str)));
                 }
 
                 var listener = res.Listener(r=r);
                 if (not listener.listen(args=[backlog])) {
                     r.close();
-                    return err(Error(code="ListenError", message="listen failed on port {port}"));
+                    return err(Error(code="ListenError", message="listen failed on port " + (port as str)));
                 }
 
                 self.resource = r;
@@ -122,18 +222,33 @@ frame HTTPServer {
         if (len(raw_bytes) == 0) return nil;
         
         var raw = _builtin_string_from_bytes(raw_bytes);
-        return parse_server_request(raw);
+        return ok(parse_server_request(raw));
     }
 
     pub fn send_response(client: res.Resource, resp: ServerResponse): bool {
         var writer = res.Writer(r=client);
-        var raw = "HTTP/1.1 " + (resp.status as str) + " OK\r\n";
-        raw = raw + render_headers(resp.headers);
+        var raw = "HTTP/1.1 " + (resp.status as str) + " " + resp.status_text + "\r\n";
+        
+        if (resp.headers["content-type"] == nil) {
+            resp.headers["content-type"] = common.MIME_TEXT_PLAIN;
+        }
+        if (resp.headers["content-length"] == nil) {
+            resp.headers["content-length"] = len(resp.body) as str;
+        }
+        if (resp.headers["connection"] == nil) {
+            resp.headers["connection"] = "close";
+        }
+
+        iter (name, value in resp.headers) {
+            raw = raw + name + ": " + value + "\r\n";
+        }
         raw = raw + "\r\n" + resp.body;
         
         var bytes: [int] = [];
-        for (var i = 0; i < len(raw); i = i + 1) {
+        var i = 0;
+        while (i < len(raw)) {
             bytes.append(_builtin_string_byte_at(raw, i));
+            i = i + 1;
         }
         return writer.write(args=[bytes]) == true;
     }
@@ -161,42 +276,41 @@ frame HTTPServer {
     }
 }
 
-// `Name: value\r\n` for every header. `iter` cannot appear inside a frame
-// method; dictionaries are walked with the two-variable form.
-fn render_headers(headers: {str: str}): str {
-    var out = "";
-    iter (name, value in headers) {
-        out = out + name + ": " + value + "\r\n";
-    }
-    return out;
-}
-
-fn parse_server_request(raw: str): ServerRequest {
+pub fn parse_server_request(raw: str): ServerRequest {
     if (len(raw) == 0) {
         var empty_h: {str: str} = {};
         return ServerRequest(method="", path="", query_string="", version="", headers=empty_h, body="", remote_addr="", client_resource=nil);
     }
 
-    var header_end = index_of_h(raw, "\r\n\r\n");
+    var header_end = _builtin_string_index_of(raw, "\r\n\r\n");
     var body_str = "";
     var header_str = raw;
     if (header_end != -1) {
-        header_str = substring(raw, 0, header_end);
-        body_str = substring(raw, header_end + 4, len(raw));
+        header_str = _builtin_substring(raw, 0, header_end);
+        body_str = _builtin_substring(raw, header_end + 4, len(raw));
+    } else {
+        header_end = _builtin_string_index_of(raw, "\n\n");
+        if (header_end != -1) {
+            header_str = _builtin_substring(raw, 0, header_end);
+            body_str = _builtin_substring(raw, header_end + 2, len(raw));
+        }
     }
 
     var lines: [str] = [];
     var curr = "";
     var i = 0;
     while (i < len(header_str)) {
-        if (i <= len(header_str) - 2 and substring(header_str, i, i + 2) == "\r\n") {
+        var ch = _builtin_substring(header_str, i, i + 1);
+        if (ch == "\n") {
+            if (len(curr) > 0 and _builtin_substring(curr, len(curr) - 1, len(curr)) == "\r") {
+                curr = _builtin_substring(curr, 0, len(curr) - 1);
+            }
             lines.append(curr);
             curr = "";
-            i = i + 2;
         } else {
-            curr = curr + substring(header_str, i, i + 1);
-            i = i + 1;
+            curr = curr + ch;
         }
+        i = i + 1;
     }
     if (len(curr) > 0) lines.append(curr);
 
@@ -212,7 +326,7 @@ fn parse_server_request(raw: str): ServerRequest {
         var pcurr = "";
         var j = 0;
         while (j < len(req_line)) {
-            var ch = substring(req_line, j, j + 1);
+            var ch = _builtin_substring(req_line, j, j + 1);
             if (ch == " ") {
                 if (len(pcurr) > 0) parts.append(pcurr);
                 pcurr = "";
@@ -226,56 +340,32 @@ fn parse_server_request(raw: str): ServerRequest {
         if (len(parts) >= 1) method_val = parts[0];
         if (len(parts) >= 2) {
             var full_path = parts[1];
-            var q_idx = index_of_h(full_path, "?");
+            var q_idx = _builtin_string_index_of(full_path, "?");
             if (q_idx != -1) {
-                path_val = substring(full_path, 0, q_idx);
-                query_val = substring(full_path, q_idx + 1, len(full_path));
+                path_val = _builtin_substring(full_path, 0, q_idx);
+                query_val = _builtin_substring(full_path, q_idx + 1, len(full_path));
             } else {
                 path_val = full_path;
             }
         }
         if (len(parts) >= 3) version_val = parts[2];
 
-        for (var k = 1; k < len(lines); k = k + 1) {
+        var k = 1;
+        while (k < len(lines)) {
             var hline = lines[k];
-            var colon = index_of_h(hline, ":");
-            if (colon != -1) {
-                var hkey = substring(hline, 0, colon);
-                var hval = substring(hline, colon + 1, len(hline));
-                while (len(hval) > 0 and substring(hval, 0, 1) == " ") {
-                    hval = substring(hval, 1, len(hval));
-                }
+            var colon = _builtin_string_index_of(hline, ":");
+            if (colon > 0) {
+                var hkey = _builtin_string_to_lower(_builtin_string_trim(_builtin_substring(hline, 0, colon)));
+                var hval = _builtin_string_trim(_builtin_substring(hline, colon + 1, len(hline)));
                 req_headers[hkey] = hval;
             }
+            k = k + 1;
         }
     }
 
-    if (req_headers["Transfer-Encoding"] == "chunked" or req_headers["transfer-encoding"] == "chunked") {
-        var unchunked = "";
-        var pos = 0;
-        var b_len = len(body_str);
-        while (pos < b_len) {
-            var crlf = index_of_h(substring(body_str, pos, b_len), "\r\n");
-            if (crlf == -1) {
-                pos = b_len;
-            } else {
-                var chunk_head = substring(body_str, pos, pos + crlf);
-                pos = pos + crlf + 2;
-                var chunk_size = parse_hex(chunk_head);
-                if (chunk_size <= 0) {
-                    pos = b_len;
-                } else {
-                    if (pos + chunk_size <= b_len) {
-                        unchunked = unchunked + substring(body_str, pos, pos + chunk_size);
-                        pos = pos + chunk_size + 2;
-                    } else {
-                        unchunked = unchunked + substring(body_str, pos, b_len);
-                        pos = b_len;
-                    }
-                }
-            }
-        }
-        body_str = unchunked;
+    // Handle chunked transfer decoding if present
+    if (req_headers["transfer-encoding"] == "chunked") {
+        body_str = decode_chunked_body(body_str);
     }
 
     return ServerRequest(
@@ -290,17 +380,36 @@ fn parse_server_request(raw: str): ServerRequest {
     );
 }
 
+fn decode_chunked_body(body_str: str): str {
+    var unchunked = "";
+    var pos = 0;
+    var b_len = len(body_str);
+    while (pos < b_len) {
+        var crlf = _builtin_string_index_of(_builtin_substring(body_str, pos, b_len), "\r\n");
+        if (crlf == -1) {
+            pos = b_len;
+        } else {
+            var chunk_head = _builtin_substring(body_str, pos, pos + crlf);
+            pos = pos + crlf + 2;
+            var chunk_size = parse_hex(chunk_head);
+            if (chunk_size <= 0) {
+                pos = b_len;
+            } else {
+                if (pos + chunk_size <= b_len) {
+                    unchunked = unchunked + _builtin_substring(body_str, pos, pos + chunk_size);
+                    pos = pos + chunk_size + 2;
+                } else {
+                    unchunked = unchunked + _builtin_substring(body_str, pos, b_len);
+                    pos = b_len;
+                }
+            }
+        }
+    }
+    return unchunked;
+}
+
 fn hex_digit_val(ch: str): int {
-    if (ch == "0") return 0;
-    if (ch == "1") return 1;
-    if (ch == "2") return 2;
-    if (ch == "3") return 3;
-    if (ch == "4") return 4;
-    if (ch == "5") return 5;
-    if (ch == "6") return 6;
-    if (ch == "7") return 7;
-    if (ch == "8") return 8;
-    if (ch == "9") return 9;
+    if (ch >= "0" and ch <= "9") return (ch as int) - 48;
     if (ch == "a" or ch == "A") return 10;
     if (ch == "b" or ch == "B") return 11;
     if (ch == "c" or ch == "C") return 12;
@@ -314,7 +423,7 @@ fn parse_hex(s: str): int {
     var value = 0;
     var i = 0;
     while (i < len(s)) {
-        var ch = substring(s, i, i + 1);
+        var ch = _builtin_substring(s, i, i + 1);
         if (ch == ";" or ch == " " or ch == "\r" or ch == "\n") {
             return value;
         }
@@ -322,19 +431,6 @@ fn parse_hex(s: str): int {
         i = i + 1;
     }
     return value;
-}
-
-fn substring(s: str, start: int, end: int): str {
-    return _builtin_substring(s, start, end);
-}
-
-fn index_of_h(s: str, pattern: str): int {
-    var i: int = 0;
-    while (i <= len(s) - len(pattern)) {
-        if (substring(s, i, i + len(pattern)) == pattern) return i;
-        i = i + 1;
-    }
-    return -1;
 }
 
 frame HTTP2Server {
@@ -358,7 +454,7 @@ frame HTTP2Server {
         var resp = ServerResponse(
             status=200,
             headers=h,
-            body="HTTP/2 Response Stream {stream_id}"
+            body="HTTP/2 Response Stream " + (stream_id as str)
         );
         return resp;
     }

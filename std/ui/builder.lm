@@ -110,58 +110,36 @@ pub fn build(root: ui.Widget, vw: float, vh: float, ts: any = nil, x: float = 0.
 // ── Widget emitter ────────────────────────────────────────────────────────────
 // Returns height consumed. Adds DrawCmds and HitZones to dl in place.
 fn _emit(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float {
-    if (w.kind == ui.KIND_TEXT) {
-        return _emit_text(dl, w, ctx, ts);
+    // Enum-valued dispatch via `match` (tag compare lowered over the WidgetKind
+    // variants). Qualified arms on the imported enum resolve against the scrutinee's
+    // own enum type, so no `==` fallback is needed here.
+    match (w.kind) {
+        ui.WidgetKind.Text => { return _emit_text(dl, w, ctx, ts); },
+        ui.WidgetKind.Button => { return _emit_button(dl, w, ctx, ts); },
+        ui.WidgetKind.Container => { return _emit_container(dl, w, ctx, ts); },
+        ui.WidgetKind.Spacer => {
+            if (w.height_val > 0.0) { return w.height_val; }
+            return ts.spacing;
+        },
+        ui.WidgetKind.Slider => { return _emit_slider(dl, w, ctx, ts); },
+        ui.WidgetKind.Checkbox => { return _emit_checkbox(dl, w, ctx, ts); },
+        ui.WidgetKind.Input => { return _emit_input(dl, w, ctx, ts); },
+        ui.WidgetKind.Progress => { return _emit_progress(dl, w, ctx, ts); },
+        ui.WidgetKind.Toggle => { return _emit_toggle(dl, w, ctx, ts); },
+        ui.WidgetKind.Badge => { return _emit_badge(dl, w, ctx, ts); },
+        ui.WidgetKind.Card => { return _emit_card(dl, w, ctx, ts); },
+        ui.WidgetKind.Alert => { return _emit_alert(dl, w, ctx, ts); },
+        ui.WidgetKind.Toast => { return _emit_alert(dl, w, ctx, ts); },
+        ui.WidgetKind.Scroll => { return _emit_scroll(dl, w, ctx, ts); },
+        ui.WidgetKind.Tabs => { return _emit_tabs(dl, w, ctx, ts); },
+        ui.WidgetKind.Select => { return _emit_select(dl, w, ctx, ts); },
+        ui.WidgetKind.Textarea => { return _emit_textarea(dl, w, ctx, ts); },
+        _ => {
+            // Unknown widget — emit a placeholder rect
+            dlist.dl_add(dl, dlist.dcmd_rect(ctx.x, ctx.y, ctx.avail_w, 24.0, 0.3, 0.3, 0.3, 0.5));
+            return 24.0;
+        }
     }
-    if (w.kind == ui.KIND_BUTTON) {
-        return _emit_button(dl, w, ctx, ts);
-    }
-    if (w.kind == ui.KIND_CONTAINER) {
-        return _emit_container(dl, w, ctx, ts);
-    }
-    if (w.kind == ui.KIND_SPACER) {
-        if (w.height_val > 0.0) { return w.height_val; }
-        return ts.spacing;
-    }
-    if (w.kind == ui.KIND_SLIDER) {
-        return _emit_slider(dl, w, ctx, ts);
-    }
-    if (w.kind == ui.KIND_CHECKBOX) {
-        return _emit_checkbox(dl, w, ctx, ts);
-    }
-    if (w.kind == ui.KIND_INPUT) {
-        return _emit_input(dl, w, ctx, ts);
-    }
-    if (w.kind == ui.KIND_PROGRESS) {
-        return _emit_progress(dl, w, ctx, ts);
-    }
-    if (w.kind == ui.KIND_TOGGLE) {
-        return _emit_toggle(dl, w, ctx, ts);
-    }
-    if (w.kind == ui.KIND_BADGE) {
-        return _emit_badge(dl, w, ctx, ts);
-    }
-    if (w.kind == ui.KIND_CARD) {
-        return _emit_card(dl, w, ctx, ts);
-    }
-    if (w.kind == ui.KIND_ALERT or w.kind == ui.KIND_TOAST) {
-        return _emit_alert(dl, w, ctx, ts);
-    }
-    if (w.kind == ui.KIND_SCROLL) {
-        return _emit_scroll(dl, w, ctx, ts);
-    }
-    if (w.kind == ui.KIND_TABS) {
-        return _emit_tabs(dl, w, ctx, ts);
-    }
-    if (w.kind == ui.KIND_SELECT) {
-        return _emit_select(dl, w, ctx, ts);
-    }
-    if (w.kind == ui.KIND_TEXTAREA) {
-        return _emit_textarea(dl, w, ctx, ts);
-    }
-    // Unknown widget — emit a placeholder rect
-    dlist.dl_add(dl, dlist.dcmd_rect(ctx.x, ctx.y, ctx.avail_w, 24.0, 0.3, 0.3, 0.3, 0.5));
-    return 24.0;
 }
 
 // ── Text ──────────────────────────────────────────────────────────────────────

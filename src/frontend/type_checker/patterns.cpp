@@ -35,6 +35,22 @@ void TypeChecker::validate_pattern_compatibility(std::shared_ptr<LM::Frontend::A
             bool variant_resolved = false;
             TypePtr constructorType = lookup_variable(bindingPattern->typeName);
 
+            // Alias-qualified patterns (e.g. `Alias.EnumName.Variant`, when the enum reached this
+            // scope under a module alias) are never registered under their literal dotted spelling,
+            // so the lookup above misses. Resolve them against the scrutinee's own enum type by its
+            // trailing segment, mirroring resolve_match_variant_info in the LIR generator.
+            if (!constructorType && bindingPattern->typeName.find('.') != std::string::npos && match_type) {
+                if (auto* et = std::get_if<EnumType>(&match_type->extra)) {
+                    std::string trailing = bindingPattern->typeName.substr(bindingPattern->typeName.find_last_of('.') + 1);
+                    auto vit = et->variantTypes.find(trailing);
+                    if (vit != et->variantTypes.end()) {
+                        constructorType = vit->second.empty()
+                            ? match_type
+                            : type_system.createFunctionType(vit->second, match_type);
+                    }
+                }
+            }
+
                         if (!constructorType && bindingPattern->typeName.find('.') == std::string::npos) {
                 if (match_type && (match_type->tag == TypeTag::Enum || match_type->tag == TypeTag::UserDefined || match_type->tag == TypeTag::Frame)) {
                     if (auto* et = std::get_if<EnumType>(&match_type->extra)) {

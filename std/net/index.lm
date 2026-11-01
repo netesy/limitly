@@ -19,7 +19,7 @@ pub import std.net.tcp show TCPClient, TCPServer;
 pub import std.net.udp show UDP;
 
 // DNS
-pub import std.net.dns show DNS;
+pub import std.net.dns show DNS, Resolver, DNSRecord, resolve, lookup, reverse_lookup, is_ipv4, is_ipv6, is_ip;
 
 // TLS
 pub import std.net.tls show TLSConfig, TLSSocket;

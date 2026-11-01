@@ -1,0 +1,28 @@
+// tests/modules/enum_match_import_test.lm
+// Regression: `match` over an enum imported under a module alias.
+//
+// Historically the type checker only resolved enum match arms for the *unqualified*
+// spelling, so an alias-qualified pattern (ek.Shape.Circle) failed with E003
+// "Unknown pattern or constructor", forcing callers to fall back to `==` chains.
+// This exercises the fixed path: unit variants, associated-value variants, and the
+// wildcard arm, on a value whose static enum type came through `import ... as ek`.
+
+import tests.modules.enum_kind_lib as ek;
+
+fn describe(s: ek.Shape): str {
+    match (s) {
+        ek.Shape.Circle => { return "circle"; },
+        ek.Shape.Square => { return "square"; },
+        ek.Shape.Point => { return "point"; },
+        ek.Shape.Rect(w, h) => { return "rect:{w}x{h}"; },
+        _ => { return "unknown"; }
+    }
+}
+
+print("=== Cross-Module Enum Match Test ===");
+
+assert(describe(ek.make_circle()) == "circle", "alias-qualified unit variant (Circle)");
+assert(describe(ek.make_square()) == "square", "alias-qualified unit variant (Square)");
+assert(describe(ek.make_rect(3, 4)) == "rect:3x4", "alias-qualified associated-value variant binds w,h");
+
+print("All cross-module enum match assertions passed.");

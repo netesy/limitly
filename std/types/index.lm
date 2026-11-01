@@ -55,64 +55,25 @@ type StrMemoryPool = {
     free_list: [int]
 };
 
-// Reference counting for shared ownership
-frame IntRc {
-    pub data: int;
-    pub ref_count: int;
+// Reference counting for shared ownership — staged frame template
+staged frame Rc(T: type) {
+    pub var data: T;
+    pub var ref_count: int;
 
-    pub init(data: int, count: int = 1) {
-        self.data = data;
+    pub init(v: T, count: int = 1) {
+        self.data = v;
         self.ref_count = count;
-    }
-
-    pub fn clone(): IntRc {
-        return IntRc(data=self.data, count=self.ref_count + 1);
     }
 
     pub fn strong_count(): int {
         return self.ref_count;
     }
-}
 
-frame StrRc {
-    pub data: str;
-    pub ref_count: int;
-
-    pub init(data: str, count: int = 1) {
-        self.data = data;
-        self.ref_count = count;
+    pub fn inc_ref(): nil {
+        self.ref_count = self.ref_count + 1;
     }
 
-    pub fn clone(): StrRc {
-        return StrRc(data=self.data, count=self.ref_count + 1);
+    pub fn dec_ref(): nil {
+        self.ref_count = self.ref_count - 1;
     }
-
-    pub fn strong_count(): int {
-        return self.ref_count;
-    }
-}
-
-// Utility functions for reference counting
-fn new_int_rc(value: int): IntRc {
-    return IntRc(data=value, count=1);
-}
-
-fn clone_int_rc(rc: IntRc): IntRc {
-    return rc.clone();
-}
-
-fn strong_count_int(rc: IntRc): int {
-    return rc.strong_count();
-}
-
-fn new_str_rc(value: str): StrRc {
-    return StrRc(data=value, count=1);
-}
-
-fn clone_str_rc(rc: StrRc): StrRc {
-    return rc.clone();
-}
-
-fn strong_count_str(rc: StrRc): int {
-    return rc.strong_count();
 }

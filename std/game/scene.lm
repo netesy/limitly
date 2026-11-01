@@ -132,8 +132,8 @@ pub fn scene(name: str = "Scene"): Scene {
 // ── Scene Manager ─────────────────────────────────────────────────────────────
 
 frame SceneManager: gtraits.Updatable {
-    pub var scenes: {str: any};
-    pub var stack: [any];
+    pub var scenes: {str: Scene};
+    pub var stack: [Scene];
     pub var current_name: str;
 
     // Transition State Machine
@@ -146,8 +146,8 @@ frame SceneManager: gtraits.Updatable {
     pub var pending_scene_name: str;
 
     pub init() {
-        self.scenes = {} as {str: any};
-        self.stack = [] as [any];
+        self.scenes = {} as {str: Scene};
+        self.stack = [] as [Scene];
         self.current_name = "";
 
         self.is_transitioning = false;
@@ -159,10 +159,9 @@ frame SceneManager: gtraits.Updatable {
         self.pending_scene_name = "";
     }
 
-    pub fn register(name: str, s: any): nil {
-        var sc = s as Scene;
-        sc.name = name;
-        self.scenes[name] = sc;
+    pub fn register(name: str, s: Scene): nil {
+        s.name = name;
+        self.scenes[name] = s;
     }
 
     pub fn get(name: str): any {
@@ -195,7 +194,7 @@ frame SceneManager: gtraits.Updatable {
             old_s.on_exit();
             i = i - 1;
         }
-        self.stack = [] as [any];
+        self.stack = [] as [Scene];
 
         // Push and enter new scene
         var next_s = self.get(name);
@@ -253,7 +252,7 @@ frame SceneManager: gtraits.Updatable {
         top.on_exit();
 
         // Create new stack without top element
-        var new_stack: [any] = [];
+        var new_stack: [Scene] = [];
         var i = 0;
         while (i < n - 1) {
             new_stack.append(self.stack[i]);

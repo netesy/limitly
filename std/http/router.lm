@@ -1,14 +1,64 @@
+// HTTP Router Module: Route matching, parameterized routes, and request handling.
+
+import std.http.common as common;
+
 frame Request {
     pub var method: str;
     pub var path: str;
     pub var headers: [str];
+    pub var header_map: {str: str};
+    pub var params: {str: str};
+    pub var query: {str: str};
     pub var body: str;
 
     pub init(method: str = "GET", path: str = "/", headers: [str] = [] as [str], body: str = "") {
-        self.method = method;
-        self.path = path;
+        self.method = _builtin_string_to_upper(method);
+        var q_idx = _builtin_string_index_of(path, "?");
+        if (q_idx != -1) {
+            self.path = _builtin_substring(path, 0, q_idx);
+            var qs = _builtin_substring(path, q_idx + 1, len(path));
+            self.query = common.parse_query_string(qs);
+        } else {
+            self.path = path;
+            self.query = {} as {str: str};
+        }
         self.headers = headers;
+        self.header_map = {} as {str: str};
+        var i = 0;
+        while (i < len(headers)) {
+            var h = headers[i];
+            var col = _builtin_string_index_of(h, ":");
+            if (col > 0) {
+                var k = _builtin_string_to_lower(_builtin_string_trim(_builtin_substring(h, 0, col)));
+                var v = _builtin_string_trim(_builtin_substring(h, col + 1, len(h)));
+                self.header_map[k] = v;
+            }
+            i = i + 1;
+        }
+        self.params = {} as {str: str};
         self.body = body;
+    }
+
+    pub fn param(name: str, fallback: str = ""): str {
+        if (self.params[name] != nil) {
+            return self.params[name];
+        }
+        return fallback;
+    }
+
+    pub fn query_val(name: str, fallback: str = ""): str {
+        if (self.query[name] != nil) {
+            return self.query[name];
+        }
+        return fallback;
+    }
+
+    pub fn header(name: str, fallback: str = ""): str {
+        var lower = _builtin_string_to_lower(name);
+        if (self.header_map[lower] != nil) {
+            return self.header_map[lower];
+        }
+        return fallback;
     }
 }
 
@@ -35,8 +85,19 @@ frame Response {
         return self;
     }
 
+    pub fn text(data: str): Response {
+        self.headers = ["Content-Type: text/plain"];
+        self.body = data;
+        return self;
+    }
+
     pub fn status(code: int): Response {
         self.status_code = code;
+        return self;
+    }
+
+    pub fn set_header(header_line: str): Response {
+        self.headers.append(header_line);
         return self;
     }
 }
@@ -44,12 +105,40 @@ frame Response {
 frame Route {
     pub var method: str;
     pub var path: str;
-    pub var handler: any; // fn(Request): Response
+    pub var handler: fn(Request): Response;
 
-    pub init(m: str, p: str, h: any) {
-        self.method = m;
+    pub init(m: str, p: str, h: fn(Request): Response) {
+        self.method = _builtin_string_to_upper(m);
         self.path = p;
         self.handler = h;
+    }
+
+    pub fn matches(req_method: str, req_path: str): bool {
+        if (self.method != "*" and self.method != req_method) {
+            return false;
+        }
+        if (self.path == req_path or self.path == "*") {
+            return true;
+        }
+        return match_pattern(self.path, req_path);
+    }
+
+    pub fn extract_params(req_path: str): {str: str} {
+        var params: {str: str} = {};
+        var route_parts = split_path(self.path);
+        var req_parts = split_path(req_path);
+        if (len(route_parts) != len(req_parts)) return params;
+
+        var i = 0;
+        while (i < len(route_parts)) {
+            var rp = route_parts[i];
+            if (len(rp) > 1 and _builtin_substring(rp, 0, 1) == ":") {
+                var param_name = _builtin_substring(rp, 1, len(rp));
+                params[param_name] = req_parts[i];
+            }
+            i = i + 1;
+        }
+        return params;
     }
 }
 
@@ -60,27 +149,32 @@ frame Router {
         self.routes = [] as [Route];
     }
 
-    pub fn get(path: str, handler: any): Router {
+    pub fn get(path: str, handler: fn(Request): Response): Router {
         self.routes.append(Route("GET", path, handler));
         return self;
     }
 
-    pub fn post(path: str, handler: any): Router {
+    pub fn post(path: str, handler: fn(Request): Response): Router {
         self.routes.append(Route("POST", path, handler));
         return self;
     }
 
-    pub fn put(path: str, handler: any): Router {
+    pub fn put(path: str, handler: fn(Request): Response): Router {
         self.routes.append(Route("PUT", path, handler));
         return self;
     }
 
-    pub fn delete(path: str, handler: any): Router {
+    pub fn delete(path: str, handler: fn(Request): Response): Router {
         self.routes.append(Route("DELETE", path, handler));
         return self;
     }
 
-    pub fn route(method: str, path: str, handler: any): Router {
+    pub fn patch(path: str, handler: fn(Request): Response): Router {
+        self.routes.append(Route("PATCH", path, handler));
+        return self;
+    }
+
+    pub fn route(method: str, path: str, handler: fn(Request): Response): Router {
         self.routes.append(Route(method, path, handler));
         return self;
     }
@@ -89,7 +183,8 @@ frame Router {
         var i = 0;
         while (i < len(self.routes)) {
             var r = self.routes[i];
-            if (r.method == req.method and r.path == req.path) {
+            if (r.matches(req.method, req.path)) {
+                req.params = r.extract_params(req.path);
                 var handler_fn = r.handler as fn(Request): Response;
                 if (handler_fn != nil) {
                     return handler_fn(req);
@@ -103,4 +198,62 @@ frame Router {
 
 pub fn router(): Router {
     return Router();
+}
+
+pub fn make_router(): Router {
+    return Router();
+}
+
+fn split_path(p: str): [str] {
+    var parts: [str] = [];
+    var curr = "";
+    var i = 0;
+    while (i < len(p)) {
+        var ch = _builtin_substring(p, i, i + 1);
+        if (ch == "/") {
+            if (len(curr) > 0) {
+                parts.append(curr);
+                curr = "";
+            }
+        } else {
+            curr = curr + ch;
+        }
+        i = i + 1;
+    }
+    if (len(curr) > 0) parts.append(curr);
+    return parts;
+}
+
+fn match_pattern(pattern: str, actual: str): bool {
+    var pattern_parts = split_path(pattern);
+    var actual_parts = split_path(actual);
+    if (len(pattern_parts) != len(actual_parts)) {
+        // Check wildcard suffix e.g. /static/*
+        if (len(pattern_parts) > 0 and pattern_parts[len(pattern_parts) - 1] == "*") {
+            if (len(actual_parts) >= len(pattern_parts) - 1) {
+                var k = 0;
+                while (k < len(pattern_parts) - 1) {
+                    if (pattern_parts[k] != actual_parts[k]) return false;
+                    k = k + 1;
+                }
+                return true;
+            }
+        }
+        return false;
+    }
+
+    var i = 0;
+    while (i < len(pattern_parts)) {
+        var pp = pattern_parts[i];
+        var ap = actual_parts[i];
+        if (len(pp) > 0 and _builtin_substring(pp, 0, 1) == ":") {
+            // parameter segment matches anything non-empty
+        } elif (pp == "*") {
+            // wildcard matches segment
+        } elif (pp != ap) {
+            return false;
+        }
+        i = i + 1;
+    }
+    return true;
 }

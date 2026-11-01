@@ -6,64 +6,114 @@ import std.graphics.shadow as shadow;
 import std.ui.state as state;
 pub import std.graphics.shadow show Shadow, shadow;
 
+// Widget identity is a real enum: `==`/`match` on WidgetKind take the tag-compare
+// path lowered once in the LIR generator (roadmaps.md item 1), so dispatch is
+// type-checked instead of free ints. KIND_* below stay as value bindings for
+// source compatibility; they hold enum values, not ints.
+enum WidgetKind {
+    Container,
+    Text,
+    Button,
+    Spacer,
+    Image,
+    Input,
+    Checkbox,
+    Slider,
+    Tabs,
+    Scroll,
+    Badge,
+    Select,
+    Textarea,
+    Toggle,
+    Stepper,
+    PlotLines,
+    PlotHistogram,
+    TreeNode,
+    ColorPicker,
+    Table,
+    Accordion,
+    Alert,
+    Calendar,
+    Card,
+    Diff,
+    Dock,
+    FileInput,
+    Filter,
+    Indicator,
+    Join,
+    Link,
+    List,
+    Progress,
+    RangeSlider,
+    Stat,
+    Timeline,
+    Tooltip,
+    Toast,
+    Steps,
+    Mask,
+    BarChart,
+    BubbleChart,
+    DoughnutChart,
+    LineChart,
+    PolarAreaChart,
+    RadarChart,
+    ScatterChart,
+    PieChart,
+    Overlay,
+    FormField
+}
+
+// Widget lifecycle phase (enter/exit transitions).
+enum LifecycleState {
+    Entering,
+    Active,
+    Exiting,
+    Removed
+}
+
 trait WidgetTrait {
     fn mark_for_removal(): nil;
 }
 
-mixin WidgetState {
-    pub var kind: int;
-    pub var text_val: str;
-    pub var on_click_action: any;
+// WidgetState is decomposed into per-concern mixins (shared state only -- mixins are
+// not interfaces and never dispatch dynamically). The Widget frame mixes all of them;
+// fields flatten onto the frame unchanged, so every `self.<field>` site keeps working.
+mixin WidgetIdentity {
+    pub var kind: WidgetKind;
+    pub var lifecycle_state: LifecycleState;
+}
 
+mixin TextualContent {
+    pub var text_val: str;
+    pub var placeholder_val: str;
+    pub var focus_key: str;
+    pub var text_editor_state: any;
+}
+
+mixin VisualStyle {
     pub var foreground_color: Color;
     pub var background_color: Color;
     pub var font_size_val: float;
     pub var font_weight_val: int;
+    pub var corner_radius_val: float;
+    pub var pressed_style_val: Style;
+    pub var hover_style_val: Style;
+    pub var opacity_val: float;
+    pub var scale_val: float;
+    pub var shadow_val: shadow.Shadow;
+}
+
+mixin LayoutMetrics {
     pub var padding_left: float;
     pub var padding_top: float;
     pub var padding_right: float;
     pub var padding_bottom: float;
-    pub var corner_radius_val: float;
     pub var spacing_val: float;
     pub var is_vertical: int;
     pub var align_val: int;
     pub var flex_val: float;
-    pub var is_enabled: int;
-    pub var is_pressed: int;
-    pub var is_hovered: int;
-    pub var click_count: int;
     pub var width_val: float;
     pub var height_val: float;
-    pub var pressed_style_val: Style;
-    pub var hover_style_val: Style;
-    pub var is_checked: int;
-    pub var slider_val: float;
-    pub var slider_min: float;
-    pub var slider_max: float;
-    pub var is_focused: int;
-    pub var active_tab: int;
-    pub var hovered_tab: int;
-    pub var tab_titles: [str];
-    pub var on_change_action: any;
-    pub var select_options: [str];
-    pub var selected_idx: int;
-    pub var is_open: int;
-    pub var opacity_val: float;
-    pub var scale_val: float;
-    pub var shadow_val: shadow.Shadow;
-    pub var lifecycle_state: int;
-    pub var enter_transition: anim.Transition;
-    pub var exit_transition: anim.Transition;
-    pub var anim_property: anim.PropertyAnimation;
-    pub var active_transition: anim.Transition;
-
-    pub var text_editor_state: any;
-    pub var scroll_x: float;
-    pub var scroll_y: float;
-    pub var max_scroll_x: float;
-    pub var max_scroll_y: float;
-    pub var placeholder_val: str;
-    pub var focus_key: str;
 
     // ── Layout Constraints ────────────────────────────────────────────────
     pub var min_width: float;
@@ -73,14 +123,68 @@ mixin WidgetState {
     pub var grow: float;
     pub var shrink: float;
     pub var aspect_ratio: float;
+}
 
-    // ── Accessibility ─────────────────────────────────────────────────────
+mixin InteractionState {
+    pub var is_enabled: int;
+    pub var is_pressed: int;
+    pub var is_hovered: int;
+    pub var is_focused: int;
+    pub var is_open: int;
+    pub var click_count: int;
+    pub var on_click_action: any;
+    pub var on_change_action: any;
+}
+
+mixin ToggleValue {
+    pub var is_checked: int;
+}
+
+mixin SliderValue {
+    pub var slider_val: float;
+    pub var slider_min: float;
+    pub var slider_max: float;
+}
+
+mixin TabState {
+    pub var active_tab: int;
+    pub var hovered_tab: int;
+    pub var tab_titles: [str];
+}
+
+mixin SelectValue {
+    pub var select_options: [str];
+    pub var selected_idx: int;
+}
+
+mixin ScrollState {
+    pub var scroll_x: float;
+    pub var scroll_y: float;
+    pub var max_scroll_x: float;
+    pub var max_scroll_y: float;
+}
+
+mixin AnimationState {
+    pub var enter_transition: anim.Transition;
+    pub var exit_transition: anim.Transition;
+    pub var anim_property: anim.PropertyAnimation;
+    pub var active_transition: anim.Transition;
+}
+
+mixin Accessibility {
     pub var a11y_role: str;
     pub var a11y_label: str;
     pub var a11y_hint: str;
     pub var a11y_live: str;
     pub var tab_index: int;
     pub var is_a11y_hidden: bool;
+}
+
+// Back-compat umbrella: keeps the old `mixin WidgetState` name valid for any external
+// mixing site. New code should mix the per-concern mixins above directly.
+mixin WidgetState {
+    pub var kind: WidgetKind;
+    pub var lifecycle_state: LifecycleState;
 }
 
 // ── Canonical Retained UI Color ──────────────────────────────────────────────
@@ -127,10 +231,10 @@ pub var light_gray: Color = Color(r=0.85, g=0.85, b=0.88, a=1.0);
 pub var transparent: Color = Color(r=0.0, g=0.0, b=0.0, a=0.0);
 
 // ── Widget Lifecycle States ──────────────────────────────────────────────────
-pub var LIFECYCLE_ENTERING: int = 0;
-pub var LIFECYCLE_ACTIVE: int = 1;
-pub var LIFECYCLE_EXITING: int = 2;
-pub var LIFECYCLE_REMOVED: int = 3;
+pub var LIFECYCLE_ENTERING = LifecycleState.Entering;
+pub var LIFECYCLE_ACTIVE = LifecycleState.Active;
+pub var LIFECYCLE_EXITING = LifecycleState.Exiting;
+pub var LIFECYCLE_REMOVED = LifecycleState.Removed;
 
 frame Point {
     pub var x: float;
@@ -322,56 +426,56 @@ pub fn style(): Style {
     return Style();
 }
 
-pub var KIND_CONTAINER: int = 1;
-pub var KIND_TEXT: int = 2;
-pub var KIND_BUTTON: int = 3;
-pub var KIND_SPACER: int = 4;
-pub var KIND_IMAGE: int = 5;
-pub var KIND_INPUT: int = 6;
-pub var KIND_CHECKBOX: int = 7;
-pub var KIND_SLIDER: int = 8;
-pub var KIND_TABS: int = 9;
-pub var KIND_SCROLL: int = 10;
-pub var KIND_BADGE: int = 11;
-pub var KIND_SELECT: int = 12;
-pub var KIND_TEXTAREA: int = 13;
-pub var KIND_TOGGLE: int = 14;
-pub var KIND_STEPPER: int = 15;
-pub var KIND_PLOT_LINES: int = 16;
-pub var KIND_PLOT_HISTOGRAM: int = 17;
-pub var KIND_TREE_NODE: int = 18;
-pub var KIND_COLOR_PICKER: int = 19;
-pub var KIND_TABLE: int = 20;
-pub var KIND_ACCORDION: int = 21;
-pub var KIND_ALERT: int = 22;
-pub var KIND_CALENDAR: int = 23;
-pub var KIND_CARD: int = 24;
-pub var KIND_DIFF: int = 25;
-pub var KIND_DOCK: int = 26;
-pub var KIND_FILE_INPUT: int = 27;
-pub var KIND_FILTER: int = 28;
-pub var KIND_INDICATOR: int = 29;
-pub var KIND_JOIN: int = 30;
-pub var KIND_LINK: int = 31;
-pub var KIND_LIST: int = 32;
-pub var KIND_PROGRESS: int = 33;
-pub var KIND_RANGE_SLIDER: int = 34;
-pub var KIND_STAT: int = 35;
-pub var KIND_TIMELINE: int = 36;
-pub var KIND_TOOLTIP: int = 37;
-pub var KIND_TOAST: int = 38;
-pub var KIND_STEPS: int = 39;
-pub var KIND_MASK: int = 40;
-pub var KIND_BAR_CHART: int = 41;
-pub var KIND_BUBBLE_CHART: int = 42;
-pub var KIND_DOUGHNUT_CHART: int = 43;
-pub var KIND_LINE_CHART: int = 44;
-pub var KIND_POLAR_AREA_CHART: int = 45;
-pub var KIND_RADAR_CHART: int = 46;
-pub var KIND_SCATTER_CHART: int = 47;
-pub var KIND_PIE_CHART: int = 48;
-pub var KIND_OVERLAY: int = 49;
-pub var KIND_FORM_FIELD: int = 50;
+pub var KIND_CONTAINER = WidgetKind.Container;
+pub var KIND_TEXT = WidgetKind.Text;
+pub var KIND_BUTTON = WidgetKind.Button;
+pub var KIND_SPACER = WidgetKind.Spacer;
+pub var KIND_IMAGE = WidgetKind.Image;
+pub var KIND_INPUT = WidgetKind.Input;
+pub var KIND_CHECKBOX = WidgetKind.Checkbox;
+pub var KIND_SLIDER = WidgetKind.Slider;
+pub var KIND_TABS = WidgetKind.Tabs;
+pub var KIND_SCROLL = WidgetKind.Scroll;
+pub var KIND_BADGE = WidgetKind.Badge;
+pub var KIND_SELECT = WidgetKind.Select;
+pub var KIND_TEXTAREA = WidgetKind.Textarea;
+pub var KIND_TOGGLE = WidgetKind.Toggle;
+pub var KIND_STEPPER = WidgetKind.Stepper;
+pub var KIND_PLOT_LINES = WidgetKind.PlotLines;
+pub var KIND_PLOT_HISTOGRAM = WidgetKind.PlotHistogram;
+pub var KIND_TREE_NODE = WidgetKind.TreeNode;
+pub var KIND_COLOR_PICKER = WidgetKind.ColorPicker;
+pub var KIND_TABLE = WidgetKind.Table;
+pub var KIND_ACCORDION = WidgetKind.Accordion;
+pub var KIND_ALERT = WidgetKind.Alert;
+pub var KIND_CALENDAR = WidgetKind.Calendar;
+pub var KIND_CARD = WidgetKind.Card;
+pub var KIND_DIFF = WidgetKind.Diff;
+pub var KIND_DOCK = WidgetKind.Dock;
+pub var KIND_FILE_INPUT = WidgetKind.FileInput;
+pub var KIND_FILTER = WidgetKind.Filter;
+pub var KIND_INDICATOR = WidgetKind.Indicator;
+pub var KIND_JOIN = WidgetKind.Join;
+pub var KIND_LINK = WidgetKind.Link;
+pub var KIND_LIST = WidgetKind.List;
+pub var KIND_PROGRESS = WidgetKind.Progress;
+pub var KIND_RANGE_SLIDER = WidgetKind.RangeSlider;
+pub var KIND_STAT = WidgetKind.Stat;
+pub var KIND_TIMELINE = WidgetKind.Timeline;
+pub var KIND_TOOLTIP = WidgetKind.Tooltip;
+pub var KIND_TOAST = WidgetKind.Toast;
+pub var KIND_STEPS = WidgetKind.Steps;
+pub var KIND_MASK = WidgetKind.Mask;
+pub var KIND_BAR_CHART = WidgetKind.BarChart;
+pub var KIND_BUBBLE_CHART = WidgetKind.BubbleChart;
+pub var KIND_DOUGHNUT_CHART = WidgetKind.DoughnutChart;
+pub var KIND_LINE_CHART = WidgetKind.LineChart;
+pub var KIND_POLAR_AREA_CHART = WidgetKind.PolarAreaChart;
+pub var KIND_RADAR_CHART = WidgetKind.RadarChart;
+pub var KIND_SCATTER_CHART = WidgetKind.ScatterChart;
+pub var KIND_PIE_CHART = WidgetKind.PieChart;
+pub var KIND_OVERLAY = WidgetKind.Overlay;
+pub var KIND_FORM_FIELD = WidgetKind.FormField;
 pub var _shared_empty_style: Style = Style();
 pub var _shared_empty_shadow: shadow.Shadow = shadow.Shadow();
 pub var _shared_empty_trans: anim.Transition = anim.Transition();
@@ -379,11 +483,22 @@ pub var _shared_empty_anim: anim.PropertyAnimation = anim.PropertyAnimation();
 
 // Unified Retained UI Node with Fluent Modifiers
 frame Widget : WidgetTrait {
-    mixin WidgetState;
+    mixin WidgetIdentity;
+    mixin TextualContent;
+    mixin VisualStyle;
+    mixin LayoutMetrics;
+    mixin InteractionState;
+    mixin ToggleValue;
+    mixin SliderValue;
+    mixin TabState;
+    mixin SelectValue;
+    mixin ScrollState;
+    mixin AnimationState;
+    mixin Accessibility;
 
     pub var children: [Widget];
 
-    pub init(k: int) {
+    pub init(k: WidgetKind) {
         self.kind = k;
         self.text_val = "";
         self.on_click_action = nil;
@@ -424,7 +539,7 @@ frame Widget : WidgetTrait {
         self.opacity_val = 1.0;
         self.scale_val = 1.0;
         self.shadow_val = _shared_empty_shadow;
-        self.lifecycle_state = 1;
+        self.lifecycle_state = LIFECYCLE_ACTIVE;
         self.enter_transition = _shared_empty_trans;
         self.exit_transition = _shared_empty_trans;
         self.anim_property = _shared_empty_anim;
@@ -877,11 +992,13 @@ pub fn empty_blueprints(): [Blueprint] {
 }
 
 pub fn blueprint_add_constraint(bp: Blueprint, c: LayoutConstraint): Blueprint {
-    return Blueprint(variant_type=bp.variant_type, container_data_val=bp.container_data_val, text_data_val=bp.text_data_val, button_data_val=bp.button_data_val, constraints=bp.constraints + [c], children=bp.children);
+    bp.constraints.append(c);
+    return bp;
 }
 
 pub fn blueprint_add_child(bp: Blueprint, child: Blueprint): Blueprint {
-    return Blueprint(variant_type=bp.variant_type, container_data_val=bp.container_data_val, text_data_val=bp.text_data_val, button_data_val=bp.button_data_val, constraints=bp.constraints, children=bp.children + [child]);
+    bp.children.append(child);
+    return bp;
 }
 
 // Extra widgets from std/ui.lm

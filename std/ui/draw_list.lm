@@ -4,32 +4,62 @@
 // Emitted by builder2.lm in a single pass; replayed by replay.lm without recursion.
 
 // ── Draw command kinds ────────────────────────────────────────────────────────
-pub var DCMD_NONE: int = 0;
-pub var DCMD_RECT: int = 1;
-pub var DCMD_RECT_ROUNDED: int = 2;
-pub var DCMD_TEXT: int = 3;
-pub var DCMD_LINE: int = 4;
-pub var DCMD_CIRCLE: int = 5;
-pub var DCMD_CLIP_PUSH: int = 6;
-pub var DCMD_CLIP_POP: int = 7;
-pub var DCMD_TRIANGLE: int = 8;
-pub var DCMD_IMAGE: int = 9;
+// Real enum: dispatch on `cmd.kind` is type-checked and lowered to the tag
+// compare the LIR generator defines once for `==`/`match`. DCMD_* below bind
+// enum values (source-compatible names, no longer ints).
+enum DrawCmdKind {
+    None,
+    Rect,
+    RectRounded,
+    Text,
+    Line,
+    Circle,
+    ClipPush,
+    ClipPop,
+    Triangle,
+    Image
+}
+
+pub var DCMD_NONE = DrawCmdKind.None;
+pub var DCMD_RECT = DrawCmdKind.Rect;
+pub var DCMD_RECT_ROUNDED = DrawCmdKind.RectRounded;
+pub var DCMD_TEXT = DrawCmdKind.Text;
+pub var DCMD_LINE = DrawCmdKind.Line;
+pub var DCMD_CIRCLE = DrawCmdKind.Circle;
+pub var DCMD_CLIP_PUSH = DrawCmdKind.ClipPush;
+pub var DCMD_CLIP_POP = DrawCmdKind.ClipPop;
+pub var DCMD_TRIANGLE = DrawCmdKind.Triangle;
+pub var DCMD_IMAGE = DrawCmdKind.Image;
 
 // Hit zone kinds (mirrors Widget kinds for dispatch)
-pub var HZONE_BUTTON: int = 1;
-pub var HZONE_SLIDER: int = 2;
-pub var HZONE_CHECKBOX: int = 3;
-pub var HZONE_INPUT: int = 4;
-pub var HZONE_TOGGLE: int = 5;
-pub var HZONE_SELECT: int = 6;
-pub var HZONE_TAB: int = 7;
-pub var HZONE_TREE_NODE: int = 8;
-pub var HZONE_CUSTOM: int = 99;
+enum HitZoneKind {
+    None,
+    Button,
+    Slider,
+    Checkbox,
+    Input,
+    Toggle,
+    Select,
+    Tab,
+    TreeNode,
+    Custom
+}
+
+pub var HZONE_NONE = HitZoneKind.None;
+pub var HZONE_BUTTON = HitZoneKind.Button;
+pub var HZONE_SLIDER = HitZoneKind.Slider;
+pub var HZONE_CHECKBOX = HitZoneKind.Checkbox;
+pub var HZONE_INPUT = HitZoneKind.Input;
+pub var HZONE_TOGGLE = HitZoneKind.Toggle;
+pub var HZONE_SELECT = HitZoneKind.Select;
+pub var HZONE_TAB = HitZoneKind.Tab;
+pub var HZONE_TREE_NODE = HitZoneKind.TreeNode;
+pub var HZONE_CUSTOM = HitZoneKind.Custom;
 
 // ── DrawCmd ───────────────────────────────────────────────────────────────────
 // A single GPU-ready draw instruction. Approx 80 bytes vs Widget's ~400 bytes.
 frame DrawCmd {
-    pub var kind: int;
+    pub var kind: DrawCmdKind;
     pub var x: float;
     pub var y: float;
     pub var w: float;
@@ -112,7 +142,7 @@ pub fn dcmd_clip_pop(): DrawCmd {
 // Hit tested as a simple linear scan — no recursion needed.
 frame HitZone {
     pub var id: str;
-    pub var kind: int;
+    pub var kind: HitZoneKind;
     pub var x: float;
     pub var y: float;
     pub var w: float;
@@ -136,7 +166,7 @@ frame HitZone {
 
     pub init() {
         self.id = "";
-        self.kind = 0;
+        self.kind = HZONE_NONE;
         self.x = 0.0; self.y = 0.0;
         self.w = 0.0; self.h = 0.0;
         self.clip_x = 0.0; self.clip_y = 0.0;

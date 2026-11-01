@@ -250,3 +250,64 @@ pub fn set_from_array(arr: [int]): Set {
     }
     return s;
 }
+
+// ── Generic mutable Set (staged frame) ────────────────────────────────────────
+// Typed set parameterized by element type. Uses linear scan for membership;
+// suitable for moderate collections (HashSet covers large-scale use).
+
+staged frame GenericSet(T: type) {
+    pub var elements: [T];
+
+    pub init() {
+        self.elements = [] as [T];
+    }
+
+    pub fn add(value: T): bool {
+        if (self.contains(value)) { return false; }
+        self.elements.append(value);
+        return true;
+    }
+
+    pub fn remove(value: T): bool {
+        var i = 0;
+        while (i < len(self.elements)) {
+            if (self.elements[i] == value) {
+                var new_elems: [T] = [];
+                var j = 0;
+                while (j < len(self.elements)) {
+                    if (j != i) { new_elems.append(self.elements[j]); }
+                    j = j + 1;
+                }
+                self.elements = new_elems;
+                return true;
+            }
+            i = i + 1;
+        }
+        return false;
+    }
+
+    pub fn contains(value: T): bool {
+        var i = 0;
+        while (i < len(self.elements)) {
+            if (self.elements[i] == value) { return true; }
+            i = i + 1;
+        }
+        return false;
+    }
+
+    pub fn size(): int {
+        return len(self.elements);
+    }
+
+    pub fn is_empty(): bool {
+        return len(self.elements) == 0;
+    }
+
+    pub fn clear(): nil {
+        self.elements = [] as [T];
+    }
+
+    pub fn to_array(): [T] {
+        return self.elements;
+    }
+}

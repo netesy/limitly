@@ -190,14 +190,14 @@ c.rpm = 3000;             // promoted field, same storage the method reads
 Lymar does not use generic `Result` types. Instead, it uses fallible annotations like `int?` (generic error) or `int?DivisionByZero` (specific error).
 
 - **Success/Error constructors**: Values must be returned using `ok(value)` or `err(...)`.
-- **Error construction syntax** — exactly three shapes parse:
+- **Error construction syntax** — four shapes parse:
  - Generic error: `return err();`
  - Typed error without a payload: `return err(DivisionByZero);` (a bare identifier; it feeds only the static error set named in `int?DivisionByZero` and carries nothing at runtime)
- - Typed error with a payload: `return err(ValidationError("Value cannot be negative"));` (arguments are **positional**; the first is the runtime error value)
+ - Typed error with a positional payload: `return err(ValidationError("Value cannot be negative"));` (arguments are **positional**; the first is the runtime error value)
+ - Frame constructor with named arguments: `return err(Error(code="DivByZero", message="divisor is zero"));` (the inner `Error(...)` is a standard frame constructor call; named arguments are valid at that level)
 - **Never write these** — they do not parse:
- - `return err("ValidationError", "msg");` — a string cannot name an error type (`Expected error type name.`)
+ - `return err("ValidationError", "msg");` — a string literal cannot name an error type (`Expected error type name.`)
  - `return err(UnknownError { message = "msg" });` — error constructors take parentheses, not braces
- - `return err(UnknownError(message = "msg"));` — `name = expr` is a named argument only in an ordinary call; inside `err(...)` it parses as an assignment expression
 - **Propagator (`?`)**: Suffixing an expression with `?` will propagate the error up the call stack if it fails.
 - **Inline Handling (`? else`)**: You can handle errors inline with optional error variable capturing.
  ```lymar

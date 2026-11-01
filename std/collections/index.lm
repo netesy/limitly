@@ -8,7 +8,7 @@ pub import std.collections.deque show Deque;
 pub import std.collections.linked_list show Node, LinkedListIterator, LinkedList;
 pub import std.collections.map show HashMapWrapper, Map;
 pub import std.collections.hashmap show HashMap, hashmap;
-pub import std.collections.set show Set;
+pub import std.collections.set show Set, GenericSet;
 pub import std.collections.hashset show HashSetWrapper, HashSet;
 pub import std.collections.queue show Queue;
 pub import std.collections.stack show Stack;

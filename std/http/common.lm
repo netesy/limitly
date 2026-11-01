@@ -3,290 +3,273 @@
 import std.core as core;
 
 // --- HTTP Method constants ---
-var METHOD_GET = "GET";
-var METHOD_POST = "POST";
-var METHOD_PUT = "PUT";
-var METHOD_DELETE = "DELETE";
-var METHOD_PATCH = "PATCH";
-var METHOD_HEAD = "HEAD";
-var METHOD_OPTIONS = "OPTIONS";
-var METHOD_TRACE = "TRACE";
-var METHOD_CONNECT = "CONNECT";
+pub var METHOD_GET = "GET";
+pub var METHOD_POST = "POST";
+pub var METHOD_PUT = "PUT";
+pub var METHOD_DELETE = "DELETE";
+pub var METHOD_PATCH = "PATCH";
+pub var METHOD_HEAD = "HEAD";
+pub var METHOD_OPTIONS = "OPTIONS";
+pub var METHOD_TRACE = "TRACE";
+pub var METHOD_CONNECT = "CONNECT";
 
 // --- HTTP Status codes ---
-var STATUS_CONTINUE = 100;
-var STATUS_SWITCHING_PROTOCOLS = 101;
-var STATUS_OK = 200;
-var STATUS_CREATED = 201;
-var STATUS_ACCEPTED = 202;
-var STATUS_NO_CONTENT = 204;
-var STATUS_MOVED_PERMANENTLY = 301;
-var STATUS_FOUND = 302;
-var STATUS_NOT_MODIFIED = 304;
-var STATUS_BAD_REQUEST = 400;
-var STATUS_UNAUTHORIZED = 401;
-var STATUS_FORBIDDEN = 403;
-var STATUS_NOT_FOUND = 404;
-var STATUS_METHOD_NOT_ALLOWED = 405;
-var STATUS_REQUEST_TIMEOUT = 408;
-var STATUS_CONFLICT = 409;
-var STATUS_INTERNAL_SERVER_ERROR = 500;
-var STATUS_NOT_IMPLEMENTED = 501;
-var STATUS_BAD_GATEWAY = 502;
-var STATUS_SERVICE_UNAVAILABLE = 503;
-var STATUS_GATEWAY_TIMEOUT = 504;
+pub var STATUS_CONTINUE = 100;
+pub var STATUS_SWITCHING_PROTOCOLS = 101;
+pub var STATUS_OK = 200;
+pub var STATUS_CREATED = 201;
+pub var STATUS_ACCEPTED = 202;
+pub var STATUS_NO_CONTENT = 204;
+pub var STATUS_MOVED_PERMANENTLY = 301;
+pub var STATUS_FOUND = 302;
+pub var STATUS_SEE_OTHER = 303;
+pub var STATUS_NOT_MODIFIED = 304;
+pub var STATUS_TEMPORARY_REDIRECT = 307;
+pub var STATUS_PERMANENT_REDIRECT = 308;
+pub var STATUS_BAD_REQUEST = 400;
+pub var STATUS_UNAUTHORIZED = 401;
+pub var STATUS_FORBIDDEN = 403;
+pub var STATUS_NOT_FOUND = 404;
+pub var STATUS_METHOD_NOT_ALLOWED = 405;
+pub var STATUS_REQUEST_TIMEOUT = 408;
+pub var STATUS_CONFLICT = 409;
+pub var STATUS_GONE = 410;
+pub var STATUS_PAYLOAD_TOO_LARGE = 413;
+pub var STATUS_UNSUPPORTED_MEDIA_TYPE = 415;
+pub var STATUS_TOO_MANY_REQUESTS = 429;
+pub var STATUS_INTERNAL_SERVER_ERROR = 500;
+pub var STATUS_NOT_IMPLEMENTED = 501;
+pub var STATUS_BAD_GATEWAY = 502;
+pub var STATUS_SERVICE_UNAVAILABLE = 503;
+pub var STATUS_GATEWAY_TIMEOUT = 504;
 
 // --- Common Header names ---
-var HDR_CONTENT_TYPE = "Content-Type";
-var HDR_CONTENT_LENGTH = "Content-Length";
-var HDR_TRANSFER_ENCODING = "Transfer-Encoding";
-var HDR_CONNECTION = "Connection";
-var HDR_HOST = "Host";
-var HDR_USER_AGENT = "User-Agent";
-var HDR_ACCEPT = "Accept";
-var HDR_ACCEPT_ENCODING = "Accept-Encoding";
-var HDR_AUTHORIZATION = "Authorization";
-var HDR_SET_COOKIE = "Set-Cookie";
-var HDR_LOCATION = "Location";
-var HDR_CACHE_CONTROL = "Cache-Control";
+pub var HDR_CONTENT_TYPE = "Content-Type";
+pub var HDR_CONTENT_LENGTH = "Content-Length";
+pub var HDR_TRANSFER_ENCODING = "Transfer-Encoding";
+pub var HDR_CONNECTION = "Connection";
+pub var HDR_HOST = "Host";
+pub var HDR_USER_AGENT = "User-Agent";
+pub var HDR_ACCEPT = "Accept";
+pub var HDR_ACCEPT_ENCODING = "Accept-Encoding";
+pub var HDR_AUTHORIZATION = "Authorization";
+pub var HDR_SET_COOKIE = "Set-Cookie";
+pub var HDR_COOKIE = "Cookie";
+pub var HDR_LOCATION = "Location";
+pub var HDR_CACHE_CONTROL = "Cache-Control";
 
 // --- Common MIME types ---
-var MIME_TEXT_PLAIN = "text/plain";
-var MIME_TEXT_HTML = "text/html";
-var MIME_TEXT_CSS = "text/css";
-var MIME_TEXT_JAVASCRIPT = "application/javascript";
-var MIME_APPLICATION_JSON = "application/json";
-var MIME_APPLICATION_XML = "application/xml";
-var MIME_APPLICATION_FORM = "application/x-www-form-urlencoded";
-var MIME_MULTIPART_FORM = "multipart/form-data";
-var MIME_OCTET_STREAM = "application/octet-stream";
+pub var MIME_TEXT_PLAIN = "text/plain";
+pub var MIME_TEXT_HTML = "text/html";
+pub var MIME_TEXT_CSS = "text/css";
+pub var MIME_TEXT_JAVASCRIPT = "application/javascript";
+pub var MIME_APPLICATION_JSON = "application/json";
+pub var MIME_APPLICATION_XML = "application/xml";
+pub var MIME_APPLICATION_FORM = "application/x-www-form-urlencoded";
+pub var MIME_MULTIPART_FORM = "multipart/form-data";
+pub var MIME_OCTET_STREAM = "application/octet-stream";
 
 // --- HTTP Version constants ---
-var HTTP_1_1 = "HTTP/1.1";
-var HTTP_2_0 = "HTTP/2.0";
-var HTTP_3_0 = "HTTP/3.0";
+pub var HTTP_1_0 = "HTTP/1.0";
+pub var HTTP_1_1 = "HTTP/1.1";
+pub var HTTP_2_0 = "HTTP/2.0";
+pub var HTTP_3_0 = "HTTP/3.0";
 
 // --- HTTP/2 Frame Type constants ---
-var FRAME_DATA = 0;
-var FRAME_HEADERS = 1;
-var FRAME_PRIORITY = 2;
-var FRAME_RST_STREAM = 3;
-var FRAME_SETTINGS = 4;
-var FRAME_PUSH_PROMISE = 5;
-var FRAME_PING = 6;
-var FRAME_GOAWAY = 7;
-var FRAME_WINDOW_UPDATE = 8;
+pub var FRAME_DATA = 0;
+pub var FRAME_HEADERS = 1;
+pub var FRAME_PRIORITY = 2;
+pub var FRAME_RST_STREAM = 3;
+pub var FRAME_SETTINGS = 4;
+pub var FRAME_PUSH_PROMISE = 5;
+pub var FRAME_PING = 6;
+pub var FRAME_GOAWAY = 7;
+pub var FRAME_WINDOW_UPDATE = 8;
 
 // --- Default User-Agent string ---
-var DEFAULT_USER_AGENT = "Lymar/1.0";
+pub var DEFAULT_USER_AGENT = "Lymar/1.0";
+
+// --- Status code classification helpers ---
+pub fn is_informational(code: int): bool { return code >= 100 and code < 200; }
+pub fn is_success(code: int): bool { return code >= 200 and code < 300; }
+pub fn is_redirect(code: int): bool { return code >= 300 and code < 400; }
+pub fn is_client_error(code: int): bool { return code >= 400 and code < 500; }
+pub fn is_server_error(code: int): bool { return code >= 500 and code < 600; }
+pub fn is_error(code: int): bool { return code >= 400 and code < 600; }
+
+pub fn is_valid_method(m: str): bool {
+    var up = _builtin_string_to_upper(m);
+    return up == "GET" or up == "POST" or up == "PUT" or up == "DELETE" or up == "PATCH" or up == "HEAD" or up == "OPTIONS" or up == "TRACE" or up == "CONNECT";
+}
 
 // --- Status code to reason phrase mapping ---
-fn status_text(code: int): str {
-    if (code == 100) { return "Continue"; }
-    if (code == 101) { return "Switching Protocols"; }
-    if (code == 200) { return "OK"; }
-    if (code == 201) { return "Created"; }
-    if (code == 202) { return "Accepted"; }
-    if (code == 204) { return "No Content"; }
-    if (code == 301) { return "Moved Permanently"; }
-    if (code == 302) { return "Found"; }
-    if (code == 304) { return "Not Modified"; }
-    if (code == 400) { return "Bad Request"; }
-    if (code == 401) { return "Unauthorized"; }
-    if (code == 403) { return "Forbidden"; }
-    if (code == 404) { return "Not Found"; }
-    if (code == 405) { return "Method Not Allowed"; }
-    if (code == 408) { return "Request Timeout"; }
-    if (code == 409) { return "Conflict"; }
-    if (code == 500) { return "Internal Server Error"; }
-    if (code == 501) { return "Not Implemented"; }
-    if (code == 502) { return "Bad Gateway"; }
-    if (code == 503) { return "Service Unavailable"; }
-    if (code == 504) { return "Gateway Timeout"; }
+pub fn status_text(code: int): str {
+    if (code == 100) return "Continue";
+    if (code == 101) return "Switching Protocols";
+    if (code == 200) return "OK";
+    if (code == 201) return "Created";
+    if (code == 202) return "Accepted";
+    if (code == 204) return "No Content";
+    if (code == 301) return "Moved Permanently";
+    if (code == 302) return "Found";
+    if (code == 303) return "See Other";
+    if (code == 304) return "Not Modified";
+    if (code == 307) return "Temporary Redirect";
+    if (code == 308) return "Permanent Redirect";
+    if (code == 400) return "Bad Request";
+    if (code == 401) return "Unauthorized";
+    if (code == 403) return "Forbidden";
+    if (code == 404) return "Not Found";
+    if (code == 405) return "Method Not Allowed";
+    if (code == 408) return "Request Timeout";
+    if (code == 409) return "Conflict";
+    if (code == 410) return "Gone";
+    if (code == 413) return "Payload Too Large";
+    if (code == 415) return "Unsupported Media Type";
+    if (code == 429) return "Too Many Requests";
+    if (code == 500) return "Internal Server Error";
+    if (code == 501) return "Not Implemented";
+    if (code == 502) return "Bad Gateway";
+    if (code == 503) return "Service Unavailable";
+    if (code == 504) return "Gateway Timeout";
     return "Unknown";
 }
 
-// --- Parse an HTTP status line (e.g. "HTTP/1.1 200 OK") ---
-// Returns [version, code_str, reason]
-fn parse_status_line(line: str): [str] {
-    // Format: HTTP/1.x CODE REASON
+// Parse status line: returns [version, code_str, reason]
+pub fn parse_status_line(line: str): [str] {
     var parts: [str] = [];
-    var start: int = 0;
-    var i: int = 0;
-    while (i < len(line)) {
-        if (substring(line, i, i + 1) == " ") {
-            if (i > start) { parts = parts + [substring(line, start, i)]; }
-            start = i + 1;
-            // After the first space, the rest (after the second space) is the reason
-            if (len(parts) == 2) {
-                parts = parts + [substring(line, i + 1, len(line))];
-                return parts;
-            }
-        }
-        i = i + 1;
+    var p1 = _builtin_string_index_of(line, " ");
+    if (p1 == -1) {
+        parts.append(line);
+        return parts;
     }
-    if (start < len(line)) { parts = parts + [substring(line, start, len(line))]; }
+    var version = _builtin_substring(line, 0, p1);
+    parts.append(version);
+
+    var rest = _builtin_substring(line, p1 + 1, len(line));
+    var p2 = _builtin_string_index_of(rest, " ");
+    if (p2 == -1) {
+        parts.append(rest);
+        parts.append("");
+        return parts;
+    }
+    var code_str = _builtin_substring(rest, 0, p2);
+    var reason = _builtin_substring(rest, p2 + 1, len(rest));
+    parts.append(code_str);
+    parts.append(reason);
     return parts;
 }
 
-// --- Parse HTTP headers from a block of text (after status line, before body) ---
-// Returns a list of header strings in "Name: Value" format
-fn parse_headers(block: str): [str] {
-    var lines: [str] = [];
+// Parse headers block into a dictionary mapping lowercase names to values
+pub fn parse_headers(block: str): {str: str} {
+    var headers: {str: str} = {};
     var start: int = 0;
     var i: int = 0;
     while (i < len(block)) {
-        if (substring(block, i, i + 1) == "\n") {
-            var line = substring(block, start, i);
-            // Strip trailing \r
-            if (len(line) > 0 and substring(line, len(line) - 1, len(line)) == "\r") {
-                line = substring(line, 0, len(line) - 1);
+        if (_builtin_substring(block, i, i + 1) == "\n") {
+            var line = _builtin_substring(block, start, i);
+            if (len(line) > 0 and _builtin_substring(line, len(line) - 1, len(line)) == "\r") {
+                line = _builtin_substring(line, 0, len(line) - 1);
             }
-            if (line != "") { lines = lines + [line]; }
+            if (len(line) > 0) {
+                var colon = _builtin_string_index_of(line, ":");
+                if (colon > 0) {
+                    var hname = _builtin_string_to_lower(_builtin_string_trim(_builtin_substring(line, 0, colon)));
+                    var hval = _builtin_string_trim(_builtin_substring(line, colon + 1, len(line)));
+                    headers[hname] = hval;
+                }
+            }
             start = i + 1;
         }
         i = i + 1;
     }
-    return lines;
+    return headers;
 }
 
-// --- Get a specific header value from a list of "Name: Value" header strings ---
-// Header name comparison is case-insensitive. Returns nil if not found.
-fn get_header(headers: [str], name: str): str? {
-    var lower_name = __http_to_lower(name);
-    var i: int = 0;
-    while (i < len(headers)) {
-        var header = headers[i];
-        match (__http_find(header, ":")) {
-            val colon_idx => {
-                var hname = __http_to_lower(substring(header, 0, colon_idx));
-                var hval = __http_trim(substring(header, colon_idx + 1, len(header)));
-                if (hname == lower_name) { return ok(hval); }
-            },
-            err e => { }
-        }
-        i = i + 1;
-    }
-    return err();
-}
-
-// --- Build a headers block string from a list of "Name: Value" strings ---
-fn build_headers_block(headers: [str]): str {
+// Build a serialized headers block string
+pub fn build_headers_block(headers: {str: str}): str {
     var block = "";
-    var i: int = 0;
-    while (i < len(headers)) {
-        block = block + headers[i] + "\r\n";
-        i = i + 1;
+    iter (name, value in headers) {
+        block = block + name + ": " + value + "\r\n";
     }
     return block;
 }
 
-// --- Build a full HTTP request string ---
-fn build_request(method: str, host: str, path: str, headers: [str], body: str): str {
-    var req = method + " " + path + " HTTP/1.1\r\n";
-    // Ensure Host header is present
-    var has_host: bool = false;
-    var has_conn: bool = false;
-    var has_cl: bool = false;
-    var i: int = 0;
-    while (i < len(headers)) {
-        var h = headers[i];
-        match (__http_find(h, ":")) {
-            val ci => {
-                var hn = __http_to_lower(substring(h, 0, ci));
-                if (hn == "host") { has_host = true; }
-                if (hn == "connection") { has_conn = true; }
-                if (hn == "content-length") { has_cl = true; }
-            },
-            err e => { }
-        }
-        req = req + h + "\r\n";
-        i = i + 1;
+// Parse URL-encoded query string or form body into a dictionary
+pub fn parse_query_string(qs: str): {str: str} {
+    var result: {str: str} = {};
+    if (len(qs) == 0) return result;
+    var raw = qs;
+    if (_builtin_substring(raw, 0, 1) == "?") {
+        raw = _builtin_substring(raw, 1, len(raw));
     }
-    if (!has_host) { req = req + "Host: " + host + "\r\n"; }
-    if (!has_conn) { req = req + "Connection: close\r\n"; }
-    if (!has_cl and body != "") { req = req + "Content-Length: " + (len(body) as str) + "\r\n"; }
-    req = req + "\r\n";
-    req = req + body;
-    return req;
-}
-
-// --- Parse URL-encoded form body into a list of "key=value" strings ---
-fn parse_form_body(body: str): [str] {
     var pairs: [str] = [];
-    var start: int = 0;
-    var i: int = 0;
-    while (i < len(body)) {
-        if (substring(body, i, i + 1) == "&") {
-            if (i > start) { pairs = pairs + [substring(body, start, i)]; }
+    var start = 0;
+    var i = 0;
+    while (i < len(raw)) {
+        if (_builtin_substring(raw, i, i + 1) == "&") {
+            if (i > start) {
+                pairs.append(_builtin_substring(raw, start, i));
+            }
             start = i + 1;
         }
         i = i + 1;
     }
-    if (start < len(body)) { pairs = pairs + [substring(body, start, len(body))]; }
-    return pairs;
+    if (start < len(raw)) {
+        pairs.append(_builtin_substring(raw, start, len(raw)));
+    }
+
+    var p = 0;
+    while (p < len(pairs)) {
+        var pair = pairs[p];
+        var eq = _builtin_string_index_of(pair, "=");
+        if (eq > 0) {
+            var k = _builtin_substring(pair, 0, eq);
+            var v = _builtin_substring(pair, eq + 1, len(pair));
+            result[k] = v;
+        } elif (len(pair) > 0) {
+            result[pair] = "";
+        }
+        p = p + 1;
+    }
+    return result;
 }
 
-// --- Internal helpers ---
+// Build URL query string from parameters
+pub fn build_query_string(params: {str: str}): str {
+    var out = "";
+    var first = true;
+    iter (k, v in params) {
+        if (!first) {
+            out = out + "&";
+        } else {
+            first = false;
+        }
+        out = out + k + "=" + v;
+    }
+    return out;
+}
 
-fn __http_find(s: str, needle: str): int? {
-    if (needle == "") { return 0; }
-    if (len(needle) > len(s)) { return nil; }
+// Parse Cookie header into dictionary of cookie name-value pairs
+pub fn parse_cookies(cookie_header: str): {str: str} {
+    var cookies: {str: str} = {};
+    if (len(cookie_header) == 0) return cookies;
+    var start = 0;
     var i = 0;
-    while (i <= len(s) - len(needle)) {
-        var found = true;
-        var j = 0;
-        while (j < len(needle)) {
-            if (substring(s, i + j, i + j + 1) != substring(needle, j, j + 1)) {
-                found = false;
-                j = len(needle);
-            } else {
-                j = j + 1;
+    while (i <= len(cookie_header)) {
+        if (i == len(cookie_header) or _builtin_substring(cookie_header, i, i + 1) == ";") {
+            var part = _builtin_string_trim(_builtin_substring(cookie_header, start, i));
+            if (len(part) > 0) {
+                var eq = _builtin_string_index_of(part, "=");
+                if (eq > 0) {
+                    var k = _builtin_string_trim(_builtin_substring(part, 0, eq));
+                    var v = _builtin_string_trim(_builtin_substring(part, eq + 1, len(part)));
+                    cookies[k] = v;
+                }
             }
-        }
-        if (found) { return i; }
-        i = i + 1;
-    }
-    return nil;
-}
-
-fn __http_to_lower(s: str): str {
-    var r = "";
-    var i = 0;
-    while (i < len(s)) {
-        var ch = substring(s, i, i + 1);
-        if (ch >= "A" and ch <= "Z") {
-            var code: int = (ch as int) + 32;
-            r = r + (code as str);
-        } else {
-            r = r + ch;
+            start = i + 1;
         }
         i = i + 1;
     }
-    return r;
-}
-
-fn __http_trim(s: str): str {
-    var start: int = 0;
-    var go: bool = true;
-    while (start < len(s) and go) {
-        var ch = substring(s, start, start + 1);
-        if (ch == " " or ch == "\t" or ch == "\r" or ch == "\n") {
-            start = start + 1;
-        } else {
-            go = false;
-        }
-    }
-    var end: int = len(s) - 1;
-    go = true;
-    while (end >= start and go) {
-        var ch = substring(s, end, end + 1);
-        if (ch == " " or ch == "\t" or ch == "\r" or ch == "\n") {
-            end = end - 1;
-        } else {
-            go = false;
-        }
-    }
-    if (start > end) { return ""; }
-    return substring(s, start, end + 1);
+    return cookies;
 }

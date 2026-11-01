@@ -356,7 +356,7 @@ pub fn parse_tables(reader: r.ByteReader): FontInfo? {
         reader.skip(4); // checkSum
         var offset = reader.read_u32();
         var length = reader.read_u32();
-        tables = tables + [TableRecord(tag, offset, length)];
+        tables.append(TableRecord(tag, offset, length));
     }
 
     var find_table_offset = fn(t_tag: int): int {
@@ -450,24 +450,24 @@ pub fn parse_tables(reader: r.ByteReader): FontInfo? {
 
         var end_codes: [int] = [];
         for (var i = 0; i < seg_count; i = i + 1) {
-            end_codes = end_codes + [reader.read_u16()];
+            end_codes.append(reader.read_u16());
         }
         reader.skip(2); // reservedPad
 
         var start_codes: [int] = [];
         for (var i = 0; i < seg_count; i = i + 1) {
-            start_codes = start_codes + [reader.read_u16()];
+            start_codes.append(reader.read_u16());
         }
 
         var id_deltas: [int] = [];
         for (var i = 0; i < seg_count; i = i + 1) {
-            id_deltas = id_deltas + [reader.read_i16()];
+            id_deltas.append(reader.read_i16());
         }
 
         var id_range_offsets_base = reader.tell();
         var id_range_offsets: [int] = [];
         for (var i = 0; i < seg_count; i = i + 1) {
-            id_range_offsets = id_range_offsets + [reader.read_u16()];
+            id_range_offsets.append(reader.read_u16());
         }
 
         var cmap4 = CmapFormat4();
@@ -490,7 +490,7 @@ pub fn parse_tables(reader: r.ByteReader): FontInfo? {
             var s_char = reader.read_u32();
             var e_char = reader.read_u32();
             var s_glyph = reader.read_u32();
-            groups = groups + [CmapGroup(s_char, e_char, s_glyph)];
+            groups.append(CmapGroup(s_char, e_char, s_glyph));
         }
         var cmap12 = CmapFormat12();
         cmap12.groups = groups;

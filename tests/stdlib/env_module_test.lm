@@ -98,6 +98,41 @@ fn test_surfaces_moved_out_of_env(): int {
     return 1;
 }
 
+fn test_env_advanced(): int {
+    print("Testing Env Advanced Extensions...");
+    env.set("LYMAR_INT_VAR", "42");
+    env.set("LYMAR_BOOL_VAR", "true");
+
+    assert(env.has("LYMAR_INT_VAR"), "has failed for present var");
+    assert(not env.has("LYMAR_NONEXISTENT_VAR"), "has failed for absent var");
+    assert(env.get_int("LYMAR_INT_VAR", 0) == 42, "get_int failed");
+    assert(env.get_int("LYMAR_ABSENT_VAR", 99) == 99, "get_int fallback failed");
+    assert(env.get_bool("LYMAR_BOOL_VAR", false) == true, "get_bool failed");
+    assert(env.get_bool("LYMAR_ABSENT_VAR", true) == true, "get_bool fallback failed");
+
+    var dict = env.to_dict();
+    assert(dict["LYMAR_INT_VAR"] == "42", "to_dict failed");
+
+    var all_keys = env.keys();
+    assert(len(all_keys) > 0, "keys failed");
+
+    // Test dotenv parsing
+    var dotenv_sample = "# Comment line\nAPP_NAME=Limitless\nPORT=8080\nDEBUG=true\n";
+    var parsed_env = env.parse_env(dotenv_sample);
+    assert(parsed_env["APP_NAME"] == "Limitless", "parse_env APP_NAME");
+    assert(parsed_env["PORT"] == "8080", "parse_env PORT");
+    assert(parsed_env["DEBUG"] == "true", "parse_env DEBUG");
+
+    var loaded = env.load_dotenv("DOTENV_TEST_VAR=loaded_ok\n");
+    assert(loaded >= 1, "load_dotenv count");
+    assert(env.get_or("DOTENV_TEST_VAR", "") == "loaded_ok", "load_dotenv verification");
+
+    env.unset("LYMAR_INT_VAR");
+    env.unset("LYMAR_BOOL_VAR");
+    env.unset("DOTENV_TEST_VAR");
+    return 1;
+}
+
 fn main(): int {
     print("=== Env Module Test Suite ===");
 
@@ -106,6 +141,7 @@ fn main(): int {
     assert(test_empty_value_behavior() == 1, "Empty value test failed");
     assert(test_optional_unwrapping() == 1, "Optional unwrapping test failed");
     assert(test_surfaces_moved_out_of_env() == 1, "Moved surfaces test failed");
+    assert(test_env_advanced() == 1, "Env advanced test failed");
 
     print("All env tests passed successfully.");
     return 0;

@@ -33,20 +33,20 @@ frame Particle: gtraits.Updatable {
     }
 
     pub fn spawn(
-        pos: any,
-        vel: any,
-        acc: any,
-        c_start: any,
-        c_end: any,
+        pos: types.Vec2,
+        vel: types.Vec2,
+        acc: types.Vec2,
+        c_start: types.Color,
+        c_end: types.Color,
         s_start: float,
         s_end: float,
         life_span: float
     ): nil {
-        self.pos = pos as types.Vec2;
-        self.vel = vel as types.Vec2;
-        self.acc = acc as types.Vec2;
-        self.color_start = c_start as types.Color;
-        self.color_end = c_end as types.Color;
+        self.pos = pos;
+        self.vel = vel;
+        self.acc = acc;
+        self.color_start = c_start;
+        self.color_end = c_end;
         self.size_start = s_start;
         self.size_end = s_end;
         self.life = 0.0;
@@ -91,7 +91,7 @@ frame Particle: gtraits.Updatable {
 }
 
 frame ParticleEmitter2D: gtraits.Updatable, gtraits.Drawable {
-    pub var position: any;
+    pub var position: types.Vec2;
     pub var particles: [Particle];
     pub var max_particles: int;
     pub var active: bool;
@@ -106,11 +106,11 @@ frame ParticleEmitter2D: gtraits.Updatable, gtraits.Drawable {
     pub var speed_max: float;
     pub var angle_min: float;
     pub var angle_max: float;
-    pub var gravity: any;
+    pub var gravity: types.Vec2;
     pub var size_start: float;
     pub var size_end: float;
-    pub var color_start: any;
-    pub var color_end: any;
+    pub var color_start: types.Color;
+    pub var color_end: types.Color;
 
     // Seed state for deterministic fast random numbers
     pub var rng_state: int;

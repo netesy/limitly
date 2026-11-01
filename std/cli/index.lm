@@ -18,7 +18,7 @@ frame ArgParser {
             if (string.String(arg).starts_with("-")) {
                 self.options[arg] = true;
             } else {
-                self.args = self.args + [arg];
+                self.args.append(arg);
             }
         }
     }
