@@ -1,7 +1,7 @@
 import std.scene.scene as scene;
 import std.scene.node as node;
 
-frame SceneBuilder {
+frame Builder {
     pub var active_scene: scene.Scene;
 
     pub init(s: scene.Scene = scene.Scene()) {

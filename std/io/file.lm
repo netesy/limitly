@@ -4,6 +4,7 @@ import std.resource as res;
 import std.internal.runtime as rt;
 import std.io.reader show Reader;
 import std.io.writer show Writer;
+import std.core show Disposable;
 
 frame FileNotFound { pub var path: str; }
 frame PermissionDenied { pub var path: str; pub var operation: str; }
@@ -13,9 +14,9 @@ frame UnknownError { pub var message: str; }
 
 pub type IOError = FileNotFound | PermissionDenied | DiskFull | NetworkError | UnknownError;
 
-frame File : Reader, Writer {
-    embed res.ResourceReader;
-    embed res.ResourceWriter;
+frame File : Reader, Writer, Disposable {
+    embed res.Reader;
+    embed res.Writer;
 
     pub var path: str;
     pub var resource: res.Resource;
@@ -23,6 +24,17 @@ frame File : Reader, Writer {
     pub init(p: str, r: res.Resource) {
         self.path = p;
         self.resource = r;
+    }
+
+    pub deinit() {
+        self.dispose();
+    }
+
+    pub fn dispose(): nil {
+        if (self.resource.is_open_val) {
+            self.close();
+        }
+        return nil;
     }
 
     pub fn read(args: [any] = [] as [any]): any {

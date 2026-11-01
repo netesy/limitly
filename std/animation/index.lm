@@ -17,7 +17,7 @@ enum Easing {
 }
 
 // Animation Lifecycle State Enumeration
-enum AnimationState {
+enum State {
     Idle,
     Running,
     Paused,
@@ -29,7 +29,7 @@ enum AnimationState {
 
 // ── Global Preferences & Accessibility ────────────────────────────────────
 
-frame AnimationPreferences {
+frame Preferences {
     pub var enabled: bool;
     pub var reduce_motion: bool;
     pub var duration_scale: float;
@@ -41,7 +41,7 @@ frame AnimationPreferences {
     }
 }
 
-pub var global_animation_preferences: AnimationPreferences = AnimationPreferences(true, false, 1.0);
+pub var global_animation_preferences: Preferences = Preferences(true, false, 1.0);
 
 // ── Easing Resolver ─────────────────────────────────────────────────────────
 
@@ -199,7 +199,7 @@ frame PropertyAnimation {
     pub var elapsed: float;
     pub var delay: float;
     pub var easing: Easing;
-    pub var state: AnimationState;
+    pub var state: State;
     pub var is_spring: bool;
     pub var is_repeat: bool;
     pub var is_reverse: bool;
@@ -214,7 +214,7 @@ frame PropertyAnimation {
         self.elapsed = 0.0;
         self.delay = 0.0;
         self.easing = easing;
-        self.state = AnimationState.Idle;
+        self.state = State.Idle;
         self.is_spring = false;
         self.is_repeat = false;
         self.is_reverse = false;
@@ -225,31 +225,31 @@ frame PropertyAnimation {
     pub fn play(): nil {
         if (not global_animation_preferences.enabled or global_animation_preferences.reduce_motion) {
             self.current_val = self.target_val;
-            self.state = AnimationState.Completed;
+            self.state = State.Completed;
             return;
         }
-        self.state = AnimationState.Running;
+        self.state = State.Running;
     }
 
     pub fn pause(): nil {
-        self.state = AnimationState.Paused;
+        self.state = State.Paused;
     }
 
     pub fn resume(): nil {
-        if (self.state == AnimationState.Paused) {
-            self.state = AnimationState.Running;
+        if (self.state == State.Paused) {
+            self.state = State.Running;
         }
     }
 
     pub fn stop(): nil {
-        self.state = AnimationState.Completed;
+        self.state = State.Completed;
         self.current_val = self.target_val;
     }
 
     pub fn reset(): nil {
         self.elapsed = 0.0;
         self.current_val = self.start_val;
-        self.state = AnimationState.Idle;
+        self.state = State.Idle;
     }
 
     pub fn set_delay(d: float): PropertyAnimation {
@@ -286,18 +286,18 @@ frame PropertyAnimation {
             self.start_val = self.current_val; // Interruptible: continue from current visual position!
             self.target_val = new_target;
             self.elapsed = 0.0;
-            self.state = AnimationState.Running;
+            self.state = State.Running;
         }
     }
 
     pub fn update(dt: float): float {
         if (not global_animation_preferences.enabled or global_animation_preferences.reduce_motion) {
             self.current_val = self.target_val;
-            self.state = AnimationState.Completed;
+            self.state = State.Completed;
             return self.current_val;
         }
 
-        if (self.state != AnimationState.Running) {
+        if (self.state != State.Running) {
             return self.current_val;
         }
 
@@ -314,7 +314,7 @@ frame PropertyAnimation {
             self.current_val = self.spring_model.update(self.current_val, self.target_val, dt);
             if (self.spring_model.is_at_rest(self.current_val, self.target_val)) {
                 self.current_val = self.target_val;
-                self.state = AnimationState.Completed;
+                self.state = State.Completed;
             }
         } else {
             self.elapsed = self.elapsed + dt;
@@ -324,7 +324,7 @@ frame PropertyAnimation {
                 } else {
                     self.current_val = self.target_val;
                 }
-                self.state = AnimationState.Completed;
+                self.state = State.Completed;
             } else {
                 var progress = self.elapsed / effective_dur;
                 if (progress >= 1.0) {
@@ -342,7 +342,7 @@ frame PropertyAnimation {
                         } else {
                             self.current_val = self.target_val;
                         }
-                        self.state = AnimationState.Completed;
+                        self.state = State.Completed;
                     }
                 } else {
                     if (len(self.keyframes_model.frames) > 0) {
@@ -360,7 +360,7 @@ frame PropertyAnimation {
 
 // ── Animation Composition Helpers ──────────────────────────────────────────
 
-frame AnimationSequence {
+frame Sequence {
     pub var anims: [PropertyAnimation];
     pub var current_idx: int;
 
@@ -369,7 +369,7 @@ frame AnimationSequence {
         self.current_idx = 0;
     }
 
-    pub fn add(anim: PropertyAnimation): AnimationSequence {
+    pub fn add(anim: PropertyAnimation): Sequence {
         self.anims.append(anim);
         return self;
     }
@@ -380,32 +380,32 @@ frame AnimationSequence {
             return 0.0;
         }
         var cur = self.anims[self.current_idx];
-        if (cur.state == AnimationState.Idle) {
+        if (cur.state == State.Idle) {
             cur.play();
         }
         var v_out = cur.update(dt);
-        if (cur.state == AnimationState.Completed) {
+        if (cur.state == State.Completed) {
             self.current_idx = self.current_idx + 1;
         }
         return v_out;
     }
 }
 
-pub fn sequence(a1: PropertyAnimation, a2: PropertyAnimation): AnimationSequence {
-    var seq = AnimationSequence();
+pub fn sequence(a1: PropertyAnimation, a2: PropertyAnimation): Sequence {
+    var seq = Sequence();
     seq.add(a1);
     seq.add(a2);
     return seq;
 }
 
-frame AnimationParallel {
+frame Parallel {
     pub var anims: [PropertyAnimation];
 
     pub init() {
         self.anims = [] as [PropertyAnimation];
     }
 
-    pub fn add(anim: PropertyAnimation): AnimationParallel {
+    pub fn add(anim: PropertyAnimation): Parallel {
         self.anims.append(anim);
         return self;
     }
@@ -414,7 +414,7 @@ frame AnimationParallel {
         var i = 0;
         while (i < len(self.anims)) {
             var a = self.anims[i];
-            if (a.state == AnimationState.Idle) {
+            if (a.state == State.Idle) {
                 a.play();
             }
             a.update(dt);
@@ -425,7 +425,7 @@ frame AnimationParallel {
     pub fn is_completed(): bool {
         var i = 0;
         while (i < len(self.anims)) {
-            if (self.anims[i].state != AnimationState.Completed) {
+            if (self.anims[i].state != State.Completed) {
                 return false;
             }
             i = i + 1;
@@ -434,8 +434,8 @@ frame AnimationParallel {
     }
 }
 
-pub fn parallel_group(a1: PropertyAnimation, a2: PropertyAnimation): AnimationParallel {
-    var p = AnimationParallel();
+pub fn parallel_group(a1: PropertyAnimation, a2: PropertyAnimation): Parallel {
+    var p = Parallel();
     p.add(a1);
     p.add(a2);
     return p;
@@ -494,7 +494,7 @@ frame Transition {
 
 // ── Shared Animation Manager ───────────────────────────────────────────────
 
-frame AnimationManager {
+frame Animator {
     pub var active_animations: [PropertyAnimation];
 
     pub init() {
@@ -513,7 +513,7 @@ frame AnimationManager {
         while (i < len(self.active_animations)) {
             var anim = self.active_animations[i];
             anim.update(dt);
-            if (anim.state == AnimationState.Running or anim.state == AnimationState.Paused) {
+            if (anim.state == State.Running or anim.state == State.Paused) {
                 remaining.append(anim);
             }
             i = i + 1;
@@ -540,7 +540,7 @@ frame IMGUIAnimationState {
         if (anim == nil) {
             anim = PropertyAnimation(target, target, dur, easing);
             anim.current_val = target;
-            anim.state = AnimationState.Completed;
+            anim.state = State.Completed;
             self.float_anims[prop_name] = anim;
             return target;
         }
@@ -596,5 +596,5 @@ frame IMGUIAnimationStore {
     }
 }
 
-pub var global_animation_manager: AnimationManager = AnimationManager();
+pub var global_animation_manager: Animator = Animator();
 pub var global_imgui_anim_store: IMGUIAnimationStore = IMGUIAnimationStore();

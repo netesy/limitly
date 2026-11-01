@@ -1,0 +1,127 @@
+// Standard Library NOL Value Representation
+// Netesy Object Language (NOL)
+
+enum Type {
+    Null,
+    Bool,
+    Int,
+    Float,
+    String,
+    Array,
+    Object
+}
+
+frame Value {
+    pub kind: Type;
+    pub bool_val: bool;
+    pub int_val: int;
+    pub float_val: float;
+    pub str_val: str;
+    pub array_val: [any];
+    pub obj_keys: [str];
+    pub obj_vals: [any];
+
+    pub fn is_null(): bool { return self.kind == Type.Null; }
+    pub fn is_bool(): bool { return self.kind == Type.Bool; }
+    pub fn is_int(): bool { return self.kind == Type.Int; }
+    pub fn is_float(): bool { return self.kind == Type.Float; }
+    pub fn is_string(): bool { return self.kind == Type.String; }
+    pub fn is_array(): bool { return self.kind == Type.Array; }
+    pub fn is_object(): bool { return self.kind == Type.Object; }
+
+    pub fn as_bool(): bool { return self.bool_val; }
+    pub fn as_int(): int { return self.int_val; }
+    pub fn as_float(): float { return self.float_val; }
+    pub fn as_string(): str { return self.str_val; }
+    pub fn as_array(): [any] { return self.array_val; }
+
+    pub fn count(): int {
+        if (self.kind == Type.Array) {
+            return len(self.array_val);
+        } elif (self.kind == Type.Object) {
+            return len(self.obj_keys);
+        }
+        return 0;
+    }
+
+    pub fn get(key: str): any {
+        if (self.kind != Type.Object) return nil;
+        var total = len(self.obj_keys);
+        var i = 0;
+        while (i < total) {
+            if (self.obj_keys[i] == key) {
+                return self.obj_vals[i];
+            }
+            i = i + 1;
+        }
+        return nil;
+    }
+
+    pub fn set(key: str, value_node: any) {
+        if (self.kind != Type.Object) return;
+        var total = len(self.obj_keys);
+        var i = 0;
+        while (i < total) {
+            if (self.obj_keys[i] == key) {
+                self.obj_vals[i] = value_node;
+                return;
+            }
+            i = i + 1;
+        }
+        self.obj_keys.append(key);
+        self.obj_vals.append(value_node);
+    }
+}
+
+pub fn make_null(): Value {
+    var arr: [any] = [];
+    var keys: [str] = [];
+    var vals: [any] = [];
+    return Value(kind=Type.Null, bool_val=false, int_val=0, float_val=0.0, str_val="", array_val=arr, obj_keys=keys, obj_vals=vals);
+}
+
+pub fn make_bool(v: bool): Value {
+    var arr: [any] = [];
+    var keys: [str] = [];
+    var vals: [any] = [];
+    return Value(kind=Type.Bool, bool_val=v, int_val=0, float_val=0.0, str_val="", array_val=arr, obj_keys=keys, obj_vals=vals);
+}
+
+pub fn make_int(v: int): Value {
+    var arr: [any] = [];
+    var keys: [str] = [];
+    var vals: [any] = [];
+    return Value(kind=Type.Int, bool_val=false, int_val=v, float_val=0.0, str_val="", array_val=arr, obj_keys=keys, obj_vals=vals);
+}
+
+pub fn make_float(v: float): Value {
+    var arr: [any] = [];
+    var keys: [str] = [];
+    var vals: [any] = [];
+    return Value(kind=Type.Float, bool_val=false, int_val=0, float_val=v, str_val="", array_val=arr, obj_keys=keys, obj_vals=vals);
+}
+
+pub fn make_string(v: str): Value {
+    var arr: [any] = [];
+    var keys: [str] = [];
+    var vals: [any] = [];
+    return Value(kind=Type.String, bool_val=false, int_val=0, float_val=0.0, str_val=v, array_val=arr, obj_keys=keys, obj_vals=vals);
+}
+
+pub fn make_array(v: [any]): Value {
+    var keys: [str] = [];
+    var vals: [any] = [];
+    return Value(kind=Type.Array, bool_val=false, int_val=0, float_val=0.0, str_val="", array_val=v, obj_keys=keys, obj_vals=vals);
+}
+
+pub fn make_object(keys: [str], vals: [any]): Value {
+    var arr: [any] = [];
+    return Value(kind=Type.Object, bool_val=false, int_val=0, float_val=0.0, str_val="", array_val=arr, obj_keys=keys, obj_vals=vals);
+}
+
+pub fn make_empty_object(): Value {
+    var keys: [str] = [];
+    var vals: [any] = [];
+    var arr: [any] = [];
+    return Value(kind=Type.Object, bool_val=false, int_val=0, float_val=0.0, str_val="", array_val=arr, obj_keys=keys, obj_vals=vals);
+}

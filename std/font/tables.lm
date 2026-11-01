@@ -3,15 +3,15 @@
 
 import std.font.reader as r;
 
-pub var TAG_HEAD: int = 0x68656164;
-pub var TAG_HHEA: int = 0x68686561;
-pub var TAG_MAXP: int = 0x6D617870;
-pub var TAG_HMTX: int = 0x686D7478;
-pub var TAG_LOCA: int = 0x6C6F6361;
-pub var TAG_GLYF: int = 0x676C7966;
-pub var TAG_CMAP: int = 0x636D6170;
-pub var TAG_OS2:  int = 0x4F532F32;
-pub var TAG_KERN: int = 0x6B65726E;
+pub const TAG_HEAD: int = 0x68656164;
+pub const TAG_HHEA: int = 0x68686561;
+pub const TAG_MAXP: int = 0x6D617870;
+pub const TAG_HMTX: int = 0x686D7478;
+pub const TAG_LOCA: int = 0x6C6F6361;
+pub const TAG_GLYF: int = 0x676C7966;
+pub const TAG_CMAP: int = 0x636D6170;
+pub const TAG_OS2:  int = 0x4F532F32;
+pub const TAG_KERN: int = 0x6B65726E;
 
 frame TableRecord {
     pub var tag: int;
@@ -127,7 +127,7 @@ frame CmapFormat12 {
     }
 }
 
-frame FontInfo {
+frame Info {
     pub var units_per_em: int;
     pub var index_to_loc_format: int; // 0 for short (u16*2), 1 for long (u32)
     pub var num_glyphs: int;
@@ -331,7 +331,7 @@ pub fn get_font_offset(reader: r.ByteReader, font_index: int): int {
     return -1;
 }
 
-pub fn parse_tables(reader: r.ByteReader): FontInfo? {
+pub fn parse_tables(reader: r.ByteReader): Info? {
     reader.seek(0);
     var scalar_type = reader.read_u32();
 
@@ -368,7 +368,7 @@ pub fn parse_tables(reader: r.ByteReader): FontInfo? {
         return -1;
     };
 
-    var info = FontInfo();
+    var info = Info();
 
     // 1. Parse 'head' table
     var head_offset = find_table_offset(TAG_HEAD);

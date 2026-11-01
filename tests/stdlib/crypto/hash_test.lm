@@ -1,4 +1,18 @@
 import std.resource as res;
+import std.crypto as crypto;
+
 print("=== Crypto Hash Tests ===");
 var r_wrap = res.create_hash_engine();
 print("Created.");
+
+// Test HashAlgorithm enum and Disposable
+var h = crypto.Hasher(crypto.HashAlgorithm.SHA256);
+h.update("hello");
+var digest = h.hex();
+assert(digest == "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824", "SHA256 digest match");
+h.dispose();
+
+var one_shot = crypto.hash(crypto.HashAlgorithm.SHA256, "hello");
+assert(one_shot == digest, "One-shot hash matches streaming");
+
+print("Crypto Hash Tests Passed.");

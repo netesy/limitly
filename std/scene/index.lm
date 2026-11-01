@@ -9,4 +9,4 @@ pub import std.scene.clip_node show ClipNode;
 pub import std.scene.effect_node show EffectNode;
 pub import std.scene.animation_node show AnimationNode;
 pub import std.scene.hit_test show HitTest;
-pub import std.scene.scene_builder show SceneBuilder;
+pub import std.scene.scene_builder show Builder;

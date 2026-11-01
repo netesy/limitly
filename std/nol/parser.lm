@@ -1,0 +1,328 @@
+// Standard Library NOL Parser
+// Netesy Object Language (NOL)
+
+import std.nol.value as value;
+import std.nol.document as document;
+import std.string as str_mod;
+
+fn _is_digit(ch: str): bool {
+    match (ch) {
+        "0" => { return true; },
+        "1" => { return true; },
+        "2" => { return true; },
+        "3" => { return true; },
+        "4" => { return true; },
+        "5" => { return true; },
+        "6" => { return true; },
+        "7" => { return true; },
+        "8" => { return true; },
+        "9" => { return true; },
+        _ => { return false; }
+    }
+}
+
+fn _is_ident_char(ch: str): bool {
+    if (_is_digit(ch)) return true;
+    if (ch >= "a" and ch <= "z") return true;
+    if (ch >= "A" and ch <= "Z") return true;
+    if (ch == "_" or ch == "-" or ch == ".") return true;
+    return false;
+}
+
+frame Parser {
+    pub text: str;
+    pub pos: int;
+    pub text_len: int;
+
+    pub init(text: str) {
+        self.text = text;
+        self.pos = 0;
+        self.text_len = len(text);
+    }
+
+    fn peek(): str {
+        if (self.pos >= self.text_len) return "";
+        return _builtin_substring(self.text, self.pos, self.pos + 1);
+    }
+
+    fn peek_next(): str {
+        if (self.pos + 1 >= self.text_len) return "";
+        return _builtin_substring(self.text, self.pos + 1, self.pos + 2);
+    }
+
+    fn advance(): str {
+        if (self.pos >= self.text_len) return "";
+        var ch = _builtin_substring(self.text, self.pos, self.pos + 1);
+        self.pos = self.pos + 1;
+        return ch;
+    }
+
+    fn skip_ws() {
+        var keep_skipping = true;
+        while (self.pos < self.text_len and keep_skipping) {
+            var ch = self.peek();
+            if (ch == " " or ch == "\t" or ch == "\n" or ch == "\r") {
+                self.advance();
+            } elif (ch == "#") {
+                self.advance();
+                if (self.peek() == "#") {
+                    // Multi-line block comment: ## ... ##
+                    self.advance();
+                    var in_comment = true;
+                    while (self.pos + 1 < self.text_len and in_comment) {
+                        if (self.peek() == "#" and self.peek_next() == "#") {
+                            self.advance();
+                            self.advance();
+                            in_comment = false;
+                        } else {
+                            self.advance();
+                        }
+                    }
+                } else {
+                    // Single-line comment: # ... \n
+                    while (self.pos < self.text_len and self.peek() != "\n") {
+                        self.advance();
+                    }
+                }
+            } else {
+                keep_skipping = false;
+            }
+        }
+    }
+
+    fn read_key(): str {
+        self.skip_ws();
+        var c = self.peek();
+        if (c == "\"" or c == "'") {
+            var quote = self.advance();
+            var buf = "";
+            while (self.pos < self.text_len and self.peek() != quote) {
+                if (self.peek() == "\\") {
+                    self.advance();
+                    var esc = self.advance();
+                    if (esc == "n") buf = buf + "\n";
+                    elif (esc == "r") buf = buf + "\r";
+                    elif (esc == "t") buf = buf + "\t";
+                    else buf = buf + esc;
+                } else {
+                    buf = buf + self.advance();
+                }
+            }
+            if (self.peek() == quote) self.advance();
+            return buf;
+        }
+
+        var key = "";
+        while (self.pos < self.text_len and _is_ident_char(self.peek())) {
+            key = key + self.advance();
+        }
+        return key;
+    }
+
+    fn parse_string(): value.Value {
+        var quote = self.advance();
+        var buf = "";
+        while (self.pos < self.text_len and self.peek() != quote) {
+            if (self.peek() == "\\") {
+                self.advance();
+                var esc = self.advance();
+                if (esc == "n") buf = buf + "\n";
+                elif (esc == "r") buf = buf + "\r";
+                elif (esc == "t") buf = buf + "\t";
+                elif (esc == "\"") buf = buf + "\"";
+                elif (esc == "'") buf = buf + "'";
+                elif (esc == "\\") buf = buf + "\\";
+                else buf = buf + esc;
+            } else {
+                buf = buf + self.advance();
+            }
+        }
+        if (self.peek() == quote) self.advance();
+        return value.make_string(buf);
+    }
+
+    fn parse_number(): value.Value {
+        var buf = "";
+        var is_fl = false;
+        if (self.peek() == "-") {
+            buf = buf + self.advance();
+        }
+        var in_num = true;
+        while (self.pos < self.text_len and in_num) {
+            var c = self.peek();
+            if (_is_digit(c)) {
+                buf = buf + self.advance();
+            } elif (c == "." or c == "e" or c == "E" or c == "+") {
+                is_fl = true;
+                buf = buf + self.advance();
+            } else {
+                in_num = false;
+            }
+        }
+        if (is_fl) {
+            var f_val = buf as float;
+            return value.make_float(f_val);
+        }
+        var i_val = buf as int;
+        return value.make_int(i_val);
+    }
+
+    fn parse_literal(): value.Value {
+        var word = "";
+        var in_word = true;
+        while (self.pos < self.text_len and in_word) {
+            var c = self.peek();
+            if ((c >= "a" and c <= "z") or (c >= "A" and c <= "Z")) {
+                word = word + self.advance();
+            } else {
+                in_word = false;
+            }
+        }
+        if (word == "true") return value.make_bool(true);
+        if (word == "false") return value.make_bool(false);
+        if (word == "null") return value.make_null();
+        return value.make_string(word);
+    }
+
+    pub fn parse_value(): any {
+        self.skip_ws();
+        var c = self.peek();
+        if (c == "{") {
+            self.advance();
+            var keys: [str] = [];
+            var vals: [any] = [];
+            var in_obj = true;
+            while (self.pos < self.text_len and in_obj) {
+                self.skip_ws();
+                if (self.peek() == "}") {
+                    in_obj = false;
+                } else {
+                    var k = self.read_key();
+                    if (len(k) == 0) {
+                        in_obj = false;
+                    } else {
+                        self.skip_ws();
+                        if (self.peek() == ":") self.advance();
+                        var v = self.parse_value();
+                        keys.append(k);
+                        vals.append(v);
+                        self.skip_ws();
+                        if (self.peek() == ",") self.advance();
+                    }
+                }
+            }
+            if (self.peek() == "}") self.advance();
+            return value.make_object(keys, vals);
+        } elif (c == "[") {
+            self.advance();
+            var items: [any] = [];
+            var in_arr = true;
+            while (self.pos < self.text_len and in_arr) {
+                self.skip_ws();
+                if (self.peek() == "]") {
+                    in_arr = false;
+                } else {
+                    var elem = self.parse_value();
+                    items.append(elem);
+                    self.skip_ws();
+                    if (self.peek() == ",") self.advance();
+                }
+            }
+            if (self.peek() == "]") self.advance();
+            return value.make_array(items);
+        } elif (c == "\"" or c == "'") {
+            return self.parse_string();
+        } elif (_is_digit(c) or c == "-") {
+            return self.parse_number();
+        } else {
+            return self.parse_literal();
+        }
+    }
+
+    fn parse_section_entries(): value.Value {
+        var keys: [str] = [];
+        var vals: [any] = [];
+        var in_sec = true;
+        while (self.pos < self.text_len and in_sec) {
+            self.skip_ws();
+            var c = self.peek();
+            if (c == "[" or len(c) == 0) {
+                in_sec = false;
+            } else {
+                var k = self.read_key();
+                if (len(k) == 0) {
+                    in_sec = false;
+                } else {
+                    self.skip_ws();
+                    if (self.peek() == ":") self.advance();
+                    var v = self.parse_value();
+                    keys.append(k);
+                    vals.append(v);
+                }
+            }
+        }
+        return value.make_object(keys, vals);
+    }
+
+    pub fn parse_doc(): any {
+        var root_keys: [str] = [];
+        var root_vals: [any] = [];
+        var in_doc = true;
+
+        while (self.pos < self.text_len and in_doc) {
+            self.skip_ws();
+            var c = self.peek();
+            if (len(c) == 0) {
+                in_doc = false;
+            } elif (c == "[") {
+                self.advance(); // skip '['
+                var sec_path = "";
+                while (self.pos < self.text_len and self.peek() != "]") {
+                    sec_path = sec_path + self.advance();
+                }
+                if (self.peek() == "]") self.advance();
+
+                var sec_trimmed = str_mod.trim(sec_path);
+                var sec_obj = self.parse_section_entries();
+
+                // Dotted section support (e.g. [dependencies.http] or [package])
+                var parts = str_mod.split(sec_trimmed, ".");
+                var total = len(parts);
+                if (total == 1) {
+                    root_keys.append(parts[0]);
+                    root_vals.append(sec_obj as any);
+                } elif (total > 1) {
+                    var curr_leaf = sec_obj;
+                    var p_idx = total - 1;
+                    while (p_idx > 0) {
+                        var k_arr: [str] = [parts[p_idx]];
+                        var v_arr: [any] = [curr_leaf];
+                        curr_leaf = value.make_object(k_arr, v_arr);
+                        p_idx = p_idx - 1;
+                    }
+                    root_keys.append(parts[0]);
+                    root_vals.append(curr_leaf as any);
+                }
+            } else {
+                var k = self.read_key();
+                if (len(k) == 0) {
+                    in_doc = false;
+                } else {
+                    self.skip_ws();
+                    if (self.peek() == ":") self.advance();
+                    var v = self.parse_value();
+                    root_keys.append(k);
+                    root_vals.append(v);
+                }
+            }
+        }
+
+        var root = value.make_object(root_keys, root_vals);
+        return document.Document(root) as any;
+    }
+}
+
+pub fn parse(text: str): any {
+    var p = Parser(text);
+    return p.parse_doc();
+}

@@ -6,12 +6,14 @@ import std.crypto.hmac as hmac;
 import std.crypto.cipher as cipher;
 import std.crypto.random as random;
 
+pub import std.crypto.hash show HashAlgorithm;
+
 // ── Re-exports: Hashing ────────────────────────────────────────────────────
-pub fn Hasher(algo: str = "sha256"): hash.Hasher {
+pub fn Hasher(algo: any = "sha256"): hash.Hasher {
     return hash.Hasher(algo);
 }
 
-pub fn hash(algo: str, data: str): str {
+pub fn hash(algo: any, data: str): str {
     return hash.hash(algo, data);
 }
 

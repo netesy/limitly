@@ -5,31 +5,12 @@ import std.time.timezone as timezone;
 import std.time.timer as timer;
 
 pub import std.time.instant show Instant;
-pub import std.time.duration show TimeDuration;
+pub import std.time.duration show Duration;
 pub import std.time.datetime show DateTime;
 pub import std.time.timezone show TimeZone;
 pub import std.time.timer show Timer;
 
-pub fn Instant(timestamp_ms: float): instant.Instant {
-    return instant.Instant(timestamp_ms);
-}
 
-pub fn Duration(seconds: int, microseconds: int): duration.TimeDuration {
-    return duration.TimeDuration(seconds, microseconds);
-}
-
-pub fn Time(timestamp: int, microseconds: int, tz: any): datetime.DateTime {
-    var tz_obj = tz as timezone.TimeZone;
-    return datetime.DateTime(timestamp, microseconds, tz_obj);
-}
-
-pub fn TimeZone(name: str, offset_hours: int, offset_minutes: int): timezone.TimeZone {
-    return timezone.TimeZone(name, offset_hours, offset_minutes);
-}
-
-pub fn Timer(): timer.Timer {
-    return timer.Timer();
-}
 
 // Global functions
 pub fn sleep_ms(ms: int): nil {
@@ -41,7 +22,7 @@ pub fn sleep_seconds(seconds: float): nil {
 }
 
 pub fn sleep_duration(dur: any): nil {
-    var d = dur as duration.TimeDuration;
+    var d = dur as duration.Duration;
     return datetime.sleep_duration(d);
 }
 

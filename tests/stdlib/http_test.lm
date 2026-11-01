@@ -1,7 +1,7 @@
 // HTTP tests - status codes, method validation, URL validation, client/server frames, and router
 
 import std.http as http;
-import std.http.router show Request, Response;
+import std.http.router as router;
 
 fn str_len(s: str): int {
     return len(s);
@@ -64,7 +64,7 @@ assert(cookies["user"] == "alice", "cookie user");
 assert(cookies["theme"] == "dark", "cookie theme");
 
 // HTTPRequest frame
-var req = http.HTTPRequest("GET", "https://api.example.com/v1/users");
+var req = http.Request("GET", "https://api.example.com/v1/users");
 req.set_header("Authorization", "Bearer token123");
 req.set_json("status: active");
 assert(req.method == "GET", "req method");
@@ -72,7 +72,7 @@ assert(req.header("authorization") == "Bearer token123", "req header case-insens
 assert(req.header("content-type") == "application/json", "req content-type");
 
 // HTTPResponse frame
-var resp = http.HTTPResponse(200, "OK", "hello response");
+var resp = http.Response(200, "OK", "hello response");
 resp.headers["content-type"] = "text/plain";
 assert(resp.is_success(), "resp is_success");
 assert(not resp.is_error(), "resp not is_error");
@@ -98,27 +98,27 @@ assert(sresp.header("content-type") == "application/json", "sresp content-type")
 // Router test
 var r = http.make_router();
 
-fn handle_home(request: Request): Response {
-    return Response(200, "welcome home");
+fn handle_home(request: router.RouteRequest): router.RouteResponse {
+    return router.RouteResponse(200, "welcome home");
 }
 
-fn handle_user(request: Request): Response {
+fn handle_user(request: router.RouteRequest): router.RouteResponse {
     var uid = request.param("id");
-    return Response(200, "user: " + uid);
+    return router.RouteResponse(200, "user: " + uid);
 }
 
 r.get("/", handle_home as any);
 r.get("/users/:id", handle_user as any);
 
-var res_home = r.handle(Request("GET", "/"));
+var res_home = r.handle(router.RouteRequest("GET", "/"));
 assert(res_home.status_code == 200, "router home status");
 assert(res_home.body == "welcome home", "router home body");
 
-var res_user = r.handle(Request("GET", "/users/42"));
+var res_user = r.handle(router.RouteRequest("GET", "/users/42"));
 assert(res_user.status_code == 200, "router user param status");
 assert(res_user.body == "user: 42", "router user param body");
 
-var res_404 = r.handle(Request("GET", "/notfound"));
+var res_404 = r.handle(router.RouteRequest("GET", "/notfound"));
 assert(res_404.status_code == 404, "router 404 status");
 
 print("HTTP tests passed!");

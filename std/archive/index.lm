@@ -6,22 +6,45 @@
 import std.io as io;
 import std.compress.zlib as zlib;
 
-frame ArchiveEntry {
+enum CompressionMethod {
+    Stored,
+    Deflated
+}
+
+pub fn compression_method_code(m: CompressionMethod): int {
+    match (m) {
+        CompressionMethod.Stored => { return 0; },
+        CompressionMethod.Deflated => { return 8; }
+    }
+}
+
+frame Entry {
     pub var filename: str;
     pub var uncompressed_size: int;
     pub var is_directory: bool;
     pub var data: str;
     pub var compression_method: int; // 0 = stored, 8 = deflated
 
-    pub init(name: str, size: int = 0, is_dir: bool = false, content: str = "", method: int = 0) {
+    pub init(name: str, size: int = 0, is_dir: bool = false, content: str = "", method: any = 0) {
         self.filename = name;
         self.uncompressed_size = size;
         self.is_directory = is_dir;
         self.data = content;
-        self.compression_method = method;
+        if (method as CompressionMethod != nil) {
+            self.compression_method = compression_method_code(method as CompressionMethod);
+        } else {
+            self.compression_method = method as int;
+        }
         if (len(content) > 0 and size == 0) {
             self.uncompressed_size = len(content);
         }
+    }
+
+    pub fn method(): CompressionMethod {
+        if (self.compression_method == 8) {
+            return CompressionMethod.Deflated;
+        }
+        return CompressionMethod.Stored;
     }
 
     pub fn text(): str {
@@ -34,20 +57,20 @@ frame ArchiveEntry {
 }
 
 frame Archive {
-    pub var entries: [ArchiveEntry];
+    pub var entries: [Entry];
     pub var archive_path: str;
 
     pub init(path: str = "") {
         self.archive_path = path;
-        self.entries = [] as [ArchiveEntry];
+        self.entries = [] as [Entry];
     }
 
-    pub fn add_entry(entry: ArchiveEntry): nil {
+    pub fn add_entry(entry: Entry): nil {
         self.entries.append(entry);
     }
 
     pub fn add_file(name: str, content: str): Archive {
-        var entry = ArchiveEntry(name=name, size=len(content), is_dir=false, content=content, method=0);
+        var entry = Entry(name=name, size=len(content), is_dir=false, content=content, method=0);
         self.entries.append(entry);
         return self;
     }
@@ -57,12 +80,12 @@ frame Archive {
         if (!_builtin_string_ends_with(dir_name, "/")) {
             dir_name = dir_name + "/";
         }
-        var entry = ArchiveEntry(name=dir_name, size=0, is_dir=true, content="", method=0);
+        var entry = Entry(name=dir_name, size=0, is_dir=true, content="", method=0);
         self.entries.append(entry);
         return self;
     }
 
-    pub fn get_entry(name: str): ArchiveEntry? {
+    pub fn get_entry(name: str): Entry? {
         var i = 0;
         while (i < len(self.entries)) {
             if (self.entries[i].filename == name) {
@@ -79,7 +102,7 @@ frame Archive {
             var missing: str? = nil;
             return missing;
         }
-        var entry = entry_opt as ArchiveEntry;
+        var entry = entry_opt as Entry;
         return ok(entry.data);
     }
 
@@ -132,7 +155,7 @@ frame Archive {
         var entry_opt = self.get_entry(name);
         match (entry_opt) {
             val entry => {
-                var e = entry as ArchiveEntry;
+                var e = entry as Entry;
                 var dest = target_dir + "/" + e.filename;
                 if (e.is_directory) {
                     ensure_dir(dest);
@@ -487,7 +510,7 @@ pub fn read_tar_from_bytes(path: str, bytes: [int]): Archive {
 
             
             if (len(filename) > 0) {
-                arch.add_entry(ArchiveEntry(name=filename, size=size, is_dir=is_dir, content=data_str, method=0));
+                arch.add_entry(Entry(name=filename, size=size, is_dir=is_dir, content=data_str, method=0));
             }
 
             // Advance offset past header and padded data
@@ -566,7 +589,7 @@ pub fn read_zip_from_bytes(path: str, bytes: [int]): Archive {
                 }
             }
 
-            arch.add_entry(ArchiveEntry(name=filename, size=uncomp_size, is_dir=is_dir, content=data_str, method=method));
+            arch.add_entry(Entry(name=filename, size=uncomp_size, is_dir=is_dir, content=data_str, method=method));
             offset = data_offset + comp_size;
         } else {
             // Not a local header, end of local entries

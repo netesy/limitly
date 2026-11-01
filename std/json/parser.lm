@@ -18,7 +18,7 @@ fn is_digit_char(ch: str): bool {
     }
 }
 
-frame JSONParser {
+frame Parser {
     pub idx: int;
     pub text: str;
 
@@ -75,7 +75,7 @@ frame JSONParser {
         }
     }
 
-    pub fn parse_string(): value.JSONValue {
+    pub fn parse_string(): value.Value {
         self.idx = self.idx + 1; // skip leading "
         var start = self.idx;
         var length = len(self.text);
@@ -93,7 +93,7 @@ frame JSONParser {
         return value.make_string(s);
     }
 
-    pub fn parse_bool(): value.JSONValue {
+    pub fn parse_bool(): value.Value {
         var ch = _builtin_substring(self.text, self.idx, self.idx + 1);
         if (ch == "t") {
             self.idx = self.idx + 4; // skip true
@@ -104,12 +104,12 @@ frame JSONParser {
         }
     }
 
-    pub fn parse_null(): value.JSONValue {
+    pub fn parse_null(): value.Value {
         self.idx = self.idx + 4; // skip null
         return value.make_null();
     }
 
-    pub fn parse_number(): value.JSONValue {
+    pub fn parse_number(): value.Value {
         var start = self.idx;
         var length = len(self.text);
         var keep_going = true;
@@ -126,7 +126,7 @@ frame JSONParser {
         return value.make_number(num_val);
     }
 
-    pub fn parse_array(): value.JSONValue {
+    pub fn parse_array(): value.Value {
         self.idx = self.idx + 1; // skip [
         var list: [any] = [];
         self.skip_whitespace();
@@ -155,7 +155,7 @@ frame JSONParser {
         return value.make_array(list);
     }
 
-    pub fn parse_object(): value.JSONValue {
+    pub fn parse_object(): value.Value {
         self.idx = self.idx + 1; // skip {
         var keys: [str] = [];
         var vals: [any] = [];
@@ -201,6 +201,6 @@ frame JSONParser {
 }
 
 pub fn parse(text: str): any {
-    var p = JSONParser(idx=0, text=text);
+    var p = Parser(idx=0, text=text);
     return p.parse_value();
 }

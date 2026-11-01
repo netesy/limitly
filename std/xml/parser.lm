@@ -2,7 +2,7 @@
 
 import std.xml.document as doc;
 
-frame XMLParser {
+frame Parser {
     pub idx: int;
     pub text: str;
 
@@ -139,8 +139,8 @@ frame XMLParser {
     }
 }
 
-pub fn parse(text: str): doc.XMLDocument {
-    var p = XMLParser(idx=0, text=text);
+pub fn parse(text: str): doc.Document {
+    var p = Parser(idx=0, text=text);
     var root = p.parse_node();
     return doc.make_document(root);
 }

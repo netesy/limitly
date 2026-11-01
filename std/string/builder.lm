@@ -1,4 +1,4 @@
-frame StringBuilder {
+frame Builder {
     pub var parts: [str] = [] as [str];
 
     pub init() {
@@ -6,7 +6,7 @@ frame StringBuilder {
     }
 
     // Append a fragment. Returns nil (not the builder) on purpose: returning a
-    // `StringBuilder` by value deep-copies the growing `parts` list on every call,
+    // `Builder` by value deep-copies the growing `parts` list on every call,
     // which made repeated appends quadratic. Callers use these as statements.
     pub fn append(s: str): nil {
         self.parts.append(s);
@@ -45,6 +45,6 @@ frame StringBuilder {
     }
 }
 
-pub fn builder(): StringBuilder {
-    return StringBuilder();
+pub fn builder(): Builder {
+    return Builder();
 }

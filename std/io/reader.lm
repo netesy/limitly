@@ -1,16 +1,16 @@
 // Standard Library I/O Reader Submodule
 
-import std.resource show Resource, ResourceReader;
+import std.resource show Resource, Reader;
 
 trait Reader {
     fn read(args: [any]): any;
 }
 
 frame StreamReader : Reader {
-    pub var r: ResourceReader;
+    pub var r: Reader;
 
     pub init(resource: Resource) {
-        self.r = ResourceReader(resource);
+        self.r = Reader(resource);
     }
 
     pub fn read(args: [any]): any {

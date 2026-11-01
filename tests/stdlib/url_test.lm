@@ -99,7 +99,7 @@ fn test_query_params(): int {
 fn test_builder(): int {
     print("Running URLBuilder tests...");
 
-    var builder = url.URLBuilder();
+    var builder = url.Builder();
     builder.set_scheme("https");
     builder.set_host("example.org");
     builder.set_port(9000);

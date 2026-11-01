@@ -9,7 +9,7 @@ import std.process.service as service;
 import std.internal.runtime as rt;
 import std.os as os;
 
-frame ProcessOutput {
+frame Output {
     pub var status: int;
     pub var stdout: str;
     pub var stderr: str;
@@ -154,9 +154,9 @@ frame Command {
         return self.execute();
     }
 
-    pub fn output(): ProcessOutput {
+    pub fn output(): Output {
         var exit_code = self.execute();
-        return ProcessOutput(status=exit_code, stdout="", stderr="");
+        return Output(status=exit_code, stdout="", stderr="");
     }
 }
 

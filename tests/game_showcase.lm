@@ -20,8 +20,8 @@ import std.gg as gg;
 fn main(): int {
     print(" === Launching Lymar Game IMGUI & Typography Showcase === ");
 
-    // Default screen size is 800x600, fully configurable via GameConfig or set_resolution
-    var cfg = game.GameConfig(
+    // Default screen size is 800x600, fully configurable via Config or set_resolution
+    var cfg = game.Config(
     title = "Lymar Game Engine - IMGUI & Typography Showcase",
     width = 800,
     height = 600,

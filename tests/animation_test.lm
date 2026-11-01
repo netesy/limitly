@@ -10,7 +10,7 @@ fn test_time_based_property_animation(): nil {
     var p_anim = anim.PropertyAnimation(0.0, 100.0, 1.0, anim.Easing.Out);
     p_anim.play();
 
-    assert(p_anim.state == anim.AnimationState.Running, "state running");
+    assert(p_anim.state == anim.State.Running, "state running");
 
     // Advance 0.5s
     var v1 = p_anim.update(0.5);
@@ -19,7 +19,7 @@ fn test_time_based_property_animation(): nil {
     // Advance to 1.0s (completion)
     var v2 = p_anim.update(0.5);
     assert(v2 == 100.0, "completed value");
-    assert(p_anim.state == anim.AnimationState.Completed, "state completed");
+    assert(p_anim.state == anim.State.Completed, "state completed");
 
     print("PropertyAnimation test passed.");
 }
@@ -138,7 +138,7 @@ fn test_keyframes_and_controls(): nil {
     assert(p_anim.current_val == 50.0, "seek 50%");
 
     p_anim.reset();
-    assert(p_anim.current_val == 0.0 and p_anim.state == anim.AnimationState.Idle, "reset");
+    assert(p_anim.current_val == 0.0 and p_anim.state == anim.State.Idle, "reset");
 
     print("Keyframes and controls test passed.");
 }
@@ -152,7 +152,7 @@ fn test_reduced_motion(): nil {
     p_anim.play();
 
     assert(p_anim.current_val == 100.0, "reduced motion instant jump");
-    assert(p_anim.state == anim.AnimationState.Completed, "reduced motion immediate completion");
+    assert(p_anim.state == anim.State.Completed, "reduced motion immediate completion");
 
     // Restore default
     anim.global_animation_preferences.reduce_motion = false;

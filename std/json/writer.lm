@@ -3,29 +3,29 @@
 import std.json.value as value;
 
 pub fn stringify(val_any: any): str {
-    var jval = val_any as value.JSONValue;
+    var jval = val_any as value.Value;
     if (jval == nil) {
         return "null";
     }
 
     match (jval.kind) {
-        value.JSONType.String => {
+        value.Type.String => {
             return "\"" + jval.str_val + "\"";
         },
-        value.JSONType.Number => {
+        value.Type.Number => {
             var num = jval.num_val;
             return "{num}";
         },
-        value.JSONType.Bool => {
+        value.Type.Bool => {
             if (jval.bool_val == true) {
                 return "true";
             }
             return "false";
         },
-        value.JSONType.Null => {
+        value.Type.Null => {
             return "null";
         },
-        value.JSONType.Array => {
+        value.Type.Array => {
             var res = "[";
             var i = 0;
             var list_len = len(jval.list_val);
@@ -39,7 +39,7 @@ pub fn stringify(val_any: any): str {
             res = res + "]";
             return res;
         },
-        value.JSONType.Object => {
+        value.Type.Object => {
             var res = "{";
             var i = 0;
             var keys_len = len(jval.obj_keys);

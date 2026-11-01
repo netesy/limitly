@@ -29,30 +29,30 @@ type c_bool = int;
 type c_void = int;
 
 // Alignment constants
-pub var ALIGNMENT_CHAR: int = 1;
-pub var ALIGNMENT_SHORT: int = 2;
-pub var ALIGNMENT_INT: int = 4;
-pub var ALIGNMENT_LONG: int = 8;
-pub var ALIGNMENT_LONGLONG: int = 8;
-pub var ALIGNMENT_PTR: int = 8;
-pub var ALIGNMENT_FLOAT: int = 4;
-pub var ALIGNMENT_DOUBLE: int = 8;
-pub var ALIGNMENT_MAX: int = 8;
+pub const ALIGNMENT_CHAR: int = 1;
+pub const ALIGNMENT_SHORT: int = 2;
+pub const ALIGNMENT_INT: int = 4;
+pub const ALIGNMENT_LONG: int = 8;
+pub const ALIGNMENT_LONGLONG: int = 8;
+pub const ALIGNMENT_PTR: int = 8;
+pub const ALIGNMENT_FLOAT: int = 4;
+pub const ALIGNMENT_DOUBLE: int = 8;
+pub const ALIGNMENT_MAX: int = 8;
 
 // Clean FFI Type Identifiers
-pub var TYPE_I8: int = 0;
-pub var TYPE_U8: int = 1;
-pub var TYPE_I16: int = 2;
-pub var TYPE_U16: int = 3;
-pub var TYPE_I32: int = 4;
-pub var TYPE_U32: int = 5;
-pub var TYPE_I64: int = 6;
-pub var TYPE_U64: int = 7;
-pub var TYPE_F32: int = 8;
-pub var TYPE_F64: int = 9;
-pub var TYPE_PTR: int = 10;
-pub var TYPE_CSTRING: int = 11;
-pub var TYPE_VOID: int = 12;
+pub const TYPE_I8: int = 0;
+pub const TYPE_U8: int = 1;
+pub const TYPE_I16: int = 2;
+pub const TYPE_U16: int = 3;
+pub const TYPE_I32: int = 4;
+pub const TYPE_U32: int = 5;
+pub const TYPE_I64: int = 6;
+pub const TYPE_U64: int = 7;
+pub const TYPE_F32: int = 8;
+pub const TYPE_F64: int = 9;
+pub const TYPE_PTR: int = 10;
+pub const TYPE_CSTRING: int = 11;
+pub const TYPE_VOID: int = 12;
 
 // C ABI calling conventions
 enum CallingConvention {

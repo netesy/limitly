@@ -1,4 +1,4 @@
-frame MIMEParams {
+frame Params {
     pub keys: [str];
     pub values: [str];
 
@@ -81,13 +81,13 @@ frame MIMEParams {
     }
 }
 
-frame MIMEType {
+frame Type {
     pub is_valid: bool;
     pub main_type: str;
-    pub params: MIMEParams;
+    pub params: Params;
     pub subtype: str;
 
-    pub init(m: str, s: str, p: MIMEParams, v: bool) {
+    pub init(m: str, s: str, p: Params, v: bool) {
         self.is_valid = v;
         self.main_type = m;
         self.params = p;
@@ -122,10 +122,10 @@ frame MIMEType {
     }
 }
 
-pub fn parse(mime_str: str): MIMEType {
+pub fn parse(mime_str: str): Type {
     var s = trim(mime_str);
     if (s == "") {
-        return MIMEType("", "", MIMEParams(), false);
+        return Type("", "", Params(), false);
     }
 
     var parts = split_str(s, ";");
@@ -133,17 +133,17 @@ pub fn parse(mime_str: str): MIMEType {
 
     var slash_idx = index_of(type_part, "/");
     if (slash_idx == -1) {
-        return MIMEType("", "", MIMEParams(), false);
+        return Type("", "", Params(), false);
     }
 
     var main_type = to_lower(trim(_builtin_substring(type_part, 0, slash_idx)));
     var subtype = to_lower(trim(_builtin_substring(type_part, slash_idx + 1, len(type_part))));
 
     if (main_type == "" or subtype == "") {
-        return MIMEType("", "", MIMEParams(), false);
+        return Type("", "", Params(), false);
     }
 
-    var params = MIMEParams();
+    var params = Params();
     var i = 1;
     while (i < len(parts)) {
         var param_part = trim(parts[i]);
@@ -164,7 +164,7 @@ pub fn parse(mime_str: str): MIMEType {
         i = i + 1;
     }
 
-    return MIMEType(main_type, subtype, params, true);
+    return Type(main_type, subtype, params, true);
 }
 
 pub fn extension_to_mime(ext: str): str {

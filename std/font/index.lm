@@ -9,7 +9,7 @@ import std.io.file as _iof;
 
 pub import std.font.rasterizer show GlyphBitmap;
 
-frame FontMetrics {
+frame Metrics {
     pub var ascent: float;
     pub var descent: float;
     pub var line_gap: float;
@@ -58,19 +58,19 @@ frame GlyphMetrics {
 frame Font {
     pub var path: str;
     pub var is_valid: bool;
-    pub var info: t.FontInfo;
+    pub var info: t.Info;
     pub var reader: r.ByteReader;
 
-    pub init(font_path: str = "", font_info: t.FontInfo = t.FontInfo(), rdr: r.ByteReader = r.ByteReader([] as [int])) {
+    pub init(font_path: str = "", font_info: t.Info = t.Info(), rdr: r.ByteReader = r.ByteReader([] as [int])) {
         self.path = font_path;
         self.info = font_info;
         self.reader = rdr;
         self.is_valid = font_info.is_valid;
     }
 
-    pub fn get_metrics(font_size: float = 16.0): FontMetrics {
+    pub fn get_metrics(font_size: float = 16.0): Metrics {
         if (!self.is_valid) {
-            return FontMetrics();
+            return Metrics();
         }
         var upem = self.info.units_per_em;
         if (upem <= 0) upem = 1000;
@@ -82,7 +82,7 @@ frame Font {
         var lh = (asc - desc) + gap;
         if (lh < font_size) lh = font_size;
 
-        return FontMetrics(asc, desc, gap, lh, upem);
+        return Metrics(asc, desc, gap, lh, upem);
     }
 
     pub fn get_glyph_index(codepoint: int): int {

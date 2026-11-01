@@ -7,8 +7,8 @@ fn main(): int {
     print("Testing std.font module compilation...");
 
     // Just test that the module loads and types are accessible
-    var metrics = font.FontMetrics();
-    print("FontMetrics created: ascent={metrics.ascent}");
+    var metrics = font.Metrics();
+    print("Metrics created: ascent={metrics.ascent}");
 
     var typo_metrics = font.TypoMetrics();
     print("TypoMetrics created: ascent={typo_metrics.ascent}");

@@ -261,13 +261,13 @@ pub fn is_finite(x: float): bool { return not is_nan(x) and not is_inf(x); }
 pub fn nearly_equal(a: float, b: float, epsilon: float = 0.000001): bool { return abs(a - b) <= epsilon; }
 
 // Constants Re-exports
-pub var PI: float = 3.14159265358979323846;
-pub var E: float = 2.71828182845904523536;
-pub var TAU: float = 6.28318530717958647692;
-pub var PHI: float = 1.61803398874989484820;
-pub var INF: float = 1e300;
-pub var NAN: float = 0.0;
-pub var EPSILON: float = 0.00000000000000022204;
+pub const PI: float = 3.14159265358979323846;
+pub const E: float = 2.71828182845904523536;
+pub const TAU: float = 6.28318530717958647692;
+pub const PHI: float = 1.61803398874989484820;
+pub const INF: float = 1e300;
+pub const NAN: float = 0.0;
+pub const EPSILON: float = 0.00000000000000022204;
 
 // Arithmetic Re-exports
 pub fn abs(x: float): float { return arithmetic.abs(x); }

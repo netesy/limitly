@@ -8,7 +8,7 @@ pub fn pad_int(n: int, width: int): str {
     return s;
 }
 
-frame TimeDuration {
+frame Duration {
     pub microseconds: int;
     pub seconds: int;
 
@@ -18,32 +18,32 @@ frame TimeDuration {
     }
 
     // Factory methods
-    pub fn from_days(days: int): TimeDuration {
-        return TimeDuration(days * 86400, 0);
+    pub fn from_days(days: int): Duration {
+        return Duration(days * 86400, 0);
     }
 
-    pub fn from_hours(hours: int): TimeDuration {
-        return TimeDuration(hours * 3600, 0);
+    pub fn from_hours(hours: int): Duration {
+        return Duration(hours * 3600, 0);
     }
 
-    pub fn from_minutes(minutes: int): TimeDuration {
-        return TimeDuration(minutes * 60, 0);
+    pub fn from_minutes(minutes: int): Duration {
+        return Duration(minutes * 60, 0);
     }
 
-    pub fn from_seconds(seconds: int): TimeDuration {
-        return TimeDuration(seconds, 0);
+    pub fn from_seconds(seconds: int): Duration {
+        return Duration(seconds, 0);
     }
 
-    pub fn from_milliseconds(ms: int): TimeDuration {
-        return TimeDuration(ms / 1000, (ms % 1000) * 1000);
+    pub fn from_milliseconds(ms: int): Duration {
+        return Duration(ms / 1000, (ms % 1000) * 1000);
     }
 
-    pub fn from_microseconds(us: int): TimeDuration {
-        return TimeDuration(us / 1000000, us % 1000000);
+    pub fn from_microseconds(us: int): Duration {
+        return Duration(us / 1000000, us % 1000000);
     }
 
     // Arithmetic operations
-    pub fn add(other: TimeDuration): TimeDuration {
+    pub fn add(other: Duration): Duration {
         var total_microseconds: int = self.microseconds + other.microseconds;
         var carry: int = 0;
         if (total_microseconds >= 1000000) {
@@ -54,37 +54,37 @@ frame TimeDuration {
             carry = -1;
             total_microseconds = 1000000 + total_microseconds;
         }
-        return TimeDuration(
+        return Duration(
             self.seconds + other.seconds + carry,
             total_microseconds
         );
     }
 
-    pub fn subtract(other: TimeDuration): TimeDuration {
-        return self.add(TimeDuration(-other.seconds, -other.microseconds));
+    pub fn subtract(other: Duration): Duration {
+        return self.add(Duration(-other.seconds, -other.microseconds));
     }
 
-    pub fn multiply(factor: int): TimeDuration {
+    pub fn multiply(factor: int): Duration {
         var total_us: int = self.seconds * 1000000 * factor + self.microseconds * factor;
-        return TimeDuration(
+        return Duration(
             total_us / 1000000,
             ((total_us % 1000000) + 1000000) % 1000000
         );
     }
 
     // Comparison
-    pub fn equals(other: TimeDuration): bool {
-        var diff: TimeDuration = self.subtract(other);
+    pub fn equals(other: Duration): bool {
+        var diff: Duration = self.subtract(other);
         return diff.seconds == 0 and diff.microseconds == 0;
     }
 
-    pub fn greater_than(other: TimeDuration): bool {
+    pub fn greater_than(other: Duration): bool {
         if (self.seconds > other.seconds) return true;
         if (self.seconds < other.seconds) return false;
         return self.microseconds > other.microseconds;
     }
 
-    pub fn less_than(other: TimeDuration): bool {
+    pub fn less_than(other: Duration): bool {
         if (self.seconds < other.seconds) return true;
         if (self.seconds > other.seconds) return false;
         return self.microseconds < other.microseconds;

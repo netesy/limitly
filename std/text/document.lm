@@ -1,6 +1,6 @@
 import std.string as string;
 
-frame TextDocument {
+frame Document {
     pub var lines: [str];
 
     pub init(initial_text: str = "") {

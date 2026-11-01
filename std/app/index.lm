@@ -35,10 +35,10 @@ fn event_type_from_int(code: int): EventType {
 }
 
 // Modifier key flags
-pub var MOD_SHIFT: int = 1;
-pub var MOD_CONTROL: int = 2;
-pub var MOD_ALT: int = 4;
-pub var MOD_SUPER: int = 8;
+pub const MOD_SHIFT: int = 1;
+pub const MOD_CONTROL: int = 2;
+pub const MOD_ALT: int = 4;
+pub const MOD_SUPER: int = 8;
 
 // Event frame
 frame Event {
@@ -113,7 +113,7 @@ pub fn default_window_config(): WindowConfig {
 }
 
 // Application state
-frame AppState {
+frame State {
     pub var is_initialized: int;
     pub var is_running: int;
     pub var window_config: WindowConfig;
@@ -135,7 +135,7 @@ fn make_default_event(): Event {
 }
 
 // Global application state
-pub var global_app_state: AppState = AppState(
+pub var global_app_state: State = State(
     is_initialized=0,
     is_running=0,
     window_config=default_window_config(),

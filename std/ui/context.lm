@@ -29,7 +29,7 @@ frame UIContextState {
     pub var dirty: int;
     pub var current_blueprint: ui_types.Blueprint;
     pub var current_widget: ui.Widget;
-    pub var focus_manager: focus.FocusManager;
+    pub var focus_manager: focus.Manager;
     pub var modifiers: int;
     pub var get_clipboard_cb: (fn(): str)?;
     pub var set_clipboard_cb: (fn(str): nil)?;

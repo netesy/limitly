@@ -7,7 +7,7 @@
 // directory, home/temp locations, platform identity - belong to std.os.
 
 import std.process.process as proc;
-pub import std.process.command show Command, ProcessOutput;
+pub import std.process.command show Command, Output;
 pub import std.process.pipe show Pipe, PipeReader, PipeWriter, PipePair, create_pipe;
 
 frame Process {

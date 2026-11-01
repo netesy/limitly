@@ -1,18 +1,25 @@
+import std.types show Ordering;
+
+pub fn compare_ordering(a: any, b: any): Ordering {
+    if (a < b) {
+        return Ordering.Less;
+    } elif (a > b) {
+        return Ordering.Greater;
+    } else {
+        return Ordering.Equal;
+    }
+}
+
 pub fn _compare(a: any, b: any, descending: bool = false, cmp: fn(any, any): int = nil): int {
     var result: int = 0;
     if (cmp != nil) {
-        // Dynamic call on 'cmp' which is a function pointer
         var res = cmp(a, b);
         result = res as int;
     } else {
-        if (a < b) {
-            result = -1;
-        } else {
-            if (a > b) {
-                result = 1;
-            } else {
-                result = 0;
-            }
+        match (compare_ordering(a, b)) {
+            Ordering.Less => { result = -1; },
+            Ordering.Greater => { result = 1; },
+            Ordering.Equal => { result = 0; }
         }
     }
     if (descending == true) {
@@ -20,6 +27,7 @@ pub fn _compare(a: any, b: any, descending: bool = false, cmp: fn(any, any): int
     }
     return result;
 }
+
 
 pub fn _swap(items: [any], i: int, j: int) {
     var temp = items[i];

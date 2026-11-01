@@ -7,7 +7,7 @@
 // by concern:
 //
 //   string.lm   - frame String (wrapper around a str value)
-//   builder.lm  - frame StringBuilder + builder()
+//   builder.lm  - frame Builder + builder()
 //   basic.lm    - length, byte_at, substr, substring, compare
 //   search.lm   - contains, starts_with, ends_with
 //   casing.lm   - to_lower, to_upper, uppercase
@@ -17,7 +17,7 @@
 //   replace.lm  - replace
 
 pub import std.string.string show String;
-pub import std.string.builder show StringBuilder, builder;
+pub import std.string.builder show Builder, builder;
 pub import std.string.basic show length, byte_at, substr, substring, compare;
 pub import std.string.search show contains, starts_with, ends_with;
 pub import std.string.casing show to_lower, to_upper, lowercase, uppercase;

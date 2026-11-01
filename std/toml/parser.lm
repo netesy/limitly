@@ -19,11 +19,11 @@ fn is_digit_char(ch: str): bool {
     }
 }
 
-frame TOMLParser {
+frame Parser {
     pub idx: int;
     pub text: str;
 
-    pub fn parse_value(): value.TOMLValue {
+    pub fn parse_value(): value.Value {
         var keys: [str] = [];
         var vals: [any] = [];
         var length = len(self.text);
@@ -109,7 +109,7 @@ frame TOMLParser {
     }
 }
 
-pub fn parse(text: str): value.TOMLValue {
-    var p = TOMLParser(idx=0, text=text);
+pub fn parse(text: str): value.Value {
+    var p = Parser(idx=0, text=text);
     return p.parse_value();
 }

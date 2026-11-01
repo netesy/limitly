@@ -2,32 +2,28 @@ import std.fs.directory;
 import std.fs.permissions;
 import std.path.index as path;
 import std.io;
-import std.io.file;
 
 pub import std.fs.directory show create_dir, list_dir;
 pub import std.fs.permissions show Permissions;
 pub import std.path.index show Path;
-pub import std.io.file show UnknownError;
 
 frame FS {
     pub init() {}
     pub fn exists(p: Path): bool { return io.exists(p.value); }
-    pub fn create_dir(p: Path): any { return io.create_directory(p.value); }
-    pub fn remove(p: Path): any {
+    pub fn create_dir(p: Path): nil? { return io.create_directory(p.value); }
+    pub fn remove(p: Path): nil? {
         if (!io.delete(p.value)) {
-            var e = UnknownError(message="failed to remove path");
-            return err(e);
+            return err();
         }
         return ok(nil);
     }
-    pub fn rename(from_path: Path, to_path: Path): any {
+    pub fn rename(from_path: Path, to_path: Path): nil? {
         if (!io.rename(from_path.value, to_path.value)) {
-            var e = UnknownError(message="failed to rename path");
-            return err(e);
+            return err();
         }
         return ok(nil);
     }
-    pub fn list_dir(p: Path): any {
+    pub fn list_dir(p: Path): [str]? {
         return io.list_directory(p.value);
     }
 }

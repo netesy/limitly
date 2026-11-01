@@ -1,6 +1,6 @@
 // JSON Value representation
 
-enum JSONType {
+enum Type {
     Null,
     Bool,
     Number,
@@ -9,8 +9,8 @@ enum JSONType {
     Object
 }
 
-frame JSONValue {
-    pub kind: JSONType;
+frame Value {
+    pub kind: Type;
     pub str_val: str;
     pub num_val: int;
     pub bool_val: bool;
@@ -18,49 +18,49 @@ frame JSONValue {
     pub obj_keys: [str];
     pub obj_vals: [any];
 
-    pub fn is_null(): bool { return self.kind == JSONType.Null; }
-    pub fn is_string(): bool { return self.kind == JSONType.String; }
-    pub fn is_number(): bool { return self.kind == JSONType.Number; }
-    pub fn is_bool(): bool { return self.kind == JSONType.Bool; }
-    pub fn is_array(): bool { return self.kind == JSONType.Array; }
-    pub fn is_object(): bool { return self.kind == JSONType.Object; }
+    pub fn is_null(): bool { return self.kind == Type.Null; }
+    pub fn is_string(): bool { return self.kind == Type.String; }
+    pub fn is_number(): bool { return self.kind == Type.Number; }
+    pub fn is_bool(): bool { return self.kind == Type.Bool; }
+    pub fn is_array(): bool { return self.kind == Type.Array; }
+    pub fn is_object(): bool { return self.kind == Type.Object; }
 }
 
-pub fn make_string(v: str): JSONValue {
+pub fn make_string(v: str): Value {
     var list: [any] = [];
     var keys: [str] = [];
     var vals: [any] = [];
-    return JSONValue(kind=JSONType.String, str_val=v, num_val=0, bool_val=false, list_val=list, obj_keys=keys, obj_vals=vals);
+    return Value(kind=Type.String, str_val=v, num_val=0, bool_val=false, list_val=list, obj_keys=keys, obj_vals=vals);
 }
 
-pub fn make_number(v: int): JSONValue {
+pub fn make_number(v: int): Value {
     var list: [any] = [];
     var keys: [str] = [];
     var vals: [any] = [];
-    return JSONValue(kind=JSONType.Number, str_val="", num_val=v, bool_val=false, list_val=list, obj_keys=keys, obj_vals=vals);
+    return Value(kind=Type.Number, str_val="", num_val=v, bool_val=false, list_val=list, obj_keys=keys, obj_vals=vals);
 }
 
-pub fn make_bool(v: bool): JSONValue {
+pub fn make_bool(v: bool): Value {
     var list: [any] = [];
     var keys: [str] = [];
     var vals: [any] = [];
-    return JSONValue(kind=JSONType.Bool, str_val="", num_val=0, bool_val=v, list_val=list, obj_keys=keys, obj_vals=vals);
+    return Value(kind=Type.Bool, str_val="", num_val=0, bool_val=v, list_val=list, obj_keys=keys, obj_vals=vals);
 }
 
-pub fn make_null(): JSONValue {
+pub fn make_null(): Value {
     var list: [any] = [];
     var keys: [str] = [];
     var vals: [any] = [];
-    return JSONValue(kind=JSONType.Null, str_val="", num_val=0, bool_val=false, list_val=list, obj_keys=keys, obj_vals=vals);
+    return Value(kind=Type.Null, str_val="", num_val=0, bool_val=false, list_val=list, obj_keys=keys, obj_vals=vals);
 }
 
-pub fn make_array(v: [any]): JSONValue {
+pub fn make_array(v: [any]): Value {
     var keys: [str] = [];
     var vals: [any] = [];
-    return JSONValue(kind=JSONType.Array, str_val="", num_val=0, bool_val=false, list_val=v, obj_keys=keys, obj_vals=vals);
+    return Value(kind=Type.Array, str_val="", num_val=0, bool_val=false, list_val=v, obj_keys=keys, obj_vals=vals);
 }
 
-pub fn make_object(k: [str], v: [any]): JSONValue {
+pub fn make_object(k: [str], v: [any]): Value {
     var list: [any] = [];
-    return JSONValue(kind=JSONType.Object, str_val="", num_val=0, bool_val=false, list_val=list, obj_keys=k, obj_vals=v);
+    return Value(kind=Type.Object, str_val="", num_val=0, bool_val=false, list_val=list, obj_keys=k, obj_vals=v);
 }

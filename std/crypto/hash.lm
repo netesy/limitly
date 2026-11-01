@@ -2,6 +2,21 @@
 // Clean cryptographic hashing using OpenSSL EVP
 
 import std.ffi as ffi;
+import std.core show Disposable;
+
+// ── Supported Hash Algorithms ───────────────────────────────────────────────
+enum HashAlgorithm {
+    SHA256,
+    SHA512,
+    SHA384,
+    SHA1,
+    MD5
+}
+
+pub fn algo_name(algo: any): str {
+    var s = algo as str;
+    return _builtin_string_to_lower(s);
+}
 
 // ── Shared OpenSSL library loader ──────────────────────────────────────────
 pub var _LIB_PATH: str = "";
@@ -51,13 +66,13 @@ pub fn _open_lib(): any {
 }
 
 // ── Streaming Hasher frame ─────────────────────────────────────────────────
-frame Hasher {
+frame Hasher : Disposable {
     pub var algorithm: str;
     pub var ctx: any;
     pub var is_open: bool;
 
-    pub init(algo: str = "sha256") {
-        self.algorithm = algo;
+    pub init(algo: any = "sha256") {
+        self.algorithm = algo_name(algo);
         self.ctx = nil;
         self.is_open = false;
         unsafe {
@@ -65,7 +80,7 @@ frame Hasher {
             if (lib != nil and lib != 0) {
                 var fn_create = ffi.library_get_symbol(lib, "crypto_hasher_create");
                 if (fn_create != nil and fn_create != 0) {
-                    var cs_algo: ffi.CString = ffi.string_to_cstring(algo);
+                    var cs_algo: ffi.CString = ffi.string_to_cstring(self.algorithm);
                     var raw_ctx = ffi.foreign_call(
                         fn_create,
                         [ffi.cstring_as_ptr(cs_algo)],
@@ -80,6 +95,32 @@ frame Hasher {
                 }
             }
         }
+    }
+
+    pub deinit() {
+        self.dispose();
+    }
+
+    pub fn dispose(): nil {
+        if (self.is_open and self.ctx != nil and self.ctx != 0) {
+            unsafe {
+                var lib = _open_lib();
+                if (lib != nil and lib != 0) {
+                    var fn_free = ffi.library_get_symbol(lib, "crypto_hasher_free");
+                    if (fn_free != nil and fn_free != 0) {
+                        ffi.foreign_call(
+                            fn_free,
+                            [self.ctx],
+                            ffi.TYPE_VOID,
+                            [ffi.TYPE_PTR]
+                        );
+                    }
+                }
+            }
+            self.is_open = false;
+            self.ctx = nil;
+        }
+        return nil;
     }
 
     pub fn update(data: str): Hasher {
@@ -137,14 +178,15 @@ frame Hasher {
 
 // ── One-shot Hash Functions ────────────────────────────────────────────────
 
-pub fn hash(algo: str, data: str): str {
+pub fn hash(algo: any, data: str): str {
+    var algo_str = algo_name(algo);
     var out_str: str = "";
     unsafe {
         var lib = _open_lib();
         if (lib != nil and lib != 0) {
             var fn_hash = ffi.library_get_symbol(lib, "crypto_hash");
             if (fn_hash != nil and fn_hash != 0) {
-                var cs_algo: ffi.CString = ffi.string_to_cstring(algo);
+                var cs_algo: ffi.CString = ffi.string_to_cstring(algo_str);
                 var cs_data: ffi.CString = ffi.string_to_cstring(data);
                 var out_buf: int = ffi.alloc(130);
 

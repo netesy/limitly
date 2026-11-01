@@ -1,4 +1,4 @@
-frame FocusManager {
+frame Manager {
     pub var current_id: str;
 
     pub init() {

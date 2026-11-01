@@ -109,8 +109,8 @@ fn test_png(): nil {
     image.free(img);
 
     // Query — no pixel load
-    var info_opt: image.ImageInfo? = image.query("tests/ffi/test_out.png");
-    var info: image.ImageInfo = info_opt? else { fail("image.query failed"); return; };
+    var info_opt: image.Info? = image.query("tests/ffi/test_out.png");
+    var info: image.Info = info_opt? else { fail("image.query failed"); return; };
     print("  query -> w={info.width} h={info.height} c={info.channels}");
     check(info.width    == 150, "queried width  == 150");
     check(info.height   == 150, "queried height == 150");

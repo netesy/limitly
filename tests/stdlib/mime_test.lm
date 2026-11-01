@@ -56,7 +56,7 @@ fn test_classification(): int {
 fn test_parameters(): int {
     print("Running MIME parameters tests...");
 
-    var params = mime.MIMEParams();
+    var params = mime.Params();
     params.set("charset", "utf-8");
     params.set("boundary", "xyz");
 

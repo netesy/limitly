@@ -1,3 +1,4 @@
+pub import std.types show Ordering;
 // std/sort/index.lm
 // Sorting algorithms and utilities
 
@@ -41,4 +42,8 @@ pub fn partial_sort(items: [any], count: int, descending: bool = false, cmp: fn(
 
 pub fn sort(items: [any], descending: bool = false, cmp: fn(any, any): int = nil) {
     s.sort(items, descending, cmp);
+}
+
+pub fn compare(a: any, b: any): Ordering {
+    return s.compare_ordering(a, b);
 }

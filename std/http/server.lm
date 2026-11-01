@@ -149,7 +149,7 @@ frame ServerResponse {
 
 pub type ResultServerRequest = ServerRequest | str;
 
-frame HTTPServer {
+frame Server {
     pub var host: str;
     pub var port: int;
     pub var handle: int;
@@ -433,8 +433,8 @@ fn parse_hex(s: str): int {
     return value;
 }
 
-frame HTTP2Server {
-    embed HTTPServer;
+frame Server2 {
+    embed Server;
     pub var active_streams: int;
 
     pub init() {

@@ -8,12 +8,12 @@ import std.time.timer as timer;
 
 fn test_duration(): int {
     print("Testing Duration...");
-    var dur1 = dur.TimeDuration(10, 0) as dur.TimeDuration;
-    var dur2 = dur.TimeDuration(20, 0) as dur.TimeDuration;
-    var dur3 = dur1.add(dur2) as dur.TimeDuration;
+    var dur1 = dur.Duration(10, 0) as dur.Duration;
+    var dur2 = dur.Duration(20, 0) as dur.Duration;
+    var dur3 = dur1.add(dur2) as dur.Duration;
     assert(dur3.seconds == 30, "duration add failed");
 
-    var duration4 = dur.TimeDuration.from_seconds(5) as dur.TimeDuration;
+    var duration4 = dur.Duration.from_seconds(5) as dur.Duration;
     assert(duration4.seconds == 5, "from_seconds failed");
     return 1;
 }
@@ -41,12 +41,12 @@ fn test_time(): int {
 fn test_instant_and_timer(): int {
     print("Testing Instant and Timer...");
     var inst = instant.Instant(0.0) as instant.Instant;
-    var elapsed = inst.elapsed() as dur.TimeDuration;
+    var elapsed = inst.elapsed() as dur.Duration;
     assert(elapsed.seconds >= 0, "instant elapsed failed");
 
     var timer_obj = timer.Timer() as timer.Timer;
     timer_obj.reset();
-    var timer_elapsed = timer_obj.elapsed() as dur.TimeDuration;
+    var timer_elapsed = timer_obj.elapsed() as dur.Duration;
     assert(timer_elapsed.seconds >= 0, "timer elapsed failed");
     return 1;
 }

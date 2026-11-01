@@ -9,14 +9,14 @@ import std.http.common as common;
 
 // ---- HTTP Request / Response frames ----
 
-frame HTTPRequest {
+frame Request {
     pub var method: str;
     pub var url_str: str;
     pub var headers: {str: str};
     pub var body: str;
 
-    pub init(method: str = "GET", url_str: str = "") {
-        self.method = _builtin_string_to_upper(method);
+    pub init(method: any = "GET", url_str: str = "") {
+        self.method = common.method_name(method);
         self.url_str = url_str;
         self.headers = {} as {str: str};
         self.body = "";
@@ -26,7 +26,7 @@ frame HTTPRequest {
         self.headers["connection"] = "close";
     }
 
-    pub fn set_header(name: str, value: str): HTTPRequest {
+    pub fn set_header(name: str, value: str): Request {
         var lower_name = _builtin_string_to_lower(_builtin_string_trim(name));
         self.headers[lower_name] = value;
         return self;
@@ -40,7 +40,7 @@ frame HTTPRequest {
         return "";
     }
 
-    pub fn set_body(body: str, content_type: str = ""): HTTPRequest {
+    pub fn set_body(body: str, content_type: str = ""): Request {
         self.body = body;
         if (content_type != "") {
             self.set_header("content-type", content_type);
@@ -49,21 +49,21 @@ frame HTTPRequest {
         return self;
     }
 
-    pub fn set_json(json_str: str): HTTPRequest {
+    pub fn set_json(json_str: str): Request {
         return self.set_body(json_str, common.MIME_APPLICATION_JSON);
     }
 
-    pub fn set_form(params: {str: str}): HTTPRequest {
+    pub fn set_form(params: {str: str}): Request {
         var form_body = common.build_query_string(params);
         return self.set_body(form_body, common.MIME_APPLICATION_FORM);
     }
 
-    pub fn set_bearer_token(token: str): HTTPRequest {
+    pub fn set_bearer_token(token: str): Request {
         return self.set_header("authorization", "Bearer " + token);
     }
 }
 
-frame HTTPResponse {
+frame Response {
     pub var status_code: int;
     pub var status_text: str;
     pub var headers: {str: str};
@@ -129,7 +129,7 @@ frame HTTPResponse {
 
 // ---- HTTP Client ----
 
-frame HTTPClient {
+frame Client {
     pub var follow_redirects: bool;
     pub var max_redirects: int;
     pub var default_headers: {str: str};
@@ -140,46 +140,46 @@ frame HTTPClient {
         self.default_headers = {} as {str: str};
     }
 
-    pub fn set_header(name: str, value: str): HTTPClient {
+    pub fn set_header(name: str, value: str): Client {
         var lower = _builtin_string_to_lower(name);
         self.default_headers[lower] = value;
         return self;
     }
 
-    pub fn get(url_str: str): HTTPResponse?Error {
-        var req = HTTPRequest("GET", url_str);
+    pub fn get(url_str: str): Response?Error {
+        var req = Request("GET", url_str);
         return self.execute(req);
     }
 
-    pub fn post(url_str: str, body: str, content_type: str = "application/json"): HTTPResponse?Error {
-        var req = HTTPRequest("POST", url_str);
+    pub fn post(url_str: str, body: str, content_type: str = "application/json"): Response?Error {
+        var req = Request("POST", url_str);
         req.set_body(body, content_type);
         return self.execute(req);
     }
 
-    pub fn put(url_str: str, body: str, content_type: str = "application/json"): HTTPResponse?Error {
-        var req = HTTPRequest("PUT", url_str);
+    pub fn put(url_str: str, body: str, content_type: str = "application/json"): Response?Error {
+        var req = Request("PUT", url_str);
         req.set_body(body, content_type);
         return self.execute(req);
     }
 
-    pub fn delete(url_str: str): HTTPResponse?Error {
-        var req = HTTPRequest("DELETE", url_str);
+    pub fn delete(url_str: str): Response?Error {
+        var req = Request("DELETE", url_str);
         return self.execute(req);
     }
 
-    pub fn patch(url_str: str, body: str, content_type: str = "application/json"): HTTPResponse?Error {
-        var req = HTTPRequest("PATCH", url_str);
+    pub fn patch(url_str: str, body: str, content_type: str = "application/json"): Response?Error {
+        var req = Request("PATCH", url_str);
         req.set_body(body, content_type);
         return self.execute(req);
     }
 
-    pub fn head(url_str: str): HTTPResponse?Error {
-        var req = HTTPRequest("HEAD", url_str);
+    pub fn head(url_str: str): Response?Error {
+        var req = Request("HEAD", url_str);
         return self.execute(req);
     }
 
-    pub fn execute(req: HTTPRequest): HTTPResponse?Error {
+    pub fn execute(req: Request): Response?Error {
         var redirect_count = 0;
         var current_req = req;
 
@@ -189,7 +189,7 @@ frame HTTPClient {
                 var location = resp.header("location", "");
                 if (location == "") return ok(resp);
 
-                current_req = HTTPRequest(current_req.method, location);
+                current_req = Request(current_req.method, location);
                 redirect_count = redirect_count + 1;
             } else {
                 return ok(resp);
@@ -198,7 +198,7 @@ frame HTTPClient {
         return err(Error(code="RedirectError", message="too many redirects"));
     }
 
-    fn execute_single(req: HTTPRequest): HTTPResponse?Error {
+    fn execute_single(req: Request): Response?Error {
         var parsed = url.URL(req.url_str);
         if (not parsed.is_valid) return err(Error(code="URLError", message="invalid URL"));
 
@@ -213,8 +213,8 @@ frame HTTPClient {
             }
         }
 
-        var client = tcp.TCPClient();
-        client.connect(host_ip, port)?;
+        var sock = tcp.Socket();
+        sock.connect(host_ip, port)?;
 
         // Apply client default headers to request
         iter (dk, dv in self.default_headers) {
@@ -250,12 +250,12 @@ frame HTTPClient {
         }
         full_request = full_request + "\r\n" + req.body;
 
-        client.send(full_request)?;
+        sock.send(full_request)?;
 
         var response_data = "";
         var reading = true;
         while (reading) {
-            var chunk = client.recv()? else {
+            var chunk = sock.recv()? else {
                 reading = false;
                 "";
             };
@@ -267,14 +267,14 @@ frame HTTPClient {
                 }
             }
         }
-        client.close()?;
+        sock.close()?;
 
         return ok(parse_http_response(response_data));
     }
 }
 
-pub fn parse_http_response(raw: str): HTTPResponse {
-    var resp = HTTPResponse();
+pub fn parse_http_response(raw: str): Response {
+    var resp = Response();
     var header_end = _builtin_string_index_of(raw, "\r\n\r\n");
     if (header_end == -1) {
         header_end = _builtin_string_index_of(raw, "\n\n");
@@ -294,7 +294,7 @@ pub fn parse_http_response(raw: str): HTTPResponse {
     return resp;
 }
 
-fn populate_response_headers(resp: HTTPResponse, header_section: str) {
+fn populate_response_headers(resp: Response, header_section: str) {
     var lines: [str] = [];
     var curr = "";
     var i = 0;
@@ -333,31 +333,31 @@ fn populate_response_headers(resp: HTTPResponse, header_section: str) {
     }
 }
 
-pub fn get(url_str: str): HTTPResponse?Error {
+pub fn get(url_str: str): Response?Error {
     if (url_str == "") return err(Error(code="URLError", message="empty URL"));
-    var client = HTTPClient();
+    var client = Client();
     return client.get(url_str);
 }
 
-pub fn post(url_str: str, body: str, content_type: str = "application/json"): HTTPResponse?Error {
+pub fn post(url_str: str, body: str, content_type: str = "application/json"): Response?Error {
     if (url_str == "") return err(Error(code="URLError", message="empty URL"));
-    var client = HTTPClient();
+    var client = Client();
     return client.post(url_str, body, content_type);
 }
 
-pub fn put(url_str: str, body: str, content_type: str = "application/json"): HTTPResponse?Error {
+pub fn put(url_str: str, body: str, content_type: str = "application/json"): Response?Error {
     if (url_str == "") return err(Error(code="URLError", message="empty URL"));
-    var client = HTTPClient();
+    var client = Client();
     return client.put(url_str, body, content_type);
 }
 
-pub fn delete(url_str: str): HTTPResponse?Error {
+pub fn delete(url_str: str): Response?Error {
     if (url_str == "") return err(Error(code="URLError", message="empty URL"));
-    var client = HTTPClient();
+    var client = Client();
     return client.delete(url_str);
 }
 
-frame HTTP2Stream {
+frame Stream2 {
     pub var stream_id: int;
     pub var state: str;
     pub var headers: {str: str};
@@ -388,7 +388,7 @@ frame HTTP2Stream {
     }
 }
 
-frame HTTP3Client {
+frame Client3 {
     pub var host: str;
     pub var port: int;
     pub var is_quic_connected: bool;
@@ -404,11 +404,11 @@ frame HTTP3Client {
         return true;
     }
 
-    pub fn request(req: HTTPRequest): HTTPResponse?Error {
+    pub fn request(req: Request): Response?Error {
         if (!self.is_quic_connected) {
             self.connect();
         }
-        var resp = HTTPResponse(200, "OK", "");
+        var resp = Response(200, "OK", "");
         resp.protocol = "HTTP/3.0";
         return ok(resp);
     }

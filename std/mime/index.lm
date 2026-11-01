@@ -1,16 +1,16 @@
 import std.mime.types as types;
 
-pub import std.mime.types show MIMEType, MIMEParams;
+pub import std.mime.types show Type, Params;
 
-pub fn MIMEType(m: str, s: str, p: any, v: bool): types.MIMEType {
-    return types.MIMEType(m, s, p as types.MIMEParams, v);
+pub fn Type(m: str, s: str, p: any, v: bool): types.Type {
+    return types.Type(m, s, p as types.Params, v);
 }
 
-pub fn MIMEParams(): types.MIMEParams {
-    return types.MIMEParams();
+pub fn Params(): types.Params {
+    return types.Params();
 }
 
-pub fn parse(mime_str: str): types.MIMEType {
+pub fn parse(mime_str: str): types.Type {
     return types.parse(mime_str);
 }
 

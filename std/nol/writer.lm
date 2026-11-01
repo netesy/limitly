@@ -1,0 +1,110 @@
+// Standard Library NOL Serializer / Dumper
+// Netesy Object Language (NOL)
+
+import std.nol.value as value;
+
+fn _make_indent(spaces: int): str {
+    var res = "";
+    var i = 0;
+    while (i < spaces) {
+        res = res + " ";
+        i = i + 1;
+    }
+    return res;
+}
+
+fn _escape_str(s: str): str {
+    var res = "\"";
+    var length = len(s);
+    var i = 0;
+    while (i < length) {
+        var ch = _builtin_substring(s, i, i + 1);
+        if (ch == "\"") res = res + "\\\"";
+        elif (ch == "\\") res = res + "\\\\";
+        elif (ch == "\n") res = res + "\\n";
+        elif (ch == "\r") res = res + "\\r";
+        elif (ch == "\t") res = res + "\\t";
+        else res = res + ch;
+        i = i + 1;
+    }
+    return res + "\"";
+}
+
+pub fn dump(val_any: any, indent: int = 2, level: int = 0, is_root: bool = true): str {
+    var node = val_any as value.Value;
+    if (node == nil) return "null";
+
+    var lbrace = "{";
+    var rbrace = "}";
+
+    match (node.kind) {
+        value.Type.Null => {
+            return "null";
+        },
+        value.Type.Bool => {
+            if (node.bool_val) return "true";
+            return "false";
+        },
+        value.Type.Int => {
+            var num = node.int_val;
+            return "{num}";
+        },
+        value.Type.Float => {
+            var fl = node.float_val;
+            return "{fl}";
+        },
+        value.Type.String => {
+            return _escape_str(node.str_val);
+        },
+        value.Type.Array => {
+            var res = "[";
+            var total = len(node.array_val);
+            var i = 0;
+            while (i < total) {
+                res = res + dump(node.array_val[i], indent, level + 1, false);
+                if (i + 1 < total) res = res + ", ";
+                i = i + 1;
+            }
+            return res + "]";
+        },
+        value.Type.Object => {
+            var total = len(node.obj_keys);
+            if (total == 0) {
+                if (is_root) return "";
+                return lbrace + rbrace;
+            }
+
+            var pad = _make_indent(level * indent);
+            var next_pad = _make_indent((level + 1) * indent);
+            var s = "";
+            if (!is_root) s = lbrace + "\n";
+
+            var i = 0;
+            while (i < total) {
+                var k = node.obj_keys[i];
+                var v = node.obj_vals[i];
+
+                if (!is_root) s = s + next_pad;
+                s = s + k + ": " + dump(v, indent, level + 1, false);
+
+                if (is_root) {
+                    s = s + "\n";
+                } else {
+                    if (i + 1 < total) s = s + ",\n";
+                    else s = s + "\n";
+                }
+                i = i + 1;
+            }
+
+            if (!is_root) s = s + pad + rbrace;
+            return s;
+        },
+        _ => {
+            return "null";
+        }
+    }
+}
+
+pub fn stringify(val_any: any, indent: int = 2): str {
+    return dump(val_any, indent, 0, true);
+}

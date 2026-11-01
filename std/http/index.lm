@@ -1,20 +1,21 @@
 // Re-exports client, server, and router submodules.
 
-pub import std.http.common as common;
-pub import std.http.client as client;
-pub import std.http.server as server;
-pub import std.http.router as router;
+import std.http.common as common;
+import std.http.client as client;
+import std.http.server as server;
+import std.http.router as router;
 
 // Client
-pub import std.http.client show HTTPClient, HTTPRequest, HTTPResponse, get, post, put, delete;
+pub import std.http.client show Client, Request, Response, get, post, put, delete;
 
 // Server
-pub import std.http.server show HTTPServer, ServerRequest, ServerResponse, parse_server_request;
+pub import std.http.server show Server, ServerRequest, ServerResponse, parse_server_request;
 
 // Router
-pub import std.http.router show Request, Response, Route, Router, router, make_router;
+pub import std.http.router show Route, Router, router, make_router;
 
 // Constants & Helpers
+pub import std.http.common show Method;
 pub import std.http.common show
     status_text, is_success, is_redirect, is_client_error, is_server_error, is_error, is_valid_method,
     parse_status_line, parse_query_string, build_query_string, parse_cookies,

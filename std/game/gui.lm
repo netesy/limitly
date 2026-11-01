@@ -87,7 +87,7 @@ frame GUI {
     pub var combo_open_id: str;
     pub var editor_controllers: {str: any};
     pub var scroll_offsets: {str: float};
-    pub var focus_manager: focus.FocusManager;
+    pub var focus_manager: focus.Manager;
 
     // Immediate-mode Modifier Support (Shadows, Opacity, Disabled)
     pub var next_shadow: any;
@@ -163,7 +163,7 @@ frame GUI {
         self.combo_open_id = "";
         self.editor_controllers = {} as {str: any};
         self.scroll_offsets = {} as {str: float};
-        self.focus_manager = focus.FocusManager();
+        self.focus_manager = focus.Manager();
 
         self.next_shadow = nil;
         self.has_next_shadow = false;

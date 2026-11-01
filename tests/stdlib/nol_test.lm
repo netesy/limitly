@@ -1,0 +1,75 @@
+import std.nol as nol;
+
+fn main(): int {
+    print("=== Running NOL Parser Test ===\n");
+
+    var ob = "{";
+    var cb = "}";
+
+    var nol_doc = "# Lymar project manifest\n" +
+        "## Multi-line\n" +
+        "   header comment ##\n" +
+        "[package]\n" +
+        "name: \"my_project\"\n" +
+        "version: \"0.1.0\"\n" +
+        "edition: 2026\n" +
+        "active: true\n" +
+        "\n" +
+        "[dependencies]\n" +
+        "http: " + ob + " version: \"1.0.0\", path: \"../http\" " + cb + "\n" +
+        "crypto: \"0.2.0\"\n" +
+        "\n" +
+        "[native]\n" +
+        "sources: [\"src/native.c\", \"src/helper.c\"]\n";
+
+    var doc = nol.parse(nol_doc)? else {
+        assert(false, "Failed to parse NOL document");
+        return 1;
+    };
+
+    assert(doc.exists("package"), "package should exist");
+    assert(doc.exists("package.name"), "package.name should exist");
+    assert(doc.exists("package.version"), "package.version should exist");
+    assert(doc.exists("package.edition"), "package.edition should exist");
+    assert(doc.exists("package.active"), "package.active should exist");
+
+    var name_val = doc.get("package.name") as nol.Value;
+    assert(name_val != nil, "name_val should not be nil");
+    assert(name_val.is_string(), "name should be string");
+    assert(name_val.as_string() == "my_project", "name should be my_project");
+
+    var edition_val = doc.get("package.edition") as nol.Value;
+    assert(edition_val.is_int(), "edition should be int");
+    assert(edition_val.as_int() == 2026, "edition should be 2026");
+
+    var active_val = doc.get("package.active") as nol.Value;
+    assert(active_val.is_bool(), "active should be bool");
+    assert(active_val.as_bool() == true, "active should be true");
+
+    var http_ver = doc.get("dependencies.http.version") as nol.Value;
+    assert(http_ver != nil, "http.version should not be nil");
+    assert(http_ver.as_string() == "1.0.0", "http.version should be 1.0.0");
+
+    var sources_val = doc.get("native.sources") as nol.Value;
+    assert(sources_val != nil, "sources should not be nil");
+    assert(sources_val.is_array(), "sources should be array");
+    assert(sources_val.count() == 2, "sources should have 2 items");
+
+    // Test NOLBuilder
+    var builder = nol.Builder();
+    builder.set("app.title", nol.make_string("Lymar App") as any);
+    builder.set("app.port", nol.make_int(8080) as any);
+    builder.set("app.debug", nol.make_bool(false) as any);
+
+    var built_doc = builder.build();
+    assert(built_doc.exists("app.title"), "app.title should exist");
+    var title_val = built_doc.get("app.title") as nol.Value;
+    assert(title_val.as_string() == "Lymar App", "title should match");
+
+    // Test stringify
+    var dumped = nol.stringify(built_doc.data());
+    assert(len(dumped) > 0, "dumped output should not be empty");
+
+    print("NOL Parser and Builder tests passed successfully!\n");
+    return 0;
+}

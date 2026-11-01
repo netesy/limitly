@@ -98,12 +98,6 @@ frame Reader {
     }
 }
 
-frame ResourceReader {
-    embed Reader;
-    pub init(r: Resource) {
-        self.resource = r;
-    }
-}
 
 frame Writer {
     pub var resource: Resource;
@@ -115,12 +109,6 @@ frame Writer {
     }
 }
 
-frame ResourceWriter {
-    embed Writer;
-    pub init(r: Resource) {
-        self.resource = r;
-    }
-}
 
 
 

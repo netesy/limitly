@@ -3,11 +3,11 @@
 
 import std.game.types as types;
 
-trait GUIComponent {
+trait Component {
     fn is_occluded(x: float, y: float, w: float, h: float): bool;
 }
 
-mixin GUIState {
+mixin State {
     pub var theme: types.GUITheme;
 
     // Input snapshot for current frame

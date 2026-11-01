@@ -2,6 +2,7 @@
 
 import std.html.escape as esc;
 import std.html.parser as parser;
+pub import std.html.parser show Node;
 
 pub fn escape(text: str): str {
     return esc.escape(text);
@@ -11,6 +12,6 @@ pub fn unescape(text: str): str {
     return esc.unescape(text);
 }
 
-pub fn parse(text: str): any {
+pub fn parse(text: str): Node {
     return parser.parse(text);
 }

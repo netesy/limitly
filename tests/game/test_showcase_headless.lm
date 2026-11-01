@@ -4,7 +4,7 @@ import std.game.types as types;
 import std.gg as gg;
 
 fn test_game_showcase_run() {
-    var cfg = game.GameConfig(
+    var cfg = game.Config(
         title="Game Showcase Smoke Test",
         width=800,
         height=600,

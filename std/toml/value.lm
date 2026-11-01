@@ -1,44 +1,44 @@
 // TOML Value representation
 
-enum TOMLType {
+enum Type {
     String,
     Number,
     Bool,
     Object
 }
 
-frame TOMLValue {
-    pub kind: TOMLType;
+frame Value {
+    pub kind: Type;
     pub str_val: str;
     pub num_val: int;
     pub bool_val: bool;
     pub obj_keys: [str];
     pub obj_vals: [any];
 
-    pub fn is_string(): bool { return self.kind == TOMLType.String; }
-    pub fn is_number(): bool { return self.kind == TOMLType.Number; }
-    pub fn is_bool(): bool { return self.kind == TOMLType.Bool; }
-    pub fn is_object(): bool { return self.kind == TOMLType.Object; }
+    pub fn is_string(): bool { return self.kind == Type.String; }
+    pub fn is_number(): bool { return self.kind == Type.Number; }
+    pub fn is_bool(): bool { return self.kind == Type.Bool; }
+    pub fn is_object(): bool { return self.kind == Type.Object; }
 }
 
-pub fn make_string(v: str): TOMLValue {
+pub fn make_string(v: str): Value {
     var keys: [str] = [];
     var vals: [any] = [];
-    return TOMLValue(kind=TOMLType.String, str_val=v, num_val=0, bool_val=false, obj_keys=keys, obj_vals=vals);
+    return Value(kind=Type.String, str_val=v, num_val=0, bool_val=false, obj_keys=keys, obj_vals=vals);
 }
 
-pub fn make_number(v: int): TOMLValue {
+pub fn make_number(v: int): Value {
     var keys: [str] = [];
     var vals: [any] = [];
-    return TOMLValue(kind=TOMLType.Number, str_val="", num_val=v, bool_val=false, obj_keys=keys, obj_vals=vals);
+    return Value(kind=Type.Number, str_val="", num_val=v, bool_val=false, obj_keys=keys, obj_vals=vals);
 }
 
-pub fn make_bool(v: bool): TOMLValue {
+pub fn make_bool(v: bool): Value {
     var keys: [str] = [];
     var vals: [any] = [];
-    return TOMLValue(kind=TOMLType.Bool, str_val="", num_val=0, bool_val=v, obj_keys=keys, obj_vals=vals);
+    return Value(kind=Type.Bool, str_val="", num_val=0, bool_val=v, obj_keys=keys, obj_vals=vals);
 }
 
-pub fn make_object(k: [str], v: [any]): TOMLValue {
-    return TOMLValue(kind=TOMLType.Object, str_val="", num_val=0, bool_val=false, obj_keys=k, obj_vals=v);
+pub fn make_object(k: [str], v: [any]): Value {
+    return Value(kind=Type.Object, str_val="", num_val=0, bool_val=false, obj_keys=k, obj_vals=v);
 }

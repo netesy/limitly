@@ -2,7 +2,7 @@
 
 import std.http.common as common;
 
-frame Request {
+frame RouteRequest {
     pub var method: str;
     pub var path: str;
     pub var headers: [str];
@@ -62,7 +62,7 @@ frame Request {
     }
 }
 
-frame Response {
+frame RouteResponse {
     pub var status_code: int;
     pub var headers: [str];
     pub var body: str;
@@ -73,30 +73,30 @@ frame Response {
         self.body = body;
     }
 
-    pub fn json(data: str): Response {
+    pub fn json(data: str): RouteResponse {
         self.headers = ["Content-Type: application/json"];
         self.body = data;
         return self;
     }
 
-    pub fn html(data: str): Response {
+    pub fn html(data: str): RouteResponse {
         self.headers = ["Content-Type: text/html"];
         self.body = data;
         return self;
     }
 
-    pub fn text(data: str): Response {
+    pub fn text(data: str): RouteResponse {
         self.headers = ["Content-Type: text/plain"];
         self.body = data;
         return self;
     }
 
-    pub fn status(code: int): Response {
+    pub fn status(code: int): RouteResponse {
         self.status_code = code;
         return self;
     }
 
-    pub fn set_header(header_line: str): Response {
+    pub fn set_header(header_line: str): RouteResponse {
         self.headers.append(header_line);
         return self;
     }
@@ -105,9 +105,9 @@ frame Response {
 frame Route {
     pub var method: str;
     pub var path: str;
-    pub var handler: fn(Request): Response;
+    pub var handler: fn(RouteRequest): RouteResponse;
 
-    pub init(m: str, p: str, h: fn(Request): Response) {
+    pub init(m: str, p: str, h: fn(RouteRequest): RouteResponse) {
         self.method = _builtin_string_to_upper(m);
         self.path = p;
         self.handler = h;
@@ -149,50 +149,50 @@ frame Router {
         self.routes = [] as [Route];
     }
 
-    pub fn get(path: str, handler: fn(Request): Response): Router {
+    pub fn get(path: str, handler: fn(RouteRequest): RouteResponse): Router {
         self.routes.append(Route("GET", path, handler));
         return self;
     }
 
-    pub fn post(path: str, handler: fn(Request): Response): Router {
+    pub fn post(path: str, handler: fn(RouteRequest): RouteResponse): Router {
         self.routes.append(Route("POST", path, handler));
         return self;
     }
 
-    pub fn put(path: str, handler: fn(Request): Response): Router {
+    pub fn put(path: str, handler: fn(RouteRequest): RouteResponse): Router {
         self.routes.append(Route("PUT", path, handler));
         return self;
     }
 
-    pub fn delete(path: str, handler: fn(Request): Response): Router {
+    pub fn delete(path: str, handler: fn(RouteRequest): RouteResponse): Router {
         self.routes.append(Route("DELETE", path, handler));
         return self;
     }
 
-    pub fn patch(path: str, handler: fn(Request): Response): Router {
+    pub fn patch(path: str, handler: fn(RouteRequest): RouteResponse): Router {
         self.routes.append(Route("PATCH", path, handler));
         return self;
     }
 
-    pub fn route(method: str, path: str, handler: fn(Request): Response): Router {
+    pub fn route(method: str, path: str, handler: fn(RouteRequest): RouteResponse): Router {
         self.routes.append(Route(method, path, handler));
         return self;
     }
 
-    pub fn handle(req: Request): Response {
+    pub fn handle(req: RouteRequest): RouteResponse {
         var i = 0;
         while (i < len(self.routes)) {
             var r = self.routes[i];
             if (r.matches(req.method, req.path)) {
                 req.params = r.extract_params(req.path);
-                var handler_fn = r.handler as fn(Request): Response;
+                var handler_fn = r.handler as fn(RouteRequest): RouteResponse;
                 if (handler_fn != nil) {
                     return handler_fn(req);
                 }
             }
             i = i + 1;
         }
-        return Response(404, "404 Not Found");
+        return RouteResponse(404, "404 Not Found");
     }
 }
 

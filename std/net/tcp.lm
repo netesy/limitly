@@ -39,7 +39,7 @@ frame Accepter {
     }
 }
 
-frame TCPClient {
+frame Socket {
     pub var resource: res.Resource?;
     pub var reader: res.Reader?;
     pub var writer: res.Writer?;
@@ -138,7 +138,7 @@ frame TCPClient {
     }
 }
 
-frame TCPServer {
+frame Server {
     pub var resource: res.Resource?;
     pub var binder: Binder?;
     pub var listener: Listener?;
@@ -186,7 +186,7 @@ frame TCPServer {
         }
     }
 
-    pub fn accept(): TCPClient?core.Error {
+    pub fn accept(): Socket?core.Error {
         match (self.accepter) {
             val acc => {
                 var fd = acc.accept();
@@ -194,7 +194,7 @@ frame TCPServer {
                     return err(Error(code="ERR", message="fail"));
                 }
                 var cr = res.adopt_socket(fd=fd);
-                var client = TCPClient();
+                var client = Socket();
                 client.resource = cr;
                 client.reader = res.Reader(r=cr);
                 client.writer = res.Writer(r=cr);

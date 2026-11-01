@@ -21,6 +21,10 @@ This document provides essential guidelines for AI agents generating code for th
 - [x] **Use `append(list, item)`** instead to add a single item to a list.
 - [x] **Use `append(list, other_list)`** to append all elements from another list.
 
+### **Module Name Prefixing in Identifiers (Package/Module Stutter)**
+- [ ] **DO NOT prefix frame, enum, or trait names with the enclosing module name** (e.g., `HTTPRequest`, `HTTPClient`, `HTTPMethod` in `std.http`, or `NOLValue`, `JSONValue`, `TOMLValue`, `TimeDuration`). The module boundary *is* the namespace. When imported as `import std.http as http;`, prefixing creates redundant stutter: `http.HTTPRequest`. Clashing imports are resolved at the call site using `as` or selective `show`, never by polluting symbol names.
+- [x] **Use clean, self-contained names**: Declare `frame Request`, `frame Response`, `frame Client`, `frame Server`, `enum Method` in `std/http/`; `frame Value`, `enum Type` in `std/json/`, `std/toml/`, `std/yaml/`, `std/nol/`; `frame Duration`, `frame Instant` in `std/time/`; `frame Entry` in `std/archive/`. Callers access them as `http.Request`, `json.Value`, `time.Duration`, etc.
+
 ### **Module Re-export via `var` Aliases**
 - [ ] **DO NOT re-export another module's symbols with `var X = mod.Symbol;`** (the old `std/std.lm` facade style). A `var` binding captures only a *runtime value*; it does **not** register the name in type position. So `var Option = core.option.Option;` leaves `Option` unusable as a type or staged-frame template and silently breaks annotations such as `var o: Option(int)`.
 - [ ] **DO NOT use a `var` alias to rename an export** (e.g. `var TCP = tcp.TCPClient;`, `var Hash = crypto_hash.Hasher;`). `pub import ... show` re-exports a symbol **under the source module's declared name** and offers no rename facility; renaming files does not change the exported name either. If a friendlier or collision-free name is genuinely required, rename the symbol inside its own module.

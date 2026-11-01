@@ -4,7 +4,10 @@ import std.xml.document as doc;
 import std.xml.parser as parser;
 import std.xml.writer as writer;
 
-pub fn parse(text: str): doc.XMLDocument {
+pub import std.xml.document show Node, Document;
+pub import std.xml.parser show Parser;
+
+pub fn parse(text: str): doc.Document {
     return parser.parse(text);
 }
 

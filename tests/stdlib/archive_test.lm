@@ -21,7 +21,7 @@ var entry_opt = arch.get_entry("hello.txt");
 assert(entry_opt != nil, "get_entry returned non-nil");
 match (entry_opt) {
     val e => {
-        var entry = e as archive.ArchiveEntry;
+        var entry = e as archive.Entry;
         assert(entry.text() == "Hello, Lymar World!", "entry content matches");
         assert(entry.size() == 19, "entry size matches");
     },
@@ -37,7 +37,7 @@ assert(parsed_tar.count() == 3, "parsed tar count is 3");
 assert(parsed_tar.has_entry("hello.txt"), "parsed tar has hello.txt");
 match (parsed_tar.get_entry("hello.txt")) {
     val e => {
-        var entry = e as archive.ArchiveEntry;
+        var entry = e as archive.Entry;
         assert(entry.text() == "Hello, Lymar World!", "parsed tar content matches");
     },
     nil => assert(false, "parsed entry was nil")
@@ -51,7 +51,7 @@ assert(parsed_zip.count() == 3, "parsed zip count is 3");
 assert(parsed_zip.has_entry("hello.txt"), "parsed zip has hello.txt");
 match (parsed_zip.get_entry("hello.txt")) {
     val e => {
-        var entry = e as archive.ArchiveEntry;
+        var entry = e as archive.Entry;
         assert(entry.text() == "Hello, Lymar World!", "parsed zip content matches");
     },
     nil => assert(false, "parsed zip entry was nil")

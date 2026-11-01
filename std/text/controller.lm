@@ -2,7 +2,7 @@ import std.text.document as doc;
 import std.text.cursor as cursor;
 
 frame EditorController {
-    pub var document: doc.TextDocument;
+    pub var document: doc.Document;
     pub var cursor: cursor.Cursor;
     pub var selection: cursor.Selection;
     pub var get_clipboard: (fn(): str)?;
@@ -11,7 +11,7 @@ frame EditorController {
     pub var history_idx: int;
 
     pub init(initial_text: str = "") {
-        self.document = doc.TextDocument(initial_text);
+        self.document = doc.Document(initial_text);
         self.cursor = cursor.Cursor();
         self.selection = cursor.Selection();
         self.get_clipboard = nil;
@@ -38,7 +38,7 @@ frame EditorController {
     pub fn undo(): nil {
         if (self.history_idx > 0) {
             self.history_idx = self.history_idx - 1;
-            self.document = doc.TextDocument(self.history[self.history_idx]);
+            self.document = doc.Document(self.history[self.history_idx]);
             self.cursor.set(0, 0);
             self.selection.set(0, 0);
         }
@@ -47,7 +47,7 @@ frame EditorController {
     pub fn redo(): nil {
         if (self.history_idx < len(self.history) - 1) {
             self.history_idx = self.history_idx + 1;
-            self.document = doc.TextDocument(self.history[self.history_idx]);
+            self.document = doc.Document(self.history[self.history_idx]);
             self.cursor.set(0, 0);
             self.selection.set(0, 0);
         }
@@ -188,7 +188,7 @@ frame EditorController {
                 cb(txt);
             } else {
                 // To actually copy selection we need a substring. For now just copy all text as a fallback if no selection extraction is built.
-                // Or better, just copy all if there's no substring logic inside TextDocument.
+                // Or better, just copy all if there's no substring logic inside Document.
                 var txt = self.document.get_text();
                 cb(txt);
             }
@@ -269,7 +269,7 @@ frame EditorController {
     }
 
     pub fn set_text(new_text: str): nil {
-        self.document = doc.TextDocument(new_text);
+        self.document = doc.Document(new_text);
         self.cursor.set(0, 0);
         self.selection.set(0, 0);
         self.history = [new_text];

@@ -1,25 +1,25 @@
-// Test std/json parsing, stringifying, and enum JSONType matching
+// Test std/json parsing, stringifying, and enum Type matching
 import std.json as json;
 
 fn test_json_primitives() {
     print("Testing JSON primitive types...");
     var null_val = json.make_null();
     assert(null_val.is_null(), "is_null should be true");
-    assert(null_val.kind == json.JSONType.Null, "kind should be Null");
+    assert(null_val.kind == json.Type.Null, "kind should be Null");
     assert(json.stringify(null_val) == "null", "null stringify");
 
     var bool_val = json.make_bool(true);
     assert(bool_val.is_bool(), "is_bool should be true");
-    assert(bool_val.kind == json.JSONType.Bool, "kind should be Bool");
+    assert(bool_val.kind == json.Type.Bool, "kind should be Bool");
     assert(json.stringify(bool_val) == "true", "true stringify");
 
     var num_val = json.make_number(42);
     assert(num_val.is_number(), "is_number should be true");
-    assert(num_val.kind == json.JSONType.Number, "kind should be Number");
+    assert(num_val.kind == json.Type.Number, "kind should be Number");
 
     var str_val = json.make_string("hello world");
     assert(str_val.is_string(), "is_string should be true");
-    assert(str_val.kind == json.JSONType.String, "kind should be String");
+    assert(str_val.kind == json.Type.String, "kind should be String");
     assert(json.stringify(str_val) == "\"hello world\"", "string stringify");
 }
 
@@ -31,12 +31,12 @@ fn test_json_parse_and_match() {
     };
 
     assert(doc.is_array(), "parsed doc is an array");
-    assert(doc.kind == json.JSONType.Array, "parsed doc kind is Array");
+    assert(doc.kind == json.Type.Array, "parsed doc kind is Array");
 
     match (doc.kind) {
-        json.JSONType.Array => {
+        json.Type.Array => {
             assert(len(doc.list_val) == 3, "items len is 3");
-            var first = doc.list_val[0] as json.JSONValue;
+            var first = doc.list_val[0] as json.Value;
             assert(first != nil, "first element not nil");
             assert(first.num_val == 1, "first num_val is 1");
         },

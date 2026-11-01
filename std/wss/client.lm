@@ -5,7 +5,7 @@ import std.core show Error;
 import std.url.index as url;
 import std.resource as res;
 
-frame WebSocketClient {
+frame Client {
     pub var resource: res.Resource?;
     pub var connector: res.Connector?;
     pub var writer: res.Writer?;

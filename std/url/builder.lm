@@ -1,6 +1,6 @@
 import std.url.url as url;
 
-frame URLBuilder {
+frame Builder {
     pub fragment: str;
     pub host: str;
     pub password: str;
@@ -21,42 +21,42 @@ frame URLBuilder {
         self.username = "";
     }
 
-    pub fn set_scheme(scheme: str): URLBuilder {
+    pub fn set_scheme(scheme: str): Builder {
         self.scheme = scheme;
         return self;
     }
 
-    pub fn set_host(host: str): URLBuilder {
+    pub fn set_host(host: str): Builder {
         self.host = host;
         return self;
     }
 
-    pub fn set_port(port: int): URLBuilder {
+    pub fn set_port(port: int): Builder {
         self.port = port;
         return self;
     }
 
-    pub fn set_path(path: str): URLBuilder {
+    pub fn set_path(path: str): Builder {
         self.path = path;
         return self;
     }
 
-    pub fn set_query(query: str): URLBuilder {
+    pub fn set_query(query: str): Builder {
         self.query = query;
         return self;
     }
 
-    pub fn set_fragment(fragment: str): URLBuilder {
+    pub fn set_fragment(fragment: str): Builder {
         self.fragment = fragment;
         return self;
     }
 
-    pub fn set_username(username: str): URLBuilder {
+    pub fn set_username(username: str): Builder {
         self.username = username;
         return self;
     }
 
-    pub fn set_password(password: str): URLBuilder {
+    pub fn set_password(password: str): Builder {
         self.password = password;
         return self;
     }

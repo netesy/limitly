@@ -3,7 +3,7 @@ import std.url.builder as builder;
 import std.url.query as query;
 
 pub import std.url.url show URL;
-pub import std.url.builder show URLBuilder;
+pub import std.url.builder show Builder;
 pub import std.url.query show QueryParams;
 
 pub fn parse(url_str: str): url.URL {

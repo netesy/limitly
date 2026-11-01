@@ -2,11 +2,11 @@
 
 import std.yaml.value as value;
 
-frame YAMLParser {
+frame Parser {
     pub idx: int;
     pub text: str;
 
-    pub fn parse_value(): value.YAMLValue {
+    pub fn parse_value(): value.Value {
         var keys: [str] = [];
         var vals: [any] = [];
         var length = len(self.text);
@@ -101,7 +101,7 @@ frame YAMLParser {
     }
 }
 
-pub fn parse(text: str): value.YAMLValue {
-    var p = YAMLParser(idx=0, text=text);
+pub fn parse(text: str): value.Value {
+    var p = Parser(idx=0, text=text);
     return p.parse_value();
 }

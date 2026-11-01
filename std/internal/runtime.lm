@@ -1,85 +1,122 @@
+enum ResourceKind {
+    File,
+    Socket,
+    Process,
+    Stdout,
+    Stderr,
+    Memory,
+    Entropy,
+    DnsResolver,
+    UdpSocket,
+    WebSocket,
+    HashEngine,
+    Graphics,
+    Os
+}
+
+pub fn resource_kind_id(k: ResourceKind): int {
+    match (k) {
+        ResourceKind.File => { return 0; },
+        ResourceKind.Socket => { return 1; },
+        ResourceKind.Process => { return 4; },
+        ResourceKind.Stdout => { return 9; },
+        ResourceKind.Stderr => { return 10; },
+        ResourceKind.Memory => { return 11; },
+        ResourceKind.Entropy => { return 12; },
+        ResourceKind.DnsResolver => { return 13; },
+        ResourceKind.UdpSocket => { return 14; },
+        ResourceKind.WebSocket => { return 15; },
+        ResourceKind.HashEngine => { return 16; },
+        ResourceKind.Graphics => { return 17; },
+        ResourceKind.Os => { return 18; }
+    }
+}
+
 // This module provides thin wrappers around VM builtins.
 
-pub var RT_FILE: int = 0;
-pub var RT_SOCKET: int = 1;
-pub var RT_PROCESS: int = 4;
-pub var RT_STDOUT: int = 9;
-pub var RT_STDERR: int = 10;
-pub var RT_MEMORY: int = 11;
-pub var RT_ENTROPY: int = 12;
-pub var RT_DNS_RESOLVER: int = 13;
-pub var RT_UDP_SOCKET: int = 14;
-pub var RT_WEBSOCKET: int = 15;
-pub var RT_HASH_ENGINE: int = 16;
-pub var RT_GRAPHICS: int = 17;
-pub var RT_OS: int = 18;
+pub const RT_FILE: int = 0;
+pub const RT_SOCKET: int = 1;
+pub const RT_PROCESS: int = 4;
+pub const RT_STDOUT: int = 9;
+pub const RT_STDERR: int = 10;
+pub const RT_MEMORY: int = 11;
+pub const RT_ENTROPY: int = 12;
+pub const RT_DNS_RESOLVER: int = 13;
+pub const RT_UDP_SOCKET: int = 14;
+pub const RT_WEBSOCKET: int = 15;
+pub const RT_HASH_ENGINE: int = 16;
+pub const RT_GRAPHICS: int = 17;
+pub const RT_OS: int = 18;
 
-pub var OP_OPEN: int = 0;
-pub var OP_CLOSE: int = 1;
-pub var OP_READ: int = 2;
-pub var OP_WRITE: int = 3;
-pub var OP_CONNECT: int = 6;
-pub var OP_DRAW_RECT: int = 7;
-pub var OP_DRAW_TEXT: int = 8;
-pub var OP_SPAWN: int = 9;
-pub var OP_POLL: int = 10;
-pub var OP_PUSH: int = 11;
-pub var OP_POP: int = 12;
-pub var OP_PUSH_CLIP: int = 11;
-pub var OP_POP_CLIP: int = 12;
-pub var OP_GET_STATE: int = 13;
-pub var OP_SET_STATE: int = 14;
-pub var OP_FILL: int = 16;
-pub var OP_BIND: int = 23;
-pub var OP_LISTEN: int = 24;
-pub var OP_ACCEPT: int = 25;
-pub var OP_RESOLVE: int = 26;
-pub var OP_SEND_TO: int = 27;
-pub var OP_RECV_FROM: int = 28;
-pub var OP_FLUSH: int = 29;
-pub var OP_MKDIR: int = 30;
-pub var OP_READDIR: int = 31;
-pub var OP_RENAME: int = 32;
-pub var OP_EXISTS: int = 33;
-pub var OP_DELETE: int = 34;
-pub var OP_HMAC: int = 35;
-pub var OP_DRAW_TRIANGLE: int = 36;
-pub var OP_APPLY_PIPELINE: int = 37;
-pub var OP_APPLY_BINDINGS: int = 38;
-pub var OP_DRAW: int = 39;
-pub var OP_MAKE_BUFFER: int = 40;
-pub var OP_MAKE_IMAGE: int = 41;
-pub var OP_MAKE_PIPELINE: int = 42;
-pub var OP_MAKE_BINDINGS: int = 43;
-pub var OP_END_PASS: int = 44;
-pub var OP_MEASURE_TEXT: int = 45;
-pub var OP_GET_FONT_METRICS: int = 46;
-pub var OP_READ_BYTES: int = 47;
-pub var OP_SIZE: int = 48;
-
+pub const OP_OPEN: int = 0;
+pub const OP_CLOSE: int = 1;
+pub const OP_READ: int = 2;
+pub const OP_WRITE: int = 3;
+pub const OP_CONNECT: int = 6;
+pub const OP_DRAW_RECT: int = 7;
+pub const OP_DRAW_TEXT: int = 8;
+pub const OP_SPAWN: int = 9;
+pub const OP_POLL: int = 10;
+pub const OP_PUSH: int = 11;
+pub const OP_POP: int = 12;
+pub const OP_PUSH_CLIP: int = 11;
+pub const OP_POP_CLIP: int = 12;
+pub const OP_GET_STATE: int = 13;
+pub const OP_SET_STATE: int = 14;
+pub const OP_FILL: int = 16;
+pub const OP_BIND: int = 23;
+pub const OP_LISTEN: int = 24;
+pub const OP_ACCEPT: int = 25;
+pub const OP_RESOLVE: int = 26;
+pub const OP_SEND_TO: int = 27;
+pub const OP_RECV_FROM: int = 28;
+pub const OP_FLUSH: int = 29;
+pub const OP_MKDIR: int = 30;
+pub const OP_READDIR: int = 31;
+pub const OP_RENAME: int = 32;
+pub const OP_EXISTS: int = 33;
+pub const OP_DELETE: int = 34;
+pub const OP_HMAC: int = 35;
+pub const OP_DRAW_TRIANGLE: int = 36;
+pub const OP_APPLY_PIPELINE: int = 37;
+pub const OP_APPLY_BINDINGS: int = 38;
+pub const OP_DRAW: int = 39;
+pub const OP_MAKE_BUFFER: int = 40;
+pub const OP_MAKE_IMAGE: int = 41;
+pub const OP_MAKE_PIPELINE: int = 42;
+pub const OP_MAKE_BINDINGS: int = 43;
+pub const OP_END_PASS: int = 44;
+pub const OP_MEASURE_TEXT: int = 45;
+pub const OP_GET_FONT_METRICS: int = 46;
+pub const OP_READ_BYTES: int = 47;
+pub const OP_SIZE: int = 48;
 
 // RT_OS operations (see src/backend/vm/resource_types.hh).
-pub var OP_ENV_GET: int = 49;
-pub var OP_ENV_SET: int = 50;
-pub var OP_ENV_UNSET: int = 51;
-pub var OP_ENV_LIST: int = 52;
-pub var OP_CWD: int = 53;
-pub var OP_CHDIR: int = 54;
-pub var OP_HOME_DIR: int = 55;
-pub var OP_TEMP_DIR: int = 56;
-pub var OP_EXE_PATH: int = 57;
-pub var OP_OS_NAME: int = 58;
-pub var OP_ARCH: int = 59;
-pub var OP_HOSTNAME: int = 60;
-pub var OP_NUM_CPU: int = 61;
+pub const OP_ENV_GET: int = 49;
+pub const OP_ENV_SET: int = 50;
+pub const OP_ENV_UNSET: int = 51;
+pub const OP_ENV_LIST: int = 52;
+pub const OP_CWD: int = 53;
+pub const OP_CHDIR: int = 54;
+pub const OP_HOME_DIR: int = 55;
+pub const OP_TEMP_DIR: int = 56;
+pub const OP_EXE_PATH: int = 57;
+pub const OP_OS_NAME: int = 58;
+pub const OP_ARCH: int = 59;
+pub const OP_HOSTNAME: int = 60;
+pub const OP_NUM_CPU: int = 61;
 
 // RT_PROCESS operations. Child processes reuse OP_SPAWN (9).
-pub var OP_PROC_ARGS: int = 62;
-pub var OP_PROC_EXIT: int = 63;
-pub var OP_PROC_ID: int = 64;
-pub var OP_PROC_RSS: int = 65;
-pub var OP_PROC_PEAK_RSS: int = 66;
-pub var OP_PROC_COMMAND: int = 67;
+pub const OP_PROC_ARGS: int = 62;
+pub const OP_PROC_EXIT: int = 63;
+pub const OP_PROC_ID: int = 64;
+pub const OP_PROC_RSS: int = 65;
+pub const OP_PROC_PEAK_RSS: int = 66;
+pub const OP_PROC_COMMAND: int = 67;
+
+pub fn create_resource(kind: ResourceKind, args: any): int {
+    return create(resource_kind_id(kind), args);
+}
 
 pub fn create(type_id: int, args: any): int {
     unsafe {

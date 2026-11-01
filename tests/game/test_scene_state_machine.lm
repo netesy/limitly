@@ -183,7 +183,7 @@ fn test_scene_transitions() {
 fn test_game_harness_integration() {
     print("=== Testing Game Harness Scene Integration ===");
 
-    var cfg = game.GameConfig(title="Scene Test", width=800, height=600);
+    var cfg = game.Config(title="Scene Test", width=800, height=600);
     var app = game.Game(cfg);
 
     var tracker = {"steps": 0};

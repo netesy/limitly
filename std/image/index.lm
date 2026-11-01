@@ -70,7 +70,7 @@ pub var light_gray:  Pixel = Pixel(r=215, g=215, b=220, a=255);
 pub var transparent: Pixel = Pixel(r=0,   g=0,   b=0,   a=0);
 
 // ── Image metadata frame ──────────────────────────────────────────────────
-frame ImageInfo {
+frame Info {
     pub var width:    int;
     pub var height:   int;
     pub var channels: int;
@@ -373,7 +373,7 @@ pub fn load_forced(path: str, channels: int): Image? {
 
 // ── Metadata Query (no pixel allocation) ──────────────────────────────────
 
-pub fn query(path: str): ImageInfo? {
+pub fn query(path: str): Info? {
     unsafe {
         var lib: int = _open_lib();
         if (lib == nil) { return err(); }
@@ -401,7 +401,7 @@ pub fn query(path: str): ImageInfo? {
         ffi.library_unload(lib);
 
         if (ok_flag == 0) { return err(); }
-        return ok(ImageInfo(w=w, h=h, c=c));
+        return ok(Info(w=w, h=h, c=c));
     }
 }
 

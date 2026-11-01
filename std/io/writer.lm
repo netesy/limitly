@@ -1,16 +1,16 @@
 // Standard Library I/O Writer Submodule
 
-import std.resource show Resource, ResourceWriter;
+import std.resource show Resource, Writer;
 
 trait Writer {
     fn write(args: [any]): any;
 }
 
 frame StreamWriter : Writer {
-    pub var w: ResourceWriter;
+    pub var w: Writer;
 
     pub init(resource: Resource) {
-        self.w = ResourceWriter(resource);
+        self.w = Writer(resource);
     }
 
     pub fn write(args: [any]): any {

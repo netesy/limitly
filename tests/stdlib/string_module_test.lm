@@ -36,13 +36,13 @@ fn test_string_frame(): int {
 }
 
 fn test_string_builder(): int {
-    print("Testing StringBuilder...");
-    var sb = s.StringBuilder() as s.StringBuilder;
+    print("Testing Builder...");
+    var sb = s.Builder() as s.Builder;
     sb.append("hello");
     sb.append(" ");
     sb.append_line("world");
     var res = sb.to_string();
-    assert(res == "hello world\n", "StringBuilder failed");
+    assert(res == "hello world\n", "Builder failed");
     return 1;
 }
 
@@ -74,7 +74,7 @@ fn main(): int {
     print("=== String Module Test Suite ===");
 
     assert(test_string_frame() == 1, "String frame test failed");
-    assert(test_string_builder() == 1, "StringBuilder test failed");
+    assert(test_string_builder() == 1, "Builder test failed");
     assert(test_string_helpers() == 1, "String helpers test failed");
 
     print("All string tests passed successfully.");

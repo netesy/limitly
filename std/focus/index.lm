@@ -1,3 +1,3 @@
 import std.focus.manager as manager;
 
-pub import std.focus.manager show FocusManager;
+pub import std.focus.manager show Manager;

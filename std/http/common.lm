@@ -2,92 +2,110 @@
 
 import std.core as core;
 
+// --- HTTP Method enum & constants ---
+enum Method {
+    GET,
+    POST,
+    PUT,
+    DELETE,
+    PATCH,
+    HEAD,
+    OPTIONS,
+    TRACE,
+    CONNECT
+}
+
+pub fn method_name(m: any): str {
+    var s = m as str;
+    return _builtin_string_to_upper(s);
+}
+
 // --- HTTP Method constants ---
-pub var METHOD_GET = "GET";
-pub var METHOD_POST = "POST";
-pub var METHOD_PUT = "PUT";
-pub var METHOD_DELETE = "DELETE";
-pub var METHOD_PATCH = "PATCH";
-pub var METHOD_HEAD = "HEAD";
-pub var METHOD_OPTIONS = "OPTIONS";
-pub var METHOD_TRACE = "TRACE";
-pub var METHOD_CONNECT = "CONNECT";
+pub const METHOD_GET = "GET";
+pub const METHOD_POST = "POST";
+pub const METHOD_PUT = "PUT";
+pub const METHOD_DELETE = "DELETE";
+pub const METHOD_PATCH = "PATCH";
+pub const METHOD_HEAD = "HEAD";
+pub const METHOD_OPTIONS = "OPTIONS";
+pub const METHOD_TRACE = "TRACE";
+pub const METHOD_CONNECT = "CONNECT";
 
 // --- HTTP Status codes ---
-pub var STATUS_CONTINUE = 100;
-pub var STATUS_SWITCHING_PROTOCOLS = 101;
-pub var STATUS_OK = 200;
-pub var STATUS_CREATED = 201;
-pub var STATUS_ACCEPTED = 202;
-pub var STATUS_NO_CONTENT = 204;
-pub var STATUS_MOVED_PERMANENTLY = 301;
-pub var STATUS_FOUND = 302;
-pub var STATUS_SEE_OTHER = 303;
-pub var STATUS_NOT_MODIFIED = 304;
-pub var STATUS_TEMPORARY_REDIRECT = 307;
-pub var STATUS_PERMANENT_REDIRECT = 308;
-pub var STATUS_BAD_REQUEST = 400;
-pub var STATUS_UNAUTHORIZED = 401;
-pub var STATUS_FORBIDDEN = 403;
-pub var STATUS_NOT_FOUND = 404;
-pub var STATUS_METHOD_NOT_ALLOWED = 405;
-pub var STATUS_REQUEST_TIMEOUT = 408;
-pub var STATUS_CONFLICT = 409;
-pub var STATUS_GONE = 410;
-pub var STATUS_PAYLOAD_TOO_LARGE = 413;
-pub var STATUS_UNSUPPORTED_MEDIA_TYPE = 415;
-pub var STATUS_TOO_MANY_REQUESTS = 429;
-pub var STATUS_INTERNAL_SERVER_ERROR = 500;
-pub var STATUS_NOT_IMPLEMENTED = 501;
-pub var STATUS_BAD_GATEWAY = 502;
-pub var STATUS_SERVICE_UNAVAILABLE = 503;
-pub var STATUS_GATEWAY_TIMEOUT = 504;
+pub const STATUS_CONTINUE = 100;
+pub const STATUS_SWITCHING_PROTOCOLS = 101;
+pub const STATUS_OK = 200;
+pub const STATUS_CREATED = 201;
+pub const STATUS_ACCEPTED = 202;
+pub const STATUS_NO_CONTENT = 204;
+pub const STATUS_MOVED_PERMANENTLY = 301;
+pub const STATUS_FOUND = 302;
+pub const STATUS_SEE_OTHER = 303;
+pub const STATUS_NOT_MODIFIED = 304;
+pub const STATUS_TEMPORARY_REDIRECT = 307;
+pub const STATUS_PERMANENT_REDIRECT = 308;
+pub const STATUS_BAD_REQUEST = 400;
+pub const STATUS_UNAUTHORIZED = 401;
+pub const STATUS_FORBIDDEN = 403;
+pub const STATUS_NOT_FOUND = 404;
+pub const STATUS_METHOD_NOT_ALLOWED = 405;
+pub const STATUS_REQUEST_TIMEOUT = 408;
+pub const STATUS_CONFLICT = 409;
+pub const STATUS_GONE = 410;
+pub const STATUS_PAYLOAD_TOO_LARGE = 413;
+pub const STATUS_UNSUPPORTED_MEDIA_TYPE = 415;
+pub const STATUS_TOO_MANY_REQUESTS = 429;
+pub const STATUS_INTERNAL_SERVER_ERROR = 500;
+pub const STATUS_NOT_IMPLEMENTED = 501;
+pub const STATUS_BAD_GATEWAY = 502;
+pub const STATUS_SERVICE_UNAVAILABLE = 503;
+pub const STATUS_GATEWAY_TIMEOUT = 504;
 
 // --- Common Header names ---
-pub var HDR_CONTENT_TYPE = "Content-Type";
-pub var HDR_CONTENT_LENGTH = "Content-Length";
-pub var HDR_TRANSFER_ENCODING = "Transfer-Encoding";
-pub var HDR_CONNECTION = "Connection";
-pub var HDR_HOST = "Host";
-pub var HDR_USER_AGENT = "User-Agent";
-pub var HDR_ACCEPT = "Accept";
-pub var HDR_ACCEPT_ENCODING = "Accept-Encoding";
-pub var HDR_AUTHORIZATION = "Authorization";
-pub var HDR_SET_COOKIE = "Set-Cookie";
-pub var HDR_COOKIE = "Cookie";
-pub var HDR_LOCATION = "Location";
-pub var HDR_CACHE_CONTROL = "Cache-Control";
+pub const HDR_CONTENT_TYPE = "Content-Type";
+pub const HDR_CONTENT_LENGTH = "Content-Length";
+pub const HDR_TRANSFER_ENCODING = "Transfer-Encoding";
+pub const HDR_CONNECTION = "Connection";
+pub const HDR_HOST = "Host";
+pub const HDR_USER_AGENT = "User-Agent";
+pub const HDR_ACCEPT = "Accept";
+pub const HDR_ACCEPT_ENCODING = "Accept-Encoding";
+pub const HDR_AUTHORIZATION = "Authorization";
+pub const HDR_SET_COOKIE = "Set-Cookie";
+pub const HDR_COOKIE = "Cookie";
+pub const HDR_LOCATION = "Location";
+pub const HDR_CACHE_CONTROL = "Cache-Control";
 
 // --- Common MIME types ---
-pub var MIME_TEXT_PLAIN = "text/plain";
-pub var MIME_TEXT_HTML = "text/html";
-pub var MIME_TEXT_CSS = "text/css";
-pub var MIME_TEXT_JAVASCRIPT = "application/javascript";
-pub var MIME_APPLICATION_JSON = "application/json";
-pub var MIME_APPLICATION_XML = "application/xml";
-pub var MIME_APPLICATION_FORM = "application/x-www-form-urlencoded";
-pub var MIME_MULTIPART_FORM = "multipart/form-data";
-pub var MIME_OCTET_STREAM = "application/octet-stream";
+pub const MIME_TEXT_PLAIN = "text/plain";
+pub const MIME_TEXT_HTML = "text/html";
+pub const MIME_TEXT_CSS = "text/css";
+pub const MIME_TEXT_JAVASCRIPT = "application/javascript";
+pub const MIME_APPLICATION_JSON = "application/json";
+pub const MIME_APPLICATION_XML = "application/xml";
+pub const MIME_APPLICATION_FORM = "application/x-www-form-urlencoded";
+pub const MIME_MULTIPART_FORM = "multipart/form-data";
+pub const MIME_OCTET_STREAM = "application/octet-stream";
 
 // --- HTTP Version constants ---
-pub var HTTP_1_0 = "HTTP/1.0";
-pub var HTTP_1_1 = "HTTP/1.1";
-pub var HTTP_2_0 = "HTTP/2.0";
-pub var HTTP_3_0 = "HTTP/3.0";
+pub const HTTP_1_0 = "HTTP/1.0";
+pub const HTTP_1_1 = "HTTP/1.1";
+pub const HTTP_2_0 = "HTTP/2.0";
+pub const HTTP_3_0 = "HTTP/3.0";
 
 // --- HTTP/2 Frame Type constants ---
-pub var FRAME_DATA = 0;
-pub var FRAME_HEADERS = 1;
-pub var FRAME_PRIORITY = 2;
-pub var FRAME_RST_STREAM = 3;
-pub var FRAME_SETTINGS = 4;
-pub var FRAME_PUSH_PROMISE = 5;
-pub var FRAME_PING = 6;
-pub var FRAME_GOAWAY = 7;
-pub var FRAME_WINDOW_UPDATE = 8;
+pub const FRAME_DATA = 0;
+pub const FRAME_HEADERS = 1;
+pub const FRAME_PRIORITY = 2;
+pub const FRAME_RST_STREAM = 3;
+pub const FRAME_SETTINGS = 4;
+pub const FRAME_PUSH_PROMISE = 5;
+pub const FRAME_PING = 6;
+pub const FRAME_GOAWAY = 7;
+pub const FRAME_WINDOW_UPDATE = 8;
 
 // --- Default User-Agent string ---
-pub var DEFAULT_USER_AGENT = "Lymar/1.0";
+pub const DEFAULT_USER_AGENT = "Lymar/1.0";
 
 // --- Status code classification helpers ---
 pub fn is_informational(code: int): bool { return code >= 100 and code < 200; }

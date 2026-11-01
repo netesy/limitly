@@ -25,7 +25,7 @@ pub fn open(path: str, mode: str): any {
 }
 
 pub fn print(msg: any): nil {
-    var w = res.ResourceWriter(res.stdout);
+    var w = res.Writer(res.stdout);
     w.write([msg]);
 }
 
@@ -89,33 +89,29 @@ pub fn rename(old_path: str, new_path: str): bool {
     }
 }
 
-pub fn create_directory(path: str): any {
+pub fn create_directory(path: str): nil? {
     match (res.create_fs_resource()) {
         val r => {
             var fs = FileSystem(r);
             var result = fs.mkdir(path);
             r.close();
             if (result) return ok(nil);
-            var unknown_e = file.UnknownError(message="fail");
-            return err(unknown_e);
+            return err();
         },
         err e => {
-            var unknown_e2 = file.UnknownError(message="fail");
-            return err(unknown_e2);
+            return err();
         }
     }
 }
 
-pub fn list_directory(path: str): any {
-    var final_result: any = nil;
+pub fn list_directory(path: str): [str]? {
     match (res.create_fs_resource()) {
         val r => {
             var fs = FileSystem(r);
             var result = fs.readdir(path);
             r.close();
             if (result == nil) {
-                var unknown_e = file.UnknownError(message="fail");
-                final_result = err(unknown_e);
+                return err();
             } else {
                 var s = result as str;
                 var parts: [str] = [];
@@ -130,13 +126,11 @@ pub fn list_directory(path: str): any {
                     }
                 }
                 if (len(current) > 0) parts.append(current);
-                final_result = ok(parts);
+                return ok(parts);
             }
         },
         err e => {
-            var unknown_e2 = file.UnknownError(message="fail");
-            final_result = err(unknown_e2);
+            return err();
         }
     }
-    return final_result;
 }

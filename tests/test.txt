@@ -133,6 +133,7 @@ tests/stdlib/uuid_test.lm
 tests/stdlib/crypto/hash_test.lm
 # Stdlib - Serialization
 tests/stdlib/serialization_test.lm
+tests/stdlib/nol_test.lm
 # Stdlib - Net
 tests/stdlib/net/net_test.lm
 # Stdlib - Archive

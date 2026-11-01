@@ -1,0 +1,21 @@
+// Standard Library NOL Module Facade
+// Nominal Object Language (NOL)
+
+import std.nol.parser as parser;
+import std.nol.writer as writer;
+import std.nol.document as document;
+
+pub import std.nol.value show Type, Value, make_null, make_bool, make_int, make_float, make_string, make_array, make_object, make_empty_object;
+pub import std.nol.document show Document, Builder;
+
+pub fn parse(text: str): document.Document? {
+    var res: any = parser.parse(text);
+    if (res == nil) {
+        return err();
+    }
+    return ok(res as document.Document);
+}
+
+pub fn stringify(val_any: any, indent: int = 2): str {
+    return writer.stringify(val_any, indent);
+}

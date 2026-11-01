@@ -6,7 +6,7 @@
 import std.core show Error;
 import std.resource as res;
 
-frame WSConnection {
+frame Connection {
     pub var resource: res.Resource?;
     pub var writer: res.Writer?;
     pub var reader: res.Reader?;
@@ -93,7 +93,7 @@ frame WSConnection {
     }
 }
 
-frame WSSServer {
+frame Server {
     var host: str;
     var port: int;
     var running: bool;
@@ -117,11 +117,11 @@ frame WSSServer {
     }
 
     // Configure the server
-    pub fn set_host(host: str): WSSServer { self.host = host; return self; }
-    pub fn set_port(port: int): WSSServer { self.port = port; return self; }
-    pub fn on_connection(handler: str): WSSServer { self.on_connect = handler; return self; }
-    pub fn on_message_handler(handler: str): WSSServer { self.on_message = handler; return self; }
-    pub fn on_disconnection(handler: str): WSSServer { self.on_disconnect = handler; return self; }
+    pub fn set_host(host: str): Server { self.host = host; return self; }
+    pub fn set_port(port: int): Server { self.port = port; return self; }
+    pub fn on_connection(handler: str): Server { self.on_connect = handler; return self; }
+    pub fn on_message_handler(handler: str): Server { self.on_message = handler; return self; }
+    pub fn on_disconnection(handler: str): Server { self.on_disconnect = handler; return self; }
 
     // Start the server (bind + listen)
     pub fn start(): int?Error {
@@ -210,22 +210,22 @@ frame WSSServer {
     pub fn is_running(): bool { return self.running; }
 }
 
-frame WSRoom {
+frame Room {
     var name: str;
-    var connections: {str: WSConnection};
+    var connections: {str: Connection};
 
     pub fn init(name: str) {
         self.name = name;
-        self.connections = {} as {str: WSConnection};
+        self.connections = {} as {str: Connection};
     }
 
-    pub fn join(id: str, conn: WSConnection): int {
+    pub fn join(id: str, conn: Connection): int {
         self.connections[id] = conn;
         return len(self.connections);
     }
 
     pub fn leave(id: str): int {
-        var new_conns: {str: WSConnection} = {} as {str: WSConnection};
+        var new_conns: {str: Connection} = {} as {str: Connection};
         var keys = __room_keys(self.connections);
         var i: int = 0;
         while (i < len(keys)) {
@@ -263,7 +263,7 @@ frame WSRoom {
 // so the loop lives in this free function and the methods walk the resulting
 // list with a while loop. Dictionaries are walked with the two-variable form,
 // `iter (key, value in dict)`.
-fn __room_keys(connections: {str: WSConnection}): [str] {
+fn __room_keys(connections: {str: Connection}): [str] {
     var keys: [str] = [];
     iter (id, conn in connections) {
         keys.append(id);

@@ -155,7 +155,7 @@ frame GlyphOutline {
     }
 }
 
-pub fn parse_glyph(reader: r.ByteReader, info: t.FontInfo, glyph_idx: int): GlyphOutline {
+pub fn parse_glyph(reader: r.ByteReader, info: t.Info, glyph_idx: int): GlyphOutline {
     var outline = GlyphOutline();
     var off_len = info.get_glyph_offset_and_length(reader, glyph_idx);
     var offset = off_len[0];

@@ -1,0 +1,68 @@
+// Standard Library NOL Document and Builder
+// Netesy Object Language (NOL)
+
+import std.nol.value as value;
+import std.string as str_mod;
+
+fn _resolve(curr: any, parts: [str], idx: int): any {
+    if (curr == nil or idx >= len(parts)) return curr;
+    var node = curr as value.Value;
+    if (!node.is_object()) return nil;
+    var next_val = node.get(parts[idx]);
+    return _resolve(next_val, parts, idx + 1);
+}
+
+fn _builder_set(curr: any, parts: [str], idx: int, value_node: any) {
+    if (curr == nil or idx >= len(parts)) return;
+    var node = curr as value.Value;
+    if (idx == len(parts) - 1) {
+        node.set(parts[idx], value_node);
+        return;
+    }
+    var next_val = node.get(parts[idx]);
+    if (next_val == nil) {
+        var new_obj = value.make_empty_object();
+        node.set(parts[idx], new_obj);
+        next_val = node.get(parts[idx]);
+    }
+    _builder_set(next_val, parts, idx + 1, value_node);
+}
+
+frame Document {
+    pub root: value.Value;
+
+    pub init(root: value.Value) {
+        self.root = root;
+    }
+
+    pub fn get(path: str): any {
+        var parts = str_mod.split(path, ".");
+        return _resolve(self.root as any, parts, 0);
+    }
+
+    pub fn exists(path: str): bool {
+        return self.get(path) != nil;
+    }
+
+    pub fn data(): value.Value {
+        return self.root;
+    }
+}
+
+frame Builder {
+    pub root: value.Value;
+
+    pub init() {
+        self.root = value.make_empty_object();
+    }
+
+    pub fn set(path: str, value_node: any): Builder {
+        var parts = str_mod.split(path, ".");
+        _builder_set(self.root as any, parts, 0, value_node);
+        return self;
+    }
+
+    pub fn build(): Document {
+        return Document(self.root);
+    }
+}

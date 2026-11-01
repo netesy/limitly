@@ -3,24 +3,24 @@
 
 import std.xml.node as xml_node;
 
-frame HTMLNode {
+frame Node {
     pub var tag_name: str;
     pub var attributes: {str: str};
-    pub var children: [HTMLNode];
+    pub var children: [Node];
     pub var text_content: str;
     pub var is_text: bool;
 
     pub init(tag: str = "div") {
         self.tag_name = tag;
         self.attributes = {} as {str: str};
-        self.children = [] as [HTMLNode];
+        self.children = [] as [Node];
         self.text_content = "";
         self.is_text = false;
     }
 }
 
-pub fn create_text_node(t: str): HTMLNode {
-    var n = HTMLNode("");
+pub fn create_text_node(t: str): Node {
+    var n = Node("");
     n.text_content = t;
     n.is_text = true;
     return n;
@@ -33,8 +33,8 @@ pub fn is_void_element(tag: str): bool {
     return false;
 }
 
-pub fn parse(html_str: str): HTMLNode {
-    var root = HTMLNode("html");
+pub fn parse(html_str: str): Node {
+    var root = Node("html");
     var stack = [root];
 
     var i = 0;
@@ -58,7 +58,7 @@ pub fn parse(html_str: str): HTMLNode {
                 if (substring(tag_body, 0, 1) == "/") {
                     // Closing tag: pop from stack cleanly without string conversion
                     if (len(stack) > 1) {
-                        var new_stack = [] as [HTMLNode];
+                        var new_stack = [] as [Node];
                         var k = 0;
                         while (k < len(stack) - 1) {
                             new_stack.append(stack[k]);
@@ -73,7 +73,7 @@ pub fn parse(html_str: str): HTMLNode {
                         space_idx = space_idx + 1;
                     }
                     var name = substring(tag_body, 0, space_idx);
-                    var node = HTMLNode(name);
+                    var node = Node(name);
 
                     var current_parent = stack[len(stack) - 1];
                     current_parent.children.append(node);

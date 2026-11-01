@@ -143,7 +143,7 @@ frame DateTime {
         return DateTime(ts, 0, tz.TimeZone.utc());
     }
 
-    pub fn add(duration: dur.TimeDuration): DateTime {
+    pub fn add(duration: dur.Duration): DateTime {
         var total_us: int = self.microseconds + duration.microseconds;
         var carry: int = 0;
         if (total_us >= 1000000) {
@@ -161,14 +161,14 @@ frame DateTime {
         );
     }
 
-    pub fn subtract(duration: dur.TimeDuration): DateTime {
-        return self.add(dur.TimeDuration(-duration.seconds, -duration.microseconds));
+    pub fn subtract(duration: dur.Duration): DateTime {
+        return self.add(dur.Duration(-duration.seconds, -duration.microseconds));
     }
 
-    pub fn difference(other: DateTime): dur.TimeDuration {
+    pub fn difference(other: DateTime): dur.Duration {
         var sec_diff: int = self.timestamp - other.timestamp;
         var us_diff: int = self.microseconds - other.microseconds;
-        return dur.TimeDuration(sec_diff, us_diff);
+        return dur.Duration(sec_diff, us_diff);
     }
 
     pub fn year(): int { return timestamp_to_year(self.timestamp); }
@@ -273,7 +273,7 @@ frame DateTime {
     }
 
     pub fn equals(other: DateTime): bool {
-        var diff: dur.TimeDuration = self.difference(other);
+        var diff: dur.Duration = self.difference(other);
         return diff.seconds == 0 and diff.microseconds == 0;
     }
 
@@ -371,7 +371,7 @@ frame DateTime {
     pub fn start_of_week(): DateTime {
         var dow: int = self.day_of_week();
         var days_back: int = dow;
-        return self.subtract(dur.TimeDuration.from_days(days_back)).start_of_day();
+        return self.subtract(dur.Duration.from_days(days_back)).start_of_day();
     }
 
     pub fn start_of_month(): DateTime {
@@ -392,7 +392,7 @@ frame DateTime {
         return DateTime.from_components(self.year(), m, 1, 0, 0, 0);
     }
 
-    pub fn age(birthdate: DateTime): dur.TimeDuration { return self.difference(birthdate); }
+    pub fn age(birthdate: DateTime): dur.Duration { return self.difference(birthdate); }
 }
 
 pub fn sleep_ms(ms: int): nil {
@@ -403,7 +403,7 @@ pub fn sleep_seconds(seconds: float): nil {
     sleep(seconds);
 }
 
-pub fn sleep_duration(duration: dur.TimeDuration): nil {
+pub fn sleep_duration(duration: dur.Duration): nil {
     sleep_ms(duration.to_milliseconds());
 }
 

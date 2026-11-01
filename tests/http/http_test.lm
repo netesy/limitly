@@ -1,4 +1,7 @@
-// HTTP tests - status codes, method validation, URL validation
+// HTTP tests - status codes, method validation, URL validation, client/server frames, and router
+
+import std.http as http;
+import std.http.router as router;
 
 fn str_len(s: str): int {
     return len(s);
@@ -11,85 +14,111 @@ fn substr(s: str, start: int, end: int): str {
 print("=== HTTP Tests ===");
 
 // Status code classification
-fn is_success(code: int): bool { return code >= 200 and code < 300; }
-fn is_redirect(code: int): bool { return code >= 300 and code < 400; }
-fn is_client_err(code: int): bool { return code >= 400 and code < 500; }
-fn is_server_err(code: int): bool { return code >= 500 and code < 600; }
+assert(http.is_success(200), "200");
+assert(http.is_success(201), "201");
+assert(http.is_success(299), "299");
+assert(not http.is_success(199), "not 199");
+assert(not http.is_success(300), "not 300");
 
-assert(is_success(200), "200");
-assert(is_success(201), "201");
-assert(is_success(299), "299");
-assert(not is_success(199), "not 199");
-assert(not is_success(300), "not 300");
+assert(http.is_redirect(301), "301");
+assert(http.is_redirect(302), "302");
+assert(http.is_redirect(399), "399");
+assert(not http.is_redirect(200), "200 no");
+assert(not http.is_redirect(400), "400 no");
 
-assert(is_redirect(301), "301");
-assert(is_redirect(302), "302");
-assert(is_redirect(399), "399");
-assert(not is_redirect(200), "200 no");
-assert(not is_redirect(400), "400 no");
+assert(http.is_client_error(400), "400");
+assert(http.is_client_error(404), "404");
+assert(http.is_client_error(499), "499");
+assert(not http.is_client_error(500), "500 no");
 
-assert(is_client_err(400), "400");
-assert(is_client_err(404), "404");
-assert(is_client_err(499), "499");
-assert(not is_client_err(500), "500 no");
+assert(http.is_server_error(500), "500");
+assert(http.is_server_error(503), "503");
+assert(not http.is_server_error(400), "400 no");
 
-assert(is_server_err(500), "500");
-assert(is_server_err(503), "503");
-assert(not is_server_err(400), "400 no");
+assert(http.status_text(200) == "OK", "status_text 200");
+assert(http.status_text(404) == "Not Found", "status_text 404");
+assert(http.status_text(500) == "Internal Server Error", "status_text 500");
 
 // Method validation
-fn is_valid_method(m: str): bool {
-    if (m == "GET") { return true; }
-    if (m == "POST") { return true; }
-    if (m == "PUT") { return true; }
-    if (m == "PATCH") { return true; }
-    if (m == "DELETE") { return true; }
-    if (m == "HEAD") { return true; }
-    if (m == "OPTIONS") { return true; }
-    return false;
+assert(http.is_valid_method("GET"), "GET");
+assert(http.is_valid_method("POST"), "POST");
+assert(http.is_valid_method("PUT"), "PUT");
+assert(http.is_valid_method("DELETE"), "DELETE");
+assert(http.is_valid_method("PATCH"), "PATCH");
+assert(http.is_valid_method("HEAD"), "HEAD");
+assert(http.is_valid_method("OPTIONS"), "OPTIONS");
+assert(not http.is_valid_method("INVALID"), "no");
+
+// Query string parsing and building
+var qs = "name=Alice&age=30&role=admin";
+var parsed_qs = http.parse_query_string(qs);
+assert(parsed_qs["name"] == "Alice", "qs name");
+assert(parsed_qs["age"] == "30", "qs age");
+assert(parsed_qs["role"] == "admin", "qs role");
+
+// Cookie parsing
+var cookie_hdr = "session_id=xyz123; user=alice; theme=dark";
+var cookies = http.parse_cookies(cookie_hdr);
+assert(cookies["session_id"] == "xyz123", "cookie session_id");
+assert(cookies["user"] == "alice", "cookie user");
+assert(cookies["theme"] == "dark", "cookie theme");
+
+// HTTPRequest frame
+var req = http.Request("GET", "https://api.example.com/v1/users");
+req.set_header("Authorization", "Bearer token123");
+req.set_json("status: active");
+assert(req.method == "GET", "req method");
+assert(req.header("authorization") == "Bearer token123", "req header case-insensitive");
+assert(req.header("content-type") == "application/json", "req content-type");
+
+// HTTPResponse frame
+var resp = http.Response(200, "OK", "hello response");
+resp.headers["content-type"] = "text/plain";
+assert(resp.is_success(), "resp is_success");
+assert(not resp.is_error(), "resp not is_error");
+assert(resp.header("Content-Type") == "text/plain", "resp header");
+assert(resp.text() == "hello response", "resp text");
+
+// ServerRequest parsing
+var raw_http = "POST /api/items?filter=active HTTP/1.1\r\nHost: localhost:8080\r\nContent-Type: application/json\r\n\r\nitem_data";
+var sreq = http.parse_server_request(raw_http);
+assert(sreq.method == "POST", "sreq method");
+assert(sreq.path == "/api/items", "sreq path");
+assert(sreq.query_string == "filter=active", "sreq query_string");
+assert(sreq.query("filter") == "active", "sreq query param");
+assert(sreq.header("host") == "localhost:8080", "sreq header host");
+assert(sreq.body == "item_data", "sreq body");
+
+// ServerResponse frame
+var sresp = http.ServerResponse();
+sresp.json(200, "result: success");
+assert(sresp.status == 200, "sresp status");
+assert(sresp.header("content-type") == "application/json", "sresp content-type");
+
+// Router test
+var r = http.make_router();
+
+fn handle_home(request: router.RouteRequest): router.RouteResponse {
+    return router.RouteResponse(200, "welcome home");
 }
 
-assert(is_valid_method("GET"), "GET");
-assert(is_valid_method("POST"), "POST");
-assert(is_valid_method("PUT"), "PUT");
-assert(is_valid_method("DELETE"), "DELETE");
-assert(is_valid_method("PATCH"), "PATCH");
-assert(is_valid_method("HEAD"), "HEAD");
-assert(is_valid_method("OPTIONS"), "OPTIONS");
-assert(not is_valid_method("INVALID"), "no");
-
-// URL validation
-fn is_http_url(s: str): bool {
-    var slen: int = str_len(s);
-    if (slen < 7) { return false; }
-    var p: str = substr(s, 0, 7);
-    if (p == "http://") { return true; }
-    if (slen < 8) { return false; }
-    var p2: str = substr(s, 0, 8);
-    if (p2 == "https://") { return true; }
-    return false;
+fn handle_user(request: router.RouteRequest): router.RouteResponse {
+    var uid = request.param("id");
+    return router.RouteResponse(200, "user: " + uid);
 }
 
-assert(is_http_url("http://example.com"), "http");
-assert(is_http_url("https://example.com/path"), "https");
-assert(not is_http_url("not-a-url"), "no");
-assert(not is_http_url(""), "empty");
-assert(not is_http_url("ftp://x.com"), "ftp");
+r.get("/", handle_home as any);
+r.get("/users/:id", handle_user as any);
 
-// Content-type parameter stripping
-fn strip_ct_params(ct: str): str {
-    var slen: int = str_len(ct);
-    var i: int = 0;
-    while (i < slen) {
-        if (substr(ct, i, i + 1) == ";") {
-            return substr(ct, 0, i);
-        }
-        i = i + 1;
-    }
-    return ct;
-}
+var res_home = r.handle(router.RouteRequest("GET", "/"));
+assert(res_home.status_code == 200, "router home status");
+assert(res_home.body == "welcome home", "router home body");
 
-assert(strip_ct_params("text/html; charset=utf-8") == "text/html", "strip params");
-assert(strip_ct_params("application/json") == "application/json", "no params");
+var res_user = r.handle(router.RouteRequest("GET", "/users/42"));
+assert(res_user.status_code == 200, "router user param status");
+assert(res_user.body == "user: 42", "router user param body");
+
+var res_404 = r.handle(router.RouteRequest("GET", "/notfound"));
+assert(res_404.status_code == 404, "router 404 status");
 
 print("HTTP tests passed!");

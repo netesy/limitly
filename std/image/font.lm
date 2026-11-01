@@ -4,7 +4,7 @@
 import std.ffi as ffi;
 import std.image.index as image;
 
-frame FontMetrics {
+frame Metrics {
     pub var ascent: float;
     pub var descent: float;
     pub var line_gap: float;

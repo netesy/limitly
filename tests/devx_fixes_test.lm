@@ -15,8 +15,8 @@ fn test_html_parser(): nil {
 fn test_archive(): nil {
     print("\nTesting Archive Module...");
     var arch = archive.Archive("test_arch.zip");
-    arch.add_entry(archive.ArchiveEntry("file1.txt", 100, false));
-    arch.add_entry(archive.ArchiveEntry("docs", 0, true));
+    arch.add_entry(archive.Entry("file1.txt", 100, false));
+    arch.add_entry(archive.Entry("docs", 0, true));
 
     var files = arch.list();
     assert(len(files) == 2, "archive 2 entries");

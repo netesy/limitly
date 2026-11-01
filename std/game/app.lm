@@ -13,7 +13,7 @@ import std.game.types as types;
 import std.game.input show InputManager;
 import std.game.scene show SceneManager;
 
-frame GameConfig {
+frame Config {
     pub var title: str;
     pub var width: int;
     pub var height: int;
@@ -31,12 +31,12 @@ frame GameConfig {
     }
 }
 
-pub fn default_config(): GameConfig {
-    return GameConfig();
+pub fn default_config(): Config {
+    return Config();
 }
 
 frame Game {
-    pub var config: GameConfig;
+    pub var config: Config;
     pub var gui: GUI;
     pub var input: InputManager;
     pub var scenes: SceneManager;
@@ -61,7 +61,7 @@ frame Game {
         if (cfg == nil) {
             self.config = default_config();
         } else {
-            self.config = cfg as GameConfig;
+            self.config = cfg as Config;
         }
         self.gui = GUI();
         self.input = InputManager();
