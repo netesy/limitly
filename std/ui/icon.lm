@@ -1,5 +1,6 @@
 // std/ui/icon - Icon widget with Unicode symbols
 import std.ui.types as ui_types;
+import std.color as color;
 
 // Common icon symbols (Unicode)
 pub const ICON_CLOSE: str = "✕";
@@ -22,12 +23,12 @@ pub const ICON_TRASH: str = "🗑";
 pub const ICON_EDIT: str = "✎";
 
 // Create an icon widget
-pub fn icon(glyph: str, size: float = 24.0, color: ui_types.Color = ui_types.white): ui_types.Widget {
+pub fn icon(glyph: str, size: float = 24.0, color_val: color.Color = color.white): ui_types.Widget {
     var w = ui_types.text(glyph);
     w.font_size_val = size;
     w.width_val = size;
     w.height_val = size;
-    w.foreground_color = color;
+    w.foreground_color = color_val;
     w.is_a11y_hidden = true;
     return w;
 }

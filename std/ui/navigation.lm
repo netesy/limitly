@@ -8,6 +8,7 @@
 //   Middleware   — optional pre-navigation guard (e.g. auth check)
 
 import std.ui.types as ui;
+import std.color as color;
 
 // ── Route Params ──────────────────────────────────────────────────────────────
 frame RouterParams {
@@ -501,9 +502,9 @@ pub fn tab_bar(routes: [(str, str)], router: Router): ui.Widget {
         var is_active = (router.current_path == path);
         var btn = ui.button(label, fn(): nil { router.navigate(path); });
         if (is_active) {
-            btn = btn.background(ui.indigo);
+            btn = btn.background(color.indigo);
         } else {
-            btn = btn.background(ui.transparent);
+            btn = btn.background(color.transparent);
         }
         btns.append(btn.role(ui.Semantic.TabList).aria_label(label));
         i = i + 1;

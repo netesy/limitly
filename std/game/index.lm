@@ -61,17 +61,20 @@ pub fn raycast_circle(ray: any, c: any, max_dist: float = 10000.0): math.RayHit2
 }
 
 // Colors & Themes
-pub fn Color(r: float = 0.0, g: float = 0.0, b: float = 0.0, a: float = 1.0): types.Color {
-    return types.Color(r=r, g=g, b=b, a=a);
+import std.color as color;
+pub import std.color show Color;
+
+pub fn Color(r: float = 0.0, g: float = 0.0, b: float = 0.0, a: float = 1.0): Color {
+    return color.Color(r=r, g=g, b=b, a=a);
 }
-pub fn rgb(r: int, g: int, b: int): types.Color {
-    return types.rgb(r, g, b);
+pub fn rgb(r: int, g: int, b: int): Color {
+    return color.rgb(r, g, b);
 }
-pub fn rgba(r: int, g: int, b: int, a: float): types.Color {
-    return types.rgba(r, g, b, a);
+pub fn rgba(r: int, g: int, b: int, a: float): Color {
+    return color.rgba(r, g, b, a);
 }
-pub fn hex(c: int, a: float = 1.0): types.Color {
-    return types.hex(c, a);
+pub fn hex(c: int, a: float = 1.0): Color {
+    return color.hex(c, a);
 }
 
 pub fn GUITheme(): types.GUITheme {
@@ -113,14 +116,14 @@ pub const VAR_ITEM_HEIGHT: int       = types.VAR_ITEM_HEIGHT;
 pub const VAR_ROUNDING: int          = types.VAR_ROUNDING;
 
 // Built-in Colors
-pub const white: types.Color = types.white;
-pub const black: types.Color = types.black;
-pub const transparent: types.Color = types.transparent;
-pub const red: types.Color = types.red;
-pub const green: types.Color = types.green;
-pub const blue: types.Color = types.blue;
-pub const yellow: types.Color = types.yellow;
-pub const cyan: types.Color = types.cyan;
+pub const white: Color = color.white;
+pub const black: Color = color.black;
+pub const transparent: Color = color.transparent;
+pub const red: Color = color.red;
+pub const green: Color = color.green;
+pub const blue: Color = color.blue;
+pub const yellow: Color = color.yellow;
+pub const cyan: Color = color.cyan;
 
 // ── 2D Camera ──────────────────────────────────────────────────────────────
 pub fn Camera(target: any = nil, offset: any = nil, zoom: float = 1.0): camera.Camera2D {

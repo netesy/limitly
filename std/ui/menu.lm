@@ -1,5 +1,6 @@
 // std/ui/menu - Dropdown and context menus
 import std.ui.types as ui_types;
+import std.color as color;
 
 // Menu item frame
 frame MenuItem {
@@ -22,7 +23,7 @@ pub fn menu(items: [str], on_select: any = nil): ui_types.Widget {
     var i = 0;
     while (i < len(items)) {
         var item = ui_types.button(items[i])
-            .background(ui_types.rgb(28, 30, 40))
+            .background(color.rgb(28, 30, 40))
             .width(160.0)
             .height(28.0);
         item_widgets.append(item);
@@ -30,8 +31,8 @@ pub fn menu(items: [str], on_select: any = nil): ui_types.Widget {
     }
     
     var w = ui_types.column(item_widgets);
-    w.background_color = ui_types.rgb(24, 26, 34);
-    w.foreground_color = ui_types.white;
+    w.background_color = color.rgb(24, 26, 34);
+    w.foreground_color = color.white;
     w.padding_left = 4.0;
     w.padding_top = 4.0;
     w.padding_right = 4.0;
@@ -54,7 +55,7 @@ pub fn menu_items(items: [MenuItem]): ui_types.Widget {
             label = mi.icon + " " + mi.label;
         }
         var btn = ui_types.button(label)
-            .background(ui_types.rgb(28, 30, 40))
+            .background(color.rgb(28, 30, 40))
             .width(180.0)
             .height(32.0)
             .on_click(mi.action);
@@ -66,8 +67,8 @@ pub fn menu_items(items: [MenuItem]): ui_types.Widget {
     }
     
     var w = ui_types.column(item_widgets);
-    w.background_color = ui_types.rgb(20, 22, 28);
-    w.foreground_color = ui_types.white;
+    w.background_color = color.rgb(20, 22, 28);
+    w.foreground_color = color.white;
     w.padding_left = 4.0;
     w.padding_top = 4.0;
     w.padding_right = 4.0;

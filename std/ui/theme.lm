@@ -1,5 +1,6 @@
 // std/ui/theme - Design tokens and theming system
 import std.ui.types as ui_types;
+import std.color as color;
 
 // Color palette token
 frame ColorPalette {
@@ -19,20 +20,20 @@ frame ColorPalette {
     pub var focus_ring: ui_types.Color;
 
     pub init() {
-        self.primary = ui_types.blue;
-        self.secondary = ui_types.indigo;
-        self.tertiary = ui_types.rgb(100, 200, 100);
-        self.background = ui_types.rgb(15, 15, 20);
-        self.surface = ui_types.rgb(24, 26, 34);
-        self.surface_variant = ui_types.rgb(35, 38, 48);
-        self.error = ui_types.red;
-        self.success = ui_types.rgb(80, 220, 130);
-        self.warning = ui_types.rgb(255, 200, 80);
-        self.info = ui_types.blue;
-        self.text_primary = ui_types.white;
-        self.text_secondary = ui_types.rgb(180, 185, 200);
-        self.border = ui_types.rgb(60, 65, 75);
-        self.focus_ring = ui_types.rgb(100, 180, 255);
+        self.primary = color.blue;
+        self.secondary = color.indigo;
+        self.tertiary = color.rgb(100, 200, 100);
+        self.background = color.rgb(15, 15, 20);
+        self.surface = color.rgb(24, 26, 34);
+        self.surface_variant = color.rgb(35, 38, 48);
+        self.error = color.red;
+        self.success = color.rgb(80, 220, 130);
+        self.warning = color.rgb(255, 200, 80);
+        self.info = color.blue;
+        self.text_primary = color.white;
+        self.text_secondary = color.rgb(180, 185, 200);
+        self.border = color.rgb(60, 65, 75);
+        self.focus_ring = color.rgb(100, 180, 255);
     }
 }
 

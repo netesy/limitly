@@ -1,5 +1,6 @@
 // std/ui/dialog - Modal dialog and overlay widgets
 import std.ui.types as ui_types;
+import std.color as color;
 import std.ui.viewport as viewport;
 
 // Modal dialog with title, content, close button, and dynamic viewport centering
@@ -11,7 +12,7 @@ pub fn dialog(title: str, content: ui_types.Widget, is_open: bool = true, width:
     var close_btn = ui_types.button("✕")
         .width(32.0)
         .height(32.0)
-        .background(ui_types.rgb(255, 100, 100))
+        .background(color.rgb(255, 100, 100))
         .on_click(on_close);
     
     var header = ui_types.row([
@@ -26,8 +27,8 @@ pub fn dialog(title: str, content: ui_types.Widget, is_open: bool = true, width:
         header,
         content
     ]);
-    dialog_content.background_color = ui_types.rgb(24, 26, 34);
-    dialog_content.foreground_color = ui_types.white;
+    dialog_content.background_color = color.rgb(24, 26, 34);
+    dialog_content.foreground_color = color.white;
     dialog_content.padding_left = 20.0;
     dialog_content.padding_top = 20.0;
     dialog_content.padding_right = 20.0;
@@ -72,10 +73,10 @@ pub fn alert_dialog(title: str, message: str, on_ok: any = nil): ui_types.Widget
 // Confirm dialog (modal with message and Yes/No buttons)
 pub fn confirm(title: str, message: str, on_yes: any = nil, on_no: any = nil): ui_types.Widget {
     var yes_btn = ui_types.button("Yes")
-        .background(ui_types.rgb(80, 220, 130))
+        .background(color.rgb(80, 220, 130))
         .on_click(on_yes);
     var no_btn = ui_types.button("No")
-        .background(ui_types.rgb(255, 100, 100))
+        .background(color.rgb(255, 100, 100))
         .on_click(on_no);
     
     var buttons = ui_types.row([yes_btn, no_btn]);
@@ -104,7 +105,7 @@ pub fn modal_backdrop(alpha: float = 0.6): ui_types.Widget {
 
     var backdrop = ui_types.empty();
     backdrop.kind = ui_types.KIND_CONTAINER;
-    backdrop.background_color = ui_types.rgba(0.0, 0.0, 0.0, alpha);
+    backdrop.background_color = color.rgba(0.0, 0.0, 0.0, alpha);
     backdrop.width_val = vw;
     backdrop.height_val = vh;
     return backdrop;

@@ -5,6 +5,7 @@
 import std.gg as gg;
 import std.math as math;
 import std.game.types as types;
+import std.color as color;
 import std.string as std_string;
 import std.text.controller as text_ctrl;
 import std.focus.manager as focus;
@@ -1508,7 +1509,7 @@ frame GUI {
         return new_idx;
     }
 
-    pub fn color_button(id: str, color: types.Color, w: float = 24.0, h: float = 24.0): bool {
+    pub fn color_button(id: str, col: types.Color, w: float = 24.0, h: float = 24.0): bool {
         var bx = self.cursor_x;
         var by = self.cursor_y;
         var full_id = self.make_id(id);
@@ -1525,7 +1526,7 @@ frame GUI {
         var border = self.theme.checkbox_border;
         if (hovered) { border = self.get_style_color(types.COLOR_ACCENT); }
         gg.draw_rect_primitive(bx, by, w, h, border.r, border.g, border.b, border.a);
-        gg.draw_rect_primitive(bx + 2.0, by + 2.0, w - 4.0, h - 4.0, color.r, color.g, color.b, color.a);
+        gg.draw_rect_primitive(bx + 2.0, by + 2.0, w - 4.0, h - 4.0, col.r, col.g, col.b, col.a);
 
         self.prev_item_hovered = hovered;
         self.prev_item_rect = types.rect(bx, by, w, h);
@@ -1533,20 +1534,20 @@ frame GUI {
         return clicked;
     }
 
-    pub fn color_picker(label: str, color: types.Color): types.Color {
+    pub fn color_picker(label: str, col: types.Color): types.Color {
         self.push_id(label);
-        self.color_button("##swatch", color, 28.0, 28.0);
+        self.color_button("##swatch", col, 28.0, 28.0);
         self.same_line();
         self.label(label);
 
         self.indent(12.0);
-        var nr = self.slider("R", color.r, 0.0, 1.0, 120.0);
-        var ng = self.slider("G", color.g, 0.0, 1.0, 120.0);
-        var nb = self.slider("B", color.b, 0.0, 1.0, 120.0);
+        var nr = self.slider("R", col.r, 0.0, 1.0, 120.0);
+        var ng = self.slider("G", col.g, 0.0, 1.0, 120.0);
+        var nb = self.slider("B", col.b, 0.0, 1.0, 120.0);
         self.unindent(12.0);
         self.pop_id();
 
-        return types.Color(r=nr, g=ng, b=nb, a=color.a);
+        return types.Color(r=nr, g=ng, b=nb, a=col.a);
     }
 
     pub fn plot_lines(label: str, values: [float], min_val: float = 0.0, max_val: float = 1.0, w: float = 180.0, h: float = 50.0): nil {
@@ -1754,7 +1755,7 @@ frame GUI {
         gg.draw_rect_primitive(bx, by, w, h, bg.r, bg.g, bg.b, bg.a);
 
         var tc = self.get_style_color(types.COLOR_TEXT);
-        if (is_active) { tc = types.white; }
+        if (is_active) { tc = color.white; }
         var tw = (len(label) * 8 * self.theme.font_scale) as float;
         gg.draw_text(label, bx + (w - tw) / 2.0, by + (h - 8.0 * (self.theme.font_scale as float)) / 2.0, tc.r, tc.g, tc.b, tc.a, self.theme.font_scale);
 
