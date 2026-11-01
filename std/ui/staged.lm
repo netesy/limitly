@@ -1,10 +1,18 @@
 // std/ui/staged.lm
 // Compile-Time Staged Evaluation for Lymar UI
 //
-// Folds static layouts, bounding boxes, and theme tokens.
+// Folds static layouts, bounding boxes, and theme tokens into read-only
+// constants at compile time; only dynamic signal bindings evaluate at runtime.
 // Provides type-safe compile-time generic state bindings via staged frame templates.
+//
+// Stage-0 note: `staged fn` calls fold when their arguments are literals.
+// Keep folded call sites written with literal geometry (grid counts, paddings,
+// palette roles) so the compile-time path engages.
 
 // ── Compile-Time Layout Folding Functions ─────────────────────────────────────
+// These three stay runtime-callable: existing qualified call sites
+// (`staged_ui.compute_item_width(...)`) evaluate them on demand. Fold your
+// static geometry through the `staged fn` family below with literal arguments.
 
 pub fn compute_item_width(char_count: int, font_scale: int, pad_x: int): int {
     var base_w = char_count * 8 * font_scale;
@@ -21,6 +29,56 @@ pub fn compute_constrained_size(desired: int, min_bound: int, max_bound: int): i
     if (desired < min_bound) { return min_bound; }
     if (max_bound > 0 and desired > max_bound) { return max_bound; }
     return desired;
+}
+
+// ── Static Bounding-Box Algebra ───────────────────────────────────────────────
+// Leaf frames of a static hierarchy ask these at their definition site; with
+// literal inputs the arithmetic never reaches the binary.
+//
+// Staged call sites must import these symbols directly
+// (`import std.ui.staged { fold_box_width, ... };`) -- qualified `mod.fn`
+// spelling does not fold. See tests/staged/staged_fn_test.lm for the model.
+
+pub staged fn fold_box_width(content_w: int, pad_x: int, border: int): int {
+    return content_w + pad_x * 2 + border * 2;
+}
+
+pub staged fn fold_box_height(content_h: int, pad_y: int, border: int): int {
+    return content_h + pad_y * 2 + border * 2;
+}
+
+// Cumulative cross-axis extent of `count` stacked children.
+pub staged fn fold_stack_extent(count: int, child_size: int, gap: int): int {
+    if (count <= 0) { return 0; }
+    return count * child_size + (count - 1) * gap;
+}
+
+// Origin of child `index` inside an evenly packed track.
+pub staged fn fold_child_offset(index: int, origin: int, child_size: int, gap: int): int {
+    return origin + index * (child_size + gap);
+}
+
+// ── Theme Token Folding ───────────────────────────────────────────────────────
+// Packed ARGB palette roles fold to integer constants; the runtime renderer
+// unpacks them once per draw, never re-resolving the ladder. Stage-0 enum
+// equality folds, so `theme_argb(ThemeRole.Accent)` yields a raw constant.
+
+enum ThemeRole {
+    WindowBg,
+    Text,
+    Accent,
+    Muted,
+    Danger,
+    Success
+}
+
+pub staged fn theme_argb(role: ThemeRole): int {
+    if (role == ThemeRole.WindowBg) { return 0xff1e2127; }
+    if (role == ThemeRole.Text) { return 0xfff1f5f9; }
+    if (role == ThemeRole.Accent) { return 0xff6366f1; }
+    if (role == ThemeRole.Muted) { return 0xff94a3b8; }
+    if (role == ThemeRole.Danger) { return 0xef4444ff; }
+    return 0x22c55eff;
 }
 
 // ── Type-Safe Compile-Time State Binding ──────────────────────────────────────

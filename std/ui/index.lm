@@ -2,7 +2,10 @@
 // Canonical entry point for Lymar Retained UI System
 
 import std.ui.types as ui_types;
-pub import std.ui.types show Widget, Style, Alignment, WidgetKind, LifecycleState;
+pub import std.ui.types show Widget, Style, WidgetKind, LifecycleState;
+// Nominal dispatch enums (Alignment/Axis magic ints are gone).
+pub import std.ui.types show Align, Axis, Weight, Semantic, AlertKind, DotState, MaskShape, BlueprintVariant, ConstraintMode, Role;
+pub import std.ui.types show align_start, align_center, align_end, AXIS_HORIZONTAL, AXIS_VERTICAL, AXIS_STACKED;
 
 import std.ui.color as color;
 pub import std.ui.types show Color;
@@ -68,9 +71,8 @@ pub fn hex(h: int): Color { return color.hex(h); }
 pub fn hsl(h: float, s: float, l: float): Color { return color.hsl(h, s, l); }
 
 // ── Styles & Layout Constants ─────────────────────────────────────────────────
-pub var align_start = ui_types.align_start;
-pub var align_center = ui_types.align_center;
-pub var align_end = ui_types.align_end;
+// align_start/center/end and AXIS_* are re-exported via `pub import show` above
+// (type-safe; the old `var` aliases were invisible in type position).
 pub fn style(): Style { return ui_types.style(); }
 
 // ── Kind Constants ────────────────────────────────────────────────────────────
@@ -254,6 +256,6 @@ pub fn dl_hit_test(dlist_obj: DrawList, px: float, py: float): HitZone {
 }
 
 // ── Modern Idiomatic Component Primitives (Embedding & Staged) ───────────────
-pub import std.ui.components show LayoutMetrics, VisualStyle, Clickable, Button, Label, Slider, Container;
+pub import std.ui.components show Fluent, Flow, LayoutMetrics, LayoutBox, VisualStyle, Clickable, Changeable, Focusable, Button, Label, Slider, Checkbox, TextInput, ProgressBar, Container;
 pub import std.ui.staged show compute_item_width, compute_grid_column_width, compute_constrained_size, Binding;
 pub import std.ui.event show EventKind, EventResult, UIEvent, make_click_event, make_hover_event, make_key_event, dispatch_event;

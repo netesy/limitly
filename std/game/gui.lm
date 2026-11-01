@@ -3,6 +3,7 @@
 // Features comprehensive widget library, moddable style stack, and customizable themes.
 
 import std.gg as gg;
+import std.math as math;
 import std.game.types as types;
 import std.string as std_string;
 import std.text.controller as text_ctrl;
@@ -13,10 +14,8 @@ import std.animation as anim;
 import std.graphics.shadow as shadow;
 
 frame WindowState {
-    pub var x: float;
-    pub var y: float;
-    pub var w: float;
-    pub var h: float;
+    embed types.Rect;
+
     pub var collapsed: bool;
     pub var is_dragging: bool;
     pub var drag_off_x: float;
@@ -370,28 +369,7 @@ frame GUI {
             }
             i = i - 1;
         }
-        if (idx == types.COLOR_WINDOW_BG) { return self.theme.bg_window; }
-        elif (idx == types.COLOR_WINDOW_TITLE) { return self.theme.bg_window_title; }
-        elif (idx == types.COLOR_PANEL_BG) { return self.theme.bg_panel; }
-        elif (idx == types.COLOR_TEXT) { return self.theme.text; }
-        elif (idx == types.COLOR_TEXT_MUTED) { return self.theme.text_muted; }
-        elif (idx == types.COLOR_ACCENT) { return self.theme.accent; }
-        elif (idx == types.COLOR_BUTTON) { return self.theme.btn_normal; }
-        elif (idx == types.COLOR_BUTTON_HOVER) { return self.theme.btn_hover; }
-        elif (idx == types.COLOR_BUTTON_ACTIVE) { return self.theme.btn_active; }
-        elif (idx == types.COLOR_SLIDER_TRACK) { return self.theme.slider_track; }
-        elif (idx == types.COLOR_SLIDER_THUMB) { return self.theme.slider_thumb; }
-        elif (idx == types.COLOR_CHECKBOX_BORDER) { return self.theme.checkbox_border; }
-        elif (idx == types.COLOR_CHECKBOX_CHECK) { return self.theme.checkbox_check; }
-        elif (idx == types.COLOR_SEPARATOR) { return self.theme.separator; }
-        elif (idx == types.COLOR_FRAME_BG) { return self.theme.frame_bg; }
-        elif (idx == types.COLOR_FRAME_BG_HOVER) { return self.theme.frame_bg_hover; }
-        elif (idx == types.COLOR_FRAME_BG_ACTIVE) { return self.theme.frame_bg_active; }
-        elif (idx == types.COLOR_TAB) { return self.theme.tab_normal; }
-        elif (idx == types.COLOR_TAB_ACTIVE) { return self.theme.tab_active; }
-        elif (idx == types.COLOR_PLOT_LINES) { return self.theme.plot_lines; }
-        elif (idx == types.COLOR_PLOT_HISTOGRAM) { return self.theme.plot_histogram; }
-        return self.theme.text;
+        return self.get_color_role(types.color_role_from_index(idx));
     }
 
     pub fn get_style_var(idx: int, default_value: float): float {
@@ -403,11 +381,7 @@ frame GUI {
             }
             i = i - 1;
         }
-        if (idx == types.VAR_PADDING) { return self.theme.padding; }
-        elif (idx == types.VAR_SPACING) { return self.theme.spacing; }
-        elif (idx == types.VAR_ITEM_HEIGHT) { return self.theme.item_height; }
-        elif (idx == types.VAR_ROUNDING) { return self.theme.rounding; }
-        return default_value;
+        return self.get_var_type(types.style_var_from_index(idx), default_value);
     }
 
     pub fn get_color_role(role: types.ColorRole): types.Color {

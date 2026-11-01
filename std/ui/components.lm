@@ -5,9 +5,24 @@
 // component frames utilizing Lymar's `embed` mechanism.
 // Flattened fields have zero pointer overhead; promoted methods provide
 // fluent builder ergonomics without wrapper allocations.
+//
+// Interaction slots are typed optional functions -- `(fn(): nil)?` -- never
+// raw `any`, and every invocation routes through a fallible `EventResult?`
+// pipeline so call sites carry no nil-check ladders.
 
 import std.color as color;
+import std.math as math;
+import std.ui.event as event;
 pub import std.color show Color;
+pub import std.ui.event show EventResult;
+
+// ── Structural Contract ───────────────────────────────────────────────────────
+// Typed children: containers hold `[Fluent]`, not `[any]`. Every concrete
+// component declares conformance, so the compiler checks composition shapes.
+
+trait Fluent {
+    fn kind_name(): str;
+}
 
 // ── Reusable Component Primitives ─────────────────────────────────────────────
 
@@ -45,6 +60,8 @@ frame LayoutMetrics {
     }
 }
 
+type LayoutBox = LayoutMetrics;
+
 frame VisualStyle {
     pub var bg: Color;
     pub var fg: Color;
@@ -71,7 +88,7 @@ frame VisualStyle {
 frame Clickable {
     pub var is_pressed: bool;
     pub var is_hovered: bool;
-    pub var on_click_action: any;
+    pub var on_click_action: (fn(): nil)?;
     pub var click_count: int;
 
     pub init() {
@@ -81,8 +98,20 @@ frame Clickable {
         self.click_count = 0;
     }
 
-    pub fn set_on_click(action: any): nil {
-        self.on_click_action = action;
+    pub fn set_on_click(action: fn(): nil): nil {
+        self.on_click_action = action as (fn(): nil)?;
+    }
+
+    // Fallible invocation: an absent handler is `Unhandled`, not a crash.
+    pub fn click(): EventResult? {
+        var slot = self.on_click_action;
+        if (slot == nil) {
+            return ok(EventResult.Unhandled);
+        }
+        var f: fn(): nil = slot as fn(): nil;
+        f();
+        self.click_count = self.click_count + 1;
+        return ok(EventResult.Handled);
     }
 
     pub fn trigger_click(): nil {
@@ -90,16 +119,67 @@ frame Clickable {
     }
 }
 
+frame Changeable {
+    pub var on_change_action: (fn(): nil)?;
+    pub var change_count: int;
+
+    pub init() {
+        self.on_change_action = nil;
+        self.change_count = 0;
+    }
+
+    pub fn set_on_change(action: fn(): nil): nil {
+        self.on_change_action = action as (fn(): nil)?;
+    }
+
+    pub fn notify_change(): EventResult? {
+        var slot = self.on_change_action;
+        if (slot == nil) {
+            return ok(EventResult.Unhandled);
+        }
+        var f: fn(): nil = slot as fn(): nil;
+        f();
+        self.change_count = self.change_count + 1;
+        return ok(EventResult.Handled);
+    }
+}
+
+frame Focusable {
+    pub var is_focused: bool;
+    pub var cursor_pos: int;
+
+    pub init() {
+        self.is_focused = false;
+        self.cursor_pos = 0;
+    }
+
+    pub fn focus(): nil {
+        self.is_focused = true;
+    }
+
+    pub fn blur(): nil {
+        self.is_focused = false;
+        self.cursor_pos = 0;
+    }
+}
+
+// ── Nominal Flow Direction ────────────────────────────────────────────────────
+
+enum Flow {
+    Vertical,
+    Horizontal
+}
+
 // ── Specialized Embedded UI Components ────────────────────────────────────────
 
-frame Button {
+frame Button: Fluent {
     embed LayoutMetrics;
     embed VisualStyle;
     embed Clickable;
 
     pub var label: str;
 
-    pub init(text: str, on_click: any = nil) {
+    pub init(text: str, on_click: (fn(): nil)? = nil) {
         self.label = text;
         self.on_click_action = on_click;
         self.bg = color.slate(700);
@@ -110,6 +190,8 @@ frame Button {
         self.pad_r = 16.0;
         self.pad_b = 8.0;
     }
+
+    pub fn kind_name(): str { return "Button"; }
 
     pub fn background(c: Color): Button {
         self.bg = c;
@@ -142,7 +224,7 @@ frame Button {
     }
 }
 
-frame Label {
+frame Label: Fluent {
     embed LayoutMetrics;
     embed VisualStyle;
 
@@ -156,6 +238,8 @@ frame Label {
         self.is_bold = false;
         self.fg = color.slate(100);
     }
+
+    pub fn kind_name(): str { return "Label"; }
 
     pub fn color(c: Color): Label {
         self.fg = c;
@@ -173,9 +257,10 @@ frame Label {
     }
 }
 
-frame Slider {
+frame Slider: Fluent {
     embed LayoutMetrics;
     embed VisualStyle;
+    embed Changeable;
 
     pub var value: float;
     pub var min_val: float;
@@ -190,23 +275,189 @@ frame Slider {
         self.fg = color.shade("indigo", 600);
     }
 
+    pub fn kind_name(): str { return "Slider"; }
+
     pub fn set_range(min_v: float, max_v: float): Slider {
         self.min_val = min_v;
         self.max_val = max_v;
         return self;
     }
+
+    // Host-side slot write: paired with the host-side invocation in
+    // `value_of`, the callback is stored and read from the same frame
+    // context. Prefer this over the promoted `set_on_change`.
+    pub fn on_change(action: fn(): nil): Slider {
+        self.on_change_action = action as (fn(): nil)?;
+        return self;
+    }
+
+    // Clamped write + change notification in one fluent step. The invoke
+    // logic is inlined here: nested fallible (`?`) calls of promoted methods
+    // would propagate through the host frame, so the slot is fired directly.
+    pub fn value_of(v: float): Slider {
+        self.value = math.clamp(v, self.min_val, self.max_val);
+        var slot = self.on_change_action;
+        if (slot != nil) {
+            var f: fn(): nil = slot as fn(): nil;
+            f();
+            self.change_count = self.change_count + 1;
+        }
+        return self;
+    }
+
+    pub fn ratio(): float {
+        if (self.max_val <= self.min_val) {
+            return 0.0;
+        }
+        return (self.value - self.min_val) / (self.max_val - self.min_val);
+    }
 }
 
-frame Container {
+frame Checkbox: Fluent {
+    embed LayoutMetrics;
+    embed VisualStyle;
+    embed Clickable;
+    embed Changeable;
+
+    pub var label: str;
+    pub var is_checked: bool;
+
+    pub init(text: str, on_change: (fn(): nil)? = nil) {
+        self.label = text;
+        self.is_checked = false;
+        self.on_change_action = on_change;
+        self.fg = color.slate(100);
+    }
+
+    pub fn kind_name(): str { return "Checkbox"; }
+
+    pub fn on_change(action: fn(): nil): Checkbox {
+        self.on_change_action = action as (fn(): nil)?;
+        return self;
+    }
+
+    pub fn toggle(): EventResult? {
+        self.is_checked = not self.is_checked;
+        self.click_count = self.click_count + 1;
+        var slot = self.on_change_action;
+        if (slot == nil) {
+            return ok(EventResult.Unhandled);
+        }
+        var f: fn(): nil = slot as fn(): nil;
+        f();
+        self.change_count = self.change_count + 1;
+        return ok(EventResult.Handled);
+    }
+}
+
+frame TextInput: Fluent {
+    embed LayoutMetrics;
+    embed VisualStyle;
+    embed Focusable;
+    embed Changeable;
+
+    pub var text: str;
+    pub var placeholder: str;
+
+    pub init(txt: str = "", hint: str = "") {
+        self.text = txt;
+        self.placeholder = hint;
+        self.bg = color.slate(900);
+        self.fg = color.white;
+        self.radius = 4.0;
+        self.pad_l = 8.0;
+        self.pad_t = 6.0;
+        self.pad_r = 8.0;
+        self.pad_b = 6.0;
+    }
+
+    pub fn kind_name(): str { return "TextInput"; }
+
+    pub fn on_change(action: fn(): nil): TextInput {
+        self.on_change_action = action as (fn(): nil)?;
+        return self;
+    }
+
+    pub fn set_text(next: str): TextInput {
+        self.text = next;
+        var slot = self.on_change_action;
+        if (slot != nil) {
+            var f: fn(): nil = slot as fn(): nil;
+            f();
+            self.change_count = self.change_count + 1;
+        }
+        return self;
+    }
+
+    pub fn display_text(): str {
+        if (self.text == "") {
+            return self.placeholder;
+        }
+        return self.text;
+    }
+}
+
+frame ProgressBar: Fluent {
     embed LayoutMetrics;
     embed VisualStyle;
 
-    pub var children: [any];
-    pub var is_vertical: bool;
+    pub var value: float;
+    pub var max_val: float;
 
-    pub init(items: [any] = [], vertical: bool = true) {
-        self.children = items;
-        self.is_vertical = vertical;
+    pub init(v: float = 0.0, max_v: float = 1.0) {
+        self.value = v;
+        self.max_val = max_v;
+        self.height_val = 8.0;
+        self.radius = 4.0;
+        self.bg = color.slate(800);
+        self.fg = color.shade("indigo", 500);
+    }
+
+    pub fn kind_name(): str { return "ProgressBar"; }
+
+    pub fn set_progress(v: float): ProgressBar {
+        self.value = math.clamp(v, 0.0, self.max_val);
+        return self;
+    }
+
+    pub fn ratio(): float {
+        if (self.max_val <= 0.0) {
+            return 0.0;
+        }
+        return self.value / self.max_val;
+    }
+}
+
+frame Container: Fluent {
+    embed LayoutMetrics;
+    embed VisualStyle;
+
+    pub var children: [Fluent];
+    pub var flow: Flow;
+
+    pub init(vertical: bool = true) {
+        self.children = [];
+        if (vertical) {
+            self.flow = Flow.Vertical;
+        } else {
+            self.flow = Flow.Horizontal;
+        }
+    }
+
+    pub fn kind_name(): str { return "Container"; }
+
+    pub fn add(c: Fluent): Container {
+        self.children.append(c);
+        return self;
+    }
+
+    pub fn layout(f: Flow): Container {
+        self.flow = f;
+        return self;
+    }
+
+    pub fn is_vertical(): bool {
+        return self.flow == Flow.Vertical;
     }
 
     pub fn background(c: Color): Container {

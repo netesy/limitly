@@ -69,6 +69,90 @@ enum LifecycleState {
     Removed
 }
 
+// ── Nominal dispatch enums ───────────────────────────────────────────────────
+// Every cross-cutting choice that used to hide behind a magic int, an int-packed
+// frame, or a stringly-typed parameter is a nominal enum here. Renderers keep
+// reading their packed int/string fields; the conversion happens once, through
+// `match`, at the fluent call site (jump-table dispatch lowered in the LIR).
+
+enum Alignment {
+    Start,
+    Center,
+    End
+}
+
+type Align = Alignment;
+
+enum Axis {
+    Horizontal,
+    Vertical,
+    Stacked
+}
+
+enum Weight {
+    Normal,
+    Medium,
+    Semibold,
+    Bold
+}
+
+// Accessibility semantics. `Semantic` reads as "the semantic role this widget
+// claims": ui.Semantic.Heading. The legacy string spelling stays available on
+// Widget as `role_str` for hand-written ARIA values.
+enum Semantic {
+    Generic,
+    Button,
+    Link,
+    Heading,
+    Label,
+    Paragraph,
+    Img,
+    Input,
+    Checkbox,
+    Slider,
+    Progress,
+    Tab,
+    TabList,
+    Region,
+    Navigation,
+    LiveStatus
+}
+
+enum AlertKind {
+    Info,
+    Success,
+    Warning,
+    Danger
+}
+
+enum DotState {
+    Offline,
+    Online,
+    Busy
+}
+
+enum MaskShape {
+    Circle,
+    Rounded,
+    Pill,
+    Squircle
+}
+
+// Blueprint discriminant: 1 = Container, 2 = Text, 3 = Button.
+enum BlueprintVariant {
+    Container,
+    Text,
+    Button
+}
+
+// LayoutConstraint encoding consumed by the blueprint evaluator:
+// mode 0 = fixed size, mode 1 = minimum, mode 2 = maximum.
+enum ConstraintMode {
+    Fixed,
+    Min,
+    Max
+}
+
 trait WidgetTrait {
     fn mark_for_removal(): nil;
 }
@@ -81,11 +165,28 @@ mixin WidgetIdentity {
     pub var lifecycle_state: LifecycleState;
 }
 
+enum Role {
+    Text,
+    Image,
+    ChartValues,
+    Rows,
+    High
+}
+
 mixin TextualContent {
     pub var text_val: str;
     pub var placeholder_val: str;
     pub var focus_key: str;
     pub var text_editor_state: any;
+    // Typed payload lanes. The `any` fields above stay as the storage the
+    // renderers read; these record *what kind* of payload is parked there so
+    // constructors and hit-testers dispatch with `match` instead of assuming.
+    pub var payload_role: Role;
+    // Semantic alert/status kind carried by Alert & Toast (Info lane is the
+    // neutral default for widgets that never set it).
+    pub var alert_kind: AlertKind;
+    // Dot state for Indicator widgets.
+    pub var dot_state: DotState;
 }
 
 mixin VisualStyle {
@@ -109,6 +210,9 @@ mixin LayoutMetrics {
     pub var spacing_val: float;
     pub var is_vertical: int;
     pub var align_val: int;
+    // Declared through the `align` fluent modifier; kept as the packed int the
+    // flexbox walkers read (0/1/2 — see Align).
+    pub var align_kind: Align;
     pub var flex_val: float;
     pub var width_val: float;
     pub var height_val: float;
@@ -130,6 +234,8 @@ mixin InteractionState {
     pub var is_focused: int;
     pub var is_open: int;
     pub var click_count: int;
+    // Callback slot: holds a `fn(): nil` (see the `fire_*` helpers in
+    // std.ui.event, which invoke it fallibly as `EventResult?`).
     pub var on_click_action: any;
     pub var on_change_action: any;
 }
@@ -229,23 +335,141 @@ pub fn rect(x: float, y: float, w: float, h: float): Rect {
     return Rect(x=x, y=y, w=w, h=h);
 }
 
-frame Axis {
-    pub var is_vertical: int;
+// ── Enum ⇄ packed-field bridges ──────────────────────────────────────────────
+// The retained renderer walks `is_vertical` / `align_val` ints directly; these
+// helpers are the single place where a nominal enum crosses into that packing,
+// dispatched by `match` rather than by an if/elif ladder.
+
+pub fn axis_flag(a: Axis): int {
+    match (a) {
+        Axis.Horizontal => { return 0; },
+        Axis.Vertical => { return 1; },
+        Axis.Stacked => { return 2; }
+    }
+    return 1;
 }
 
-pub const AXIS_HORIZONTAL: Axis = Axis(is_vertical=0);
-pub const AXIS_VERTICAL: Axis = Axis(is_vertical=1);
-
-frame Alignment {
-    pub var align_type: int;
+pub fn align_flag(a: Align): int {
+    match (a) {
+        Align.Start => { return 0; },
+        Align.Center => { return 1; },
+        Align.End => { return 2; }
+    }
+    return 0;
 }
 
-pub var align_start: Alignment = Alignment(align_type=0);
-pub var align_center: Alignment = Alignment(align_type=1);
-pub var align_end: Alignment = Alignment(align_type=2);
+pub const AXIS_HORIZONTAL: Axis = Axis.Horizontal;
+pub const AXIS_VERTICAL: Axis = Axis.Vertical;
+pub const AXIS_STACKED: Axis = Axis.Stacked;
 
-pub var normal: int = 400;
-pub var bold: int = 700;
+pub fn weight_value(w: Weight): int {
+    match (w) {
+        Weight.Normal => { return 400; },
+        Weight.Medium => { return 500; },
+        Weight.Semibold => { return 600; },
+        Weight.Bold => { return 700; }
+    }
+    return 400;
+}
+
+pub const normal: Weight = Weight.Normal;
+pub const bold: Weight = Weight.Bold;
+
+// ARIA spelling for each semantic role.
+pub fn semantic_name(s: Semantic): str {
+    match (s) {
+        Semantic.Generic => { return "generic"; },
+        Semantic.Button => { return "button"; },
+        Semantic.Link => { return "link"; },
+        Semantic.Heading => { return "heading"; },
+        Semantic.Label => { return "label"; },
+        Semantic.Paragraph => { return "paragraph"; },
+        Semantic.Img => { return "img"; },
+        Semantic.Input => { return "textbox"; },
+        Semantic.Checkbox => { return "checkbox"; },
+        Semantic.Slider => { return "slider"; },
+        Semantic.Progress => { return "progressbar"; },
+        Semantic.Tab => { return "tab"; },
+        Semantic.TabList => { return "tablist"; },
+        Semantic.Region => { return "region"; },
+        Semantic.Navigation => { return "navigation"; },
+        Semantic.LiveStatus => { return "status"; }
+    }
+    return "generic";
+}
+
+pub fn mask_shape_name(m: MaskShape): str {
+    match (m) {
+        MaskShape.Circle => { return "circle"; },
+        MaskShape.Rounded => { return "rounded"; },
+        MaskShape.Pill => { return "pill"; },
+        MaskShape.Squircle => { return "squircle"; }
+    }
+    return "circle";
+}
+
+// Stringly-typed legacy spellings fold into the nominal domain through match.
+pub fn alert_kind_of(type_val: str): AlertKind {
+    match (type_val) {
+        "error" => { return AlertKind.Danger; },
+        "danger" => { return AlertKind.Danger; },
+        "warning" => { return AlertKind.Warning; },
+        "success" => { return AlertKind.Success; },
+        _ => { return AlertKind.Info; }
+    }
+}
+
+pub fn dot_state_of(status: str): DotState {
+    match (status) {
+        "online" => { return DotState.Online; },
+        "active" => { return DotState.Online; },
+        "busy" => { return DotState.Busy; },
+        "warning" => { return DotState.Busy; },
+        _ => { return DotState.Offline; }
+    }
+}
+
+
+pub fn semantic_alert_name(kind: AlertKind): str {
+    match (kind) {
+        AlertKind.Danger => { return "danger"; },
+        AlertKind.Warning => { return "warning"; },
+        AlertKind.Success => { return "success"; },
+        _ => { return "info"; }
+    }
+}
+
+pub fn dot_state_name(state: DotState): str {
+    match (state) {
+        DotState.Online => { return "online"; },
+        DotState.Busy => { return "busy"; },
+        _ => { return "offline"; }
+    }
+}
+pub const align_start: Align = Align.Start;
+pub const align_center: Align = Align.Center;
+pub const align_end: Align = Align.End;
+
+// Canonical spellings written back into the legacy string lanes the renderers
+// still read, so the enum stays the single source of truth.
+pub fn alert_kind_name(k: AlertKind): str {
+    match (k) {
+        AlertKind.Info => { return "info"; },
+        AlertKind.Success => { return "success"; },
+        AlertKind.Warning => { return "warning"; },
+        AlertKind.Danger => { return "danger"; }
+    }
+    return "info";
+}
+
+pub fn dot_state_name(s: DotState): str {
+    match (s) {
+        DotState.Online => { return "online"; },
+        DotState.Busy => { return "busy"; },
+        DotState.Offline => { return "offline"; }
+    }
+    return "offline";
+}
 
 // Reusable Style Model (LVGL / CSS Inspired)
 frame Style {
@@ -479,6 +703,11 @@ frame Widget : WidgetTrait {
         self.spacing_val = 0.0;
         self.is_vertical = 1;
         self.align_val = 0;
+        // Enum-side defaults mirror the packed ints above.
+        self.align_kind = Align.Start;
+        self.payload_role = Role.Text;
+        self.alert_kind = AlertKind.Info;
+        self.dot_state = DotState.Offline;
         self.flex_val = 1.0;
         self.is_enabled = 1;
         self.is_pressed = 0;
@@ -555,13 +784,14 @@ frame Widget : WidgetTrait {
         return self;
     }
 
-    pub fn weight(w: int): Widget {
-        self.font_weight_val = w;
+    pub fn bold(): Widget {
+        self.font_weight_val = weight_value(Weight.Bold);
         return self;
     }
 
-    pub fn bold(): Widget {
-        self.font_weight_val = 700;
+    // Semantic weight: the Weight enum crosses into the packed int once, here.
+    pub fn weight(w: Weight): Widget {
+        self.font_weight_val = weight_value(w);
         return self;
     }
 
@@ -599,8 +829,9 @@ frame Widget : WidgetTrait {
         return self;
     }
 
-    pub fn align(a: Alignment): Widget {
-        self.align_val = a.align_type;
+    pub fn align(a: Align): Widget {
+        self.align_kind = a;
+        self.align_val = align_flag(a);
         return self;
     }
 
@@ -669,7 +900,15 @@ frame Widget : WidgetTrait {
     pub fn fill(): Widget { self.grow = 1.0; return self; }
 
     // ── Accessibility Modifiers ───────────────────────────────────────────
-    pub fn role(r: str): Widget { self.a11y_role = r; return self; }
+    // Nominal semantics: `widget.role(Semantic.Heading)`.
+    pub fn role(s: Semantic): Widget {
+        self.a11y_role = semantic_name(s);
+        return self;
+    }
+
+    // Escape hatch for hand-written ARIA strings.
+    pub fn role_str(r: str): Widget { self.a11y_role = r; return self; }
+
     pub fn aria_label(lbl: str): Widget { self.a11y_label = lbl; return self; }
     pub fn aria_hint(hint: str): Widget { self.a11y_hint = hint; return self; }
     pub fn aria_live(mode: str): Widget { self.a11y_live = mode; return self; }
@@ -791,6 +1030,7 @@ pub fn textarea(content: str): Widget {
     var w = Widget(KIND_TEXTAREA);
     w.text_val = content;
     w.text_editor_state = text_ctrl.EditorController(content);
+    w.payload_role = Role.Text;
     w.focus_key = "ta_default";
     w.foreground_color = white;
     w.padding_left = 8.0;
@@ -915,6 +1155,65 @@ pub fn blueprint_add_child(bp: Blueprint, child: Blueprint): Blueprint {
     return bp;
 }
 
+// ── Nominal blueprint builders ────────────────────────────────────
+// The evaluator walks the packed `variant_type` int (1/2/3); these helpers are
+// the only place new blueprints are minted, so call sites never spell a raw
+// discriminant.
+
+pub fn variant_code(v: BlueprintVariant): int {
+    match (v) {
+        BlueprintVariant.Container => { return 1; },
+        BlueprintVariant.Text => { return 2; },
+        BlueprintVariant.Button => { return 3; }
+    }
+    return 1;
+}
+
+pub fn blueprint_container(children: [Blueprint] = empty_blueprints(), axis: Axis = AXIS_VERTICAL): Blueprint {
+    return Blueprint(
+        variant_type=variant_code(BlueprintVariant.Container),
+        container_data_val=container_data(axis),
+        text_data_val=text_data(""),
+        button_data_val=button_data(""),
+        constraints=empty_constraints(),
+        children=children
+    );
+}
+
+pub fn blueprint_text(content: str): Blueprint {
+    return Blueprint(
+        variant_type=variant_code(BlueprintVariant.Text),
+        container_data_val=container_data(AXIS_VERTICAL),
+        text_data_val=text_data(content),
+        button_data_val=button_data(""),
+        constraints=empty_constraints(),
+        children=empty_blueprints()
+    );
+}
+
+pub fn blueprint_button(label: str): Blueprint {
+    return Blueprint(
+        variant_type=variant_code(BlueprintVariant.Button),
+        container_data_val=container_data(AXIS_VERTICAL),
+        text_data_val=text_data(""),
+        button_data_val=button_data(label),
+        constraints=empty_constraints(),
+        children=empty_blueprints()
+    );
+}
+
+// Typed constraint: the ConstraintMode enum crosses into the packed int once,
+// through match.
+pub fn constraint(m: ConstraintMode, value: int): LayoutConstraint {
+    var encoded = 0;
+    match (m) {
+        ConstraintMode.Fixed => { encoded = 0; },
+        ConstraintMode.Min => { encoded = 1; },
+        ConstraintMode.Max => { encoded = 2; }
+    }
+    return LayoutConstraint(mode=encoded, value_num=value);
+}
+
 // Extra widgets from std/ui.lm
 pub fn select(options: [str], selected_idx: int = 0, on_change: any = nil): Widget {
     var w = Widget(KIND_SELECT);
@@ -952,6 +1251,7 @@ pub fn pie_chart(label: str, values: [float], labels: [str] = [] as [str]): Widg
     w.width_val = 120.0;
     w.background_color = rgb(24, 26, 34);
     w.text_editor_state = values;
+    w.payload_role = Role.ChartValues;
     return w;
 }
 
@@ -961,25 +1261,37 @@ pub fn table(headers: [str], rows: [[Widget]]): Widget {
     w.background_color = rgb(24, 26, 34);
     w.foreground_color = white;
     w.text_editor_state = rows;
+    w.payload_role = Role.Rows;
     return w;
 }
 
 pub fn alert(message: str, type_val: str = "info"): Widget {
+    return alert_k(message, alert_kind_of(type_val));
+}
+
+// Nominal form: the palette is chosen by an exhaustive match, never a ladder.
+pub fn alert_k(message: str, kind: AlertKind): Widget {
     var w = Widget(KIND_ALERT);
     w.text_val = message;
-    w.placeholder_val = type_val;
-    if (type_val == "error" or type_val == "danger") {
-        w.background_color = rgb(80, 25, 30);
-        w.foreground_color = rgb(255, 120, 130);
-    } elif (type_val == "warning") {
-        w.background_color = rgb(70, 55, 20);
-        w.foreground_color = rgb(255, 210, 90);
-    } elif (type_val == "success") {
-        w.background_color = rgb(25, 65, 35);
-        w.foreground_color = rgb(100, 230, 140);
-    } else {
-        w.background_color = rgb(30, 45, 70);
-        w.foreground_color = rgb(120, 180, 255);
+    w.alert_kind = kind;
+    w.placeholder_val = alert_kind_name(kind);
+    match (kind) {
+        AlertKind.Danger => {
+            w.background_color = rgb(80, 25, 30);
+            w.foreground_color = rgb(255, 120, 130);
+        },
+        AlertKind.Warning => {
+            w.background_color = rgb(70, 55, 20);
+            w.foreground_color = rgb(255, 210, 90);
+        },
+        AlertKind.Success => {
+            w.background_color = rgb(25, 65, 35);
+            w.foreground_color = rgb(100, 230, 140);
+        },
+        AlertKind.Info => {
+            w.background_color = rgb(30, 45, 70);
+            w.foreground_color = rgb(120, 180, 255);
+        }
     }
     w.height_val = 36.0;
     return w;
@@ -1004,12 +1316,14 @@ pub fn bar_chart(label: str, values: [float], labels: [str] = [] as [str]): Widg
     w.background_color = rgb(24, 26, 34);
     w.foreground_color = rgb(80, 180, 255);
     w.text_editor_state = values;
+    w.payload_role = Role.ChartValues;
     return w;
 }
 
 pub fn image(source: str = ""): Widget {
     var w = Widget(KIND_IMAGE);
     w.text_val = source;
+    w.payload_role = Role.Image;
     return w;
 }
 
@@ -1023,6 +1337,7 @@ pub fn plot_histogram(label: str, values: [float], min_val: float = 0.0, max_val
     w.background_color = rgb(24, 26, 34);
     w.foreground_color = rgb(80, 220, 130);
     w.text_editor_state = values;
+    w.payload_role = Role.ChartValues;
     return w;
 }
 
@@ -1054,6 +1369,7 @@ pub fn range_slider(low: float = 20.0, high: float = 80.0, min_val: float = 0.0,
     w.slider_max = max_val;
     w.slider_val = low;
     w.padding_left = high;
+    w.payload_role = Role.High;
     w.height_val = 24.0;
     w.width_val = 160.0;
     w.background_color = rgb(35, 38, 48);
@@ -1066,6 +1382,11 @@ pub fn mask(shape: str = "circle", child: Widget = empty()): Widget {
     w.text_val = shape;
     w.children = [child];
     return w;
+}
+
+// Nominal form of `mask`.
+pub fn mask_shape(shape: MaskShape, child: Widget = empty()): Widget {
+    return mask(mask_shape_name(shape), child);
 }
 
 pub fn stepper(value: int = 0, step: int = 1, min_val: int = 0, max_val: int = 100, on_change: any = nil): Widget {
@@ -1116,6 +1437,7 @@ pub fn line_chart(label: str, values: [float]): Widget {
     w.background_color = rgb(24, 26, 34);
     w.foreground_color = rgb(100, 220, 160);
     w.text_editor_state = values;
+    w.payload_role = Role.ChartValues;
     return w;
 }
 
@@ -1158,10 +1480,11 @@ pub fn tree_node(label: str, children: [Widget], default_open: bool = false): Wi
     return w;
 }
 
-pub fn grid(columns_count: int, children: [Widget]): Widget {
+pub fn grid(columns_count: int, children: [Widget], spacing_val: float = 8.0): Widget {
     var w = Widget(KIND_CONTAINER);
     w.is_vertical = 0;
     w.active_tab = columns_count;
+    w.spacing_val = spacing_val;
     w.children = children;
     return w;
 }
@@ -1175,6 +1498,7 @@ pub fn radar_chart(label: str, values: [float], labels: [str] = [] as [str]): Wi
     w.background_color = rgb(24, 26, 34);
     w.foreground_color = rgb(100, 200, 255);
     w.text_editor_state = values;
+    w.payload_role = Role.ChartValues;
     return w;
 }
 
@@ -1229,9 +1553,14 @@ pub fn steps(step_titles: [str], active_step: int = 0): Widget {
 }
 
 pub fn toast(message: str, type_val: str = "info"): Widget {
+    return toast_k(message, alert_kind_of(type_val));
+}
+
+pub fn toast_k(message: str, kind: AlertKind): Widget {
     var w = Widget(KIND_TOAST);
     w.text_val = message;
-    w.placeholder_val = type_val;
+    w.alert_kind = kind;
+    w.placeholder_val = alert_kind_name(kind);
     w.background_color = rgb(28, 30, 42);
     w.foreground_color = white;
     w.height_val = 36.0;
@@ -1283,6 +1612,7 @@ pub fn plot_lines(label: str, values: [float], min_val: float = 0.0, max_val: fl
     w.background_color = rgb(24, 26, 34);
     w.foreground_color = rgb(100, 180, 255);
     w.text_editor_state = values;
+    w.payload_role = Role.ChartValues;
     return w;
 }
 
@@ -1323,6 +1653,7 @@ pub fn polar_area_chart(label: str, values: [float], labels: [str] = [] as [str]
     w.width_val = 120.0;
     w.background_color = rgb(24, 26, 34);
     w.text_editor_state = values;
+    w.payload_role = Role.ChartValues;
     return w;
 }
 
@@ -1349,6 +1680,7 @@ pub fn bubble_chart(label: str, values: [float]): Widget {
     w.background_color = rgb(24, 26, 34);
     w.foreground_color = rgb(255, 180, 90);
     w.text_editor_state = values;
+    w.payload_role = Role.ChartValues;
     return w;
 }
 
@@ -1360,6 +1692,7 @@ pub fn scatter_chart(label: str, values: [float]): Widget {
     w.background_color = rgb(24, 26, 34);
     w.foreground_color = rgb(220, 120, 255);
     w.text_editor_state = values;
+    w.payload_role = Role.ChartValues;
     return w;
 }
 
@@ -1371,6 +1704,7 @@ pub fn doughnut_chart(label: str, values: [float], labels: [str] = [] as [str]):
     w.width_val = 120.0;
     w.background_color = rgb(24, 26, 34);
     w.text_editor_state = values;
+    w.payload_role = Role.ChartValues;
     return w;
 }
 
@@ -1411,15 +1745,19 @@ pub fn checkbox(checked: bool = false, on_change: any = nil): Widget {
 }
 
 pub fn indicator(status: str = "online", label: str = ""): Widget {
+    return indicator_k(dot_state_of(status), label);
+}
+
+// Nominal form: dot color chosen by exhaustive match.
+pub fn indicator_k(status: DotState, label: str = ""): Widget {
     var w = Widget(KIND_INDICATOR);
-    w.placeholder_val = status;
+    w.dot_state = status;
+    w.placeholder_val = dot_state_name(status);
     w.text_val = label;
-    if (status == "online" or status == "active") {
-        w.foreground_color = rgb(80, 220, 130);
-    } elif (status == "busy" or status == "warning") {
-        w.foreground_color = rgb(255, 200, 80);
-    } else {
-        w.foreground_color = rgb(150, 155, 170);
+    match (status) {
+        DotState.Online => { w.foreground_color = rgb(80, 220, 130); },
+        DotState.Busy => { w.foreground_color = rgb(255, 200, 80); },
+        DotState.Offline => { w.foreground_color = rgb(150, 155, 170); }
     }
     w.height_val = 20.0;
     return w;

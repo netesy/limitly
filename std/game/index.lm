@@ -8,6 +8,8 @@ import std.game.camera;
 import std.game.sprite;
 import std.game.particles;
 pub import std.game.gui show GUI, default_gui;
+pub import std.game.components show WidgetState;
+pub import std.game.types show Vec2, Rect, ColorRole, StyleVar;
 pub import std.game.scene show Scene, SceneManager, default_scene_manager, TRANSITION_NONE, TRANSITION_FADE;
 pub import std.game.app show Config, Game;
 pub import std.graphics.shadow show Shadow, shadow;

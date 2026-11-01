@@ -3,6 +3,7 @@
 
 import std.ui.types as ui_types;
 import std.ui.types as ui;
+import std.ui.event as event;
 import std.ui.theme as theme;
 import std.ui.theme_renderer as theme_renderer;
 import std.ui.layout as layout;
@@ -510,7 +511,7 @@ pub fn hit_test_and_click_blueprint(bp: ui_types.Blueprint, px: float, py: float
             var child_bp = bp.children[i];
             var updated_child = hit_test_and_click_blueprint(child_bp, px, py, curr_x, curr_y, child_w, child_h);
             new_children.append(updated_child);
-            if (data.axis.is_vertical == 1) {
+            if (ui_types.axis_flag(data.axis) == 1) {
                 curr_y = curr_y + child_h + 8.0 + data.spacing;
             } else {
                 curr_x = curr_x + 120.0 + data.spacing;
@@ -734,10 +735,7 @@ if (w.kind == ui.KIND_INPUT) {
                 w.slider_val = w.slider_val + step_val;
                 if (w.slider_val > w.slider_max) w.slider_val = w.slider_max;
             }
-            if (w.on_change_action != nil) {
-                var act: fn(): nil = w.on_change_action as fn(): nil;
-                act();
-            }
+            event.fire_action(w.on_change_action)? else { };
             mark_element_dirty(1);
         }
     }
@@ -753,10 +751,7 @@ if (w.kind == ui.KIND_INPUT) {
     }
     if (w.kind == ui.KIND_FILE_INPUT or w.kind == ui.KIND_LINK or w.kind == ui.KIND_ALERT or w.kind == ui.KIND_TOAST) {
         if (px >= x and px <= x + available_w and py >= y and py <= y + 32.0) {
-            if (w.on_change_action != nil) {
-                var act: fn(): nil = w.on_change_action as fn(): nil;
-                act();
-            }
+            event.fire_action(w.on_change_action)? else { };
             mark_element_dirty(1);
         }
     }
@@ -777,10 +772,7 @@ if (w.kind == ui.KIND_INPUT) {
             if (ratio < 0.0) ratio = 0.0;
             if (ratio > 1.0) ratio = 1.0;
             w.slider_val = w.slider_min + ratio * (w.slider_max - w.slider_min);
-            if (w.on_change_action != nil) {
-                var act: fn(): nil = w.on_change_action as fn(): nil;
-                act();
-            }
+            event.fire_action(w.on_change_action)? else { };
             mark_element_dirty(1);
         }
     }
@@ -793,10 +785,7 @@ if (w.kind == ui.KIND_INPUT) {
             var item_w = (len(title) as float) * 8.0 + 24.0;
             if (px >= tab_x and px <= tab_x + item_w and py >= y and py <= y + tab_h) {
                 w.active_tab = i;
-                if (w.on_change_action != nil) {
-                    var act: fn(): nil = w.on_change_action as fn(): nil;
-                    act();
-                }
+                event.fire_action(w.on_change_action)? else { };
                 mark_element_dirty(1);
             }
             tab_x = tab_x + item_w + w.spacing_val;
@@ -840,10 +829,7 @@ if (w.kind == ui.KIND_INPUT) {
                     w.selected_idx = opt_idx;
                     w.text_val = w.select_options[opt_idx];
                     w.is_open = 0;
-                    if (w.on_change_action != nil) {
-                        var act: fn(): nil = w.on_change_action as fn(): nil;
-                        act();
-                    }
+                    event.fire_action(w.on_change_action)? else { };
                     mark_element_dirty(1);
                     return;
                 }
@@ -897,10 +883,7 @@ pub fn dispatch_pointer_down(px: float, py: float): nil {
                 var w = hz.widget as ui.Widget;
                 if (w.kind == ui.KIND_TABS) {
                     w.active_tab = hz.tab_index;
-                    if (w.on_change_action != nil) {
-                        var act: fn(): nil = w.on_change_action as fn(): nil;
-                        act();
-                    }
+                    event.fire_action(w.on_change_action)? else { };
                     mark_element_dirty(1);
                     return;
                 }
@@ -926,10 +909,7 @@ pub fn dispatch_pointer_down(px: float, py: float): nil {
                 if (ratio < 0.0) ratio = 0.0;
                 if (ratio > 1.0) ratio = 1.0;
                 w.slider_val = w.slider_min + ratio * (w.slider_max - w.slider_min);
-                if (w.on_change_action != nil) {
-                    var act: fn(): nil = w.on_change_action as fn(): nil;
-                    act();
-                }
+                event.fire_action(w.on_change_action)? else { };
                 mark_element_dirty(1);
             }
         } elif (hz.kind == dlist.HitZoneKind.Checkbox) {
@@ -956,10 +936,7 @@ pub fn dispatch_pointer_down(px: float, py: float): nil {
                     w.selected_idx = hz.tab_index;
                     w.text_val = w.select_options[hz.tab_index];
                     w.is_open = 0;
-                    if (w.on_change_action != nil) {
-                        var act: fn(): nil = w.on_change_action as fn(): nil;
-                        act();
-                    }
+                    event.fire_action(w.on_change_action)? else { };
                     mark_element_dirty(1);
                     return;
                 } else {
@@ -1012,10 +989,7 @@ pub fn dispatch_pointer_move(px: float, py: float): nil {
             if (ratio < 0.0) ratio = 0.0;
             if (ratio > 1.0) ratio = 1.0;
             cap.slider_val = cap.slider_min + ratio * (cap.slider_max - cap.slider_min);
-            if (cap.on_change_action != nil) {
-                var act: fn(): nil = cap.on_change_action as fn(): nil;
-                act();
-            }
+            event.fire_action(cap.on_change_action)? else { };
             mark_element_dirty(1);
         }
     }
@@ -1049,7 +1023,7 @@ fn render_blueprint_node(bp: ui_types.Blueprint, x: float, y: float, available_w
         while (i < len(bp.children)) {
             var child_bp = bp.children[i];
             render_blueprint_node(child_bp, curr_x, curr_y, child_w, child_h, cvs);
-            if (data.axis.is_vertical == 1) {
+            if (ui_types.axis_flag(data.axis) == 1) {
                 curr_y = curr_y + child_h + 8.0 + data.spacing;
             } else {
                 curr_x = curr_x + 120.0 + data.spacing;
@@ -2268,10 +2242,7 @@ pub fn dispatch_pointer_up(px: float, py: float): nil {
                 py >= global_ui_context.captured_bounds_y and
                 py <= global_ui_context.captured_bounds_y + global_ui_context.captured_bounds_h) {
                 cap.click_count = cap.click_count + 1;
-                if (cap.on_click_action != nil) {
-                    var f: fn(): nil = cap.on_click_action as fn(): nil;
-                    f();
-                }
+                event.fire_action(cap.on_click_action)? else { };
                 mark_element_dirty(1);
             }
         } elif (cap.kind == ui.KIND_CHECKBOX) {
@@ -2286,10 +2257,7 @@ pub fn dispatch_pointer_up(px: float, py: float): nil {
                     cap.is_checked = 1;
                     cap.text_val = "[X]";
                 }
-                if (cap.on_change_action != nil) {
-                    var act: fn(): nil = cap.on_change_action as fn(): nil;
-                    act();
-                }
+                event.fire_action(cap.on_change_action)? else { };
                 mark_element_dirty(1);
             }
         }
@@ -2313,20 +2281,14 @@ fn send_char_to_widget(w: ui.Widget, cp: int): int {
             if (len(ch) > 0) {
                 ctrl.insert_text(ch);
                 w.text_val = ctrl.get_text();
-                if (w.on_change_action != nil) {
-                    var act: fn(): nil = w.on_change_action as fn(): nil;
-                    act();
-                }
+                event.fire_action(w.on_change_action)? else { };
                 mark_element_dirty(1);
             }
             return 1;
         } elif (cp == 10 or cp == 13) {
             ctrl.insert_newline();
             w.text_val = ctrl.get_text();
-            if (w.on_change_action != nil) {
-                var act: fn(): nil = w.on_change_action as fn(): nil;
-                act();
-            }
+            event.fire_action(w.on_change_action)? else { };
             mark_element_dirty(1);
             return 1;
         }
@@ -2336,10 +2298,7 @@ if (w.kind == ui.KIND_INPUT and w.is_focused == 1) {
             var ch = codepoint_to_utf8(cp);
             if (len(ch) > 0) {
                 w.text_val = w.text_val + ch;
-                if (w.on_change_action != nil) {
-                    var act: fn(): nil = w.on_change_action as fn(): nil;
-                    act();
-                }
+                event.fire_action(w.on_change_action)? else { };
                 mark_element_dirty(1);
             }
             return 1;
@@ -2371,28 +2330,19 @@ fn send_key_down_to_widget(w: ui.Widget, key_code: int, mods: int): int {
         if (key_code == 8) { // Backspace
             ctrl.backspace();
             w.text_val = ctrl.get_text();
-            if (w.on_change_action != nil) {
-                var act: fn(): nil = w.on_change_action as fn(): nil;
-                act();
-            }
+            event.fire_action(w.on_change_action)? else { };
             mark_element_dirty(1);
             return 1;
         } elif (key_code == 90 and (mods & MOD_CTRL) != 0) { // Ctrl+Z
             ctrl.undo();
             w.text_val = ctrl.get_text();
-            if (w.on_change_action != nil) {
-                var act: fn(): nil = w.on_change_action as fn(): nil;
-                act();
-            }
+            event.fire_action(w.on_change_action)? else { };
             mark_element_dirty(1);
             return 1;
         } elif (key_code == 89 and (mods & MOD_CTRL) != 0) { // Ctrl+Y
             ctrl.redo();
             w.text_val = ctrl.get_text();
-            if (w.on_change_action != nil) {
-                var act: fn(): nil = w.on_change_action as fn(): nil;
-                act();
-            }
+            event.fire_action(w.on_change_action)? else { };
             mark_element_dirty(1);
             return 1;
         } elif (key_code == 262) { // Right
@@ -2422,10 +2372,7 @@ fn send_key_down_to_widget(w: ui.Widget, key_code: int, mods: int): int {
         } elif (key_code == 86 and (mods & MOD_CTRL) != 0) { // Ctrl+V
             ctrl.paste();
             w.text_val = ctrl.get_text();
-            if (w.on_change_action != nil) {
-                var act: fn(): nil = w.on_change_action as fn(): nil;
-                act();
-            }
+            event.fire_action(w.on_change_action)? else { };
             mark_element_dirty(1);
             return 1;
         }
@@ -2434,10 +2381,7 @@ if (w.kind == ui.KIND_INPUT and w.is_focused == 1) {
         if (key_code == 8) { // Backspace
             if (len(w.text_val) > 0) {
                 w.text_val = utf8_pop_back(w.text_val);
-                if (w.on_change_action != nil) {
-                    var act: fn(): nil = w.on_change_action as fn(): nil;
-                    act();
-                }
+                event.fire_action(w.on_change_action)? else { };
                 mark_element_dirty(1);
             }
             return 1;
@@ -2446,10 +2390,7 @@ if (w.kind == ui.KIND_INPUT and w.is_focused == 1) {
     // Activate button on Enter or Space if focused
     if (w.kind == ui.KIND_BUTTON and w.is_focused == 1) {
         if (key_code == 13 or key_code == 32) { // Enter or Space
-            if (w.on_click_action != nil) {
-                var f: fn(): nil = w.on_click_action as fn(): nil;
-                f();
-            }
+            event.fire_action(w.on_click_action)? else { };
             mark_element_dirty(1);
             return 1;
         }
@@ -2464,10 +2405,7 @@ if (w.kind == ui.KIND_INPUT and w.is_focused == 1) {
                 w.is_checked = 1;
                 w.text_val = "[X]";
             }
-            if (w.on_change_action != nil) {
-                var act: fn(): nil = w.on_change_action as fn(): nil;
-                act();
-            }
+            event.fire_action(w.on_change_action)? else { };
             mark_element_dirty(1);
             return 1;
         }

@@ -2,7 +2,14 @@
 // Type-Safe Event Handling & Fallible Event Propagation for Lymar UI
 //
 // Replaces untyped `any` callbacks and sentinel numbers with nominal enums,
-// exhaustive match dispatch, and Lymar fallible types (`EventResult?nil`).
+// exhaustive match dispatch, and Lymar fallible types (`EventResult?`).
+//
+// A widget stores its callback in the `on_click_action` / `on_change_action`
+// slot as a `fn(): nil` (the shape the retained renderer already invokes).
+// `fire_action`/`fire_action_for` route that slot through a fallible pipeline
+// so the dynamic `any` never leaks past this boundary: it is cast once, guarded,
+// and a nil/absent handler becomes an `Unhandled` result rather than a nil check
+// at every call site.
 
 enum EventKind {
     Click,
@@ -69,36 +76,55 @@ pub fn make_key_event(k: EventKind, key: int): UIEvent {
     return UIEvent(k, key=key);
 }
 
-// Fallible event processing pipeline using native `match`
+// Invoke a widget's `fn(): nil` action slot fallibly. A nil action is not an
+// error condition -- it is simply `Unhandled`, which removes the
+// `if (w.on_click_action != nil)` guard from every dispatch site.
+pub fn fire_action(action: any): EventResult? {
+    if (action == nil) {
+        return ok(EventResult.Ignored);
+    }
+    var act: fn(): nil = action as fn(): nil;
+    if (act == nil) {
+        // Slot holds a value that is not callable -- reject fallibly.
+        return err();
+    }
+    act();
+    return ok(EventResult.Handled);
+}
+
+// Route an actionable event: fire the handler if one is bound (best-effort),
+// then report the event as consumed. A nil handler is not a failure of routing
+// -- the event was still handled by reaching a target.
+fn route(handler: any): EventResult? {
+    fire_action(handler)? else { };
+    return ok(EventResult.Handled);
+}
+
+// Full fallible pipeline: resolve the target, dispatch on the nominal kind via
+// `match`, then invoke the handler. Returns `err()` when the event carries no
+// target so callers can propagate with `?` instead of inspecting fields.
 pub fn dispatch_event(evt: UIEvent, handler: any = nil): EventResult? {
     if (evt.target_id == "") {
         return err();
     }
 
+    // Exhaustive `match` on the nominal kind decides routing. Each arm returns
+    // fallibly; actionable kinds consume the event via `route`.
     match (evt.kind) {
-        EventKind.Click => {
-            return ok(EventResult.Handled);
-        },
-        EventKind.Press => {
-            return ok(EventResult.Handled);
-        },
-        EventKind.Release => {
-            return ok(EventResult.Handled);
-        },
-        EventKind.Hover => {
-            return ok(EventResult.Handled);
-        },
-        EventKind.PointerMove => {
-            return ok(EventResult.Handled);
-        },
+        EventKind.Click => { return route(handler); },
+        EventKind.Press => { return route(handler); },
+        EventKind.Release => { return route(handler); },
+        EventKind.Hover => { return route(handler); },
+        EventKind.PointerMove => { return route(handler); },
+        EventKind.Scroll => { return route(handler); },
+        EventKind.Focus => { return route(handler); },
+        EventKind.Blur => { return route(handler); },
         EventKind.KeyDown => {
-            if (evt.key_code == 27) { // Escape
-                return ok(EventResult.Handled);
-            }
+            // Only Escape is consumed here; other keys stay unhandled.
+            if (evt.key_code == 27) { return route(handler); }
             return ok(EventResult.Unhandled);
         },
-        _ => {
-            return ok(EventResult.Unhandled);
-        }
+        EventKind.KeyUp => { return ok(EventResult.Unhandled); },
+        _ => { return ok(EventResult.Unhandled); }
     }
 }

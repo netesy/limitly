@@ -488,7 +488,7 @@ pub fn router_link(label: str, path: str, router: Router): ui.Widget {
         router.navigate(path);
     })
     .aria_label(label)
-    .role("link");
+    .role(ui.Semantic.Link);
 }
 
 // ── Tab Bar Widget ────────────────────────────────────────────────────────────
@@ -505,7 +505,7 @@ pub fn tab_bar(routes: [(str, str)], router: Router): ui.Widget {
         } else {
             btn = btn.background(ui.transparent);
         }
-        btns.append(btn.role("tab").aria_label(label));
+        btns.append(btn.role(ui.Semantic.TabList).aria_label(label));
         i = i + 1;
     }
     return ui.row(btns).spacing(4.0);
@@ -528,5 +528,5 @@ pub fn breadcrumbs(router: Router): ui.Widget {
         }
         i = i + 1;
     }
-    return ui.row(items).spacing(2.0).aria_label("Breadcrumb navigation").role("navigation");
+    return ui.row(items).spacing(2.0).aria_label("Breadcrumb navigation").role(ui.Semantic.Navigation);
 }

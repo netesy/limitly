@@ -13,14 +13,7 @@ frame Window {
         self.width = w;
         self.height = h;
         self.root = ui_types.empty();
-        self.root_blueprint = ui_types.Blueprint(
-            variant_type=1,
-            container_data_val=ui_types.container_data(ui_types.AXIS_VERTICAL),
-            text_data_val=ui_types.text_data(""),
-            button_data_val=ui_types.button_data(""),
-            constraints=ui_types.empty_constraints(),
-            children=ui_types.empty_blueprints()
-        );
+        self.root_blueprint = ui_types.blueprint_container();
     }
 
     pub fn set_root(w: ui_types.Widget): Window {

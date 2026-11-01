@@ -292,6 +292,44 @@ pub const VAR_ITEM_HEIGHT: int = 2;
 pub const VAR_ROUNDING: int = 3;
 
 
+
+pub fn color_role_from_index(idx: int): ColorRole {
+    match (idx) {
+        0 => { return ColorRole.WindowBg; },
+        1 => { return ColorRole.WindowTitle; },
+        2 => { return ColorRole.PanelBg; },
+        3 => { return ColorRole.Text; },
+        4 => { return ColorRole.TextMuted; },
+        5 => { return ColorRole.Accent; },
+        6 => { return ColorRole.Button; },
+        7 => { return ColorRole.ButtonHover; },
+        8 => { return ColorRole.ButtonActive; },
+        9 => { return ColorRole.SliderTrack; },
+        10 => { return ColorRole.SliderThumb; },
+        11 => { return ColorRole.CheckboxBorder; },
+        12 => { return ColorRole.CheckboxCheck; },
+        13 => { return ColorRole.Separator; },
+        14 => { return ColorRole.FrameBg; },
+        15 => { return ColorRole.FrameBgHover; },
+        16 => { return ColorRole.FrameBgActive; },
+        17 => { return ColorRole.Tab; },
+        18 => { return ColorRole.TabActive; },
+        19 => { return ColorRole.PlotLines; },
+        20 => { return ColorRole.PlotHistogram; },
+        _ => { return ColorRole.Text; }
+    }
+}
+
+pub fn style_var_from_index(idx: int): StyleVar {
+    match (idx) {
+        0 => { return StyleVar.Padding; },
+        1 => { return StyleVar.Spacing; },
+        2 => { return StyleVar.ItemHeight; },
+        3 => { return StyleVar.Rounding; },
+        _ => { return StyleVar.Padding; }
+    }
+}
+
 frame GUITheme {
     pub var bg_window: Color;
     pub var bg_window_title: Color;
