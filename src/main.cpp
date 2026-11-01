@@ -217,6 +217,8 @@ int main(int argc, char* argv[]) {
     if (command == "link") return Lyra::handle_link(argc, argv);
     if (command == "publish") return Lyra::handle_publish(argc, argv);
     if (command == "pack") return Lyra::handle_pack(argc, argv);
+    if (command == "deb") return Lyra::handle_deb(argc, argv);
+    if (command == "msi") return Lyra::handle_msi(argc, argv);
     if (command == "install") return Lyra::handle_install(argc, argv);
     if (command == "search") return Lyra::handle_search(argc, argv);
     if (command == "info") return Lyra::handle_info(argc, argv);
