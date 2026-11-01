@@ -26,7 +26,7 @@ fn main(): nil {
 
     // Hit test
     var hz = dlist.dl_hit_test(dl, 60.0, 115.0);
-    if (hz.kind == dlist.HZONE_BUTTON) {
+    if (hz.kind == dlist.HitZoneKind.Button) {
         print("Hit: '{hz.id}' (button)");
     } else {
         print("No hit zone");

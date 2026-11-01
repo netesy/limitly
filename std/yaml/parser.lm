@@ -6,7 +6,7 @@ frame YAMLParser {
     pub idx: int;
     pub text: str;
 
-    pub fn parse_value(): any {
+    pub fn parse_value(): value.YAMLValue {
         var keys: [str] = [];
         var vals: [any] = [];
         var length = len(self.text);
@@ -97,11 +97,11 @@ frame YAMLParser {
                 }
             }
         }
-        return value.make_object(keys, vals) as any;
+        return value.make_object(keys, vals);
     }
 }
 
-pub fn parse(text: str): any {
+pub fn parse(text: str): value.YAMLValue {
     var p = YAMLParser(idx=0, text=text);
     return p.parse_value();
 }

@@ -37,7 +37,7 @@ fn main(): nil {
     print("\nHit testing first button zone:");
     var b1_zone = dl.hits[0] as dlist.HitZone;
     var hz1 = dlist.dl_hit_test(dl, b1_zone.x + 10.0, b1_zone.y + 10.0);
-    if (hz1.kind == dlist.HZONE_BUTTON) {
+    if (hz1.kind == dlist.HitZoneKind.Button) {
         print("  Hit button 1: '{hz1.id}'");
     } else {
         print("  Miss");
@@ -46,7 +46,7 @@ fn main(): nil {
     print("Hit testing second button zone:");
     var b2_zone = dl.hits[1] as dlist.HitZone;
     var hz2 = dlist.dl_hit_test(dl, b2_zone.x + 10.0, b2_zone.y + 10.0);
-    if (hz2.kind == dlist.HZONE_BUTTON) {
+    if (hz2.kind == dlist.HitZoneKind.Button) {
         print("  Hit button 2: '{hz2.id}'");
     } else {
         print("  Miss");

@@ -57,12 +57,6 @@ frame Game {
     pub var accumulator: float;
     pub var fixed_dt: float;
 
-    // Legacy fields for backward compatibility
-    pub var mouse_x: float;
-    pub var mouse_y: float;
-    pub var mouse_down: bool;
-    pub var mouse_wheel: float;
-
     pub init(cfg: any = nil) {
         if (cfg == nil) {
             self.config = default_config();
@@ -86,11 +80,6 @@ frame Game {
         self.fps = 60.0;
         self.accumulator = 0.0;
         self.fixed_dt = self.config.fixed_dt;
-
-        self.mouse_x = 0.0;
-        self.mouse_y = 0.0;
-        self.mouse_down = false;
-        self.mouse_wheel = 0.0;
     }
 
     pub fn setup(): bool {
@@ -171,12 +160,6 @@ frame Game {
             }
         }
 
-        // Backward compatibility synchronization
-        self.mouse_x = self.input.mouse_x;
-        self.mouse_y = self.input.mouse_y;
-        self.mouse_down = self.input.is_mouse_down(0);
-        self.mouse_wheel = self.input.mouse_wheel;
-
         // Synchronize input to IMGUI engine
         self.gui.keys_down = self.input.keys_down;
         self.gui.keys_pressed = self.input.keys_pressed;
@@ -191,7 +174,7 @@ frame Game {
         gg.begin_pass(self.width, self.height, bg.r, bg.g, bg.b, bg.a);
 
         // Begin IMGUI
-        self.gui.begin(self.mouse_x, self.mouse_y, self.mouse_down, self.mouse_wheel, self.delta_time);
+        self.gui.begin(self.input.mouse_x, self.input.mouse_y, self.input.is_mouse_down(0), self.input.mouse_wheel, self.delta_time);
 
         // Update active scenes
         if (self.scenes.has_scenes()) {
@@ -208,7 +191,6 @@ frame Game {
         self.gui.end();
         gg.end_pass();
         gg.commit();
-        self.mouse_wheel = 0.0;
     }
 
     pub fn dt(): float {

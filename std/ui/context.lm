@@ -892,7 +892,7 @@ pub fn dispatch_pointer_down(px: float, py: float): nil {
         }
         var dl = global_ui_context.cached_draw_list as dlist.DrawList;
         var hz = dlist.dl_hit_test(dl, px, py);
-        if (hz.kind == dlist.HZONE_BUTTON) {
+        if (hz.kind == dlist.HitZoneKind.Button) {
             if (hz.widget != nil) {
                 var w = hz.widget as ui.Widget;
                 if (w.kind == ui.KIND_TABS) {
@@ -913,7 +913,7 @@ pub fn dispatch_pointer_down(px: float, py: float): nil {
                 global_ui_context.captured_bounds_h = hz.h;
                 mark_element_dirty(1);
             }
-        } elif (hz.kind == dlist.HZONE_SLIDER) {
+        } elif (hz.kind == dlist.HitZoneKind.Slider) {
             if (hz.widget != nil) {
                 var w = hz.widget as ui.Widget;
                 global_ui_context.captured_widget = w;
@@ -932,7 +932,7 @@ pub fn dispatch_pointer_down(px: float, py: float): nil {
                 }
                 mark_element_dirty(1);
             }
-        } elif (hz.kind == dlist.HZONE_CHECKBOX) {
+        } elif (hz.kind == dlist.HitZoneKind.Checkbox) {
             if (hz.widget != nil) {
                 var w = hz.widget as ui.Widget;
                 global_ui_context.captured_widget = w;
@@ -942,14 +942,14 @@ pub fn dispatch_pointer_down(px: float, py: float): nil {
                 global_ui_context.captured_bounds_w = hz.w;
                 global_ui_context.captured_bounds_h = hz.h;
             }
-        } elif (hz.kind == dlist.HZONE_INPUT) {
+        } elif (hz.kind == dlist.HitZoneKind.Input) {
             if (hz.widget != nil) {
                 var w = hz.widget as ui.Widget;
                 blur_focus_recursive(global_ui_context.current_widget);
                 w.is_focused = 1;
                 mark_element_dirty(1);
             }
-        } elif (hz.kind == dlist.HZONE_SELECT) {
+        } elif (hz.kind == dlist.HitZoneKind.Select) {
             if (hz.widget != nil) {
                 var w = hz.widget as ui.Widget;
                 if (hz.tab_index >= 0 and hz.tab_index < len(w.select_options)) {

@@ -1,4 +1,4 @@
-import std.collections.linkedlist as linked_list;
+import std.collections.linked_list as linked_list;
 
 fn main(): int {
     var l: linked_list.LinkedList(int) = linked_list.LinkedList();

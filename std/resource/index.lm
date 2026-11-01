@@ -310,8 +310,6 @@ pub var OP_DELETE: int = rt.OP_DELETE;
 pub var OP_READ_BYTES: int = rt.OP_READ_BYTES;
 pub var OP_SIZE: int = rt.OP_SIZE;
 pub var OP_GET_STATE: int = rt.OP_GET_STATE;
-pub var OP_PEAK_RSS: int = rt.OP_PEAK_RSS;
-pub var OP_CURRENT_RSS: int = rt.OP_CURRENT_RSS;
 
 pub var KIND_OS: int = rt.RT_OS;
 pub var KIND_PROCESS: int = rt.RT_PROCESS;

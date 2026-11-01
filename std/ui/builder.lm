@@ -765,7 +765,7 @@ fn _emit_select(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap)
 
     // Hit zone for select header (-1 indicates toggling dropdown)
     var hz = dlist.make_button_zone(w.text_val, sx, sy, sel_w, sel_h, nil, w);
-    hz.kind = dlist.HZONE_SELECT;
+    hz.kind = dlist.HitZoneKind.Select;
     hz.tab_index = -1;
     _add_hit(dl, hz, ctx);
 
@@ -793,7 +793,7 @@ fn _emit_select(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap)
             dlist.dl_add(dl, dlist.dcmd_text(opt_text, sx + 10.0, opt_item_y + 4.0, ts.text_r, ts.text_g, ts.text_b, 1.0, 1.0));
 
             var opt_hz = dlist.make_button_zone(opt_text, sx, opt_item_y, sel_w, item_h, nil, w);
-            opt_hz.kind = dlist.HZONE_SELECT;
+            opt_hz.kind = dlist.HitZoneKind.Select;
             opt_hz.tab_index = opt_idx;
             _add_hit(dl, opt_hz, ctx);
 

@@ -35,7 +35,7 @@ send({'jsonrpc': '2.0', 'method': 'initialized', 'params': {}})
 
 # 2. Open document that imports linkedlist
 test_code = (
-    "import std.collections.linkedlist as linked_list;\n"
+    "import std.collections.linked_list as linked_list;\n"
     "fn run_test() {\n"
     "    var l = linked_list.LinkedList();\n"
     "    l.push_back(10);\n"

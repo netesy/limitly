@@ -57,11 +57,6 @@ pub var OP_GET_FONT_METRICS: int = 46;
 pub var OP_READ_BYTES: int = 47;
 pub var OP_SIZE: int = 48;
 
-// Deprecated aliases. These once addressed ad-hoc RSS ops that occupied 49/50
-// on the PROCESS resource; those slots now belong to the OS resource, so the
-// aliases point at the dedicated PROC ops and callers keep working.
-pub var OP_PEAK_RSS: int = 66;   // OP_PROC_PEAK_RSS
-pub var OP_CURRENT_RSS: int = 65; // OP_PROC_RSS
 
 // RT_OS operations (see src/backend/vm/resource_types.hh).
 pub var OP_ENV_GET: int = 49;

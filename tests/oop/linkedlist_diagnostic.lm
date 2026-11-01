@@ -1,6 +1,6 @@
 // Diagnostic test for LinkedList to identify frame mutation issues
 
-import std.collections.linkedlist as ll;
+import std.collections.linked_list as ll;
 
 print("=== LinkedList Diagnostic Test ===");
 

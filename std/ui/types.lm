@@ -6,10 +6,8 @@ import std.graphics.shadow as shadow;
 import std.ui.state as state;
 pub import std.graphics.shadow show Shadow, shadow;
 
-// Widget identity is a real enum: `==`/`match` on WidgetKind take the tag-compare
-// path lowered once in the LIR generator (roadmaps.md item 1), so dispatch is
-// type-checked instead of free ints. KIND_* below stay as value bindings for
-// source compatibility; they hold enum values, not ints.
+// Widget identity enum: `==`/`match` on WidgetKind take the tag-compare
+// path lowered in the LIR generator, so dispatch is type-checked.
 enum WidgetKind {
     Container,
     Text,
@@ -178,13 +176,6 @@ mixin Accessibility {
     pub var a11y_live: str;
     pub var tab_index: int;
     pub var is_a11y_hidden: bool;
-}
-
-// Back-compat umbrella: keeps the old `mixin WidgetState` name valid for any external
-// mixing site. New code should mix the per-concern mixins above directly.
-mixin WidgetState {
-    pub var kind: WidgetKind;
-    pub var lifecycle_state: LifecycleState;
 }
 
 // ── Canonical Retained UI Color ──────────────────────────────────────────────
@@ -869,7 +860,7 @@ pub fn empty(): Widget {
     return Widget(KIND_CONTAINER);
 }
 
-// Legacy structures maintained for compatibility
+// Blueprint data structures
 frame ContainerData {
     pub var axis: Axis;
     pub var spacing: float;
@@ -915,56 +906,6 @@ pub fn button_data(label: str): ButtonData {
         padding=rect(8.0, 4.0, 8.0, 4.0),
         enabled=1
     );
-}
-
-frame ImageData {
-    pub var texture_id: int;
-    pub var tint: Color;
-    pub var fit_mode: int;
-}
-
-pub fn image_data(tex_id: int): ImageData {
-    return ImageData(texture_id=tex_id, tint=color_rgb(1.0, 1.0, 1.0), fit_mode=0);
-}
-
-frame TextFieldData {
-    pub var prompt_text: str;
-    pub var text: str;
-    pub var font_size: float;
-    pub var background: Color;
-    pub var corner_radius: float;
-    pub var editable: int;
-}
-
-pub fn text_field_data(prompt_text: str): TextFieldData {
-    return TextFieldData(
-        prompt_text=prompt_text,
-        text="",
-        font_size=14.0,
-        background=color_rgb8(40, 40, 40),
-        corner_radius=4.0,
-        editable=1
-    );
-}
-
-frame ScrollData {
-    pub var axis: Axis;
-    pub var scrollbar_width: float;
-    pub var scrollbar_color: Color;
-}
-
-pub fn scroll_data(axis: Axis): ScrollData {
-    return ScrollData(axis=axis, scrollbar_width=8.0, scrollbar_color=color_rgb8(100, 100, 100));
-}
-
-frame CustomData {
-    pub var type_id: int;
-    pub var state_size: int;
-    pub var render_callback: int;
-}
-
-pub fn custom_data(type_id: int, state_size: int): CustomData {
-    return CustomData(type_id=type_id, state_size=state_size, render_callback=0);
 }
 
 frame LayoutConstraint {

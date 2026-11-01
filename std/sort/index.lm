@@ -1,5 +1,5 @@
 // std/sort/index.lm
-// Compatibility re-export forwarding to std.algorithm.sort
+// Sorting algorithms and utilities
 
 import std.algorithm.sort as s;
 

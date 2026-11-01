@@ -11,7 +11,6 @@ fn main(): int {
     assert(m.get("date") == nil, "TreeMap get non-existent should be nil");
     
     m.remove("banana");
-    m.
     assert(m.length() == 2, "TreeMap length after remove should be 2");
     assert(m.get("banana") == nil, "TreeMap get banana after remove should be nil");
     

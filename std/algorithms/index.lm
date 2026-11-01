@@ -1,5 +1,5 @@
 // std/algorithms/index.lm
-// Compatibility re-export for std.algorithm
+// General algorithm suite
 
 import std.algorithm as algo;
 
