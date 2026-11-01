@@ -1,0 +1,107 @@
+// tests/modern_ui_game_test.lm
+// Test suite for modern Lymar UI and Game architectures
+// Verifies:
+// 1. Zero-cost frame embedding (`embed`) on UI components
+// 2. Promoted methods and fields without wrapper allocations
+// 3. Staged layout metrics and generic type-safe Binding(T)
+// 4. Nominal enum event routing with fallible results (EventResult?nil)
+// 5. IMGUI embedded geometry with promoted contains() method
+// 6. ColorRole native pattern matching
+
+import std.ui as ui;
+import std.ui.components as comp;
+import std.ui.staged as staged_ui;
+import std.ui.event as event;
+import std.game as game;
+import std.game.components as gcomp;
+import std.game.types as gtypes;
+import std.color as color;
+
+fn test_embedded_ui_components() {
+    print("=== Testing Embedded UI Components ===");
+    var btn = comp.Button("Submit");
+    btn.background(color.tw_indigo(600)).padding(12.0).corner_radius(6.0);
+
+    assert(btn.label == "Submit", "Button label mismatch");
+    assert(btn.pad_l == 12.0, "Button pad_l mismatch");
+    assert(btn.radius == 6.0, "Button corner radius mismatch");
+    assert(btn.bg.to_hex() == "#4f46e5", "Button background hex mismatch");
+
+    var lbl = comp.Label("Dashboard").color(color.white).font_size(20.0).bold();
+    assert(lbl.text == "Dashboard", "Label text mismatch");
+    assert(lbl.font_size_val == 20.0, "Label font size mismatch");
+    assert(lbl.is_bold == true, "Label bold flag mismatch");
+    print("[PASS] Embedded UI Components");
+}
+
+fn test_staged_and_generic_bindings() {
+    print("=== Testing Staged UI & Generic State Bindings ===");
+    val item_w = staged_ui.compute_item_width(10, 1, 16);
+    assert(item_w == 112, "Item width computation mismatch");
+
+    val col_w = staged_ui.compute_grid_column_width(1000, 4, 10);
+    assert(col_w == 242, "Column width computation mismatch");
+
+    var state: staged_ui.Binding(int) = staged_ui.Binding(42);
+    assert(state.get() == 42, "Initial binding value mismatch");
+    state.set(99);
+    assert(state.get() == 99, "Updated binding value mismatch");
+    print("[PASS] Staged UI & Generic State Bindings");
+}
+
+fn test_nominal_event_and_fallible_dispatch() {
+    print("=== Testing Nominal Enums & Fallible Event Dispatch ===");
+    var evt = event.make_click_event("submit_button", 120.0, 45.0);
+    assert(evt.kind as str == "Click", "Event kind string reflection mismatch");
+
+    var res = event.dispatch_event(evt)? else {
+        assert(false, "Event dispatch failed unexpectedly");
+        return;
+    };
+    assert(res as str == "Handled", "Event result mismatch");
+
+    // Invalid target produces fallible error
+    var invalid_evt = event.make_click_event("", 0.0, 0.0);
+    var errored = false;
+    var res2 = event.dispatch_event(invalid_evt)? else {
+        errored = true;
+        EventResult.Ignored
+    };
+    assert(errored == true, "Empty target should produce fallible error");
+    print("[PASS] Nominal Enums & Fallible Event Dispatch");
+}
+
+fn test_game_embedded_geometry() {
+    print("=== Testing Game IMGUI Embedded Geometry ===");
+    var ws = gcomp.WidgetState("slider_1", 20.0, 30.0, 200.0, 40.0);
+    assert(ws.id == "slider_1", "Widget ID mismatch");
+    // Promoted field from Rect
+    assert(ws.w == 200.0, "Promoted width mismatch");
+    // Promoted method from Rect
+    assert(ws.contains(50.0, 50.0) == true, "Point inside Rect should match");
+    assert(ws.contains(300.0, 50.0) == false, "Point outside Rect should not match");
+
+    ws.update_hover(50.0, 50.0);
+    assert(ws.is_hot == true, "Widget should be hot when hovered");
+    print("[PASS] Game IMGUI Embedded Geometry");
+}
+
+fn test_game_color_role_matching() {
+    print("=== Testing ColorRole Native Match ===");
+    var gui = game.GUI();
+    var btn_c = gui.get_color_role(gtypes.ColorRole.Button);
+    assert(btn_c.r > 0.0, "Button role color should be initialized");
+    var win_c = gui.get_color_role(gtypes.ColorRole.WindowBg);
+    assert(win_c.a > 0.0, "WindowBg role color should have alpha");
+    print("[PASS] ColorRole Native Match");
+}
+
+test_embedded_ui_components();
+test_staged_and_generic_bindings();
+test_nominal_event_and_fallible_dispatch();
+test_game_embedded_geometry();
+test_game_color_role_matching();
+print("========================================");
+print("All Modern UI & Game Architecture Tests Passed 100%!");
+print("========================================");
+

@@ -1,0 +1,39 @@
+// std/game/components.lm
+// Zero-Cost Frame Embedding Architecture for std.game IMGUI
+//
+// Eliminates loose dynamic dictionaries and parallel arrays by embedding
+// geometry primitives directly into widget state representations.
+
+import std.math as math;
+import std.game.types as types;
+import std.color as color;
+pub import std.color show Color;
+
+frame WidgetState {
+    embed types.Rect;
+
+    pub var id: str;
+    pub var is_hot: bool;
+    pub var is_active: bool;
+    pub var is_focused: bool;
+
+    pub init(id: str, x: float = 0.0, y: float = 0.0, w: float = 0.0, h: float = 0.0) {
+        self.id = id;
+        self.x = x;
+        self.y = y;
+        self.w = w;
+        self.h = h;
+        self.is_hot = false;
+        self.is_active = false;
+        self.is_focused = false;
+    }
+
+    pub fn update_hover(mx: float, my: float): bool {
+        self.is_hot = self.contains(mx, my);
+        return self.is_hot;
+    }
+
+    pub fn set_active(active: bool): nil {
+        self.is_active = active;
+    }
+}

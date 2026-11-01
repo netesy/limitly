@@ -175,3 +175,6 @@ tests/staged/staged_vm_test.lm
 tests/staged/staged_value_param_test.lm
 # Staged frames (roadmap 1b): frame templates minting named frames per type tuple
 tests/staged/staged_frame_test.lm
+
+# Modern Idiomatic UI & Game Architecture
+tests/modern_ui_game_test.lm

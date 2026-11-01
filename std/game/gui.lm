@@ -410,6 +410,43 @@ frame GUI {
         return default_value;
     }
 
+    pub fn get_color_role(role: types.ColorRole): types.Color {
+        match (role) {
+            types.ColorRole.WindowBg => { return self.theme.bg_window; },
+            types.ColorRole.WindowTitle => { return self.theme.bg_window_title; },
+            types.ColorRole.PanelBg => { return self.theme.bg_panel; },
+            types.ColorRole.Text => { return self.theme.text; },
+            types.ColorRole.TextMuted => { return self.theme.text_muted; },
+            types.ColorRole.Accent => { return self.theme.accent; },
+            types.ColorRole.Button => { return self.theme.btn_normal; },
+            types.ColorRole.ButtonHover => { return self.theme.btn_hover; },
+            types.ColorRole.ButtonActive => { return self.theme.btn_active; },
+            types.ColorRole.SliderTrack => { return self.theme.slider_track; },
+            types.ColorRole.SliderThumb => { return self.theme.slider_thumb; },
+            types.ColorRole.CheckboxBorder => { return self.theme.checkbox_border; },
+            types.ColorRole.CheckboxCheck => { return self.theme.checkbox_check; },
+            types.ColorRole.Separator => { return self.theme.separator; },
+            types.ColorRole.FrameBg => { return self.theme.frame_bg; },
+            types.ColorRole.FrameBgHover => { return self.theme.frame_bg_hover; },
+            types.ColorRole.FrameBgActive => { return self.theme.frame_bg_active; },
+            types.ColorRole.Tab => { return self.theme.tab_normal; },
+            types.ColorRole.TabActive => { return self.theme.tab_active; },
+            types.ColorRole.PlotLines => { return self.theme.plot_lines; },
+            types.ColorRole.PlotHistogram => { return self.theme.plot_histogram; },
+            _ => { return self.theme.text; }
+        }
+    }
+
+    pub fn get_var_type(v: types.StyleVar, default_value: float): float {
+        match (v) {
+            types.StyleVar.Padding => { return self.theme.padding; },
+            types.StyleVar.Spacing => { return self.theme.spacing; },
+            types.StyleVar.ItemHeight => { return self.theme.item_height; },
+            types.StyleVar.Rounding => { return self.theme.rounding; },
+            _ => { return default_value; }
+        }
+    }
+
 
     // ── ID & Scoping ───────────────────────────────────────────────────────────
 

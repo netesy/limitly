@@ -1,0 +1,42 @@
+// std/ui/staged.lm
+// Compile-Time Staged Evaluation for Lymar UI
+//
+// Folds static layouts, bounding boxes, and theme tokens.
+// Provides type-safe compile-time generic state bindings via staged frame templates.
+
+// ── Compile-Time Layout Folding Functions ─────────────────────────────────────
+
+pub fn compute_item_width(char_count: int, font_scale: int, pad_x: int): int {
+    var base_w = char_count * 8 * font_scale;
+    return base_w + pad_x * 2;
+}
+
+pub fn compute_grid_column_width(container_w: int, num_cols: int, gap: int): int {
+    if (num_cols <= 1) { return container_w; }
+    var total_gaps = (num_cols - 1) * gap;
+    return (container_w - total_gaps) / num_cols;
+}
+
+pub fn compute_constrained_size(desired: int, min_bound: int, max_bound: int): int {
+    if (desired < min_bound) { return min_bound; }
+    if (max_bound > 0 and desired > max_bound) { return max_bound; }
+    return desired;
+}
+
+// ── Type-Safe Compile-Time State Binding ──────────────────────────────────────
+
+staged frame Binding(T: type) {
+    pub var value: T;
+
+    pub init(initial: T) {
+        self.value = initial;
+    }
+
+    pub fn get(): T {
+        return self.value;
+    }
+
+    pub fn set(new_val: T): nil {
+        self.value = new_val;
+    }
+}

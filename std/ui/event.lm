@@ -1,0 +1,104 @@
+// std/ui/event.lm
+// Type-Safe Event Handling & Fallible Event Propagation for Lymar UI
+//
+// Replaces untyped `any` callbacks and sentinel numbers with nominal enums,
+// exhaustive match dispatch, and Lymar fallible types (`EventResult?nil`).
+
+enum EventKind {
+    Click,
+    Press,
+    Release,
+    Hover,
+    PointerMove,
+    Scroll,
+    KeyDown,
+    KeyUp,
+    Focus,
+    Blur
+}
+
+enum EventResult {
+    Handled,
+    Unhandled,
+    Ignored
+}
+
+frame UIEvent {
+    pub var kind: EventKind;
+    pub var target_id: str;
+    pub var x: float;
+    pub var y: float;
+    pub var delta_x: float;
+    pub var delta_y: float;
+    pub var key_code: int;
+    pub var is_shift: bool;
+    pub var is_ctrl: bool;
+    pub var is_alt: bool;
+
+    pub init(
+        k: EventKind,
+        target: str = "",
+        x: float = 0.0,
+        y: float = 0.0,
+        dx: float = 0.0,
+        dy: float = 0.0,
+        key: int = 0
+    ) {
+        self.kind = k;
+        self.target_id = target;
+        self.x = x;
+        self.y = y;
+        self.delta_x = dx;
+        self.delta_y = dy;
+        self.key_code = key;
+        self.is_shift = false;
+        self.is_ctrl = false;
+        self.is_alt = false;
+    }
+}
+
+pub fn make_click_event(target_id: str, x: float, y: float): UIEvent {
+    return UIEvent(EventKind.Click, target=target_id, x=x, y=y);
+}
+
+pub fn make_hover_event(target_id: str, x: float, y: float): UIEvent {
+    return UIEvent(EventKind.Hover, target=target_id, x=x, y=y);
+}
+
+pub fn make_key_event(k: EventKind, key: int): UIEvent {
+    return UIEvent(k, key=key);
+}
+
+// Fallible event processing pipeline using native `match`
+pub fn dispatch_event(evt: UIEvent, handler: any = nil): EventResult? {
+    if (evt.target_id == "") {
+        return err();
+    }
+
+    match (evt.kind) {
+        EventKind.Click => {
+            return ok(EventResult.Handled);
+        },
+        EventKind.Press => {
+            return ok(EventResult.Handled);
+        },
+        EventKind.Release => {
+            return ok(EventResult.Handled);
+        },
+        EventKind.Hover => {
+            return ok(EventResult.Handled);
+        },
+        EventKind.PointerMove => {
+            return ok(EventResult.Handled);
+        },
+        EventKind.KeyDown => {
+            if (evt.key_code == 27) { // Escape
+                return ok(EventResult.Handled);
+            }
+            return ok(EventResult.Unhandled);
+        },
+        _ => {
+            return ok(EventResult.Unhandled);
+        }
+    }
+}

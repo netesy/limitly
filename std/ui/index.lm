@@ -252,3 +252,8 @@ pub fn replay(dlist_obj: DrawList): nil {
 pub fn dl_hit_test(dlist_obj: DrawList, px: float, py: float): HitZone {
     return dlist.dl_hit_test(dlist_obj, px, py);
 }
+
+// ── Modern Idiomatic Component Primitives (Embedding & Staged) ───────────────
+pub import std.ui.components show LayoutMetrics, VisualStyle, Clickable, Button, Label, Slider, Container;
+pub import std.ui.staged show compute_item_width, compute_grid_column_width, compute_constrained_size, Binding;
+pub import std.ui.event show EventKind, EventResult, UIEvent, make_click_event, make_hover_event, make_key_event, dispatch_event;

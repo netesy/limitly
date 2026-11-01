@@ -1,0 +1,226 @@
+// std/ui/components.lm
+// Zero-Cost Component Embedding Architecture for Lymar Retained UI.
+//
+// Replaces monolithic 60-field God objects with fine-grained, composable
+// component frames utilizing Lymar's `embed` mechanism.
+// Flattened fields have zero pointer overhead; promoted methods provide
+// fluent builder ergonomics without wrapper allocations.
+
+import std.color as color;
+pub import std.color show Color;
+
+// ── Reusable Component Primitives ─────────────────────────────────────────────
+
+frame LayoutMetrics {
+    pub var width_val: float;
+    pub var height_val: float;
+    pub var pad_l: float;
+    pub var pad_t: float;
+    pub var pad_r: float;
+    pub var pad_b: float;
+    pub var spacing_val: float;
+    pub var flex_val: float;
+
+    pub init() {
+        self.width_val = 0.0;
+        self.height_val = 0.0;
+        self.pad_l = 0.0;
+        self.pad_t = 0.0;
+        self.pad_r = 0.0;
+        self.pad_b = 0.0;
+        self.spacing_val = 0.0;
+        self.flex_val = 0.0;
+    }
+
+    pub fn set_dimensions(w: float, h: float): nil {
+        self.width_val = w;
+        self.height_val = h;
+    }
+
+    pub fn set_padding(p: float): nil {
+        self.pad_l = p;
+        self.pad_t = p;
+        self.pad_r = p;
+        self.pad_b = p;
+    }
+}
+
+frame VisualStyle {
+    pub var bg: Color;
+    pub var fg: Color;
+    pub var radius: float;
+    pub var opacity_val: float;
+
+    pub init() {
+        self.bg = color.transparent;
+        self.fg = color.white;
+        self.radius = 0.0;
+        self.opacity_val = 1.0;
+    }
+
+    pub fn set_colors(background: Color, foreground: Color): nil {
+        self.bg = background;
+        self.fg = foreground;
+    }
+
+    pub fn set_radius(r: float): nil {
+        self.radius = r;
+    }
+}
+
+frame Clickable {
+    pub var is_pressed: bool;
+    pub var is_hovered: bool;
+    pub var on_click_action: any;
+    pub var click_count: int;
+
+    pub init() {
+        self.is_pressed = false;
+        self.is_hovered = false;
+        self.on_click_action = nil;
+        self.click_count = 0;
+    }
+
+    pub fn set_on_click(action: any): nil {
+        self.on_click_action = action;
+    }
+
+    pub fn trigger_click(): nil {
+        self.click_count = self.click_count + 1;
+    }
+}
+
+// ── Specialized Embedded UI Components ────────────────────────────────────────
+
+frame Button {
+    embed LayoutMetrics;
+    embed VisualStyle;
+    embed Clickable;
+
+    pub var label: str;
+
+    pub init(text: str, on_click: any = nil) {
+        self.label = text;
+        self.on_click_action = on_click;
+        self.bg = color.slate(700);
+        self.fg = color.white;
+        self.radius = 4.0;
+        self.pad_l = 16.0;
+        self.pad_t = 8.0;
+        self.pad_r = 16.0;
+        self.pad_b = 8.0;
+    }
+
+    pub fn background(c: Color): Button {
+        self.bg = c;
+        return self;
+    }
+
+    pub fn foreground(c: Color): Button {
+        self.fg = c;
+        return self;
+    }
+
+    pub fn padding(p: float): Button {
+        self.set_padding(p);
+        return self;
+    }
+
+    pub fn corner_radius(r: float): Button {
+        self.set_radius(r);
+        return self;
+    }
+
+    pub fn width(w: float): Button {
+        self.width_val = w;
+        return self;
+    }
+
+    pub fn height(h: float): Button {
+        self.height_val = h;
+        return self;
+    }
+}
+
+frame Label {
+    embed LayoutMetrics;
+    embed VisualStyle;
+
+    pub var text: str;
+    pub var font_size_val: float;
+    pub var is_bold: bool;
+
+    pub init(txt: str) {
+        self.text = txt;
+        self.font_size_val = 14.0;
+        self.is_bold = false;
+        self.fg = color.slate(100);
+    }
+
+    pub fn color(c: Color): Label {
+        self.fg = c;
+        return self;
+    }
+
+    pub fn font_size(sz: float): Label {
+        self.font_size_val = sz;
+        return self;
+    }
+
+    pub fn bold(): Label {
+        self.is_bold = true;
+        return self;
+    }
+}
+
+frame Slider {
+    embed LayoutMetrics;
+    embed VisualStyle;
+
+    pub var value: float;
+    pub var min_val: float;
+    pub var max_val: float;
+
+    pub init(v: float = 0.0, min_v: float = 0.0, max_v: float = 1.0) {
+        self.value = v;
+        self.min_val = min_v;
+        self.max_val = max_v;
+        self.height_val = 20.0;
+        self.bg = color.slate(800);
+        self.fg = color.tw_indigo(600);
+    }
+
+    pub fn set_range(min_v: float, max_v: float): Slider {
+        self.min_val = min_v;
+        self.max_val = max_v;
+        return self;
+    }
+}
+
+frame Container {
+    embed LayoutMetrics;
+    embed VisualStyle;
+
+    pub var children: [any];
+    pub var is_vertical: bool;
+
+    pub init(items: [any] = [], vertical: bool = true) {
+        self.children = items;
+        self.is_vertical = vertical;
+    }
+
+    pub fn background(c: Color): Container {
+        self.bg = c;
+        return self;
+    }
+
+    pub fn padding(p: float): Container {
+        self.set_padding(p);
+        return self;
+    }
+
+    pub fn spacing(s: float): Container {
+        self.spacing_val = s;
+        return self;
+    }
+}

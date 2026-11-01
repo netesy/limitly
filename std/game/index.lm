@@ -220,3 +220,6 @@ pub fn scene(name: str = "Scene"): Scene {
     return Scene(name=name);
 }
 pub var scenes: SceneManager = default_scene_manager;
+
+// ── Modern Embedded Widget State ───────────────────────────────────────────
+pub import std.game.components show WidgetState;
