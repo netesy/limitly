@@ -622,6 +622,9 @@ public:
 
         for (const auto& stmt : program->statements) {
             if (auto imp = std::dynamic_pointer_cast<Frontend::AST::ImportStatement>(stmt)) {
+                if (imp->visibility == Frontend::AST::VisibilityLevel::Public) {
+                    continue; // Re-exported symbols via pub import are exported for consumers
+                }
                 if (imp->alias.has_value() && !imp->alias.value().empty()) {
                     imports.push_back({imp->alias.value(), imp->line});
                 } else if (imp->filter.has_value() && !imp->filter.value().identifiers.empty()) {
@@ -1200,15 +1203,23 @@ void print_friendly_diagnostic(const LintDiagnostic& d, const std::vector<std::s
 
 std::vector<LintDiagnostic> Linter::lintSource(const std::string& filename, const std::string& source, const Options& opts) {
     (void)opts;
-    Frontend::Scanner scanner(source, filename);
-    scanner.scanTokens();
-    Frontend::Parser parser(scanner);
-    auto program = parser.parse();
+    try {
+        Frontend::Scanner scanner(source, filename);
+        scanner.scanTokens();
+        Frontend::Parser parser(scanner);
+        auto program = parser.parse();
+        if (!program) return {};
 
-    LintVisitor visitor;
-    visitor.filename = filename;
-    visitor.visit_program(program);
-    return visitor.diagnostics;
+        LintVisitor visitor;
+        visitor.filename = filename;
+        visitor.visit_program(program);
+        return visitor.diagnostics;
+    } catch (const std::exception& e) {
+        if (filename.find("/errors/") != std::string::npos || filename.find("\\errors\\") != std::string::npos) {
+            return {};
+        }
+        return {{filename, 1, 1, "error", "syntax-error", e.what(), "fix syntax errors before linting"}};
+    }
 }
 
 std::vector<LintDiagnostic> Linter::lintFile(const std::string& filepath, const Options& opts) {
@@ -1241,7 +1252,7 @@ int Linter::run(int argc, char** argv) {
     }
 
     if (opts.target_paths.empty()) {
-        if (fs::exists("src")) opts.target_paths.push_back("src");
+        if (fs::exists("std")) opts.target_paths.push_back("std");
         if (fs::exists("tests")) opts.target_paths.push_back("tests");
     }
 
@@ -1252,7 +1263,9 @@ int Linter::run(int argc, char** argv) {
         } else if (fs::is_directory(path_str)) {
             for (const auto& entry : fs::recursive_directory_iterator(path_str)) {
                 if (entry.is_regular_file() && entry.path().extension() == ".lm") {
-                    files_to_lint.push_back(entry.path().generic_string());
+                    std::string gen_path = entry.path().generic_string();
+                    if (gen_path.find("tests/errors/") != std::string::npos) continue;
+                    files_to_lint.push_back(gen_path);
                 }
             }
         }
