@@ -1151,7 +1151,8 @@ uint64_t lymar_aot_value_equal(uint64_t left, uint64_t right, uint64_t left_kind
     try {
     RuntimeGuard runtime_guard;
 
-    const bool left_nil = lymar_aot_is_nil(left, left_kind), right_nil = lymar_aot_is_nil(right, right_kind);
+    const bool left_nil = lymar_aot_is_nil(left, left_kind) || (right_kind == object_kind && (left == 2 || left == 0));
+    const bool right_nil = lymar_aot_is_nil(right, right_kind) || (left_kind == object_kind && (right == 2 || right == 0));
     if (left_nil || right_nil) return left_nil && right_nil;
     if (left_kind == boolean_kind || right_kind == boolean_kind) {
         if ((left_kind == boolean_kind || (left_kind == object_kind && left <= 1) || (!left_kind && left <= 1)) &&

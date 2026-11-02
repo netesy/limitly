@@ -98,8 +98,8 @@ Type language_type_to_abi_type(TypePtr lang_type) {
         case TypeTag::Channel:
         case TypeTag::UserDefined:
         case TypeTag::ErrorUnion:
+        case TypeTag::Nil:
             return Type::Ptr;
-        case TypeTag::Nil: return Type::Void;
         default: return Type::Void;
     }
 }
