@@ -133,6 +133,32 @@ bool is_snake_case(const std::string& s) {
     return true;
 }
 
+void collect_referenced_type(const std::shared_ptr<Frontend::AST::TypeAnnotation>& type, std::unordered_set<std::string>& used) {
+    if (!type) return;
+    if (!type->typeName.empty()) {
+        auto dot = type->typeName.find('.');
+        if (dot != std::string::npos) {
+            used.insert(type->typeName.substr(0, dot));
+            used.insert(type->typeName.substr(dot + 1));
+        } else {
+            used.insert(type->typeName);
+        }
+    }
+    if (type->elementType) collect_referenced_type(type->elementType, used);
+    if (type->keyType) collect_referenced_type(type->keyType, used);
+    if (type->valueType) collect_referenced_type(type->valueType, used);
+    if (type->returnType) collect_referenced_type(type->returnType, used);
+    for (const auto& t : type->unionTypes) collect_referenced_type(t, used);
+    for (const auto& t : type->tupleTypes) collect_referenced_type(t, used);
+    for (const auto& t : type->functionParams) collect_referenced_type(t, used);
+    for (const auto& p : type->functionParameters) collect_referenced_type(p.type, used);
+    for (const auto& f : type->structuralFields) collect_referenced_type(f.type, used);
+    for (const auto& a : type->associatedTypes) collect_referenced_type(a, used);
+    for (const auto& a : type->stagedCallArgs) collect_referenced_type(a, used);
+}
+
+void collect_referenced_vars(const std::shared_ptr<Frontend::AST::Node>& node, std::unordered_set<std::string>& used);
+
 void collect_referenced_vars(const std::shared_ptr<Frontend::AST::Node>& node, std::unordered_set<std::string>& used) {
     if (!node) return;
 
@@ -207,6 +233,77 @@ void collect_referenced_vars(const std::shared_ptr<Frontend::AST::Node>& node, s
 
     if (auto cast_expr = std::dynamic_pointer_cast<Frontend::AST::CastExpr>(node)) {
         collect_referenced_vars(cast_expr->expression, used);
+        collect_referenced_type(cast_expr->targetType, used);
+        return;
+    }
+
+    if (auto grouping = std::dynamic_pointer_cast<Frontend::AST::GroupingExpr>(node)) {
+        collect_referenced_vars(grouping->expression, used);
+        return;
+    }
+
+    if (auto range = std::dynamic_pointer_cast<Frontend::AST::RangeExpr>(node)) {
+        collect_referenced_vars(range->start, used);
+        collect_referenced_vars(range->end, used);
+        collect_referenced_vars(range->step, used);
+        return;
+    }
+
+    if (auto lambda = std::dynamic_pointer_cast<Frontend::AST::LambdaExpr>(node)) {
+        for (const auto& p : lambda->params) collect_referenced_type(p.second, used);
+        if (lambda->returnType.has_value() && lambda->returnType.value()) {
+            collect_referenced_type(lambda->returnType.value(), used);
+        }
+        collect_referenced_vars(lambda->body, used);
+        return;
+    }
+
+    if (auto obj_lit = std::dynamic_pointer_cast<Frontend::AST::ObjectLiteralExpr>(node)) {
+        auto dot = obj_lit->constructorName.find('.');
+        if (dot != std::string::npos) {
+            used.insert(obj_lit->constructorName.substr(0, dot));
+            used.insert(obj_lit->constructorName.substr(dot + 1));
+        } else if (!obj_lit->constructorName.empty()) {
+            used.insert(obj_lit->constructorName);
+        }
+        for (const auto& [k, v] : obj_lit->properties) {
+            collect_referenced_vars(v, used);
+        }
+        return;
+    }
+
+    if (auto fi = std::dynamic_pointer_cast<Frontend::AST::FrameInstantiationExpr>(node)) {
+        auto dot = fi->frameName.find('.');
+        if (dot != std::string::npos) {
+            used.insert(fi->frameName.substr(0, dot));
+            used.insert(fi->frameName.substr(dot + 1));
+        } else if (!fi->frameName.empty()) {
+            used.insert(fi->frameName);
+        }
+        for (const auto& a : fi->positionalArgs) collect_referenced_vars(a, used);
+        for (const auto& [k, v] : fi->namedArgs) collect_referenced_vars(v, used);
+        return;
+    }
+
+    if (auto tp = std::dynamic_pointer_cast<Frontend::AST::TypePatternExpr>(node)) {
+        collect_referenced_type(tp->type, used);
+        return;
+    }
+
+    if (auto bp = std::dynamic_pointer_cast<Frontend::AST::BindingPatternExpr>(node)) {
+        auto dot = bp->typeName.find('.');
+        if (dot != std::string::npos) {
+            used.insert(bp->typeName.substr(0, dot));
+            used.insert(bp->typeName.substr(dot + 1));
+        } else if (!bp->typeName.empty()) {
+            used.insert(bp->typeName);
+        }
+        for (const auto& p : bp->patterns) collect_referenced_vars(p, used);
+        return;
+    }
+
+    if (auto op = std::dynamic_pointer_cast<Frontend::AST::OrPatternExpr>(node)) {
+        for (const auto& p : op->patterns) collect_referenced_vars(p, used);
         return;
     }
 
@@ -269,7 +366,176 @@ void collect_referenced_vars(const std::shared_ptr<Frontend::AST::Node>& node, s
     }
 
     if (auto var_decl = std::dynamic_pointer_cast<Frontend::AST::VarDeclaration>(node)) {
+        if (var_decl->type.has_value() && var_decl->type.value()) {
+            collect_referenced_type(var_decl->type.value(), used);
+        }
         collect_referenced_vars(var_decl->initializer, used);
+        return;
+    }
+
+    if (auto destr = std::dynamic_pointer_cast<Frontend::AST::DestructuringDeclaration>(node)) {
+        collect_referenced_vars(destr->initializer, used);
+        return;
+    }
+
+    if (auto func_decl = std::dynamic_pointer_cast<Frontend::AST::FunctionDeclaration>(node)) {
+        if (func_decl->returnType.has_value() && func_decl->returnType.value()) {
+            collect_referenced_type(func_decl->returnType.value(), used);
+        }
+        for (const auto& p : func_decl->params) {
+            collect_referenced_type(p.second, used);
+        }
+        for (const auto& p : func_decl->optionalParams) {
+            collect_referenced_type(p.second.first, used);
+            collect_referenced_vars(p.second.second, used);
+        }
+        collect_referenced_vars(func_decl->body, used);
+        return;
+    }
+
+    if (auto frame_decl = std::dynamic_pointer_cast<Frontend::AST::FrameDeclaration>(node)) {
+        for (const auto& impl : frame_decl->implements) {
+            auto dot = impl.find('.');
+            if (dot != std::string::npos) {
+                used.insert(impl.substr(0, dot));
+                used.insert(impl.substr(dot + 1));
+            } else {
+                used.insert(impl);
+            }
+        }
+        for (const auto& field : frame_decl->fields) {
+            if (field) {
+                collect_referenced_type(field->type, used);
+                collect_referenced_vars(field->defaultValue, used);
+            }
+        }
+        for (const auto& method : frame_decl->methods) {
+            if (method) {
+                collect_referenced_type(method->returnType, used);
+                for (const auto& p : method->parameters) collect_referenced_type(p.second, used);
+                for (const auto& p : method->optionalParams) {
+                    collect_referenced_type(p.second.first, used);
+                    collect_referenced_vars(p.second.second, used);
+                }
+                collect_referenced_vars(method->body, used);
+            }
+        }
+        if (frame_decl->init) {
+            for (const auto& p : frame_decl->init->parameters) collect_referenced_type(p.second, used);
+            for (const auto& p : frame_decl->init->optionalParams) {
+                collect_referenced_type(p.second.first, used);
+                collect_referenced_vars(p.second.second, used);
+            }
+            collect_referenced_vars(frame_decl->init->body, used);
+        }
+        if (frame_decl->deinit) {
+            collect_referenced_vars(frame_decl->deinit->body, used);
+        }
+        for (const auto& emb : frame_decl->embeds) {
+            if (emb) {
+                auto dot = emb->typeName.find('.');
+                if (dot != std::string::npos) {
+                    used.insert(emb->typeName.substr(0, dot));
+                    used.insert(emb->typeName.substr(dot + 1));
+                } else {
+                    used.insert(emb->typeName);
+                }
+            }
+        }
+        return;
+    }
+
+    if (auto trait_decl = std::dynamic_pointer_cast<Frontend::AST::TraitDeclaration>(node)) {
+        for (const auto& ext : trait_decl->extends) {
+            auto dot = ext.find('.');
+            if (dot != std::string::npos) {
+                used.insert(ext.substr(0, dot));
+                used.insert(ext.substr(dot + 1));
+            } else {
+                used.insert(ext);
+            }
+        }
+        for (const auto& m : trait_decl->methods) {
+            collect_referenced_vars(m, used);
+        }
+        return;
+    }
+
+    if (auto mixin_decl = std::dynamic_pointer_cast<Frontend::AST::MixinDeclaration>(node)) {
+        for (const auto& f : mixin_decl->fields) {
+            if (f) {
+                collect_referenced_type(f->type, used);
+                collect_referenced_vars(f->defaultValue, used);
+            }
+        }
+        for (const auto& m : mixin_decl->methods) {
+            if (m) {
+                collect_referenced_type(m->returnType, used);
+                for (const auto& p : m->parameters) collect_referenced_type(p.second, used);
+                for (const auto& p : m->optionalParams) {
+                    collect_referenced_type(p.second.first, used);
+                    collect_referenced_vars(p.second.second, used);
+                }
+                collect_referenced_vars(m->body, used);
+            }
+        }
+        return;
+    }
+
+    if (auto type_decl = std::dynamic_pointer_cast<Frontend::AST::TypeDeclaration>(node)) {
+        collect_referenced_type(type_decl->type, used);
+        return;
+    }
+
+    if (auto enum_decl = std::dynamic_pointer_cast<Frontend::AST::EnumDeclaration>(node)) {
+        for (const auto& v : enum_decl->variants) {
+            for (const auto& t : v.second) collect_referenced_type(t, used);
+        }
+        return;
+    }
+
+    if (auto mod_decl = std::dynamic_pointer_cast<Frontend::AST::ModuleDeclaration>(node)) {
+        for (const auto& s : mod_decl->publicMembers) collect_referenced_vars(s, used);
+        for (const auto& s : mod_decl->protectedMembers) collect_referenced_vars(s, used);
+        for (const auto& s : mod_decl->privateMembers) collect_referenced_vars(s, used);
+        return;
+    }
+
+    if (auto par = std::dynamic_pointer_cast<Frontend::AST::ParallelStatement>(node)) {
+        collect_referenced_vars(par->body, used);
+        return;
+    }
+
+    if (auto conc = std::dynamic_pointer_cast<Frontend::AST::ConcurrentStatement>(node)) {
+        collect_referenced_vars(conc->body, used);
+        return;
+    }
+
+    if (auto task = std::dynamic_pointer_cast<Frontend::AST::TaskStatement>(node)) {
+        collect_referenced_vars(task->iterable, used);
+        collect_referenced_vars(task->body, used);
+        return;
+    }
+
+    if (auto worker = std::dynamic_pointer_cast<Frontend::AST::WorkerStatement>(node)) {
+        collect_referenced_vars(worker->iterable, used);
+        collect_referenced_vars(worker->body, used);
+        return;
+    }
+
+    if (auto unsafe = std::dynamic_pointer_cast<Frontend::AST::UnsafeStatement>(node)) {
+        collect_referenced_vars(unsafe->body, used);
+        return;
+    }
+
+    if (auto staged = std::dynamic_pointer_cast<Frontend::AST::StagedBlockStatement>(node)) {
+        collect_referenced_vars(staged->body, used);
+        return;
+    }
+
+    if (auto staged_expr = std::dynamic_pointer_cast<Frontend::AST::StagedExpr>(node)) {
+        collect_referenced_vars(staged_expr->expression, used);
+        collect_referenced_vars(staged_expr->block, used);
         return;
     }
 
