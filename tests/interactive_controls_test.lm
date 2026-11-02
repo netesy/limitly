@@ -4,6 +4,7 @@
 import std.app as app;
 import std.ui as ui;
 import std.ui.context as ui_context;
+import std.color as color;
 
 fn test_click_action() {
     print("Button clicked callback executed");
@@ -13,13 +14,27 @@ fn run_tests() {
     print("=== Testing Interactive Controls and Single Click ===");
 
     var cfg = app.default_window_config();
+
     app.init(cfg);
 
+
     var btn = ui.button("Submit", test_click_action);
+
     var chk = ui.checkbox(false);
+
     var sld = ui.slider(20.0, 0.0, 100.0);
+
     var inp = ui.input("test", "Placeholder");
-    var tab_bar = ui.tabs(["Tab1", "Tab2", "Tab3"], [ui.empty(), ui.empty(), ui.empty()], 0).height(36.0);
+
+
+    var e1 = ui.empty();
+
+    var pages: [ui.Widget] = [e1, e1, e1];
+
+    var tab_bar = ui.tabs(["Tab1", "Tab2", "Tab3"], pages, 0);
+
+    tab_bar.height(36.0);
+
     var scr = ui.scroll(ui.column([
         ui.text("Line 1"),
         ui.text("Line 2"),
@@ -33,6 +48,7 @@ fn run_tests() {
         ui.text("Line 10")
     ])).height(60.0);
 
+
     var root = ui.column([
         tab_bar,
         btn,
@@ -41,7 +57,9 @@ fn run_tests() {
         inp,
         scr
     ]).spacing(10.0);
+
     app.ui(root);
+
     app.present_frame();
     // 1. Verify Single Click (Mouse Down + Mouse Up should invoke callback ONCE)
     assert(btn.click_count == 0, "Initial button click count should be 0");
@@ -163,7 +181,7 @@ fn run_tests() {
     print("Pass: Slider drag semantics verified");
 
     // 9. Verify Badge Widget
-    var bdg = ui.badge("ACTIVE").background(ui.green).foreground(ui.white);
+    var bdg = ui.badge("ACTIVE").background(color.green).foreground(color.white);
     assert(bdg.kind == ui.KIND_BADGE, "Badge kind must be KIND_BADGE");
     assert(bdg.text_val == "ACTIVE", "Badge text should match label");
     print("Pass: Badge widget verified");

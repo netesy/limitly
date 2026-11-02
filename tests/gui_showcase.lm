@@ -10,6 +10,8 @@
 
 import std.app as app;
 import std.ui as ui;
+import std.color as color;
+import std.animation as anim;
 
 // Action Callbacks
 fn on_deploy() {
@@ -58,30 +60,30 @@ fn build_header(): ui.Widget {
     ui.text("LIMIT STUDIO")
     .font_size(20.0)
     .bold()
-    .color(ui.indigo),
+    .color(color.indigo),
 
     ui.spacer(),
 
     ui.text("Cluster: us - east - prod - 1 | Latency: 12ms")
     .font_size(12.0)
-    .color(ui.green),
+    .color(color.green),
 
-    ui.badge("HEALTHY").background(ui.rgb(30, 80, 50)).foreground(ui.rgb(100, 240, 150)),
+    ui.badge("HEALTHY").background(color.rgb(30, 80, 50)).foreground(color.rgb(100, 240, 150)),
 
     ui.spacer(),
 
     ui.button("Deploy v2.4", on_deploy)
-    .background(ui.indigo)
-    .foreground(ui.white)
+    .background(color.indigo)
+    .foreground(color.white)
     .padding_xy(14.0, 7.0)
     .corner_radius(6.0)
     .shadow(ui.shadow(r = 0.2, g = 0.1, b = 0.5, a = 0.4, off_x = 0.0, off_y = 4.0, blur = 10.0))
-    .animate(0.25, 23)
+    .animate(0.25, anim.Easing.InOut)
     .spring(180.0, 12.0),
 
     ui.button("Sync State", on_sync)
-    .background(ui.rgb(45, 50, 68))
-    .foreground(ui.rgba(160, 200, 255, 1))
+    .background(color.rgb(45, 50, 68))
+    .foreground(color.rgba(160, 200, 255, 1))
     .padding_xy(14.0, 7.0)
     .corner_radius(6.0)
     ]).spacing(10.0);
@@ -92,7 +94,7 @@ fn build_header(): ui.Widget {
 // Reusable Metric Stat Card
 fn stat_card(title: str, metric: str, subtitle: str, metric_color: ui.Color, badge_label: str): ui.Widget {
     var card_style = ui.style()
-    .background(ui.rgb(26, 28, 36))
+    .background(color.rgb(26, 28, 36))
     .padding(12.0)
     .corner_radius(8.0)
     .spacing(4.0);
@@ -100,9 +102,9 @@ fn stat_card(title: str, metric: str, subtitle: str, metric_color: ui.Color, bad
     var top_row = ui.row([
     ui.text(title)
     .font_size(11.0)
-    .color(ui.gray),
+    .color(color.gray),
     ui.spacer(),
-    ui.badge(badge_label).background(ui.rgb(35, 45, 60)).foreground(ui.rgb(140, 190, 255))
+    ui.badge(badge_label).background(color.rgb(35, 45, 60)).foreground(color.rgb(140, 190, 255))
     ]);
 
     return ui.column([
@@ -113,7 +115,7 @@ fn stat_card(title: str, metric: str, subtitle: str, metric_color: ui.Color, bad
     .color(metric_color),
     ui.text(subtitle)
     .font_size(11.0)
-    .color(ui.light_gray)
+    .color(color.light_gray)
     ])
     .style(card_style)
     .width(220.0);
@@ -122,15 +124,15 @@ fn stat_card(title: str, metric: str, subtitle: str, metric_color: ui.Color, bad
 // TAB 0: Overview Page
 fn build_overview_page(): ui.Widget {
     var metrics_row = ui.row([
-    stat_card("COMPUTE UTILIZATION", "42.8 % ", "16 vCPUs active - 4 nodes", ui.rgb(80, 220, 130), "STABLE"),
+    stat_card("COMPUTE UTILIZATION", "42.8 % ", "16 vCPUs active - 4 nodes", color.rgb(80, 220, 130), "STABLE"),
     ui.spacer(),
-    stat_card("INGRESS BANDWIDTH", "1.84 GB / s", " + 14.2 % vs prior hour", ui.rgb(100, 180, 255), "PEAK"),
+    stat_card("INGRESS BANDWIDTH", "1.84 GB / s", " + 14.2 % vs prior hour", color.rgb(100, 180, 255), "PEAK"),
     ui.spacer(),
-    stat_card("EDGE AVAILABILITY", "99.995 % ", "0 dropouts detected", ui.rgb(80, 220, 130), "SLO MET")
+    stat_card("EDGE AVAILABILITY", "99.995 % ", "0 dropouts detected", color.rgb(80, 220, 130), "SLO MET")
     ]).spacing(8.0);
 
     var summary_card_style = ui.style()
-    .background(ui.rgb(24, 26, 34))
+    .background(color.rgb(24, 26, 34))
     .padding(14.0)
     .corner_radius(8.0)
     .spacing(8.0);
@@ -139,31 +141,31 @@ fn build_overview_page(): ui.Widget {
     ui.text("Infrastructure Orchestration Summary")
     .font_size(14.0)
     .bold()
-    .color(ui.white),
+    .color(color.white),
     ui.spacer(),
-    ui.badge("MULTI - REGION").background(ui.indigo).foreground(ui.white)
+    ui.badge("MULTI - REGION").background(color.indigo).foreground(color.white)
     ]);
 
     var summary_desc = ui.text("Autonomous edge cluster running across 34 PoPs. Self - healing mesh routing enabled.")
     .font_size(12.0)
-    .color(ui.light_gray);
+    .color(color.light_gray);
 
     var quick_actions = ui.row([
     ui.button("Sync Cluster State", on_sync)
-    .background(ui.blue)
-    .foreground(ui.white)
+    .background(color.blue)
+    .foreground(color.white)
     .padding_xy(12.0, 6.0)
     .corner_radius(4.0),
 
     ui.button("Drain Worker Nodes", on_drain)
-    .background(ui.rgb(65, 40, 40))
-    .foreground(ui.rgb(255, 140, 120))
+    .background(color.rgb(65, 40, 40))
+    .foreground(color.rgb(255, 140, 120))
     .padding_xy(12.0, 6.0)
     .corner_radius(4.0),
 
     ui.button("Purge Edge Cache", on_purge)
-    .background(ui.rgb(40, 45, 55))
-    .foreground(ui.light_gray)
+    .background(color.rgb(40, 45, 55))
+    .foreground(color.light_gray)
     .padding_xy(12.0, 6.0)
     .corner_radius(4.0)
     ]).spacing(10.0);
@@ -182,28 +184,28 @@ fn build_overview_page(): ui.Widget {
 
 // Service Row in Catalog
 fn service_row(name: str, status: str, version: str, region: str, is_healthy: int): ui.Widget {
-    var status_bg = ui.rgb(25, 75, 45);
-    var status_fg = ui.rgb(90, 240, 140);
+    var status_bg = color.rgb(25, 75, 45);
+    var status_fg = color.rgb(90, 240, 140);
     if (is_healthy == 0) {
-        status_bg = ui.rgb(75, 55, 20);
-        status_fg = ui.rgb(255, 210, 80);
+        status_bg = color.rgb(75, 55, 20);
+        status_fg = color.rgb(255, 210, 80);
         }
 
         return ui.row([
         ui.text(name)
         .font_size(13.0)
         .bold()
-        .color(ui.white)
+        .color(color.white)
         .width(180.0),
         ui.badge(status).background(status_bg).foreground(status_fg),
         ui.spacer(),
-        ui.badge(version).background(ui.rgb(35, 45, 65)).foreground(ui.rgb(130, 180, 255)),
+        ui.badge(version).background(color.rgb(35, 45, 65)).foreground(color.rgb(130, 180, 255)),
         ui.spacer(),
-        ui.badge(region).background(ui.rgb(35, 38, 48)).foreground(ui.gray),
+        ui.badge(region).background(color.rgb(35, 38, 48)).foreground(color.gray),
         ui.spacer(),
         ui.button("Restart", on_sync)
-        .background(ui.rgb(45, 48, 60))
-        .foreground(ui.light_gray)
+        .background(color.rgb(45, 48, 60))
+        .foreground(color.light_gray)
         .padding_xy(10.0, 4.0)
         .corner_radius(4.0)
         ]).spacing(8.0);
@@ -212,16 +214,16 @@ fn service_row(name: str, status: str, version: str, region: str, is_healthy: in
     // TAB 1: Microservices Catalog Page
     fn build_microservices_page(): ui.Widget {
         var card_style = ui.style()
-        .background(ui.rgb(24, 26, 34))
+        .background(color.rgb(24, 26, 34))
         .padding(14.0)
         .corner_radius(8.0)
         .spacing(10.0);
 
         var filter_bar = ui.row([
-        ui.text("Filter: ").color(ui.light_gray),
+        ui.text("Filter: ").color(color.light_gray),
         ui.input("payments", "Search microservice...", on_search_changed).width(200.0),
         ui.spacer(),
-        ui.badge("4 SERVICES MONITORED").background(ui.rgb(35, 50, 70)).foreground(ui.rgb(140, 200, 255))
+        ui.badge("4 SERVICES MONITORED").background(color.rgb(35, 50, 70)).foreground(color.rgb(140, 200, 255))
         ]).spacing(8.0);
 
         var list = ui.column([
@@ -240,7 +242,7 @@ fn service_row(name: str, status: str, version: str, region: str, is_healthy: in
     // TAB 2: Live Telemetry Page (Scissor Clipped Scroll View)
     fn build_telemetry_page(): ui.Widget {
         var card_style = ui.style()
-        .background(ui.rgb(22, 24, 30))
+        .background(color.rgb(22, 24, 30))
         .padding(12.0)
         .corner_radius(8.0)
         .spacing(6.0);
@@ -249,28 +251,28 @@ fn service_row(name: str, status: str, version: str, region: str, is_healthy: in
         ui.text("Real - Time Cluster Telemetry Feed")
         .font_size(13.0)
         .bold()
-        .color(ui.light_gray),
+        .color(color.light_gray),
         ui.spacer(),
-        ui.badge("SCISSOR CLIPPED").background(ui.rgb(30, 60, 90)).foreground(ui.rgb(120, 200, 255)),
-        ui.badge("LIVE STREAM").background(ui.rgb(25, 75, 45)).foreground(ui.rgb(90, 240, 140))
+        ui.badge("SCISSOR CLIPPED").background(color.rgb(30, 60, 90)).foreground(color.rgb(120, 200, 255)),
+        ui.badge("LIVE STREAM").background(color.rgb(25, 75, 45)).foreground(color.rgb(90, 240, 140))
         ]).spacing(8.0);
 
         var logs = [
-        ui.text("[13: 50: 02] [INFO] Deployment b72ef1 verified on 12 edge nodes - HTTP / 3 enabled").color(ui.rgb(140, 210, 160)),
-        ui.text("[13: 50: 18] [SEC] Autonomous TLS certificate renewal confirmed (0 ms downtime)").color(ui.rgb(160, 190, 240)),
-        ui.text("[13: 50: 31] [METR] Prometheus metrics exporter heartbeat ACK received on: 9090").color(ui.gray),
-        ui.text("[13: 50: 44] [POD] Pod worker - node - us - east - 8 auto - healed after healthcheck timeout").color(ui.rgb(255, 200, 100)),
-        ui.text("[13: 51: 02] [NET] BGP anycast route converged across 34 points of presence").color(ui.rgb(140, 210, 160)),
-        ui.text("[13: 51: 15] [AUTH] mTLS mutual authentication handshake success (auth0 - gateway)").color(ui.rgb(160, 190, 240)),
-        ui.text("[13: 51: 28] [DB] Read replica replication lag < 4ms across cross - region VPC").color(ui.gray),
-        ui.text("[13: 51: 40] [CDN] Edge cache hit ratio reached 98.6 % on static assets bucket").color(ui.rgb(140, 210, 160)),
-        ui.text("[13: 51: 55] [SYS] Kernel eBPF packet filter rules updated without packet drop").color(ui.rgb(160, 190, 240)),
-        ui.text("[13: 52: 10] [ALERT] Spike in queries absorbed by horizontal autoscale pool").color(ui.rgb(255, 140, 120)),
-        ui.text("[13: 52: 25] [SYNC] Distributed consensus quorum acknowledged in epoch #4912").color(ui.rgb(160, 190, 240)),
-        ui.text("[13: 52: 40] [MESH] Envoy proxy sidecar memory stabilized at 18.4 MB").color(ui.gray),
-        ui.text("[13: 52: 55] [HEAL] Node pool cordon lifted automatically on us - east - prod - 1").color(ui.rgb(140, 210, 160)),
-        ui.text("[13: 53: 10] [RATE] Token bucket rate limiter allowed 42, 900 req / sec sustained").color(ui.rgb(160, 190, 240)),
-        ui.text("[13: 53: 25] [DONE] Telemetry buffer flushed cleanly to persistent storage").color(ui.rgb(140, 210, 160))
+        ui.text("[13: 50: 02] [INFO] Deployment b72ef1 verified on 12 edge nodes - HTTP / 3 enabled").color(color.rgb(140, 210, 160)),
+        ui.text("[13: 50: 18] [SEC] Autonomous TLS certificate renewal confirmed (0 ms downtime)").color(color.rgb(160, 190, 240)),
+        ui.text("[13: 50: 31] [METR] Prometheus metrics exporter heartbeat ACK received on: 9090").color(color.gray),
+        ui.text("[13: 50: 44] [POD] Pod worker - node - us - east - 8 auto - healed after healthcheck timeout").color(color.rgb(255, 200, 100)),
+        ui.text("[13: 51: 02] [NET] BGP anycast route converged across 34 points of presence").color(color.rgb(140, 210, 160)),
+        ui.text("[13: 51: 15] [AUTH] mTLS mutual authentication handshake success (auth0 - gateway)").color(color.rgb(160, 190, 240)),
+        ui.text("[13: 51: 28] [DB] Read replica replication lag < 4ms across cross - region VPC").color(color.gray),
+        ui.text("[13: 51: 40] [CDN] Edge cache hit ratio reached 98.6 % on static assets bucket").color(color.rgb(140, 210, 160)),
+        ui.text("[13: 51: 55] [SYS] Kernel eBPF packet filter rules updated without packet drop").color(color.rgb(160, 190, 240)),
+        ui.text("[13: 52: 10] [ALERT] Spike in queries absorbed by horizontal autoscale pool").color(color.rgb(255, 140, 120)),
+        ui.text("[13: 52: 25] [SYNC] Distributed consensus quorum acknowledged in epoch #4912").color(color.rgb(160, 190, 240)),
+        ui.text("[13: 52: 40] [MESH] Envoy proxy sidecar memory stabilized at 18.4 MB").color(color.gray),
+        ui.text("[13: 52: 55] [HEAL] Node pool cordon lifted automatically on us - east - prod - 1").color(color.rgb(140, 210, 160)),
+        ui.text("[13: 53: 10] [RATE] Token bucket rate limiter allowed 42, 900 req / sec sustained").color(color.rgb(160, 190, 240)),
+        ui.text("[13: 53: 25] [DONE] Telemetry buffer flushed cleanly to persistent storage").color(color.rgb(140, 210, 160))
         ];
 
         // Scissor clipped scroll container (190px high)
@@ -285,13 +287,13 @@ fn service_row(name: str, status: str, version: str, region: str, is_healthy: in
     // TAB 3: Settings & Tools Page (Select, Checkboxes, Slider, Open Window)
     fn build_settings_page(): ui.Widget {
         var card_style = ui.style()
-        .background(ui.rgb(24, 26, 34))
+        .background(color.rgb(24, 26, 34))
         .padding(14.0)
         .corner_radius(8.0)
         .spacing(12.0);
 
         var region_row = ui.row([
-        ui.text("Target Region / Environment: ").color(ui.white).width(200.0),
+        ui.text("Target Region / Environment: ").color(color.white).width(200.0),
         ui.select([
         "US - East (N. Virginia)",
         "EU - Central (Frankfurt)",
@@ -299,17 +301,17 @@ fn service_row(name: str, status: str, version: str, region: str, is_healthy: in
         "Global Multi - Cloud"
         ], 0, on_region_changed).width(220.0),
         ui.spacer(),
-        ui.badge("ACTIVE ENV").background(ui.indigo).foreground(ui.white)
+        ui.badge("ACTIVE ENV").background(color.indigo).foreground(color.white)
         ]).spacing(10.0);
 
         var toggle_row = ui.row([
-        ui.text("Autonomous Scale: ").color(ui.light_gray),
+        ui.text("Autonomous Scale: ").color(color.light_gray),
         ui.checkbox(true, on_autoscale_toggled),
         ui.spacer(),
-        ui.text("Zero - Downtime Rolling: ").color(ui.light_gray),
+        ui.text("Zero - Downtime Rolling: ").color(color.light_gray),
         ui.checkbox(true, on_rolling_toggled),
         ui.spacer(),
-        ui.text("Replicas (1..20): ").color(ui.light_gray),
+        ui.text("Replicas (1..20): ").color(color.light_gray),
         ui.slider(8.0, 1.0, 20.0, on_replica_slider).width(120.0)
         ]).spacing(8.0);
 
@@ -318,15 +320,15 @@ fn service_row(name: str, status: str, version: str, region: str, is_healthy: in
         ui.text("System Diagnostics & Telemetry")
         .font_size(13.0)
         .bold()
-        .color(ui.white),
+        .color(color.white),
         ui.text("Collects real - time engine telemetry, scissor clipping state, and event loop metrics.")
         .font_size(11.0)
-        .color(ui.gray)
+        .color(color.gray)
         ]),
         ui.spacer(),
         ui.button("Run Diagnostics", on_sync)
-        .background(ui.indigo)
-        .foreground(ui.white)
+        .background(color.indigo)
+        .foreground(color.white)
         .padding_xy(16.0, 8.0)
         .corner_radius(6.0)
         ]).spacing(12.0);
@@ -343,11 +345,11 @@ fn service_row(name: str, status: str, version: str, region: str, is_healthy: in
         return ui.row([
         ui.text("Lymar Engine v1.0 - Software Framebuffer - Scissor Clipped Retained Canvas")
         .font_size(11.0)
-        .color(ui.gray),
+        .color(color.gray),
         ui.spacer(),
         ui.text("Memory: 14.2 MB | Ready")
         .font_size(11.0)
-        .color(ui.gray)
+        .color(color.gray)
         ]);
     }
 

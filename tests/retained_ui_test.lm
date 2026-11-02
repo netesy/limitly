@@ -4,6 +4,7 @@
 import std.app as app;
 import std.gg as gg;
 import std.ui as ui;
+import std.color as color;
 
 fn main() {
     print("=== Retained UI Interactive End-to-End Test ===");
@@ -13,9 +14,9 @@ fn main() {
 
     // Construct retained UI tree using modern fluent std.ui API
     var btn = ui.button("Click Me")
-        .background(ui.rgb(60, 120, 210));
+        .background(color.rgb(60, 120, 210));
     var lbl = ui.text("Hello Retained UI")
-        .color(ui.white);
+        .color(color.white);
     var root = ui.column([btn, lbl]);
 
     app.ui(root);

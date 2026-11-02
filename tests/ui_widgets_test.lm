@@ -1,6 +1,7 @@
 // Comprehensive Integration Test Suite for Lymar std.ui Widgets & Charts
 import std.ui as ui;
 import std.ui.context as ctx;
+import std.color as color;
 
 fn test_widget_constructors(): nil {
     print("Testing widget constructors...");
@@ -104,7 +105,7 @@ fn test_ui_context_rendering_and_dispatch(): nil {
             ui.progress(0.5)
         ]),
         ui.accordion("Settings", ui.column([
-            ui.color_picker("Theme", ui.blue),
+            ui.color_picker("Theme", color.blue),
             ui.file_input("Config File")
         ]), true),
         ui.bar_chart("Revenue", [30.0, 60.0, 90.0]),

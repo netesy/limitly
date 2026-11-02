@@ -323,6 +323,72 @@ If a backend cannot faithfully implement an LIR instruction, the backend must be
 
 Behavioral equivalence across all supported backends is mandatory.
 
+---
+
+### **8. Library-Specific Guidelines: std/ui and std/game**
+
+These guidelines apply when working on the `std/ui` and `std/game` libraries, focusing on leveraging Lymar's native strengths for idiomatic, high-performance code.
+
+#### **Zero-Cost Frame Embedding (embed)**
+- [ ] **DO NOT use monolithic 60-field structs** that mix every possible property (e.g., a single `Widget` frame with 60+ fields for all widget types).
+- [x] **Use specific widget frames that embed only what they need**: 
+  ```lymar
+  frame Button {
+    embed LayoutBox;
+    embed VisualStyle;
+    embed Clickable;
+    pub var label: str;
+  }
+  ```
+- Embedding flattens fields at compile time with zero pointer overhead. Promoted methods provide fluent syntax without wrapper allocations.
+- Each widget type (Button, Label, Slider, etc.) should embed only the component mixins it actually uses.
+
+#### **Compile-Time Staging (staged fn)**
+- [ ] **DO NOT construct UI trees at runtime** if they can be static (e.g., parsing style snapshots on every frame).
+- [x] **Use staged static UI trees**: Static layout hierarchies, theme palettes, and constant bounding boxes should be computed at compile time into read-only constant memory.
+- Only dynamic signal bindings should evaluate at runtime.
+- Example: `staged fn build_app_ui(): Widget { ... }` executes at compile time, producing a constant widget tree.
+
+#### **Nominal Enums & Exhaustive match**
+- [ ] **DO NOT use 40-line if/elif ladders** or magic integer status codes for widget states, event types, or alignment modes.
+- [x] **Use type-safe enums**: Declare `enum WidgetKind { Button, Label, Slider }`, `enum Event { Click, Hover, Focus }`, `enum Alignment { Start, Center, End }`.
+- Dispatch with `match` for compiler-optimized jump tables and exhaustiveness checking:
+  ```lymar
+  match (widget.kind) {
+    WidgetKind.Button => { ... },
+    WidgetKind.Label => { ... },
+    _ => { ... }
+  }
+  ```
+
+#### **Fallible Types (T?Error) for Event Handling**
+- [ ] **DO NOT use nullable `any` action callbacks** (e.g., `on_click_action: any = nil`) that require runtime nil checks.
+- [x] **Use typed optional functions**: `on_click_action: (fn(): nil)?` for type-safe event handling.
+- Event handling should use fallible streams/results: `Event?Handled` eliminates dynamic `any` boxing and nil-check ladders.
+- Invocations should route through fallible types: `var result = button.click()? else { return EventResult.Unhandled; }`.
+
+#### **Clean Domain Imports (No Transitive Re-exports)**
+- [ ] **DO NOT re-export another foundational domain's primitive types** from client libraries (e.g., `std/ui` re-exporting `Color`, `hex`, `rgb` and redefining shadow copies of `white`, `black`, `red`).
+- Transitive re-exports cause runtime nil-pointer lookup bugs, cyclic dependencies, and muddy call-site imports.
+- [x] **Consume domain types directly**: Code requiring colors should `import std.color as color;` and use `color.white` or `color.indigo(600)`.
+- Code requiring math types should `import std.math as math;` and use `math.Vec2` or `math.Rect`.
+- Each module stays within its own architectural boundary; UI libraries focus on layout and interaction, not color math.
+
+#### **Type-Safe Callbacks over Dynamic `any`**
+- [ ] **DO NOT use `any` for callbacks** (e.g., `on_click: any`, `on_change: any`). This disables type checking and requires unsafe casts.
+- [x] **Use typed function signatures**: `on_click: (fn(): nil)?`, `on_change: (fn(float)): nil?`.
+- This enables compile-time type checking and eliminates runtime cast errors.
+
+#### **Named Constants over Magic Integers**
+- [ ] **DO NOT use flat integer magic constants** (e.g., `COLOR_BG = 0`, `COLOR_TEXT = 1`) with if/elif dispatch.
+- [x] **Use nominal enums**: `enum ColorRole { WindowBg, Text, Accent }` dispatched via `match`.
+- Enums provide compile-time exhaustiveness checks and cast cleanly to strings (`role as str`).
+
+#### **Component-Based Architecture over God Objects**
+- [ ] **DO NOT create monolithic frames** that contain every possible field (the "God object" anti-pattern).
+- [x] **Use mixins and embed for composition**: Break concerns into reusable component mixins (LayoutMetrics, VisualStyle, Clickable, Focusable) and embed them as needed.
+- This follows the single responsibility principle and enables zero-cost composition through `embed`.
+
 When modifying Fyra, treat it as an independent repository. Commit and push the Fyra changes to the Fyra repository first, then update the Lymar superproject's Fyra gitlink and commit/push that change. Do not merely commit the modified submodule state in Lymar. Verify git status in both repositories before finishing.
  
 Run `git submodule update --init` in Lymar after updating the Fyra gitlink and before building/testing. Verify that the Fyra version in Lymar's git status matches the intended version.

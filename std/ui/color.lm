@@ -1,9 +1,11 @@
 // std/ui/color.lm
 // UI Color bridge delegating to canonical std.color.
+// NOTE: This module is deprecated. Import std.color directly instead.
 
 import std.color as color;
 pub import std.color show Color;
 
+// Convenience functions delegating to std.color
 pub fn rgb(r: int, g: int, b: int): Color { return color.rgb(r, g, b); }
 pub fn rgba(r: int, g: int, b: int, a: float): Color { return color.rgba(r, g, b, a); }
 pub fn color_rgb(r: float, g: float, b: float): Color { return color.color_rgb(r, g, b); }
@@ -11,16 +13,3 @@ pub fn color_rgba(r: float, g: float, b: float, a: float): Color { return color.
 pub fn color_rgb8(r: int, g: int, b: int): Color { return color.rgb(r, g, b); }
 pub fn hex(h: int): Color { return color.hex(h); }
 pub fn hsl(h: float, s: float, l: float): Color { return color.hsl(h, s, l); }
-
-// Standard palette aliases
-pub const white: Color       = color.white;
-pub const black: Color       = color.black;
-pub const red: Color         = color.red;
-pub const green: Color       = color.green;
-pub const blue: Color        = color.blue;
-pub const indigo: Color      = color.indigo;
-pub const yellow: Color      = color.yellow;
-pub const gray: Color        = color.gray;
-pub const dark_gray: Color   = color.dark_gray;
-pub const light_gray: Color  = color.light_gray;
-pub const transparent: Color = color.transparent;

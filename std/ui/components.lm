@@ -497,20 +497,16 @@ frame Spacer: Fluent {
 
 pub fn column(children: [any] = []): Container {
     var c = Container(true);
-    var i = 0;
-    while (i < len(children)) {
-        c.add(children[i] as Fluent);
-        i = i + 1;
+    iter (child in children) {
+        c.add(child as Fluent);
     }
     return c;
 }
 
 pub fn row(children: [any] = []): Container {
     var c = Container(false);
-    var i = 0;
-    while (i < len(children)) {
-        c.add(children[i] as Fluent);
-        i = i + 1;
+    iter (child in children) {
+        c.add(child as Fluent);
     }
     return c;
 }

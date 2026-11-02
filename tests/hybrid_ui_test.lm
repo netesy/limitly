@@ -8,6 +8,7 @@ import std.ui.draw_list as dlist;
 import std.ui.replay as replay;
 import std.app as app;
 import std.gg as gg;
+import std.color as color;
 
 fn main(): nil {
     print("=== Hybrid UI Pipeline Test ===");
@@ -16,7 +17,7 @@ fn main(): nil {
     // ── Phase 1: Declare widgets using the unchanged fluent API
     var save_btn = ui.button("Save").size(100.0, 32.0).on_click(fn(): nil { print("[Hybrid] Save clicked"); });
     var cancel_btn = ui.button("Cancel").size(100.0, 32.0).on_click(fn(): nil { print("[Hybrid] Cancel clicked"); });
-    var title = ui.text("Dashboard").font_size(24.0).color(ui.white);
+    var title = ui.text("Dashboard").font_size(24.0).color(color.white);
     
     var root = ui.column([
         title,

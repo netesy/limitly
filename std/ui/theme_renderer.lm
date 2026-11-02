@@ -57,7 +57,7 @@ pub fn get_button_bg_color(w: ui_types.Widget, theme: Theme): ui_types.Color {
         if (w.hover_style_val.has_bg) {
             return w.hover_style_val.bg;
         }
-        return ui_types.rgb(150, 200, 255);
+        return color.rgb(150, 200, 255);
     }
     return bg;
 }
@@ -69,5 +69,5 @@ pub fn get_input_border_color(w: ui_types.Widget, has_focus: bool, theme: Theme)
     } elif (w.is_hovered == 1) {
         return theme.colors.border;
     }
-    return ui_types.rgb(55, 60, 75);
+    return color.rgb(55, 60, 75);
 }

@@ -1312,7 +1312,7 @@ fn render_widget_node(w: ui.Widget, x: float, y: float, available_w: float, avai
             if (w.hover_style_val.has_bg) {
                 bg = w.hover_style_val.bg;
             } else {
-                bg = ui.rgb(150, 200, 255);
+                bg = color.rgb(150, 200, 255);
             }
         }
         var p = paint.Paint();

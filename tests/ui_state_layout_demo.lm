@@ -2,6 +2,7 @@
 // Demonstrates signals, computed values, effects, and responsive layout
 import std.app as app;
 import std.ui as ui;
+import std.color as color;
 
 fn main() {
     print("UI State & Layout Demo");
@@ -85,12 +86,12 @@ fn main() {
     // Grid layout example
     var grid_spec = ui.GridSpec(columns=3, col_gap=12.0, row_gap=12.0);
     var grid_items = [
-        ui.text("Item 1").background(ui.blue).padding(16.0),
-        ui.text("Item 2").background(ui.green).padding(16.0),
-        ui.text("Item 3").background(ui.red).padding(16.0),
-        ui.text("Item 4").background(ui.yellow).padding(16.0),
-        ui.text("Item 5").background(ui.indigo).padding(16.0),
-        ui.text("Item 6").background(ui.gray).padding(16.0)
+        ui.text("Item 1").background(color.blue).padding(16.0),
+        ui.text("Item 2").background(color.green).padding(16.0),
+        ui.text("Item 3").background(color.red).padding(16.0),
+        ui.text("Item 4").background(color.yellow).padding(16.0),
+        ui.text("Item 5").background(color.indigo).padding(16.0),
+        ui.text("Item 6").background(color.gray).padding(16.0)
     ];
 
     var grid_layout = ui.column([
@@ -100,8 +101,8 @@ fn main() {
 
     // Aspect ratio example
     var aspect_box = ui.text("16:9 Aspect Ratio")
-        .background(ui.indigo)
-        .foreground(ui.white)
+        .background(color.indigo)
+        .foreground(color.white)
         .padding(20.0)
         .aspect_ratio(16.0 / 9.0);
 

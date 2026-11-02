@@ -12,6 +12,7 @@
 import std.app as app;
 import std.ui as ui;
 import std.gg as gg;
+import std.color as color;
 
 fn test_button_callback() {
     print("Action callback executed successfully!");
@@ -19,7 +20,7 @@ fn test_button_callback() {
 
 fn test_fluent_text_styling(): int {
     var t = ui.text("Hello Lymar")
-        .color(ui.red)
+        .color(color.red)
         .font_size(24.0)
         .bold();
 
@@ -34,8 +35,8 @@ fn test_fluent_text_styling(): int {
 
 fn test_fluent_button_styling(): int {
     var btn = ui.button("Save", test_button_callback)
-        .background(ui.indigo)
-        .foreground(ui.white)
+        .background(color.indigo)
+        .foreground(color.white)
         .padding(14.0)
         .corner_radius(8.0)
         .size(160.0, 44.0);
@@ -76,8 +77,8 @@ fn test_layout_modifiers(): int {
 fn test_style_reuse_and_precedence(): int {
     // Define a reusable style
     var base_style = ui.style()
-        .background(ui.blue)
-        .foreground(ui.white)
+        .background(color.blue)
+        .foreground(color.white)
         .padding(10.0)
         .corner_radius(6.0)
         .font_size(16.0);
@@ -92,12 +93,12 @@ fn test_style_reuse_and_precedence(): int {
     assert(btn2.padding_left == 10.0, "btn2 base padding mismatch");
 
     // Test modifier override ordering: local modifier overrides style property (later wins)
-    btn2.background(ui.red).padding(18.0);
+    btn2.background(color.red).padding(18.0);
     assert(btn2.background_color.r > 0.8, "btn2 overridden background mismatch");
     assert(btn2.padding_left == 18.0, "btn2 overridden padding mismatch");
 
     // Test direct modifier override ordering: later direct modifier overrides earlier direct modifier
-    var t = ui.text("Test").color(ui.red).color(ui.green);
+    var t = ui.text("Test").color(color.red).color(color.green);
     assert(t.foreground_color.g > 0.7, "later modifier precedence failed");
 
     print("[PASS] 4. Reusable Style value and modifier precedence");
@@ -105,9 +106,9 @@ fn test_style_reuse_and_precedence(): int {
 }
 
 fn test_state_styling(): int {
-    var pressed_style = ui.style().background(ui.dark_gray).foreground(ui.yellow);
+    var pressed_style = ui.style().background(color.dark_gray).foreground(color.yellow);
     var btn = ui.button("Stateful")
-        .background(ui.blue)
+        .background(color.blue)
         .pressed(pressed_style);
 
     var ps = btn.pressed_style_val as ui.Style;
@@ -122,7 +123,7 @@ fn test_retained_lifecycle_and_callback(): int {
     assert(app.init(cfg) == 1, "app init failed");
 
     var btn = ui.button("Click Counter", test_button_callback)
-        .background(ui.rgb(40, 100, 200))
+        .background(color.rgb(40, 100, 200))
         .size(200.0, 40.0);
 
     var root = ui.column([btn]).padding(20.0);
@@ -161,11 +162,11 @@ fn test_retained_lifecycle_and_callback(): int {
 
 fn test_style_merge(): int {
     var s1 = ui.style()
-        .background(ui.red)
+        .background(color.red)
         .padding(10.0);
 
     var s2 = ui.style()
-        .foreground(ui.blue)
+        .foreground(color.blue)
         .corner_radius(6.0);
 
     var merged = s1.merge(s2);

@@ -4,7 +4,9 @@ import std.text.controller as text_ctrl;
 import std.animation as anim;
 import std.graphics.shadow as shadow;
 import std.ui.state as state;
+import std.color as color;
 pub import std.graphics.shadow show Shadow, shadow;
+pub import std.color show Color;
 
 // Widget identity enum: `==`/`match` on WidgetKind take the tag-compare
 // path lowered in the LIR generator, so dispatch is type-checked.
@@ -284,29 +286,6 @@ mixin Accessibility {
     pub var is_a11y_hidden: bool;
 }
 
-// ── Canonical Retained UI Color (Re-exported from std.color) ────────────────
-import std.color as color;
-pub import std.color show Color;
-
-pub fn rgb(r: int, g: int, b: int): Color { return color.rgb(r, g, b); }
-pub fn rgba(r: int, g: int, b: int, a: float): Color { return color.rgba(r, g, b, a); }
-pub fn hex(h: int): Color { return color.hex(h); }
-pub fn color_rgb(r: float, g: float, b: float): Color { return color.color_rgb(r, g, b); }
-pub fn color_rgba(r: float, g: float, b: float, a: float): Color { return color.color_rgba(r, g, b, a); }
-pub fn lerp(c1: Color, c2: Color, t: float): Color { return color.lerp(c1, c2, t); }
-
-pub const white: Color = color.white;
-pub const black: Color = color.black;
-pub const red: Color = color.red;
-pub const green: Color = color.green;
-pub const blue: Color = color.blue;
-pub const indigo: Color = color.indigo;
-pub const yellow: Color = color.yellow;
-pub const gray: Color = color.gray;
-pub const dark_gray: Color = color.dark_gray;
-pub const light_gray: Color = color.light_gray;
-pub const transparent: Color = color.transparent;
-
 // ── Widget Lifecycle States ──────────────────────────────────────────────────
 pub const LIFECYCLE_ENTERING = LifecycleState.Entering;
 pub const LIFECYCLE_ACTIVE = LifecycleState.Active;
@@ -500,9 +479,9 @@ frame Style {
 
     pub init() {
         self.has_bg = false;
-        self.bg = transparent;
+        self.bg = color.transparent;
         self.has_fg = false;
-        self.fg = white;
+        self.fg = color.white;
         self.has_padding = false;
         self.pad_l = 0.0;
         self.pad_t = 0.0;
@@ -698,8 +677,8 @@ frame Widget : WidgetTrait {
         self.text_val = "";
         self.on_click_action = nil;
         self.children = [] as [Widget];
-        self.foreground_color = white;
-        self.background_color = transparent;
+        self.foreground_color = color.white;
+        self.background_color = color.transparent;
         self.font_size_val = 14.0;
         self.font_weight_val = 400;
         self.padding_left = 0.0;
@@ -1014,7 +993,7 @@ frame Widget : WidgetTrait {
 pub fn text(content: str): Widget {
     var w = Widget(KIND_TEXT);
     w.text_val = content;
-    w.foreground_color = white;
+    w.foreground_color = color.white;
     return w;
 }
 
@@ -1022,8 +1001,8 @@ pub fn button(label: str, on_click: any = nil): Widget {
     var w = Widget(KIND_BUTTON);
     w.text_val = label;
     w.on_click_action = on_click;
-    w.background_color = blue;
-    w.foreground_color = white;
+    w.background_color = color.blue;
+    w.foreground_color = color.white;
     w.padding_left = 10.0;
     w.padding_top = 8.0;
     w.padding_right = 10.0;
@@ -1039,7 +1018,7 @@ pub fn textarea(content: str): Widget {
     w.text_editor_state = text_ctrl.EditorController(content);
     w.payload_role = Role.Text;
     w.focus_key = "ta_default";
-    w.foreground_color = white;
+    w.foreground_color = color.white;
     w.padding_left = 8.0;
     w.padding_top = 8.0;
     w.padding_right = 8.0;
@@ -1229,7 +1208,7 @@ pub fn select(options: [str], selected_idx: int = 0, on_change: any = nil): Widg
     w.on_change_action = on_change;
     w.is_open = 0;
     w.background_color = color.rgb(28, 30, 38);
-    w.foreground_color = white;
+    w.foreground_color = color.white;
     w.height_val = 28.0;
     w.width_val = 180.0;
     w.padding_left = 10.0;
@@ -1266,7 +1245,7 @@ pub fn table(headers: [str], rows: [[Widget]]): Widget {
     var w = Widget(KIND_TABLE);
     w.tab_titles = headers;
     w.background_color = color.rgb(24, 26, 34);
-    w.foreground_color = white;
+    w.foreground_color = color.white;
     w.text_editor_state = rows;
     w.payload_role = Role.Rows;
     return w;
@@ -1310,7 +1289,7 @@ pub fn accordion(title: str, content: Widget, default_open: bool = false): Widge
     w.children = [content];
     if (default_open) w.is_open = 1; else w.is_open = 0;
     w.background_color = color.rgb(28, 30, 40);
-    w.foreground_color = white;
+    w.foreground_color = color.white;
     return w;
 }
 
@@ -1354,7 +1333,7 @@ pub fn stat(title: str, value: str, desc: str = ""): Widget {
     w.placeholder_val = value;
     w.focus_key = desc;
     w.background_color = color.rgb(24, 26, 34);
-    w.foreground_color = white;
+    w.foreground_color = color.white;
     w.height_val = 70.0;
     w.width_val = 160.0;
     return w;
@@ -1406,7 +1385,7 @@ pub fn stepper(value: int = 0, step: int = 1, min_val: int = 0, max_val: int = 1
     w.height_val = 28.0;
     w.width_val = 120.0;
     w.background_color = color.rgb(28, 30, 38);
-    w.foreground_color = white;
+    w.foreground_color = color.white;
     return w;
 }
 
@@ -1414,7 +1393,7 @@ pub fn calendar(selected_date: str = "2025-01-01"): Widget {
     var w = Widget(KIND_CALENDAR);
     w.text_val = selected_date;
     w.background_color = color.rgb(24, 26, 34);
-    w.foreground_color = white;
+    w.foreground_color = color.white;
     w.height_val = 180.0;
     w.width_val = 220.0;
     return w;
@@ -1427,7 +1406,7 @@ pub fn toggle(enabled: bool = false, on_change: any = nil): Widget {
         w.foreground_color = color.rgb(80, 220, 130);
     } else {
         w.is_checked = 0;
-        w.foreground_color = gray;
+        w.foreground_color = color.gray;
     }
     w.background_color = color.rgb(35, 38, 48);
     w.height_val = 22.0;
@@ -1483,7 +1462,7 @@ pub fn tree_node(label: str, children: [Widget], default_open: bool = false): Wi
     } else {
         w.is_open = 0;
     }
-    w.foreground_color = white;
+    w.foreground_color = color.white;
     return w;
 }
 
@@ -1519,8 +1498,8 @@ pub fn list(items: [Widget]): Widget {
 pub fn badge(label: str): Widget {
     var w = Widget(KIND_BADGE);
     w.text_val = label;
-    w.background_color = blue;
-    w.foreground_color = white;
+    w.background_color = color.blue;
+    w.foreground_color = color.white;
     w.height_val = 20.0;
     w.corner_radius_val = 4.0;
     w.padding_left = 6.0;
@@ -1545,7 +1524,7 @@ pub fn file_input(label: str = "Choose File...", on_select: any = nil): Widget {
     w.text_val = label;
     w.on_change_action = on_select;
     w.background_color = color.rgb(35, 40, 52);
-    w.foreground_color = white;
+    w.foreground_color = color.white;
     w.height_val = 32.0;
     w.width_val = 220.0;
     return w;
@@ -1569,7 +1548,7 @@ pub fn toast_k(message: str, kind: AlertKind): Widget {
     w.alert_kind = kind;
     w.placeholder_val = alert_kind_name(kind);
     w.background_color = color.rgb(28, 30, 42);
-    w.foreground_color = white;
+    w.foreground_color = color.white;
     w.height_val = 36.0;
     w.width_val = 240.0;
     return w;
@@ -1581,7 +1560,7 @@ pub fn filter(query: str = "", placeholder: str = "Filter...", on_change: any = 
     w.placeholder_val = placeholder;
     w.on_change_action = on_change;
     w.background_color = color.rgb(20, 22, 28);
-    w.foreground_color = white;
+    w.foreground_color = color.white;
     w.height_val = 28.0;
     w.width_val = 180.0;
     return w;
@@ -1592,7 +1571,7 @@ pub fn card(title: str, content: Widget): Widget {
     w.text_val = title;
     w.children = [content];
     w.background_color = color.rgb(24, 26, 34);
-    w.foreground_color = white;
+    w.foreground_color = color.white;
     w.padding_left = 12.0;
     w.padding_top = 12.0;
     w.padding_right = 12.0;
@@ -1631,7 +1610,7 @@ pub fn text_area(value: str = "", placeholder: str = "Type here...", on_change: 
     w.text_editor_state = text_ctrl.EditorController(value);
     w.focus_key = "ta_default";
     w.background_color = color.rgb(20, 22, 28);
-    w.foreground_color = white;
+    w.foreground_color = color.white;
     w.height_val = 120.0;
     w.width_val = 300.0;
     w.padding_left = 8.0;
@@ -1742,7 +1721,7 @@ pub fn checkbox(checked: bool = false, on_change: any = nil): Widget {
     } else {
         w.is_checked = 0;
         w.text_val = "[ ]";
-        w.foreground_color = gray;
+        w.foreground_color = color.gray;
     }
     w.background_color = color.rgb(35, 38, 48);
     w.height_val = 26.0;
@@ -1789,7 +1768,7 @@ pub fn input(value: str = "", placeholder: str = "Type here...", on_change: any 
     w.placeholder_val = placeholder;
     w.on_change_action = on_change;
     w.background_color = color.rgb(20, 22, 28);
-    w.foreground_color = white;
+    w.foreground_color = color.white;
     w.height_val = 28.0;
     w.width_val = 220.0;
     w.padding_left = 8.0;
