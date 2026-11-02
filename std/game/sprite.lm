@@ -31,7 +31,7 @@ frame Sprite: gtraits.Drawable {
     pub var origin: types.Vec2;     // 0.0,0.0 = top-left; 0.5,0.5 = center
     pub var scale: types.Vec2;
     pub var rotation: float;        // in radians
-    pub var tint: types.Color;
+    pub var tint: color.Color;
     pub var flip_x: bool;
     pub var flip_y: bool;
 
@@ -79,7 +79,7 @@ frame Sprite: gtraits.Drawable {
         if (tint == nil) {
             self.tint = color.white;
         } else {
-            self.tint = tint as types.Color;
+            self.tint = tint as color.Color;
         }
 
         self.flip_x = false;
@@ -250,11 +250,10 @@ frame AnimatedSprite: gtraits.Updatable, gtraits.Drawable {
         self.is_playing = false;
     }
 
-    pub fn add_clip(clip: any): nil {
-        var c = clip as AnimationClip;
-        self.clips[c.name] = c;
+    pub fn add_clip(clip: AnimationClip): nil {
+        self.clips[clip.name] = clip;
         if (self.current_clip == "") {
-            self.current_clip = c.name;
+            self.current_clip = clip.name;
         }
     }
 

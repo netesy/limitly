@@ -3,6 +3,7 @@
 
 import std.game as game;
 import std.gg as gg;
+import std.color as color;
 
 fn test_primitives() {
  print("=== Testing std.game Types & Primitives ===");
@@ -13,7 +14,7 @@ fn test_primitives() {
  assert(r.contains(150.0, 120.0) == true, "Rect should contain point inside");
  assert(r.contains(50.0, 50.0) == false, "Rect should not contain point outside");
 
- var c = game.hex(0xff0000, 1.0);
+ var c = color.hex(0xff0000, 1.0);
  assert(c.r > 0.99, "Hex red extraction failed");
  print("[OK] Primitives passed");
 }

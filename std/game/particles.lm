@@ -12,8 +12,8 @@ frame Particle: gtraits.Updatable {
     pub var pos: types.Vec2;
     pub var vel: types.Vec2;
     pub var acc: types.Vec2;
-    pub var color_start: types.Color;
-    pub var color_end: types.Color;
+    pub var color_start: color.Color;
+    pub var color_end: color.Color;
     pub var size_start: float;
     pub var size_end: float;
     pub var life: float;
@@ -37,8 +37,8 @@ frame Particle: gtraits.Updatable {
         pos: types.Vec2,
         vel: types.Vec2,
         acc: types.Vec2,
-        c_start: types.Color,
-        c_end: types.Color,
+        c_start: color.Color,
+        c_end: color.Color,
         s_start: float,
         s_end: float,
         life_span: float
@@ -67,13 +67,13 @@ frame Particle: gtraits.Updatable {
         self.pos = self.pos.add(self.vel.scale(dt));
     }
 
-    pub fn current_color(): types.Color {
+    pub fn current_color(): color.Color {
         var t = 0.0;
         if (self.max_life > 0.0) {
             t = self.life / self.max_life;
         }
         if (t > 1.0) t = 1.0;
-        return types.Color(
+        return color.Color(
             r=self.color_start.r + (self.color_end.r - self.color_start.r) * t,
             g=self.color_start.g + (self.color_end.g - self.color_start.g) * t,
             b=self.color_start.b + (self.color_end.b - self.color_start.b) * t,
@@ -110,8 +110,8 @@ frame ParticleEmitter2D: gtraits.Updatable, gtraits.Drawable {
     pub var gravity: types.Vec2;
     pub var size_start: float;
     pub var size_end: float;
-    pub var color_start: types.Color;
-    pub var color_end: types.Color;
+    pub var color_start: color.Color;
+    pub var color_end: color.Color;
 
     // Seed state for deterministic fast random numbers
     pub var rng_state: int;
@@ -139,8 +139,8 @@ frame ParticleEmitter2D: gtraits.Updatable, gtraits.Drawable {
         self.gravity = types.Vec2(x=0.0, y=98.0);
         self.size_start = 6.0;
         self.size_end = 1.0;
-        self.color_start = types.hex(0xffd700, 1.0); // Gold
-        self.color_end = types.hex(0xff0044, 0.0);   // Fading red
+        self.color_start = color.hex(0xffd700, 1.0); // Gold
+        self.color_end = color.hex(0xff0044, 0.0);   // Fading red
 
         self.rng_state = 123456789;
     }
@@ -153,8 +153,8 @@ frame ParticleEmitter2D: gtraits.Updatable, gtraits.Drawable {
 
     fn spawn_one(): nil {
         var i = 0;
-        var spawned = false;
-        while (i < len(self.particles) and not spawned) {
+        var n = len(self.particles);
+        while (i < n) {
             var p = self.particles[i];
             if (not p.alive) {
                 var angle = self.angle_min + (self.angle_max - self.angle_min) * self.next_float();
@@ -172,7 +172,7 @@ frame ParticleEmitter2D: gtraits.Updatable, gtraits.Drawable {
                     self.size_end,
                     life
                 );
-                spawned = true;
+                return;
             }
             i = i + 1;
         }
@@ -197,7 +197,8 @@ frame ParticleEmitter2D: gtraits.Updatable, gtraits.Drawable {
         }
 
         var i = 0;
-        while (i < len(self.particles)) {
+        var n = len(self.particles);
+        while (i < n) {
             self.particles[i].update(dt);
             i = i + 1;
         }
@@ -205,7 +206,8 @@ frame ParticleEmitter2D: gtraits.Updatable, gtraits.Drawable {
 
     pub fn draw(camera: any = nil): nil {
         var i = 0;
-        while (i < len(self.particles)) {
+        var n = len(self.particles);
+        while (i < n) {
             var p = self.particles[i];
             if (p.alive) {
                 var screen_pos = p.pos;

@@ -11,14 +11,15 @@ import std.math as math;
 import std.game.gui show GUI;
 import std.game.types as types;
 import std.game.input show InputManager;
-import std.game.scene show SceneManager;
+import std.color as color;
+import std.game.scene show Scene, SceneManager;
 
 frame Config {
     pub var title: str;
     pub var width: int;
     pub var height: int;
     pub var resizable: bool;
-    pub var bg_color: types.Color;
+    pub var bg_color: color.Color;
     pub var fixed_dt: float;
 
     pub init(title: str = "Lymar Game", width: int = 800, height: int = 600, resizable: bool = true) {
@@ -26,7 +27,7 @@ frame Config {
         self.width = width;
         self.height = height;
         self.resizable = resizable;
-        self.bg_color = types.hex(0x1e1e24, 1.0);
+        self.bg_color = color.hex(0x1e1e24, 1.0);
         self.fixed_dt = 1.0 / 60.0;
     }
 }
@@ -209,11 +210,11 @@ frame Game {
     }
 
     // Scene state machine helpers
-    pub fn register_scene(name: str, sc: any): nil { self.scenes.register(name, sc); }
+    pub fn register_scene(name: str, sc: Scene): nil { self.scenes.register(name, sc); }
     pub fn switch_scene(name: str, transition_duration: float = 0.0): nil { self.scenes.switch_to(name, transition_duration); }
     pub fn push_scene(name: str): nil { self.scenes.push(name); }
-    pub fn pop_scene(): any { return self.scenes.pop(); }
-    pub fn current_scene(): any { return self.scenes.current(); }
+    pub fn pop_scene(): Scene | nil { return self.scenes.pop(); }
+    pub fn current_scene(): Scene | nil { return self.scenes.current(); }
 
     // Direct input query helpers
     pub fn is_key_down(key: int): bool { return self.input.is_key_down(key); }

@@ -7,7 +7,6 @@
 import std.math as math;
 import std.game.types as types;
 import std.color as color;
-pub import std.color show Color;
 
 frame WidgetState {
     embed types.Rect;

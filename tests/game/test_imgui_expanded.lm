@@ -5,6 +5,7 @@
 import std.gg as gg;
 import std.game.types as types;
 import std.game.gui as gui;
+import std.color as color;
 
 fn test_style_stack(): int {
  print("=== Test 1: Style Stack & Moddability ===");
@@ -15,7 +16,7 @@ fn test_style_stack(): int {
  assert(def_btn_c.r == ui.theme.btn_normal.r, "Default button color should match theme");
 
  // Push custom button color
- var custom_pink = types.hex(0xff007f, 1.0);
+ var custom_pink = color.hex(0xff007f, 1.0);
  ui.push_style_color(types.COLOR_BUTTON, custom_pink);
  var pushed_c = ui.get_style_color(types.COLOR_BUTTON);
  assert(pushed_c.r == custom_pink.r and pushed_c.g == custom_pink.g, "Pushed color should be returned");
@@ -98,7 +99,7 @@ fn test_extended_controls(): int {
 
  // 6. Color Picker & Swatch
  ui.begin(0.0, 0.0, false);
- var base_col = types.hex(0x336699, 1.0);
+ var base_col = color.hex(0x336699, 1.0);
  var picked_col = ui.color_picker("Player Color", base_col);
  assert(picked_col.r == base_col.r, "Color picker should return current color");
  ui.end();

@@ -1945,7 +1945,9 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
         for (const auto& arg : expr.arguments) arg_regs.push_back(emit_argument(*arg, arg_regs.size()));
         
         Reg result = allocate_register();
-        TypePtr object_type = member_expr->object->inferred_type;
+        TypePtr object_type = (dynamic_cast<LM::Frontend::AST::ThisExpr*>(member_expr->object.get()) && this_register_ != UINT32_MAX)
+            ? get_register_language_type(this_register_)
+            : member_expr->object->inferred_type;
         if (!object_type) {
             object_type = get_register_language_type(object_reg);
         }
@@ -2338,7 +2340,9 @@ Reg Generator::emit_assign_expr(LM::Frontend::AST::AssignExpr& expr) {
             std::string field_name = expr.member.value();
             
             // Get the type of the object to find the correct frame
-            TypePtr object_type = expr.object->inferred_type;
+            TypePtr object_type = (dynamic_cast<LM::Frontend::AST::ThisExpr*>(expr.object.get()) && this_register_ != UINT32_MAX)
+                ? get_register_language_type(this_register_)
+                : expr.object->inferred_type;
             TypePtr resolved_object_type = resolve_underlying_type(object_type);
             if (resolved_object_type && resolved_object_type->tag == TypeTag::Frame) {
                 auto frame_type_info = std::get_if<FrameType>(&resolved_object_type->extra);
@@ -2931,7 +2935,9 @@ Reg Generator::emit_member_access_with_obj(LM::Frontend::AST::MemberExpr& expr, 
     }
     
     // Get the type of the object to find the correct frame
-    TypePtr object_type = expr.object->inferred_type;
+    TypePtr object_type = (dynamic_cast<LM::Frontend::AST::ThisExpr*>(expr.object.get()) && this_register_ != UINT32_MAX)
+        ? get_register_language_type(this_register_)
+        : expr.object->inferred_type;
     TypePtr resolved_object_type = resolve_underlying_type(object_type);
     if (resolved_object_type && resolved_object_type->tag == TypeTag::Frame) {
         auto frame_type_info = std::get_if<FrameType>(&resolved_object_type->extra);

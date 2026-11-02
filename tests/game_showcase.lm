@@ -15,6 +15,7 @@
 
 import std.game as game;
 import std.game.types as types;
+import std.color as color;
 import std.gg as gg;
 
 fn main(): int {
@@ -28,7 +29,7 @@ fn main(): int {
     resizable = true
     );
     // Dark deep-space background
-    cfg.bg_color = types.hex(0x0b0d19, 1.0);
+    cfg.bg_color = color.hex(0x0b0d19, 1.0);
 
     var app = game.Game(cfg);
     if (not app.setup()) {
@@ -42,7 +43,7 @@ fn main(): int {
         // ── Game State ─────────────────────────────────────────────────────────────
         var ship_angle = 0.0;
         var ship_speed = 3.5;
-        var ship_color = types.hex(0x00f0ff, 1.0);
+        var ship_color = color.hex(0x00f0ff, 1.0);
 
         var health = 85.0;
         var shield = 65.0;
@@ -174,7 +175,7 @@ fn main(): int {
                                                 warp_drive = app.gui.toggle("Warp Drive", warp_drive);
 
                                                 app.gui.separator();
-                                                if (app.gui.button_colored("ENGAGE HYPERDRIVE", types.hex(0xff0055, 1.0), bar_w, 28.0)) {
+                                                if (app.gui.button_colored("ENGAGE HYPERDRIVE", color.hex(0xff0055, 1.0), bar_w, 28.0)) {
                                                     log_messages.append("[Hyperdrive] Micro - jump sequence initiated ! ");
                                                     }
 
@@ -272,7 +273,7 @@ fn main(): int {
                                                                                                             app.gui.label("Initiate thermal purge?");
                                                                                                             app.gui.spacing(8.0);
 
-                                                                                                            if (app.gui.button_colored("PURGE CORE", types.hex(0xee2222, 1.0), 120.0, 26.0)) {
+                                                                                                            if (app.gui.button_colored("PURGE CORE", color.hex(0xee2222, 1.0), 120.0, 26.0)) {
                                                                                                                 log_messages.append("[Purge] Core flushed ! Temp stabilized.");
                                                                                                                 app.gui.close_popup("AlertModal");
                                                                                                                 }

@@ -22,10 +22,7 @@ mixin State {
 }
 
 frame WindowState {
-    pub var x: float;
-    pub var y: float;
-    pub var w: float;
-    pub var h: float;
+    embed types.Rect;
     pub var collapsed: bool;
     pub var is_dragging: bool;
     pub var drag_off_x: float;

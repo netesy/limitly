@@ -4,6 +4,7 @@
 import std.math as math;
 import std.gg as gg;
 import std.game.types as types;
+import std.color as color;
 import std.game.traits as gtraits;
 
 // Transition modes
@@ -23,16 +24,16 @@ frame Scene: gtraits.Updatable {
     pub var is_paused: bool;
     pub var is_visible: bool;
 
-    // Optional functional callback delegates
-    pub var on_enter_cb: any;
-    pub var on_exit_cb: any;
-    pub var on_pause_cb: any;
-    pub var on_resume_cb: any;
-    pub var update_cb: any;
-    pub var fixed_update_cb: any;
-    pub var draw_cb: any;
-    pub var draw_gui_cb: any;
-    pub var on_event_cb: any;
+    // Optional functional callback delegates with type-safe signatures
+    pub var on_enter_cb: (fn(): nil)?;
+    pub var on_exit_cb: (fn(): nil)?;
+    pub var on_pause_cb: (fn(): nil)?;
+    pub var on_resume_cb: (fn(): nil)?;
+    pub var update_cb: (fn(float): nil)?;
+    pub var fixed_update_cb: (fn(float): nil)?;
+    pub var draw_cb: (fn(): nil)?;
+    pub var draw_gui_cb: (fn(): nil)?;
+    pub var on_event_cb: (fn(int, any, any): bool)?;
 
     pub init(name: str = "Scene") {
         self.name = name;
@@ -111,10 +112,6 @@ frame Scene: gtraits.Updatable {
     pub fn draw_gui(gui: any): nil {
         if (not self.is_visible) return;
         if (self.draw_gui_cb != nil) {
-            // The callback is stored as an opaque `any`, so invoking it with a
-            // managed argument has no provable ownership contract (E003).
-            // Mirror draw()'s nullary delegate: GUI-draw callbacks capture the
-            // gui themselves instead of receiving it through the opaque call.
             var cb = self.draw_gui_cb as fn(): nil;
             cb();
         }
@@ -147,7 +144,7 @@ frame SceneManager: gtraits.Updatable {
     pub var transition_timer: float;
     pub var transition_duration: float;
     pub var transition_alpha: float;
-    pub var transition_color: types.Color;
+    pub var transition_color: color.Color;
     pub var pending_scene_name: str;
 
     pub init() {
@@ -160,7 +157,7 @@ frame SceneManager: gtraits.Updatable {
         self.transition_timer = 0.0;
         self.transition_duration = 0.3;
         self.transition_alpha = 0.0;
-        self.transition_color = types.hex(0x000000, 1.0);
+        self.transition_color = color.hex(0x000000, 1.0);
         self.pending_scene_name = "";
     }
 
@@ -169,14 +166,14 @@ frame SceneManager: gtraits.Updatable {
         self.scenes[name] = s;
     }
 
-    pub fn get(name: str): any {
+    pub fn get(name: str): Scene | nil {
         if (self.scenes[name] != nil) {
             return self.scenes[name];
         }
         return nil;
     }
 
-    pub fn current(): any {
+    pub fn current(): Scene | nil {
         var n = len(self.stack);
         if (n == 0) return nil;
         return self.stack[n - 1];
@@ -192,16 +189,14 @@ frame SceneManager: gtraits.Updatable {
 
     // Direct scene switch
     fn _perform_switch(name: str): nil {
-        // Exit and clear entire current stack
         var i = len(self.stack) - 1;
         while (i >= 0) {
-            var old_s = self.stack[i] as Scene;
+            var old_s = self.stack[i];
             old_s.on_exit();
             i = i - 1;
         }
         self.stack = [] as [Scene];
 
-        // Push and enter new scene
         var next_s = self.get(name);
         if (next_s != nil) {
             var sc = next_s as Scene;
@@ -249,11 +244,11 @@ frame SceneManager: gtraits.Updatable {
     }
 
     // Modal pop: exits top scene, removes it, and resumes previously paused scene
-    pub fn pop(): any {
+    pub fn pop(): Scene | nil {
         var n = len(self.stack);
         if (n == 0) return nil;
 
-        var top = self.stack[n - 1] as Scene;
+        var top = self.stack[n - 1];
         top.on_exit();
 
         // Create new stack without top element
@@ -324,7 +319,7 @@ frame SceneManager: gtraits.Updatable {
         // Draw visible scenes in stack order (bottom to top)
         var i = 0;
         while (i < len(self.stack)) {
-            var sc = self.stack[i] as Scene;
+            var sc = self.stack[i];
             if (sc.is_visible) {
                 sc.draw();
             }
@@ -347,7 +342,7 @@ frame SceneManager: gtraits.Updatable {
     pub fn draw_gui(gui: any): nil {
         var i = 0;
         while (i < len(self.stack)) {
-            var sc = self.stack[i] as Scene;
+            var sc = self.stack[i];
             if (sc.is_visible) {
                 sc.draw_gui(gui);
             }
@@ -359,7 +354,7 @@ frame SceneManager: gtraits.Updatable {
         // Events route from top of stack down until handled
         var i = len(self.stack) - 1;
         while (i >= 0) {
-            var sc = self.stack[i] as Scene;
+            var sc = self.stack[i];
             if (sc.is_active and not sc.is_paused) {
                 if (sc.on_event(event_type, p1, p2)) {
                     return true;

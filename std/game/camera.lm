@@ -21,19 +21,9 @@ frame Camera2D: gtraits.Updatable {
     pub var shake_offset: types.Vec2;
     pub var shake_rotation: float;
 
-    pub init(target: any = nil, offset: any = nil, zoom: float = 1.0, rotation: float = 0.0) {
-        if (target == nil) {
-            self.target = types.Vec2(x=0.0, y=0.0);
-        } else {
-            self.target = target as types.Vec2;
-        }
-
-        if (offset == nil) {
-            self.offset = types.Vec2(x=0.0, y=0.0);
-        } else {
-            self.offset = offset as types.Vec2;
-        }
-
+    pub init(target: types.Vec2 = types.Vec2(), offset: types.Vec2 = types.Vec2(), zoom: float = 1.0, rotation: float = 0.0) {
+        self.target = target;
+        self.offset = offset;
         self.zoom = zoom;
         if (self.zoom <= 0.0) {
             self.zoom = 1.0;
@@ -53,10 +43,9 @@ frame Camera2D: gtraits.Updatable {
         self.offset = types.Vec2(x=width * 0.5, y=height * 0.5);
     }
 
-    pub fn screen_to_world(screen_pos: any): types.Vec2 {
-        var sp = screen_pos as types.Vec2;
+    pub fn screen_to_world(screen_pos: types.Vec2): types.Vec2 {
         var total_shake_rot = self.rotation + self.shake_rotation;
-        var p = sp.sub(self.offset).sub(self.shake_offset);
+        var p = screen_pos.sub(self.offset).sub(self.shake_offset);
         if (self.zoom != 0.0) {
             p = p.scale(1.0 / self.zoom);
         }
@@ -66,10 +55,9 @@ frame Camera2D: gtraits.Updatable {
         return p.add(self.target);
     }
 
-    pub fn world_to_screen(world_pos: any): types.Vec2 {
-        var wp = world_pos as types.Vec2;
+    pub fn world_to_screen(world_pos: types.Vec2): types.Vec2 {
         var total_shake_rot = self.rotation + self.shake_rotation;
-        var p = wp.sub(self.target);
+        var p = world_pos.sub(self.target);
         if (total_shake_rot != 0.0) {
             p = p.rotate(total_shake_rot);
         }
@@ -77,10 +65,9 @@ frame Camera2D: gtraits.Updatable {
         return p.add(self.offset).add(self.shake_offset);
     }
 
-    pub fn follow(target_pos: any, smoothness: float = 0.1, dt: float = 0.016): nil {
-        var tp = target_pos as types.Vec2;
+    pub fn follow(target_pos: types.Vec2, smoothness: float = 0.1, dt: float = 0.016): nil {
         var s = math.clamp(smoothness * dt * 60.0, 0.0, 1.0);
-        self.target = self.target.lerp(tp, s);
+        self.target = self.target.lerp(target_pos, s);
     }
 
     pub fn add_trauma(amount: float): nil {
@@ -110,15 +97,14 @@ frame Camera2D: gtraits.Updatable {
 
     // ── World-Space Primitive Drawing Helpers ─────────────────────────────────
 
-    pub fn draw_rect(world_rect: any, r: float, g: float, b: float, a: float): nil {
-        var wr = world_rect as types.Rect;
-        var screen_pos = self.world_to_screen(types.Vec2(x=wr.x, y=wr.y));
-        var sw = wr.w * self.zoom;
-        var sh = wr.h * self.zoom;
+    pub fn draw_rect(world_rect: types.Rect, r: float, g: float, b: float, a: float): nil {
+        var screen_pos = self.world_to_screen(types.Vec2(x=world_rect.x, y=world_rect.y));
+        var sw = world_rect.w * self.zoom;
+        var sh = world_rect.h * self.zoom;
         gg.draw_rect_primitive(screen_pos.x, screen_pos.y, sw, sh, r, g, b, a);
     }
 
-    pub fn draw_circle(world_center: any, radius: float, r: float, g: float, b: float, a: float, segments: int = 16): nil {
+    pub fn draw_circle(world_center: types.Vec2, radius: float, r: float, g: float, b: float, a: float, segments: int = 16): nil {
         var screen_center = self.world_to_screen(world_center);
         var sr = radius * self.zoom;
         var segs = segments;
@@ -137,7 +123,7 @@ frame Camera2D: gtraits.Updatable {
         }
     }
 
-    pub fn draw_line(p1: any, p2: any, thickness: float, r: float, g: float, b: float, a: float): nil {
+    pub fn draw_line(p1: types.Vec2, p2: types.Vec2, thickness: float, r: float, g: float, b: float, a: float): nil {
         var sp1 = self.world_to_screen(p1);
         var sp2 = self.world_to_screen(p2);
         var diff = sp2.sub(sp1);
@@ -155,6 +141,6 @@ frame Camera2D: gtraits.Updatable {
     }
 }
 
-pub fn Camera(target: any = nil, offset: any = nil, zoom: float = 1.0): Camera2D {
+pub fn Camera(target: types.Vec2 = types.Vec2(), offset: types.Vec2 = types.Vec2(), zoom: float = 1.0): Camera2D {
     return Camera2D(target=target, offset=offset, zoom=zoom);
 }

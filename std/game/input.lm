@@ -221,12 +221,11 @@ frame InputManager {
 
     pub fn on_key_down(key: int): nil {
         var already_down = false;
-        var i = 0;
-        while (i < len(self.keys_down)) {
-            if (self.keys_down[i] == key) {
+        iter (k in self.keys_down) {
+            if (k == key) {
                 already_down = true;
+                break;
             }
-            i = i + 1;
         }
 
         if (not already_down) {
@@ -248,15 +247,13 @@ frame InputManager {
 
     pub fn on_key_up(key: int): nil {
         var new_keys: [int] = [];
-        var i = 0;
         var was_down = false;
-        while (i < len(self.keys_down)) {
-            if (self.keys_down[i] == key) {
+        iter (k in self.keys_down) {
+            if (k == key) {
                 was_down = true;
             } else {
-                new_keys.append(self.keys_down[i]);
+                new_keys.append(k);
             }
-            i = i + 1;
         }
         self.keys_down = new_keys;
 
@@ -283,34 +280,22 @@ frame InputManager {
     // ── Direct Queries ─────────────────────────────────────────────────────────
 
     pub fn is_key_down(key: int): bool {
-        var i = 0;
-        while (i < len(self.keys_down)) {
-            if (self.keys_down[i] == key) {
-                return true;
-            }
-            i = i + 1;
+        iter (k in self.keys_down) {
+            if (k == key) { return true; }
         }
         return false;
     }
 
     pub fn is_key_pressed(key: int): bool {
-        var i = 0;
-        while (i < len(self.keys_pressed)) {
-            if (self.keys_pressed[i] == key) {
-                return true;
-            }
-            i = i + 1;
+        iter (k in self.keys_pressed) {
+            if (k == key) { return true; }
         }
         return false;
     }
 
     pub fn is_key_released(key: int): bool {
-        var i = 0;
-        while (i < len(self.keys_released)) {
-            if (self.keys_released[i] == key) {
-                return true;
-            }
-            i = i + 1;
+        iter (k in self.keys_released) {
+            if (k == key) { return true; }
         }
         return false;
     }
@@ -353,12 +338,10 @@ frame InputManager {
     pub fn is_action_down(action_name: str): bool {
         var keys = self.actions[action_name];
         if (keys == nil) { return false; }
-        var i = 0;
-        while (i < len(keys)) {
-            if (self.is_key_down(keys[i])) {
+        iter (k in keys) {
+            if (self.is_key_down(k)) {
                 return true;
             }
-            i = i + 1;
         }
         return false;
     }
@@ -366,12 +349,10 @@ frame InputManager {
     pub fn is_action_pressed(action_name: str): bool {
         var keys = self.actions[action_name];
         if (keys == nil) { return false; }
-        var i = 0;
-        while (i < len(keys)) {
-            if (self.is_key_pressed(keys[i])) {
+        iter (k in keys) {
+            if (self.is_key_pressed(k)) {
                 return true;
             }
-            i = i + 1;
         }
         return false;
     }
@@ -379,12 +360,10 @@ frame InputManager {
     pub fn is_action_released(action_name: str): bool {
         var keys = self.actions[action_name];
         if (keys == nil) { return false; }
-        var i = 0;
-        while (i < len(keys)) {
-            if (self.is_key_released(keys[i])) {
+        iter (k in keys) {
+            if (self.is_key_released(k)) {
                 return true;
             }
-            i = i + 1;
         }
         return false;
     }

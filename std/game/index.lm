@@ -1,90 +1,81 @@
 // std/game/index.lm
 // Clean unified standard library facade for std.game
 
-import std.game.types;
-import std.game.math;
-import std.game.input;
-import std.game.camera;
-import std.game.sprite;
-import std.game.particles;
+import std.game.types as types;
+import std.game.input as input_mod;
+
+pub import std.game.types show
+    Vec2, vec2,
+    Rect, rect,
+    ColorRole, StyleVar,
+    GUITheme, default_theme, dark_theme, light_theme, cyberpunk_theme, retro_theme;
+
+pub import std.game.math show
+    Circle, circle,
+    Ray2D, ray2d,
+    Contact2D, RayHit2D,
+    test_aabb_aabb, test_circle_circle, test_circle_aabb,
+    raycast_aabb, raycast_circle;
+
+pub import std.game.camera show
+    Camera2D, Camera;
+
+pub import std.game.sprite show
+    Texture2D, texture2d,
+    Sprite, sprite,
+    SpriteSheet, AnimationClip, AnimatedSprite;
+
+pub fn Texture(id: int = -1, width: int = 0, height: int = 0): Texture2D {
+    return Texture2D(id=id, width=width, height=height);
+}
+
+pub import std.game.particles show
+    Particle, ParticleEmitter2D, ParticleEmitter;
+
+pub import std.game.input show
+    InputManager;
+
+pub const KEY_SPACE: int         = input_mod.KEY_SPACE;
+pub const KEY_ENTER: int         = input_mod.KEY_ENTER;
+pub const KEY_ESCAPE: int        = input_mod.KEY_ESCAPE;
+pub const KEY_LEFT: int          = input_mod.KEY_LEFT;
+pub const KEY_RIGHT: int         = input_mod.KEY_RIGHT;
+pub const KEY_UP: int            = input_mod.KEY_UP;
+pub const KEY_DOWN: int          = input_mod.KEY_DOWN;
+pub const KEY_W: int             = input_mod.KEY_W;
+pub const KEY_A: int             = input_mod.KEY_A;
+pub const KEY_S: int             = input_mod.KEY_S;
+pub const KEY_D: int             = input_mod.KEY_D;
+pub const KEY_F: int             = input_mod.KEY_F;
+pub const KEY_H: int             = input_mod.KEY_H;
+pub const KEY_F3: int            = input_mod.KEY_F3;
+pub const KEY_TAB: int           = input_mod.KEY_TAB;
+pub const KEY_BACKSPACE: int     = input_mod.KEY_BACKSPACE;
+
+pub const MOUSE_LEFT: int        = input_mod.MOUSE_LEFT;
+pub const MOUSE_RIGHT: int       = input_mod.MOUSE_RIGHT;
+pub const MOUSE_MIDDLE: int      = input_mod.MOUSE_MIDDLE;
+
+pub const MOD_SHIFT: int         = input_mod.MOD_SHIFT;
+pub const MOD_CONTROL: int       = input_mod.MOD_CONTROL;
+pub const MOD_ALT: int           = input_mod.MOD_ALT;
+pub const MOD_SUPER: int         = input_mod.MOD_SUPER;
+
+pub const MOD_NONE: int          = 0;
+pub const MOD_CTRL: int          = input_mod.MOD_CONTROL;
+
+pub const KEY_MOD_NONE: int      = 0;
+pub const KEY_MOD_SHIFT: int     = input_mod.MOD_SHIFT;
+pub const KEY_MOD_CTRL: int      = input_mod.MOD_CONTROL;
+pub const KEY_MOD_CONTROL: int   = input_mod.MOD_CONTROL;
+pub const KEY_MOD_ALT: int       = input_mod.MOD_ALT;
+pub const KEY_MOD_SUPER: int     = input_mod.MOD_SUPER;
+
 pub import std.game.gui show GUI, default_gui;
 pub import std.game.components show WidgetState, Transform2D;
-pub import std.game.types show Vec2, Rect, ColorRole, StyleVar;
-pub import std.game.scene show Scene, SceneManager, default_scene_manager, TRANSITION_NONE, TRANSITION_FADE;
-pub import std.game.app show Config, Game;
+pub import std.game.scene show Scene, scene, SceneManager, default_scene_manager, TRANSITION_NONE, TRANSITION_FADE;
+pub import std.game.app show Config, default_config, Game;
 pub import std.graphics.shadow show Shadow, shadow;
-
-// ── Types & Math ───────────────────────────────────────────────────────────
-pub fn Vec2(x: float = 0.0, y: float = 0.0): types.Vec2 {
-    return types.Vec2(x=x, y=y);
-}
-pub fn vec2(x: float, y: float): types.Vec2 {
-    return types.Vec2(x=x, y=y);
-}
-
-pub fn Rect(x: float = 0.0, y: float = 0.0, w: float = 0.0, h: float = 0.0): types.Rect {
-    return types.Rect(x=x, y=y, w=w, h=h);
-}
-pub fn rect(x: float, y: float, w: float, h: float): types.Rect {
-    return types.Rect(x=x, y=y, w=w, h=h);
-}
-
-pub fn Circle(center: any = nil, radius: float = 10.0): math.Circle {
-    return math.Circle(center=center, radius=radius);
-}
-pub fn circle(center: any = nil, radius: float = 10.0): math.Circle {
-    return math.Circle(center=center, radius=radius);
-}
-
-pub fn Ray2D(origin: any = nil, direction: any = nil): math.Ray2D {
-    return math.Ray2D(origin=origin, direction=direction);
-}
-pub fn ray2d(origin: any = nil, direction: any = nil): math.Ray2D {
-    return math.Ray2D(origin=origin, direction=direction);
-}
-
-// Collision functions
-pub fn test_aabb_aabb(a: any, b: any): math.Contact2D {
-    return math.test_aabb_aabb(a, b);
-}
-pub fn test_circle_circle(a: any, b: any): math.Contact2D {
-    return math.test_circle_circle(a, b);
-}
-pub fn test_circle_aabb(c: any, b: any): math.Contact2D {
-    return math.test_circle_aabb(c, b);
-}
-pub fn raycast_aabb(ray: any, b: any, max_dist: float = 10000.0): math.RayHit2D {
-    return math.raycast_aabb(ray, b, max_dist);
-}
-pub fn raycast_circle(ray: any, c: any, max_dist: float = 10000.0): math.RayHit2D {
-    return math.raycast_circle(ray, c, max_dist);
-}
-
-// Colors & Themes
-import std.color as color;
-pub import std.color show Color;
-
-pub fn Color(r: float = 0.0, g: float = 0.0, b: float = 0.0, a: float = 1.0): Color {
-    return color.Color(r=r, g=g, b=b, a=a);
-}
-pub fn rgb(r: int, g: int, b: int): Color {
-    return color.rgb(r, g, b);
-}
-pub fn rgba(r: int, g: int, b: int, a: float): Color {
-    return color.rgba(r, g, b, a);
-}
-pub fn hex(c: int, a: float = 1.0): Color {
-    return color.hex(c, a);
-}
-
-pub fn GUITheme(): types.GUITheme {
-    return types.GUITheme();
-}
-pub var default_theme: types.GUITheme = types.default_theme();
-pub fn dark_theme(): types.GUITheme { return types.dark_theme(); }
-pub fn light_theme(): types.GUITheme { return types.light_theme(); }
-pub fn cyberpunk_theme(): types.GUITheme { return types.cyberpunk_theme(); }
-pub fn retro_theme(): types.GUITheme { return types.retro_theme(); }
 
 // Style Color Indices
 pub const COLOR_WINDOW_BG: int       = types.COLOR_WINDOW_BG;
@@ -115,116 +106,7 @@ pub const VAR_SPACING: int           = types.VAR_SPACING;
 pub const VAR_ITEM_HEIGHT: int       = types.VAR_ITEM_HEIGHT;
 pub const VAR_ROUNDING: int          = types.VAR_ROUNDING;
 
-// Built-in Colors
-pub const white: Color = color.white;
-pub const black: Color = color.black;
-pub const transparent: Color = color.transparent;
-pub const red: Color = color.red;
-pub const green: Color = color.green;
-pub const blue: Color = color.blue;
-pub const yellow: Color = color.yellow;
-pub const cyan: Color = color.cyan;
-
-// ── 2D Camera ──────────────────────────────────────────────────────────────
-pub fn Camera(target: any = nil, offset: any = nil, zoom: float = 1.0): camera.Camera2D {
-    return camera.Camera2D(target=target, offset=offset, zoom=zoom);
-}
-pub fn Camera2D(target: any = nil, offset: any = nil, zoom: float = 1.0, rotation: float = 0.0): camera.Camera2D {
-    return camera.Camera2D(target=target, offset=offset, zoom=zoom, rotation=rotation);
-}
-
-// ── Sprites & Animation ───────────────────────────────────────────────────
-pub fn Texture(id: int = -1, width: int = 0, height: int = 0): sprite.Texture2D {
-    return sprite.Texture2D(id=id, width=width, height=height);
-}
-pub fn Sprite(
-    texture: any = nil,
-    position: any = nil,
-    src_rect: any = nil,
-    origin: any = nil,
-    scale: any = nil,
-    rotation: float = 0.0,
-    tint: any = nil
-): sprite.Sprite {
-    return sprite.Sprite(
-        texture=texture,
-        position=position,
-        src_rect=src_rect,
-        origin=origin,
-        scale=scale,
-        rotation=rotation,
-        tint=tint
-    );
-}
-pub fn SpriteSheet(texture: any = nil, cell_w: int = 16, cell_h: int = 16): sprite.SpriteSheet {
-    return sprite.SpriteSheet(texture=texture, cell_w=cell_w, cell_h=cell_h);
-}
-pub fn AnimationClip(name: str = "", frames: any = nil, fps: float = 10.0, loop: bool = true): sprite.AnimationClip {
-    return sprite.AnimationClip(name=name, frames=frames, fps=fps, loop=loop);
-}
-pub fn AnimatedSprite(texture: any = nil, position: any = nil): sprite.AnimatedSprite {
-    return sprite.AnimatedSprite(texture=texture, position=position);
-}
-
-// ── Particles ─────────────────────────────────────────────────────────────
-pub fn ParticleEmitter(max_count: int = 150): particles.ParticleEmitter2D {
-    return particles.ParticleEmitter2D(max_count=max_count);
-}
-pub fn ParticleEmitter2D(max_count: int = 150): particles.ParticleEmitter2D {
-    return particles.ParticleEmitter2D(max_count=max_count);
-}
-
-// ── Input System ──────────────────────────────────────────────────────────
-pub fn InputManager(): input.InputManager {
-    return input.InputManager();
-}
-
-// Key constants
-pub const KEY_SPACE: int         = input.KEY_SPACE;
-pub const KEY_ENTER: int         = input.KEY_ENTER;
-pub const KEY_ESCAPE: int        = input.KEY_ESCAPE;
-pub const KEY_LEFT: int          = input.KEY_LEFT;
-pub const KEY_RIGHT: int         = input.KEY_RIGHT;
-pub const KEY_UP: int            = input.KEY_UP;
-pub const KEY_DOWN: int          = input.KEY_DOWN;
-pub const KEY_W: int             = input.KEY_W;
-pub const KEY_A: int             = input.KEY_A;
-pub const KEY_S: int             = input.KEY_S;
-pub const KEY_D: int             = input.KEY_D;
-pub const KEY_F: int             = input.KEY_F;
-pub const KEY_H: int             = input.KEY_H;
-pub const KEY_F3: int            = input.KEY_F3;
-pub const KEY_TAB: int           = input.KEY_TAB;
-pub const KEY_BACKSPACE: int     = input.KEY_BACKSPACE;
-
-pub const MOUSE_LEFT: int        = input.MOUSE_LEFT;
-pub const MOUSE_RIGHT: int       = input.MOUSE_RIGHT;
-pub const MOUSE_MIDDLE: int      = input.MOUSE_MIDDLE;
-
-// Key Modifiers
-pub const KEY_MOD_NONE: int      = 0;
-pub const KEY_MOD_SHIFT: int     = input.MOD_SHIFT;
-pub const KEY_MOD_CTRL: int      = input.MOD_CONTROL;
-pub const KEY_MOD_CONTROL: int   = input.MOD_CONTROL;
-pub const KEY_MOD_ALT: int       = input.MOD_ALT;
-pub const KEY_MOD_SUPER: int     = input.MOD_SUPER;
-
-pub const MOD_NONE: int          = 0;
-pub const MOD_SHIFT: int         = input.MOD_SHIFT;
-pub const MOD_CTRL: int          = input.MOD_CONTROL;
-pub const MOD_CONTROL: int       = input.MOD_CONTROL;
-pub const MOD_ALT: int           = input.MOD_ALT;
-pub const MOD_SUPER: int         = input.MOD_SUPER;
-pub var input: input.InputManager = input.default_input;
-
-// ── IMGUI Engine ───────────────────────────────────────────────────────────
+// Default Singletons
+pub var input: input_mod.InputManager = input_mod.default_input;
 pub var gui: GUI = default_gui;
-
-// ── Scene State Machine ────────────────────────────────────────────────────
-pub fn scene(name: str = "Scene"): Scene {
-    return Scene(name=name);
-}
 pub var scenes: SceneManager = default_scene_manager;
-
-// ── Modern Embedded Widget State ───────────────────────────────────────────
-pub import std.game.components show WidgetState, Transform2D;

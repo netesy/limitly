@@ -47,7 +47,7 @@ frame Vec2 {
     }
 
     pub fn mag(): float {
-        return math.sqrt(self.mag_sq());
+        return math.sqrt(self.x * self.x + self.y * self.y);
     }
 
     pub fn length(): float {
@@ -187,34 +187,8 @@ pub fn rect(x: float, y: float, w: float, h: float): Rect {
     return Rect(x=x, y=y, w=w, h=h);
 }
 
-// ── Canonical Game Color (Re-exported from std.color) ─────────────────────────
+// ── Canonical Game Color ───────────────────────────────────────────────────
 import std.color as color;
-pub import std.color show Color;
-
-pub fn rgb(r: int, g: int, b: int): Color {
-    return color.rgb(r, g, b);
-}
-
-pub fn rgba(r: int, g: int, b: int, a: float): Color {
-    return color.rgba(r, g, b, a);
-}
-
-pub fn hex(c: int, a: float = 1.0): Color {
-    return color.hex(c, a);
-}
-
-pub fn lerp(c1: Color, c2: Color, t: float): Color {
-    return color.lerp(c1, c2, t);
-}
-
-pub const white: Color = color.white;
-pub const black: Color = color.black;
-pub const transparent: Color = color.transparent;
-pub const red: Color = color.red;
-pub const green: Color = color.green;
-pub const blue: Color = color.blue;
-pub const yellow: Color = color.yellow;
-pub const cyan: Color = color.cyan;
 
 // Style Color Role Enum
 enum ColorRole {
@@ -318,28 +292,28 @@ pub fn style_var_from_index(idx: int): StyleVar {
 }
 
 frame GUITheme {
-    pub var bg_window: Color;
-    pub var bg_window_title: Color;
-    pub var bg_panel: Color;
-    pub var text: Color;
-    pub var text_muted: Color;
-    pub var accent: Color;
-    pub var btn_normal: Color;
-    pub var btn_hover: Color;
-    pub var btn_active: Color;
-    pub var slider_track: Color;
-    pub var slider_thumb: Color;
-    pub var slider_thumb_hover: Color;
-    pub var checkbox_border: Color;
-    pub var checkbox_check: Color;
-    pub var separator: Color;
-    pub var frame_bg: Color;
-    pub var frame_bg_hover: Color;
-    pub var frame_bg_active: Color;
-    pub var tab_normal: Color;
-    pub var tab_active: Color;
-    pub var plot_lines: Color;
-    pub var plot_histogram: Color;
+    pub var bg_window: color.Color;
+    pub var bg_window_title: color.Color;
+    pub var bg_panel: color.Color;
+    pub var text: color.Color;
+    pub var text_muted: color.Color;
+    pub var accent: color.Color;
+    pub var btn_normal: color.Color;
+    pub var btn_hover: color.Color;
+    pub var btn_active: color.Color;
+    pub var slider_track: color.Color;
+    pub var slider_thumb: color.Color;
+    pub var slider_thumb_hover: color.Color;
+    pub var checkbox_border: color.Color;
+    pub var checkbox_check: color.Color;
+    pub var separator: color.Color;
+    pub var frame_bg: color.Color;
+    pub var frame_bg_hover: color.Color;
+    pub var frame_bg_active: color.Color;
+    pub var tab_normal: color.Color;
+    pub var tab_active: color.Color;
+    pub var plot_lines: color.Color;
+    pub var plot_histogram: color.Color;
     pub var padding: float;
     pub var spacing: float;
     pub var item_height: float;
@@ -355,28 +329,28 @@ frame GUITheme {
 
     pub init() {
         // Modern game engine slate/dark palette
-        self.bg_window          = hex(0x181a1f, 0.95);
-        self.bg_window_title    = hex(0x21252b, 1.0);
-        self.bg_panel           = hex(0x282c34, 0.90);
-        self.text               = hex(0xabb2bf, 1.0);
-        self.text_muted         = hex(0x5c6370, 1.0);
-        self.accent             = hex(0x61afef, 1.0);
-        self.btn_normal         = hex(0x2c313a, 1.0);
-        self.btn_hover          = hex(0x3e4451, 1.0);
-        self.btn_active         = hex(0x4b5263, 1.0);
-        self.slider_track       = hex(0x1e2227, 1.0);
-        self.slider_thumb       = hex(0x61afef, 1.0);
-        self.slider_thumb_hover = hex(0x98c379, 1.0);
-        self.checkbox_border    = hex(0x4b5263, 1.0);
-        self.checkbox_check     = hex(0x98c379, 1.0);
-        self.separator          = hex(0x3e4451, 0.6);
-        self.frame_bg           = hex(0x21252b, 1.0);
-        self.frame_bg_hover     = hex(0x2c313a, 1.0);
-        self.frame_bg_active    = hex(0x3e4451, 1.0);
-        self.tab_normal         = hex(0x21252b, 1.0);
-        self.tab_active         = hex(0x61afef, 1.0);
-        self.plot_lines         = hex(0x98c379, 1.0);
-        self.plot_histogram     = hex(0xe5c07b, 1.0);
+        self.bg_window          = color.hex(0x181a1f, 0.95);
+        self.bg_window_title    = color.hex(0x21252b, 1.0);
+        self.bg_panel           = color.hex(0x282c34, 0.90);
+        self.text               = color.hex(0xabb2bf, 1.0);
+        self.text_muted         = color.hex(0x5c6370, 1.0);
+        self.accent             = color.hex(0x61afef, 1.0);
+        self.btn_normal         = color.hex(0x2c313a, 1.0);
+        self.btn_hover          = color.hex(0x3e4451, 1.0);
+        self.btn_active         = color.hex(0x4b5263, 1.0);
+        self.slider_track       = color.hex(0x1e2227, 1.0);
+        self.slider_thumb       = color.hex(0x61afef, 1.0);
+        self.slider_thumb_hover = color.hex(0x98c379, 1.0);
+        self.checkbox_border    = color.hex(0x4b5263, 1.0);
+        self.checkbox_check     = color.hex(0x98c379, 1.0);
+        self.separator          = color.hex(0x3e4451, 0.6);
+        self.frame_bg           = color.hex(0x21252b, 1.0);
+        self.frame_bg_hover     = color.hex(0x2c313a, 1.0);
+        self.frame_bg_active    = color.hex(0x3e4451, 1.0);
+        self.tab_normal         = color.hex(0x21252b, 1.0);
+        self.tab_active         = color.hex(0x61afef, 1.0);
+        self.plot_lines         = color.hex(0x98c379, 1.0);
+        self.plot_histogram     = color.hex(0xe5c07b, 1.0);
         self.padding            = 10.0;
         self.spacing            = 6.0;
         self.item_height        = 24.0;
@@ -402,82 +376,82 @@ pub fn dark_theme(): GUITheme {
 
 pub fn light_theme(): GUITheme {
     var t = GUITheme();
-    t.bg_window          = hex(0xf0f2f5, 0.98);
-    t.bg_window_title    = hex(0xdde1e6, 1.0);
-    t.bg_panel           = hex(0xffffff, 1.0);
-    t.text               = hex(0x161616, 1.0);
-    t.text_muted         = hex(0x6f6f6f, 1.0);
-    t.accent             = hex(0x0f62fe, 1.0);
-    t.btn_normal         = hex(0xe0e0e0, 1.0);
-    t.btn_hover          = hex(0xd1d1d1, 1.0);
-    t.btn_active         = hex(0x0f62fe, 1.0);
-    t.slider_track       = hex(0xd0d0d0, 1.0);
-    t.slider_thumb       = hex(0x0f62fe, 1.0);
-    t.slider_thumb_hover = hex(0x0043ce, 1.0);
-    t.checkbox_border    = hex(0x8d8d8d, 1.0);
-    t.checkbox_check     = hex(0x0f62fe, 1.0);
-    t.separator          = hex(0xc6c6c6, 0.8);
-    t.frame_bg           = hex(0xffffff, 1.0);
-    t.frame_bg_hover     = hex(0xebebeb, 1.0);
-    t.frame_bg_active    = hex(0xdddddd, 1.0);
-    t.tab_normal         = hex(0xe0e0e0, 1.0);
-    t.tab_active         = hex(0x0f62fe, 1.0);
-    t.plot_lines         = hex(0x198038, 1.0);
-    t.plot_histogram     = hex(0x0f62fe, 1.0);
+    t.bg_window          = color.hex(0xf0f2f5, 0.98);
+    t.bg_window_title    = color.hex(0xdde1e6, 1.0);
+    t.bg_panel           = color.hex(0xffffff, 1.0);
+    t.text               = color.hex(0x161616, 1.0);
+    t.text_muted         = color.hex(0x6f6f6f, 1.0);
+    t.accent             = color.hex(0x0f62fe, 1.0);
+    t.btn_normal         = color.hex(0xe0e0e0, 1.0);
+    t.btn_hover          = color.hex(0xd1d1d1, 1.0);
+    t.btn_active         = color.hex(0x0f62fe, 1.0);
+    t.slider_track       = color.hex(0xd0d0d0, 1.0);
+    t.slider_thumb       = color.hex(0x0f62fe, 1.0);
+    t.slider_thumb_hover = color.hex(0x0043ce, 1.0);
+    t.checkbox_border    = color.hex(0x8d8d8d, 1.0);
+    t.checkbox_check     = color.hex(0x0f62fe, 1.0);
+    t.separator          = color.hex(0xc6c6c6, 0.8);
+    t.frame_bg           = color.hex(0xffffff, 1.0);
+    t.frame_bg_hover     = color.hex(0xebebeb, 1.0);
+    t.frame_bg_active    = color.hex(0xdddddd, 1.0);
+    t.tab_normal         = color.hex(0xe0e0e0, 1.0);
+    t.tab_active         = color.hex(0x0f62fe, 1.0);
+    t.plot_lines         = color.hex(0x198038, 1.0);
+    t.plot_histogram     = color.hex(0x0f62fe, 1.0);
     return t;
 }
 
 pub fn cyberpunk_theme(): GUITheme {
     var t = GUITheme();
-    t.bg_window          = hex(0x0d0d1a, 0.95);
-    t.bg_window_title    = hex(0x160033, 1.0);
-    t.bg_panel           = hex(0x180040, 0.90);
-    t.text               = hex(0x00f0ff, 1.0);
-    t.text_muted         = hex(0x7928ca, 1.0);
-    t.accent             = hex(0xff0055, 1.0);
-    t.btn_normal         = hex(0x220055, 1.0);
-    t.btn_hover          = hex(0xff007f, 1.0);
-    t.btn_active         = hex(0x00f0ff, 1.0);
-    t.slider_track       = hex(0x1a0033, 1.0);
-    t.slider_thumb       = hex(0xff0055, 1.0);
-    t.slider_thumb_hover = hex(0x00f0ff, 1.0);
-    t.checkbox_border    = hex(0xff0055, 1.0);
-    t.checkbox_check     = hex(0x00f0ff, 1.0);
-    t.separator          = hex(0xff007f, 0.6);
-    t.frame_bg           = hex(0x160033, 1.0);
-    t.frame_bg_hover     = hex(0x2a0066, 1.0);
-    t.frame_bg_active    = hex(0x3a0088, 1.0);
-    t.tab_normal         = hex(0x220055, 1.0);
-    t.tab_active         = hex(0xff0055, 1.0);
-    t.plot_lines         = hex(0x00f0ff, 1.0);
-    t.plot_histogram     = hex(0xff0055, 1.0);
+    t.bg_window          = color.hex(0x0d0d1a, 0.95);
+    t.bg_window_title    = color.hex(0x160033, 1.0);
+    t.bg_panel           = color.hex(0x180040, 0.90);
+    t.text               = color.hex(0x00f0ff, 1.0);
+    t.text_muted         = color.hex(0x7928ca, 1.0);
+    t.accent             = color.hex(0xff0055, 1.0);
+    t.btn_normal         = color.hex(0x220055, 1.0);
+    t.btn_hover          = color.hex(0xff007f, 1.0);
+    t.btn_active         = color.hex(0x00f0ff, 1.0);
+    t.slider_track       = color.hex(0x1a0033, 1.0);
+    t.slider_thumb       = color.hex(0xff0055, 1.0);
+    t.slider_thumb_hover = color.hex(0x00f0ff, 1.0);
+    t.checkbox_border    = color.hex(0xff0055, 1.0);
+    t.checkbox_check     = color.hex(0x00f0ff, 1.0);
+    t.separator          = color.hex(0xff007f, 0.6);
+    t.frame_bg           = color.hex(0x160033, 1.0);
+    t.frame_bg_hover     = color.hex(0x2a0066, 1.0);
+    t.frame_bg_active    = color.hex(0x3a0088, 1.0);
+    t.tab_normal         = color.hex(0x220055, 1.0);
+    t.tab_active         = color.hex(0xff0055, 1.0);
+    t.plot_lines         = color.hex(0x00f0ff, 1.0);
+    t.plot_histogram     = color.hex(0xff0055, 1.0);
     return t;
 }
 
 pub fn retro_theme(): GUITheme {
     var t = GUITheme();
-    t.bg_window          = hex(0xc0c0c0, 1.0);
-    t.bg_window_title    = hex(0x000080, 1.0);
-    t.bg_panel           = hex(0xd4d0c8, 1.0);
-    t.text               = hex(0x000000, 1.0);
-    t.text_muted         = hex(0x808080, 1.0);
-    t.accent             = hex(0x000080, 1.0);
-    t.btn_normal         = hex(0xc0c0c0, 1.0);
-    t.btn_hover          = hex(0xd4d0c8, 1.0);
-    t.btn_active         = hex(0x808080, 1.0);
-    t.slider_track       = hex(0x808080, 1.0);
-    t.slider_thumb       = hex(0xc0c0c0, 1.0);
-    t.slider_thumb_hover = hex(0xffffff, 1.0);
-    t.checkbox_border    = hex(0x808080, 1.0);
-    t.checkbox_check     = hex(0x000000, 1.0);
-    t.separator          = hex(0x808080, 1.0);
-    t.frame_bg           = hex(0xffffff, 1.0);
-    t.frame_bg_hover     = hex(0xffffff, 1.0);
-    t.frame_bg_active    = hex(0xe0e0e0, 1.0);
-    t.tab_normal         = hex(0xc0c0c0, 1.0);
-    t.tab_active         = hex(0xffffff, 1.0);
-    t.plot_lines         = hex(0x008000, 1.0);
-    t.plot_histogram     = hex(0x000080, 1.0);
+    t.bg_window          = color.hex(0xc0c0c0, 1.0);
+    t.bg_window_title    = color.hex(0x000080, 1.0);
+    t.bg_panel           = color.hex(0xd4d0c8, 1.0);
+    t.text               = color.hex(0x000000, 1.0);
+    t.text_muted         = color.hex(0x808080, 1.0);
+    t.accent             = color.hex(0x000080, 1.0);
+    t.btn_normal         = color.hex(0xc0c0c0, 1.0);
+    t.btn_hover          = color.hex(0xd4d0c8, 1.0);
+    t.btn_active         = color.hex(0x808080, 1.0);
+    t.slider_track       = color.hex(0x808080, 1.0);
+    t.slider_thumb       = color.hex(0xc0c0c0, 1.0);
+    t.slider_thumb_hover = color.hex(0xffffff, 1.0);
+    t.checkbox_border    = color.hex(0x808080, 1.0);
+    t.checkbox_check     = color.hex(0x000000, 1.0);
+    t.separator          = color.hex(0x808080, 1.0);
+    t.frame_bg           = color.hex(0xffffff, 1.0);
+    t.frame_bg_hover     = color.hex(0xffffff, 1.0);
+    t.frame_bg_active    = color.hex(0xe0e0e0, 1.0);
+    t.tab_normal         = color.hex(0xc0c0c0, 1.0);
+    t.tab_active         = color.hex(0xffffff, 1.0);
+    t.plot_lines         = color.hex(0x008000, 1.0);
+    t.plot_histogram     = color.hex(0x000080, 1.0);
     t.rounding           = 0.0;
     return t;
 }

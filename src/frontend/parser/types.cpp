@@ -87,9 +87,25 @@ std::shared_ptr<LM::Frontend::AST::TypeAnnotation> Parser::parseBasicType() {
         }
         consume(TokenType::RIGHT_BRACKET, "Expected ']' after list element type.");
     } else if (match({TokenType::LEFT_PAREN})) {
-        type->isTuple = true; type->typeName = "tuple";
-        if (!check(TokenType::RIGHT_PAREN)) { do { type->tupleTypes.push_back(parseBasicType()); } while (match({TokenType::COMMA})); }
+        bool hasComma = false;
+        if (!check(TokenType::RIGHT_PAREN)) {
+            do {
+                type->tupleTypes.push_back(parseBasicType());
+                if (check(TokenType::COMMA)) {
+                    hasComma = true;
+                    advance();
+                } else {
+                    break;
+                }
+            } while (true);
+        }
         consume(TokenType::RIGHT_PAREN, "Expected ')' after tuple element types.");
+        if (type->tupleTypes.size() == 1 && !hasComma) {
+            type = type->tupleTypes[0];
+        } else {
+            type->isTuple = true;
+            type->typeName = "tuple";
+        }
     } else if (match({TokenType::LEFT_BRACE})) {
         type = parseBraceType();
     } else if (isIdentifierLike(peek()) && peek().type != TokenType::FN && peek().type != TokenType::FUNCTION_TYPE && !isPrimitiveType(peek().type) && !isKnownTypeName(peek().lexeme)) {
