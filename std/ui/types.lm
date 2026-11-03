@@ -60,7 +60,8 @@ enum WidgetKind {
     ScatterChart,
     PieChart,
     Overlay,
-    FormField
+    FormField,
+    MultiSelect
 }
 
 // Widget lifecycle phase (enter/exit transitions).
@@ -261,6 +262,7 @@ mixin TabState {
 mixin SelectValue {
     pub var select_options: [str];
     pub var selected_idx: int;
+    pub var selected_indices: [int];
 }
 
 mixin ScrollState {
@@ -650,6 +652,7 @@ pub const KIND_SCATTER_CHART = WidgetKind.ScatterChart;
 pub const KIND_PIE_CHART = WidgetKind.PieChart;
 pub const KIND_OVERLAY = WidgetKind.Overlay;
 pub const KIND_FORM_FIELD = WidgetKind.FormField;
+pub const KIND_MULTI_SELECT = WidgetKind.MultiSelect;
 pub var _shared_empty_style: Style = Style();
 pub var _shared_empty_shadow: shadow.Shadow = shadow.Shadow();
 pub var _shared_empty_trans: anim.Transition = anim.Transition();
@@ -714,6 +717,7 @@ frame Widget : WidgetTrait {
         self.on_change_action = nil;
         self.select_options = [] as [str];
         self.selected_idx = 0;
+        self.selected_indices = [] as [int];
         self.is_open = 0;
         self.opacity_val = 1.0;
         self.scale_val = 1.0;
@@ -1217,6 +1221,22 @@ pub fn select(options: [str], selected_idx: int = 0, on_change: any = nil): Widg
     if (len(options) > selected_idx) {
         w.text_val = options[selected_idx];
     }
+    return w;
+}
+
+pub fn multi_select(options: [str], selected_indices: [int] = [] as [int], on_change: any = nil): Widget {
+    var w = Widget(KIND_MULTI_SELECT);
+    w.select_options = options;
+    w.selected_indices = selected_indices;
+    w.on_change_action = on_change;
+    w.is_open = 0;
+    w.background_color = color.rgb(28, 30, 38);
+    w.foreground_color = color.white;
+    w.height_val = 28.0;
+    w.width_val = 200.0;
+    w.padding_left = 10.0;
+    w.padding_right = 10.0;
+    w.corner_radius_val = 4.0;
     return w;
 }
 

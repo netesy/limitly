@@ -1,0 +1,145 @@
+// tests/gui_test_forms.lm
+// Test suite for std.ui Form Controls, Inputs, and Dropdown / Multi-Select Widgets
+
+import std.app as app;
+import std.ui as ui;
+import std.color as color;
+
+fn on_action() {
+    print("[Action] Form control triggered");
+}
+
+fn build_view(): ui.Widget {
+    val header = ui.row([
+        ui.text("FORM CONTROLS & INPUTS TEST").font_size(16.0).bold().color(color.rgb(255, 255, 255)),
+        ui.badge("TAB 1 / 4").background(color.rgb(99, 102, 241)),
+        ui.spacer(1.0),
+        ui.indicator("online", "Interactive Engine Active")
+    ]).spacing(12.0).height(28.0);
+
+    val btn_row = ui.row([
+        ui.button("Primary Action", on_action)
+            .background(color.rgb(99, 102, 241))
+            .corner_radius(19.0)
+            .foreground(color.white),
+        ui.button("Secondary", on_action)
+            .background(color.rgb(45, 48, 62))
+            .foreground(color.rgb(240, 242, 248)),
+        ui.button("Subtle Outline", on_action)
+            .background(color.rgb(30, 32, 42))
+            .foreground(color.rgb(160, 165, 185))
+    ]).spacing(10.0);
+
+    val txt_row = ui.row([
+        ui.input("developer@lymar.org", "Enter email...", on_action).width(260.0),
+        ui.filter("package:ui", "Search components...", on_action).width(200.0),
+        ui.file_input("manifest.json", on_action).width(240.0)
+    ]).spacing(12.0);
+
+    val check_toggle_row = ui.row([
+        ui.checkbox(true, on_action),
+        ui.text("Strict Type Checking").font_size(12.0).color(color.rgb(220, 225, 240)),
+        ui.checkbox(false, on_action),
+        ui.text("Verbose Telemetry").font_size(12.0).color(color.rgb(220, 225, 240)),
+        ui.toggle(true, on_action),
+        ui.text("Live JIT").font_size(12.0).color(color.rgb(220, 225, 240)),
+        ui.toggle(false, on_action),
+        ui.text("Auto-Rollback").font_size(12.0).color(color.rgb(220, 225, 240))
+    ]).spacing(10.0);
+
+    val slider_row = ui.row([
+        ui.column([
+            ui.text("Single Slider (70%):").font_size(12.0).color(color.rgb(160, 165, 185)),
+            ui.slider(70.0, 0.0, 100.0, on_action).width(210.0)
+        ]).spacing(4.0),
+        ui.column([
+            ui.text("Range Slider (20% - 80%):").font_size(12.0).color(color.rgb(160, 165, 185)),
+            ui.range_slider(20.0, 80.0, 0.0, 100.0).width(210.0)
+        ]).spacing(4.0),
+        ui.column([
+            ui.text("Numeric Stepper (+/-):").font_size(12.0).color(color.rgb(160, 165, 185)),
+            ui.stepper(5, 1, 0, 20, on_action)
+        ]).spacing(4.0),
+        ui.column([
+            ui.text("Color Picker:").font_size(12.0).color(color.rgb(160, 165, 185)),
+            ui.color_picker("Accent Hue", color.rgb(99, 102, 241), on_action)
+        ]).spacing(4.0)
+    ]).spacing(16.0);
+
+    // Closed dropdown and multi-select
+    val sel_closed = ui.select(["Production (us-east)", "Staging (eu-central)", "Dev Local (localhost)"], 0, on_action).width(230.0);
+    val multi_closed = ui.multi_select(["Networking", "Storage", "Compute Engine", "Security", "Telemetry"], [0, 2], on_action).width(230.0);
+
+    val select_closed_row = ui.row([
+        ui.column([
+            ui.text("Dropdown Select (Closed):").font_size(12.0).color(color.rgb(160, 165, 185)),
+            sel_closed
+        ]).spacing(4.0),
+        ui.column([
+            ui.text("Multi-Select Dropdown (Closed):").font_size(12.0).color(color.rgb(160, 165, 185)),
+            multi_closed
+        ]).spacing(4.0)
+    ]).spacing(20.0);
+
+    // Open dropdown and multi-select to examine their menus & selection states
+    var sel_open = ui.select(["Production (us-east)", "Staging (eu-central)", "Dev Local (localhost)"], 1, on_action).width(230.0);
+    sel_open.is_open = 1;
+
+    var multi_open = ui.multi_select(["Networking", "Storage", "Compute Engine", "Security", "Telemetry"], [0, 2], on_action).width(230.0);
+    multi_open.is_open = 1;
+
+    val select_open_row = ui.row([
+        ui.column([
+            ui.text("Dropdown Select (Open Menu):").font_size(12.0).color(color.rgb(160, 165, 185)),
+            sel_open
+        ]).spacing(4.0),
+        ui.column([
+            ui.text("Multi-Select (Open Checklist):").font_size(12.0).color(color.rgb(160, 165, 185)),
+            multi_open
+        ]).spacing(4.0)
+    ]).spacing(20.0);
+
+    val field_col = ui.column([
+        ui.form_field("Workspace Title", ui.input("Lymar Core Production", "Title"), "Visible to team members"),
+        ui.form_field("API Secret Token", ui.input("", "Enter token..."), "", "Missing required deployment secret")
+    ]).spacing(8.0);
+
+    val ta_field = ui.column([
+        ui.text("Script Editor / Textarea:").font_size(12.0).color(color.rgb(160, 165, 185)),
+        ui.text_area("// Configuration Manifest\napp_name = \"limitless-ui\"\nversion = \"2.4.0\"\nworkers = 16\n", "Type config...", on_action)
+            .width(760.0)
+            .height(65.0)
+    ]).spacing(4.0);
+
+    return ui.column([
+        header,
+        btn_row,
+        txt_row,
+        check_toggle_row,
+        slider_row,
+        select_closed_row,
+        select_open_row,
+        field_col,
+        ta_field
+    ]).spacing(10.0).padding(14.0);
+}
+
+fn main() {
+    print("=== Launching Form Controls & Inputs Test ===");
+
+    var cfg = app.default_window_config();
+    cfg.title = "Lymar UI - Forms, Dropdown & Multi-Select Test";
+    cfg.width = 920;
+    cfg.height = 700;
+
+    assert(app.init(cfg) == 1, "app init failed");
+
+    val root = build_view();
+    app.ui(root);
+
+    print("Running forms application main loop...");
+    app.run();
+
+    app.shutdown();
+}
+

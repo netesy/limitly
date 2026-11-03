@@ -1,0 +1,328 @@
+// tests/gui_all_widgets_test.lm
+// Comprehensive Design System Test Suite for std.ui
+// Exercises every widget, control, container, and visualization element in std.ui.
+
+import std.app as app;
+import std.ui as ui;
+import std.color as color;
+import std.env as env;
+
+fn on_click_btn() {
+    print("[Test] Button clicked");
+}
+
+fn on_input_change() {
+    print("[Test] Input changed");
+}
+
+fn on_tab_switch() {
+    print("[Test] Tab switched");
+}
+
+// ── Tab 1: Form Controls & Inputs ─────────────────────────────────────────────
+fn build_forms_page(): ui.Widget {
+    val btn_row = ui.row([
+        ui.button("Primary Button", on_click_btn)
+            .background(color.rgb(99, 102, 241))
+            .foreground(color.white),
+        ui.button("Secondary", on_click_btn)
+            .background(color.rgb(45, 48, 62))
+            .foreground(color.rgb(240, 242, 248)),
+        ui.button("Subtle", on_click_btn)
+            .background(color.rgb(30, 32, 42))
+            .foreground(color.rgb(160, 165, 185))
+    ]).spacing(8.0);
+
+    val txt_row = ui.row([
+        ui.input("developer@lymar.org", "Enter email address...", on_input_change)
+            .width(260.0),
+        ui.filter("system", "Filter packages...", on_input_change)
+            .width(180.0),
+        ui.file_input("main_pipeline.yaml")
+            .width(240.0)
+    ]).spacing(12.0);
+
+    val check_toggle_row = ui.row([
+        ui.checkbox(true, on_input_change),
+        ui.text("Strict Types").font_size(12.0).color(color.rgb(200, 205, 220)),
+        ui.checkbox(false, on_input_change),
+        ui.text("Debug Verbose").font_size(12.0).color(color.rgb(200, 205, 220)),
+        ui.toggle(true, on_input_change),
+        ui.text("Live JIT").font_size(12.0).color(color.rgb(200, 205, 220)),
+        ui.toggle(false, on_input_change),
+        ui.text("Telemetry").font_size(12.0).color(color.rgb(200, 205, 220))
+    ]).spacing(10.0);
+
+    val slider_row = ui.row([
+        ui.column([
+            ui.text("Single Slider (75%):").font_size(12.0).color(color.rgb(160, 165, 185)),
+            ui.slider(75.0, 0.0, 100.0, on_input_change).width(200.0)
+        ]).spacing(4.0),
+        ui.column([
+            ui.text("Range Slider (20% - 80%):").font_size(12.0).color(color.rgb(160, 165, 185)),
+            ui.range_slider(20.0, 80.0, 0.0, 100.0).width(200.0)
+        ]).spacing(4.0),
+        ui.column([
+            ui.text("Stepper (+/-):").font_size(12.0).color(color.rgb(160, 165, 185)),
+            ui.stepper(4, 1, 0, 16, on_input_change)
+        ]).spacing(4.0)
+    ]).spacing(20.0);
+
+    var open_single = env.get_int("UI_OPEN_SELECT", 0);
+    var sel_single = ui.select(["Production (us-east)", "Staging (eu-central)", "Dev Local (localhost)"], 0, on_input_change).width(230.0);
+    sel_single.is_open = open_single;
+
+    var open_multi = env.get_int("UI_OPEN_MULTI", 0);
+    var sel_multi = ui.multi_select(["Networking", "Storage", "Compute Engine", "Security", "Telemetry"], [0, 2], on_input_change).width(230.0);
+    sel_multi.is_open = open_multi;
+
+    val select_row = ui.row([
+        ui.column([
+            ui.text("Dropdown Select (Single):").font_size(12.0).color(color.rgb(160, 165, 185)),
+            sel_single
+        ]).spacing(4.0),
+        ui.column([
+            ui.text("Multi-Select Dropdown:").font_size(12.0).color(color.rgb(160, 165, 185)),
+            sel_multi
+        ]).spacing(4.0),
+        ui.column([
+            ui.text("Color Picker:").font_size(12.0).color(color.rgb(160, 165, 185)),
+            ui.color_picker("Brand Accent", color.rgb(99, 102, 241), on_input_change)
+        ]).spacing(4.0)
+    ]).spacing(20.0);
+
+    val field_col = ui.column([
+        ui.form_field("Workspace Title", ui.input("Lymar Core Production", "Title"), "Visible to team members"),
+        ui.form_field("API Secret Token", ui.input("", "Enter token..."), "", "Missing required deployment secret")
+    ]).spacing(8.0);
+
+    val ta_field = ui.column([
+        ui.text("Script Editor / Textarea:").font_size(12.0).color(color.rgb(160, 165, 185)),
+        ui.text_area("// Configuration Manifest\napp_name = \"limitless-ui\"\nversion = \"2.4.0\"\nworkers = 16\n", "Type config...", on_input_change)
+            .width(760.0)
+            .height(70.0)
+    ]).spacing(4.0);
+
+    return ui.column([
+        btn_row,
+        txt_row,
+        check_toggle_row,
+        slider_row,
+        select_row,
+        field_col,
+        ta_field
+    ]).spacing(10.0);
+}
+
+// ── Tab 2: Feedback & Data Display ────────────────────────────────────────────
+fn build_feedback_page(): ui.Widget {
+    val badges_row = ui.row([
+        ui.badge("ACTIVE").background(color.rgb(34, 197, 94)),
+        ui.badge("WARNING").background(color.rgb(234, 179, 8)),
+        ui.badge("ERROR").background(color.rgb(239, 68, 68)),
+        ui.badge("BETA v2.4").background(color.rgb(99, 102, 241)),
+        ui.indicator("online", "Cluster Node 01 (Online)"),
+        ui.indicator("busy", "Build Worker (Busy)"),
+        ui.indicator("offline", "Cold Backup (Offline)")
+    ]).spacing(12.0);
+
+    val stats_row = ui.row([
+        ui.stat("MONTHLY REVENUE", "$48,250", "+18.4% vs last mo").width(170.0),
+        ui.stat("ACTIVE CLUSTERS", "142 Nodes", "99.98% uptime").width(170.0),
+        ui.stat("API LATENCY", "14.2 ms", "-3.1 ms optimal").width(170.0),
+        ui.stat("DEPLOYMENTS", "1,208", "0 failed builds").width(170.0)
+    ]).spacing(12.0);
+
+    val progress_col = ui.column([
+        ui.text("Multi-Step Wizard (Steps):").font_size(12.0).color(color.rgb(160, 165, 185)),
+        ui.steps(["Configure", "Build Artifacts", "Run Unit Tests", "Deploy to Edge"], 2),
+        ui.text("Deployment Progress: 78%").font_size(12.0).color(color.rgb(160, 165, 185)),
+        ui.progress(0.78, 760.0)
+    ]).spacing(6.0);
+
+    val alerts_col = ui.column([
+        ui.alert("Success: Container image build #482 passed 142/142 tests.", "success"),
+        ui.alert("Warning: Memory utilization on worker-eu-west exceeds 82%.", "warning"),
+        ui.alert("Notice: Scheduled database maintenance window in 2 hours.", "info"),
+        ui.alert("Critical: SSL certificate for auth.domain.io expires in 2 days.", "danger")
+    ]).spacing(6.0);
+
+    val toast_diff_row = ui.row([
+        ui.column([
+            ui.text("Notification Toast & Links:").font_size(12.0).color(color.rgb(160, 165, 185)),
+            ui.toast("Snapshot #901 created successfully", "success").width(280.0),
+            ui.link("View Full Deployment Audit Logs ->", "https://lymar.org/logs")
+        ]).spacing(8.0),
+        ui.column([
+            ui.text("Source Code Unified Diff:").font_size(12.0).color(color.rgb(160, 165, 185)),
+            ui.diff("val timeout_seconds = 30;", "val timeout_seconds = 120; // Increased for cold starts")
+                .width(460.0)
+        ]).spacing(4.0)
+    ]).spacing(16.0);
+
+    return ui.column([
+        badges_row,
+        stats_row,
+        progress_col,
+        alerts_col,
+        toast_diff_row
+    ]).spacing(10.0);
+}
+
+// ── Tab 3: Containers & Structured Layout ──────────────────────────────────────
+fn build_containers_page(): ui.Widget {
+    val table_headers = ["Node ID", "Instance Type", "Region", "Memory", "Status"];
+    val row1 = [ui.text("i-08a9f21"), ui.text("c6g.2xlarge"), ui.text("us-east-1"), ui.text("16.0 GB"), ui.badge("Running").background(color.rgb(34, 197, 94))];
+    val row2 = [ui.text("i-03b7e45"), ui.text("m6g.xlarge"), ui.text("us-west-2"), ui.text("8.0 GB"), ui.badge("Running").background(color.rgb(34, 197, 94))];
+    val row3 = [ui.text("i-01c8912"), ui.text("r6g.4xlarge"), ui.text("eu-central-1"), ui.text("32.0 GB"), ui.badge("Maintenance").background(color.rgb(234, 179, 8))];
+    val row4 = [ui.text("i-09f44a1"), ui.text("t4g.nano"), ui.text("ap-northeast-1"), ui.text("0.5 GB"), ui.badge("Stopped").background(color.rgb(100, 110, 130))];
+    val table_rows = [row1, row2, row3, row4];
+
+    val tbl = ui.table(table_headers, table_rows);
+
+    val tree = ui.tree_node("Project Limitless", [
+        ui.tree_node("src", [
+            ui.text("main.lm"),
+            ui.text("pipeline.lm"),
+            ui.tree_node("transforms", [
+                ui.text("SSARenamer.cpp"),
+                ui.text("ConstantFolder.cpp")
+            ], true)
+        ], true),
+        ui.tree_node("std", [
+            ui.text("ui.lm"),
+            ui.text("app.lm")
+        ], false)
+    ], true);
+
+    val time_events = [
+        ui.text("08:00 AM - Initialized cluster orchestrator"),
+        ui.text("10:30 AM - Scaled replica pool to 16 workers"),
+        ui.text("01:15 PM - Ingress TLS certificate renewed"),
+        ui.text("03:45 PM - Deployed application version 2.4.0")
+    ];
+    val tline = ui.timeline(time_events);
+
+    val cal = ui.calendar("2026-11-15");
+
+    val acc1 = ui.accordion("Cluster Networking & Ingress Rules", ui.text("CIDR: 10.0.0.0/16 | Subnets: 3 private, 3 public | NAT Gateways: 2"), true);
+    val acc2 = ui.accordion("Database Sharding & Read Replicas", ui.text("Primary: PostgreSQL 16 (Multi-AZ) | Replicas: 3 read-pools"), false);
+
+    val left_col = ui.column([
+        ui.text("Infrastructure Node Instances:").font_size(12.0).color(color.rgb(160, 165, 185)),
+        tbl,
+        acc1,
+        acc2
+    ]).spacing(8.0).width(480.0);
+
+    val right_col = ui.column([
+        ui.row([
+            ui.column([
+                ui.text("Release Timeline:").font_size(12.0).color(color.rgb(160, 165, 185)),
+                tline
+            ]).spacing(4.0).width(200.0),
+            ui.column([
+                ui.text("File Tree:").font_size(12.0).color(color.rgb(160, 165, 185)),
+                tree
+            ]).spacing(4.0).width(160.0)
+        ]).spacing(10.0),
+        ui.text("Maintenance Calendar:").font_size(12.0).color(color.rgb(160, 165, 185)),
+        cal
+    ]).spacing(8.0).width(380.0);
+
+    return ui.row([
+        left_col,
+        right_col
+    ]).spacing(12.0);
+}
+
+// ── Tab 4: Analytics & Visualizations ─────────────────────────────────────────
+fn build_charts_page(): ui.Widget {
+    val bar = ui.bar_chart("HTTP Requests / Day (k)", [42.0, 58.0, 75.0, 68.0, 92.0, 84.0, 110.0], ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"])
+        .width(370.0)
+        .height(130.0);
+
+    val line = ui.line_chart("P99 Response Latency (ms)", [18.0, 16.0, 22.0, 34.0, 26.0, 20.0, 17.0, 15.0])
+        .width(370.0)
+        .height(130.0);
+
+    val pie = ui.pie_chart("Resource Allocation Breakdown", [65.0, 25.0, 10.0])
+        .width(370.0)
+        .height(120.0);
+
+    val histo = ui.plot_histogram("Latency Distribution Histogram", [0.15, 0.35, 0.70, 0.95, 0.85, 0.50, 0.25, 0.10])
+        .width(370.0)
+        .height(120.0);
+
+    val top_charts = ui.row([bar, line]).spacing(16.0);
+    val bottom_charts = ui.row([pie, histo]).spacing(16.0);
+
+    val summary_card = ui.card("System Performance Metrics", ui.column([
+        ui.text("All telemetry signals are operating within healthy SLA bounds (99.98%).").font_size(12.0).color(color.rgb(200, 205, 220)),
+        ui.row([
+            ui.indicator("online", "Telemetry Collector"),
+            ui.indicator("online", "Time-Series DB"),
+            ui.indicator("online", "Alerting Gateway")
+        ]).spacing(16.0)
+    ]).spacing(8.0)).width(760.0);
+
+    return ui.column([
+        top_charts,
+        bottom_charts,
+        summary_card
+    ]).spacing(12.0);
+}
+
+// ── Header & App Assembly ─────────────────────────────────────────────────────
+fn build_header(): ui.Widget {
+    return ui.row([
+        ui.text("LIMITLESS UI").font_size(16.0).bold().color(color.rgb(255, 255, 255)),
+        ui.badge("DESIGN SYSTEM VERIFIED").background(color.rgb(99, 102, 241)),
+        ui.spacer(1.0),
+        ui.indicator("online", "All Systems Operational"),
+        ui.button("Export Spec", on_click_btn)
+            .background(color.rgb(35, 38, 50))
+            .foreground(color.rgb(220, 225, 240))
+    ]).spacing(12.0).height(30.0);
+}
+
+fn build_main_view(): ui.Widget {
+    val tab_titles = ["Form Controls", "Data & Feedback", "Layout & Structure", "Visualizations"];
+    val tab_pages = [
+        build_forms_page(),
+        build_feedback_page(),
+        build_containers_page(),
+        build_charts_page()
+    ];
+
+    var active_tab = env.get_int("UI_TAB", 0);
+    val tab_view = ui.tabs(tab_titles, tab_pages, active_tab, on_tab_switch);
+
+    val page = ui.column([
+        build_header(),
+        ui.spacer(4.0),
+        tab_view
+    ]).spacing(8.0).padding(12.0);
+
+    return ui.scroll(page);
+}
+
+fn main() {
+    print("=== Launching Comprehensive UI Widget & Design System Test ===");
+
+    var cfg = app.default_window_config();
+    cfg.title = "Lymar UI Comprehensive Widget Test Suite";
+    cfg.width = 920;
+    cfg.height = 700;
+
+    assert(app.init(cfg) == 1, "app init failed");
+
+    val root = build_main_view();
+    app.ui(root);
+
+    print("Running application main loop...");
+    app.run();
+
+    app.shutdown();
+    print("UI Widget Test Suite closed cleanly.");
+}

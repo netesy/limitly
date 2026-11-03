@@ -2131,11 +2131,19 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                                 case ::TypeTag::UInt8: case ::TypeTag::UInt16:
                                 case ::TypeTag::UInt32: case ::TypeTag::UInt64:
                                     elem_type = LIR::Type::I64; break;
+                                case ::TypeTag::Float32:
+                                case ::TypeTag::Float64:
+                                    elem_type = LIR::Type::F64; break;
                                 default: break;
                             }
                         }
                     }
-                    store_reg(inst.dst, elem, elem_type);
+                    if (elem_type == LIR::Type::F64 || elem_type == LIR::Type::F32) {
+                        ir::Value* fval = builder_->createExternCall("lymar_aot_to_float", {elem, context_->getConstantInt(context_->getIntegerType(64), 1)}, context_->getDoubleType());
+                        store_reg(inst.dst, fval, elem_type);
+                    } else {
+                        store_reg(inst.dst, elem, elem_type);
+                    }
                     break;
                 }
 
@@ -2183,12 +2191,19 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 ir::Value* elem_addr = builder_->createAdd(data_ptr, offset);
                 ir::Instruction* elem = builder_->createLoadl(elem_addr);
                 elem->setName("lidx_elem_" + lidx_id);
-                store_reg(inst.dst, elem, inst.result_type);
+                ir::Value* final_elem = elem;
+                if (inst.result_type == LIR::Type::F64 || inst.result_type == LIR::Type::F32) {
+                    final_elem = builder_->createExternCall("lymar_aot_to_float", {elem, context_->getConstantInt(context_->getIntegerType(64), 1)}, context_->getDoubleType());
+                }
+                store_reg(inst.dst, final_elem, inst.result_type);
                 builder_->createJmp(b_done);
 
                 // Step 4: Slow path fallback
                 builder_->setInsertPoint(b_slow);
                 ir::Value* slow_res = builder_->createCall(fn, {list_val, idx_val});
+                if (inst.result_type == LIR::Type::F64 || inst.result_type == LIR::Type::F32) {
+                    slow_res = builder_->createExternCall("lymar_aot_to_float", {slow_res, context_->getConstantInt(context_->getIntegerType(64), 1)}, context_->getDoubleType());
+                }
                 store_reg(inst.dst, slow_res, inst.result_type);
                 builder_->createJmp(b_done);
 

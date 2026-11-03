@@ -1,0 +1,88 @@
+// tests/gui_test_feedback.lm
+// Test suite for std.ui Badges, Status Indicators, Stats, Alerts, Toasts, Progress, Steps, and Diff
+
+import std.app as app;
+import std.ui as ui;
+import std.color as color;
+
+fn build_view(): ui.Widget {
+    val header = ui.row([
+        ui.text("FEEDBACK & DATA DISPLAY TEST").font_size(16.0).bold().color(color.rgb(255, 255, 255)),
+        ui.badge("TAB 2 / 4").background(color.rgb(99, 102, 241)),
+        ui.spacer(1.0),
+        ui.indicator("online", "Telemetry Collector Active")
+    ]).spacing(12.0).height(28.0);
+
+    val badges_row = ui.row([
+        ui.badge("ACTIVE").background(color.rgb(34, 197, 94)),
+        ui.badge("WARNING").background(color.rgb(234, 179, 8)),
+        ui.badge("ERROR").background(color.rgb(239, 68, 68)),
+        ui.badge("BETA v2.4").background(color.rgb(99, 102, 241)),
+        ui.indicator("online", "Cluster Node 01 (Online)"),
+        ui.indicator("busy", "Build Worker (Busy)"),
+        ui.indicator("offline", "Cold Backup (Offline)")
+    ]).spacing(14.0);
+
+    val stats_row = ui.row([
+        ui.stat("MONTHLY REVENUE", "$48,250", "+18.4% vs last mo").width(180.0),
+        ui.stat("ACTIVE CLUSTERS", "142 Nodes", "99.98% uptime").width(180.0),
+        ui.stat("API LATENCY", "14.2 ms", "-3.1 ms optimal").width(180.0),
+        ui.stat("DEPLOYMENTS", "1,208", "0 failed builds").width(180.0)
+    ]).spacing(12.0);
+
+    val progress_col = ui.column([
+        ui.text("Multi-Step Wizard (Steps):").font_size(12.0).color(color.rgb(160, 165, 185)),
+        ui.steps(["Configure", "Build Artifacts", "Run Unit Tests", "Deploy to Edge"], 2),
+        ui.text("Deployment Progress: 78%").font_size(12.0).color(color.rgb(160, 165, 185)),
+        ui.progress(0.78, 760.0)
+    ]).spacing(6.0);
+
+    val alerts_col = ui.column([
+        ui.alert("Success: Container image build #482 passed 142/142 tests.", "success"),
+        ui.alert("Warning: Memory utilization on worker-eu-west exceeds 82%.", "warning"),
+        ui.alert("Notice: Scheduled database maintenance window in 2 hours.", "info"),
+        ui.alert("Critical: SSL certificate for auth.domain.io expires in 2 days.", "danger")
+    ]).spacing(6.0);
+
+    val toast_diff_row = ui.row([
+        ui.column([
+            ui.text("Notification Toast & Links:").font_size(12.0).color(color.rgb(160, 165, 185)),
+            ui.toast("Snapshot #901 created successfully", "success").width(280.0),
+            ui.link("View Full Deployment Audit Logs ->", "https://lymar.org/logs")
+        ]).spacing(8.0),
+        ui.column([
+            ui.text("Source Code Unified Diff:").font_size(12.0).color(color.rgb(160, 165, 185)),
+            ui.diff("val timeout_seconds = 30;", "val timeout_seconds = 120; // Increased for cold starts")
+                .width(460.0)
+        ]).spacing(4.0)
+    ]).spacing(16.0);
+
+    return ui.column([
+        header,
+        badges_row,
+        stats_row,
+        progress_col,
+        alerts_col,
+        toast_diff_row
+    ]).spacing(12.0).padding(14.0);
+}
+
+fn main() {
+    print("=== Launching Feedback & Data Display Test ===");
+
+    var cfg = app.default_window_config();
+    cfg.title = "Lymar UI - Feedback & Data Display Test";
+    cfg.width = 920;
+    cfg.height = 700;
+
+    assert(app.init(cfg) == 1, "app init failed");
+
+    val root = build_view();
+    app.ui(root);
+
+    print("Running feedback application main loop...");
+    app.run();
+
+    app.shutdown();
+}
+

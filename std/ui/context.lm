@@ -932,6 +932,37 @@ pub fn dispatch_pointer_down(px: float, py: float): nil {
         } elif (hz.kind == dlist.HitZoneKind.Select) {
             if (hz.widget != nil) {
                 var w = hz.widget as ui.Widget;
+                if (w.kind == ui.KIND_MULTI_SELECT) {
+                    if (hz.tab_index >= 0 and hz.tab_index < len(w.select_options)) {
+                        var new_indices = [] as [int];
+                        var found = 0;
+                        var idx_i = 0;
+                        while (idx_i < len(w.selected_indices)) {
+                            var cur = w.selected_indices[idx_i];
+                            if (cur == hz.tab_index) {
+                                found = 1;
+                            } else {
+                                new_indices.append(cur);
+                            }
+                            idx_i = idx_i + 1;
+                        }
+                        if (found == 0) {
+                            new_indices.append(hz.tab_index);
+                        }
+                        w.selected_indices = new_indices;
+                        event.fire_action(w.on_change_action)? else { };
+                        mark_element_dirty(1);
+                        return;
+                    } else {
+                        if (w.is_open == 1) {
+                            w.is_open = 0;
+                        } else {
+                            w.is_open = 1;
+                        }
+                        mark_element_dirty(1);
+                        return;
+                    }
+                }
                 if (hz.tab_index >= 0 and hz.tab_index < len(w.select_options)) {
                     w.selected_idx = hz.tab_index;
                     w.text_val = w.select_options[hz.tab_index];

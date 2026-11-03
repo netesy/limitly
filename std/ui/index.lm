@@ -104,6 +104,7 @@ pub const KIND_SCATTER_CHART: WidgetKind = ui_types.KIND_SCATTER_CHART;
 pub const KIND_PIE_CHART: WidgetKind = ui_types.KIND_PIE_CHART;
 pub const KIND_OVERLAY: WidgetKind = ui_types.KIND_OVERLAY;
 pub const KIND_FORM_FIELD: WidgetKind = ui_types.KIND_FORM_FIELD;
+pub const KIND_MULTI_SELECT: WidgetKind = ui_types.KIND_MULTI_SELECT;
 
 // ── Lifecycle Constants ───────────────────────────────────────────────────────
 pub const LIFECYCLE_ENTERING: LifecycleState = ui_types.LIFECYCLE_ENTERING;
@@ -205,6 +206,7 @@ pub fn row(children: [Widget]): Widget { return ui_types.row(children); }
 pub fn scatter_chart(label: str, values: [float]): Widget { return ui_types.scatter_chart(label, values); }
 pub fn scroll(content: Widget): Widget { return ui_types.scroll(content); }
 pub fn select(options: [str], selected_idx: int = 0, on_change: any = nil): Widget { return ui_types.select(options, selected_idx, on_change); }
+pub fn multi_select(options: [str], selected_indices: [int] = [] as [int], on_change: any = nil): Widget { return ui_types.multi_select(options, selected_indices, on_change); }
 pub fn slider(value: float = 50.0, min_val: float = 0.0, max_val: float = 100.0, on_change: any = nil): Widget { return ui_types.slider(value, min_val, max_val, on_change); }
 pub fn spacer(flex: float = 1.0): Widget { return ui_types.spacer(flex); }
 pub fn stack(children: [Widget]): Widget { return ui_types.stack(children); }

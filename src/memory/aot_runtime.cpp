@@ -984,8 +984,6 @@ double lymar_aot_to_float(uint64_t value, uint64_t kind) {
     try {
     RuntimeGuard runtime_guard;
 
-    if (auto integer = integer_number(value, kind)) return static_cast<double>(*integer);
-    if (!kind) return static_cast<double>(static_cast<int64_t>(value));
     if (kind == boolean_kind || lymar_aot_is_nil(value, kind)) return 0.0;
     auto found = heap().allocations.find(value);
     if (found != heap().allocations.end() && !found->second.raw_memory && found->second.size >= 16) {
@@ -996,6 +994,7 @@ double lymar_aot_to_float(uint64_t value, uint64_t kind) {
         }
         if (auto* text = string_data(value)) { try { return std::stod(text); } catch (...) {} }
     }
+    if (auto integer = integer_number(value, kind)) return static_cast<double>(*integer);
     return static_cast<double>(static_cast<int64_t>(value));
 
     } catch (const std::exception& failure) {
