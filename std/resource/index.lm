@@ -1,3 +1,6 @@
+// std/resource/index.lm
+// Public entrypoint and facade for std.resource. Resource management and operating system handles.
+
 import std.internal.runtime as rt;
 
 frame Resource {

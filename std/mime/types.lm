@@ -1,3 +1,6 @@
+// std/mime/types.lm
+// Types submodule for std.mime. MIME type registry and content-type detection.
+
 frame Params {
     pub keys: [str];
     pub values: [str];

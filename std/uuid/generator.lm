@@ -1,3 +1,6 @@
+// std/uuid/generator.lm
+// Generator submodule for std.uuid. Universally Unique Identifier (UUID) generation and parsing.
+
 import std.uuid.uuid as uuid;
 import std.random.random as random;
 

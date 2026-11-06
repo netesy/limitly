@@ -1,3 +1,6 @@
+// std/math/vector2.lm
+// Vector2 submodule for std.math. Mathematical constants, arithmetic functions, trigonometry, and statistics.
+
 import std.math.arithmetic as arith;
 import std.math show Addable, Scalable, Normalizable;
 

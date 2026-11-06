@@ -1,3 +1,6 @@
+// std/focus/index.lm
+// Public entrypoint and facade for std.focus. Focus management, keyboard focus rings, and widget focus navigation.
+
 import std.focus.manager as manager;
 
 pub import std.focus.manager show Manager;

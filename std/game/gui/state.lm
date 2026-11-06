@@ -1,6 +1,7 @@
 // std/game/gui/state.lm
 // Modular layout state, window tracking, and style state for IMGUI
 
+import std.math as math;
 import std.game.types as types;
 
 trait Component {

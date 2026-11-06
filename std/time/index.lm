@@ -1,3 +1,6 @@
+// std/time/index.lm
+// Public entrypoint and facade for std.time. Date, time, timestamps, durations, and timezone computations.
+
 import std.time.instant as instant;
 import std.time.duration as duration;
 import std.time.datetime as datetime;

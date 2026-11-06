@@ -1,3 +1,6 @@
+// std/algorithm/unique.lm
+// Unique submodule for std.algorithm. Algorithmic utilities, searching, filtering, and sequence manipulation.
+
 pub fn unique(items: [any]): [any] {
     var res: [any] = [];
     var i = 0;

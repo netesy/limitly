@@ -1,3 +1,6 @@
+// std/net/udp.lm
+// Udp submodule for std.net. Network communications: TCP, UDP sockets, and network addressing.
+
 import std.core as core;
 import std.core show Error;
 import std.resource as res;

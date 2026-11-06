@@ -1,3 +1,6 @@
+// std/graphics/matrix.lm
+// Matrix submodule for std.graphics. 2D/3D graphics abstractions, canvases, shaders, and rendering pipelines.
+
 frame Matrix {
     pub var data: [float]; // 16 elements (4x4 matrix)
 

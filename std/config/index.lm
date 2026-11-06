@@ -1,3 +1,6 @@
+// std/config/index.lm
+// Public entrypoint and facade for std.config. Configuration parsing, environment settings, and configuration loaders.
+
 import std.env as env;
 
 frame Config {

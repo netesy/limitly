@@ -1,3 +1,6 @@
+// std/graphics/text_layout.lm
+// Text Layout submodule for std.graphics. 2D/3D graphics abstractions, canvases, shaders, and rendering pipelines.
+
 import std.graphics.font as font;
 import std.gg as gg;
 import std.string as std_string;

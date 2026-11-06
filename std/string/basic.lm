@@ -1,22 +1,56 @@
 // std/string/basic.lm
 // Length, positional byte/substring access and byte-wise ordering.
 
+/// Returns the byte length of the given string.
+///
+/// @tip Wraps `len(value)` for idiomatic functional composition.
+/// @param value The string to measure.
+/// @return Length of the string in bytes.
 pub fn length(value: str): int {
     return len(value);
 }
 
+/// Retrieves the raw byte value at the specified zero-based index.
+///
+/// @pre index >= 0 and index < len(value)
+/// @param value The target string.
+/// @param index Zero-based byte offset.
+/// @return Byte value as integer (0-255).
 pub fn byte_at(value: str, index: int): int {
+    contract(index >= 0 and index < len(value), "String index out of bounds");
     return _builtin_string_byte_at(value, index);
 }
 
+/// Extracts a substring from start index to end index (exclusive).
+///
+/// @pre start >= 0 and start <= end and end <= len(value)
+/// @param value The target string.
+/// @param start Starting byte index (inclusive).
+/// @param end Ending byte index (exclusive).
+/// @return Extracted substring.
 pub fn substr(value: str, start: int, end: int): str {
+    contract(start >= 0 and start <= end and end <= len(value), "Substring indices out of bounds");
     return _builtin_substring(value, start, end);
 }
 
+/// Extracts a substring from start index to end index (exclusive).
+///
+/// @tip Alias for `substr`.
+/// @pre start >= 0 and start <= end and end <= len(value)
+/// @param value The target string.
+/// @param start Starting byte index (inclusive).
+/// @param end Ending byte index (exclusive).
+/// @return Extracted substring.
 pub fn substring(value: str, start: int, end: int): str {
+    contract(start >= 0 and start <= end and end <= len(value), "Substring indices out of bounds");
     return _builtin_substring(value, start, end);
 }
 
+/// Lexicographically compares two strings byte-by-byte.
+///
+/// @param left The first string.
+/// @param right The second string.
+/// @return -1 if left < right, 0 if left == right, 1 if left > right.
 pub fn compare(left: str, right: str): int {
     if (left == right) return 0;
     var len_l = len(left);

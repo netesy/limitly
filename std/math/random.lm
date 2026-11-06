@@ -1,3 +1,6 @@
+// std/math/random.lm
+// Random submodule for std.math. Mathematical constants, arithmetic functions, trigonometry, and statistics.
+
 import std.resource as res;
 
 frame Random {

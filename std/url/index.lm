@@ -1,3 +1,6 @@
+// std/url/index.lm
+// Public entrypoint and facade for std.url. URL parsing, URL encoding, query strings, and URI resolution.
+
 import std.url.url as url;
 import std.url.builder as builder;
 import std.url.query as query;

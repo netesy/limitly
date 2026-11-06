@@ -1,3 +1,6 @@
+// std/string/builder.lm
+// Builder submodule for std.string. String manipulation, UTF-8 text processing, and string builders.
+
 frame Builder {
     pub var parts: [str] = [] as [str];
 

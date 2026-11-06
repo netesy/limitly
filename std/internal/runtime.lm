@@ -1,3 +1,6 @@
+// std/internal/runtime.lm
+// Runtime submodule for std.internal. Internal runtime support and resource identifiers.
+
 enum ResourceKind {
     File,
     Socket,

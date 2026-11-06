@@ -1,3 +1,6 @@
+// std/unicode/category.lm
+// Category submodule for std.unicode. Unicode character classification, normalization, and rune operations.
+
 pub fn is_upper(ch: str): bool {
     if (len(ch) == 0) return false;
     var c = _builtin_substring(ch, 0, 1);

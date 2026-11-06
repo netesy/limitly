@@ -1,3 +1,6 @@
+// std/mime/index.lm
+// Public entrypoint and facade for std.mime. MIME type registry and content-type detection.
+
 import std.mime.types as types;
 
 pub import std.mime.types show Type, Params;

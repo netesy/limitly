@@ -1,3 +1,6 @@
+// std/graphics/shader.lm
+// Shader submodule for std.graphics. 2D/3D graphics abstractions, canvases, shaders, and rendering pipelines.
+
 frame Shader {
     pub var source: str;
     pub var stage: int; // 0 = vertex, 1 = fragment, 2 = compute

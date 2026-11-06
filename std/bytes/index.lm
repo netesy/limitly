@@ -1,3 +1,6 @@
+// std/bytes/index.lm
+// Public entrypoint and facade for std.bytes. Byte buffer manipulation, binary slicing, and endian utilities.
+
 frame ByteBuffer {
     pub var data: [int];
     

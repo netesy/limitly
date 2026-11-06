@@ -1,3 +1,6 @@
+// std/graphics/renderer.lm
+// Renderer submodule for std.graphics. 2D/3D graphics abstractions, canvases, shaders, and rendering pipelines.
+
 import std.graphics.canvas as canvas;
 import std.graphics.surface as surface;
 

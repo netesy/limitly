@@ -1,3 +1,6 @@
+// std/text/cursor.lm
+// Cursor submodule for std.text. Rich text editing, text layout, cursors, and text selection.
+
 frame Cursor {
     pub var line: int;
     pub var col: int;

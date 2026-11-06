@@ -1,3 +1,6 @@
+// std/graphics/ellipse.lm
+// Ellipse submodule for std.graphics. 2D/3D graphics abstractions, canvases, shaders, and rendering pipelines.
+
 var PI: float = 3.141592653589793;
 
 frame Ellipse {

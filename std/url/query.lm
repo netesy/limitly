@@ -1,3 +1,6 @@
+// std/url/query.lm
+// Query submodule for std.url. URL parsing, URL encoding, query strings, and URI resolution.
+
 import std.encoding.percent as percent;
 
 frame QueryParams {

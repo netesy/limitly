@@ -1,3 +1,6 @@
+// std/math/matrix.lm
+// Matrix submodule for std.math. Mathematical constants, arithmetic functions, trigonometry, and statistics.
+
 frame Matrix {
     pub data: [float];
 

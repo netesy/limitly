@@ -1,3 +1,6 @@
+// std/graphics/texture.lm
+// Texture submodule for std.graphics. 2D/3D graphics abstractions, canvases, shaders, and rendering pipelines.
+
 frame Texture {
     pub var width: int;
     pub var height: int;

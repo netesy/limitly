@@ -1,3 +1,6 @@
+// std/graphics/path.lm
+// Path submodule for std.graphics. 2D/3D graphics abstractions, canvases, shaders, and rendering pipelines.
+
 frame Path {
     pub var commands: [int];
     pub var points: [float];

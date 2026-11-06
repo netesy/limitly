@@ -1,3 +1,6 @@
+// std/fs/index.lm
+// Public entrypoint and facade for std.fs. Filesystem paths, directory iteration, and file metadata access.
+
 import std.fs.directory;
 import std.fs.permissions;
 import std.path.index as path;

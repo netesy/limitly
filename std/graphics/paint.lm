@@ -1,3 +1,6 @@
+// std/graphics/paint.lm
+// Paint submodule for std.graphics. 2D/3D graphics abstractions, canvases, shaders, and rendering pipelines.
+
 import std.graphics.color as color;
 import std.graphics.brush as brush;
 

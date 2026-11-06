@@ -1,3 +1,6 @@
+// std/algorithm/transform.lm
+// Transform submodule for std.algorithm. Algorithmic utilities, searching, filtering, and sequence manipulation.
+
 pub fn map(items: [any], f: fn(any): any): [any] {
     var res: [any] = [];
     var i = 0;

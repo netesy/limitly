@@ -1,3 +1,6 @@
+// std/text/document.lm
+// Document submodule for std.text. Rich text editing, text layout, cursors, and text selection.
+
 import std.string as string;
 
 frame Document {

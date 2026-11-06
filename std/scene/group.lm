@@ -1,3 +1,6 @@
+// std/scene/group.lm
+// Group submodule for std.scene. Scene graph nodes, 2D/3D scene trees, and transformation hierarchies.
+
 import std.scene.node as node;
 
 frame Group {

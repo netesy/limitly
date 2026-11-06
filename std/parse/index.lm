@@ -1,3 +1,6 @@
+// std/parse/index.lm
+// Public entrypoint and facade for std.parse. Parsing helpers for numbers, booleans, dates, and text tokens.
+
 import std.parse.numbers as numbers;
 import std.parse.bool as bool_parser;
 import std.time.datetime as datetime;

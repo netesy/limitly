@@ -1,3 +1,6 @@
+// std/algorithm/filter.lm
+// Filter submodule for std.algorithm. Algorithmic utilities, searching, filtering, and sequence manipulation.
+
 pub fn filter(items: [any], p: fn(any): bool): [any] {
     var res: [any] = [];
     var i = 0;

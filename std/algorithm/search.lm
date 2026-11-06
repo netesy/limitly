@@ -1,3 +1,6 @@
+// std/algorithm/search.lm
+// Search submodule for std.algorithm. Algorithmic utilities, searching, filtering, and sequence manipulation.
+
 pub fn linear_search(items: [any], value: any): int {
     var i = 0;
     while (i < len(items)) {

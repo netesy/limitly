@@ -1,3 +1,6 @@
+// std/focus/manager.lm
+// Manager submodule for std.focus. Focus management, keyboard focus rings, and widget focus navigation.
+
 frame Manager {
     pub var current_id: str;
 

@@ -1,3 +1,6 @@
+// std/algorithm/shuffle.lm
+// Shuffle submodule for std.algorithm. Algorithmic utilities, searching, filtering, and sequence manipulation.
+
 pub fn shuffle(items: [any]) {
     var n = len(items);
     if (n <= 1) {

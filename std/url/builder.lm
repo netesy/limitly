@@ -1,3 +1,6 @@
+// std/url/builder.lm
+// Builder submodule for std.url. URL parsing, URL encoding, query strings, and URI resolution.
+
 import std.url.url as url;
 
 frame Builder {

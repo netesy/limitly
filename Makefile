@@ -285,7 +285,7 @@ windows: $(BIN_DIR) $(MAIN_RSP) liblymar ssl-lib $(LYRA_BIN) $(BIN_DIR)/liblymar
 
 linux: $(BIN_DIR) $(MAIN_RSP) liblymar ssl-lib $(LYRA_BIN) $(BIN_DIR)/liblymar_aot.a
 	@echo "[BUILD] Linking lymar ..."
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) @$(MAIN_RSP) $(OBJ_DIR)/liblymar.a $(FYRA_LIB) $(LYRA_LIB) -o $(BIN_DIR)/lymar$(EXE_EXT) $(LIBS) -lssl -lcrypto -lpthread
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) @$(MAIN_RSP) $(OBJ_DIR)/liblymar.a $(FYRA_LIB) $(LYRA_LIB) -o $(BIN_DIR)/lymar$(EXE_EXT) $(LIBS) -lssl -lcrypto -lz -lpthread
 	@echo "[OK] lymar built."
 
 $(BIN_DIR)/liblymar_aot.a: $(OBJ_DIR)/src/memory/aot_runtime.o $(OBJ_DIR)/src/memory/aot_ffi.o $(OBJ_DIR)/src/runtime/os_info.o $(OBJ_DIR)/src/runtime/lymarrt/lymarrt.o $(OBJ_DIR)/src/runtime/sokol/sokol_app_runtime.o $(OBJ_DIR)/src/runtime/truetype.o Makefile | $(BIN_DIR)

@@ -1,3 +1,6 @@
+// std/graphics/vector3.lm
+// Vector3 submodule for std.graphics. 2D/3D graphics abstractions, canvases, shaders, and rendering pipelines.
+
 import std.math as math;
 
 frame Vector3 {

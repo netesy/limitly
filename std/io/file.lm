@@ -14,6 +14,11 @@ frame UnknownError { pub var message: str; }
 
 pub type IOError = FileNotFound | PermissionDenied | DiskFull | NetworkError | UnknownError;
 
+/// Stream handle for local file reading and writing.
+///
+/// @tip Always ensure files are closed via `file.close()` or automatic deinit cleanup.
+///
+/// @note Implements Reader, Writer, and Disposable traits.
 frame File : Reader, Writer, Disposable {
     embed res.Reader;
     embed res.Writer;
@@ -30,6 +35,7 @@ frame File : Reader, Writer, Disposable {
         self.dispose();
     }
 
+    /// Disposes resources held by the file handle.
     pub fn dispose(): nil {
         if (self.resource.is_open_val) {
             self.close();
@@ -37,6 +43,9 @@ frame File : Reader, Writer, Disposable {
         return nil;
     }
 
+    /// Reads content from the file stream.
+    ///
+    /// @return String content or fallible IOError.
     pub fn read(args: [any] = [] as [any]): any {
         if (len(args) == 0) {
             var res_data = rt.call(self.resource.handle, res.OP_READ, []);
@@ -46,12 +55,17 @@ frame File : Reader, Writer, Disposable {
         return rt.call(self.resource.handle, res.OP_READ, args);
     }
 
+    /// Reads raw bytes from the file stream.
     pub fn read_bytes(): [int]?IOError {
         var res_data = rt.call(self.resource.handle, res.OP_READ_BYTES, []);
         if (res_data == nil or len(res_data as [int]) == 0) return err(UnknownError(message="empty"));
         return ok(res_data as [int]);
     }
 
+    /// Writes data to the file stream.
+    ///
+    /// @param arg The data string or argument list to write.
+    /// @return Fallible ok(nil) or err(UnknownError).
     pub fn write(arg: any): any {
         var args_list: [any] = [];
         if (arg as [any] != nil) {
@@ -64,6 +78,7 @@ frame File : Reader, Writer, Disposable {
         return ok(nil);
     }
 
+    /// Closes the underlying operating system file resource.
     pub fn close(): nil?IOError {
         if (self.resource.is_open_val) {
             rt.destroy(self.resource.handle);
@@ -72,12 +87,27 @@ frame File : Reader, Writer, Disposable {
         return ok(nil);
     }
 
+    /// Checks if the file stream is currently open.
     pub fn is_open(): bool {
         return self.resource.is_open();
     }
 }
 
+/// Opens a file at the given path with specified mode ("r", "w", "a", etc.).
+///
+/// @pre len(path) > 0 and len(mode) > 0
+/// @param path The relative or absolute filesystem path.
+/// @param mode File access mode ('r', 'w', 'a', etc.).
+/// @return Fallible File handle or IOError variant.
+///
+/// @example
+/// var file = open("data.txt", "r")? else {
+///     print("Failed to open data.txt");
+///     return;
+/// };
 pub fn open(path: str, mode: str): File?IOError {
+    contract(len(path) > 0, "File path must not be empty");
+    contract(len(mode) > 0, "File mode must not be empty");
     match (res.open_file(path=path, mode=mode)) {
         val r => return ok(File(path, r)),
         err e => {

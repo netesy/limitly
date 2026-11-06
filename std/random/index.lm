@@ -1,3 +1,6 @@
+// std/random/index.lm
+// Public entrypoint and facade for std.random. Random number generation and statistical distributions.
+
 import std.resource as res;
 
 frame Random {

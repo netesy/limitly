@@ -1,3 +1,6 @@
+// std/math/trigonometry.lm
+// Trigonometry submodule for std.math. Mathematical constants, arithmetic functions, trigonometry, and statistics.
+
 import std.math.constants as const;
 import std.math.arithmetic as arith;
 

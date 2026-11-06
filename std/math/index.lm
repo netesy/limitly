@@ -1,3 +1,6 @@
+// std/math/index.lm
+// Public entrypoint and facade for std.math. Mathematical constants, arithmetic functions, trigonometry, and statistics.
+
 import std.math.constants;
 import std.math.arithmetic;
 import std.math.trigonometry;

@@ -1,3 +1,6 @@
+// std/text/controller.lm
+// Controller submodule for std.text. Rich text editing, text layout, cursors, and text selection.
+
 import std.text.document as doc;
 import std.text.cursor as cursor;
 

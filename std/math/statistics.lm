@@ -1,3 +1,6 @@
+// std/math/statistics.lm
+// Statistics submodule for std.math. Mathematical constants, arithmetic functions, trigonometry, and statistics.
+
 import std.math.arithmetic as arith;
 
 pub fn sum(items: [any]): float {

@@ -1,3 +1,6 @@
+// std/unicode/normalize.lm
+// Normalize submodule for std.unicode. Unicode character classification, normalization, and rune operations.
+
 fn _char_to_lower(ch: str): str {
     if (ch == "A") { return "a"; }
     if (ch == "B") { return "b"; }

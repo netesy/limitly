@@ -5,22 +5,55 @@ import std.compress.zlib as zlib;
 
 pub import std.compress.zlib show Zlib;
 
+/// Creates a new Zlib instance for streaming and block compression.
+///
+/// @tip Preferred for namespace-style usage: `var z = compress.Zlib();`
 pub fn Zlib(): zlib.Zlib {
     return zlib.Zlib();
 }
 
+/// Compresses an input string into deflate hex representation.
+///
+/// @tip Recommended level 6 for best compression ratio vs performance.
+/// @pre level >= 0 and level <= 9
+/// @param data Plain text or binary string to compress.
+/// @param level Compression level between 0 and 9 (default: 6).
+/// @return Fallible compressed hex string.
 pub fn compress(data: str, level: int = 6): str? {
+    contract(level >= 0 and level <= 9, "Compression level must be between 0 and 9");
     return zlib.compress(data, level);
 }
 
+/// Decompresses a hex-encoded deflate payload.
+///
+/// @warning Enforce memory limits when handling untrusted inputs.
+/// @pre max_limit > 0
+/// @param compressed Hex-encoded compressed payload.
+/// @param max_limit Maximum decompressed bytes allowed (default: 10MB).
+/// @return Fallible decompressed string.
 pub fn decompress(compressed: str, max_limit: int = 10485760): str? {
+    contract(max_limit > 0, "Decompression limit must be positive");
     return zlib.decompress(compressed, max_limit);
 }
 
+/// Compresses an input string into raw deflate bytes encoded as hex.
+///
+/// @pre level >= 0 and level <= 9
+/// @param data String data to compress.
+/// @param level Compression level (0..9).
+/// @return Fallible compressed hex string.
 pub fn compress_hex(data: str, level: int = 6): str? {
+    contract(level >= 0 and level <= 9, "Compression level must be between 0 and 9");
     return zlib.compress_hex(data, level);
 }
 
+/// Decompresses a hex-encoded deflate payload into plain text.
+///
+/// @pre max_limit > 0
+/// @param compressed_hex Hex-encoded compressed payload.
+/// @param max_limit Maximum decompressed bytes allowed.
+/// @return Fallible decompressed string.
 pub fn decompress_hex(compressed_hex: str, max_limit: int = 10485760): str? {
+    contract(max_limit > 0, "Decompression limit must be positive");
     return zlib.decompress_hex(compressed_hex, max_limit);
 }

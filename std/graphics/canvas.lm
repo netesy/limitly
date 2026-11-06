@@ -1,3 +1,6 @@
+// std/graphics/canvas.lm
+// Canvas submodule for std.graphics. 2D/3D graphics abstractions, canvases, shaders, and rendering pipelines.
+
 import std.graphics.rect as rect;
 import std.graphics.paint as paint;
 import std.graphics.color as color;

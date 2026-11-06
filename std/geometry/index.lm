@@ -1,3 +1,6 @@
+// std/geometry/index.lm
+// Public entrypoint and facade for std.geometry. Geometric shapes, intersections, bounding boxes, and vectors.
+
 import std.math as math;
 import std.linear_algebra as la;
 

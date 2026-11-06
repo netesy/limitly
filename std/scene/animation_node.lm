@@ -1,3 +1,6 @@
+// std/scene/animation_node.lm
+// Animation Node submodule for std.scene. Scene graph nodes, 2D/3D scene trees, and transformation hierarchies.
+
 import std.scene.node as node;
 import std.graphics.transform as transform; // required: promoted apply_base body resolves in host scope
 import std.graphics.animation as animation;

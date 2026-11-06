@@ -1,3 +1,6 @@
+// std/cli/index.lm
+// Public entrypoint and facade for std.cli. Command-line argument parsing, options, and CLI flag handling.
+
 import std.string as string;
 import std.collections.hash as hash;
 

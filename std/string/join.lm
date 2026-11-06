@@ -1,3 +1,6 @@
+// std/string/join.lm
+// Join submodule for std.string. String manipulation, UTF-8 text processing, and string builders.
+
 pub fn join(values: [str], delimiter: str): str {
     return _builtin_string_join(values, delimiter);
 }

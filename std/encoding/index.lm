@@ -1,3 +1,6 @@
+// std/encoding/index.lm
+// Public entrypoint and facade for std.encoding. Data encodings: Base64, Hex, URL percent, UTF-16, and UTF-32.
+
 import std.encoding.base64 as base64;
 import std.encoding.hex as hex;
 import std.encoding.percent as percent;

@@ -1,3 +1,6 @@
+// std/unicode/index.lm
+// Public entrypoint and facade for std.unicode. Unicode character classification, normalization, and rune operations.
+
 import std.unicode.rune as rune;
 import std.unicode.category as category;
 import std.unicode.normalize as normalize;

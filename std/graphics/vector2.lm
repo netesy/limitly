@@ -1,3 +1,6 @@
+// std/graphics/vector2.lm
+// Vector2 submodule for std.graphics. 2D/3D graphics abstractions, canvases, shaders, and rendering pipelines.
+
 import std.math as math;
 
 frame Vector2 {

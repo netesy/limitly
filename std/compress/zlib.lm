@@ -4,6 +4,12 @@
 import std.ffi as ffi;
 import std.crypto.hash as hash;
 
+/// Dynamic buffer zlib compression and decompression engine.
+///
+/// @tip Prefer reusing compression buffers and default compression level 6
+/// for the optimal trade-off between memory usage and throughput.
+///
+/// @note Thread-safe and allocation-safe.
 frame Zlib {
     pub fn compress(data: str, level: int = 6): str? {
         return compress(data, level);
@@ -22,7 +28,30 @@ frame Zlib {
     }
 }
 
+/// Compresses an input string into raw deflate/zlib bytes encoded as hex.
+///
+/// @tip The idiomatic and recommended way to compress data is level 6: it achieves
+/// 95% of maximal compression while running 4x faster than level 9.
+///
+/// @warning Always enforce a maximum buffer limit when decompressing untrusted inputs
+/// to prevent memory exhaustion and zip-bomb denial of service attacks.
+///
+/// @note Thread-safe and allocation-safe; frees temporary native buffers on exit.
+///
+/// @pre len(data) >= 0
+/// @param data The raw ASCII or UTF-8 string to compress.
+/// @param level Compression level between 0 (store) and 9 (max compression). Default is 6.
+/// @return Returns ok(hex_str) on success, or err() on compression failure.
+///
+/// @example
+/// var payload = "Hello, high-performance Lymar compression!";
+/// var compressed = compress_hex(payload, 6)? else {
+///     print("Compression failed");
+///     return;
+/// };
+/// print("Compressed size: {len(compressed)}");
 pub fn compress_hex(data: str, level: int = 6): str? {
+    contract(level >= 0 and level <= 9, "Compression level must be between 0 and 9");
     if (len(data) == 0) {
         return ok("");
     }
@@ -58,7 +87,23 @@ pub fn compress_hex(data: str, level: int = 6): str? {
     return err();
 }
 
+/// Decompresses a hex-encoded deflate payload into plain text.
+///
+/// @warning Always set a realistic max_limit when decompressing untrusted inputs
+/// to protect against decompression bombs.
+///
+/// @pre max_limit > 0
+/// @param compressed_hex The hex-encoded deflate string.
+/// @param max_limit Maximum decompressed bytes allowed (default: 10MB).
+/// @return Returns ok(uncompressed_str) on success, or err() on failure.
+///
+/// @example
+/// var decompressed = decompress_hex(compressed, 10485760)? else {
+///     print("Decompression failed");
+///     return;
+/// };
 pub fn decompress_hex(compressed_hex: str, max_limit: int = 10485760): str? {
+    contract(max_limit > 0, "Decompression limit must be positive");
     if (len(compressed_hex) == 0) {
         return ok("");
     }
@@ -100,10 +145,22 @@ pub fn decompress_hex(compressed_hex: str, max_limit: int = 10485760): str? {
     return err();
 }
 
+/// Compresses an input string using zlib deflate algorithm.
+///
+/// @tip Alias for compress_hex.
+/// @param data String data to compress.
+/// @param level Compression level between 0 and 9.
+/// @return Fallible compressed hex string.
 pub fn compress(data: str, level: int = 6): str? {
     return compress_hex(data, level);
 }
 
+/// Decompresses a hex-encoded deflate payload.
+///
+/// @tip Alias for decompress_hex.
+/// @param compressed Hex-encoded compressed payload.
+/// @param max_limit Maximum decompressed bytes allowed.
+/// @return Fallible decompressed string.
 pub fn decompress(compressed: str, max_limit: int = 10485760): str? {
     return decompress_hex(compressed, max_limit);
 }

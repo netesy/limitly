@@ -1,3 +1,6 @@
+// std/graphics/animation.lm
+// Animation submodule for std.graphics. 2D/3D graphics abstractions, canvases, shaders, and rendering pipelines.
+
 frame Animation {
     pub var duration: float;
     pub var current_time: float;

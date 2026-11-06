@@ -1,3 +1,6 @@
+// std/range/index.lm
+// Public entrypoint and facade for std.range. Range generators, stepping, and range iterators.
+
 import std.traits show Iterator;
 
 frame Range {

@@ -1,3 +1,6 @@
+// std/unicode/rune.lm
+// Rune submodule for std.unicode. Unicode character classification, normalization, and rune operations.
+
 fn char_code(ch: str): int {
     var alphabet = " abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     var i = 0;

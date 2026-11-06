@@ -1,3 +1,6 @@
+// std/graphics/brush.lm
+// Brush submodule for std.graphics. 2D/3D graphics abstractions, canvases, shaders, and rendering pipelines.
+
 import std.graphics.color as color;
 
 frame Brush {

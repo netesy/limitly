@@ -1,3 +1,6 @@
+// std/uuid/uuid.lm
+// Uuid submodule for std.uuid. Universally Unique Identifier (UUID) generation and parsing.
+
 frame UUID {
     pub bytes: [int];
     pub is_valid: bool;

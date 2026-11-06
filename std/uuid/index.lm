@@ -1,3 +1,6 @@
+// std/uuid/index.lm
+// Public entrypoint and facade for std.uuid. Universally Unique Identifier (UUID) generation and parsing.
+
 import std.uuid.uuid as uuid;
 import std.uuid.generator as generator;
 

@@ -1,3 +1,6 @@
+// std/linear_algebra/index.lm
+// Public entrypoint and facade for std.linear_algebra. Vector and matrix linear algebra routines and transformations.
+
 import std.math as math;
 
 frame Vec2 {

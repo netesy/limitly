@@ -1,3 +1,6 @@
+// std/url/url.lm
+// Url submodule for std.url. URL parsing, URL encoding, query strings, and URI resolution.
+
 import std.encoding.percent as percent;
 import std.url.query as query;
 
