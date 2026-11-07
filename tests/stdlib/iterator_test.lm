@@ -1,6 +1,6 @@
 import std.iterator as iterator;
 
-fn twice(x: any): any { return x * 2; }
+fn twice(x: any): int { return x * 2; }
 fn even(x: any): bool { return x % 2 == 0; }
 
 fn main(): int {

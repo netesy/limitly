@@ -2,7 +2,7 @@
 
 import std.iterator as iter;
 
-fn square(x: any): any {
+fn square(x: any): int {
     var val_int = x as int;
     return val_int * val_int;
 }

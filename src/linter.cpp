@@ -2,6 +2,7 @@
 #include "frontend/scanner.hh"
 #include "frontend/parser.hh"
 #include "frontend/ast.hh"
+#include "frontend/type_checker.hh"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -578,6 +579,529 @@ void collect_referenced_vars(const std::shared_ptr<Frontend::AST::Node>& node, s
         }
         return;
     }
+}
+
+void collect_return_statements(const std::shared_ptr<Frontend::AST::Statement>& stmt,
+                               std::vector<std::shared_ptr<Frontend::AST::ReturnStatement>>& returns) {
+    if (!stmt) return;
+    if (auto ret = std::dynamic_pointer_cast<Frontend::AST::ReturnStatement>(stmt)) {
+        returns.push_back(ret);
+        return;
+    }
+    if (std::dynamic_pointer_cast<Frontend::AST::FunctionDeclaration>(stmt)) {
+        return;
+    }
+    if (auto block = std::dynamic_pointer_cast<Frontend::AST::BlockStatement>(stmt)) {
+        for (const auto& s : block->statements) {
+            collect_return_statements(s, returns);
+        }
+        return;
+    }
+    if (auto if_stmt = std::dynamic_pointer_cast<Frontend::AST::IfStatement>(stmt)) {
+        collect_return_statements(if_stmt->thenBranch, returns);
+        collect_return_statements(if_stmt->elseBranch, returns);
+        return;
+    }
+    if (auto while_stmt = std::dynamic_pointer_cast<Frontend::AST::WhileStatement>(stmt)) {
+        collect_return_statements(while_stmt->body, returns);
+        return;
+    }
+    if (auto for_stmt = std::dynamic_pointer_cast<Frontend::AST::ForStatement>(stmt)) {
+        collect_return_statements(for_stmt->body, returns);
+        return;
+    }
+    if (auto iter_stmt = std::dynamic_pointer_cast<Frontend::AST::IterStatement>(stmt)) {
+        collect_return_statements(iter_stmt->body, returns);
+        return;
+    }
+    if (auto unsafe_stmt = std::dynamic_pointer_cast<Frontend::AST::UnsafeStatement>(stmt)) {
+        collect_return_statements(unsafe_stmt->body, returns);
+        return;
+    }
+}
+
+std::string infer_expression_type(const std::shared_ptr<Frontend::AST::Expression>& expr,
+                                  const std::unordered_map<std::string, std::string>& var_types) {
+    if (!expr) return "";
+
+    if (auto lit = std::dynamic_pointer_cast<Frontend::AST::LiteralExpr>(expr)) {
+        if (std::holds_alternative<bool>(lit->value)) return "bool";
+        if (std::holds_alternative<std::nullptr_t>(lit->value)) return "nil";
+        if (lit->literalType == Frontend::TokenType::INT_LITERAL || lit->literalType == Frontend::TokenType::HEX_LITERAL) return "int";
+        if (lit->literalType == Frontend::TokenType::FLOAT_LITERAL || lit->literalType == Frontend::TokenType::SCIENTIFIC_LITERAL) return "float";
+        if (lit->literalType == Frontend::TokenType::STRING) return "str";
+        if (lit->literalType == Frontend::TokenType::NIL) return "nil";
+        if (std::holds_alternative<std::string>(lit->value)) return "str";
+    }
+
+    if (auto var = std::dynamic_pointer_cast<Frontend::AST::VariableExpr>(expr)) {
+        auto it = var_types.find(var->name);
+        if (it != var_types.end()) return it->second;
+    }
+
+    if (auto interp = std::dynamic_pointer_cast<Frontend::AST::InterpolatedStringExpr>(expr)) {
+        return "str";
+    }
+
+    if (auto cast_expr = std::dynamic_pointer_cast<Frontend::AST::CastExpr>(expr)) {
+        if (cast_expr->targetType) {
+            return format_type(cast_expr->targetType);
+        }
+    }
+
+    if (auto list_expr = std::dynamic_pointer_cast<Frontend::AST::ListExpr>(expr)) {
+        if (!list_expr->elements.empty()) {
+            std::string elem_type = infer_expression_type(list_expr->elements[0], var_types);
+            if (!elem_type.empty()) {
+                return "[" + elem_type + "]";
+            }
+        }
+        return "[any]";
+    }
+
+    if (auto dict_expr = std::dynamic_pointer_cast<Frontend::AST::DictExpr>(expr)) {
+        if (!dict_expr->entries.empty()) {
+            std::string k_type = infer_expression_type(dict_expr->entries[0].first, var_types);
+            std::string v_type = infer_expression_type(dict_expr->entries[0].second, var_types);
+            if (!k_type.empty() && !v_type.empty()) {
+                return "{" + k_type + ": " + v_type + "}";
+            }
+        }
+    }
+
+    if (auto idx = std::dynamic_pointer_cast<Frontend::AST::IndexExpr>(expr)) {
+        std::string coll = infer_expression_type(idx->object, var_types);
+        if (coll.size() > 2 && coll.front() == '[' && coll.back() == ']') {
+            return coll.substr(1, coll.size() - 2);
+        }
+    }
+
+    if (auto bin = std::dynamic_pointer_cast<Frontend::AST::BinaryExpr>(expr)) {
+        switch (bin->op) {
+            case Frontend::TokenType::EQUAL_EQUAL:
+            case Frontend::TokenType::BANG_EQUAL:
+            case Frontend::TokenType::LESS:
+            case Frontend::TokenType::GREATER:
+            case Frontend::TokenType::LESS_EQUAL:
+            case Frontend::TokenType::GREATER_EQUAL:
+            case Frontend::TokenType::AND:
+            case Frontend::TokenType::OR:
+                return "bool";
+            case Frontend::TokenType::MODULUS:
+            case Frontend::TokenType::AMPERSAND:
+            case Frontend::TokenType::PIPE:
+            case Frontend::TokenType::CARET:
+            case Frontend::TokenType::LESS_LESS:
+            case Frontend::TokenType::GREATER_GREATER:
+                return "int";
+            case Frontend::TokenType::PLUS: {
+                std::string l = infer_expression_type(bin->left, var_types);
+                std::string r = infer_expression_type(bin->right, var_types);
+                if (l == "str" || r == "str") return "str";
+                if (l == "float" || r == "float") return "float";
+                if (l == "int" && r == "int") return "int";
+                return l.empty() ? r : l;
+            }
+            case Frontend::TokenType::MINUS:
+            case Frontend::TokenType::STAR:
+            case Frontend::TokenType::SLASH:
+            case Frontend::TokenType::POWER: {
+                std::string l = infer_expression_type(bin->left, var_types);
+                std::string r = infer_expression_type(bin->right, var_types);
+                if (l == "float" || r == "float") return "float";
+                if (l == "int" && r == "int") return "int";
+                return l.empty() ? r : l;
+            }
+            default:
+                break;
+        }
+    }
+
+    if (auto un = std::dynamic_pointer_cast<Frontend::AST::UnaryExpr>(expr)) {
+        if (un->op == Frontend::TokenType::BANG || un->op == Frontend::TokenType::NOT) return "bool";
+        if (un->op == Frontend::TokenType::MINUS || un->op == Frontend::TokenType::TILDE) {
+            return infer_expression_type(un->right, var_types);
+        }
+    }
+
+    if (auto call = std::dynamic_pointer_cast<Frontend::AST::CallExpr>(expr)) {
+        if (auto callee_var = std::dynamic_pointer_cast<Frontend::AST::VariableExpr>(call->callee)) {
+            if (callee_var->name == "len" || callee_var->name == "str_len") return "int";
+            if (callee_var->name == "parse_int" || callee_var->name == "to_int") return "int";
+            if (callee_var->name == "to_string" || callee_var->name == "to_str") return "str";
+            if (callee_var->name == "parse_bool") return "bool";
+            if (callee_var->name == "parse_float") return "float";
+        }
+        if (auto member = std::dynamic_pointer_cast<Frontend::AST::MemberExpr>(call->callee)) {
+            if (member->name == "length" || member->name == "len" || member->name == "count") return "int";
+            if (member->name == "to_string") return "str";
+            if (member->name == "is_valid" || member->name == "is_empty" ||
+                member->name == "starts_with" || member->name == "ends_with" ||
+                member->name == "contains" || member->name == "equals") return "bool";
+        }
+    }
+
+    return "";
+}
+
+void find_param_uses(const std::string& param,
+                     const std::shared_ptr<Frontend::AST::Expression>& expr,
+                     std::string& inferred) {
+    if (!expr || !inferred.empty()) return;
+
+    if (auto cast_expr = std::dynamic_pointer_cast<Frontend::AST::CastExpr>(expr)) {
+        if (auto var = std::dynamic_pointer_cast<Frontend::AST::VariableExpr>(cast_expr->expression)) {
+            if (var->name == param && cast_expr->targetType) {
+                inferred = format_type(cast_expr->targetType);
+                return;
+            }
+        }
+    }
+
+    if (auto bin = std::dynamic_pointer_cast<Frontend::AST::BinaryExpr>(expr)) {
+        if (bin->op == Frontend::TokenType::MODULUS ||
+            bin->op == Frontend::TokenType::AMPERSAND ||
+            bin->op == Frontend::TokenType::PIPE ||
+            bin->op == Frontend::TokenType::CARET ||
+            bin->op == Frontend::TokenType::LESS_LESS ||
+            bin->op == Frontend::TokenType::GREATER_GREATER) {
+            if (auto var = std::dynamic_pointer_cast<Frontend::AST::VariableExpr>(bin->left)) {
+                if (var->name == param) { inferred = "int"; return; }
+            }
+            if (auto var = std::dynamic_pointer_cast<Frontend::AST::VariableExpr>(bin->right)) {
+                if (var->name == param) { inferred = "int"; return; }
+            }
+        }
+        if (bin->op == Frontend::TokenType::STAR || bin->op == Frontend::TokenType::SLASH ||
+            bin->op == Frontend::TokenType::MINUS) {
+            auto is_int_lit = [](const std::shared_ptr<Frontend::AST::Expression>& e) {
+                if (auto lit = std::dynamic_pointer_cast<Frontend::AST::LiteralExpr>(e)) {
+                    return lit->literalType == Frontend::TokenType::INT_LITERAL || lit->literalType == Frontend::TokenType::HEX_LITERAL;
+                }
+                return false;
+            };
+            if (auto var = std::dynamic_pointer_cast<Frontend::AST::VariableExpr>(bin->left)) {
+                if (var->name == param && is_int_lit(bin->right)) { inferred = "int"; return; }
+            }
+            if (auto var = std::dynamic_pointer_cast<Frontend::AST::VariableExpr>(bin->right)) {
+                if (var->name == param && is_int_lit(bin->left)) { inferred = "int"; return; }
+            }
+        }
+        find_param_uses(param, bin->left, inferred);
+        find_param_uses(param, bin->right, inferred);
+        return;
+    }
+
+    if (auto call = std::dynamic_pointer_cast<Frontend::AST::CallExpr>(expr)) {
+        find_param_uses(param, call->callee, inferred);
+        for (const auto& arg : call->arguments) {
+            find_param_uses(param, arg, inferred);
+        }
+        return;
+    }
+
+    if (auto un = std::dynamic_pointer_cast<Frontend::AST::UnaryExpr>(expr)) {
+        if (un->op == Frontend::TokenType::TILDE) {
+            if (auto var = std::dynamic_pointer_cast<Frontend::AST::VariableExpr>(un->right)) {
+                if (var->name == param) { inferred = "int"; return; }
+            }
+        }
+        find_param_uses(param, un->right, inferred);
+        return;
+    }
+
+    if (auto member = std::dynamic_pointer_cast<Frontend::AST::MemberExpr>(expr)) {
+        if (auto var = std::dynamic_pointer_cast<Frontend::AST::VariableExpr>(member->object)) {
+            if (var->name == param) {
+                if (member->name == "length" || member->name == "starts_with" ||
+                    member->name == "ends_with" || member->name == "contains") {
+                    inferred = "str";
+                    return;
+                }
+            }
+        }
+        find_param_uses(param, member->object, inferred);
+        return;
+    }
+}
+
+void find_param_uses_in_stmt(const std::string& param,
+                             const std::shared_ptr<Frontend::AST::Statement>& stmt,
+                             std::string& inferred) {
+    if (!stmt || !inferred.empty()) return;
+    if (auto expr_stmt = std::dynamic_pointer_cast<Frontend::AST::ExprStatement>(stmt)) {
+        find_param_uses(param, expr_stmt->expression, inferred);
+        return;
+    }
+    if (auto ret_stmt = std::dynamic_pointer_cast<Frontend::AST::ReturnStatement>(stmt)) {
+        find_param_uses(param, ret_stmt->value, inferred);
+        return;
+    }
+    if (auto var_decl = std::dynamic_pointer_cast<Frontend::AST::VarDeclaration>(stmt)) {
+        find_param_uses(param, var_decl->initializer, inferred);
+        return;
+    }
+    if (auto block = std::dynamic_pointer_cast<Frontend::AST::BlockStatement>(stmt)) {
+        for (const auto& s : block->statements) {
+            find_param_uses_in_stmt(param, s, inferred);
+            if (!inferred.empty()) return;
+        }
+        return;
+    }
+    if (auto if_stmt = std::dynamic_pointer_cast<Frontend::AST::IfStatement>(stmt)) {
+        find_param_uses(param, if_stmt->condition, inferred);
+        find_param_uses_in_stmt(param, if_stmt->thenBranch, inferred);
+        find_param_uses_in_stmt(param, if_stmt->elseBranch, inferred);
+        return;
+    }
+    if (auto while_stmt = std::dynamic_pointer_cast<Frontend::AST::WhileStatement>(stmt)) {
+        find_param_uses(param, while_stmt->condition, inferred);
+        find_param_uses_in_stmt(param, while_stmt->body, inferred);
+        return;
+    }
+    if (auto for_stmt = std::dynamic_pointer_cast<Frontend::AST::ForStatement>(stmt)) {
+        find_param_uses_in_stmt(param, for_stmt->initializer, inferred);
+        find_param_uses(param, for_stmt->condition, inferred);
+        find_param_uses(param, for_stmt->increment, inferred);
+        find_param_uses_in_stmt(param, for_stmt->body, inferred);
+        return;
+    }
+    if (auto iter_stmt = std::dynamic_pointer_cast<Frontend::AST::IterStatement>(stmt)) {
+        find_param_uses(param, iter_stmt->iterable, inferred);
+        find_param_uses_in_stmt(param, iter_stmt->body, inferred);
+        return;
+    }
+    if (auto unsafe_stmt = std::dynamic_pointer_cast<Frontend::AST::UnsafeStatement>(stmt)) {
+        find_param_uses_in_stmt(param, unsafe_stmt->body, inferred);
+        return;
+    }
+}
+
+struct AstDeclarations {
+    std::unordered_map<int, std::vector<std::shared_ptr<Frontend::AST::VarDeclaration>>> vars_by_line;
+    std::unordered_map<int, std::vector<std::shared_ptr<Frontend::AST::FunctionDeclaration>>> funcs_by_line;
+    std::unordered_map<int, std::vector<std::shared_ptr<Frontend::AST::FrameMethod>>> methods_by_line;
+};
+
+void collect_declarations(const std::shared_ptr<Frontend::AST::Statement>& stmt, AstDeclarations& decls) {
+    if (!stmt) return;
+    if (auto vd = std::dynamic_pointer_cast<Frontend::AST::VarDeclaration>(stmt)) {
+        decls.vars_by_line[vd->line].push_back(vd);
+        return;
+    }
+    if (auto fd = std::dynamic_pointer_cast<Frontend::AST::FunctionDeclaration>(stmt)) {
+        decls.funcs_by_line[fd->line].push_back(fd);
+        if (fd->body) {
+            for (const auto& s : fd->body->statements) {
+                collect_declarations(s, decls);
+            }
+        }
+        return;
+    }
+    if (auto frame = std::dynamic_pointer_cast<Frontend::AST::FrameDeclaration>(stmt)) {
+        if (frame->init) {
+            decls.methods_by_line[frame->init->line].push_back(frame->init);
+            if (frame->init->body) {
+                for (const auto& s : frame->init->body->statements) {
+                    collect_declarations(s, decls);
+                }
+            }
+        }
+        if (frame->deinit) {
+            decls.methods_by_line[frame->deinit->line].push_back(frame->deinit);
+            if (frame->deinit->body) {
+                for (const auto& s : frame->deinit->body->statements) {
+                    collect_declarations(s, decls);
+                }
+            }
+        }
+        for (const auto& m : frame->methods) {
+            if (m) {
+                decls.methods_by_line[m->line].push_back(m);
+                if (m->body) {
+                    for (const auto& s : m->body->statements) {
+                        collect_declarations(s, decls);
+                    }
+                }
+            }
+        }
+        return;
+    }
+    if (auto block = std::dynamic_pointer_cast<Frontend::AST::BlockStatement>(stmt)) {
+        for (const auto& s : block->statements) {
+            collect_declarations(s, decls);
+        }
+        return;
+    }
+    if (auto if_stmt = std::dynamic_pointer_cast<Frontend::AST::IfStatement>(stmt)) {
+        collect_declarations(if_stmt->thenBranch, decls);
+        collect_declarations(if_stmt->elseBranch, decls);
+        return;
+    }
+    if (auto while_stmt = std::dynamic_pointer_cast<Frontend::AST::WhileStatement>(stmt)) {
+        collect_declarations(while_stmt->body, decls);
+        return;
+    }
+    if (auto for_stmt = std::dynamic_pointer_cast<Frontend::AST::ForStatement>(stmt)) {
+        collect_declarations(for_stmt->initializer, decls);
+        collect_declarations(for_stmt->body, decls);
+        return;
+    }
+    if (auto iter_stmt = std::dynamic_pointer_cast<Frontend::AST::IterStatement>(stmt)) {
+        collect_declarations(iter_stmt->body, decls);
+        return;
+    }
+    if (auto unsafe_stmt = std::dynamic_pointer_cast<Frontend::AST::UnsafeStatement>(stmt)) {
+        collect_declarations(unsafe_stmt->body, decls);
+        return;
+    }
+}
+
+bool replace_var_annotation(std::string& line, const std::string& var_name, const std::string& old_type, const std::string& new_type) {
+    bool in_str = false;
+    char quote = 0;
+    int interp_depth = 0;
+    size_t i = 0;
+    while (i < line.length()) {
+        if (in_str) {
+            if (line[i] == '\\' && i + 1 < line.length()) { i += 2; continue; }
+            if (line[i] == quote && interp_depth == 0) { in_str = false; i++; continue; }
+            if (line[i] == '{') { interp_depth++; i++; continue; }
+            if (line[i] == '}' && interp_depth > 0) { interp_depth--; i++; continue; }
+            i++;
+            continue;
+        } else {
+            if (line[i] == '"' || line[i] == '\'') { in_str = true; quote = line[i]; interp_depth = 0; i++; continue; }
+            if (line[i] == '/' && i + 1 < line.length() && line[i + 1] == '/') break;
+        }
+
+        if (line.compare(i, var_name.length(), var_name) == 0) {
+            bool left_boundary = (i == 0 || (!isalnum(static_cast<unsigned char>(line[i - 1])) && line[i - 1] != '_'));
+            bool right_boundary = (i + var_name.length() >= line.length() || (!isalnum(static_cast<unsigned char>(line[i + var_name.length()])) && line[i + var_name.length()] != '_'));
+            if (left_boundary && right_boundary) {
+                size_t p = i + var_name.length();
+                while (p < line.length() && (line[p] == ' ' || line[p] == '\t')) p++;
+                if (p < line.length() && line[p] == ':') {
+                    p++;
+                    while (p < line.length() && (line[p] == ' ' || line[p] == '\t')) p++;
+                    if (p < line.length() && line.compare(p, old_type.length(), old_type) == 0) {
+                        bool r_bound = (p + old_type.length() >= line.length() || (!isalnum(static_cast<unsigned char>(line[p + old_type.length()])) && line[p + old_type.length()] != '_'));
+                        if (r_bound) {
+                            line.replace(p, old_type.length(), new_type);
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        i++;
+    }
+    return false;
+}
+
+bool replace_return_type_annotation(std::string& line, const std::string& func_name, const std::string& old_type, const std::string& new_type) {
+    bool in_str = false;
+    char quote = 0;
+    int interp_depth = 0;
+    size_t i = 0;
+    while (i < line.length()) {
+        if (in_str) {
+            if (line[i] == '\\' && i + 1 < line.length()) { i += 2; continue; }
+            if (line[i] == quote && interp_depth == 0) { in_str = false; i++; continue; }
+            if (line[i] == '{') { interp_depth++; i++; continue; }
+            if (line[i] == '}' && interp_depth > 0) { interp_depth--; i++; continue; }
+            i++;
+            continue;
+        } else {
+            if (line[i] == '"' || line[i] == '\'') { in_str = true; quote = line[i]; interp_depth = 0; i++; continue; }
+            if (line[i] == '/' && i + 1 < line.length() && line[i + 1] == '/') break;
+        }
+
+        if (line.compare(i, func_name.length(), func_name) == 0) {
+            bool left_boundary = (i == 0 || (!isalnum(static_cast<unsigned char>(line[i - 1])) && line[i - 1] != '_'));
+            bool right_boundary = (i + func_name.length() >= line.length() || (!isalnum(static_cast<unsigned char>(line[i + func_name.length()])) && line[i + func_name.length()] != '_'));
+            if (left_boundary && right_boundary) {
+                size_t p = line.find('(', i + func_name.length());
+                if (p != std::string::npos) {
+                    int depth = 0;
+                    size_t close_paren = std::string::npos;
+                    for (size_t k = p; k < line.length(); ++k) {
+                        if (line[k] == '(') depth++;
+                        else if (line[k] == ')') {
+                            depth--;
+                            if (depth == 0) { close_paren = k; break; }
+                        }
+                    }
+                    if (close_paren != std::string::npos) {
+                        size_t colon = close_paren + 1;
+                        while (colon < line.length() && (line[colon] == ' ' || line[colon] == '\t')) colon++;
+                        if (colon < line.length() && line[colon] == ':') {
+                            size_t t_pos = colon + 1;
+                            while (t_pos < line.length() && (line[t_pos] == ' ' || line[t_pos] == '\t')) t_pos++;
+                            if (t_pos < line.length() && line.compare(t_pos, old_type.length(), old_type) == 0) {
+                                bool r_bound = (t_pos + old_type.length() >= line.length() || (!isalnum(static_cast<unsigned char>(line[t_pos + old_type.length()])) && line[t_pos + old_type.length()] != '_'));
+                                if (r_bound) {
+                                    line.replace(t_pos, old_type.length(), new_type);
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        i++;
+    }
+    return false;
+}
+
+bool insert_return_type_annotation(std::string& line, const std::string& func_name, const std::string& new_type) {
+    bool in_str = false;
+    char quote = 0;
+    int interp_depth = 0;
+    size_t i = 0;
+    while (i < line.length()) {
+        if (in_str) {
+            if (line[i] == '\\' && i + 1 < line.length()) { i += 2; continue; }
+            if (line[i] == quote && interp_depth == 0) { in_str = false; i++; continue; }
+            if (line[i] == '{') { interp_depth++; i++; continue; }
+            if (line[i] == '}' && interp_depth > 0) { interp_depth--; i++; continue; }
+            i++;
+            continue;
+        } else {
+            if (line[i] == '"' || line[i] == '\'') { in_str = true; quote = line[i]; interp_depth = 0; i++; continue; }
+            if (line[i] == '/' && i + 1 < line.length() && line[i + 1] == '/') break;
+        }
+
+        if (line.compare(i, func_name.length(), func_name) == 0) {
+            bool left_boundary = (i == 0 || (!isalnum(static_cast<unsigned char>(line[i - 1])) && line[i - 1] != '_'));
+            bool right_boundary = (i + func_name.length() >= line.length() || (!isalnum(static_cast<unsigned char>(line[i + func_name.length()])) && line[i + func_name.length()] != '_'));
+            if (left_boundary && right_boundary) {
+                size_t p = line.find('(', i + func_name.length());
+                if (p != std::string::npos) {
+                    int depth = 0;
+                    size_t close_paren = std::string::npos;
+                    for (size_t k = p; k < line.length(); ++k) {
+                        if (line[k] == '(') depth++;
+                        else if (line[k] == ')') {
+                            depth--;
+                            if (depth == 0) { close_paren = k; break; }
+                        }
+                    }
+                    if (close_paren != std::string::npos) {
+                        size_t after_paren = close_paren + 1;
+                        while (after_paren < line.length() && (line[after_paren] == ' ' || line[after_paren] == '\t')) after_paren++;
+                        if (after_paren < line.length() && line[after_paren] != ':') {
+                            line.insert(close_paren + 1, ": " + new_type);
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        i++;
+    }
+    return false;
 }
 
 struct VarMeta {
@@ -1309,7 +1833,7 @@ int Linter::run(int argc, char** argv) {
             for (const auto& entry : fs::recursive_directory_iterator(path_str)) {
                 if (entry.is_regular_file() && entry.path().extension() == ".lm") {
                     std::string gen_path = entry.path().generic_string();
-                    if (gen_path.find("tests/errors/") != std::string::npos) continue;
+                    if (gen_path.find("tests/errors/") != std::string::npos || gen_path.find("tests/negative/") != std::string::npos) continue;
                     files_to_lint.push_back(gen_path);
                 }
             }
@@ -1407,7 +1931,7 @@ int Linter::runFix(int argc, char** argv) {
             for (const auto& entry : fs::recursive_directory_iterator(path_str)) {
                 if (entry.is_regular_file() && entry.path().extension() == ".lm") {
                     std::string gen_path = entry.path().generic_string();
-                    if (gen_path.find("tests/errors/") != std::string::npos) continue;
+                    if (gen_path.find("tests/errors/") != std::string::npos || gen_path.find("tests/negative/") != std::string::npos) continue;
                     files_to_fix.push_back(gen_path);
                 }
             }
@@ -1503,6 +2027,53 @@ int Linter::runFix(int argc, char** argv) {
         std::sort(diags.begin(), diags.end(), [](const LintDiagnostic& a, const LintDiagnostic& b) {
             return a.line > b.line;
         });
+
+        AstDeclarations decls;
+        std::string initial_content;
+        for (const auto& line_str : lines) {
+            initial_content += line_str + "\n";
+        }
+        try {
+            Frontend::Scanner scanner(initial_content, file);
+            scanner.scanTokens();
+            Frontend::Parser parser(scanner);
+            auto file_ast = parser.parse();
+            if (file_ast) {
+                for (const auto& s : file_ast->statements) {
+                    collect_declarations(s, decls);
+                }
+            }
+        } catch (...) {}
+
+        auto verify_program_clean = [&](const std::vector<std::string>& test_lines) -> bool {
+            std::string test_source;
+            for (const auto& tl : test_lines) {
+                if (tl == "__LYMAR_REMOVED_LINE__") continue;
+                test_source += tl + "\n";
+            }
+            try {
+                // Silence stderr/stdout during speculative verification check
+                std::stringstream sink;
+                auto* old_cerr = std::cerr.rdbuf(sink.rdbuf());
+                auto* old_cout = std::cout.rdbuf(sink.rdbuf());
+
+                Frontend::Scanner scanner(test_source, file);
+                scanner.scanTokens();
+                Frontend::Parser parser(scanner);
+                auto prog = parser.parse();
+                bool clean = false;
+                if (prog) {
+                    auto result = Frontend::TypeCheckerFactory::check_program(prog, test_source, file);
+                    clean = result.success;
+                }
+
+                std::cerr.rdbuf(old_cerr);
+                std::cout.rdbuf(old_cout);
+                return clean;
+            } catch (...) {
+                return false;
+            }
+        };
 
         int file_fixes = 0;
         std::unordered_set<int> fixed_redundant_bool_lines;
@@ -1839,6 +2410,189 @@ int Linter::runFix(int argc, char** argv) {
                                 std::cout << cyan << "  [fix] " << reset << file << ":" << d.line << ": renamed '" << sym << "' to '" << target << "'\n";
                             }
                         }
+                    }
+                }
+            } else if (d.rule == "any-overuse") {
+                std::string orig_line = line;
+                bool fix_attempted = false;
+                std::string fix_desc = "";
+
+                if (d.message.find("Explicit 'any' dynamic type annotation on variable '") != std::string::npos) {
+                    std::string var_name;
+                    auto var_pos = d.message.find("variable '");
+                    if (var_pos != std::string::npos) {
+                        auto q1 = var_pos + 10;
+                        auto q2 = d.message.find('\'', q1);
+                        if (q2 != std::string::npos) var_name = d.message.substr(q1, q2 - q1);
+                    }
+                    if (!var_name.empty() && decls.vars_by_line.count(d.line)) {
+                        for (const auto& vd : decls.vars_by_line[d.line]) {
+                            if (vd->name == var_name && vd->initializer) {
+                                std::unordered_map<std::string, std::string> vtypes;
+                                std::string inferred = infer_expression_type(vd->initializer, vtypes);
+                                if (!inferred.empty() && inferred != "any") {
+                                    if (replace_var_annotation(line, var_name, "any", inferred)) {
+                                        fix_attempted = true;
+                                        fix_desc = "inferred variable '" + var_name + "' type as '" + inferred + "'";
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else if (d.message.find("has return type 'any'") != std::string::npos) {
+                    std::string func_name;
+                    auto q1 = d.message.find('\'');
+                    if (q1 != std::string::npos) {
+                        auto q2 = d.message.find('\'', q1 + 1);
+                        if (q2 != std::string::npos) func_name = d.message.substr(q1 + 1, q2 - q1 - 1);
+                    }
+                    if (!func_name.empty()) {
+                        std::shared_ptr<Frontend::AST::Statement> body = nullptr;
+                        std::unordered_map<std::string, std::string> local_vars;
+                        if (decls.funcs_by_line.count(d.line)) {
+                            for (const auto& fd : decls.funcs_by_line[d.line]) {
+                                if (fd->name == func_name) {
+                                    body = fd->body;
+                                    for (const auto& [pname, ptype] : fd->params) {
+                                        if (ptype && format_type(ptype) != "any") local_vars[pname] = format_type(ptype);
+                                        else {
+                                            std::string p_inf;
+                                            find_param_uses_in_stmt(pname, fd->body, p_inf);
+                                            if (!p_inf.empty()) local_vars[pname] = p_inf;
+                                        }
+                                    }
+                                    if (fd->body) {
+                                        for (const auto& s : fd->body->statements) {
+                                            if (auto vd = std::dynamic_pointer_cast<Frontend::AST::VarDeclaration>(s)) {
+                                                if (vd->initializer) {
+                                                    std::string t = infer_expression_type(vd->initializer, local_vars);
+                                                    if (!t.empty()) local_vars[vd->name] = t;
+                                                }
+                                            }
+                                        }
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                        if (body) {
+                            std::vector<std::shared_ptr<Frontend::AST::ReturnStatement>> returns;
+                            collect_return_statements(body, returns);
+                            std::string inferred;
+                            if (returns.empty()) {
+                                inferred = "nil";
+                            } else {
+                                bool all_same = true;
+                                for (const auto& ret : returns) {
+                                    std::string t = infer_expression_type(ret->value, local_vars);
+                                    if (t.empty()) { all_same = false; break; }
+                                    if (inferred.empty()) inferred = t;
+                                    else if (inferred != t) { all_same = false; break; }
+                                }
+                                if (!all_same) inferred = "";
+                            }
+                            if (!inferred.empty() && inferred != "any") {
+                                if (replace_return_type_annotation(line, func_name, "any", inferred)) {
+                                    fix_attempted = true;
+                                    fix_desc = "inferred function '" + func_name + "' return type as '" + inferred + "'";
+                                }
+                            }
+                        }
+                    }
+                } else if (d.message.find("uses dynamic 'any' type") != std::string::npos) {
+                    std::string param_name;
+                    auto q1 = d.message.find('\'');
+                    if (q1 != std::string::npos) {
+                        auto q2 = d.message.find('\'', q1 + 1);
+                        if (q2 != std::string::npos) param_name = d.message.substr(q1 + 1, q2 - q1 - 1);
+                    }
+                    if (!param_name.empty()) {
+                        std::shared_ptr<Frontend::AST::Statement> body = nullptr;
+                        if (decls.funcs_by_line.count(d.line)) {
+                            for (const auto& fd : decls.funcs_by_line[d.line]) {
+                                for (const auto& [pname, ptype] : fd->params) {
+                                    if (pname == param_name) {
+                                        body = fd->body;
+                                        break;
+                                    }
+                                }
+                                if (body) break;
+                            }
+                        }
+                        if (body) {
+                            std::string inferred;
+                            find_param_uses_in_stmt(param_name, body, inferred);
+                            if (!inferred.empty() && inferred != "any") {
+                                if (replace_var_annotation(line, param_name, "any", inferred)) {
+                                    fix_attempted = true;
+                                    fix_desc = "inferred parameter '" + param_name + "' type as '" + inferred + "'";
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (fix_attempted) {
+                    if (verify_program_clean(lines)) {
+                        file_fixes++;
+                        if (opts.verbose) {
+                            std::cout << cyan << "  [fix] " << reset << file << ":" << d.line << ": " << fix_desc << "\n";
+                        }
+                    } else {
+                        line = orig_line;
+                    }
+                }
+            } else if (d.rule == "missing-return-type") {
+                std::string orig_line = line;
+                bool fix_attempted = false;
+                std::string fix_desc = "";
+                std::string func_name;
+                auto q1 = d.message.find('\'');
+                if (q1 != std::string::npos) {
+                    auto q2 = d.message.find('\'', q1 + 1);
+                    if (q2 != std::string::npos) func_name = d.message.substr(q1 + 1, q2 - q1 - 1);
+                }
+                if (!func_name.empty() && decls.funcs_by_line.count(d.line)) {
+                    for (const auto& fd : decls.funcs_by_line[d.line]) {
+                        if (fd->name == func_name && fd->body) {
+                            std::unordered_map<std::string, std::string> local_vars;
+                            for (const auto& [pname, ptype] : fd->params) {
+                                if (ptype) local_vars[pname] = format_type(ptype);
+                            }
+                            std::vector<std::shared_ptr<Frontend::AST::ReturnStatement>> returns;
+                            collect_return_statements(fd->body, returns);
+                            std::string inferred;
+                            if (returns.empty()) {
+                                inferred = "nil";
+                            } else {
+                                bool all_same = true;
+                                for (const auto& ret : returns) {
+                                    std::string t = infer_expression_type(ret->value, local_vars);
+                                    if (t.empty()) { all_same = false; break; }
+                                    if (inferred.empty()) inferred = t;
+                                    else if (inferred != t) { all_same = false; break; }
+                                }
+                                if (!all_same) inferred = "";
+                            }
+                            if (!inferred.empty() && inferred != "any") {
+                                if (insert_return_type_annotation(line, func_name, inferred)) {
+                                    fix_attempted = true;
+                                    fix_desc = "added inferred return type ':" + inferred + "' to function '" + func_name + "'";
+                                }
+                            }
+                            break;
+                        }
+                    }
+                }
+                if (fix_attempted) {
+                    if (verify_program_clean(lines)) {
+                        file_fixes++;
+                        if (opts.verbose) {
+                            std::cout << cyan << "  [fix] " << reset << file << ":" << d.line << ": " << fix_desc << "\n";
+                        }
+                    } else {
+                        line = orig_line;
                     }
                 }
             }

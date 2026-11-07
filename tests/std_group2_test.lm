@@ -26,7 +26,7 @@ fn is_even(value: any): bool {
     return value % 2 == 0;
 }
 
-fn double_value(value: any): any {
+fn double_value(value: any): int {
     return value * 2;
 }
 
