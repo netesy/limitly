@@ -1,0 +1,106 @@
+// tests/ui_widget_button_test.lm
+// Rigorous verification of Button handling, state transitions, hit-testing, and looks
+
+import std.ui as ui;
+import std.ui.context as ctx;
+import std.ui.builder as builder;
+import std.ui.draw_list as dlist;
+import std.color as color;
+
+var clicked_count = 0;
+
+fn on_test_click() {
+    clicked_count = clicked_count + 1;
+}
+
+fn test_button_rendering_and_dimensions() {
+    print("Testing Button dimensions and rendering...");
+    val btn = ui.button("Click Me", on_test_click)
+        .width(120.0)
+        .height(36.0)
+        .corner_radius(8.0)
+        .background(color.rgb(99, 102, 241))
+        .foreground(color.white);
+
+    assert(btn.kind == ui.KIND_BUTTON, "button kind mismatch");
+    assert(btn.text_val == "Click Me", "button text mismatch");
+    assert(btn.width_val == 120.0, "button width mismatch");
+    assert(btn.height_val == 36.0, "button height mismatch");
+    assert(btn.corner_radius_val == 8.0, "button radius mismatch");
+
+    // Build draw list
+    var dl = builder.build(btn, 800.0, 600.0, nil, 20.0, 20.0);
+    assert(dl != nil, "draw list build failed");
+    var list = dl as dlist.DrawList;
+    assert(len(list.cmds) > 0, "draw list has no commands");
+    assert(len(list.hits) > 0, "button hit zone not emitted");
+
+    var hz = list.hits[0];
+    assert(hz.kind == dlist.HitZoneKind.Button, "hit zone kind mismatch");
+    assert(hz.x == 20.0, "hit zone x mismatch");
+    assert(hz.y == 20.0, "hit zone y mismatch");
+    assert(hz.w == 120.0, "hit zone w mismatch");
+    assert(hz.h == 36.0, "hit zone h mismatch");
+    print("  [PASS] Button dimensions, styling, and hit zone verified.");
+}
+
+fn test_button_interaction_lifecycle() {
+    print("Testing Button click & capture lifecycle...");
+    clicked_count = 0;
+
+    val btn = ui.button("Action", on_test_click)
+        .width(100.0)
+        .height(40.0);
+
+    ctx.ui_init();
+    ctx.set_viewport_size(800.0, 600.0);
+    ctx.set_root(btn);
+
+    // 1. Hit outside button (10, 10)
+    ctx.dispatch_pointer_down(10.0, 10.0);
+    assert(btn.is_pressed == 0, "button should not be pressed when clicked outside");
+    ctx.dispatch_pointer_up(10.0, 10.0);
+    assert(clicked_count == 0, "click count should be 0");
+
+    // 2. Hit inside button (x in [20, 120], y in [20, 60])
+    // Mouse down at (50, 30)
+    ctx.dispatch_pointer_down(50.0, 30.0);
+    assert(btn.is_pressed == 1, "button should be pressed after pointer down inside");
+    assert(ctx.global_ui_context.has_captured == 1, "button should capture input");
+
+    // Mouse move still inside (70, 35)
+    ctx.dispatch_pointer_move(70.0, 35.0);
+    assert(btn.is_pressed == 1, "button should remain pressed inside bounds");
+
+    // Mouse move outside bounds (200, 200)
+    ctx.dispatch_pointer_move(200.0, 200.0);
+    assert(btn.is_pressed == 0, "button should unpress when pointer moves outside");
+
+    // Mouse move back inside (50, 30)
+    ctx.dispatch_pointer_move(50.0, 30.0);
+    assert(btn.is_pressed == 1, "button should re-press when pointer moves back inside");
+
+    // Mouse up inside -> triggers click
+    ctx.dispatch_pointer_up(50.0, 30.0);
+    assert(btn.is_pressed == 0, "button is_pressed must be reset after mouse up");
+    assert(clicked_count == 1, "click handler must have fired once");
+    assert(btn.click_count == 1, "widget click_count should be 1");
+
+    // 3. Mouse down inside, but released outside -> must cancel click
+    ctx.dispatch_pointer_down(50.0, 30.0);
+    assert(btn.is_pressed == 1, "button pressed on down");
+    ctx.dispatch_pointer_move(300.0, 300.0);
+    ctx.dispatch_pointer_up(300.0, 300.0);
+    assert(clicked_count == 1, "click handler must NOT fire when released outside");
+    assert(btn.is_pressed == 0, "is_pressed must be reset even if cancelled");
+
+    print("  [PASS] Button full pointer lifecycle (down, drag-out, drag-in, up, cancel) verified.");
+}
+
+fn main(): int {
+    print("=== Testing Widget 1: Button ===");
+    test_button_rendering_and_dimensions();
+    test_button_interaction_lifecycle();
+    print("All Button tests passed successfully!");
+    return 0;
+}

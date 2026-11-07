@@ -21,7 +21,7 @@ fn build_view(): ui.Widget {
     .width(420.0)
     .height(180.0);
 
-    val pie = ui.pie_chart("Resource Allocation Breakdown", [65.0, 25.0, 10.0])
+    val pie = ui.pie_chart("Resource Allocation Breakdown", [65.0, 25.0, 10.0], ["Compute", "Storage", "Network"])
     .width(420.0)
     .height(170.0);
 

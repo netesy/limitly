@@ -132,9 +132,12 @@ fn main() {
     cfg.width = 920;
     cfg.height = 700;
 
-    assert(app.init(cfg) == 1, "app init failed");
-
+    var init_res = app.init(cfg);
+    print("app init returned: {init_res}");
+    assert(init_res == 1, "app init failed");
+    print("Building view...");
     val root = build_view();
+    print("Setting ui...");
     app.ui(root);
 
     print("Running forms application main loop...");

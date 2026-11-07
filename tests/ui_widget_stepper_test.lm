@@ -1,0 +1,116 @@
+import std.ui as ui;
+import std.ui.context as ctx;
+import std.ui.builder as builder;
+import std.ui.draw_list as dlist;
+
+var stepper_changes = 0;
+fn on_stepper_change() {
+    stepper_changes = stepper_changes + 1;
+}
+
+var range_changes = 0;
+fn on_range_change() {
+    range_changes = range_changes + 1;
+}
+
+fn test_stepper() {
+    print("Testing Stepper widget...");
+    stepper_changes = 0;
+    // stepper(value=10, step=2, min_val=0, max_val=20)
+    var stp = ui.stepper(10, 2, 0, 20, on_stepper_change);
+    assert(stp.slider_val == 10.0, "Initial stepper value should be 10");
+    assert(stp.spacing_val == 2.0, "Stepper step should be 2");
+    assert(stp.slider_min == 0.0, "Stepper min should be 0");
+    assert(stp.slider_max == 20.0, "Stepper max should be 20");
+
+    ctx.ui_init();
+    ctx.set_viewport_size(400.0, 400.0);
+    ctx.set_root(stp);
+
+    var dl = builder.build(stp, 360.0, 360.0, nil, 20.0, 20.0);
+    // There must be 2 button hit zones for dec and inc
+    assert(len(dl.hits) >= 2, "DrawList hits should include dec and inc zones");
+
+    var dec_hz = dl.hits[0];
+    var inc_hz = dl.hits[1];
+    assert(dec_hz.tab_index == -1, "First hit zone should be dec (-1)");
+    assert(inc_hz.tab_index == 1, "Second hit zone should be inc (1)");
+
+    // Click dec button
+    ctx.dispatch_pointer_down(dec_hz.x + 5.0, dec_hz.y + 5.0);
+    ctx.dispatch_pointer_up(dec_hz.x + 5.0, dec_hz.y + 5.0);
+    assert(stp.slider_val == 8.0, "Stepper should decrement by 2 to 8");
+    assert(stepper_changes == 1, "on_change callback should have fired once");
+
+    // Click dec several times down to minimum
+    var i = 0;
+    while (i < 5) {
+        ctx.dispatch_pointer_down(dec_hz.x + 5.0, dec_hz.y + 5.0);
+        ctx.dispatch_pointer_up(dec_hz.x + 5.0, dec_hz.y + 5.0);
+        i = i + 1;
+    }
+    assert(stp.slider_val == 0.0, "Stepper should clamp at min 0.0");
+
+    // Click inc button up to 4.0
+    ctx.dispatch_pointer_down(inc_hz.x + 5.0, inc_hz.y + 5.0);
+    ctx.dispatch_pointer_up(inc_hz.x + 5.0, inc_hz.y + 5.0);
+    ctx.dispatch_pointer_down(inc_hz.x + 5.0, inc_hz.y + 5.0);
+    ctx.dispatch_pointer_up(inc_hz.x + 5.0, inc_hz.y + 5.0);
+    assert(stp.slider_val == 4.0, "Stepper should increment by 2 twice to 4");
+
+    print("Stepper tests passed!");
+}
+
+fn test_range_slider() {
+    print("Testing RangeSlider widget...");
+    range_changes = 0;
+    // range_slider(low=20, high=80, min=0, max=100)
+    var rslider = ui.range_slider(20.0, 80.0, 0.0, 100.0);
+    rslider.on_change_action = on_range_change;
+    assert(rslider.slider_val == 20.0, "Initial low should be 20");
+    assert(rslider.slider_high == 80.0, "Initial high should be 80");
+
+    ctx.ui_init();
+    ctx.set_viewport_size(400.0, 400.0);
+    ctx.set_root(rslider);
+
+    var dl = builder.build(rslider, 360.0, 360.0, nil, 20.0, 20.0);
+    assert(len(dl.hits) >= 1, "DrawList hits should include range slider zone");
+
+    var hz = dl.hits[0];
+    assert(hz.kind == dlist.HitZoneKind.Slider, "HitZone kind should be Slider");
+
+    // Click closer to low thumb (e.g. at 30% along track)
+    var click_x_low = hz.x + 0.3 * hz.w;
+    ctx.dispatch_pointer_down(click_x_low, hz.y + 5.0);
+    assert(rslider.slider_val >= 29.0 and rslider.slider_val <= 31.0, "Low thumb should seek to ~30.0");
+    assert(rslider.slider_high == 80.0, "High thumb should remain 80.0");
+    assert(range_changes == 1, "on_change callback should have fired");
+
+    // Drag low thumb towards 40%
+    var drag_x_low = hz.x + 0.4 * hz.w;
+    ctx.dispatch_pointer_move(drag_x_low, hz.y + 5.0);
+    assert(rslider.slider_val >= 39.0 and rslider.slider_val <= 41.0, "Low thumb should drag to ~40.0");
+    ctx.dispatch_pointer_up(drag_x_low, hz.y + 5.0);
+
+    // Click closer to high thumb (e.g. at 90% along track)
+    var click_x_high = hz.x + 0.9 * hz.w;
+    ctx.dispatch_pointer_down(click_x_high, hz.y + 5.0);
+    assert(rslider.slider_val >= 39.0 and rslider.slider_val <= 41.0, "Low thumb should remain ~40.0");
+    assert(rslider.slider_high >= 89.0 and rslider.slider_high <= 91.0, "High thumb should seek to ~90.0");
+
+    // Drag high thumb down to below low thumb (should clamp to low thumb)
+    var drag_x_below = hz.x + 0.2 * hz.w;
+    ctx.dispatch_pointer_move(drag_x_below, hz.y + 5.0);
+    assert(rslider.slider_high >= rslider.slider_val, "High thumb should not go below low thumb");
+    ctx.dispatch_pointer_up(drag_x_below, hz.y + 5.0);
+
+    print("RangeSlider tests passed!");
+}
+
+fn main(): int {
+    test_stepper();
+    test_range_slider();
+    print("ALL STEPPER & RANGE SLIDER TESTS PASSED!");
+    return 0;
+}

@@ -187,7 +187,7 @@ pub fn indicator(status: str = "online", label: str = ""): Widget { return ui_ty
 pub fn input(value: str = "", placeholder: str = "Type here...", on_change: any = nil): Widget { return ui_types.input(value, placeholder, on_change); }
 pub fn join(items: [Widget]): Widget { return ui_types.join(items); }
 pub fn line_chart(label: str, values: [float]): Widget { return ui_types.line_chart(label, values); }
-pub fn link(text_val: str, url: str): Widget { return ui_types.link(text_val, url); }
+pub fn link(text_val: str, url: str = "", on_click: any = nil): Widget { return ui_types.link(text_val, url, on_click); }
 pub fn list(items: [Widget]): Widget { return ui_types.list(items); }
 pub fn mask(shape: str = "circle", child: Widget = empty()): Widget { return ui_types.mask(shape, child); }
 pub fn overlay(content: Widget, x: float = 0.0, y: float = 0.0, width_val: float = 0.0, height_val: float = 0.0): Widget { return ui_types.overlay(content, x, y, width_val, height_val); }

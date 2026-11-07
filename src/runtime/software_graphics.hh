@@ -370,14 +370,16 @@ public:
                 const auto& data = vbuf_it->second.data;
 
                 if (primitive_type == 1 && data.size() >= 10) { // Triangle Primitive (x1, y1, x2, y2, x3, y3, r, g, b, a)
+                    if (width_ <= 0 || height_ <= 0 || pixels_.empty()) return value_true;
                     double x1 = data[0], y1 = data[1], x2 = data[2], y2 = data[3], x3 = data[4], y3 = data[5];
                     double r = data[6], g = data[7], b = data[8], a = data[9];
 
                     ClipRect clip = get_current_clip();
-                    int min_x = std::clamp(static_cast<int>(std::floor(std::min({x1, x2, x3}))), clip.x0, clip.x1);
-                    int max_x = std::clamp(static_cast<int>(std::ceil(std::max({x1, x2, x3}))), clip.x0, clip.x1);
-                    int min_y = std::clamp(static_cast<int>(std::floor(std::min({y1, y2, y3}))), clip.y0, clip.y1);
-                    int max_y = std::clamp(static_cast<int>(std::ceil(std::max({y1, y2, y3}))), clip.y0, clip.y1);
+                    int min_x = std::clamp(static_cast<int>(std::floor(std::min({x1, x2, x3}))), std::max(0, clip.x0), std::min(width_, clip.x1));
+                    int max_x = std::clamp(static_cast<int>(std::ceil(std::max({x1, x2, x3}))), std::max(0, clip.x0), std::min(width_, clip.x1));
+                    int min_y = std::clamp(static_cast<int>(std::floor(std::min({y1, y2, y3}))), std::max(0, clip.y0), std::min(height_, clip.y1));
+                    int max_y = std::clamp(static_cast<int>(std::ceil(std::max({y1, y2, y3}))), std::max(0, clip.y0), std::min(height_, clip.y1));
+                    if (max_x <= min_x || max_y <= min_y) return value_true;
 
                     auto edge = [](double ax, double ay, double bx, double by, double cx, double cy) {
                         return (cx - ax) * (by - ay) - (cy - ay) * (bx - ax);
@@ -398,22 +400,34 @@ public:
 
                             if ((w0 >= 0 && w1 >= 0 && w2 >= 0) || (w0 <= 0 && w1 <= 0 && w2 <= 0)) {
                                 size_t idx = static_cast<size_t>(py * width_ + px) * 4;
-                                pixels_[idx]     = ru;
-                                pixels_[idx + 1] = gu;
-                                pixels_[idx + 2] = bu;
-                                pixels_[idx + 3] = au;
+                                if (idx + 3 >= pixels_.size()) continue;
+                                if (au >= 255) {
+                                    pixels_[idx]     = ru;
+                                    pixels_[idx + 1] = gu;
+                                    pixels_[idx + 2] = bu;
+                                    pixels_[idx + 3] = 255;
+                                } else if (au > 0) {
+                                    float af = au / 255.0f;
+                                    float inv = 1.0f - af;
+                                    pixels_[idx]     = static_cast<uint8_t>(ru * af + pixels_[idx] * inv);
+                                    pixels_[idx + 1] = static_cast<uint8_t>(gu * af + pixels_[idx + 1] * inv);
+                                    pixels_[idx + 2] = static_cast<uint8_t>(bu * af + pixels_[idx + 2] * inv);
+                                    pixels_[idx + 3] = std::max(pixels_[idx + 3], au);
+                                }
                             }
                         }
                     }
                 } else if (data.size() >= 8) { // Rectangle Primitive (x, y, w, h, r, g, b, a)
+                    if (width_ <= 0 || height_ <= 0 || pixels_.empty()) return value_true;
                     double x = data[0], y = data[1], w = data[2], h = data[3];
                     double r = data[4], g = data[5], b = data[6], a = data[7];
 
                     ClipRect clip = get_current_clip();
-                    int x0 = std::clamp(static_cast<int>(x), clip.x0, clip.x1);
-                    int y0 = std::clamp(static_cast<int>(y), clip.y0, clip.y1);
-                    int x1 = std::clamp(static_cast<int>(x + w), clip.x0, clip.x1);
-                    int y1 = std::clamp(static_cast<int>(y + h), clip.y0, clip.y1);
+                    int x0 = std::clamp(static_cast<int>(x), std::max(0, clip.x0), std::min(width_, clip.x1));
+                    int y0 = std::clamp(static_cast<int>(y), std::max(0, clip.y0), std::min(height_, clip.y1));
+                    int x1 = std::clamp(static_cast<int>(x + w), std::max(0, clip.x0), std::min(width_, clip.x1));
+                    int y1 = std::clamp(static_cast<int>(y + h), std::max(0, clip.y0), std::min(height_, clip.y1));
+                    if (x1 <= x0 || y1 <= y0) return value_true;
 
                     uint8_t ru = static_cast<uint8_t>(std::clamp(r * 255.0, 0.0, 255.0));
                     uint8_t gu = static_cast<uint8_t>(std::clamp(g * 255.0, 0.0, 255.0));
@@ -436,6 +450,8 @@ public:
             case ResourceOperation::DRAW_RECT: {
                 double x = 0.0, y = 0.0, w = 0.0, h = 0.0;
                 double r = 1.0, g = 1.0, b = 1.0, a = 1.0;
+                double rad = 0.0;
+                double border_w = 0.0;
                 if (!args.empty()) {
                     if (auto* list = reinterpret_cast<LmList*>(check_header_type(args[0], list_type))) {
                         if (lm_list_len(list) > 0) x = register_value_to_double(lm_list_get(list, 0));
@@ -446,6 +462,17 @@ public:
                         if (lm_list_len(list) > 5) g = register_value_to_double(lm_list_get(list, 5));
                         if (lm_list_len(list) > 6) b = register_value_to_double(lm_list_get(list, 6));
                         if (lm_list_len(list) > 7) a = register_value_to_double(lm_list_get(list, 7));
+                        size_t llen = lm_list_len(list);
+                        if (llen > 0) x = register_value_to_double(lm_list_get(list, 0));
+                        if (llen > 1) y = register_value_to_double(lm_list_get(list, 1));
+                        if (llen > 2) w = register_value_to_double(lm_list_get(list, 2));
+                        if (llen > 3) h = register_value_to_double(lm_list_get(list, 3));
+                        if (llen > 4) r = register_value_to_double(lm_list_get(list, 4));
+                        if (llen > 5) g = register_value_to_double(lm_list_get(list, 5));
+                        if (llen > 6) b = register_value_to_double(lm_list_get(list, 6));
+                        if (llen > 7) a = register_value_to_double(lm_list_get(list, 7));
+                        if (llen > 8) rad = register_value_to_double(lm_list_get(list, 8));
+                        if (llen > 9) border_w = register_value_to_double(lm_list_get(list, 9));
                     } else {
                         x = register_value_to_double(args[0]);
                         if (args.size() > 1) y = register_value_to_double(args[1]);
@@ -455,28 +482,137 @@ public:
                         if (args.size() > 5) g = register_value_to_double(args[5]);
                         if (args.size() > 6) b = register_value_to_double(args[6]);
                         if (args.size() > 7) a = register_value_to_double(args[7]);
+                        if (args.size() > 8) rad = register_value_to_double(args[8]);
+                        if (args.size() > 9) border_w = register_value_to_double(args[9]);
                     }
                 }
 
+                if (width_ <= 0 || height_ <= 0 || pixels_.empty()) return value_true;
+                if (w <= 0.0 || h <= 0.0) return value_true;
+
                 ClipRect clip = get_current_clip();
-                int x0 = std::clamp(static_cast<int>(x), clip.x0, clip.x1);
-                int y0 = std::clamp(static_cast<int>(y), clip.y0, clip.y1);
-                int x1 = std::clamp(static_cast<int>(x + w), clip.x0, clip.x1);
-                int y1 = std::clamp(static_cast<int>(y + h), clip.y0, clip.y1);
+                int x0 = std::clamp(static_cast<int>(std::floor(x)), std::max(0, clip.x0), std::min(width_, clip.x1));
+                int y0 = std::clamp(static_cast<int>(std::floor(y)), std::max(0, clip.y0), std::min(height_, clip.y1));
+                int x1 = std::clamp(static_cast<int>(std::ceil(x + w)), std::max(0, clip.x0), std::min(width_, clip.x1));
+                int y1 = std::clamp(static_cast<int>(std::ceil(y + h)), std::max(0, clip.y0), std::min(height_, clip.y1));
+                if (x1 <= x0 || y1 <= y0) return value_true;
 
                 uint8_t ru = static_cast<uint8_t>(std::clamp(r * 255.0, 0.0, 255.0));
                 uint8_t gu = static_cast<uint8_t>(std::clamp(g * 255.0, 0.0, 255.0));
                 uint8_t bu = static_cast<uint8_t>(std::clamp(b * 255.0, 0.0, 255.0));
                 uint8_t au = static_cast<uint8_t>(std::clamp(a * 255.0, 0.0, 255.0));
+                float alpha_base = static_cast<float>(std::clamp(a, 0.0, 1.0));
+                if (alpha_base <= 0.0f) return value_true;
 
-                uint32_t pixel32 = ru | (static_cast<uint32_t>(gu) << 8) |
-                                   (static_cast<uint32_t>(bu) << 16) |
-                                   (static_cast<uint32_t>(au) << 24);
-                auto* p32 = reinterpret_cast<uint32_t*>(pixels_.data());
-                int span = x1 - x0;
-                if (span > 0) {
+                if (rad <= 0.5 && border_w <= 0.0) {
+                    if (alpha_base >= 0.999f) {
+                        uint32_t pixel32 = ru | (static_cast<uint32_t>(gu) << 8) |
+                                           (static_cast<uint32_t>(bu) << 16) |
+                                           (255u << 24);
+                        auto* p32 = reinterpret_cast<uint32_t*>(pixels_.data());
+                        int span = x1 - x0;
+                        if (span > 0) {
+                            for (int py = y0; py < y1; ++py) {
+                                std::fill_n(p32 + (py * width_ + x0), span, pixel32);
+                            }
+                        }
+                    } else {
+                        float inv_a = 1.0f - alpha_base;
+                        for (int py = y0; py < y1; ++py) {
+                            for (int px = x0; px < x1; ++px) {
+                                size_t idx = static_cast<size_t>(py * width_ + px) * 4;
+                                pixels_[idx]     = static_cast<uint8_t>(ru * alpha_base + pixels_[idx] * inv_a);
+                                pixels_[idx + 1] = static_cast<uint8_t>(gu * alpha_base + pixels_[idx + 1] * inv_a);
+                                pixels_[idx + 2] = static_cast<uint8_t>(bu * alpha_base + pixels_[idx + 2] * inv_a);
+                                pixels_[idx + 3] = std::max(pixels_[idx + 3], static_cast<uint8_t>(alpha_base * 255.0f));
+                            }
+                        }
+                    }
+                } else {
+                    double max_r = std::min(w * 0.5, h * 0.5);
+                    if (rad > max_r) rad = max_r;
+                    double cx_left = x + rad;
+                    double cx_right = x + w - rad;
+                    double cy_top = y + rad;
+                    double cy_bot = y + h - rad;
+
                     for (int py = y0; py < y1; ++py) {
-                        std::fill_n(p32 + (py * width_ + x0), span, pixel32);
+                        double pY = py + 0.5;
+                        for (int px = x0; px < x1; ++px) {
+                            double pX = px + 0.5;
+
+                            float cov = 1.0f;
+                            if (rad > 0.0) {
+                                double c_dx = 0.0;
+                                double c_dy = 0.0;
+                                bool in_corner = false;
+
+                                if (pX < cx_left) {
+                                    if (pY < cy_top) {
+                                        c_dx = pX - cx_left; c_dy = pY - cy_top; in_corner = true;
+                                    } else if (pY > cy_bot) {
+                                        c_dx = pX - cx_left; c_dy = pY - cy_bot; in_corner = true;
+                                    }
+                                } else if (pX > cx_right) {
+                                    if (pY < cy_top) {
+                                        c_dx = pX - cx_right; c_dy = pY - cy_top; in_corner = true;
+                                    } else if (pY > cy_bot) {
+                                        c_dx = pX - cx_right; c_dy = pY - cy_bot; in_corner = true;
+                                    }
+                                }
+
+                                if (in_corner) {
+                                    double dist = std::sqrt(c_dx * c_dx + c_dy * c_dy);
+                                    if (dist > rad + 0.5) {
+                                        continue;
+                                    } else if (dist > rad - 0.5) {
+                                        cov = static_cast<float>(rad + 0.5 - dist);
+                                    }
+                                    if (border_w > 0.0) {
+                                        double inner_r = rad - border_w;
+                                        if (inner_r > 0.0) {
+                                            if (dist < inner_r - 0.5) {
+                                                continue;
+                                            } else if (dist < inner_r + 0.5) {
+                                                cov *= static_cast<float>(dist - (inner_r - 0.5));
+                                            }
+                                        }
+                                    }
+                                } else if (border_w > 0.0) {
+                                    double d_edge = std::min({pX - x, (x + w) - pX, pY - y, (y + h) - pY});
+                                    if (d_edge > border_w + 0.5) {
+                                        continue;
+                                    } else if (d_edge > border_w - 0.5) {
+                                        cov *= static_cast<float>(border_w + 0.5 - d_edge);
+                                    }
+                                }
+                            } else if (border_w > 0.0) {
+                                double d_edge = std::min({pX - x, (x + w) - pX, pY - y, (y + h) - pY});
+                                if (d_edge > border_w + 0.5) {
+                                    continue;
+                                } else if (d_edge > border_w - 0.5) {
+                                    cov *= static_cast<float>(border_w + 0.5 - d_edge);
+                                }
+                            }
+
+                            float final_a = alpha_base * cov;
+                            if (final_a <= 0.001f) continue;
+
+                            size_t idx = static_cast<size_t>(py * width_ + px) * 4;
+                            if (idx + 3 >= pixels_.size()) continue;
+                            if (final_a >= 0.999f) {
+                                pixels_[idx]     = ru;
+                                pixels_[idx + 1] = gu;
+                                pixels_[idx + 2] = bu;
+                                pixels_[idx + 3] = 255;
+                            } else {
+                                float inv = 1.0f - final_a;
+                                pixels_[idx]     = static_cast<uint8_t>(ru * final_a + pixels_[idx] * inv);
+                                pixels_[idx + 1] = static_cast<uint8_t>(gu * final_a + pixels_[idx + 1] * inv);
+                                pixels_[idx + 2] = static_cast<uint8_t>(bu * final_a + pixels_[idx + 2] * inv);
+                                pixels_[idx + 3] = std::max(pixels_[idx + 3], static_cast<uint8_t>(final_a * 255.0f));
+                            }
+                        }
                     }
                 }
                 return value_true;
@@ -496,14 +632,28 @@ public:
                         if (lm_list_len(list) > 7) g  = register_value_to_double(lm_list_get(list, 7));
                         if (lm_list_len(list) > 8) b  = register_value_to_double(lm_list_get(list, 8));
                         if (lm_list_len(list) > 9) a  = register_value_to_double(lm_list_get(list, 9));
+                    } else if (args.size() >= 6) {
+                        x1 = register_value_to_double(args[0]);
+                        y1 = register_value_to_double(args[1]);
+                        x2 = register_value_to_double(args[2]);
+                        y2 = register_value_to_double(args[3]);
+                        x3 = register_value_to_double(args[4]);
+                        y3 = register_value_to_double(args[5]);
+                        if (args.size() > 6) r = register_value_to_double(args[6]);
+                        if (args.size() > 7) g = register_value_to_double(args[7]);
+                        if (args.size() > 8) b = register_value_to_double(args[8]);
+                        if (args.size() > 9) a = register_value_to_double(args[9]);
                     }
                 }
 
+                if (width_ <= 0 || height_ <= 0 || pixels_.empty()) return value_true;
+
                 ClipRect clip = get_current_clip();
-                int min_x = std::clamp(static_cast<int>(std::floor(std::min({x1, x2, x3}))), clip.x0, clip.x1);
-                int max_x = std::clamp(static_cast<int>(std::ceil(std::max({x1, x2, x3}))), clip.x0, clip.x1);
-                int min_y = std::clamp(static_cast<int>(std::floor(std::min({y1, y2, y3}))), clip.y0, clip.y1);
-                int max_y = std::clamp(static_cast<int>(std::ceil(std::max({y1, y2, y3}))), clip.y0, clip.y1);
+                int min_x = std::clamp(static_cast<int>(std::floor(std::min({x1, x2, x3}))), std::max(0, clip.x0), std::min(width_, clip.x1));
+                int max_x = std::clamp(static_cast<int>(std::ceil(std::max({x1, x2, x3}))), std::max(0, clip.x0), std::min(width_, clip.x1));
+                int min_y = std::clamp(static_cast<int>(std::floor(std::min({y1, y2, y3}))), std::max(0, clip.y0), std::min(height_, clip.y1));
+                int max_y = std::clamp(static_cast<int>(std::ceil(std::max({y1, y2, y3}))), std::max(0, clip.y0), std::min(height_, clip.y1));
+                if (max_x <= min_x || max_y <= min_y) return value_true;
 
                 auto edge = [](double ax, double ay, double bx, double by, double cx, double cy) {
                     return (cx - ax) * (by - ay) - (cy - ay) * (bx - ax);
@@ -524,10 +674,20 @@ public:
 
                         if ((w0 >= 0 && w1 >= 0 && w2 >= 0) || (w0 <= 0 && w1 <= 0 && w2 <= 0)) {
                             size_t idx = static_cast<size_t>(py * width_ + px) * 4;
-                            pixels_[idx]     = ru;
-                            pixels_[idx + 1] = gu;
-                            pixels_[idx + 2] = bu;
-                            pixels_[idx + 3] = au;
+                            if (idx + 3 >= pixels_.size()) continue;
+                            if (au >= 255) {
+                                pixels_[idx]     = ru;
+                                pixels_[idx + 1] = gu;
+                                pixels_[idx + 2] = bu;
+                                pixels_[idx + 3] = 255;
+                            } else if (au > 0) {
+                                float af = au / 255.0f;
+                                float inv = 1.0f - af;
+                                pixels_[idx]     = static_cast<uint8_t>(ru * af + pixels_[idx] * inv);
+                                pixels_[idx + 1] = static_cast<uint8_t>(gu * af + pixels_[idx + 1] * inv);
+                                pixels_[idx + 2] = static_cast<uint8_t>(bu * af + pixels_[idx + 2] * inv);
+                                pixels_[idx + 3] = std::max(pixels_[idx + 3], au);
+                            }
                         }
                     }
                 }

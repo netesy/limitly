@@ -90,11 +90,15 @@ fn _add_hit(dl: dlist.DrawList, hz: dlist.HitZone, ctx: LayoutCtx): nil {
 }
 
 // ── Drawing & Styling Helpers ─────────────────────────────────────────────────
-fn _draw_border(dl: dlist.DrawList, x: float, y: float, w: float, h: float, r: float, g: float, b: float, a: float = 1.0): nil {
-    dlist.dl_add(dl, dlist.dcmd_rect(x, y, w, 1.0, r, g, b, a));
-    dlist.dl_add(dl, dlist.dcmd_rect(x, y + h - 1.0, w, 1.0, r, g, b, a));
-    dlist.dl_add(dl, dlist.dcmd_rect(x, y, 1.0, h, r, g, b, a));
-    dlist.dl_add(dl, dlist.dcmd_rect(x + w - 1.0, y, 1.0, h, r, g, b, a));
+fn _draw_border(dl: dlist.DrawList, x: float, y: float, w: float, h: float, r: float, g: float, b: float, a: float = 1.0, rad: float = 0.0): nil {
+    if (rad > 0.0) {
+        dlist.dl_add(dl, dlist.dcmd_border_rounded(x, y, w, h, rad, 1.0, r, g, b, a));
+    } else {
+        dlist.dl_add(dl, dlist.dcmd_rect(x, y, w, 1.0, r, g, b, a));
+        dlist.dl_add(dl, dlist.dcmd_rect(x, y + h - 1.0, w, 1.0, r, g, b, a));
+        dlist.dl_add(dl, dlist.dcmd_rect(x, y, 1.0, h, r, g, b, a));
+        dlist.dl_add(dl, dlist.dcmd_rect(x + w - 1.0, y, 1.0, h, r, g, b, a));
+    }
 }
 
 fn _draw_shadow(dl: dlist.DrawList, x: float, y: float, w: float, h: float, rad: float = 4.0): nil {
@@ -103,35 +107,23 @@ fn _draw_shadow(dl: dlist.DrawList, x: float, y: float, w: float, h: float, rad:
 }
 
 fn _draw_checkmark(dl: dlist.DrawList, cx: float, cy: float, cr: float, cg: float, cb: float): nil {
-    dlist.dl_add(dl, dlist.dcmd_rect(cx + 3.0, cy + 8.0, 2.0, 4.0, cr, cg, cb, 1.0));
-    dlist.dl_add(dl, dlist.dcmd_rect(cx + 5.0, cy + 10.0, 2.0, 4.0, cr, cg, cb, 1.0));
-    dlist.dl_add(dl, dlist.dcmd_rect(cx + 7.0, cy + 8.0, 2.0, 4.0, cr, cg, cb, 1.0));
-    dlist.dl_add(dl, dlist.dcmd_rect(cx + 9.0, cy + 5.0, 2.0, 5.0, cr, cg, cb, 1.0));
-    dlist.dl_add(dl, dlist.dcmd_rect(cx + 11.0, cy + 3.0, 2.0, 4.0, cr, cg, cb, 1.0));
+    dlist.dl_add(dl, dlist.dcmd_line(cx + 4.0, cy + 9.5, cx + 7.5, cy + 13.5, cr, cg, cb, 1.0));
+    dlist.dl_add(dl, dlist.dcmd_line(cx + 7.5, cy + 13.5, cx + 14.5, cy + 4.5, cr, cg, cb, 1.0));
 }
 
 fn _draw_chevron_down(dl: dlist.DrawList, cx: float, cy: float, cr: float, cg: float, cb: float): nil {
-    dlist.dl_add(dl, dlist.dcmd_rect(cx, cy, 2.0, 2.0, cr, cg, cb, 1.0));
-    dlist.dl_add(dl, dlist.dcmd_rect(cx + 2.0, cy + 2.0, 2.0, 2.0, cr, cg, cb, 1.0));
-    dlist.dl_add(dl, dlist.dcmd_rect(cx + 4.0, cy + 4.0, 2.0, 2.0, cr, cg, cb, 1.0));
-    dlist.dl_add(dl, dlist.dcmd_rect(cx + 6.0, cy + 2.0, 2.0, 2.0, cr, cg, cb, 1.0));
-    dlist.dl_add(dl, dlist.dcmd_rect(cx + 8.0, cy, 2.0, 2.0, cr, cg, cb, 1.0));
+    dlist.dl_add(dl, dlist.dcmd_line(cx + 1.0, cy + 3.0, cx + 5.5, cy + 7.5, cr, cg, cb, 1.0));
+    dlist.dl_add(dl, dlist.dcmd_line(cx + 5.5, cy + 7.5, cx + 10.0, cy + 3.0, cr, cg, cb, 1.0));
 }
 
 fn _draw_chevron_up(dl: dlist.DrawList, cx: float, cy: float, cr: float, cg: float, cb: float): nil {
-    dlist.dl_add(dl, dlist.dcmd_rect(cx, cy + 4.0, 2.0, 2.0, cr, cg, cb, 1.0));
-    dlist.dl_add(dl, dlist.dcmd_rect(cx + 2.0, cy + 2.0, 2.0, 2.0, cr, cg, cb, 1.0));
-    dlist.dl_add(dl, dlist.dcmd_rect(cx + 4.0, cy, 2.0, 2.0, cr, cg, cb, 1.0));
-    dlist.dl_add(dl, dlist.dcmd_rect(cx + 6.0, cy + 2.0, 2.0, 2.0, cr, cg, cb, 1.0));
-    dlist.dl_add(dl, dlist.dcmd_rect(cx + 8.0, cy + 4.0, 2.0, 2.0, cr, cg, cb, 1.0));
+    dlist.dl_add(dl, dlist.dcmd_line(cx + 1.0, cy + 7.5, cx + 5.5, cy + 3.0, cr, cg, cb, 1.0));
+    dlist.dl_add(dl, dlist.dcmd_line(cx + 5.5, cy + 3.0, cx + 10.0, cy + 7.5, cr, cg, cb, 1.0));
 }
 
 fn _draw_chevron_right(dl: dlist.DrawList, cx: float, cy: float, cr: float, cg: float, cb: float): nil {
-    dlist.dl_add(dl, dlist.dcmd_rect(cx, cy, 2.0, 2.0, cr, cg, cb, 1.0));
-    dlist.dl_add(dl, dlist.dcmd_rect(cx + 2.0, cy + 2.0, 2.0, 2.0, cr, cg, cb, 1.0));
-    dlist.dl_add(dl, dlist.dcmd_rect(cx + 4.0, cy + 4.0, 2.0, 2.0, cr, cg, cb, 1.0));
-    dlist.dl_add(dl, dlist.dcmd_rect(cx + 2.0, cy + 6.0, 2.0, 2.0, cr, cg, cb, 1.0));
-    dlist.dl_add(dl, dlist.dcmd_rect(cx, cy + 8.0, 2.0, 2.0, cr, cg, cb, 1.0));
+    dlist.dl_add(dl, dlist.dcmd_line(cx + 2.0, cy + 1.0, cx + 6.5, cy + 5.5, cr, cg, cb, 1.0));
+    dlist.dl_add(dl, dlist.dcmd_line(cx + 6.5, cy + 5.5, cx + 2.0, cy + 10.0, cr, cg, cb, 1.0));
 }
 
 // ── Main build entry point ────────────────────────────────────────────────────
@@ -315,7 +307,7 @@ fn _emit_button(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap)
     if (w.is_hovered != 0) {
         bord_r = ts.accent_r; bord_g = ts.accent_g; bord_b = ts.accent_b; bord_a = 0.9;
     }
-    _draw_border(dl, bx, by, bw, bh, bord_r, bord_g, bord_b, bord_a);
+    _draw_border(dl, bx, by, bw, bh, bord_r, bord_g, bord_b, bord_a, rad);
 
     // Label with accurate proportional font centering
     var fs = w.font_size_val;
@@ -603,7 +595,7 @@ fn _emit_checkbox(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSna
     if (w.is_checked != 0) {
         bord_r = ts.accent_r; bord_g = ts.accent_g; bord_b = ts.accent_b;
     }
-    _draw_border(dl, cx, cy, box_size, box_size, bord_r, bord_g, bord_b, 1.0);
+    _draw_border(dl, cx, cy, box_size, box_size, bord_r, bord_g, bord_b, 1.0, 4.0);
 
     // Checked fill & vector checkmark
     if (w.is_checked != 0) {
@@ -640,7 +632,7 @@ fn _emit_input(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap):
     if (w.is_focused != 0) {
         bord_r = ts.accent_r; bord_g = ts.accent_g; bord_b = ts.accent_b;
     }
-    _draw_border(dl, ix, iy, iw, ih, bord_r, bord_g, bord_b, 1.0);
+    _draw_border(dl, ix, iy, iw, ih, bord_r, bord_g, bord_b, 1.0, 4.0);
 
     // Text or placeholder
     var display = w.text_val;
@@ -691,7 +683,7 @@ fn _emit_toggle(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap)
     }
     dlist.dl_add(dl, dlist.dcmd_rect_rounded(tx, ty, tw, th, 11.0, track_r, track_g, track_b, 1.0));
     if (w.is_checked == 0) {
-        _draw_border(dl, tx, ty, tw, th, ts.border_r, ts.border_g, ts.border_b, 1.0);
+        _draw_border(dl, tx, ty, tw, th, ts.border_r, ts.border_g, ts.border_b, 1.0, 11.0);
     }
 
     // Thumb
@@ -733,7 +725,7 @@ fn _emit_badge(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap):
     var txt_b = bgb * 0.65 + 0.35;
 
     dlist.dl_add(dl, dlist.dcmd_rect_rounded(bx, by, bw, bh, 11.0, surf_r, surf_g, surf_b, 1.0));
-    _draw_border(dl, bx, by, bw, bh, bgr, bgg, bgb, 1.0);
+    _draw_border(dl, bx, by, bw, bh, bgr, bgg, bgb, 1.0, 11.0);
     dlist.dl_add(dl, dlist.dcmd_text(w.text_val, bx + w.padding_left + 9.0, by + w.padding_top + 4.0, txt_r, txt_g, txt_b, 1.0, 0.85));
     return bh;
 }
@@ -773,7 +765,7 @@ fn _emit_card(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): 
     if (w.height_val > 0.0) { total_h = w.height_val; }
 
     dl.cmds[bg_cmd_idx].h = total_h;
-    _draw_border(dl, ctx.x, ctx.y, cw, total_h, ts.border_r, ts.border_g, ts.border_b, 0.8);
+    _draw_border(dl, ctx.x, ctx.y, cw, total_h, ts.border_r, ts.border_g, ts.border_b, 0.8, rad);
 
     return total_h;
 }
@@ -788,7 +780,7 @@ fn _emit_alert(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap):
         bgr = w.background_color.r; bgg = w.background_color.g; bgb = w.background_color.b; bga = w.background_color.a;
     }
     dlist.dl_add(dl, dlist.dcmd_rect_rounded(ctx.x, ctx.y, aw, ah, 6.0, bgr, bgg, bgb, bga));
-    _draw_border(dl, ctx.x, ctx.y, aw, ah, ts.border_r, ts.border_g, ts.border_b, 0.8);
+    _draw_border(dl, ctx.x, ctx.y, aw, ah, ts.border_r, ts.border_g, ts.border_b, 0.8, 6.0);
 
     // Left accent bar (4px thick)
     var bar_r = ts.accent_r; var bar_g = ts.accent_g; var bar_b = ts.accent_b;
@@ -798,6 +790,13 @@ fn _emit_alert(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap):
     dlist.dl_add(dl, dlist.dcmd_rect(ctx.x, ctx.y, 4.0, ah, bar_r, bar_g, bar_b, 1.0));
 
     dlist.dl_add(dl, dlist.dcmd_text(w.text_val, ctx.x + 14.0, ctx.y + 13.0, ts.text_r, ts.text_g, ts.text_b, 1.0, 1.0));
+
+    if (w.on_click_action != nil) {
+        dlist.dl_add(dl, dlist.dcmd_text("x", ctx.x + aw - 20.0, ctx.y + 12.0, ts.text2_r, ts.text2_g, ts.text2_b, 1.0, 0.9));
+        var hz = dlist.make_button_zone("alert_close", ctx.x + aw - 26.0, ctx.y + 8.0, 20.0, 24.0, w.on_click_action, w);
+        _add_hit(dl, hz, ctx);
+    }
+
     return ah + ts.spacing;
 }
 
@@ -930,7 +929,7 @@ fn _emit_select(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap)
     if (w.is_open != 0) {
         bord_r = ts.accent_r; bord_g = ts.accent_g; bord_b = ts.accent_b;
     }
-    _draw_border(dl, sx, sy, sel_w, sel_h, bord_r, bord_g, bord_b, 1.0);
+    _draw_border(dl, sx, sy, sel_w, sel_h, bord_r, bord_g, bord_b, 1.0, 4.0);
 
     // Text
     var ty = sy + (sel_h - 12.0) / 2.0;
@@ -960,7 +959,7 @@ fn _emit_select(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap)
         // Shadow & Menu Background
         _draw_shadow(dl, sx, menu_y, sel_w, menu_h, 6.0);
         dlist.dl_add(dl, dlist.dcmd_rect_rounded(sx, menu_y, sel_w, menu_h, 6.0, ts.surface_r * 0.95, ts.surface_g * 0.95, ts.surface_b * 0.95, 1.0));
-        _draw_border(dl, sx, menu_y, sel_w, menu_h, ts.border_r * 1.3, ts.border_g * 1.3, ts.border_b * 1.3, 1.0);
+        _draw_border(dl, sx, menu_y, sel_w, menu_h, ts.border_r * 1.3, ts.border_g * 1.3, ts.border_b * 1.3, 1.0, 6.0);
 
         var opt_idx = 0;
         while (opt_idx < num_opts) {
@@ -1010,7 +1009,7 @@ fn _emit_textarea(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSna
     if (w.is_focused != 0) {
         bord_r = ts.accent_r; bord_g = ts.accent_g; bord_b = ts.accent_b;
     }
-    _draw_border(dl, ix, iy, iw, ih, bord_r, bord_g, bord_b, 1.0);
+    _draw_border(dl, ix, iy, iw, ih, bord_r, bord_g, bord_b, 1.0, 4.0);
 
     // Clip to textarea interior
     dlist.dl_add(dl, dlist.dcmd_clip_push(ix + 1.0, iy + 1.0, iw - 2.0, ih - 2.0));
@@ -1066,7 +1065,7 @@ fn _emit_multi_select(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: Them
     if (w.is_open != 0) {
         bord_r = ts.accent_r; bord_g = ts.accent_g; bord_b = ts.accent_b;
     }
-    _draw_border(dl, sx, sy, sel_w, sel_h, bord_r, bord_g, bord_b, 1.0);
+    _draw_border(dl, sx, sy, sel_w, sel_h, bord_r, bord_g, bord_b, 1.0, 4.0);
 
     var n_sel = len(w.selected_indices);
     var label = "Select options...";
@@ -1098,7 +1097,7 @@ fn _emit_multi_select(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: Them
 
         _draw_shadow(dl, sx, menu_y, sel_w, menu_h, 6.0);
         dlist.dl_add(dl, dlist.dcmd_rect_rounded(sx, menu_y, sel_w, menu_h, 6.0, ts.surface_r * 0.95, ts.surface_g * 0.95, ts.surface_b * 0.95, 1.0));
-        _draw_border(dl, sx, menu_y, sel_w, menu_h, ts.border_r * 1.3, ts.border_g * 1.3, ts.border_b * 1.3, 1.0);
+        _draw_border(dl, sx, menu_y, sel_w, menu_h, ts.border_r * 1.3, ts.border_g * 1.3, ts.border_b * 1.3, 1.0, 6.0);
 
         var opt_idx = 0;
         while (opt_idx < num_opts) {
@@ -1120,7 +1119,7 @@ fn _emit_multi_select(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: Them
             var box_x = sx + 8.0;
             var box_y = opt_item_y + 7.0;
             dlist.dl_add(dl, dlist.dcmd_rect_rounded(box_x, box_y, 14.0, 14.0, 3.0, ts.surface_r * 0.7, ts.surface_g * 0.7, ts.surface_b * 0.7, 1.0));
-            _draw_border(dl, box_x, box_y, 14.0, 14.0, ts.border_r, ts.border_g, ts.border_b, 1.0);
+            _draw_border(dl, box_x, box_y, 14.0, 14.0, ts.border_r, ts.border_g, ts.border_b, 1.0, 3.0);
 
             if (is_item_sel == 1) {
                 dlist.dl_add(dl, dlist.dcmd_rect_rounded(box_x, box_y, 14.0, 14.0, 3.0, ts.accent_r, ts.accent_g, ts.accent_b, 1.0));
@@ -1160,7 +1159,7 @@ fn _emit_table(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap):
 
     // Header bar
     dlist.dl_add(dl, dlist.dcmd_rect_rounded(tx, cur_y, tw, 30.0, 4.0, ts.surface_r * 0.85, ts.surface_g * 0.85, ts.surface_b * 0.85, 1.0));
-    _draw_border(dl, tx, cur_y, tw, 30.0, ts.border_r, ts.border_g, ts.border_b, 1.0);
+    _draw_border(dl, tx, cur_y, tw, 30.0, ts.border_r, ts.border_g, ts.border_b, 1.0, 4.0);
 
     var col_idx = 0;
     while (col_idx < len(w.tab_titles)) {
@@ -1200,7 +1199,7 @@ fn _emit_table(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap):
                         bgb = cell_widget.background_color.b;
                     }
                     dlist.dl_add(dl, dlist.dcmd_rect_rounded(bx, by, bw, bh, 9.0, bgr, bgg, bgb, 0.25));
-                    _draw_border(dl, bx, by, bw, bh, bgr, bgg, bgb, 0.6);
+                    _draw_border(dl, bx, by, bw, bh, bgr, bgg, bgb, 0.6, 9.0);
                     dlist.dl_add(dl, dlist.dcmd_text(cell_widget.text_val, bx + 7.0, by + 3.0, bgr, bgg, bgb, 1.0, 0.8));
                 } else {
                     dlist.dl_add(dl, dlist.dcmd_text(cell_widget.text_val, cell_x, row_y + 7.0, ts.text_r, ts.text_g, ts.text_b, 1.0, 0.95));
@@ -1213,7 +1212,7 @@ fn _emit_table(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap):
     }
 
     var total_h = cur_y - ty;
-    _draw_border(dl, tx, ty, tw, total_h, ts.border_r, ts.border_g, ts.border_b, 1.0);
+    _draw_border(dl, tx, ty, tw, total_h, ts.border_r, ts.border_g, ts.border_b, 1.0, 4.0);
     return total_h + w.padding_top + w.padding_bottom;
 }
 
@@ -1225,7 +1224,7 @@ fn _emit_accordion(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSn
     var head_h = 36.0;
 
     dlist.dl_add(dl, dlist.dcmd_rect_rounded(ax, ay, aw, head_h, 6.0, ts.surface_r * 1.1, ts.surface_g * 1.1, ts.surface_b * 1.1, 1.0));
-    _draw_border(dl, ax, ay, aw, head_h, ts.border_r, ts.border_g, ts.border_b, 1.0);
+    _draw_border(dl, ax, ay, aw, head_h, ts.border_r, ts.border_g, ts.border_b, 1.0, 6.0);
 
     if (w.is_open != 0) {
         _draw_chevron_down(dl, ax + 14.0, ay + 15.0, ts.accent_r, ts.accent_g, ts.accent_b);
@@ -1233,6 +1232,13 @@ fn _emit_accordion(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSn
         _draw_chevron_right(dl, ax + 14.0, ay + 15.0, ts.text2_r, ts.text2_g, ts.text2_b);
     }
     dlist.dl_add(dl, dlist.dcmd_text(w.text_val, ax + 30.0, ay + 10.0, ts.text_r, ts.text_g, ts.text_b, 1.0, 1.0));
+
+    var hz = dlist.HitZone();
+    hz.id = "accordion_head";
+    hz.kind = dlist.HitZoneKind.TreeNode;
+    hz.x = ax; hz.y = ay; hz.w = aw; hz.h = head_h;
+    hz.widget = w;
+    _add_hit(dl, hz, ctx);
 
     var total_h = head_h;
     if (w.is_open != 0 and len(w.children) > 0) {
@@ -1258,7 +1264,7 @@ fn _emit_stat(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): 
     var sy = ctx.y + w.padding_top;
 
     dlist.dl_add(dl, dlist.dcmd_rect_rounded(sx, sy, sw, sh, 6.0, ts.surface_r, ts.surface_g, ts.surface_b, 1.0));
-    _draw_border(dl, sx, sy, sw, sh, ts.border_r, ts.border_g, ts.border_b, 0.8);
+    _draw_border(dl, sx, sy, sw, sh, ts.border_r, ts.border_g, ts.border_b, 0.8, 6.0);
     // Top accent line
     dlist.dl_add(dl, dlist.dcmd_rect_rounded(sx, sy, sw, 3.0, 2.0, ts.accent_r, ts.accent_g, ts.accent_b, 1.0));
 
@@ -1268,7 +1274,7 @@ fn _emit_stat(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): 
     if (len(w.focus_key) > 0) {
         var pw = (len(w.focus_key) as float) * 6.5 + 12.0;
         dlist.dl_add(dl, dlist.dcmd_rect_rounded(sx + 12.0, sy + 58.0, pw, 18.0, 9.0, 0.08, 0.35, 0.18, 0.4));
-        _draw_border(dl, sx + 12.0, sy + 58.0, pw, 18.0, 0.1, 0.6, 0.3, 0.6);
+        _draw_border(dl, sx + 12.0, sy + 58.0, pw, 18.0, 0.1, 0.6, 0.3, 0.6, 9.0);
         dlist.dl_add(dl, dlist.dcmd_text(w.focus_key, sx + 18.0, sy + 61.0, 0.3, 0.85, 0.5, 1.0, 0.8));
     }
 
@@ -1312,25 +1318,44 @@ fn _emit_link(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): 
 // ── Stepper ───────────────────────────────────────────────────────────────────
 fn _emit_stepper(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float {
     var sw = 110.0;
-    var sh = 26.0;
+    var sh = 28.0;
     var sx = ctx.x + w.padding_left;
     var sy = ctx.y + w.padding_top;
 
-    dlist.dl_add(dl, dlist.dcmd_rect_rounded(sx, sy, sw, sh, 4.0, ts.surface_r, ts.surface_g, ts.surface_b, 1.0));
-    dlist.dl_add(dl, dlist.dcmd_rect(sx, sy, sw, 1.0, ts.border_r, ts.border_g, ts.border_b, 1.0));
-    dlist.dl_add(dl, dlist.dcmd_rect(sx, sy + sh - 1.0, sw, 1.0, ts.border_r, ts.border_g, ts.border_b, 1.0));
-    dlist.dl_add(dl, dlist.dcmd_rect(sx, sy, 1.0, sh, ts.border_r, ts.border_g, ts.border_b, 1.0));
-    dlist.dl_add(dl, dlist.dcmd_rect(sx + sw - 1.0, sy, 1.0, sh, ts.border_r, ts.border_g, ts.border_b, 1.0));
+    // Outer rounded container
+    dlist.dl_add(dl, dlist.dcmd_rect_rounded(sx, sy, sw, sh, 6.0, ts.surface_r, ts.surface_g, ts.surface_b, 1.0));
+    _draw_border(dl, sx, sy, sw, sh, ts.border_r, ts.border_g, ts.border_b, 1.0, 6.0);
 
-    dlist.dl_add(dl, dlist.dcmd_text("-", sx + 10.0, sy + 5.0, ts.text_r, ts.text_g, ts.text_b, 1.0, 1.0));
-    dlist.dl_add(dl, dlist.dcmd_rect(sx + 28.0, sy, 1.0, sh, ts.border_r, ts.border_g, ts.border_b, 0.8));
+    // Subtle button backgrounds
+    dlist.dl_add(dl, dlist.dcmd_rect_rounded(sx + 1.0, sy + 1.0, 27.0, sh - 2.0, 5.0, ts.surface_r * 1.35, ts.surface_g * 1.35, ts.surface_b * 1.35, 0.7));
+    dlist.dl_add(dl, dlist.dcmd_rect_rounded(sx + sw - 28.0, sy + 1.0, 27.0, sh - 2.0, 5.0, ts.surface_r * 1.35, ts.surface_g * 1.35, ts.surface_b * 1.35, 0.7));
 
+    // Dividers
+    dlist.dl_add(dl, dlist.dcmd_rect(sx + 28.0, sy + 2.0, 1.0, sh - 4.0, ts.border_r, ts.border_g, ts.border_b, 0.8));
+    dlist.dl_add(dl, dlist.dcmd_rect(sx + sw - 29.0, sy + 2.0, 1.0, sh - 4.0, ts.border_r, ts.border_g, ts.border_b, 0.8));
+
+    // Minus glyph (centered at sx + 14.0)
+    dlist.dl_add(dl, dlist.dcmd_line(sx + 9.0, sy + sh * 0.5, sx + 19.0, sy + sh * 0.5, ts.text_r, ts.text_g, ts.text_b, 1.0));
+
+    // Plus glyph (centered at sx + sw - 14.5)
+    dlist.dl_add(dl, dlist.dcmd_line(sx + sw - 19.5, sy + sh * 0.5, sx + sw - 9.5, sy + sh * 0.5, ts.text_r, ts.text_g, ts.text_b, 1.0));
+    dlist.dl_add(dl, dlist.dcmd_line(sx + sw - 14.5, sy + sh * 0.5 - 5.0, sx + sw - 14.5, sy + sh * 0.5 + 5.0, ts.text_r, ts.text_g, ts.text_b, 1.0));
+
+    // Centered value text
     var val_int = w.slider_val as int;
     var val_str = "{val_int}";
-    dlist.dl_add(dl, dlist.dcmd_text(val_str, sx + 46.0, sy + 5.0, ts.text_r, ts.text_g, ts.text_b, 1.0, 1.0));
+    var text_x = sx + (sw * 0.5) - ((len(val_str) as float) * 4.0);
+    var text_y = sy + (sh * 0.5) - 6.0;
+    dlist.dl_add(dl, dlist.dcmd_text(val_str, text_x, text_y, ts.text_r, ts.text_g, ts.text_b, 1.0, 1.0));
 
-    dlist.dl_add(dl, dlist.dcmd_rect(sx + sw - 28.0, sy, 1.0, sh, ts.border_r, ts.border_g, ts.border_b, 0.8));
-    dlist.dl_add(dl, dlist.dcmd_text("+", sx + sw - 18.0, sy + 5.0, ts.text_r, ts.text_g, ts.text_b, 1.0, 1.0));
+    // Hit zones for decrement and increment buttons
+    var hz_dec = dlist.make_button_zone("stepper_dec", sx, sy, 28.0, sh, w.on_change_action, w);
+    hz_dec.tab_index = -1;
+    _add_hit(dl, hz_dec, ctx);
+
+    var hz_inc = dlist.make_button_zone("stepper_inc", sx + sw - 28.0, sy, 28.0, sh, w.on_change_action, w);
+    hz_inc.tab_index = 1;
+    _add_hit(dl, hz_inc, ctx);
 
     return sh + w.padding_top + w.padding_bottom;
 }
@@ -1349,7 +1374,9 @@ fn _emit_range_slider(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: Them
     if (range_span <= 0.0) { range_span = 100.0; }
     var low_pct = (w.slider_val - w.slider_min) / range_span;
     if (low_pct < 0.0) { low_pct = 0.0; }
-    var high_pct = (w.padding_left - w.slider_min) / range_span;
+    if (low_pct > 1.0) { low_pct = 1.0; }
+    var high_pct = (w.slider_high - w.slider_min) / range_span;
+    if (high_pct < 0.0) { high_pct = 0.0; }
     if (high_pct > 1.0) { high_pct = 1.0; }
 
     var low_x = rx + low_pct * rw;
@@ -1361,6 +1388,10 @@ fn _emit_range_slider(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: Them
 
     dlist.dl_add(dl, dlist.dcmd_rect_rounded(low_x - 5.0, track_y - 4.0, 12.0, 12.0, 6.0, 1.0, 1.0, 1.0, 1.0));
     dlist.dl_add(dl, dlist.dcmd_rect_rounded(high_x - 5.0, track_y - 4.0, 12.0, 12.0, 6.0, 1.0, 1.0, 1.0, 1.0));
+
+    // Register interactive slider zone
+    var hz = dlist.make_slider_zone("range_slider", rx, track_y - 6.0, rw, 16.0, w.slider_min, w.slider_max, w.slider_val, w.on_change_action, w);
+    _add_hit(dl, hz, ctx);
 
     return 24.0 + w.padding_top + w.padding_bottom;
 }
@@ -1376,6 +1407,9 @@ fn _emit_color_picker(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: Them
     dlist.dl_add(dl, dlist.dcmd_rect(cx, cy + 21.0, 26.0, 1.0, ts.border_r, ts.border_g, ts.border_b, 1.0));
 
     dlist.dl_add(dl, dlist.dcmd_text(w.text_val, cx + 34.0, cy + 5.0, ts.text_r, ts.text_g, ts.text_b, 1.0, 1.0));
+
+    var hz = dlist.make_button_zone("color_picker", cx, cy, 26.0, 20.0, w.on_change_action, w);
+    _add_hit(dl, hz, ctx);
 
     return 26.0 + w.padding_top + w.padding_bottom;
 }
@@ -1413,6 +1447,10 @@ fn _emit_steps(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap):
 
         var title = w.tab_titles[i];
         dlist.dl_add(dl, dlist.dcmd_text(title, node_x + 26.0, sy + 3.0, ts.text_r, ts.text_g, ts.text_b, 1.0, 0.9));
+
+        var hz = dlist.make_button_zone("step_" + num_str, node_x, sy, 20.0 + (len(title) as float) * 7.0, 20.0, w.on_change_action, w);
+        hz.tab_index = i;
+        _add_hit(dl, hz, ctx);
 
         i = i + 1;
     }
@@ -1457,6 +1495,13 @@ fn _emit_tree_node(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSn
     if (w.is_open != 0) { chev = "v "; }
     dlist.dl_add(dl, dlist.dcmd_text(chev, nx, ny + 4.0, ts.accent_r, ts.accent_g, ts.accent_b, 1.0, 1.0));
     dlist.dl_add(dl, dlist.dcmd_text(w.text_val, nx + 16.0, ny + 4.0, ts.text_r, ts.text_g, ts.text_b, 1.0, 1.0));
+
+    var hz = dlist.HitZone();
+    hz.id = "tree_node_head";
+    hz.kind = dlist.HitZoneKind.TreeNode;
+    hz.x = nx; hz.y = ny; hz.w = ctx.avail_w; hz.h = 24.0;
+    hz.widget = w;
+    _add_hit(dl, hz, ctx);
 
     var total_h = 24.0;
     if (w.is_open != 0) {
@@ -1512,7 +1557,7 @@ fn _emit_diff(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): 
     var dw = ctx.avail_w - w.padding_left - w.padding_right;
 
     dlist.dl_add(dl, dlist.dcmd_rect_rounded(dx, dy, dw, 56.0, 4.0, ts.surface_r * 0.8, ts.surface_g * 0.8, ts.surface_b * 0.8, 1.0));
-    _draw_border(dl, dx, dy, dw, 56.0, ts.border_r, ts.border_g, ts.border_b, 0.8);
+    _draw_border(dl, dx, dy, dw, 56.0, ts.border_r, ts.border_g, ts.border_b, 0.8, 4.0);
 
     // Deletion
     dlist.dl_add(dl, dlist.dcmd_rect(dx + 1.0, dy + 2.0, dw - 2.0, 24.0, 0.4, 0.1, 0.14, 0.3));
@@ -1536,12 +1581,15 @@ fn _emit_file_input(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeS
     var fh = 30.0;
 
     dlist.dl_add(dl, dlist.dcmd_rect_rounded(fx, fy, fw, fh, 4.0, ts.surface_r * 0.7, ts.surface_g * 0.7, ts.surface_b * 0.7, 1.0));
-    _draw_border(dl, fx, fy, fw, fh, ts.border_r, ts.border_g, ts.border_b, 1.0);
+    _draw_border(dl, fx, fy, fw, fh, ts.border_r, ts.border_g, ts.border_b, 1.0, 4.0);
 
     dlist.dl_add(dl, dlist.dcmd_rect_rounded(fx + 2.0, fy + 2.0, 72.0, fh - 4.0, 3.0, ts.accent_r * 0.7, ts.accent_g * 0.7, ts.accent_b * 0.7, 1.0));
-    _draw_border(dl, fx + 2.0, fy + 2.0, 72.0, fh - 4.0, ts.accent_r, ts.accent_g, ts.accent_b, 1.0);
+    _draw_border(dl, fx + 2.0, fy + 2.0, 72.0, fh - 4.0, ts.accent_r, ts.accent_g, ts.accent_b, 1.0, 3.0);
     dlist.dl_add(dl, dlist.dcmd_text("Browse...", fx + 10.0, fy + 7.0, 1.0, 1.0, 1.0, 1.0, 0.9));
     dlist.dl_add(dl, dlist.dcmd_text(w.text_val, fx + 82.0, fy + 7.0, ts.text2_r, ts.text2_g, ts.text2_b, 1.0, 0.9));
+
+    var hz = dlist.make_button_zone("file_browse", fx, fy, 76.0, fh, w.on_change_action, w);
+    _add_hit(dl, hz, ctx);
 
     return fh + w.padding_top + w.padding_bottom;
 }
@@ -1555,7 +1603,7 @@ fn _emit_filter(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap)
     var fh = 30.0;
 
     dlist.dl_add(dl, dlist.dcmd_rect_rounded(fx, fy, fw, fh, 4.0, ts.surface_r * 0.7, ts.surface_g * 0.7, ts.surface_b * 0.7, 1.0));
-    _draw_border(dl, fx, fy, fw, fh, ts.border_r, ts.border_g, ts.border_b, 1.0);
+    _draw_border(dl, fx, fy, fw, fh, ts.border_r, ts.border_g, ts.border_b, 1.0, 4.0);
 
     dlist.dl_add(dl, dlist.dcmd_rect_rounded(fx + 6.0, fy + 6.0, 18.0, 18.0, 9.0, ts.accent_r * 0.25, ts.accent_g * 0.25, ts.accent_b * 0.25, 1.0));
     dlist.dl_add(dl, dlist.dcmd_text("Q", fx + 11.0, fy + 8.0, ts.accent_r, ts.accent_g, ts.accent_b, 1.0, 0.85));
@@ -1579,7 +1627,7 @@ fn _emit_calendar(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSna
     var ch = 160.0;
 
     dlist.dl_add(dl, dlist.dcmd_rect_rounded(cx, cy, cw, ch, 6.0, ts.surface_r, ts.surface_g, ts.surface_b, 1.0));
-    _draw_border(dl, cx, cy, cw, ch, ts.border_r, ts.border_g, ts.border_b, 1.0);
+    _draw_border(dl, cx, cy, cw, ch, ts.border_r, ts.border_g, ts.border_b, 1.0, 6.0);
 
     dlist.dl_add(dl, dlist.dcmd_text("<", cx + 10.0, cy + 8.0, ts.text2_r, ts.text2_g, ts.text2_b, 1.0, 1.0));
     dlist.dl_add(dl, dlist.dcmd_text("November 2026", cx + 55.0, cy + 8.0, ts.text_r, ts.text_g, ts.text_b, 1.0, 1.0));
@@ -1610,7 +1658,7 @@ fn _emit_bar_chart(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSn
     var cy = ctx.y + w.padding_top;
 
     dlist.dl_add(dl, dlist.dcmd_rect_rounded(cx, cy, cw, ch, 6.0, ts.surface_r, ts.surface_g, ts.surface_b, 1.0));
-    _draw_border(dl, cx, cy, cw, ch, ts.border_r, ts.border_g, ts.border_b, 1.0);
+    _draw_border(dl, cx, cy, cw, ch, ts.border_r, ts.border_g, ts.border_b, 1.0, 6.0);
 
     dlist.dl_add(dl, dlist.dcmd_text(w.text_val, cx + 12.0, cy + 8.0, ts.text_r, ts.text_g, ts.text_b, 1.0, 0.9));
 
@@ -1666,7 +1714,7 @@ fn _emit_line_chart(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeS
     var cy = ctx.y + w.padding_top;
 
     dlist.dl_add(dl, dlist.dcmd_rect_rounded(cx, cy, cw, ch, 6.0, ts.surface_r, ts.surface_g, ts.surface_b, 1.0));
-    _draw_border(dl, cx, cy, cw, ch, ts.border_r, ts.border_g, ts.border_b, 1.0);
+    _draw_border(dl, cx, cy, cw, ch, ts.border_r, ts.border_g, ts.border_b, 1.0, 6.0);
 
     dlist.dl_add(dl, dlist.dcmd_text(w.text_val, cx + 12.0, cy + 8.0, ts.text_r, ts.text_g, ts.text_b, 1.0, 0.9));
 
@@ -1713,7 +1761,29 @@ fn _emit_line_chart(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeS
     return ch + w.padding_top + w.padding_bottom;
 }
 
-// ── PieChart ──────────────────────────────────────────────────────────────────
+// ── Fast Math for Charts ──────────────────────────────────────────────────────
+fn _sin(rad: float): float {
+    var PI = 3.141592653589793;
+    var x = rad;
+    while (x > PI) { x = x - 2.0 * PI; }
+    while (x < -PI) { x = x + 2.0 * PI; }
+    var sum = 0.0;
+    var term = x;
+    var i = 1;
+    while (i < 10) {
+        var i_f = i as float;
+        sum = sum + term;
+        term = -term * x * x / ((2.0 * i_f) * (2.0 * i_f + 1.0));
+        i = i + 1;
+    }
+    return sum;
+}
+
+fn _cos(rad: float): float {
+    return _sin(rad + 1.5707963267948966);
+}
+
+// ── PieChart & DoughnutChart ──────────────────────────────────────────────────
 fn _emit_pie_chart(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float {
     var cw = 220.0;
     if (w.width_val > 0.0) { cw = w.width_val; }
@@ -1723,25 +1793,93 @@ fn _emit_pie_chart(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSn
     var cy = ctx.y + w.padding_top;
 
     dlist.dl_add(dl, dlist.dcmd_rect_rounded(cx, cy, cw, ch, 6.0, ts.surface_r, ts.surface_g, ts.surface_b, 1.0));
-    _draw_border(dl, cx, cy, cw, ch, ts.border_r, ts.border_g, ts.border_b, 1.0);
+    _draw_border(dl, cx, cy, cw, ch, ts.border_r, ts.border_g, ts.border_b, 1.0, 6.0);
 
     dlist.dl_add(dl, dlist.dcmd_text(w.text_val, cx + 12.0, cy + 8.0, ts.text_r, ts.text_g, ts.text_b, 1.0, 0.9));
 
-    var pie_cx = cx + 46.0;
-    var pie_cy = cy + 60.0;
-    dlist.dl_add(dl, dlist.dcmd_rect_rounded(pie_cx - 28.0, pie_cy - 28.0, 56.0, 56.0, 28.0, ts.accent_r, ts.accent_g, ts.accent_b, 1.0));
-    dlist.dl_add(dl, dlist.dcmd_rect_rounded(pie_cx - 14.0, pie_cy - 14.0, 28.0, 28.0, 14.0, ts.surface_r, ts.surface_g, ts.surface_b, 1.0));
+    // Data values
+    var vals: [float] = [65.0, 25.0, 10.0];
+    if (w.text_editor_state != nil) {
+        vals = w.text_editor_state as [float];
+    }
+    var total_val = 0.0;
+    var vi = 0;
+    while (vi < len(vals)) {
+        total_val = total_val + vals[vi];
+        vi = vi + 1;
+    }
+    if (total_val <= 0.0) { total_val = 1.0; }
 
-    var leg_x = cx + 86.0;
-    var leg_y = cy + 32.0;
-    dlist.dl_add(dl, dlist.dcmd_rect_rounded(leg_x, leg_y + 2.0, 8.0, 8.0, 2.0, ts.accent_r, ts.accent_g, ts.accent_b, 1.0));
-    dlist.dl_add(dl, dlist.dcmd_text("Segment A (65%)", leg_x + 14.0, leg_y, ts.text_r, ts.text_g, ts.text_b, 1.0, 0.85));
+    var pie_r = 44.0;
+    if (ch < 130.0) { pie_r = 30.0; }
+    var pie_cx = cx + pie_r + 18.0;
+    var pie_cy = cy + (ch * 0.5) + 6.0;
 
-    dlist.dl_add(dl, dlist.dcmd_rect_rounded(leg_x, leg_y + 20.0, 8.0, 8.0, 2.0, 0.06, 0.72, 0.50, 1.0));
-    dlist.dl_add(dl, dlist.dcmd_text("Segment B (25%)", leg_x + 14.0, leg_y + 18.0, ts.text_r, ts.text_g, ts.text_b, 1.0, 0.85));
+    // Palette: Indigo, Emerald, Amber, Rose, Sky, Purple
+    var pal_r: [float] = [0.39, 0.06, 0.96, 0.94, 0.23, 0.55];
+    var pal_g: [float] = [0.40, 0.72, 0.62, 0.27, 0.51, 0.36];
+    var pal_b: [float] = [0.95, 0.50, 0.04, 0.27, 0.96, 0.96];
 
-    dlist.dl_add(dl, dlist.dcmd_rect_rounded(leg_x, leg_y + 38.0, 8.0, 8.0, 2.0, 0.95, 0.65, 0.15, 1.0));
-    dlist.dl_add(dl, dlist.dcmd_text("Segment C (10%)", leg_x + 14.0, leg_y + 36.0, ts.text_r, ts.text_g, ts.text_b, 1.0, 0.85));
+    var cur_angle = -1.5707963; // 12 o'clock
+    var slice_i = 0;
+    var n_slices = len(vals);
+    while (slice_i < n_slices) {
+        var v = vals[slice_i];
+        if (v > 0.0) {
+            var sweep = (v / total_val) * 6.2831853;
+            var end_ang = cur_angle + sweep;
+
+            var cr = pal_r[slice_i % 6];
+            var cg = pal_g[slice_i % 6];
+            var cb = pal_b[slice_i % 6];
+
+            var a = cur_angle;
+            var step_size = 0.14;
+            while (a < end_ang) {
+                var next_a = a + step_size;
+                if (next_a > end_ang) { next_a = end_ang; }
+
+                var x1 = pie_cx + pie_r * _cos(a);
+                var y1 = pie_cy + pie_r * _sin(a);
+                var x2 = pie_cx + pie_r * _cos(next_a);
+                var y2 = pie_cy + pie_r * _sin(next_a);
+
+                dlist.dl_add(dl, dlist.dcmd_triangle(pie_cx, pie_cy, x1, y1, x2, y2, cr, cg, cb, 1.0));
+                a = next_a;
+            }
+            cur_angle = end_ang;
+        }
+        slice_i = slice_i + 1;
+    }
+
+    // Cutout center hole for doughnut chart
+    if (w.kind == ui.WidgetKind.DoughnutChart) {
+        var inner_r = pie_r * 0.55;
+        dlist.dl_add(dl, dlist.dcmd_rect_rounded(pie_cx - inner_r, pie_cy - inner_r, inner_r * 2.0, inner_r * 2.0, inner_r, ts.surface_r, ts.surface_g, ts.surface_b, 1.0));
+    }
+
+    // Dynamic legend with computed percentages and labels
+    var leg_x = pie_cx + pie_r + 20.0;
+    var leg_y = cy + 30.0;
+    var leg_i = 0;
+    while (leg_i < n_slices and leg_i < 6) {
+        var cr = pal_r[leg_i % 6];
+        var cg = pal_g[leg_i % 6];
+        var cb = pal_b[leg_i % 6];
+
+        var pct = ((vals[leg_i] / total_val) * 100.0) as int;
+        var item_label = "Segment {leg_i + 1}";
+        if (leg_i < len(w.tab_titles) and len(w.tab_titles[leg_i]) > 0) {
+            item_label = w.tab_titles[leg_i];
+        }
+        var entry_text = "{item_label} ({pct}%)";
+
+        var row_y = leg_y + (leg_i as float) * 20.0;
+        dlist.dl_add(dl, dlist.dcmd_rect_rounded(leg_x, row_y + 2.0, 8.0, 8.0, 2.0, cr, cg, cb, 1.0));
+        dlist.dl_add(dl, dlist.dcmd_text(entry_text, leg_x + 14.0, row_y, ts.text_r, ts.text_g, ts.text_b, 1.0, 0.85));
+
+        leg_i = leg_i + 1;
+    }
 
     return ch + w.padding_top + w.padding_bottom;
 }
@@ -1756,7 +1894,7 @@ fn _emit_histogram(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSn
     var cy = ctx.y + w.padding_top;
 
     dlist.dl_add(dl, dlist.dcmd_rect_rounded(cx, cy, cw, ch, 6.0, ts.surface_r, ts.surface_g, ts.surface_b, 1.0));
-    _draw_border(dl, cx, cy, cw, ch, ts.border_r, ts.border_g, ts.border_b, 1.0);
+    _draw_border(dl, cx, cy, cw, ch, ts.border_r, ts.border_g, ts.border_b, 1.0, 6.0);
 
     dlist.dl_add(dl, dlist.dcmd_text(w.text_val, cx + 10.0, cy + 6.0, ts.text_r, ts.text_g, ts.text_b, 1.0, 0.85));
 

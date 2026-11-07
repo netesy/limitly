@@ -1,0 +1,75 @@
+import std.ui as ui;
+import std.ui.context as ctx;
+import std.ui.builder as builder;
+import std.ui.draw_list as dlist;
+import std.color as color;
+
+var color_clicked = 0;
+fn on_color_change() {
+    color_clicked = color_clicked + 1;
+}
+
+var file_clicked = 0;
+fn on_file_change() {
+    file_clicked = file_clicked + 1;
+}
+
+fn test_color_picker() {
+    print("Testing ColorPicker widget...");
+    color_clicked = 0;
+    var cp = ui.color_picker("Accent", color.rgb(100, 150, 200), on_color_change);
+    assert(cp.text_val == "Accent", "ColorPicker label should be Accent");
+
+    ctx.ui_init();
+    ctx.set_viewport_size(400.0, 400.0);
+    ctx.set_root(cp);
+
+    var dl = builder.build(cp, 360.0, 360.0, nil, 20.0, 20.0);
+    assert(len(dl.hits) >= 1, "DrawList hits should include color picker zone");
+
+    var hz = dl.hits[0];
+    assert(hz.kind == dlist.HitZoneKind.Button, "HitZone kind should be Button");
+
+    // Click color picker swatch
+    ctx.dispatch_pointer_down(hz.x + 5.0, hz.y + 5.0);
+    assert(cp.is_pressed == 1, "ColorPicker should be pressed on pointer down");
+    ctx.dispatch_pointer_up(hz.x + 5.0, hz.y + 5.0);
+    assert(cp.is_pressed == 0, "ColorPicker should release pressed state on pointer up");
+    assert(color_clicked == 1, "on_change callback should have fired");
+
+    print("ColorPicker tests passed!");
+}
+
+fn test_file_input() {
+    print("Testing FileInput widget...");
+    file_clicked = 0;
+    var fi = ui.file_input("document.pdf", on_file_change);
+    assert(fi.text_val == "document.pdf", "FileInput filename should be document.pdf");
+
+    ctx.ui_init();
+    ctx.set_viewport_size(400.0, 400.0);
+    ctx.set_root(fi);
+
+    var dl = builder.build(fi, 360.0, 360.0, nil, 20.0, 20.0);
+    assert(len(dl.hits) >= 1, "DrawList hits should include file input browse zone");
+
+    var hz = dl.hits[0];
+    assert(hz.kind == dlist.HitZoneKind.Button, "HitZone kind should be Button");
+
+    // Click Browse... button
+    ctx.dispatch_pointer_down(hz.x + 5.0, hz.y + 5.0);
+    assert(fi.is_pressed == 1, "FileInput should be pressed on pointer down");
+    ctx.dispatch_pointer_up(hz.x + 5.0, hz.y + 5.0);
+    assert(fi.is_pressed == 0, "FileInput should release pressed state on pointer up");
+    assert(file_clicked == 1, "on_change callback should have fired");
+
+    print("FileInput tests passed!");
+}
+
+fn main(): int {
+    test_color_picker();
+    test_file_input();
+    print("ALL COLOR PICKER & FILE INPUT TESTS PASSED!");
+    return 0;
+}
+

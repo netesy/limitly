@@ -249,6 +249,7 @@ mixin ToggleValue {
 
 mixin SliderValue {
     pub var slider_val: float;
+    pub var slider_high: float;
     pub var slider_min: float;
     pub var slider_max: float;
 }
@@ -708,6 +709,7 @@ frame Widget : WidgetTrait {
         self.hover_style_val = _shared_empty_style;
         self.is_checked = 0;
         self.slider_val = 0.0;
+        self.slider_high = 1.0;
         self.slider_min = 0.0;
         self.slider_max = 1.0;
         self.is_focused = 0;
@@ -1240,10 +1242,11 @@ pub fn multi_select(options: [str], selected_indices: [int] = [] as [int], on_ch
     return w;
 }
 
-pub fn link(text_val: str, url: str): Widget {
+pub fn link(text_val: str, url: str = "", on_click: any = nil): Widget {
     var w = Widget(KIND_LINK);
     w.text_val = text_val;
     w.placeholder_val = url;
+    w.on_click_action = on_click;
     w.foreground_color = color.rgb(100, 180, 255);
     w.height_val = 20.0;
     return w;
@@ -1374,7 +1377,7 @@ pub fn range_slider(low: float = 20.0, high: float = 80.0, min_val: float = 0.0,
     w.slider_min = min_val;
     w.slider_max = max_val;
     w.slider_val = low;
-    w.padding_left = high;
+    w.slider_high = high;
     w.payload_role = Role.High;
     w.height_val = 24.0;
     w.width_val = 160.0;

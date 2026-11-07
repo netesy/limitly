@@ -13,8 +13,6 @@
 /// var parts = split.split("apple,banana,orange", ",");
 /// ```
 pub fn split(value: str, delimiter: str): [str] {
-    contract(len(value) >= 0, "value must be a valid string");
-    contract(len(delimiter) >= 0, "delimiter must be a valid string");
     var dlen = len(delimiter);
     var vlen = len(value);
     var parts: [str] = [];
@@ -29,14 +27,17 @@ pub fn split(value: str, delimiter: str): [str] {
     var start = 0;
     var i = 0;
     while (i <= vlen - dlen) {
-        if (_builtin_substring(value, i, i + dlen) == delimiter) {
-            parts.append(_builtin_substring(value, start, i));
+        val sub = _builtin_substring(value, i, i + dlen);
+        if (sub == delimiter) {
+            val part = _builtin_substring(value, start, i);
+            parts.append(part);
             start = i + dlen;
             i = start;
         } else {
             i = i + 1;
         }
     }
-    parts.append(_builtin_substring(value, start, vlen));
+    val rem = _builtin_substring(value, start, vlen);
+    parts.append(rem);
     return parts;
 }

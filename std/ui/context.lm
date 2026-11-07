@@ -879,8 +879,22 @@ pub fn dispatch_pointer_down(px: float, py: float): nil {
         if (hz.kind == dlist.HitZoneKind.Button) {
             if (hz.widget != nil) {
                 var w = hz.widget as ui.Widget;
-                if (w.kind == ui.KIND_TABS) {
+                if (w.kind == ui.KIND_TABS or w.kind == ui.KIND_STEPS) {
                     w.active_tab = hz.tab_index;
+                    event.fire_action(w.on_change_action)? else { };
+                    mark_element_dirty(1);
+                    return;
+                }
+                if (w.kind == ui.KIND_STEPPER) {
+                    var step_val = w.spacing_val;
+                    if (step_val <= 0.0) { step_val = 1.0; }
+                    if (hz.tab_index == -1) {
+                        w.slider_val = w.slider_val - step_val;
+                        if (w.slider_val < w.slider_min) { w.slider_val = w.slider_min; }
+                    } elif (hz.tab_index == 1) {
+                        w.slider_val = w.slider_val + step_val;
+                        if (w.slider_val > w.slider_max) { w.slider_val = w.slider_max; }
+                    }
                     event.fire_action(w.on_change_action)? else { };
                     mark_element_dirty(1);
                     return;
@@ -906,7 +920,24 @@ pub fn dispatch_pointer_down(px: float, py: float): nil {
                 var ratio = (px - hz.x) / hz.w;
                 if (ratio < 0.0) ratio = 0.0;
                 if (ratio > 1.0) ratio = 1.0;
-                w.slider_val = w.slider_min + ratio * (w.slider_max - w.slider_min);
+                if (w.kind == ui.KIND_RANGE_SLIDER) {
+                    var cur_val = w.slider_min + ratio * (w.slider_max - w.slider_min);
+                    var dist_low = cur_val - w.slider_val;
+                    if (dist_low < 0.0) dist_low = -dist_low;
+                    var dist_high = cur_val - w.slider_high;
+                    if (dist_high < 0.0) dist_high = -dist_high;
+                    if (dist_low <= dist_high) {
+                        w.active_tab = 0;
+                        w.slider_val = cur_val;
+                        if (w.slider_val > w.slider_high) w.slider_val = w.slider_high;
+                    } else {
+                        w.active_tab = 1;
+                        w.slider_high = cur_val;
+                        if (w.slider_high < w.slider_val) w.slider_high = w.slider_val;
+                    }
+                } else {
+                    w.slider_val = w.slider_min + ratio * (w.slider_max - w.slider_min);
+                }
                 event.fire_action(w.on_change_action)? else { };
                 mark_element_dirty(1);
             }
@@ -978,6 +1009,19 @@ pub fn dispatch_pointer_down(px: float, py: float): nil {
                     return;
                 }
             }
+        } elif (hz.kind == dlist.HitZoneKind.TreeNode) {
+            if (hz.widget != nil) {
+                var w = hz.widget as ui.Widget;
+                if (w.is_open == 1) {
+                    w.is_open = 0;
+                } else {
+                    w.is_open = 1;
+                }
+                event.fire_action(w.on_change_action)? else { };
+                event.fire_action(w.on_click_action)? else { };
+                mark_element_dirty(1);
+                return;
+            }
         } else {
             hit_test_and_click_widget(global_ui_context.current_widget, px, py, 20.0, 20.0, content_w, content_h);
         }
@@ -1013,11 +1057,22 @@ pub fn dispatch_pointer_move(px: float, py: float): nil {
                 cap.is_pressed = 0;
                 mark_element_dirty(1);
             }
-        } elif (cap.kind == ui.KIND_SLIDER) {
+        } elif (cap.kind == ui.KIND_SLIDER or cap.kind == ui.KIND_RANGE_SLIDER) {
             var ratio = (px - global_ui_context.captured_bounds_x) / global_ui_context.captured_bounds_w;
             if (ratio < 0.0) ratio = 0.0;
             if (ratio > 1.0) ratio = 1.0;
-            cap.slider_val = cap.slider_min + ratio * (cap.slider_max - cap.slider_min);
+            if (cap.kind == ui.KIND_RANGE_SLIDER) {
+                var cur_val = cap.slider_min + ratio * (cap.slider_max - cap.slider_min);
+                if (cap.active_tab == 0) {
+                    cap.slider_val = cur_val;
+                    if (cap.slider_val > cap.slider_high) cap.slider_val = cap.slider_high;
+                } else {
+                    cap.slider_high = cur_val;
+                    if (cap.slider_high < cap.slider_val) cap.slider_high = cap.slider_val;
+                }
+            } else {
+                cap.slider_val = cap.slider_min + ratio * (cap.slider_max - cap.slider_min);
+            }
             event.fire_action(cap.on_change_action)? else { };
             mark_element_dirty(1);
         }
@@ -2267,26 +2322,31 @@ pub fn dispatch_pointer_up(px: float, py: float): nil {
         var cap = global_ui_context.captured_widget;
         cap.is_pressed = 0;
 
-        if (cap.kind == ui.KIND_BUTTON) {
+        if (cap.kind == ui.KIND_BUTTON or cap.kind == ui.KIND_LINK or cap.kind == ui.KIND_FILE_INPUT or cap.kind == ui.KIND_COLOR_PICKER or cap.kind == ui.KIND_ALERT or cap.kind == ui.KIND_TOAST) {
             if (px >= global_ui_context.captured_bounds_x and
             px <= global_ui_context.captured_bounds_x + global_ui_context.captured_bounds_w and
             py >= global_ui_context.captured_bounds_y and
             py <= global_ui_context.captured_bounds_y + global_ui_context.captured_bounds_h) {
                 cap.click_count = cap.click_count + 1;
                 event.fire_action(cap.on_click_action)? else { };
+                event.fire_action(cap.on_change_action)? else { };
                 mark_element_dirty(1);
             }
-        } elif (cap.kind == ui.KIND_CHECKBOX) {
+        } elif (cap.kind == ui.KIND_CHECKBOX or cap.kind == ui.KIND_TOGGLE) {
             if (px >= global_ui_context.captured_bounds_x and
             px <= global_ui_context.captured_bounds_x + global_ui_context.captured_bounds_w and
             py >= global_ui_context.captured_bounds_y and
             py <= global_ui_context.captured_bounds_y + global_ui_context.captured_bounds_h) {
                 if (cap.is_checked == 1) {
                     cap.is_checked = 0;
-                    cap.text_val = "[ ]";
+                    if (cap.text_val == "[X]") {
+                        cap.text_val = "[ ]";
+                    }
                 } else {
                     cap.is_checked = 1;
-                    cap.text_val = "[X]";
+                    if (cap.text_val == "[ ]") {
+                        cap.text_val = "[X]";
+                    }
                 }
                 event.fire_action(cap.on_change_action)? else { };
                 mark_element_dirty(1);
@@ -2426,15 +2486,19 @@ if (w.kind == ui.KIND_BUTTON and w.is_focused == 1) {
     return 1;
 }
 }
-// Toggle checkbox on Space if focused
-if (w.kind == ui.KIND_CHECKBOX and w.is_focused == 1) {
+// Toggle checkbox or toggle on Space if focused
+if ((w.kind == ui.KIND_CHECKBOX or w.kind == ui.KIND_TOGGLE) and w.is_focused == 1) {
     if (key_code == 32) { // Space
     if (w.is_checked == 1) {
         w.is_checked = 0;
-        w.text_val = "[ ]";
+        if (w.text_val == "[X]") {
+            w.text_val = "[ ]";
+        }
     } else {
         w.is_checked = 1;
-        w.text_val = "[X]";
+        if (w.text_val == "[ ]") {
+            w.text_val = "[X]";
+        }
     }
     event.fire_action(w.on_change_action)? else { };
     mark_element_dirty(1);

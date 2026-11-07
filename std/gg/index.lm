@@ -1,6 +1,7 @@
 // std.gg - Portable Sokol-GFX Style Low-Level Graphics Abstraction Module
 
 import std.internal.runtime as rt;
+import std.math as math;
 
 trait ResourceTrait {
     fn is_valid(): bool;
@@ -208,7 +209,45 @@ pub fn set_window_size(width: int, height: int): nil {
 
 pub fn draw_rect_primitive(x: float, y: float, w: float, h: float, r: float, g: float, b: float, a: float): nil {
     if (global_graphics_context.handle != -1) {
-        rt.call(global_graphics_context.handle, rt.OP_DRAW_RECT, [x, y, w, h, r, g, b, a]);
+        rt.call(global_graphics_context.handle, rt.OP_DRAW_RECT, [x, y, w, h, r, g, b, a, 0.0, 0.0]);
+    }
+}
+
+pub fn draw_rect_rounded_primitive(x: float, y: float, w: float, h: float, rad: float, r: float, g: float, b: float, a: float): nil {
+    if (global_graphics_context.handle != -1) {
+        rt.call(global_graphics_context.handle, rt.OP_DRAW_RECT, [x, y, w, h, r, g, b, a, rad, 0.0]);
+    }
+}
+
+pub fn draw_rect_border_primitive(x: float, y: float, w: float, h: float, rad: float, border_w: float, r: float, g: float, b: float, a: float): nil {
+    if (global_graphics_context.handle != -1) {
+        rt.call(global_graphics_context.handle, rt.OP_DRAW_RECT, [x, y, w, h, r, g, b, a, rad, border_w]);
+    }
+}
+
+fn _sqrt(v: float): float {
+    if (v <= 0.0) { return 0.0; }
+    var x = v;
+    var y = 1.0;
+    var i = 0;
+    while (i < 20) {
+        x = (x + y) * 0.5;
+        y = v / x;
+        i = i + 1;
+    }
+    return x;
+}
+
+pub fn draw_line_primitive(x1: float, y1: float, x2: float, y2: float, r: float, g: float, b: float, a: float, thickness: float = 1.5): nil {
+    var dx = x2 - x1;
+    var dy = y2 - y1;
+    var len_val = _sqrt(dx * dx + dy * dy);
+    if (len_val > 0.001) {
+        var half_t = thickness * 0.5;
+        var nx = (-dy / len_val) * half_t;
+        var ny = (dx / len_val) * half_t;
+        draw_triangle_primitive(x1 + nx, y1 + ny, x1 - nx, y1 - ny, x2 + nx, y2 + ny, r, g, b, a);
+        draw_triangle_primitive(x1 - nx, y1 - ny, x2 - nx, y2 - ny, x2 + nx, y2 + ny, r, g, b, a);
     }
 }
 

@@ -1,0 +1,91 @@
+// tests/ui_widget_checkbox_test.lm
+// Test Checkbox and Toggle state handling, label preservation, and event dispatch
+
+import std.ui as ui;
+import std.ui.context as ctx;
+import std.ui.builder as builder;
+import std.ui.draw_list as dlist;
+import std.color as color;
+
+var cb_changed = 0;
+var toggle_changed = 0;
+
+fn on_cb_change() {
+    cb_changed = cb_changed + 1;
+}
+
+fn on_toggle_change() {
+    toggle_changed = toggle_changed + 1;
+}
+
+fn test_checkbox_handling() {
+    print("Testing Checkbox handling and label preservation...");
+    cb_changed = 0;
+
+    val cb = ui.checkbox(false, on_cb_change);
+    cb.text_val = "Strict Mode";
+
+    ctx.ui_init();
+    ctx.set_viewport_size(800.0, 600.0);
+    ctx.set_root(cb);
+
+    // Initial state
+    assert(cb.is_checked == 0, "initial is_checked should be 0");
+    assert(cb.text_val == "Strict Mode", "initial label should be Strict Mode");
+
+    // Click checkbox at (25, 25)
+    ctx.dispatch_pointer_down(25.0, 25.0);
+    assert(ctx.global_ui_context.has_captured == 1, "checkbox must be captured on pointer down");
+    ctx.dispatch_pointer_up(25.0, 25.0);
+
+    // After click 1
+    assert(cb.is_checked == 1, "is_checked should be 1 after click");
+    assert(cb_changed == 1, "on_change callback should have fired once");
+    assert(cb.text_val == "Strict Mode", "label MUST NOT be clobbered with '[X]'!");
+
+    // After click 2
+    ctx.dispatch_pointer_down(25.0, 25.0);
+    ctx.dispatch_pointer_up(25.0, 25.0);
+    assert(cb.is_checked == 0, "is_checked should be 0 after second click");
+    assert(cb_changed == 2, "on_change callback should have fired twice");
+    assert(cb.text_val == "Strict Mode", "label MUST NOT be clobbered with '[ ]'!");
+
+    print("  [PASS] Checkbox toggles state and preserves label.");
+}
+
+fn test_toggle_handling() {
+    print("Testing Toggle handling...");
+    toggle_changed = 0;
+
+    val tog = ui.toggle(false, on_toggle_change);
+    tog.text_val = "Live JIT";
+
+    ctx.ui_init();
+    ctx.set_viewport_size(800.0, 600.0);
+    ctx.set_root(tog);
+
+    // Initial state
+    assert(tog.is_checked == 0, "initial toggle is_checked should be 0");
+    assert(tog.text_val == "Live JIT", "initial toggle label should be Live JIT");
+
+    // Click toggle at (25, 25)
+    ctx.dispatch_pointer_down(25.0, 25.0);
+    assert(ctx.global_ui_context.has_captured == 1, "toggle must be captured on pointer down");
+    ctx.dispatch_pointer_up(25.0, 25.0);
+
+    // After click 1
+    assert(tog.is_checked == 1, "toggle is_checked should be 1 after click");
+    assert(toggle_changed == 1, "toggle on_change callback should have fired once");
+    assert(tog.text_val == "Live JIT", "toggle label MUST NOT be clobbered");
+
+    print("  [PASS] Toggle toggles state and fires change handler.");
+}
+
+fn main(): int {
+    print("=== Testing Widget 2 & 3: Checkbox & Toggle ===");
+    test_checkbox_handling();
+    test_toggle_handling();
+    print("All Checkbox and Toggle tests passed successfully!");
+    return 0;
+}
+

@@ -20,8 +20,11 @@ pub fn replay(draw_list: dl.DrawList): nil {
                 gg.draw_rect_primitive(cmd.x, cmd.y, cmd.w, cmd.h, cmd.r, cmd.g, cmd.b, cmd.a);
             },
             dl.DrawCmdKind.RectRounded => {
-                // gg has no native rounded rect — use plain rect (visual parity to come when gg gains it)
-                gg.draw_rect_primitive(cmd.x, cmd.y, cmd.w, cmd.h, cmd.r, cmd.g, cmd.b, cmd.a);
+                if (cmd.border_width > 0.0) {
+                    gg.draw_rect_border_primitive(cmd.x, cmd.y, cmd.w, cmd.h, cmd.radius, cmd.border_width, cmd.r, cmd.g, cmd.b, cmd.a);
+                } else {
+                    gg.draw_rect_rounded_primitive(cmd.x, cmd.y, cmd.w, cmd.h, cmd.radius, cmd.r, cmd.g, cmd.b, cmd.a);
+                }
             },
             dl.DrawCmdKind.Text => {
                 var scale_i: int = 1;
@@ -29,16 +32,10 @@ pub fn replay(draw_list: dl.DrawList): nil {
                 gg.draw_text(cmd.text, cmd.x, cmd.y, cmd.r, cmd.g, cmd.b, cmd.a, scale_i);
             },
             dl.DrawCmdKind.Line => {
-                // Approximate line as a thin rect
-                var dx = cmd.x2 - cmd.x;
-                var dy = cmd.y2 - cmd.y;
-                if (dx < 0.0) { dx = -dx; }
-                if (dy < 0.0) { dy = -dy; }
-                if (dx > dy) {
-                    gg.draw_rect_primitive(cmd.x, cmd.y, dx, 1.0, cmd.r, cmd.g, cmd.b, cmd.a);
-                } else {
-                    gg.draw_rect_primitive(cmd.x, cmd.y, 1.0, dy, cmd.r, cmd.g, cmd.b, cmd.a);
-                }
+                gg.draw_line_primitive(cmd.x, cmd.y, cmd.x2, cmd.y2, cmd.r, cmd.g, cmd.b, cmd.a, 1.5);
+            },
+            dl.DrawCmdKind.Triangle => {
+                gg.draw_triangle_primitive(cmd.x, cmd.y, cmd.x2, cmd.y2, cmd.x3, cmd.y3, cmd.r, cmd.g, cmd.b, cmd.a);
             },
             dl.DrawCmdKind.ClipPush => {
                 gg.push_clip(cmd.x, cmd.y, cmd.w, cmd.h);

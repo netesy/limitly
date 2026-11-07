@@ -1,0 +1,136 @@
+import std.ui as ui;
+import std.ui.context as ctx;
+import std.ui.builder as builder;
+import std.ui.draw_list as dlist;
+import std.color as color;
+
+var accordion_toggled = 0;
+fn on_accordion_toggle() {
+    accordion_toggled = accordion_toggled + 1;
+}
+
+var tree_toggled = 0;
+fn on_tree_toggle() {
+    tree_toggled = tree_toggled + 1;
+}
+
+fn test_accordion() {
+    print("Testing Accordion interactive expand/collapse...");
+    accordion_toggled = 0;
+    var content = ui.text("This is the accordion detailed content.");
+    var acc = ui.accordion("General Settings", content, false);
+    acc.on_click_action = on_accordion_toggle;
+    assert(acc.is_open == 0, "Accordion should start closed");
+
+    ctx.ui_init();
+    ctx.set_viewport_size(500.0, 400.0);
+    ctx.set_root(acc);
+
+    var dl_closed = builder.build(acc, 460.0, 360.0, nil, 20.0, 20.0);
+    assert(len(dl_closed.hits) == 1, "Closed accordion should have 1 header hit zone");
+
+    // Click header to open
+    var hz = dl_closed.hits[0];
+    assert(hz.kind == dlist.HitZoneKind.TreeNode, "Accordion hit zone kind should be TreeNode");
+    ctx.dispatch_pointer_down(hz.x + 10.0, hz.y + 10.0);
+    assert(acc.is_open == 1, "Accordion should now be open");
+    assert(accordion_toggled == 1, "Accordion toggle action should have fired");
+
+    var dl_open = builder.build(acc, 460.0, 360.0, nil, 20.0, 20.0);
+    assert(len(dl_open.cmds) > len(dl_closed.cmds), "Open accordion should emit additional child draw commands");
+
+    // Click header again to collapse
+    ctx.dispatch_pointer_down(hz.x + 10.0, hz.y + 10.0);
+    assert(acc.is_open == 0, "Accordion should now be closed again");
+    assert(accordion_toggled == 2, "Accordion toggle action should have fired twice");
+
+    print("Accordion tests passed!");
+}
+
+fn test_tree_node() {
+    print("Testing TreeNode interactive hierarchy...");
+    tree_toggled = 0;
+    var empty_leaves = [] as [ui.Widget];
+    var leaf1 = ui.tree_node("src", empty_leaves);
+    var leaf2 = ui.tree_node("tests", empty_leaves);
+    var leaves = [leaf1, leaf2] as [ui.Widget];
+    var tree_root = ui.tree_node("limitless-project", leaves, false);
+    tree_root.on_click_action = on_tree_toggle;
+    assert(tree_root.is_open == 0, "Tree node should start collapsed");
+
+    ctx.ui_init();
+    ctx.set_viewport_size(500.0, 400.0);
+    ctx.set_root(tree_root);
+
+    var dl_closed = builder.build(tree_root, 460.0, 360.0, nil, 20.0, 20.0);
+    assert(len(dl_closed.hits) == 1, "Collapsed tree root should have 1 hit zone");
+
+    // Click tree root to expand
+    var hz = dl_closed.hits[0];
+    ctx.dispatch_pointer_down(hz.x + 5.0, hz.y + 5.0);
+    assert(tree_root.is_open == 1, "Tree node should now be expanded");
+    assert(tree_toggled == 1, "Tree toggle action should have fired");
+
+    // When expanded, children should also produce hit zones
+    var dl_open = builder.build(tree_root, 460.0, 360.0, nil, 20.0, 20.0);
+    assert(len(dl_open.hits) == 3, "Expanded tree root + 2 leaves should produce 3 hit zones");
+
+    // Click to collapse
+    ctx.dispatch_pointer_down(hz.x + 5.0, hz.y + 5.0);
+    assert(tree_root.is_open == 0, "Tree node should be collapsed again");
+
+    print("TreeNode tests passed!");
+}
+
+fn test_table() {
+    print("Testing Table layout and striping...");
+    var headers = ["User", "Role", "Status"];
+    var row1 = [ui.text("Alice"), ui.text("Admin"), ui.badge("Active")] as [ui.Widget];
+    var row2 = [ui.text("Bob"), ui.text("Developer"), ui.badge("Offline")] as [ui.Widget];
+    var row3 = [ui.text("Charlie"), ui.text("Designer"), ui.badge("Active")] as [ui.Widget];
+    var rows = [row1, row2, row3] as [[ui.Widget]];
+
+    var tbl = ui.table(headers, rows);
+    assert(len(tbl.tab_titles) == 3, "Table should have 3 header titles");
+
+    ctx.ui_init();
+    ctx.set_viewport_size(600.0, 400.0);
+    ctx.set_root(tbl);
+
+    var dl = builder.build(tbl, 560.0, 360.0, nil, 20.0, 20.0);
+    // Must contain header rect, alternating stripe rects, and cell texts
+    assert(len(dl.cmds) >= 15, "Table should emit headers, rows, alternating stripes, and borders");
+
+    print("Table layout tests passed!");
+}
+
+fn test_timeline_and_calendar() {
+    print("Testing Timeline and Calendar widgets...");
+    var ev1 = ui.text("Commit created");
+    var ev2 = ui.text("Build succeeded");
+    var ev3 = ui.text("Deployed to staging");
+    var evs = [ev1, ev2, ev3] as [ui.Widget];
+    var tl = ui.timeline(evs);
+
+    var cal = ui.calendar("2026-11-07");
+
+    var items = [tl, cal] as [ui.Widget];
+    var panel = ui.column(items);
+    ctx.ui_init();
+    ctx.set_viewport_size(600.0, 600.0);
+    ctx.set_root(panel);
+
+    var dl = builder.build(panel, 560.0, 560.0, nil, 20.0, 20.0);
+    assert(len(dl.cmds) >= 20, "Timeline and Calendar should produce rich command lists");
+
+    print("Timeline and Calendar tests passed!");
+}
+
+fn main(): int {
+    test_accordion();
+    test_tree_node();
+    test_table();
+    test_timeline_and_calendar();
+    print("ALL CONTAINERS, NAVIGATION & LAYOUT TESTS PASSED!");
+    return 0;
+}

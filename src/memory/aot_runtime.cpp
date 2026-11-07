@@ -155,11 +155,12 @@ struct SharedHeap {
                 auto eptr = std::current_exception();
                 if (eptr) std::rethrow_exception(eptr);
             } catch (const std::exception& e) {
-                std::fprintf(stderr, "[AOT FATAL UNCAUGHT EXCEPTION]: %s\n", e.what());
+                std::string msg = std::string("[AOT FATAL UNCAUGHT EXCEPTION]: ") + e.what() + "\n";
+                lymar_stdout_write(msg.c_str(), msg.size());
             } catch (...) {
-                std::fprintf(stderr, "[AOT FATAL UNCAUGHT UNKNOWN EXCEPTION]\n");
+                const char msg[] = "[AOT FATAL UNCAUGHT UNKNOWN EXCEPTION]\n";
+                lymar_stdout_write(msg, sizeof(msg) - 1);
             }
-            std::fflush(stderr);
             std::abort();
         });
     }
@@ -2795,7 +2796,12 @@ void lymar_aot_assert(uint64_t condition, uint64_t message) {
     if (condition == 1 || condition == 18) return;
     auto text = message > 4096 ? string_data(message) : nullptr;
     if (!heap().worker) {
-        if(text) std::printf("%s\n",text); else std::printf("Assertion failed\n");
+        if (text) {
+            lymar_stdout_write(text, std::strlen(text));
+            lymar_stdout_write("\n", 1);
+        } else {
+            lymar_stdout_write("Assertion failed\n", 17);
+        }
         std::fflush(stdout);
         std::exit(1);
     }

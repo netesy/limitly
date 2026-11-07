@@ -1,0 +1,66 @@
+// tests/ui_widget_slider_test.lm
+// Test Slider seek, drag, clamping, and change callback dispatch
+
+import std.ui as ui;
+import std.ui.context as ctx;
+import std.ui.builder as builder;
+import std.ui.draw_list as dlist;
+import std.color as color;
+
+var slider_changed = 0;
+
+fn on_slider_change() {
+    slider_changed = slider_changed + 1;
+}
+
+fn test_slider_handling() {
+    print("Testing Slider handling and drag interpolation...");
+    slider_changed = 0;
+
+    val s = ui.slider(0.0, 0.0, 100.0, on_slider_change)
+        .width(200.0);
+
+    ctx.ui_init();
+    ctx.set_viewport_size(800.0, 600.0);
+    ctx.set_root(s);
+
+    assert(s.slider_val == 0.0, "initial slider value should be 0");
+    assert(s.slider_min == 0.0, "slider min should be 0");
+    assert(s.slider_max == 100.0, "slider max should be 100");
+
+    // Hit zone is at (20, 20), width 200, height 24
+    // 1. Click at 50% position: x = 20 + 100 = 120, y = 30
+    ctx.dispatch_pointer_down(120.0, 30.0);
+    assert(s.slider_val >= 49.0 and s.slider_val <= 51.0, "slider value should seek to ~50% on click");
+    assert(slider_changed == 1, "change callback should fire on pointer down seek");
+    assert(ctx.global_ui_context.has_captured == 1, "slider should be captured");
+
+    // 2. Drag to 75% position: x = 20 + 150 = 170
+    ctx.dispatch_pointer_move(170.0, 30.0);
+    assert(s.slider_val >= 74.0 and s.slider_val <= 76.0, "slider value should update to ~75% on drag");
+    assert(slider_changed == 2, "change callback should fire on drag");
+
+    // 3. Drag past right edge: x = 300 (past 220) -> should clamp to 100.0
+    ctx.dispatch_pointer_move(300.0, 30.0);
+    assert(s.slider_val == 100.0, "slider value should clamp to 100 at right edge");
+
+    // 4. Drag past left edge: x = 0 (before 20) -> should clamp to 0.0
+    ctx.dispatch_pointer_move(0.0, 30.0);
+    assert(s.slider_val == 0.0, "slider value should clamp to 0 at left edge");
+
+    // 5. Release at 25% (x = 70)
+    ctx.dispatch_pointer_move(70.0, 30.0);
+    ctx.dispatch_pointer_up(70.0, 30.0);
+    assert(s.slider_val >= 24.0 and s.slider_val <= 26.0, "slider should remain at ~25% on release");
+    assert(ctx.global_ui_context.has_captured == 0, "capture should be released");
+
+    print("  [PASS] Slider seek, drag, clamp, and event dispatch verified.");
+}
+
+fn main(): int {
+    print("=== Testing Widget 4: Slider ===");
+    test_slider_handling();
+    print("All Slider tests passed successfully!");
+    return 0;
+}
+

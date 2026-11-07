@@ -1,0 +1,142 @@
+import std.ui as ui;
+import std.ui.context as ctx;
+import std.ui.builder as builder;
+import std.ui.draw_list as dlist;
+import std.color as color;
+
+var step_changed = 0;
+fn on_step_change() {
+    step_changed = step_changed + 1;
+}
+
+var alert_dismissed = 0;
+fn on_alert_dismiss() {
+    alert_dismissed = alert_dismissed + 1;
+}
+
+var link_clicked = 0;
+fn on_link_click() {
+    link_clicked = link_clicked + 1;
+}
+
+fn test_badge_and_indicator() {
+    print("Testing Badge and Indicator...");
+    var b = ui.badge("NEW");
+    assert(b.text_val == "NEW", "Badge text should be NEW");
+
+    var ind = ui.indicator("online", "Connected");
+    assert(ind.text_val == "Connected", "Indicator label should be Connected");
+
+    ctx.ui_init();
+    ctx.set_viewport_size(400.0, 400.0);
+    ctx.set_root(b);
+
+    var dl = builder.build(b, 360.0, 360.0, nil, 20.0, 20.0);
+    assert(len(dl.cmds) >= 3, "Badge should emit rounded rect, border, and text");
+    print("Badge and Indicator tests passed!");
+}
+
+fn test_stat_and_diff() {
+    print("Testing Stat and Diff...");
+    var s = ui.stat("Total Revenue", "$89,400", "+12.4% vs last month");
+    assert(s.text_val == "Total Revenue", "Stat title should match");
+    assert(s.placeholder_val == "$89,400", "Stat value should match");
+    assert(s.focus_key == "+12.4% vs last month", "Stat desc pill should match");
+
+    var d = ui.diff("let x = 1;", "var x: int = 2;");
+    assert(d.text_val == "let x = 1;", "Diff deletion text should match");
+    assert(d.placeholder_val == "var x: int = 2;", "Diff addition text should match");
+
+    ctx.ui_init();
+    ctx.set_viewport_size(400.0, 400.0);
+    ctx.set_root(d);
+
+    var dl = builder.build(d, 360.0, 360.0, nil, 20.0, 20.0);
+    // Diff should contain red delete and green add commands
+    assert(len(dl.cmds) >= 6, "Diff should emit container, deletion bar+text, and addition bar+text");
+    print("Stat and Diff tests passed!");
+}
+
+fn test_steps() {
+    print("Testing Steps interactive progression...");
+    step_changed = 0;
+    var st = ui.steps(["Order Placed", "Processing", "Shipped", "Delivered"], 1);
+    st.on_change_action = on_step_change;
+    assert(st.active_tab == 1, "Initial active step should be 1 (Processing)");
+    assert(len(st.tab_titles) == 4, "Should have 4 steps");
+
+    ctx.ui_init();
+    ctx.set_viewport_size(600.0, 400.0);
+    ctx.set_root(st);
+
+    var dl = builder.build(st, 560.0, 360.0, nil, 20.0, 20.0);
+    assert(len(dl.hits) == 4, "Steps should have 4 hit zones for step selection");
+
+    // Click step 3 ("Delivered", index 3)
+    var step4_hz = dl.hits[3];
+    ctx.dispatch_pointer_down(step4_hz.x + 5.0, step4_hz.y + 5.0);
+    assert(st.active_tab == 3, "Active step should now be 3 (Delivered)");
+    assert(step_changed == 1, "on_change callback should have fired");
+
+    // Click step 0 ("Order Placed", index 0)
+    var step1_hz = dl.hits[0];
+    ctx.dispatch_pointer_down(step1_hz.x + 5.0, step1_hz.y + 5.0);
+    assert(st.active_tab == 0, "Active step should now be 0");
+    assert(step_changed == 2, "on_change callback should have fired again");
+
+    print("Steps interactive tests passed!");
+}
+
+fn test_alert_and_toast() {
+    print("Testing Alert and Toast...");
+    alert_dismissed = 0;
+    var a = ui.alert("System updated successfully!", "success");
+    a.on_click_action = on_alert_dismiss;
+
+    ctx.ui_init();
+    ctx.set_viewport_size(500.0, 400.0);
+    ctx.set_root(a);
+
+    var dl = builder.build(a, 460.0, 360.0, nil, 20.0, 20.0);
+    assert(len(dl.hits) == 1, "Alert with on_click_action should have 1 dismiss hit zone");
+
+    var close_hz = dl.hits[0];
+    ctx.dispatch_pointer_down(close_hz.x + 2.0, close_hz.y + 2.0);
+    assert(a.is_pressed == 1, "Alert should be pressed on pointer down");
+    ctx.dispatch_pointer_up(close_hz.x + 2.0, close_hz.y + 2.0);
+    assert(a.is_pressed == 0, "Alert should release pressed state");
+    assert(alert_dismissed == 1, "Dismiss callback should have fired");
+
+    print("Alert and Toast tests passed!");
+}
+
+fn test_link() {
+    print("Testing Link widget...");
+    link_clicked = 0;
+    var l = ui.link("https://lymar-lang.org", "https://lymar-lang.org", on_link_click);
+    assert(l.text_val == "https://lymar-lang.org", "Link text should match URL");
+
+    ctx.ui_init();
+    ctx.set_viewport_size(400.0, 400.0);
+    ctx.set_root(l);
+
+    var dl = builder.build(l, 360.0, 360.0, nil, 20.0, 20.0);
+    assert(len(dl.hits) == 1, "Link should have 1 button hit zone");
+
+    var hz = dl.hits[0];
+    ctx.dispatch_pointer_down(hz.x + 10.0, hz.y + 5.0);
+    ctx.dispatch_pointer_up(hz.x + 10.0, hz.y + 5.0);
+    assert(link_clicked == 1, "Link click callback should have fired");
+
+    print("Link widget tests passed!");
+}
+
+fn main(): int {
+    test_badge_and_indicator();
+    test_stat_and_diff();
+    test_steps();
+    test_alert_and_toast();
+    test_link();
+    print("ALL DATA DISPLAY & FEEDBACK TESTS PASSED!");
+    return 0;
+}

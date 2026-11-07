@@ -1,0 +1,78 @@
+// tests/ui_widget_input_test.lm
+// Test Input and Textarea focus, typing, backspace, and change events
+
+import std.ui as ui;
+import std.ui.context as ctx;
+import std.ui.builder as builder;
+import std.ui.draw_list as dlist;
+import std.color as color;
+
+var input_changed = 0;
+
+fn on_input_change() {
+    input_changed = input_changed + 1;
+}
+
+fn test_input_handling() {
+    print("Testing Input focus, character typing, and backspace...");
+    input_changed = 0;
+
+    val input1 = ui.input("", "Enter username...", on_input_change)
+        .width(200.0);
+    val input2 = ui.input("initial", "Search...", on_input_change)
+        .width(200.0);
+
+    val col = ui.column([input1, input2]).spacing(10.0);
+
+    ctx.ui_init();
+    ctx.set_viewport_size(800.0, 600.0);
+    ctx.set_root(col);
+
+    assert(input1.text_val == "", "input1 should be empty");
+    assert(input1.placeholder_val == "Enter username...", "placeholder mismatch");
+    assert(input1.is_focused == 0, "input1 should not be focused initially");
+
+    // 1. Click input1 (at x=30, y=25) to focus
+    ctx.dispatch_pointer_down(30.0, 25.0);
+    ctx.dispatch_pointer_up(30.0, 25.0);
+    assert(input1.is_focused == 1, "input1 should be focused after click");
+    assert(input2.is_focused == 0, "input2 should not be focused");
+
+    // 2. Type 'L', 'y', 'm', 'a', 'r' (ASCII 76, 121, 109, 97, 114)
+    ctx.dispatch_char_input(76);
+    assert(input1.text_val == "L", "text_val should be 'L'");
+    assert(input_changed == 1, "on_change should fire after char");
+
+    ctx.dispatch_char_input(121);
+    ctx.dispatch_char_input(109);
+    ctx.dispatch_char_input(97);
+    ctx.dispatch_char_input(114);
+    assert(input1.text_val == "Lymar", "text_val should be 'Lymar'");
+    assert(input_changed == 5, "on_change should have fired 5 times");
+
+    // 3. Backspace (key_code 8)
+    ctx.dispatch_key_down(8, 0);
+    assert(input1.text_val == "Lyma", "text_val should be 'Lyma' after backspace");
+    assert(input_changed == 6, "on_change should fire after backspace");
+
+    // 4. Click input2 (at x=30, y=65) -> input1 blurs, input2 focuses
+    ctx.dispatch_pointer_down(30.0, 65.0);
+    ctx.dispatch_pointer_up(30.0, 65.0);
+    assert(input1.is_focused == 0, "input1 should be blurred");
+    assert(input2.is_focused == 1, "input2 should be focused");
+
+    // 5. Type into input2
+    ctx.dispatch_char_input(33); // '!'
+    assert(input2.text_val == "initial!", "input2 text_val updated");
+    assert(input1.text_val == "Lyma", "input1 text_val should remain unchanged");
+
+    print("  [PASS] Input focus management, character typing, and backspace verified.");
+}
+
+fn main(): int {
+    print("=== Testing Widget 5: TextInput / Input ===");
+    test_input_handling();
+    print("All Input tests passed successfully!");
+    return 0;
+}
+

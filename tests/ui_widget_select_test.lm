@@ -1,0 +1,108 @@
+// tests/ui_widget_select_test.lm
+// Test Single Select and MultiSelect dropdown opening, option selection, and state updates
+
+import std.ui as ui;
+import std.ui.context as ctx;
+import std.ui.builder as builder;
+import std.ui.draw_list as dlist;
+import std.color as color;
+
+var sel_changed = 0;
+var multi_changed = 0;
+
+fn on_sel_change() {
+    sel_changed = sel_changed + 1;
+}
+
+fn on_multi_change() {
+    multi_changed = multi_changed + 1;
+}
+
+fn test_single_select() {
+    print("Testing Single Select dropdown handling...");
+    sel_changed = 0;
+
+    val options = ["Option A", "Option B", "Option C"];
+    val sel = ui.select(options, 0, on_sel_change).width(200.0);
+
+    ctx.ui_init();
+    ctx.set_viewport_size(800.0, 600.0);
+    ctx.set_root(sel);
+
+    assert(sel.selected_idx == 0, "initial selected index should be 0");
+    assert(sel.text_val == "Option A", "initial text should be Option A");
+    assert(sel.is_open == 0, "dropdown should be closed initially");
+
+    // 1. Click header at (50, 35) to open dropdown
+    ctx.dispatch_pointer_down(50.0, 35.0);
+    ctx.dispatch_pointer_up(50.0, 35.0);
+    assert(sel.is_open == 1, "dropdown should now be open");
+    assert(sel_changed == 0, "on_change should not fire merely on opening");
+
+    // Rebuild draw list with open state to get option hit zones
+    // Options are positioned vertically below the header (header height ~32px)
+    // Option 0: y in [52, 78], Option 1: y in [80, 106], Option 2: y in [108, 134]
+    // 2. Click Option 2 ("Option C") at y = 115
+    ctx.dispatch_pointer_down(50.0, 115.0);
+    ctx.dispatch_pointer_up(50.0, 115.0);
+
+    assert(sel.selected_idx == 2, "selected index should now be 2");
+    assert(sel.text_val == "Option C", "text_val should be Option C");
+    assert(sel.is_open == 0, "dropdown should close after option selection");
+    assert(sel_changed == 1, "on_change should fire after selecting an option");
+
+    print("  [PASS] Single Select open, select, close, and event dispatch verified.");
+}
+
+fn test_multi_select() {
+    print("Testing MultiSelect dropdown handling...");
+    multi_changed = 0;
+
+    val options = ["Alpha", "Beta", "Gamma", "Delta"];
+    val multi = ui.multi_select(options, [0], on_multi_change).width(200.0);
+
+    ctx.ui_init();
+    ctx.set_viewport_size(800.0, 600.0);
+    ctx.set_root(multi);
+
+    assert(len(multi.selected_indices) == 1, "initial selected count should be 1");
+    assert(multi.selected_indices[0] == 0, "initial selection should be [0]");
+    assert(multi.is_open == 0, "multi select should be closed initially");
+
+    // 1. Click header to open
+    ctx.dispatch_pointer_down(50.0, 35.0);
+    ctx.dispatch_pointer_up(50.0, 35.0);
+    assert(multi.is_open == 1, "multi select should be open");
+
+    // 2. Click Option 2 ("Gamma") at y = 115 -> should add index 2 to selected_indices
+    ctx.dispatch_pointer_down(50.0, 115.0);
+    ctx.dispatch_pointer_up(50.0, 115.0);
+    assert(len(multi.selected_indices) == 2, "selected count should now be 2");
+    assert(multi_changed == 1, "on_change should fire after toggling option");
+
+    // Multi-select stays open so user can pick multiple items
+    assert(multi.is_open == 1, "multi-select should remain open for multi-picking");
+
+    // 3. Click Option 0 ("Alpha") at y = 60 -> should remove index 0
+    ctx.dispatch_pointer_down(50.0, 60.0);
+    ctx.dispatch_pointer_up(50.0, 60.0);
+    assert(len(multi.selected_indices) == 1, "selected count should be 1 after untoggling");
+    assert(multi.selected_indices[0] == 2, "remaining selected index should be 2");
+    assert(multi_changed == 2, "on_change should fire after untoggling option");
+
+    // 4. Click header at (50, 35) to close
+    ctx.dispatch_pointer_down(50.0, 35.0);
+    ctx.dispatch_pointer_up(50.0, 35.0);
+    assert(multi.is_open == 0, "multi select should close when header is clicked");
+
+    print("  [PASS] MultiSelect toggle, multi-selection, and close verified.");
+}
+
+fn main(): int {
+    print("=== Testing Widget 6: Select & MultiSelect ===");
+    test_single_select();
+    test_multi_select();
+    print("All Select tests passed successfully!");
+    return 0;
+}
+
