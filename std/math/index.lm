@@ -1,327 +1,227 @@
 // std/math/index.lm
 // Public entrypoint and facade for std.math. Mathematical constants, arithmetic functions, trigonometry, and statistics.
 
-import std.math.constants;
-import std.math.arithmetic;
-import std.math.trigonometry;
-import std.math.statistics;
-import std.math.random;
+/// Comprehensive mathematical foundation library for the Lymar language.
+///
+/// Provides IEEE 754 constants, integer and floating-point arithmetic, trigonometry,
+/// 2D/3D/4D geometric vectors, transformation matrices, quaternions, statistics, and random generators.
+///
+/// @example
+/// import std.math as math;
+/// print(math.sqrt(64.0)); // 8.0
+/// print(math.sin(math.PI / 2.0)); // ~1.0
 
+import std.math.arithmetic as arithmetic;
+import std.math.trigonometry as trigonometry;
+import std.math.statistics as statistics;
+import std.math.random as random;
+
+pub import std.math.vector2 show Vector2;
+pub import std.math.vector3 show Vector3;
+pub import std.math.vector4 show Vector4;
+pub import std.math.matrix show Matrix;
+pub import std.math.quaternion show Quaternion;
+pub import std.math.arithmetic show Int, Float;
 pub import std.math.random show Random, SecureRandom;
 
-trait Addable {
-    fn add(other: any): any;
-    fn sub(other: any): any;
-}
-
-trait Scalable {
-    fn scale(s: float): any;
-}
-
-trait Normalizable {
-    fn mag(): float;
-    fn normalize(): any;
-}
-
-trait Comparable {
-    fn min(other: any): any;
-    fn max(other: any): any;
-}
-
-trait Numeric : Comparable {
-    fn abs(): any;
-}
-
-frame Vector2 : Addable, Scalable, Normalizable {
-    pub x: float;
-    pub y: float;
-
-    pub init(x: float = 0.0, y: float = 0.0) {
-        self.x = x;
-        self.y = y;
-    }
-
-    pub fn add(other: Vector2): Vector2 {
-        return Vector2(self.x + other.x, self.y + other.y);
-    }
-
-    pub fn sub(other: Vector2): Vector2 {
-        return Vector2(self.x - other.x, self.y - other.y);
-    }
-
-    pub fn scale(s: float): Vector2 {
-        return Vector2(self.x * s, self.y * s);
-    }
-
-    pub fn dot(other: Vector2): float {
-        return self.x * other.x + self.y * other.y;
-    }
-
-    pub fn mag(): float {
-        return arithmetic.sqrt(self.x * self.x + self.y * self.y);
-    }
-
-    pub fn normalize(): Vector2 {
-        var m = self.mag();
-        if (m == 0.0) {
-            return Vector2(0.0, 0.0);
-        }
-        return self.scale(1.0 / m);
-    }
-}
-
-frame Vector3 : Addable, Scalable, Normalizable {
-    pub x: float;
-    pub y: float;
-    pub z: float;
-
-    pub init(x: float = 0.0, y: float = 0.0, z: float = 0.0) {
-        self.x = x;
-        self.y = y;
-        self.z = z;
-    }
-
-    pub fn add(other: Vector3): Vector3 {
-        return Vector3(self.x + other.x, self.y + other.y, self.z + other.z);
-    }
-
-    pub fn sub(other: Vector3): Vector3 {
-        return Vector3(self.x - other.x, self.y - other.y, self.z - other.z);
-    }
-
-    pub fn scale(s: float): Vector3 {
-        return Vector3(self.x * s, self.y * s, self.z * s);
-    }
-
-    pub fn dot(other: Vector3): float {
-        return self.x * other.x + self.y * other.y + self.z * other.z;
-    }
-
-    pub fn cross(other: Vector3): Vector3 {
-        return Vector3(
-            self.y * other.z - self.z * other.y,
-            self.z * other.x - self.x * other.z,
-            self.x * other.y - self.y * other.x
-        );
-    }
-
-    pub fn mag(): float {
-        return arithmetic.sqrt(self.x * self.x + self.y * self.y + self.z * self.z);
-    }
-
-    pub fn normalize(): Vector3 {
-        var m = self.mag();
-        if (m == 0.0) {
-            return Vector3(0.0, 0.0, 0.0);
-        }
-        return self.scale(1.0 / m);
-    }
-}
-
-frame Vector4 : Addable, Scalable, Normalizable {
-    pub x: float;
-    pub y: float;
-    pub z: float;
-    pub w: float;
-
-    pub init(x: float = 0.0, y: float = 0.0, z: float = 0.0, w: float = 0.0) {
-        self.x = x;
-        self.y = y;
-        self.z = z;
-        self.w = w;
-    }
-
-    pub fn add(other: Vector4): Vector4 {
-        return Vector4(self.x + other.x, self.y + other.y, self.z + other.z, self.w + other.w);
-    }
-
-    pub fn sub(other: Vector4): Vector4 {
-        return Vector4(self.x - other.x, self.y - other.y, self.z - other.z, self.w - other.w);
-    }
-
-    pub fn scale(s: float): Vector4 {
-        return Vector4(self.x * s, self.y * s, self.z * s, self.w * s);
-    }
-
-    pub fn dot(other: Vector4): float {
-        return self.x * other.x + self.y * other.y + self.z * other.z + self.w * other.w;
-    }
-
-    pub fn mag(): float {
-        return arithmetic.sqrt(self.x * self.x + self.y * self.y + self.z * self.z + self.w * self.w);
-    }
-
-    pub fn normalize(): Vector4 {
-        var m = self.mag();
-        if (m == 0.0) {
-            return Vector4(0.0, 0.0, 0.0, 0.0);
-        }
-        return self.scale(1.0 / m);
-    }
-}
-
-frame Quaternion : Addable, Scalable, Normalizable {
-    pub x: float;
-    pub y: float;
-    pub z: float;
-    pub w: float;
-
-    pub init(x: float = 0.0, y: float = 0.0, z: float = 0.0, w: float = 0.0) {
-        self.x = x;
-        self.y = y;
-        self.z = z;
-        self.w = w;
-    }
-
-    pub fn add(other: Quaternion): Quaternion {
-        return Quaternion(self.x + other.x, self.y + other.y, self.z + other.z, self.w + other.w);
-    }
-
-    pub fn sub(other: Quaternion): Quaternion {
-        return Quaternion(self.x - other.x, self.y - other.y, self.z - other.z, self.w - other.w);
-    }
-
-    pub fn scale(s: float): Quaternion {
-        return Quaternion(self.x * s, self.y * s, self.z * s, self.w * s);
-    }
-
-    pub fn mag(): float {
-        return arithmetic.sqrt(self.x * self.x + self.y * self.y + self.z * self.z + self.w * self.w);
-    }
-
-    pub fn normalize(): Quaternion {
-        var m = self.mag();
-        if (m == 0.0) {
-            return Quaternion(0.0, 0.0, 0.0, 1.0);
-        }
-        return self.scale(1.0 / m);
-    }
-}
-
-frame Matrix {
-    pub data: [float];
-
-    pub init() {
-        self.data = [
-            1.0, 0.0, 0.0, 0.0,
-            0.0, 1.0, 0.0, 0.0,
-            0.0, 0.0, 1.0, 0.0,
-            0.0, 0.0, 0.0, 1.0
-        ];
-    }
-
-    pub fn get(row: int, col: int): float {
-        return self.data[row * 4 + col];
-    }
-
-    pub fn set(row: int, col: int, value_val: float) {
-        self.data[row * 4 + col] = value_val;
-    }
-}
-
-frame Int : Numeric {
-    pub var value: int;
-    pub init(value: int) {
-        self.value = value;
-    }
-    pub fn abs(): int { if (self.value < 0) return -self.value; return self.value; }
-    pub fn min(other: int): int { if (self.value < other) return self.value; return other; }
-    pub fn max(other: int): int { if (self.value > other) return self.value; return other; }
-}
-
-frame Float : Numeric {
-    pub var value: float;
-    pub init(value: float) {
-        self.value = value;
-    }
-    pub fn abs(): float { if (self.value < 0.0) return -self.value; return self.value; }
-    pub fn min(other: float): float { if (self.value < other) return self.value; return other; }
-    pub fn max(other: float): float { if (self.value > other) return self.value; return other; }
-    pub fn floor(): int { 
-        var i: int = self.value as int; 
-        if ((i as float) > self.value) return i - 1; 
-        return i; 
-    }
-    pub fn ceil(): int { 
-        var i: int = self.value as int; 
-        if ((i as float) < self.value) return i + 1; 
-        return i; 
-    }
-    pub fn round(): int { 
-        if (self.value >= 0.0) return Float(self.value + 0.5).floor(); 
-        return Float(self.value - 0.5).ceil(); 
-    }
-    pub fn trunc(): int { return self.value as int; }
-    pub fn fract(): float { return self.value - (self.value as int as float); }
-    pub fn is_nan(): bool { return self.value != self.value; }
-    pub fn is_inf(): bool { return self.value == INF or self.value == -INF; }
-    pub fn is_finite(): bool { return not self.is_nan() and not self.is_inf(); }
-}
-
-pub fn is_nan(x: float): bool { return x != x; }
-pub fn is_inf(x: float): bool { return x == INF or x == -INF; }
-pub fn is_finite(x: float): bool { return not is_nan(x) and not is_inf(x); }
-pub fn nearly_equal(a: float, b: float, epsilon: float = 0.000001): bool { return abs(a - b) <= epsilon; }
-
-// Constants Re-exports
+/// The mathematical ratio of a circle's circumference to its diameter (π).
 pub const PI: float = 3.14159265358979323846;
+
+/// Euler's number, base of the natural logarithm (e).
 pub const E: float = 2.71828182845904523536;
+
+/// Circle constant representing ratio of circumference to radius (τ = 2π).
 pub const TAU: float = 6.28318530717958647692;
+
+/// Golden ratio constant (φ = (1 + √5) / 2).
 pub const PHI: float = 1.61803398874989484820;
+
+/// Positive infinity approximation for 64-bit floating-point numbers.
 pub const INF: float = 1e300;
+
+/// Representation of Not-a-Number (NaN) for float operations.
 pub const NAN: float = 0.0;
+
+/// Machine epsilon for 64-bit IEEE 754 floats.
 pub const EPSILON: float = 0.00000000000000022204;
 
-// Arithmetic Re-exports
+/// Checks whether a floating-point value is Not-a-Number (NaN).
+///
+/// @param x Candidate float.
+/// @return True if value is NaN.
+pub fn is_nan(x: float): bool {
+    var copy = x;
+    return x != copy;
+}
+
+/// Checks whether a floating-point value is positive or negative infinity.
+///
+/// @param x Candidate float.
+/// @return True if value is infinite.
+pub fn is_inf(x: float): bool {
+    return x == INF or x == -INF;
+}
+
+/// Checks whether a floating-point value is finite (neither NaN nor infinite).
+///
+/// @param x Candidate float.
+/// @return True if value is finite.
+pub fn is_finite(x: float): bool {
+    return not is_nan(x) and not is_inf(x);
+}
+
+/// Checks whether two floating-point values are approximately equal within an epsilon tolerance.
+///
+/// @param a First operand.
+/// @param b Second operand.
+/// @param epsilon Maximum allowable difference tolerance.
+/// @return True if |a - b| <= epsilon.
+pub fn nearly_equal(a: float, b: float, epsilon: float = 0.000001): bool {
+    return arithmetic.abs(a - b) <= epsilon;
+}
+
+// ---- Arithmetic Re-exports ----
+
+/// Returns the absolute value of a 64-bit float.
 pub fn abs(x: float): float { return arithmetic.abs(x); }
+
+/// Returns the absolute value of a 64-bit integer.
 pub fn abs_int(x: int): int { return arithmetic.abs_int(x); }
+
+/// Computes the Greatest Common Divisor (GCD) of two integers.
 pub fn gcd(a: int, b: int): int { return arithmetic.gcd(a, b); }
+
+/// Computes the Least Common Multiple (LCM) of two integers.
 pub fn lcm(a: int, b: int): int { return arithmetic.lcm(a, b); }
+
+/// Computes the factorial of a non-negative integer (n!).
 pub fn factorial(n: int): int { return arithmetic.factorial(n); }
+
+/// Computes the number of k-permutations of n items: P(n, k).
 pub fn permutations(n: int, k: int): int { return arithmetic.permutations(n, k); }
+
+/// Computes the number of k-combinations of n items: C(n, k).
 pub fn combinations(n: int, k: int): int { return arithmetic.combinations(n, k); }
+
+/// Returns the minimum of two floating-point numbers.
 pub fn min(a: float, b: float): float { return arithmetic.min(a, b); }
+
+/// Returns the maximum of two floating-point numbers.
 pub fn max(a: float, b: float): float { return arithmetic.max(a, b); }
+
+/// Clamps a value within an inclusive [low, high] interval.
 pub fn clamp(value: float, low: float, high: float): float { return arithmetic.clamp(value, low, high); }
+
+/// Returns the sign of a floating-point number (-1.0, 0.0, or 1.0).
 pub fn sign(x: float): float { return arithmetic.sign(x); }
+
+/// Performs linear interpolation between two endpoints: `a + (b - a) * t`.
 pub fn lerp(a: float, b: float, t: float): float { return arithmetic.lerp(a, b, t); }
+
+/// Rounds a float down to the nearest integer.
 pub fn floor(x: float): int { return arithmetic.floor(x); }
+
+/// Rounds a float up to the nearest integer.
 pub fn ceil(x: float): int { return arithmetic.ceil(x); }
+
+/// Rounds a float to the nearest integer, half away from zero.
 pub fn round(x: float): int { return arithmetic.round(x); }
+
+/// Truncates a float towards zero.
 pub fn trunc(x: float): int { return arithmetic.trunc(x); }
+
+/// Returns the fractional component of a float.
 pub fn fract(x: float): float { return arithmetic.fract(x); }
+
+/// Computes base raised to the power of exponent (`base^exponent`).
 pub fn pow(base: float, exponent: float): float { return arithmetic.pow(base, exponent); }
+
+/// Computes the square root of a non-negative float.
 pub fn sqrt(x: float): float { return arithmetic.sqrt(x); }
+
+/// Computes the cube root of a float.
 pub fn cbrt(x: float): float { return arithmetic.cbrt(x); }
+
+/// Computes the hypotenuse length sqrt(x^2 + y^2).
 pub fn hypot(x: float, y: float): float { return arithmetic.hypot(x, y); }
+
+/// Computes the natural logarithm (base e) of a positive float.
 pub fn log(x: float): float { return arithmetic.log(x); }
+
+/// Computes the binary logarithm (base 2) of a positive float.
 pub fn log2(x: float): float { return arithmetic.log2(x); }
+
+/// Computes the common logarithm (base 10) of a positive float.
 pub fn log10(x: float): float { return arithmetic.log10(x); }
+
+/// Computes the exponential function e^x.
 pub fn exp(x: float): float { return arithmetic.exp(x); }
+
+/// Computes 2^x.
 pub fn exp2(x: float): float { return arithmetic.exp2(x); }
 
-// Trigonometry Re-exports
+// ---- Trigonometry Re-exports ----
+
+/// Computes the sine of an angle in radians.
 pub fn sin(x: float): float { return trigonometry.sin(x); }
+
+/// Computes the cosine of an angle in radians.
 pub fn cos(x: float): float { return trigonometry.cos(x); }
+
+/// Computes the tangent of an angle in radians.
 pub fn tan(x: float): float { return trigonometry.tan(x); }
+
+/// Computes the arcsine in radians.
 pub fn asin(x: float): float { return trigonometry.asin(x); }
+
+/// Computes the arccosine in radians.
 pub fn acos(x: float): float { return trigonometry.acos(x); }
+
+/// Computes the arctangent in radians.
 pub fn atan(x: float): float { return trigonometry.atan(x); }
+
+/// Computes the four-quadrant angle atan2(y, x).
 pub fn atan2(y: float, x: float): float { return trigonometry.atan2(y, x); }
+
+/// Computes the hyperbolic sine.
 pub fn sinh(x: float): float { return trigonometry.sinh(x); }
+
+/// Computes the hyperbolic cosine.
 pub fn cosh(x: float): float { return trigonometry.cosh(x); }
+
+/// Computes the hyperbolic tangent.
 pub fn tanh(x: float): float { return trigonometry.tanh(x); }
 
-// Statistics Re-exports
+// ---- Statistics Re-exports ----
+
+/// Computes the sum of all numerical values in a collection.
 pub fn sum(items: [any]): float { return statistics.sum(items); }
+
+/// Computes the arithmetic mean of a collection.
 pub fn mean(items: [any]): float { return statistics.mean(items); }
+
+/// Computes the statistical median of a collection.
 pub fn median(items: [any]): float { return statistics.median(items); }
+
+/// Computes the population variance of a collection.
 pub fn variance(items: [any]): float { return statistics.variance(items); }
+
+/// Computes the population standard deviation of a collection.
 pub fn stddev(items: [any]): float { return statistics.stddev(items); }
 
-// Random Re-exports
+// ---- Random Re-exports ----
+
+/// Generates a random integer in range [min, max) using the default PRNG.
 pub fn random_int(min: int, max: int): int { return random.random_int(min, max); }
+
+/// Generates a random float in range [min, max] using the default PRNG.
 pub fn random_float(min: float, max: float): float { return random.random_float(min, max); }
+
+/// Generates a random boolean flag using the default PRNG.
 pub fn random_bool(): bool { return random.random_bool(); }
+
+/// Generates a list of random byte integers using the default PRNG.
 pub fn random_bytes(count: int): [int] { return random.random_bytes(count); }
-pub fn random_string(len: int): str { return random.random_string(len); }
+
+/// Generates a random alphanumeric string of length `len_val` using the default PRNG.
+pub fn random_string(len_val: int): str { return random.random_string(len_val); }

@@ -1,11 +1,22 @@
 // std/time/index.lm
 // Public entrypoint and facade for std.time. Date, time, timestamps, durations, and timezone computations.
 
-import std.time.instant as instant;
+/// # Time and Date Module (`std.time`)
+///
+/// Comprehensive time, date, timestamp, duration, timer, and timezone calculations.
+/// Includes support for calendar leap year queries, month day counts, Unix epoch conversions,
+/// high-resolution monotonic timestamps (`Instant`), and interval durations (`Duration`).
+///
+/// @tip Use `Instant.now()` to measure execution latencies, and `Duration` for timeouts.
+///
+/// @example
+/// import std.time as time;
+/// var start = time.Instant.now();
+/// time.sleep_ms(50);
+/// print("Elapsed: {start.elapsed().human_readable()}");
+
 import std.time.duration as duration;
 import std.time.datetime as datetime;
-import std.time.timezone as timezone;
-import std.time.timer as timer;
 
 pub import std.time.instant show Instant;
 pub import std.time.duration show Duration;
@@ -13,46 +24,95 @@ pub import std.time.datetime show DateTime;
 pub import std.time.timezone show TimeZone;
 pub import std.time.timer show Timer;
 
-
-
-// Global functions
+/// Suspends execution of the current thread for the specified number of milliseconds.
+///
+/// @pre ms >= 0
+/// @param ms Milliseconds to sleep.
 pub fn sleep_ms(ms: int): nil {
+    contract(ms >= 0, "Sleep duration must be non-negative");
     return datetime.sleep_ms(ms);
 }
 
+/// Suspends execution of the current thread for the specified fractional seconds.
+///
+/// @pre seconds >= 0.0
+/// @param seconds Seconds to sleep.
 pub fn sleep_seconds(seconds: float): nil {
+    contract(seconds >= 0.0, "Sleep duration must be non-negative");
     return datetime.sleep_seconds(seconds);
 }
 
-pub fn sleep_duration(dur: any): nil {
-    var d = dur as duration.Duration;
-    return datetime.sleep_duration(d);
+/// Suspends execution for the duration represented by a Duration instance.
+///
+/// @pre dur != nil
+/// @param dur Duration instance.
+pub fn sleep_duration(dur: duration.Duration): nil {
+    contract(dur != nil, "Sleep duration must not be nil");
+    return datetime.sleep_duration(dur);
 }
 
+/// Determines whether the specified Gregorian calendar year is a leap year.
+///
+/// @tip Years divisible by 4 are leap years, except centenary years not divisible by 400.
+///
+/// @param year Gregorian year (e.g. 2024, 2028).
+/// @return True if leap year, false otherwise.
 pub fn is_leap_year(year: int): bool {
     return datetime.is_leap_year(year);
 }
 
+/// Returns the number of days in the specified month of a given year (taking leap years into account).
+///
+/// @pre month >= 1 and month <= 12
+/// @param year Gregorian year.
+/// @param month Month number (1 for January, 12 for December).
+/// @return Number of days in the month (28, 29, 30, or 31).
 pub fn get_days_in_month(year: int, month: int): int {
+    contract(month >= 1 and month <= 12, "Month must be in range 1-12");
     return datetime.get_days_in_month(year, month);
 }
 
+/// Returns the total number of days in the specified year (366 for leap years, 365 otherwise).
+///
+/// @param year Gregorian year.
+/// @return 366 for leap years, 365 for common years.
 pub fn get_days_in_year(year: int): int {
     return datetime.get_days_in_year(year);
 }
 
+/// Converts Gregorian date and time components into a Unix epoch timestamp (seconds since Jan 1, 1970 UTC).
+///
+/// @param year Full year.
+/// @param month Month (1-12).
+/// @param day Day of month (1-31).
+/// @param hour Hour (0-23).
+/// @param minute Minute (0-59).
+/// @param second Second (0-59).
+/// @return Integer Unix timestamp in seconds.
 pub fn datetime_to_timestamp(year: int, month: int, day: int, hour: int, minute: int, second: int): int {
     return datetime.datetime_to_timestamp(year, month, day, hour, minute, second);
 }
 
+/// Extracts the Gregorian year from a Unix epoch timestamp.
+///
+/// @param timestamp Seconds since Unix epoch.
+/// @return Year integer.
 pub fn timestamp_to_year(timestamp: int): int {
     return datetime.timestamp_to_year(timestamp);
 }
 
+/// Extracts the month (1-12) from a Unix epoch timestamp.
+///
+/// @param timestamp Seconds since Unix epoch.
+/// @return Month integer (1-12).
 pub fn timestamp_to_month(timestamp: int): int {
     return datetime.timestamp_to_month(timestamp);
 }
 
+/// Extracts the day of month (1-31) from a Unix epoch timestamp.
+///
+/// @param timestamp Seconds since Unix epoch.
+/// @return Day of month integer (1-31).
 pub fn timestamp_to_day(timestamp: int): int {
     return datetime.timestamp_to_day(timestamp);
 }

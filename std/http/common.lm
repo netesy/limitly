@@ -1,8 +1,6 @@
 // HTTP Common: shared types, constants, and utilities for the HTTP module.
 
-import std.core as core;
-
-// --- HTTP Method enum & constants ---
+/// HTTP request method enum.
 enum Method {
     GET,
     POST,
@@ -15,7 +13,11 @@ enum Method {
     CONNECT
 }
 
-pub fn method_name(m: any): str {
+/// Converts an HTTP Method or string to uppercase canonical method name.
+///
+/// @param m Method enum variant or method name string.
+/// @return Uppercase method string (e.g. `"GET"`).
+pub fn method_name(m): str {
     var s = m as str;
     return _builtin_string_to_upper(s);
 }

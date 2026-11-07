@@ -1,7 +1,14 @@
-// CSV Writer Module
+// std/csv/writer.lm
+// CSV tabular text serializer.
 
 import std.string.join as join;
 
+/// Serializes a 2D matrix of strings into a comma-separated CSV text document.
+///
+/// Appends a newline after each record row.
+///
+/// @param rows 2D list of row strings to format.
+/// @return Formatted CSV text string.
 pub fn stringify_csv(rows: [[str]]): str {
     var res = "";
     var i = 0;

@@ -13,7 +13,7 @@ pub import std.color show Color;
 import std.ui.state as state;
 pub import std.ui.state show Signal, ComputedSignal, Effect;
 
-import std.ui.viewport as viewport;
+pub import std.ui.viewport show Viewport, MediaQuery;
 
 import std.ui.layout as layout;
 pub import std.ui.layout show LayoutBox, GridSpec, Breakpoint;
@@ -21,21 +21,17 @@ pub import std.ui.layout show LayoutBox, GridSpec, Breakpoint;
 import std.ui.navigation as nav;
 pub import std.ui.navigation show Router, RouterParams, Route;
 
-import std.ui.charts as charts;
+pub import std.ui.charts show plot_lines, plot_histogram;
 
-import std.ui.application as app;
 pub import std.ui.application show Application;
 
-import std.ui.window as win;
 pub import std.ui.window show Window;
 
-import std.ui.theme as theme;
 import std.ui.dialog as dialog;
 
 import std.ui.grid as grid;
 pub import std.ui.grid show GridLayout;
 
-import std.animation as anim;
 pub import std.animation as animation;
 
 import std.graphics.shadow as shadow;
@@ -127,7 +123,7 @@ pub fn shadow(
 }
 
 // ── State Management ───────────────────────────────────────────────────────────
-pub fn signal(init_val: any): Signal { return state.signal(init_val); }
+pub fn signal(init_val): Signal { return state.signal(init_val); }
 pub fn signal_bool(init_val: bool): Signal { return state.signal_bool(init_val); }
 pub fn signal_int(init_val: int): Signal { return state.signal_int(init_val); }
 pub fn signal_float(init_val: float): Signal { return state.signal_float(init_val); }

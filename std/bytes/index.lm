@@ -1,6 +1,23 @@
 // std/bytes/index.lm
 // Public entrypoint and facade for std.bytes. Byte buffer manipulation, binary slicing, and endian utilities.
 
+/// # Byte Buffer and Endian Utilities (`std.bytes`)
+///
+/// Dynamically resizable binary byte buffer (`ByteBuffer`) and big-endian / little-endian
+/// integer serialization routines.
+///
+/// @tip Use `ByteBuffer` for assembling protocol packets, network frames, or binary file headers.
+///
+/// @example
+/// import std.bytes as bytes;
+/// var buf = bytes.ByteBuffer();
+/// buf.append(0xDE);
+/// buf.append(0xAD);
+/// print("Hex: {buf.to_hex()}"); // "dead"
+
+/// Dynamically expanding byte buffer supporting sequential appending, indexing, and hex formatting.
+///
+/// @param initial Optional starting list of byte values.
 frame ByteBuffer {
     pub var data: [int];
     
@@ -12,10 +29,16 @@ frame ByteBuffer {
         }
     }
     
+    /// Appends a single byte (0-255) to the buffer.
+    ///
+    /// @param byte Byte value to append (automatically masked to 8 bits).
     pub fn append(byte: int) {
         self.data.append(byte % 256);
     }
     
+    /// Appends all bytes from an array to the buffer.
+    ///
+    /// @param bytes Array of byte integers to append.
     pub fn append_all(bytes: [int]) {
         var i = 0;
         while (i < len(bytes)) {
@@ -24,12 +47,26 @@ frame ByteBuffer {
         }
     }
     
+    /// Retrieves the byte value at the specified index.
+    ///
+    /// @pre idx >= 0 and idx < len(self.data)
+    /// @param idx Zero-based index into the buffer.
+    /// @return Byte value as an integer.
     pub fn get(idx: int): int {
+        contract(idx >= 0 and idx < len(self.data), "Index out of bounds");
         return self.data[idx];
     }
     
-    pub fn len(): int { return len(self.data); }
+    /// Returns the total number of bytes currently stored in the buffer.
+    ///
+    /// @return Number of bytes as an integer.
+    pub fn len(): int { 
+        return len(self.data); 
+    }
     
+    /// Formats all bytes in the buffer into a lowercase hexadecimal string.
+    ///
+    /// @return Hexadecimal string representation.
     pub fn to_hex(): str {
         var hex = "0123456789abcdef";
         var res = "";
@@ -42,6 +79,10 @@ frame ByteBuffer {
     }
 }
 
+/// Encodes a 32-bit integer into a 4-byte big-endian array.
+///
+/// @param value Integer to encode.
+/// @return 4-element byte array [MSB, ..., LSB].
 pub fn encode_i32_be(value: int): [int] {
     return [
         (value >> 24) & 0xFF,
@@ -51,6 +92,10 @@ pub fn encode_i32_be(value: int): [int] {
     ];
 }
 
+/// Encodes a 32-bit integer into a 4-byte little-endian array.
+///
+/// @param value Integer to encode.
+/// @return 4-element byte array [LSB, ..., MSB].
 pub fn encode_i32_le(value: int): [int] {
     return [
         value & 0xFF,
@@ -60,6 +105,22 @@ pub fn encode_i32_le(value: int): [int] {
     ];
 }
 
+/// Decodes a 32-bit big-endian integer from the first 4 bytes of an array.
+///
+/// @pre len(bytes) >= 4
+/// @param bytes Byte array of length at least 4.
+/// @return Decoded 32-bit integer.
 pub fn decode_i32_be(bytes: [int]): int {
+    contract(len(bytes) >= 4, "Byte array must contain at least 4 bytes");
     return (bytes[0] << 24) | (bytes[1] << 16) | (bytes[2] << 8) | bytes[3];
+}
+
+/// Decodes a 32-bit little-endian integer from the first 4 bytes of an array.
+///
+/// @pre len(bytes) >= 4
+/// @param bytes Byte array of length at least 4.
+/// @return Decoded 32-bit integer.
+pub fn decode_i32_le(bytes: [int]): int {
+    contract(len(bytes) >= 4, "Byte array must contain at least 4 bytes");
+    return bytes[0] | (bytes[1] << 8) | (bytes[2] << 16) | (bytes[3] << 24);
 }

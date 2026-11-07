@@ -1,10 +1,18 @@
-// Re-exports all networking submodules for convenient access.
+// std/net/index.lm
 //
-// Usage:
-//   import std.net as net;
-//   var result = net.DNS.resolve("example.com");
-//   var client = net.TCPClient();
-//   client.connect("127.0.0.1", 8080);
+// Core networking facade: TCP client/server sockets, UDP datagrams,
+// DNS resolution and IP validation, and TLS transport encryption.
+//
+// @tip Import `std.net as net;` to access high-level networking primitives
+// under a single cohesive namespace.
+//
+// @example
+// import std.net as net;
+// var ip = net.resolve("example.com")? else {
+//     print("DNS lookup failed");
+//     return;
+// };
+// print("Resolved: {ip}");
 
 pub import std.net.tcp as tcp;
 pub import std.net.udp as udp;
@@ -23,6 +31,19 @@ pub import std.net.dns show DNS, Resolver, DNSRecord, resolve, lookup, reverse_l
 
 // TLS
 pub import std.net.tls show TLSConfig, TLSSocket;
-pub fn TLSConfig(): tls.TLSConfig { return tls.TLSConfig(); }
-pub fn connect_tls(host: str, port: int, cfg: any = nil): any { return tls.connect(host, port, cfg); }
 
+/// Establishes an encrypted TLS client connection to the specified host and port.
+///
+/// @tip Always specify a hostname rather than a raw IP to ensure SNI certificate validation succeeds.
+/// @warning Connecting with disabled verification exposes connections to man-in-the-middle attacks.
+///
+/// @pre len(host) > 0 and port > 0 and port <= 65535
+/// @param host Target server domain name or IP address.
+/// @param port Target TCP port number (1-65535).
+/// @param cfg Optional custom TLSConfig instance.
+/// @return Connected TLSSocket, or err(Error).
+pub fn connect_tls(host: str, port: int, cfg: tls.TLSConfig = nil): tls.TLSSocket? {
+    contract(len(host) > 0, "TLS target host must not be empty");
+    contract(port > 0 and port <= 65535, "Port must be in valid range 1-65535");
+    return tls.connect(host, port, cfg);
+}

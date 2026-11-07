@@ -1,14 +1,39 @@
 // std/string/search.lm
 // Containment and prefix/suffix tests.
 
+/// Checks whether `needle` occurs anywhere within `value`.
+///
+/// @param value The string to search within.
+/// @param needle The substring to search for.
+/// @return `true` if `needle` is found, `false` otherwise.
+/// @example
+/// ```lymar
+/// var has_limit = search.contains("limitless", "limit");
+/// ```
 pub fn contains(value: str, needle: str): bool {
+    contract(len(value) >= 0, "value must be a valid string");
+    contract(len(needle) >= 0, "needle must be a valid string");
     return _builtin_string_contains(value, needle);
 }
 
+/// Checks whether `value` begins with the given `prefix`.
+///
+/// @param value The string to test.
+/// @param prefix The prefix to search for.
+/// @return `true` if `value` starts with `prefix`, `false` otherwise.
 pub fn starts_with(value: str, prefix: str): bool {
+    contract(len(value) >= 0, "value must be a valid string");
+    contract(len(prefix) >= 0, "prefix must be a valid string");
     return _builtin_string_starts_with(value, prefix);
 }
 
+/// Checks whether `value` ends with the given `suffix`.
+///
+/// @param value The string to test.
+/// @param suffix The suffix to search for.
+/// @return `true` if `value` ends with `suffix`, `false` otherwise.
 pub fn ends_with(value: str, suffix: str): bool {
+    contract(len(value) >= 0, "value must be a valid string");
+    contract(len(suffix) >= 0, "suffix must be a valid string");
     return _builtin_string_ends_with(value, suffix);
 }

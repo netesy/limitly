@@ -1,6 +1,15 @@
 // std/string/trim.lm
 // Whitespace trimming, backed by the compiler intrinsic.
 
+/// Strips leading and trailing ASCII whitespace characters from `value`.
+///
+/// @param value The string to trim.
+/// @return Trimmed string without leading or trailing spaces, tabs, or newlines.
+/// @example
+/// ```lymar
+/// var clean = trim.trim("   hello world\n\t");
+/// ```
 pub fn trim(value: str): str {
+    contract(len(value) >= 0, "value must be a valid string");
     return _builtin_string_trim(value);
 }

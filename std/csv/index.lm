@@ -1,12 +1,30 @@
-// CSV Module Gateway Index
+// std/csv/index.lm
+// Public facade for std.csv: Comma-Separated Values parsing and serialization.
+
+/// Comma-Separated Values (CSV) tabular data library.
+///
+/// Implements RFC 4180 parsing and serializing of tabular data records.
+///
+/// @example
+/// import std.csv as csv;
+/// var rows = csv.parse("name,age\nAlice,30\nBob,25");
+/// print(rows[0][0]); // "name"
 
 import std.csv.reader as reader;
 import std.csv.writer as writer;
 
+/// Parses CSV formatted text into a 2D matrix of row records and column values.
+///
+/// @param text Raw CSV text.
+/// @return 2D list of strings `[[str]]`.
 pub fn parse(text: str): [[str]] {
     return reader.parse_csv(text);
 }
 
+/// Serializes a 2D matrix of strings into a comma-separated CSV text document.
+///
+/// @param rows 2D list of row strings to format.
+/// @return Formatted CSV text.
 pub fn stringify(rows: [[str]]): str {
     return writer.stringify_csv(rows);
 }

@@ -1,65 +1,73 @@
-// std/format/index.lm
-// Public entrypoint and facade for std.format. Text formatting, string interpolation, and number representation.
+// Standard Library Text Formatting Module
+//
+// String alignment, case conversion, interpolation templates, and primitive value representations.
 
 import std.format.formatter as formatter;
-import std.format.printf as printf;
 
+pub import std.format.formatter show format_int, format_float, format_bool, pad_left, pad_right, center, truncate, title_case, snake_case, camel_case, kebab_case, pascal_case;
+pub import std.format.printf show printf_template;
+
+/// Facade helper frame aggregating formatting utilities.
+///
+/// @example
+/// ```lymar
+/// var fmt = Format();
+/// var res = fmt.pad_left("42", 5, "0");
+/// ```
 frame Format {
     pub init() {}
+
+    /// Formats an integer value as string.
     pub fn format_int(value: int): str { return formatter.format_int(value); }
+
+    /// Formats a float value as string.
     pub fn format_float(value: float): str { return formatter.format_float(value); }
+
+    /// Formats a boolean value as string.
     pub fn format_bool(value: bool): str { return formatter.format_bool(value); }
+
+    /// Left-pads text to target length.
     pub fn pad_left(value: str, length_val: int, fill_char: str): str { return formatter.pad_left(value, length_val, fill_char); }
+
+    /// Right-pads text to target length.
     pub fn pad_right(value: str, length_val: int, fill_char: str): str { return formatter.pad_right(value, length_val, fill_char); }
+
+    /// Centers text within target width.
     pub fn center(value: str, length_val: int, fill_char: str): str { return formatter.center(value, length_val, fill_char); }
+
+    /// Truncates text to maximum length.
     pub fn truncate(value: str, length_val: int, ellipsis: bool): str { return formatter.truncate(value, length_val, ellipsis); }
+
+    /// Converts string to Title Case.
     pub fn title_case(value: str): str { return formatter.title_case(value); }
+
+    /// Converts string to snake_case.
     pub fn snake_case(value: str): str { return formatter.snake_case(value); }
+
+    /// Converts string to camelCase.
     pub fn camel_case(value: str): str { return formatter.camel_case(value); }
+
+    /// Converts string to kebab-case.
     pub fn kebab_case(value: str): str { return formatter.kebab_case(value); }
+
+    /// Converts string to PascalCase.
     pub fn pascal_case(value: str): str { return formatter.pascal_case(value); }
 }
 
-pub fn format_int(value: int): str {
-    return formatter.format_int(value);
-}
-
-pub fn format_float(value: float): str {
-    return formatter.format_float(value);
-}
-
-pub fn format_bool(value: bool): str {
-    return formatter.format_bool(value);
-}
-
+/// Left-pads a string with whitespace until reaching target length.
+///
+/// @param value Input text string.
+/// @param length_val Minimum output length.
+/// @return Padded string.
 pub fn pad_string(value: str, length_val: int): str {
     return formatter.pad_left(value, length_val, " ");
 }
 
-pub fn title_case(value: str): str {
-    return formatter.title_case(value);
-}
-
-pub fn snake_case(value: str): str {
-    return formatter.snake_case(value);
-}
-
-pub fn camel_case(value: str): str {
-    return formatter.camel_case(value);
-}
-
-pub fn kebab_case(value: str): str {
-    return formatter.kebab_case(value);
-}
-
-pub fn pascal_case(value: str): str {
-    return formatter.pascal_case(value);
-}
-
+/// Truncates a string to maximum length, appending an ellipsis (`"..."`).
+///
+/// @param value Input text.
+/// @param length_val Maximum character length allowed.
+/// @return Truncated string with ellipsis.
 pub fn truncate_string(value: str, length_val: int): str {
     return formatter.truncate(value, length_val, true);
-}
-
-pub fn printf_template(template: str, args: [any]): str {
-    return printf.printf_template(template, args);
 }

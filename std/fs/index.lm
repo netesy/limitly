@@ -1,32 +1,83 @@
 // std/fs/index.lm
 // Public entrypoint and facade for std.fs. Filesystem paths, directory iteration, and file metadata access.
 
-import std.fs.directory;
-import std.fs.permissions;
-import std.path.index as path;
-import std.io;
+/// High-level filesystem abstraction module using strongly-typed `Path` handles.
+///
+/// Provides path-based directory creation, deletion, renaming, listing, and existence queries.
+///
+/// @example
+/// import std.fs as fs;
+/// import std.path as path;
+/// var filesystem = fs.FS();
+/// var p = path.Path("my_folder");
+/// filesystem.create_dir(p);
+/// print(filesystem.exists(p)); // true
+
+import std.io as io;
+import std.path.index show Path;
 
 pub import std.fs.directory show create_dir, list_dir;
 pub import std.fs.permissions show Permissions;
 pub import std.path.index show Path;
 
+/// High-level filesystem manager operating on strongly-typed `Path` instances.
 frame FS {
     pub init() {}
-    pub fn exists(p: Path): bool { return io.exists(p.value); }
-    pub fn create_dir(p: Path): nil? { return io.create_directory(p.value); }
+
+    /// Checks whether the file or directory exists at path `p`.
+    ///
+    /// @pre p != nil
+    /// @param p Strongly-typed path handle.
+    /// @return True if target exists.
+    pub fn exists(p: Path): bool {
+        contract(p != nil, "Path parameter must not be nil");
+        return io.exists(p.value);
+    }
+
+    /// Creates a directory at path `p`.
+    ///
+    /// @pre p != nil
+    /// @param p Strongly-typed path handle.
+    /// @return Fallible unit result.
+    pub fn create_dir(p: Path): nil? {
+        contract(p != nil, "Path parameter must not be nil");
+        return io.create_directory(p.value);
+    }
+
+    /// Deletes a file or empty directory at path `p`.
+    ///
+    /// @pre p != nil
+    /// @param p Strongly-typed path handle.
+    /// @return Fallible unit result.
     pub fn remove(p: Path): nil? {
+        contract(p != nil, "Path parameter must not be nil");
         if (!io.delete(p.value)) {
             return err();
         }
         return ok(nil);
     }
+
+    /// Renames or moves a file or directory from `from_path` to `to_path`.
+    ///
+    /// @pre from_path != nil and to_path != nil
+    /// @param from_path Source path handle.
+    /// @param to_path Destination path handle.
+    /// @return Fallible unit result.
     pub fn rename(from_path: Path, to_path: Path): nil? {
+        contract(from_path != nil and to_path != nil, "Source and destination paths must not be nil");
         if (!io.rename(from_path.value, to_path.value)) {
             return err();
         }
         return ok(nil);
     }
+
+    /// Lists directory entry names at path `p`.
+    ///
+    /// @pre p != nil
+    /// @param p Strongly-typed path handle.
+    /// @return Fallible list of filename strings.
     pub fn list_dir(p: Path): [str]? {
+        contract(p != nil, "Path parameter must not be nil");
         return io.list_directory(p.value);
     }
 }

@@ -1,5 +1,7 @@
-// Base64 Encoding Module
+// std/encoding/base64.lm
+// RFC 4648 Base64 Encoding and Decoding.
 
+/// Decodes an ASCII character to its 6-bit Base64 index.
 fn get_b64_index(ch: str): int {
     var chars: str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     var i: int = 0;
@@ -12,6 +14,18 @@ fn get_b64_index(ch: str): int {
     return 0;
 }
 
+/// Encodes an array of binary bytes into an RFC 4648 Base64 string with `=` padding.
+///
+/// @tip Base64 transforms arbitrary binary payloads into URL/safe text representations.
+/// @note Every 3 bytes of input generate 4 Base64 characters; partial blocks are padded with `=`.
+///
+/// @param bytes Array of byte values (0-255) to encode.
+/// @return Encoded Base64 ASCII string.
+///
+/// @example
+/// import std.encoding.base64 as b64;
+/// var encoded = b64.encode_base64([72, 101, 108, 108, 111]);
+/// print("Base64: {encoded}"); // "SGVsbG8="
 pub fn encode_base64(bytes: [int]): str {
     var chars: str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     var res: str = "";
@@ -51,6 +65,18 @@ pub fn encode_base64(bytes: [int]): str {
     return res;
 }
 
+/// Decodes an RFC 4648 Base64 encoded string into a byte array.
+///
+/// @tip Handles `=` padding automatically.
+/// @warning Malformed inputs or non-base64 characters evaluate to zero bits.
+///
+/// @param s Base64 encoded string to decode.
+/// @return Array of decoded integer bytes.
+///
+/// @example
+/// import std.encoding.base64 as b64;
+/// var bytes = b64.decode_base64("SGVsbG8=");
+/// print("Byte count: {len(bytes)}");
 pub fn decode_base64(s: str): [int] {
     var res: [int] = [];
     var j: int = 0;

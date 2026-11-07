@@ -1,5 +1,7 @@
-// JSON Value representation
+// std/json/value.lm
+// JSON Value AST node representation and primitive constructors.
 
+/// Enumeration of standard JSON node value types.
 enum Type {
     Null,
     Bool,
@@ -9,6 +11,14 @@ enum Type {
     Object
 }
 
+/// Represents an immutable Abstract Syntax Tree (AST) node for a JSON value.
+///
+/// Encapsulates JSON primitives (null, bool, number, string) and collections (array, object).
+///
+/// @example
+/// import std.json as json;
+/// var v = json.make_string("limitless");
+/// print(v.is_string()); // true
 frame Value {
     pub kind: Type;
     pub str_val: str;
@@ -18,14 +28,29 @@ frame Value {
     pub obj_keys: [str];
     pub obj_vals: [any];
 
+    /// Checks if the value represents JSON `null`.
     pub fn is_null(): bool { return self.kind == Type.Null; }
+
+    /// Checks if the value represents a JSON string.
     pub fn is_string(): bool { return self.kind == Type.String; }
+
+    /// Checks if the value represents a JSON integer number.
     pub fn is_number(): bool { return self.kind == Type.Number; }
+
+    /// Checks if the value represents a JSON boolean.
     pub fn is_bool(): bool { return self.kind == Type.Bool; }
+
+    /// Checks if the value represents a JSON array list.
     pub fn is_array(): bool { return self.kind == Type.Array; }
+
+    /// Checks if the value represents a JSON key-value object.
     pub fn is_object(): bool { return self.kind == Type.Object; }
 }
 
+/// Constructs a JSON string value node.
+///
+/// @param v Text string value.
+/// @return Populated `Value` node.
 pub fn make_string(v: str): Value {
     var list: [any] = [];
     var keys: [str] = [];
@@ -33,6 +58,10 @@ pub fn make_string(v: str): Value {
     return Value(kind=Type.String, str_val=v, num_val=0, bool_val=false, list_val=list, obj_keys=keys, obj_vals=vals);
 }
 
+/// Constructs a JSON number value node from a 64-bit integer.
+///
+/// @param v Integer numeric value.
+/// @return Populated `Value` node.
 pub fn make_number(v: int): Value {
     var list: [any] = [];
     var keys: [str] = [];
@@ -40,6 +69,10 @@ pub fn make_number(v: int): Value {
     return Value(kind=Type.Number, str_val="", num_val=v, bool_val=false, list_val=list, obj_keys=keys, obj_vals=vals);
 }
 
+/// Constructs a JSON boolean value node.
+///
+/// @param v Boolean value.
+/// @return Populated `Value` node.
 pub fn make_bool(v: bool): Value {
     var list: [any] = [];
     var keys: [str] = [];
@@ -47,6 +80,9 @@ pub fn make_bool(v: bool): Value {
     return Value(kind=Type.Bool, str_val="", num_val=0, bool_val=v, list_val=list, obj_keys=keys, obj_vals=vals);
 }
 
+/// Constructs a JSON null value node.
+///
+/// @return Populated `Value` node representing null.
 pub fn make_null(): Value {
     var list: [any] = [];
     var keys: [str] = [];
@@ -54,13 +90,24 @@ pub fn make_null(): Value {
     return Value(kind=Type.Null, str_val="", num_val=0, bool_val=false, list_val=list, obj_keys=keys, obj_vals=vals);
 }
 
+/// Constructs a JSON array value node from a list of items.
+///
+/// @param v List of child values.
+/// @return Populated `Value` node representing an array.
 pub fn make_array(v: [any]): Value {
     var keys: [str] = [];
     var vals: [any] = [];
     return Value(kind=Type.Array, str_val="", num_val=0, bool_val=false, list_val=v, obj_keys=keys, obj_vals=vals);
 }
 
+/// Constructs a JSON object value node from parallel lists of keys and values.
+///
+/// @pre len(k) == len(v)
+/// @param k List of string keys.
+/// @param v Parallel list of child values.
+/// @return Populated `Value` node representing an object.
 pub fn make_object(k: [str], v: [any]): Value {
+    contract(len(k) == len(v), "Key and value counts must match");
     var list: [any] = [];
     return Value(kind=Type.Object, str_val="", num_val=0, bool_val=false, list_val=list, obj_keys=k, obj_vals=v);
 }

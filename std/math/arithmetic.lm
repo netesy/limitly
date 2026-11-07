@@ -1,77 +1,168 @@
+// std/math/arithmetic.lm
+// Fundamental arithmetic operations, integer algorithms, rounding, powers, and roots.
+
 import std.math.constants as const;
 
+/// Wrapper providing object-oriented arithmetic helpers for 64-bit signed integers.
+///
+/// @example
+/// import std.math.arithmetic as arithmetic;
+/// var i = arithmetic.Int(-42);
+/// print(i.abs()); // 42
 frame Int {
     pub var value: int;
+
     pub init(value: int) {
         self.value = value;
     }
-    pub fn abs(): int { if (self.value < 0) return -self.value; return self.value; }
-    pub fn min(other: int): int { if (self.value < other) return self.value; return other; }
-    pub fn max(other: int): int { if (self.value > other) return self.value; return other; }
+
+    /// Computes the absolute value of the integer.
+    ///
+    /// @return Non-negative integer value.
+    pub fn abs(): int {
+        if (self.value < 0) return -self.value;
+        return self.value;
+    }
+
+    /// Returns the minimum between this value and another integer.
+    ///
+    /// @param other Integer to compare against.
+    /// @return Lesser of the two integers.
+    pub fn min(other: int): int {
+        if (self.value < other) return self.value;
+        return other;
+    }
+
+    /// Returns the maximum between this value and another integer.
+    ///
+    /// @param other Integer to compare against.
+    /// @return Greater of the two integers.
+    pub fn max(other: int): int {
+        if (self.value > other) return self.value;
+        return other;
+    }
 }
 
+/// Wrapper providing object-oriented arithmetic, rounding, exponentiation, and logarithms for 64-bit floats.
+///
+/// @example
+/// import std.math.arithmetic as arithmetic;
+/// var f = arithmetic.Float(16.0);
+/// print(f.sqrt()); // 4.0
 frame Float {
     pub var value: float;
+
     pub init(value: float) {
         self.value = value;
     }
-    pub fn abs(): float { if (self.value < 0.0) return -self.value; return self.value; }
-    pub fn min(other: float): float { if (self.value < other) return self.value; return other; }
-    pub fn max(other: float): float { if (self.value > other) return self.value; return other; }
 
-    // Rounding operations
+    /// Computes the absolute magnitude of the floating-point value.
+    ///
+    /// @return Non-negative floating-point magnitude.
+    pub fn abs(): float {
+        if (self.value < 0.0) return -self.value;
+        return self.value;
+    }
+
+    /// Returns the lesser of this value and another float.
+    ///
+    /// @param other Float to compare against.
+    /// @return Minimum value.
+    pub fn min(other: float): float {
+        if (self.value < other) return self.value;
+        return other;
+    }
+
+    /// Returns the greater of this value and another float.
+    ///
+    /// @param other Float to compare against.
+    /// @return Maximum value.
+    pub fn max(other: float): float {
+        if (self.value > other) return self.value;
+        return other;
+    }
+
+    /// Rounds down to the nearest integer less than or equal to this value.
+    ///
+    /// @return Floor integer value.
     pub fn floor(): int {
         var i: int = self.value as int;
         if ((i as float) > self.value) return i - 1;
         return i;
     }
 
+    /// Rounds up to the nearest integer greater than or equal to this value.
+    ///
+    /// @return Ceil integer value.
     pub fn ceil(): int {
         var i: int = self.value as int;
         if ((i as float) < self.value) return i + 1;
         return i;
     }
 
+    /// Rounds to the nearest integer, rounding halfway values away from zero.
+    ///
+    /// @return Nearest integer.
     pub fn round(): int {
         if (self.value >= 0.0) return Float(self.value + 0.5).floor();
         return Float(self.value - 0.5).ceil();
     }
 
-    pub fn trunc(): int { return self.value as int; }
+    /// Truncates the fractional part, rounding towards zero.
+    ///
+    /// @return Truncated integer.
+    pub fn trunc(): int {
+        return self.value as int;
+    }
 
-    pub fn fract(): float { return self.value - (self.value as int as float); }
+    /// Computes the fractional part of the float (`value - trunc(value)`).
+    ///
+    /// @return Fractional component.
+    pub fn fract(): float {
+        return self.value - (self.value as int as float);
+    }
 
-    // Powers and logs
+    /// Computes the square root using the Babylonian method.
+    ///
+    /// @pre self.value >= 0.0
+    /// @return Non-negative square root, or NAN if negative.
     pub fn sqrt(): float {
+        contract(self.value >= 0.0, "Input to sqrt must be non-negative");
         if (self.value < 0.0) return const.NAN;
         if (self.value == 0.0) return 0.0;
         var x = self.value;
         var y = 1.0;
         var e = 0.000000000000001;
-        while (abs(x - y) > e) {
+        while (Float(x - y).abs() > e) {
             x = (x + y) / 2.0;
             y = self.value / x;
         }
         return x;
     }
 
+    /// Computes the cube root of the floating-point value.
+    ///
+    /// @return Real cube root.
     pub fn cbrt(): float {
         if (self.value == 0.0) return 0.0;
         var x = self.value;
         var y = 1.0;
         if (x < 0.0) {
             x = -x;
-            while (abs(x - y * y * y) > 0.000000000000001) {
+            while (Float(x - y * y * y).abs() > 0.000000000000001) {
                 y = (2.0 * y + x / (y * y)) / 3.0;
             }
             return -y;
         }
-        while (abs(x - y * y * y) > 0.000000000000001) {
+        while (Float(x - y * y * y).abs() > 0.000000000000001) {
             y = (2.0 * y + x / (y * y)) / 3.0;
         }
         return y;
     }
 
+    /// Computes the exponential function e^x via Taylor series expansion.
+    ///
+    /// @return Euler's number raised to power of self.value.
     pub fn exp(): float {
         var x = self.value;
         var sum = 1.0;
@@ -81,13 +172,18 @@ frame Float {
             var i_f = i as float;
             term = term * x / i_f;
             sum = sum + term;
-            if (abs(term) < 1e-16) return sum;
+            if (Float(term).abs() < 1e-16) return sum;
             i = i + 1;
         }
         return sum;
     }
 
+    /// Computes the natural logarithm (base e).
+    ///
+    /// @pre self.value > 0.0
+    /// @return Natural logarithm of value, or NAN if non-positive.
     pub fn log(): float {
+        contract(self.value > 0.0, "Input to log must be strictly positive");
         if (self.value <= 0.0) return const.NAN;
         var x = self.value;
         var count = 0;
@@ -108,32 +204,79 @@ frame Float {
             if (i % 2 == 1) sum = sum + term / i_f;
             else sum = sum - term / i_f;
             term = term * x;
-            if (abs(term) < 1e-16) return sum + (count as float);
+            if (Float(term).abs() < 1e-16) return sum + (count as float);
             i = i + 1;
         }
         return sum + (count as float);
     }
 
-    pub fn log2(): float { return self.log() / Float(2.0).log(); }
-    pub fn log10(): float { return self.log() / Float(10.0).log(); }
-    pub fn exp2(): float { return Float(self.value * Float(2.0).log()).exp(); }
+    /// Computes the base-2 logarithm.
+    ///
+    /// @pre self.value > 0.0
+    /// @return Logarithm base 2.
+    pub fn log2(): float {
+        contract(self.value > 0.0, "Input to log2 must be strictly positive");
+        return self.log() / Float(2.0).log();
+    }
 
+    /// Computes the common logarithm (base 10).
+    ///
+    /// @pre self.value > 0.0
+    /// @return Logarithm base 10.
+    pub fn log10(): float {
+        contract(self.value > 0.0, "Input to log10 must be strictly positive");
+        return self.log() / Float(10.0).log();
+    }
+
+    /// Computes 2 raised to the power of this value.
+    ///
+    /// @return 2^value.
+    pub fn exp2(): float {
+        return Float(self.value * Float(2.0).log()).exp();
+    }
+
+    /// Computes base raised to arbitrary floating-point exponent (`self.value^exponent`).
+    ///
+    /// @pre self.value >= 0.0
+    /// @param exponent Exponent value.
+    /// @return Resulting power.
     pub fn pow(exponent: float): float {
+        contract(self.value >= 0.0, "Base of float pow must be non-negative");
         if (self.value == 0.0) return 0.0;
         if (self.value < 0.0) return const.NAN;
         return Float(exponent * self.log()).exp();
     }
 
+    /// Computes the hypotenuse length sqrt(x^2 + y^2) avoiding intermediate overflow.
+    ///
+    /// @param other Perpendicular length.
+    /// @return Hypotenuse length.
     pub fn hypot(other: float): float {
         return Float(self.value * self.value + other * other).sqrt();
     }
 }
 
-// Basic operations
-pub fn abs(x: float): float { return Float(x).abs(); }
-pub fn abs_int(x: int): int { return Int(x).abs(); }
+/// Returns the absolute value of a 64-bit float.
+///
+/// @param x Input float.
+/// @return Absolute value |x|.
+pub fn abs(x: float): float {
+    return Float(x).abs();
+}
 
-// Integer utilities
+/// Returns the absolute value of a 64-bit integer.
+///
+/// @param x Input integer.
+/// @return Absolute value |x|.
+pub fn abs_int(x: int): int {
+    return Int(x).abs();
+}
+
+/// Computes the Greatest Common Divisor (GCD) of two integers using the Euclidean algorithm.
+///
+/// @param a First integer.
+/// @param b Second integer.
+/// @return Greatest common divisor.
 pub fn gcd(a: int, b: int): int {
     var x = abs_int(a);
     var y = abs_int(b);
@@ -145,12 +288,23 @@ pub fn gcd(a: int, b: int): int {
     return x;
 }
 
+/// Computes the Least Common Multiple (LCM) of two integers.
+///
+/// @param a First integer.
+/// @param b Second integer.
+/// @return Least common multiple, or 0 if either operand is 0.
 pub fn lcm(a: int, b: int): int {
     if (a == 0 or b == 0) return 0;
     return abs_int(a * b) / gcd(a, b);
 }
 
+/// Computes the factorial of a non-negative integer (n!).
+///
+/// @pre n >= 0
+/// @param n Non-negative integer.
+/// @return Factorial n! (returns 0 for negative input).
 pub fn factorial(n: int): int {
+    contract(n >= 0, "Factorial input must be non-negative");
     if (n < 0) return 0;
     if (n == 0) return 1;
     var res = 1;
@@ -162,36 +316,202 @@ pub fn factorial(n: int): int {
     return res;
 }
 
+/// Computes the number of k-permutations of n items: P(n, k) = n! / (n - k)!.
+///
+/// @pre n >= 0 and k >= 0 and k <= n
+/// @param n Total items.
+/// @param k Items chosen.
+/// @return Permutation count.
 pub fn permutations(n: int, k: int): int {
+    contract(n >= 0 and k >= 0 and k <= n, "Invalid permutation parameters");
     if (k < 0 or k > n) return 0;
     return factorial(n) / factorial(n - k);
 }
 
+/// Computes the number of k-combinations of n items: C(n, k) = n! / (k! * (n - k)!).
+///
+/// @pre n >= 0 and k >= 0 and k <= n
+/// @param n Total items.
+/// @param k Items chosen.
+/// @return Combination count.
 pub fn combinations(n: int, k: int): int {
+    contract(n >= 0 and k >= 0 and k <= n, "Invalid combination parameters");
     if (k < 0 or k > n) return 0;
     return factorial(n) / (factorial(k) * factorial(n - k));
 }
 
-pub fn min(a: float, b: float): float { return Float(a).min(b); }
-pub fn max(a: float, b: float): float { return Float(a).max(b); }
-pub fn clamp(value: float, low: float, high: float): float { if (value < low) return low; if (value > high) return high; return value; }
-pub fn sign(x: float): float { if (x > 0.0) return 1.0; if (x < 0.0) return -1.0; return 0.0; }
-pub fn lerp(a: float, b: float, t: float): float { return a + (b - a) * t; }
+/// Returns the minimum of two floating-point numbers.
+///
+/// @param a First operand.
+/// @param b Second operand.
+/// @return Lesser of a and b.
+pub fn min(a: float, b: float): float {
+    return Float(a).min(b);
+}
 
-// Rounding utility functions
-pub fn floor(x: float): int { return Float(x).floor(); }
-pub fn ceil(x: float): int { return Float(x).ceil(); }
-pub fn round(x: float): int { return Float(x).round(); }
-pub fn trunc(x: float): int { return Float(x).trunc(); }
-pub fn fract(x: float): float { return Float(x).fract(); }
+/// Returns the maximum of two floating-point numbers.
+///
+/// @param a First operand.
+/// @param b Second operand.
+/// @return Greater of a and b.
+pub fn max(a: float, b: float): float {
+    return Float(a).max(b);
+}
 
-// Powers and logs utility functions
-pub fn pow(base: float, exponent: float): float { return Float(base).pow(exponent); }
-pub fn sqrt(x: float): float { return Float(x).sqrt(); }
-pub fn cbrt(x: float): float { return Float(x).cbrt(); }
-pub fn hypot(x: float, y: float): float { return Float(x).hypot(y); }
-pub fn log(x: float): float { return Float(x).log(); }
-pub fn log2(x: float): float { return Float(x).log2(); }
-pub fn log10(x: float): float { return Float(x).log10(); }
-pub fn exp(x: float): float { return Float(x).exp(); }
-pub fn exp2(x: float): float { return Float(x).exp2(); }
+/// Clamps a value within an inclusive [low, high] interval.
+///
+/// @pre low <= high
+/// @param value Candidate value.
+/// @param low Lower bound.
+/// @param high Upper bound.
+/// @return Clamped value.
+pub fn clamp(value: float, low: float, high: float): float {
+    contract(low <= high, "Lower bound must not exceed upper bound");
+    if (value < low) return low;
+    if (value > high) return high;
+    return value;
+}
+
+/// Returns the sign of a floating-point number (-1.0, 0.0, or 1.0).
+///
+/// @param x Input float.
+/// @return 1.0 if positive, -1.0 if negative, 0.0 if zero.
+pub fn sign(x: float): float {
+    if (x > 0.0) return 1.0;
+    if (x < 0.0) return -1.0;
+    return 0.0;
+}
+
+/// Performs linear interpolation between two endpoints.
+///
+/// @param a Start value (t = 0.0).
+/// @param b End value (t = 1.0).
+/// @param t Interpolation parameter.
+/// @return Interpolated float `a + (b - a) * t`.
+pub fn lerp(a: float, b: float, t: float): float {
+    return a + (b - a) * t;
+}
+
+/// Rounds a float down to the nearest integer.
+///
+/// @param x Input float.
+/// @return Floor integer.
+pub fn floor(x: float): int {
+    return Float(x).floor();
+}
+
+/// Rounds a float up to the nearest integer.
+///
+/// @param x Input float.
+/// @return Ceil integer.
+pub fn ceil(x: float): int {
+    return Float(x).ceil();
+}
+
+/// Rounds a float to the nearest integer, half away from zero.
+///
+/// @param x Input float.
+/// @return Rounded integer.
+pub fn round(x: float): int {
+    return Float(x).round();
+}
+
+/// Truncates a float towards zero.
+///
+/// @param x Input float.
+/// @return Truncated integer.
+pub fn trunc(x: float): int {
+    return Float(x).trunc();
+}
+
+/// Returns the fractional part of a float.
+///
+/// @param x Input float.
+/// @return Fractional component.
+pub fn fract(x: float): float {
+    return Float(x).fract();
+}
+
+/// Computes base raised to the power of exponent (base^exponent).
+///
+/// @pre base >= 0.0
+/// @param base Base number.
+/// @param exponent Exponent.
+/// @return Resulting power.
+pub fn pow(base: float, exponent: float): float {
+    contract(base >= 0.0, "Base of pow must be non-negative");
+    return Float(base).pow(exponent);
+}
+
+/// Computes the square root of a non-negative floating-point number.
+///
+/// @pre x >= 0.0
+/// @param x Non-negative float.
+/// @return Square root.
+pub fn sqrt(x: float): float {
+    contract(x >= 0.0, "Input to sqrt must be non-negative");
+    return Float(x).sqrt();
+}
+
+/// Computes the cube root of a floating-point number.
+///
+/// @param x Input float.
+/// @return Cube root.
+pub fn cbrt(x: float): float {
+    return Float(x).cbrt();
+}
+
+/// Computes the hypotenuse length sqrt(x^2 + y^2).
+///
+/// @param x Leg length x.
+/// @param y Leg length y.
+/// @return Hypotenuse length.
+pub fn hypot(x: float, y: float): float {
+    return Float(x).hypot(y);
+}
+
+/// Computes the natural logarithm (base e) of a positive number.
+///
+/// @pre x > 0.0
+/// @param x Strictly positive float.
+/// @return Natural logarithm.
+pub fn log(x: float): float {
+    contract(x > 0.0, "Input to log must be strictly positive");
+    return Float(x).log();
+}
+
+/// Computes the binary logarithm (base 2) of a positive number.
+///
+/// @pre x > 0.0
+/// @param x Strictly positive float.
+/// @return Base-2 logarithm.
+pub fn log2(x: float): float {
+    contract(x > 0.0, "Input to log2 must be strictly positive");
+    return Float(x).log2();
+}
+
+/// Computes the common logarithm (base 10) of a positive number.
+///
+/// @pre x > 0.0
+/// @param x Strictly positive float.
+/// @return Base-10 logarithm.
+pub fn log10(x: float): float {
+    contract(x > 0.0, "Input to log10 must be strictly positive");
+    return Float(x).log10();
+}
+
+/// Computes the exponential function e^x.
+///
+/// @param x Exponent.
+/// @return e raised to x.
+pub fn exp(x: float): float {
+    return Float(x).exp();
+}
+
+/// Computes 2^x.
+///
+/// @param x Exponent.
+/// @return 2 raised to x.
+pub fn exp2(x: float): float {
+    return Float(x).exp2();
+}

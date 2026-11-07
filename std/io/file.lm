@@ -1,25 +1,43 @@
-// Standard Library I/O File Submodule
+// std/io/file.lm
+// File resource handle and stream operations.
 
 import std.resource as res;
 import std.internal.runtime as rt;
-import std.io.reader show Reader;
-import std.io.writer show Writer;
 import std.core show Disposable;
 
+/// Error indicating the requested file does not exist.
 frame FileNotFound { pub var path: str; }
+
+/// Error indicating insufficient filesystem access permissions.
 frame PermissionDenied { pub var path: str; pub var operation: str; }
+
+/// Error indicating the storage device has no remaining space.
 frame DiskFull { pub var path: str; }
+
+/// Error indicating a network filesystem failure.
 frame NetworkError { pub var message: str; }
+
+/// Error representing an unspecified or operating system I/O failure.
 frame UnknownError { pub var message: str; }
 
+/// Fallible I/O error type union.
 pub type IOError = FileNotFound | PermissionDenied | DiskFull | NetworkError | UnknownError;
 
 /// Stream handle for local file reading and writing.
 ///
+/// Wraps an operating system file descriptor handle, providing buffered string
+/// and binary I/O, resource cleanup via `close()` or `deinit()`.
+///
 /// @tip Always ensure files are closed via `file.close()` or automatic deinit cleanup.
 ///
-/// @note Implements Reader, Writer, and Disposable traits.
-frame File : Reader, Writer, Disposable {
+/// @example
+/// import std.io.file as file;
+/// var f = file.open("test.txt", "w")? else {
+///     return;
+/// };
+/// f.write("Lymar I/O");
+/// f.close();
+frame File : Disposable {
     embed res.Reader;
     embed res.Writer;
 
@@ -45,6 +63,7 @@ frame File : Reader, Writer, Disposable {
 
     /// Reads content from the file stream.
     ///
+    /// @param args Optional read arguments (e.g. byte limits).
     /// @return String content or fallible IOError.
     pub fn read(args: [any] = [] as [any]): any {
         if (len(args) == 0) {
@@ -56,6 +75,8 @@ frame File : Reader, Writer, Disposable {
     }
 
     /// Reads raw bytes from the file stream.
+    ///
+    /// @return List of byte integers or fallible IOError.
     pub fn read_bytes(): [int]?IOError {
         var res_data = rt.call(self.resource.handle, res.OP_READ_BYTES, []);
         if (res_data == nil or len(res_data as [int]) == 0) return err(UnknownError(message="empty"));
@@ -64,9 +85,11 @@ frame File : Reader, Writer, Disposable {
 
     /// Writes data to the file stream.
     ///
+    /// @pre arg != nil
     /// @param arg The data string or argument list to write.
     /// @return Fallible ok(nil) or err(UnknownError).
     pub fn write(arg: any): any {
+        contract(arg != nil, "Write payload must not be nil");
         var args_list: [any] = [];
         if (arg as [any] != nil) {
             args_list = arg as [any];
@@ -79,6 +102,8 @@ frame File : Reader, Writer, Disposable {
     }
 
     /// Closes the underlying operating system file resource.
+    ///
+    /// @return Fallible ok(nil) or err(IOError).
     pub fn close(): nil?IOError {
         if (self.resource.is_open_val) {
             rt.destroy(self.resource.handle);
@@ -88,6 +113,8 @@ frame File : Reader, Writer, Disposable {
     }
 
     /// Checks if the file stream is currently open.
+    ///
+    /// @return True if file handle is open.
     pub fn is_open(): bool {
         return self.resource.is_open();
     }

@@ -1,24 +1,66 @@
 // Standard Library Format Formatter Submodule
+//
+// String alignment, case conversions, and primitive value representations.
 
 import std.string as s;
 
+/// Formats an integer value as a string representation.
+///
+/// @param value Integer number to convert.
+/// @return String representation of the integer.
+///
+/// @example
+/// ```lymar
+/// var txt = format_int(42);
+/// ```
 pub fn format_int(value: int): str {
     return "{value}";
 }
 
+/// Formats a floating-point value as a string representation.
+///
+/// @param value Floating-point number to convert.
+/// @return String representation of the float.
+///
+/// @example
+/// ```lymar
+/// var txt = format_float(3.14159);
+/// ```
 pub fn format_float(value: float): str {
     return "{value}";
 }
 
+/// Formats a boolean value as `"true"` or `"false"`.
+///
+/// @param value Boolean to convert.
+/// @return Literal `"true"` or `"false"`.
+///
+/// @example
+/// ```lymar
+/// var txt = format_bool(true);
+/// ```
 pub fn format_bool(value: bool): str {
-    if (value == true) {
+    if (value) {
         return "true";
     } else {
         return "false";
     }
 }
 
+/// Pads the beginning of a string with a fill character until reaching the desired target length.
+///
+/// @param value Source text.
+/// @param length_val Desired minimum length.
+/// @param fill_char Character string used for padding.
+/// @return Padded string or original if already long enough.
+///
+/// @example
+/// ```lymar
+/// var padded = pad_left("42", 5, "0"); // "00042"
+/// ```
 pub fn pad_left(value: str, length_val: int, fill_char: str): str {
+    contract(length_val >= 0, "target length must be non-negative");
+    contract(len(fill_char) > 0, "fill character must not be empty");
     if (len(value) >= length_val) return value;
 
     var padding = length_val - len(value);
@@ -31,7 +73,20 @@ pub fn pad_left(value: str, length_val: int, fill_char: str): str {
     return pad_str + value;
 }
 
+/// Pads the end of a string with a fill character until reaching the desired target length.
+///
+/// @param value Source text.
+/// @param length_val Desired minimum length.
+/// @param fill_char Character string used for padding.
+/// @return Padded string or original if already long enough.
+///
+/// @example
+/// ```lymar
+/// var padded = pad_right("hello", 8, "."); // "hello..."
+/// ```
 pub fn pad_right(value: str, length_val: int, fill_char: str): str {
+    contract(length_val >= 0, "target length must be non-negative");
+    contract(len(fill_char) > 0, "fill character must not be empty");
     if (len(value) >= length_val) return value;
 
     var padding = length_val - len(value);
@@ -44,7 +99,20 @@ pub fn pad_right(value: str, length_val: int, fill_char: str): str {
     return value + pad_str;
 }
 
+/// Centers text by evenly distributing padding characters on both sides.
+///
+/// @param value Text to center.
+/// @param length_val Total target width.
+/// @param fill_char Character string used for padding.
+/// @return Centered text string.
+///
+/// @example
+/// ```lymar
+/// var centered = center("title", 11, "="); // "===title==="
+/// ```
 pub fn center(value: str, length_val: int, fill_char: str): str {
+    contract(length_val >= 0, "target length must be non-negative");
+    contract(len(fill_char) > 0, "fill character must not be empty");
     if (len(value) >= length_val) return value;
 
     var padding = length_val - len(value);
@@ -68,7 +136,19 @@ pub fn center(value: str, length_val: int, fill_char: str): str {
     return left_str + value + right_str;
 }
 
+/// Truncates a string to maximum length, optionally appending an ellipsis (`"..."`).
+///
+/// @param value Source text.
+/// @param length_val Maximum character length allowed.
+/// @param ellipsis If true and length > 3, replaces trailing characters with `"..."`.
+/// @return Truncated string.
+///
+/// @example
+/// ```lymar
+/// var short_text = truncate("long descriptive title", 10, true);
+/// ```
 pub fn truncate(value: str, length_val: int, ellipsis: bool): str {
+    contract(length_val >= 0, "target length must be non-negative");
     if (len(value) <= length_val) return value;
 
     if (ellipsis and length_val > 3) {
@@ -78,6 +158,15 @@ pub fn truncate(value: str, length_val: int, ellipsis: bool): str {
     return _builtin_substring(value, 0, length_val);
 }
 
+/// Converts text into Title Case capitalization.
+///
+/// @param value Input text string.
+/// @return Title-cased string.
+///
+/// @example
+/// ```lymar
+/// var res = title_case("hello world"); // "Hello World"
+/// ```
 pub fn title_case(value: str): str {
     if (value == "") return "";
 
@@ -101,6 +190,15 @@ pub fn title_case(value: str): str {
     return result;
 }
 
+/// Converts text into snake_case by lowercasing and replacing whitespace with underscores.
+///
+/// @param value Input text string.
+/// @return Lowercase snake_case identifier string.
+///
+/// @example
+/// ```lymar
+/// var id = snake_case("User First Name"); // "user_first_name"
+/// ```
 pub fn snake_case(value: str): str {
     var result = "";
     var i = 0;
@@ -119,6 +217,15 @@ pub fn snake_case(value: str): str {
     return result;
 }
 
+/// Converts text into camelCase identifier format.
+///
+/// @param value Input text string.
+/// @return camelCase identifier string.
+///
+/// @example
+/// ```lymar
+/// var id = camel_case("user first name"); // "userFirstName"
+/// ```
 pub fn camel_case(value: str): str {
     var snake = snake_case(value);
     var parts = s.split(snake, "_");
@@ -145,10 +252,28 @@ pub fn camel_case(value: str): str {
     return result;
 }
 
+/// Converts text into kebab-case identifier format using hyphens.
+///
+/// @param value Input text string.
+/// @return kebab-case string.
+///
+/// @example
+/// ```lymar
+/// var id = kebab_case("user profile pic"); // "user-profile-pic"
+/// ```
 pub fn kebab_case(value: str): str {
     return s.replace(snake_case(value), "_", "-");
 }
 
+/// Converts text into PascalCase identifier format.
+///
+/// @param value Input text string.
+/// @return PascalCase string.
+///
+/// @example
+/// ```lymar
+/// var id = pascal_case("user account state"); // "UserAccountState"
+/// ```
 pub fn pascal_case(value: str): str {
     var snake = snake_case(value);
     var parts = s.split(snake, "_");

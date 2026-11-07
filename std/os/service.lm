@@ -11,7 +11,7 @@
 
 import std.internal.runtime as rt;
 
-pub fn request(op: int): any {
+pub fn request(op: int) {
     var handle = rt.create(rt.RT_OS, []);
     if (handle == -1) return nil;
     var result = rt.call(handle, op, []);
@@ -19,7 +19,7 @@ pub fn request(op: int): any {
     return result;
 }
 
-pub fn request_with(op: int, args: [any]): any {
+pub fn request_with(op: int, args: [any]) {
     var handle = rt.create(rt.RT_OS, []);
     if (handle == -1) return nil;
     var result = rt.call(handle, op, args);

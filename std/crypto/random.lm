@@ -4,25 +4,35 @@
 import std.ffi as ffi;
 import std.crypto.hash as hash;
 
+/// Namespace helper frame for cryptographically secure pseudo-random generation.
 frame Random {
+    /// Generates secure random bytes formatted as a lowercase hex string.
     pub fn hex(num_bytes: int): str {
         return random_hex(num_bytes);
     }
 
+    /// Generates a RFC 4122 Version 4 random UUID.
     pub fn uuid(): str {
         return uuid();
     }
 
+    /// Generates a secure random integer in range [min, max].
     pub fn int_range(min: int, max: int): int {
         return random_int(min, max);
     }
 
+    /// Generates a secure random string of given length.
     pub fn string(length: int, alphabet: str = ""): str {
         return random_string(length, alphabet);
     }
 }
 
+/// Generates cryptographically secure random bytes as a lowercase hex string.
+///
+/// @param num_bytes Number of random bytes to draw.
+/// @return Hexadecimal representation of random bytes.
 pub fn random_hex(num_bytes: int): str {
+    contract(num_bytes >= 0, "num_bytes must be non-negative");
     if (num_bytes <= 0) { return ""; }
     var out_str: str = "";
     unsafe {
@@ -47,6 +57,9 @@ pub fn random_hex(num_bytes: int): str {
     return out_str;
 }
 
+/// Generates a cryptographically secure RFC 4122 v4 UUID string.
+///
+/// @return Formatted UUID string (e.g. `"f47ac10b-58cc-4372-a567-0e02b2c3d479"`).
 pub fn uuid(): str {
     var h: str = random_hex(16);
     if (len(h) < 32) { return ""; }
@@ -58,7 +71,13 @@ pub fn uuid(): str {
     return p1 + "-" + p2 + "-" + p3 + "-" + p4 + "-" + p5;
 }
 
+/// Generates a uniform cryptographically secure integer between `min` and `max`.
+///
+/// @param min Lower bound (inclusive).
+/// @param max Upper bound (inclusive).
+/// @return Random integer in `[min, max]`.
 pub fn random_int(min: int, max: int): int {
+    contract(min <= max, "min must be less than or equal to max");
     if (min >= max) { return min; }
     var range_size = max - min;
     var result_val = min;
@@ -83,7 +102,13 @@ pub fn random_int(min: int, max: int): int {
     return result_val;
 }
 
+/// Generates a secure random string of specified length using a selected alphabet.
+///
+/// @param length Number of characters to generate.
+/// @param alphabet Character pool string (defaults to alphanumeric).
+/// @return Secure random character string.
 pub fn random_string(length: int, alphabet: str = ""): str {
+    contract(length >= 0, "length must be non-negative");
     if (length <= 0) { return ""; }
     var alpha = alphabet;
     if (alpha == "") {

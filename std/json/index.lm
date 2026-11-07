@@ -1,25 +1,59 @@
-// JSON Module Gateway Index
+// std/json/index.lm
+// Public facade for std.json: JSON parsing, serializing, and AST values.
+
+/// JSON (JavaScript Object Notation) serialization and parsing library.
+///
+/// Implements RFC 8259 compliant parsing and serializing of JSON data into
+/// structured, type-safe `Value` AST nodes.
+///
+/// @example
+/// import std.json as json;
+/// var data = json.parse("{\"status\": 200}")? else { return; };
+/// print(data.is_object()); // true
 
 import std.json.parser as parser;
 import std.json.writer as writer;
+import std.json.value as value;
+
 pub import std.json.value show Value, Type, make_string, make_number, make_bool, make_null, make_array, make_object;
 
-pub fn parse(text: str): Value? {
-    var res: any = parser.parse(text);
+/// Parses JSON text into a fallible `Value` AST root.
+///
+/// @param text Raw JSON text.
+/// @return Fallible `Value` root node.
+pub fn parse(text: str): value.Value? {
+    if (len(text) == 0) return err();
+    var res = parser.parse(text);
     if (res == nil) {
         return err();
     }
-    return ok(res as Value);
+    return ok(res);
 }
 
-pub fn stringify(val_obj: Value): str {
+/// Serializes a JSON `Value` node into a JSON string.
+///
+/// @param val_obj Value AST node to format.
+/// @return Serialized JSON text.
+pub fn stringify(val_obj: value.Value): str {
     return writer.stringify(val_obj);
 }
 
+/// Encodes a single key-value pair as a JSON object entry.
+///
+/// @param key Object key name.
+/// @param val_str Serialized value text.
+/// @return Formatted entry string.
 pub fn encode_pair(key: str, val_str: str): str {
     return writer.encode_pair(key, val_str);
 }
 
+/// Encodes parallel lists of keys and string values into a JSON object string.
+///
+/// @pre len(keys) == len(vals)
+/// @param keys List of object key names.
+/// @param vals Parallel list of serialized value strings.
+/// @return Serialized JSON object literal.
 pub fn encode_object(keys: [str], vals: [str]): str {
+    contract(len(keys) == len(vals), "Key and value counts must match");
     return writer.encode_object(keys, vals);
 }

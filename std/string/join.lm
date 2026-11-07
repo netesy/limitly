@@ -1,6 +1,17 @@
 // std/string/join.lm
-// Join submodule for std.string. String manipulation, UTF-8 text processing, and string builders.
+// Concatenating multiple strings with a separator.
 
+/// Joins a list of strings using the specified delimiter string.
+///
+/// @param values Array of string elements to join.
+/// @param delimiter Separator string placed between each element.
+/// @return Concatenated string.
+/// @example
+/// ```lymar
+/// var csv = join.join(["a", "b", "c"], ", ");
+/// ```
 pub fn join(values: [str], delimiter: str): str {
+    contract(len(values) >= 0, "values must be a valid list");
+    contract(len(delimiter) >= 0, "delimiter must be a valid string");
     return _builtin_string_join(values, delimiter);
 }

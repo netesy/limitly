@@ -1,8 +1,8 @@
-// std/iterator/index.lm
-// Public entrypoint and facade for std.iterator. Iterator traits, adapters, generators, and lazy sequences.
+// Standard Library Iterator Module
+//
+// Iterator protocol traits, adapters (map, filter, take, skip, zip, chain), and pipeline generators.
 
 import std.iterator.iterator as it;
-import std.iterator.iterable as iterable;
 import std.iterator.map as map;
 import std.iterator.filter as filter;
 import std.iterator.take as take;

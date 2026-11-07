@@ -1,15 +1,18 @@
+// std/xml/parser.lm
 // XML Parser Module
 
 import std.xml.document as doc;
 
+/// Recursive descent parser for XML documents.
 frame Parser {
     pub idx: int;
     pub text: str;
 
+    /// Advances the parser position past any whitespace characters.
     pub fn skip_whitespace() {
         var length = len(self.text);
         var skip = true;
-        while (self.idx < length and skip == true) {
+        while (self.idx < length and skip) {
             var ch = _builtin_substring(self.text, self.idx, self.idx + 1);
             if (ch == " " or ch == "\t" or ch == "\n" or ch == "\r") {
                 self.idx = self.idx + 1;
@@ -19,24 +22,34 @@ frame Parser {
         }
     }
 
+    /// Looks ahead at the next non-whitespace character without consuming it.
+    ///
+    /// @return Peeked character string, or empty string if at EOF.
     pub fn peek_char(): str {
         self.skip_whitespace();
         if (self.idx >= len(self.text)) return "";
         return _builtin_substring(self.text, self.idx, self.idx + 1);
     }
 
-    pub fn parse_node(): any {
+    /// Parses the next XML node (element, attributes, and children) at the current position.
+    ///
+    /// @return Parsed `Node`.
+    pub fn parse_node(): doc.Node {
+        var empty_keys: [str] = [];
+        var empty_vals: [str] = [];
+        var empty_kids: [any] = [];
+
         self.skip_whitespace();
         var length = len(self.text);
-        if (self.idx >= length) return nil;
+        if (self.idx >= length) return doc.make_node("", "", empty_keys, empty_vals, empty_kids);
 
         var open_ch = _builtin_substring(self.text, self.idx, self.idx + 1);
-        if (open_ch != "<") return nil;
+        if (open_ch != "<") return doc.make_node("", "", empty_keys, empty_vals, empty_kids);
         self.idx = self.idx + 1; // skip '<'
 
         var tag_start = self.idx;
         var find_tag_end = true;
-        while (self.idx < length and find_tag_end == true) {
+        while (self.idx < length and find_tag_end) {
             var ch = _builtin_substring(self.text, self.idx, self.idx + 1);
             if (ch == ">" or ch == " " or ch == "/" or ch == "\t") {
                 find_tag_end = false;
@@ -49,7 +62,7 @@ frame Parser {
         var keys: [str] = [];
         var vals: [str] = [];
         var parse_attrs = true;
-        while (self.idx < length and parse_attrs == true) {
+        while (self.idx < length and parse_attrs) {
             var ch = _builtin_substring(self.text, self.idx, self.idx + 1);
             if (ch == ">") {
                 self.idx = self.idx + 1; // skip '>'
@@ -57,13 +70,13 @@ frame Parser {
             } elif (ch == "/") {
                 self.idx = self.idx + 2; // skip '/>'
                 var kids: [any] = [];
-                return doc.make_node(tag_name, "", keys, vals, kids) as any;
+                return doc.make_node(tag_name, "", keys, vals, kids);
             } elif (ch == " " or ch == "\t" or ch == "\n" or ch == "\r") {
                 self.idx = self.idx + 1;
             } else {
                 var attr_key_start = self.idx;
                 var find_eq = true;
-                while (self.idx < length and find_eq == true) {
+                while (self.idx < length and find_eq) {
                     var cur_ch = _builtin_substring(self.text, self.idx, self.idx + 1);
                     if (cur_ch == "=") {
                         find_eq = false;
@@ -78,7 +91,7 @@ frame Parser {
                 self.idx = self.idx + 1; // skip quote
                 var attr_val_start = self.idx;
                 var find_quote = true;
-                while (self.idx < length and find_quote == true) {
+                while (self.idx < length and find_quote) {
                     var cur_ch = _builtin_substring(self.text, self.idx, self.idx + 1);
                     if (cur_ch == quote_ch) {
                         find_quote = false;
@@ -96,7 +109,7 @@ frame Parser {
 
         var text_start = self.idx;
         var find_tag_open = true;
-        while (self.idx < length and find_tag_open == true) {
+        while (self.idx < length and find_tag_open) {
             var ch = _builtin_substring(self.text, self.idx, self.idx + 1);
             if (ch == "<") {
                 find_tag_open = false;
@@ -113,15 +126,15 @@ frame Parser {
             }
             self.idx = self.idx + 1; // skip '>'
             var kids: [any] = [];
-            return doc.make_node(tag_name, inner_text, keys, vals, kids) as any;
+            return doc.make_node(tag_name, inner_text, keys, vals, kids);
         }
 
         var children: [any] = [];
         var parse_children = true;
-        while (self.idx < length and parse_children == true) {
+        while (self.idx < length and parse_children) {
             var child = self.parse_node();
-            if (child != nil) {
-                children.append(child);
+            if (len(child.name) > 0) {
+                children.append(child as any);
             }
             self.skip_whitespace();
             var close_slash = _builtin_substring(self.text, self.idx + 1, self.idx + 2);
@@ -135,11 +148,20 @@ frame Parser {
         }
         self.idx = self.idx + 1; // skip '>'
 
-        return doc.make_node(tag_name, inner_text, keys, vals, children) as any;
+        return doc.make_node(tag_name, inner_text, keys, vals, children);
     }
 }
 
+/// Parses an XML document string into a `Document` AST.
+///
+/// @param text XML document source text.
+/// @return Parsed `Document` instance.
+/// @example
+/// ```lymar
+/// var d = parser.parse("<user id=\"1\"><name>Alice</name></user>");
+/// ```
 pub fn parse(text: str): doc.Document {
+    contract(len(text) >= 0, "text must be a valid string");
     var p = Parser(idx=0, text=text);
     var root = p.parse_node();
     return doc.make_document(root);

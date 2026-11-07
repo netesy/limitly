@@ -1,17 +1,31 @@
-// Standard Library Random Distributions Submodule
+// std/random/distributions.lm
+// Statistical and uniform distributions.
 
 import std.random.random as r;
 
+/// Continuous uniform distribution over the real interval `[min_val, max_val)`.
+///
+/// @tip Useful for sampling values where all outcomes within the range have equal likelihood.
+///
+/// @param min_val Inclusive minimum value of the interval.
+/// @param max_val Exclusive maximum value of the interval.
 frame Uniform {
     pub var min_val: float;
     pub var max_val: float;
 
     pub init(min_val: float, max_val: float) {
+        contract(min_val <= max_val, "min_val must not be greater than max_val");
         self.min_val = min_val;
         self.max_val = max_val;
     }
 
+    /// Samples a value from the uniform distribution using the supplied RNG.
+    ///
+    /// @pre rng != nil
+    /// @param rng Random instance to sample from.
+    /// @return Sampled floating-point value.
     pub fn sample(rng: r.Random): float {
+        contract(rng != nil, "RNG instance must not be nil");
         return rng.range_float(self.min_val, self.max_val);
     }
 }

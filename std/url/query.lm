@@ -3,6 +3,19 @@
 
 import std.encoding.percent as percent;
 
+/// Manages structured URL query parameters as key-value pairs.
+///
+/// Supports duplicate keys, URL-encoding on serialization, and URL-decoding on parsing.
+///
+/// @tip Use `add` to retain duplicate parameter keys and `set` to replace existing keys.
+///
+/// @example
+/// import std.url.query as query;
+/// var qp = query.QueryParams();
+/// qp.set("format", "json");
+/// qp.add("filter", "active");
+/// qp.add("filter", "recent");
+/// print(qp.to_string()); // "format=json&filter=active&filter=recent"
 frame QueryParams {
     pub keys: [str];
     pub values: [str];
@@ -12,7 +25,13 @@ frame QueryParams {
         self.values = [] as [str];
     }
 
+    /// Retrieves the first value associated with the specified key.
+    ///
+    /// @pre len(key) > 0
+    /// @param key Query parameter name.
+    /// @return First matching parameter value, or empty string if not found.
     pub fn get(key: str): str {
+        contract(len(key) > 0, "Query key must not be empty");
         var i: int = 0;
         var length: int = len(self.keys);
         while (i < length) {
@@ -24,7 +43,13 @@ frame QueryParams {
         return "";
     }
 
+    /// Retrieves all values associated with the specified key.
+    ///
+    /// @pre len(key) > 0
+    /// @param key Query parameter name.
+    /// @return List of matching string values.
     pub fn get_all(key: str): [str] {
+        contract(len(key) > 0, "Query key must not be empty");
         var result: [str] = [] as [str];
         var i: int = 0;
         var length: int = len(self.keys);
@@ -37,7 +62,16 @@ frame QueryParams {
         return result;
     }
 
+    /// Sets or replaces the value for the given key.
+    ///
+    /// If the key exists, its first occurrence is updated and subsequent duplicates remain unmodified.
+    /// If the key does not exist, a new key-value entry is appended.
+    ///
+    /// @pre len(key) > 0
+    /// @param key Parameter name.
+    /// @param value New parameter value.
     pub fn set(key: str, value: str) {
+        contract(len(key) > 0, "Query key must not be empty");
         var i: int = 0;
         var length: int = len(self.keys);
         var found: bool = false;
@@ -54,12 +88,23 @@ frame QueryParams {
         }
     }
 
+    /// Appends a key-value pair without replacing any existing entries.
+    ///
+    /// @pre len(key) > 0
+    /// @param key Parameter name.
+    /// @param value Parameter value.
     pub fn add(key: str, value: str) {
+        contract(len(key) > 0, "Query key must not be empty");
         self.keys.append(key);
         self.values.append(value);
     }
 
+    /// Removes all occurrences of the specified key.
+    ///
+    /// @pre len(key) > 0
+    /// @param key Parameter name to remove.
     pub fn remove(key: str) {
+        contract(len(key) > 0, "Query key must not be empty");
         var new_keys: [str] = [] as [str];
         var new_values: [str] = [] as [str];
         var i: int = 0;
@@ -75,7 +120,13 @@ frame QueryParams {
         self.values = new_values;
     }
 
+    /// Checks whether the query collection contains the specified key.
+    ///
+    /// @pre len(key) > 0
+    /// @param key Parameter name to check.
+    /// @return True if key is present, false otherwise.
     pub fn has(key: str): bool {
+        contract(len(key) > 0, "Query key must not be empty");
         var i: int = 0;
         var length: int = len(self.keys);
         while (i < length) {
@@ -87,6 +138,9 @@ frame QueryParams {
         return false;
     }
 
+    /// Encodes parameters into a percent-encoded `application/x-www-form-urlencoded` query string.
+    ///
+    /// @return Formatted query string (without leading '?').
     pub fn to_string(): str {
         var result: str = "";
         var i: int = 0;
@@ -102,13 +156,24 @@ frame QueryParams {
     }
 }
 
+/// Parses an `application/x-www-form-urlencoded` query string into a `QueryParams` object.
+///
+/// Automatically decodes percent-encoded characters in keys and values.
+///
+/// @param qs Raw query string (without or with leading '?').
+/// @return Populated `QueryParams` instance.
 pub fn parse(qs: str): QueryParams {
     var qp = QueryParams();
     if (qs == "") {
         return qp;
     }
 
-    var pairs: [str] = split_str(qs, "&");
+    var clean_qs: str = qs;
+    if (_builtin_substring(clean_qs, 0, 1) == "?") {
+        clean_qs = _builtin_substring(clean_qs, 1, len(clean_qs));
+    }
+
+    var pairs: [str] = split_str(clean_qs, "&");
     var i: int = 0;
     while (i < len(pairs)) {
         var pair: str = pairs[i];
@@ -127,6 +192,10 @@ pub fn parse(qs: str): QueryParams {
     return qp;
 }
 
+/// Formats a `QueryParams` instance into a percent-encoded query string.
+///
+/// @param qp Parameters to serialize.
+/// @return Percent-encoded query string.
 pub fn build(qp: QueryParams): str {
     return qp.to_string();
 }

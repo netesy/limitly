@@ -1,9 +1,5 @@
-// Re-exports client, server, and router submodules.
-
-import std.http.common as common;
-import std.http.client as client;
-import std.http.server as server;
-import std.http.router as router;
+// std/http/index.lm
+// Clean, unified HTTP client, server, router, and protocol standard library facade.
 
 // Client
 pub import std.http.client show Client, Request, Response, get, post, put, delete;
@@ -17,7 +13,7 @@ pub import std.http.router show Route, Router, router, make_router;
 // Constants & Helpers
 pub import std.http.common show Method;
 pub import std.http.common show
-    status_text, is_success, is_redirect, is_client_error, is_server_error, is_error, is_valid_method,
+    method_name, status_text, is_success, is_redirect, is_client_error, is_server_error, is_error, is_valid_method,
     parse_status_line, parse_query_string, build_query_string, parse_cookies,
     STATUS_OK, STATUS_CREATED, STATUS_ACCEPTED, STATUS_NO_CONTENT,
     STATUS_MOVED_PERMANENTLY, STATUS_FOUND, STATUS_NOT_MODIFIED,

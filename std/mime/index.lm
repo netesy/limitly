@@ -5,22 +5,36 @@ import std.mime.types as types;
 
 pub import std.mime.types show Type, Params;
 
-pub fn Type(m: str, s: str, p: any, v: bool): types.Type {
-    return types.Type(m, s, p as types.Params, v);
-}
-
-pub fn Params(): types.Params {
-    return types.Params();
-}
-
+/// Parses a raw MIME / Content-Type string (e.g. "text/html; charset=utf-8").
+///
+/// @param mime_str Raw MIME string to parse.
+/// @return Parsed `Type` instance with components and parameters.
+/// @example
+/// ```lymar
+/// var m = mime.parse("application/json; charset=utf-8");
+/// if (m.is_valid and m.is_application()) {
+///     print("Valid application payload\n");
+/// }
+/// ```
 pub fn parse(mime_str: str): types.Type {
+    contract(len(mime_str) >= 0, "mime_str must be a valid string");
     return types.parse(mime_str);
 }
 
+/// Resolves a file extension to its standardized MIME type.
+///
+/// @param ext File extension with or without leading dot (e.g. `"html"` or `".json"`).
+/// @return Matching MIME type string, or `"application/octet-stream"` if unrecognized.
 pub fn extension_to_mime(ext: str): str {
+    contract(len(ext) > 0, "ext cannot be empty");
     return types.extension_to_mime(ext);
 }
 
+/// Resolves a MIME type string to its canonical file extension (including leading dot).
+///
+/// @param mime_str MIME type string (e.g. `"text/html"`).
+/// @return Canonical file extension with leading dot (e.g. `".html"`), or empty string if unrecognized.
 pub fn mime_to_extension(mime_str: str): str {
+    contract(len(mime_str) > 0, "mime_str cannot be empty");
     return types.mime_to_extension(mime_str);
 }

@@ -1,3 +1,4 @@
+// std/xml/index.lm
 // XML Module Gateway Index
 
 import std.xml.document as doc;
@@ -7,10 +8,23 @@ import std.xml.writer as writer;
 pub import std.xml.document show Node, Document;
 pub import std.xml.parser show Parser;
 
+/// Parses XML markup into a `Document` structure.
+///
+/// @param text XML source string to parse.
+/// @return Parsed `Document` AST.
+/// @example
+/// ```lymar
+/// var d = xml.parse("<root><item>Hello</item></root>");
+/// ```
 pub fn parse(text: str): doc.Document {
+    contract(len(text) >= 0, "text must be a valid string");
     return parser.parse(text);
 }
 
-pub fn stringify(node_val: any): str {
+/// Serializes an XML `Node` tree into formatted XML text.
+///
+/// @param node_val Node to serialize.
+/// @return Serialized XML string.
+pub fn stringify(node_val: doc.Node): str {
     return writer.stringify_node(node_val);
 }

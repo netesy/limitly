@@ -1,22 +1,40 @@
 // std/math/statistics.lm
-// Statistics submodule for std.math. Mathematical constants, arithmetic functions, trigonometry, and statistics.
+// Descriptive statistics including sum, arithmetic mean, median, variance, and standard deviation.
 
 import std.math.arithmetic as arith;
 
+/// Computes the sum of all numerical values in a collection.
+///
+/// @param items List of numerical values.
+/// @return Total sum as a 64-bit float.
 pub fn sum(items: [any]): float {
     var s = 0.0;
     for (var i = 0; i < len(items); i = i + 1) {
-        s = s + items[i] as float;
+        s = s + (items[i] as float);
     }
     return s;
 }
 
+/// Computes the arithmetic mean (average) of a collection of numbers.
+///
+/// @pre len(items) > 0
+/// @param items List of numerical values.
+/// @return Mean value, or 0.0 if collection is empty.
 pub fn mean(items: [any]): float {
+    contract(len(items) > 0, "Collection must not be empty");
     if (len(items) == 0) return 0.0;
     return sum(items) / (len(items) as float);
 }
 
+/// Computes the statistical median (middle value) of a collection.
+///
+/// Automatically creates an internal copy to perform sorting, leaving the input collection unmodified.
+///
+/// @pre len(items) > 0
+/// @param items List of numerical values.
+/// @return Median value.
 pub fn median(items: [any]): float {
+    contract(len(items) > 0, "Collection must not be empty");
     var n = len(items);
     if (n == 0) return 0.0;
 
@@ -46,7 +64,13 @@ pub fn median(items: [any]): float {
     }
 }
 
+/// Computes the population variance (σ²) of a collection of values.
+///
+/// @pre len(items) >= 2
+/// @param items List of numerical values.
+/// @return Population variance.
 pub fn variance(items: [any]): float {
+    contract(len(items) >= 2, "Variance requires at least two data points");
     var n = len(items);
     if (n < 2) return 0.0;
     var m = mean(items);
@@ -58,6 +82,12 @@ pub fn variance(items: [any]): float {
     return s / (n as float);
 }
 
+/// Computes the population standard deviation (σ = √variance) of a collection.
+///
+/// @pre len(items) >= 2
+/// @param items List of numerical values.
+/// @return Population standard deviation.
 pub fn stddev(items: [any]): float {
+    contract(len(items) >= 2, "Standard deviation requires at least two data points");
     return arith.sqrt(variance(items));
 }

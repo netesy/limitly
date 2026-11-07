@@ -1,52 +1,62 @@
-// std/sort/index.lm
-// Public entrypoint and facade for std.sort. Sorting algorithms: quicksort, mergesort, heapsort, and timsort.
+// Standard Library Sort Module
+//
+// Sorting algorithms and ordering utilities: quicksort, mergesort, heapsort, timsort, and counting sort.
 
 pub import std.types show Ordering;
-// std/sort/index.lm
-// Sorting algorithms and utilities
 
 import std.algorithm.sort as s;
 
+/// Sorts a sequence using insertion sort algorithm.
 pub fn insertion_sort(items: [any], descending: bool = false, cmp: fn(any, any): int = nil) {
     s.insertion_sort(items, descending, cmp);
 }
 
+/// Sorts a sequence in-place using quicksort.
 pub fn quicksort(items: [any], descending: bool = false, cmp: fn(any, any): int = nil) {
     s.quicksort(items, descending, cmp);
 }
 
+/// Sorts a sequence using mergesort algorithm.
 pub fn mergesort(items: [any], descending: bool = false, cmp: fn(any, any): int = nil) {
     s.mergesort(items, descending, cmp);
 }
 
+/// Sorts a sequence using heapsort.
 pub fn heapsort(items: [any], descending: bool = false, cmp: fn(any, any): int = nil) {
     s.heapsort(items, descending, cmp);
 }
 
+/// Sorts an integer list using counting sort.
 pub fn counting_sort(items: [int], descending: bool = false) {
     s.counting_sort(items, descending);
 }
 
+/// Sorts an integer list using radix sort.
 pub fn radix_sort(items: [int], descending: bool = false) {
     s.radix_sort(items, descending);
 }
 
+/// Sorts a sequence using adaptive timsort.
 pub fn timsort(items: [any], descending: bool = false, cmp: fn(any, any): int = nil) {
     s.timsort(items, descending, cmp);
 }
 
+/// Stable-sorts a sequence preserving relative order of equivalent items.
 pub fn stable_sort(items: [any], descending: bool = false, cmp: fn(any, any): int = nil) {
     s.stable_sort(items, descending, cmp);
 }
 
+/// Sorts the first `count` elements of a sequence.
 pub fn partial_sort(items: [any], count: int, descending: bool = false, cmp: fn(any, any): int = nil) {
     s.partial_sort(items, count, descending, cmp);
 }
 
+/// Default high-performance sequence sorting function.
 pub fn sort(items: [any], descending: bool = false, cmp: fn(any, any): int = nil) {
     s.sort(items, descending, cmp);
 }
 
-pub fn compare(a: any, b: any): Ordering {
+/// Compares two elements and returns their Ordering relation.
+pub fn compare(a, b): Ordering {
     return s.compare_ordering(a, b);
 }

@@ -2,8 +2,14 @@
 // Scene Builder submodule for std.scene. Scene graph nodes, 2D/3D scene trees, and transformation hierarchies.
 
 import std.scene.scene as scene;
-import std.scene.node as node;
 
+/// Fluent builder for constructing and composing hierarchical scenes.
+///
+/// @example
+/// ```lymar
+/// var b = Builder();
+/// var s = b.build();
+/// ```
 frame Builder {
     pub var active_scene: scene.Scene;
 
@@ -11,6 +17,9 @@ frame Builder {
         self.active_scene = s;
     }
 
+    /// Finalizes construction and returns the built scene instance.
+    ///
+    /// @return Built Scene instance.
     pub fn build(): scene.Scene {
         return self.active_scene;
     }

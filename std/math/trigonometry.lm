@@ -1,15 +1,27 @@
 // std/math/trigonometry.lm
-// Trigonometry submodule for std.math. Mathematical constants, arithmetic functions, trigonometry, and statistics.
+// Trigonometric and hyperbolic functions with angle reduction and Taylor series expansion.
 
 import std.math.constants as const;
 import std.math.arithmetic as arith;
 
+/// Wrapper providing trigonometric and hyperbolic evaluations for angles in radians.
+///
+/// Implements argument reduction modulo 2π and rapid Taylor/Maclaurin series convergence.
+///
+/// @example
+/// import std.math.trigonometry as trig;
+/// var tf = trig.TrigFloat(3.14159265 / 2.0);
+/// print(tf.sin()); // ~1.0
 frame TrigFloat {
     pub var value: float;
+
     pub init(value: float) {
         self.value = value;
     }
 
+    /// Computes the sine of the angle in radians.
+    ///
+    /// @return Sine value in range [-1.0, 1.0].
     pub fn sin(): float {
         var x = self.normalize_angle();
         var sum = 0.0;
@@ -24,6 +36,9 @@ frame TrigFloat {
         return sum;
     }
 
+    /// Computes the cosine of the angle in radians.
+    ///
+    /// @return Cosine value in range [-1.0, 1.0].
     pub fn cos(): float {
         var x = self.normalize_angle();
         var sum = 0.0;
@@ -38,9 +53,19 @@ frame TrigFloat {
         return sum;
     }
 
-    pub fn tan(): float { return self.sin() / self.cos(); }
+    /// Computes the tangent of the angle in radians (`sin / cos`).
+    ///
+    /// @return Tangent value.
+    pub fn tan(): float {
+        return self.sin() / self.cos();
+    }
 
+    /// Computes the arcsine (inverse sine) in radians.
+    ///
+    /// @pre self.value >= -1.0 and self.value <= 1.0
+    /// @return Angle in radians in range [-π/2, π/2], or NAN if out of domain.
     pub fn asin(): float {
+        contract(self.value >= -1.0 and self.value <= 1.0, "Input to asin must be in [-1.0, 1.0]");
         if (self.value < -1.0 or self.value > 1.0) return const.NAN;
         var x = self.value;
         var sum = x;
@@ -56,8 +81,18 @@ frame TrigFloat {
         return sum;
     }
 
-    pub fn acos(): float { return const.PI / 2.0 - self.asin(); }
+    /// Computes the arccosine (inverse cosine) in radians.
+    ///
+    /// @pre self.value >= -1.0 and self.value <= 1.0
+    /// @return Angle in radians in range [0, π].
+    pub fn acos(): float {
+        contract(self.value >= -1.0 and self.value <= 1.0, "Input to acos must be in [-1.0, 1.0]");
+        return const.PI / 2.0 - self.asin();
+    }
 
+    /// Computes the arctangent (inverse tangent) in radians.
+    ///
+    /// @return Angle in radians in range (-π/2, π/2).
     pub fn atan(): float {
         var x = self.value;
         if (arith.abs(x) > 1.0) {
@@ -77,6 +112,10 @@ frame TrigFloat {
         return sum;
     }
 
+    /// Computes the four-quadrant arctangent atan2(y, x).
+    ///
+    /// @param x Horizontal Cartesian coordinate.
+    /// @return Angle in radians in range (-π, π].
     pub fn atan2(x: float): float {
         var y = self.value;
         if (x > 0.0) return TrigFloat(y / x).atan();
@@ -87,16 +126,25 @@ frame TrigFloat {
         return 0.0;
     }
 
+    /// Computes the hyperbolic sine sinh(x) = (e^x - e^-x) / 2.
+    ///
+    /// @return Hyperbolic sine.
     pub fn sinh(): float {
         var e = arith.exp(self.value);
         return (e - 1.0 / e) / 2.0;
     }
 
+    /// Computes the hyperbolic cosine cosh(x) = (e^x + e^-x) / 2.
+    ///
+    /// @return Hyperbolic cosine.
     pub fn cosh(): float {
         var e = arith.exp(self.value);
         return (e + 1.0 / e) / 2.0;
     }
 
+    /// Computes the hyperbolic tangent tanh(x) = sinh(x) / cosh(x).
+    ///
+    /// @return Hyperbolic tangent in range (-1.0, 1.0).
     pub fn tanh(): float {
         var e = arith.exp(2.0 * self.value);
         return (e - 1.0) / (e + 1.0);
@@ -110,14 +158,87 @@ frame TrigFloat {
     }
 }
 
-pub fn sin(x: float): float { return TrigFloat(x).sin(); }
-pub fn cos(x: float): float { return TrigFloat(x).cos(); }
-pub fn tan(x: float): float { return TrigFloat(x).tan(); }
-pub fn asin(x: float): float { return TrigFloat(x).asin(); }
-pub fn acos(x: float): float { return TrigFloat(x).acos(); }
-pub fn atan(x: float): float { return TrigFloat(x).atan(); }
-pub fn atan2(y: float, x: float): float { return TrigFloat(y).atan2(x); }
+/// Computes the sine of an angle in radians.
+///
+/// @param x Angle in radians.
+/// @return Sine value.
+pub fn sin(x: float): float {
+    return TrigFloat(x).sin();
+}
 
-pub fn sinh(x: float): float { return TrigFloat(x).sinh(); }
-pub fn cosh(x: float): float { return TrigFloat(x).cosh(); }
-pub fn tanh(x: float): float { return TrigFloat(x).tanh(); }
+/// Computes the cosine of an angle in radians.
+///
+/// @param x Angle in radians.
+/// @return Cosine value.
+pub fn cos(x: float): float {
+    return TrigFloat(x).cos();
+}
+
+/// Computes the tangent of an angle in radians.
+///
+/// @param x Angle in radians.
+/// @return Tangent value.
+pub fn tan(x: float): float {
+    return TrigFloat(x).tan();
+}
+
+/// Computes the arcsine in radians.
+///
+/// @pre x >= -1.0 and x <= 1.0
+/// @param x Value in domain [-1.0, 1.0].
+/// @return Angle in radians.
+pub fn asin(x: float): float {
+    contract(x >= -1.0 and x <= 1.0, "Input to asin must be in [-1.0, 1.0]");
+    return TrigFloat(x).asin();
+}
+
+/// Computes the arccosine in radians.
+///
+/// @pre x >= -1.0 and x <= 1.0
+/// @param x Value in domain [-1.0, 1.0].
+/// @return Angle in radians.
+pub fn acos(x: float): float {
+    contract(x >= -1.0 and x <= 1.0, "Input to acos must be in [-1.0, 1.0]");
+    return TrigFloat(x).acos();
+}
+
+/// Computes the arctangent in radians.
+///
+/// @param x Input float.
+/// @return Angle in radians.
+pub fn atan(x: float): float {
+    return TrigFloat(x).atan();
+}
+
+/// Computes the four-quadrant angle between positive x-axis and point (x, y).
+///
+/// @param y Vertical coordinate.
+/// @param x Horizontal coordinate.
+/// @return Angle in radians in range (-π, π].
+pub fn atan2(y: float, x: float): float {
+    return TrigFloat(y).atan2(x);
+}
+
+/// Computes the hyperbolic sine.
+///
+/// @param x Input float.
+/// @return Hyperbolic sine.
+pub fn sinh(x: float): float {
+    return TrigFloat(x).sinh();
+}
+
+/// Computes the hyperbolic cosine.
+///
+/// @param x Input float.
+/// @return Hyperbolic cosine.
+pub fn cosh(x: float): float {
+    return TrigFloat(x).cosh();
+}
+
+/// Computes the hyperbolic tangent.
+///
+/// @param x Input float.
+/// @return Hyperbolic tangent.
+pub fn tanh(x: float): float {
+    return TrigFloat(x).tanh();
+}

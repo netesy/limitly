@@ -6,66 +6,194 @@ import std.crypto.hmac as hmac;
 import std.crypto.cipher as cipher;
 import std.crypto.random as random;
 
-pub import std.crypto.hash show HashAlgorithm;
+pub import std.crypto.hash show HashAlgorithm, Hasher;
+pub import std.crypto.cipher show GcmCipher;
 
 // ── Re-exports: Hashing ────────────────────────────────────────────────────
-pub fn Hasher(algo: any = "sha256"): hash.Hasher {
-    return hash.Hasher(algo);
-}
 
-pub fn hash(algo: any, data: str): str {
+/// Calculates a one-shot cryptographic hash of input data using the specified algorithm.
+///
+/// @param algo Algorithm (`HashAlgorithm` enum or string identifier e.g. `"sha256"`).
+/// @param data String data to hash.
+/// @return Hex-encoded digest string.
+/// @example
+/// ```lymar
+/// var digest = crypto.hash("sha256", "data");
+/// ```
+pub fn hash(algo, data: str): str {
+    contract(len(data) >= 0, "data must be a valid string");
     return hash.hash(algo, data);
 }
 
-pub fn sha256(data: str): str { return hash.sha256(data); }
-pub fn sha512(data: str): str { return hash.sha512(data); }
-pub fn sha384(data: str): str { return hash.sha384(data); }
-pub fn sha1(data: str): str   { return hash.sha1(data); }
-pub fn md5(data: str): str    { return hash.md5(data); }
+/// Computes SHA-256 hexadecimal digest of input data.
+///
+/// @param data Plain text or binary string to hash.
+/// @return 64-character lowercase hex digest string.
+pub fn sha256(data: str): str {
+    contract(len(data) >= 0, "data must be a valid string");
+    return hash.sha256(data);
+}
+
+/// Computes SHA-512 hexadecimal digest of input data.
+///
+/// @param data Plain text or binary string to hash.
+/// @return 128-character lowercase hex digest string.
+pub fn sha512(data: str): str {
+    contract(len(data) >= 0, "data must be a valid string");
+    return hash.sha512(data);
+}
+
+/// Computes SHA-384 hexadecimal digest of input data.
+///
+/// @param data Plain text or binary string to hash.
+/// @return 96-character lowercase hex digest string.
+pub fn sha384(data: str): str {
+    contract(len(data) >= 0, "data must be a valid string");
+    return hash.sha384(data);
+}
+
+/// Computes legacy SHA-1 hexadecimal digest of input data.
+///
+/// @warning SHA-1 is cryptographically broken; prefer SHA-256 for secure hashing.
+/// @param data Plain text or binary string to hash.
+/// @return 40-character lowercase hex digest string.
+pub fn sha1(data: str): str {
+    contract(len(data) >= 0, "data must be a valid string");
+    return hash.sha1(data);
+}
+
+/// Computes legacy MD5 hexadecimal digest of input data.
+///
+/// @warning MD5 is cryptographically broken; use only for legacy compatibility or checksums.
+/// @param data Plain text or binary string to hash.
+/// @return 32-character lowercase hex digest string.
+pub fn md5(data: str): str {
+    contract(len(data) >= 0, "data must be a valid string");
+    return hash.md5(data);
+}
 
 // ── Re-exports: HMAC ───────────────────────────────────────────────────────
+
+/// Computes an HMAC signature using a chosen digest algorithm.
+///
+/// @param algo Digest algorithm (e.g. `"sha256"`, `"sha512"`).
+/// @param key Secret key string.
+/// @param data Message payload to authenticate.
+/// @return Hexadecimal HMAC signature.
 pub fn hmac(algo: str, key: str, data: str): str {
+    contract(len(algo) > 0, "algo cannot be empty");
+    contract(len(key) > 0, "key cannot be empty");
     return hmac.hmac(algo, key, data);
 }
 
+/// Computes an HMAC-SHA256 signature for message authentication.
+///
+/// @param key Secret key string.
+/// @param data Message payload to authenticate.
+/// @return 64-character lowercase hex HMAC signature.
 pub fn hmac_sha256(key: str, data: str): str {
+    contract(len(key) > 0, "key cannot be empty");
     return hmac.sha256(key, data);
 }
 
+/// Computes an HMAC-SHA512 signature for high-security message authentication.
+///
+/// @param key Secret key string.
+/// @param data Message payload to authenticate.
+/// @return 128-character lowercase hex HMAC signature.
 pub fn hmac_sha512(key: str, data: str): str {
+    contract(len(key) > 0, "key cannot be empty");
     return hmac.sha512(key, data);
 }
 
 // ── Re-exports: AES Ciphers (AEAD GCM & CBC) ──────────────────────────────
+
+/// Encrypts plaintext using authenticated AES-GCM (Galois/Counter Mode).
+///
+/// @param key Hex-encoded AES key (16, 24, or 32 bytes for AES-128/192/256).
+/// @param iv Hex-encoded initialization vector (typically 12 bytes / 24 hex characters).
+/// @param plaintext Plain text data to encrypt.
+/// @param aad Optional additional authenticated data.
+/// @return Fallible `GcmCipher` structure containing ciphertext and authentication tag.
 pub fn encrypt_gcm(key: str, iv: str, plaintext: str, aad: str = ""): cipher.GcmCipher? {
+    contract(len(key) > 0, "key cannot be empty");
+    contract(len(iv) > 0, "iv cannot be empty");
     return cipher.encrypt_gcm(key, iv, plaintext, aad);
 }
 
+/// Decrypts and authenticates AES-GCM ciphertext using the provided authentication tag.
+///
+/// @param key Hex-encoded AES key.
+/// @param iv Hex-encoded initialization vector.
+/// @param ciphertext Hex-encoded ciphertext payload.
+/// @param tag Hex-encoded 16-byte authentication tag.
+/// @param aad Optional additional authenticated data matching encryption.
+/// @return Fallible decrypted plaintext string.
 pub fn decrypt_gcm(key: str, iv: str, ciphertext: str, tag: str, aad: str = ""): str? {
+    contract(len(key) > 0, "key cannot be empty");
+    contract(len(iv) > 0, "iv cannot be empty");
+    contract(len(tag) > 0, "tag cannot be empty");
     return cipher.decrypt_gcm(key, iv, ciphertext, tag, aad);
 }
 
+/// Encrypts plaintext using AES in CBC mode with PKCS#7 padding.
+///
+/// @param key Hex-encoded AES key.
+/// @param iv Hex-encoded 16-byte initialization vector.
+/// @param plaintext Plain text data to encrypt.
+/// @return Fallible hex-encoded ciphertext.
 pub fn encrypt_cbc(key: str, iv: str, plaintext: str): str? {
+    contract(len(key) > 0, "key cannot be empty");
+    contract(len(iv) > 0, "iv cannot be empty");
     return cipher.encrypt_cbc(key, iv, plaintext);
 }
 
+/// Decrypts hex-encoded AES-CBC ciphertext with PKCS#7 unpadding.
+///
+/// @param key Hex-encoded AES key.
+/// @param iv Hex-encoded 16-byte initialization vector.
+/// @param ciphertext Hex-encoded ciphertext to decrypt.
+/// @return Fallible decrypted plaintext string.
 pub fn decrypt_cbc(key: str, iv: str, ciphertext: str): str? {
+    contract(len(key) > 0, "key cannot be empty");
+    contract(len(iv) > 0, "iv cannot be empty");
     return cipher.decrypt_cbc(key, iv, ciphertext);
 }
 
 // ── Re-exports: Secure Random ──────────────────────────────────────────────
+
+/// Generates cryptographically secure random bytes formatted as a lowercase hex string.
+///
+/// @param num_bytes Number of random bytes to generate.
+/// @return Hex string of length `num_bytes * 2`.
 pub fn random_hex(num_bytes: int): str {
+    contract(num_bytes > 0, "num_bytes must be positive");
     return random.random_hex(num_bytes);
 }
 
+/// Generates a RFC 4122 Version 4 random UUID string.
+///
+/// @return Formatted UUID string (e.g. `"f47ac10b-58cc-4372-a567-0e02b2c3d479"`).
 pub fn uuid(): str {
     return random.uuid();
 }
 
+/// Generates a cryptographically secure random integer within `[min, max]`.
+///
+/// @param min Minimum inclusive bound.
+/// @param max Maximum inclusive bound.
+/// @return Random integer `n` such that `min <= n <= max`.
 pub fn random_int(min: int, max: int): int {
+    contract(min <= max, "min must be less than or equal to max");
     return random.random_int(min, max);
 }
 
+/// Generates a cryptographically secure random string of given length using a character set.
+///
+/// @param length Number of characters to generate.
+/// @param alphabet Character set to sample from (default: alphanumeric).
+/// @return Secure random string.
 pub fn random_string(length: int, alphabet: str = ""): str {
+    contract(length >= 0, "length must be non-negative");
     return random.random_string(length, alphabet);
 }

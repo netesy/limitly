@@ -5,13 +5,6 @@ import std.compress.zlib as zlib;
 
 pub import std.compress.zlib show Zlib;
 
-/// Creates a new Zlib instance for streaming and block compression.
-///
-/// @tip Preferred for namespace-style usage: `var z = compress.Zlib();`
-pub fn Zlib(): zlib.Zlib {
-    return zlib.Zlib();
-}
-
 /// Compresses an input string into deflate hex representation.
 ///
 /// @tip Recommended level 6 for best compression ratio vs performance.

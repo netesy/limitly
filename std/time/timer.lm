@@ -2,6 +2,7 @@
 
 import std.time.instant as inst;
 import std.time.duration as dur;
+pub import std.time.duration show Duration;
 
 frame Timer {
     pub start_time: inst.Instant;

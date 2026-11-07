@@ -1,6 +1,7 @@
 // std/mime/types.lm
 // Types submodule for std.mime. MIME type registry and content-type detection.
 
+/// Key-value parameters associated with a MIME type (e.g., `charset=utf-8`).
 frame Params {
     pub keys: [str];
     pub values: [str];
@@ -10,6 +11,10 @@ frame Params {
         self.values = [] as [str];
     }
 
+    /// Retrieves a parameter value by case-sensitive key name.
+    ///
+    /// @param key Parameter key to look up.
+    /// @return Associated value string, or empty string if not present.
     pub fn get(key: str): str {
         var i: int = 0;
         var length: int = len(self.keys);
@@ -22,7 +27,12 @@ frame Params {
         return "";
     }
 
+    /// Sets or updates a parameter key-value pair.
+    ///
+    /// @param key Parameter name.
+    /// @param value Parameter value.
     pub fn set(key: str, value: str) {
+        contract(len(key) > 0, "key cannot be empty");
         var i: int = 0;
         var length: int = len(self.keys);
         var found: bool = false;
@@ -39,6 +49,10 @@ frame Params {
         }
     }
 
+    /// Checks if a parameter key exists in this collection.
+    ///
+    /// @param key Parameter name to check.
+    /// @return `true` if key exists, `false` otherwise.
     pub fn has(key: str): bool {
         var i: int = 0;
         var length: int = len(self.keys);
@@ -51,12 +65,21 @@ frame Params {
         return false;
     }
 
+    /// Appends a parameter pair without checking for duplicates.
+    ///
+    /// @param key Parameter name.
+    /// @param value Parameter value.
     pub fn add(key: str, value: str) {
+        contract(len(key) > 0, "key cannot be empty");
         self.keys.append(key);
         self.values.append(value);
     }
 
+    /// Removes a parameter by key name if present.
+    ///
+    /// @param key Parameter name to remove.
     pub fn remove(key: str) {
+        contract(len(key) > 0, "key cannot be empty");
         var new_keys: [str] = [] as [str];
         var new_values: [str] = [] as [str];
         var i: int = 0;
@@ -72,6 +95,9 @@ frame Params {
         self.values = new_values;
     }
 
+    /// Serializes parameters to a semicolon-delimited string (e.g. `; charset=utf-8`).
+    ///
+    /// @return Formatted parameter suffix string.
     pub fn to_string(): str {
         var result: str = "";
         var i: int = 0;
@@ -84,6 +110,7 @@ frame Params {
     }
 }
 
+/// Represents a parsed MIME media type with main type, subtype, and parameters.
 frame Type {
     pub is_valid: bool;
     pub main_type: str;
@@ -97,6 +124,9 @@ frame Type {
         self.subtype = s;
     }
 
+    /// Serializes this MIME type back to standardized format (e.g. `"text/html; charset=utf-8"`).
+    ///
+    /// @return Formatted MIME type string, or empty string if invalid.
     pub fn to_string(): str {
         if (not self.is_valid) {
             return "";
@@ -104,28 +134,48 @@ frame Type {
         return self.main_type + "/" + self.subtype + self.params.to_string();
     }
 
+    /// Checks if this is a textual media type (`text/*`).
+    ///
+    /// @return `true` if main type is "text", `false` otherwise.
     pub fn is_text(): bool {
         return self.main_type == "text";
     }
 
+    /// Checks if this is an image media type (`image/*`).
+    ///
+    /// @return `true` if main type is "image", `false` otherwise.
     pub fn is_image(): bool {
         return self.main_type == "image";
     }
 
+    /// Checks if this is an audio media type (`audio/*`).
+    ///
+    /// @return `true` if main type is "audio", `false` otherwise.
     pub fn is_audio(): bool {
         return self.main_type == "audio";
     }
 
+    /// Checks if this is a video media type (`video/*`).
+    ///
+    /// @return `true` if main type is "video", `false` otherwise.
     pub fn is_video(): bool {
         return self.main_type == "video";
     }
 
+    /// Checks if this is an application media type (`application/*`).
+    ///
+    /// @return `true` if main type is "application", `false` otherwise.
     pub fn is_application(): bool {
         return self.main_type == "application";
     }
 }
 
+/// Parses a raw MIME / Content-Type string into structured `Type`.
+///
+/// @param mime_str Raw MIME string (e.g. `"text/html; charset=utf-8"`).
+/// @return Parsed `Type` structure.
 pub fn parse(mime_str: str): Type {
+    contract(len(mime_str) >= 0, "mime_str must be a valid string");
     var s = trim(mime_str);
     if (s == "") {
         return Type("", "", Params(), false);
@@ -170,7 +220,12 @@ pub fn parse(mime_str: str): Type {
     return Type(main_type, subtype, params, true);
 }
 
+/// Maps a file extension to its corresponding MIME type.
+///
+/// @param ext File extension (e.g. `"html"` or `".png"`).
+/// @return Matching MIME type string, or `"application/octet-stream"` if unknown.
 pub fn extension_to_mime(ext: str): str {
+    contract(len(ext) > 0, "ext cannot be empty");
     var clean_ext = to_lower(trim(ext));
     if (len(clean_ext) > 0 and _builtin_substring(clean_ext, 0, 1) == ".") {
         clean_ext = _builtin_substring(clean_ext, 1, len(clean_ext));
@@ -199,7 +254,12 @@ pub fn extension_to_mime(ext: str): str {
     return "application/octet-stream";
 }
 
+/// Maps a MIME type string to its canonical file extension (including leading dot).
+///
+/// @param mime_str MIME type string (e.g. `"text/html"`).
+/// @return File extension starting with dot, or empty string if unknown.
 pub fn mime_to_extension(mime_str: str): str {
+    contract(len(mime_str) > 0, "mime_str cannot be empty");
     var parsed = parse(mime_str);
     if (not parsed.is_valid) {
         return "";

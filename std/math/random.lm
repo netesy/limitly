@@ -1,8 +1,18 @@
 // std/math/random.lm
-// Random submodule for std.math. Mathematical constants, arithmetic functions, trigonometry, and statistics.
+// Pseudorandom and entropy-backed number generation for mathematical simulations.
 
 import std.resource as res;
 
+/// Lightweight pseudorandom number generator using a 64-bit linear/xorshift sequence.
+///
+/// Suitable for non-cryptographic simulations, games, and randomized algorithms.
+///
+/// @tip For cryptographic keys or tokens, use `SecureRandom` or `std.random.SecureRandom`.
+///
+/// @example
+/// import std.math.random as random;
+/// var rng = random.Random(42);
+/// print(rng.next_int());
 frame Random {
     var state: int;
 
@@ -30,6 +40,9 @@ frame Random {
         }
     }
 
+    /// Generates the next pseudorandom 64-bit integer.
+    ///
+    /// @return Generated integer.
     pub fn next_int(): int {
         var x = self.state;
         x = x ^ (x << 13);
@@ -39,24 +52,54 @@ frame Random {
         return x * 0x2545F4914F6CDD1D;
     }
 
+    /// Generates a pseudorandom float uniformly distributed in [0.0, 1.0).
+    ///
+    /// @return Generated float.
     pub fn next_float(): float {
         var i = self.next_int();
         if (i < 0) i = -i;
         return (i % 1000000000 as float) / 1000000000.0;
     }
 
-    pub fn next_bool(): bool { return self.next_int() % 2 == 0; }
+    /// Generates a pseudorandom boolean value.
+    ///
+    /// @return Random boolean flag.
+    pub fn next_bool(): bool {
+        return self.next_int() % 2 == 0;
+    }
 
+    /// Generates a random integer within the half-open range [min, max).
+    ///
+    /// @pre min <= max
+    /// @param min Inclusive lower bound.
+    /// @param max Exclusive upper bound.
+    /// @return Uniform random integer.
     pub fn range_int(min: int, max: int): int {
+        contract(min <= max, "Minimum bound must not exceed maximum bound");
         if (min >= max) return min;
         var r = self.next_int();
         if (r < 0) r = -r;
         return min + (r % (max - min));
     }
 
-    pub fn range_float(min: float, max: float): float { return min + (max - min) * self.next_float(); }
+    /// Generates a random float within the range [min, max].
+    ///
+    /// @pre min <= max
+    /// @param min Inclusive lower bound.
+    /// @param max Inclusive upper bound.
+    /// @return Uniform random float.
+    pub fn range_float(min: float, max: float): float {
+        contract(min <= max, "Minimum bound must not exceed maximum bound");
+        return min + (max - min) * self.next_float();
+    }
 
+    /// Generates a list of random byte values in range [0, 255].
+    ///
+    /// @pre count >= 0
+    /// @param count Number of bytes to generate.
+    /// @return List of random byte integers.
     pub fn next_bytes(count: int): [int] {
+        contract(count >= 0, "Byte count must be non-negative");
         var res_bytes: [int] = [];
         for (var i = 0; i < count; i = i + 1) {
             var b = self.next_int();
@@ -66,17 +109,25 @@ frame Random {
         return res_bytes;
     }
 
+    /// Generates a random alphanumeric or custom string.
+    ///
+    /// @pre len_val >= 0
+    /// @param len_val Desired string length.
+    /// @param alphabet Character pool to sample from.
+    /// @return Generated string.
     pub fn next_string(len_val: int, alphabet: str = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"): str {
+        contract(len_val >= 0, "String length must be non-negative");
         var res_str = "";
         var a_len = len(alphabet);
         for (var i = 0; i < len_val; i = i + 1) {
             var idx = self.range_int(min=0, max=a_len);
-            res_str = res_str + substring(alphabet, idx, idx + 1);
+            res_str = res_str + _builtin_substring(alphabet, idx, idx + 1);
         }
         return res_str;
     }
 }
 
+/// Cryptographically secure entropy-backed random number generator.
 frame SecureRandom {
     var reader: res.Reader?;
 
@@ -93,6 +144,9 @@ frame SecureRandom {
         }
     }
 
+    /// Generates a secure random 64-bit integer.
+    ///
+    /// @return Entropy-backed integer.
     pub fn next_int(): int {
         match (self.reader) {
             val rd => {
@@ -104,13 +158,22 @@ frame SecureRandom {
         }
     }
 
+    /// Generates a secure random float in range [0.0, 1.0).
+    ///
+    /// @return Uniform random float.
     pub fn next_float(): float {
         var i = self.next_int();
         if (i < 0) i = -i;
         return (i % 1000000000 as float) / 1000000000.0;
     }
 
+    /// Generates entropy-backed random bytes.
+    ///
+    /// @pre count >= 0
+    /// @param count Number of bytes to generate.
+    /// @return List of random byte integers.
     pub fn next_bytes(count: int): [int] {
+        contract(count >= 0, "Byte count must be non-negative");
         var res_bytes: [int] = [];
         for (var i = 0; i < count; i = i + 1) {
             var b = self.next_int();
@@ -123,8 +186,51 @@ frame SecureRandom {
 
 var _default_rng: Random = Random(seed=123456789);
 
-pub fn random_int(min: int, max: int): int { return _default_rng.range_int(min=min, max=max); }
-pub fn random_float(min: float, max: float): float { return _default_rng.range_float(min=min, max=max); }
-pub fn random_bool(): bool { return _default_rng.next_bool(); }
-pub fn random_bytes(count: int): [int] { return _default_rng.next_bytes(count=count); }
-pub fn random_string(len_val: int): str { return _default_rng.next_string(len_val=len_val); }
+/// Generates a random integer in range [min, max) using the default PRNG.
+///
+/// @pre min <= max
+/// @param min Inclusive minimum bound.
+/// @param max Exclusive maximum bound.
+/// @return Generated integer.
+pub fn random_int(min: int, max: int): int {
+    contract(min <= max, "Minimum bound must not exceed maximum bound");
+    return _default_rng.range_int(min=min, max=max);
+}
+
+/// Generates a random float in range [min, max] using the default PRNG.
+///
+/// @pre min <= max
+/// @param min Inclusive minimum bound.
+/// @param max Inclusive maximum bound.
+/// @return Generated float.
+pub fn random_float(min: float, max: float): float {
+    contract(min <= max, "Minimum bound must not exceed maximum bound");
+    return _default_rng.range_float(min=min, max=max);
+}
+
+/// Generates a random boolean flag using the default PRNG.
+///
+/// @return Random boolean.
+pub fn random_bool(): bool {
+    return _default_rng.next_bool();
+}
+
+/// Generates a list of random byte integers using the default PRNG.
+///
+/// @pre count >= 0
+/// @param count Number of bytes.
+/// @return List of random bytes.
+pub fn random_bytes(count: int): [int] {
+    contract(count >= 0, "Byte count must be non-negative");
+    return _default_rng.next_bytes(count=count);
+}
+
+/// Generates a random alphanumeric string of length `len_val` using the default PRNG.
+///
+/// @pre len_val >= 0
+/// @param len_val Desired string length.
+/// @return Random alphanumeric string.
+pub fn random_string(len_val: int): str {
+    contract(len_val >= 0, "String length must be non-negative");
+    return _default_rng.next_string(len_val=len_val);
+}

@@ -1,7 +1,9 @@
-// Standard Library Inter-Process Pipe Stream Module
+// std/process/pipe.lm
+// Inter-process pipe streams and unidirectional I/O channels.
 
 import std.resource as res;
 
+/// Reader endpoint of an inter-process pipe.
 frame PipeReader {
     pub var resource: res.Resource;
 
@@ -9,13 +11,22 @@ frame PipeReader {
         self.resource = r;
     }
 
+    /// Reads up to `buffer_size` bytes from the pipe as a string.
+    ///
+    /// @pre buffer_size > 0
+    /// @param buffer_size Maximum bytes to read.
+    /// @return String content read, or empty string on EOF/error.
     pub fn read(buffer_size: int = 1024): str {
+        contract(buffer_size > 0, "Buffer size must be positive");
         if (!self.resource.is_open()) return "";
         var result = res._call(self.resource.handle, res.OP_READ, [buffer_size]);
         if (result == nil) return "";
         return result as str;
     }
 
+    /// Reads all remaining data from the pipe until EOF.
+    ///
+    /// @return Complete accumulated content string.
     pub fn read_all(): str {
         var total = "";
         var keep_reading = true;
@@ -30,6 +41,9 @@ frame PipeReader {
         return total;
     }
 
+    /// Reads a single newline-terminated line from the pipe.
+    ///
+    /// @return Line text without trailing newline.
     pub fn read_line(): str {
         var line = "";
         var keep_reading = true;
@@ -46,10 +60,14 @@ frame PipeReader {
         return line;
     }
 
+    /// Checks if the read end of the pipe remains open.
+    ///
+    /// @return True if open.
     pub fn is_open(): bool {
         return self.resource.is_open();
     }
 
+    /// Closes the read end of the pipe.
     pub fn close(): nil {
         if (self.resource.is_open()) {
             self.resource.close();
@@ -57,6 +75,7 @@ frame PipeReader {
     }
 }
 
+/// Writer endpoint of an inter-process pipe.
 frame PipeWriter {
     pub var resource: res.Resource;
 
@@ -64,26 +83,43 @@ frame PipeWriter {
         self.resource = r;
     }
 
+    /// Writes string content into the pipe.
+    ///
+    /// @param content String data to send.
+    /// @return True if write succeeded, false otherwise.
     pub fn write(content: str): bool {
         if (!self.resource.is_open()) return false;
         var result = res._call(self.resource.handle, res.OP_WRITE, [content]);
-        return (result == true);
+        if (result as bool) return true;
+        return false;
     }
 
+    /// Writes string content followed by a newline.
+    ///
+    /// @param line String line to send.
+    /// @return True if write succeeded.
     pub fn write_line(line: str): bool {
         return self.write(line + "\n");
     }
 
+    /// Flushes any buffered pipe data.
+    ///
+    /// @return True on success.
     pub fn flush(): bool {
         if (!self.resource.is_open()) return false;
         var result = res._call(self.resource.handle, res.OP_FLUSH, []);
-        return (result == true);
+        if (result as bool) return true;
+        return false;
     }
 
+    /// Checks if the write end of the pipe remains open.
+    ///
+    /// @return True if open.
     pub fn is_open(): bool {
         return self.resource.is_open();
     }
 
+    /// Closes the write end of the pipe.
     pub fn close(): nil {
         if (self.resource.is_open()) {
             self.resource.close();
@@ -91,6 +127,7 @@ frame PipeWriter {
     }
 }
 
+/// Unidirectional pipe pair combining a reader and a writer endpoint.
 frame PipePair {
     pub var reader: PipeReader;
     pub var writer: PipeWriter;
@@ -100,36 +137,44 @@ frame PipePair {
         self.writer = w;
     }
 
+    /// Writes string content to the pipe.
     pub fn write(content: str): bool {
         return self.writer.write(content);
     }
 
+    /// Writes a line to the pipe.
     pub fn write_line(line: str): bool {
         return self.writer.write_line(line);
     }
 
+    /// Reads up to `buffer_size` bytes from the pipe.
     pub fn read(buffer_size: int = 1024): str {
         return self.reader.read(buffer_size);
     }
 
+    /// Reads all remaining data from the pipe.
     pub fn read_all(): str {
         return self.reader.read_all();
     }
 
+    /// Reads a newline-delimited line from the pipe.
     pub fn read_line(): str {
         return self.reader.read_line();
     }
 
+    /// Checks if either endpoint of the pipe is still open.
     pub fn is_open(): bool {
         return self.reader.is_open() or self.writer.is_open();
     }
 
+    /// Closes both reader and writer endpoints.
     pub fn close(): nil {
         self.reader.close();
         self.writer.close();
     }
 }
 
+/// Self-contained inter-process pipe.
 frame Pipe {
     pub reader: PipeReader;
     pub writer: PipeWriter;
@@ -140,36 +185,46 @@ frame Pipe {
         self.writer = pair.writer;
     }
 
+    /// Writes string content to the pipe.
     pub fn write(content: str): bool {
         return self.writer.write(content);
     }
 
+    /// Writes a line to the pipe.
     pub fn write_line(line: str): bool {
         return self.writer.write_line(line);
     }
 
+    /// Reads up to `buffer_size` bytes from the pipe.
     pub fn read(buffer_size: int = 1024): str {
         return self.reader.read(buffer_size);
     }
 
+    /// Reads all remaining data from the pipe.
     pub fn read_all(): str {
         return self.reader.read_all();
     }
 
+    /// Reads a line from the pipe.
     pub fn read_line(): str {
         return self.reader.read_line();
     }
 
+    /// Checks if the pipe is open.
     pub fn is_open(): bool {
         return self.reader.is_open() or self.writer.is_open();
     }
 
+    /// Closes both endpoints.
     pub fn close(): nil {
         self.reader.close();
         self.writer.close();
     }
 }
 
+/// Creates a new unidirectional inter-process pipe pair.
+///
+/// @return `PipePair` containing reader and writer endpoints.
 pub fn create_pipe(): PipePair {
     var r_res = res.create(res.KIND_FILE, ["pipe_read"])? else {
         return PipePair(PipeReader(res.Resource(-1, res.KIND_FILE)), PipeWriter(res.Resource(-1, res.KIND_FILE)));

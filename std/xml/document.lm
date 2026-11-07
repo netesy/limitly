@@ -1,5 +1,7 @@
+// std/xml/document.lm
 // XML Document and Node representation
 
+/// Represents an XML element node with attributes, text, and nested children.
 frame Node {
     pub name: str;
     pub text: str;
@@ -8,14 +10,28 @@ frame Node {
     pub children: [any];
 }
 
+/// Represents a top-level XML document wrapping a root element node.
 frame Document {
-    pub root: any; // Node as any
+    pub root: Node;
 }
 
+/// Constructs a new XML `Node` with attributes and children.
+///
+/// @param name Element tag name.
+/// @param text Inner textual content.
+/// @param keys Attribute names.
+/// @param vals Attribute values.
+/// @param children List of nested child nodes.
+/// @return Configured `Node` instance.
 pub fn make_node(name: str, text: str, keys: [str], vals: [str], children: [any]): Node {
+    contract(len(name) > 0, "name cannot be empty");
     return Node(name=name, text=text, attrs_keys=keys, attrs_vals=vals, children=children);
 }
 
-pub fn make_document(root: any): Document {
+/// Constructs a new XML `Document` wrapping the given root element.
+///
+/// @param root Root `Node` element.
+/// @return Configured `Document` instance.
+pub fn make_document(root: Node): Document {
     return Document(root=root);
 }

@@ -4,6 +4,7 @@
 import std.ffi as ffi;
 import std.crypto.hash as hash;
 
+/// Represents a single pattern match result within target text.
 frame Match {
     pub var is_matched: bool;
     pub var value: str;
@@ -19,19 +20,29 @@ frame Match {
         self.index = index;
     }
 
+    /// Returns the matched substring text.
+    ///
+    /// @return Matched string value.
     pub fn to_string(): str {
         return self.value;
     }
 
+    /// Returns the length of the matched substring in characters.
+    ///
+    /// @return Character count of matched string.
     pub fn length(): int {
         return len(self.value);
     }
 
+    /// Checks if this match object represents a successful match.
+    ///
+    /// @return `true` if match succeeded, `false` otherwise.
     pub fn is_valid(): bool {
         return self.is_matched;
     }
 }
 
+/// Compiled POSIX regular expression evaluator.
 frame Regex {
     pub var flags: int;  // 1=case_insensitive, 2=multiline, 4=global
     pub var pattern: str;
@@ -44,9 +55,9 @@ frame Regex {
 
         unsafe {
             var lib = hash._open_lib();
-            if (lib != nil and lib != 0) {
+            if (lib != 0) {
                 var fn_comp = ffi.library_get_symbol(lib, "lymar_regex_compile");
-                if (fn_comp != nil and fn_comp != 0) {
+                if (fn_comp != 0) {
                     var cs = ffi.string_to_cstring(pattern);
                     var p = ffi.foreign_call(
                         fn_comp,
@@ -55,7 +66,7 @@ frame Regex {
                         [ffi.TYPE_PTR, ffi.TYPE_I32]
                     );
                     ffi.cstring_free(cs);
-                    if (p != nil and p != 0) {
+                    if (p != 0) {
                         self.preg = p;
                     }
                 }
@@ -67,38 +78,51 @@ frame Regex {
         if (self.preg != nil and self.preg != 0) {
             unsafe {
                 var lib = hash._open_lib();
-                var fn_free = ffi.library_get_symbol(lib, "lymar_regex_free");
-                if (fn_free != nil and fn_free != 0) {
-                    ffi.foreign_call(fn_free, [self.preg], ffi.TYPE_VOID, [ffi.TYPE_PTR]);
+                if (lib != 0) {
+                    var fn_free = ffi.library_get_symbol(lib, "lymar_regex_free");
+                    if (fn_free != 0) {
+                        ffi.foreign_call(fn_free, [self.preg], ffi.TYPE_VOID, [ffi.TYPE_PTR]);
+                    }
                 }
             }
             self.preg = nil;
         }
     }
 
-    // Pattern matching test
+    /// Tests if this regular expression matches any portion of the input string.
+    ///
+    /// @param text Target string to evaluate.
+    /// @return `true` if pattern matches, `false` otherwise.
     pub fn is_match(text: str): bool {
         var m = self.find_match(text, 0);
         return m.is_matched;
     }
 
+    /// Alias for `is_match`.
+    ///
+    /// @param text Target string to evaluate.
+    /// @return `true` if pattern matches, `false` otherwise.
     pub fn matches(text: str): bool {
         return self.is_match(text);
     }
 
-    // Return a rich Match object
+    /// Finds the first match starting at `start_pos`.
+    ///
+    /// @param text Target text to search.
+    /// @param start_pos Character index to begin search from.
+    /// @return `Match` result object.
     pub fn find_match(text: str, start_pos: int = 0): Match {
+        contract(start_pos >= 0, "start_pos must be non-negative");
         if (self.pattern == "" or len(text) == 0 or start_pos > len(text)) {
             return Match(is_matched=false);
         }
 
-        // 1. Try native POSIX regex
         if (self.preg != nil and self.preg != 0) {
             unsafe {
                 var lib = hash._open_lib();
-                if (lib != nil and lib != 0) {
+                if (lib != 0) {
                     var fn_match = ffi.library_get_symbol(lib, "lymar_regex_match");
-                    if (fn_match != nil and fn_match != 0) {
+                    if (fn_match != 0) {
                         var cs = ffi.string_to_cstring(text);
                         var s_buf = ffi.alloc(4);
                         var e_buf = ffi.alloc(4);
@@ -117,53 +141,55 @@ frame Regex {
                         ffi.free(s_buf);
                         ffi.free(e_buf);
 
-                        if (res == 1) {
-                            var matched_val = _builtin_substring(text, s, e);
-                            return Match(is_matched=true, value=matched_val, start=s, end=e, index=0);
+                        if (res == 1 and s >= 0 and e >= s and e <= len(text)) {
+                            var matched_str = _builtin_substring(text, s, e);
+                            return Match(is_matched=true, value=matched_str, start=s, end=e, index=s);
                         }
                     }
                 }
             }
         }
 
-        // 2. Fallback to substring matching
-        var m_start = self.find_match_start(text, start_pos);
-        if (m_start != -1) {
+        var idx = self.find_match_start(text, start_pos);
+        if (idx != -1) {
             var pat_len = len(self.pattern);
-            var m_val = _builtin_substring(text, m_start, m_start + pat_len);
-            return Match(is_matched=true, value=m_val, start=m_start, end=m_start + pat_len, index=0);
+            var matched_str = _builtin_substring(text, idx, idx + pat_len);
+            return Match(is_matched=true, value=matched_str, start=idx, end=idx + pat_len, index=idx);
         }
-
         return Match(is_matched=false);
     }
 
-    // Return all matches as a list of Match objects
+    /// Finds all non-overlapping matches within target text.
+    ///
+    /// @param text Target string to search.
+    /// @return List of `Match` objects.
     pub fn find_matches(text: str): [Match] {
         var results: [Match] = [];
         var start_pos = 0;
-        var idx = 0;
         var text_len = len(text);
+        var idx = 0;
+        var running = true;
 
-        while (start_pos <= text_len) {
+        while (start_pos <= text_len and running) {
             var m = self.find_match(text, start_pos);
-            if (not m.is_matched) {
-                return results;
-            }
-
-            m.index = idx;
-            results.append(m);
-            idx = idx + 1;
-
-            if (m.end <= start_pos) {
-                start_pos = start_pos + 1;
+            if (!m.is_matched) {
+                running = false;
             } else {
-                start_pos = m.end;
+                m.index = idx;
+                results.append(m);
+                idx = idx + 1;
+
+                if (m.end <= start_pos) {
+                    start_pos = start_pos + 1;
+                } else {
+                    start_pos = m.end;
+                }
             }
         }
         return results;
     }
 
-    // Legacy find_first_match returning str or nil
+    /// Returns the first matched substring, or nil if no match.
     pub fn find_first_match(text: str): any {
         var m = self.find_match(text, 0);
         if (m.is_matched) {
@@ -172,7 +198,7 @@ frame Regex {
         return nil;
     }
 
-    // Legacy find_all_matches returning [str]
+    /// Returns all matched substrings as a list of strings.
     pub fn find_all_matches(text: str): [str] {
         var ms = self.find_matches(text);
         var results: [str] = [];
@@ -185,7 +211,11 @@ frame Regex {
         return results;
     }
 
-    // Replacement operations
+    /// Replaces the first match of pattern with replacement.
+    ///
+    /// @param text Source text.
+    /// @param replacement Replacement string.
+    /// @return Modified string.
     pub fn replace(text: str, replacement: str): str {
         var m = self.find_match(text, 0);
         if (not m.is_matched) {
@@ -196,6 +226,11 @@ frame Regex {
         return before + replacement + after;
     }
 
+    /// Replaces all occurrences of pattern with replacement.
+    ///
+    /// @param text Source text.
+    /// @param replacement Replacement string.
+    /// @return Modified string with all matches replaced.
     pub fn replace_all(text: str, replacement: str): str {
         var ms = self.find_matches(text);
         if (len(ms) == 0) {
@@ -216,7 +251,10 @@ frame Regex {
         return result;
     }
 
-    // Splitting operations
+    /// Splits input text around matches of this pattern.
+    ///
+    /// @param text String to split.
+    /// @return List of string fragments.
     pub fn split(text: str): [str] {
         var ms = self.find_matches(text);
         var parts: [str] = [];
@@ -233,11 +271,16 @@ frame Regex {
         return parts;
     }
 
-    // Utility methods
+    /// Checks if the regex pattern is structurally balanced and non-empty.
+    ///
+    /// @return `true` if pattern syntax is balanced, `false` otherwise.
     pub fn is_valid(): bool {
         return self.pattern != "" and self.is_balanced_pattern();
     }
 
+    /// Serializes regex to string representation (e.g. `"/pattern/i"`).
+    ///
+    /// @return String representation with flags.
     pub fn to_string(): str {
         var flag_str = "";
         if (self.flags & 1 != 0) flag_str = flag_str + "i";
@@ -247,7 +290,7 @@ frame Regex {
         return "/" + self.pattern + "/" + flag_str;
     }
 
-    // Fallback helper
+    /// Fallback literal search helper.
     pub fn find_match_start(text: str, start_pos: int): int {
         var pattern_to_use = self.pattern;
         var sub_len = len(pattern_to_use);
@@ -275,11 +318,11 @@ frame Regex {
             var ch = _builtin_substring(self.pattern, i, i + 1);
 
             if (ch == "(") open_parens = open_parens + 1;
-            else if (ch == ")") open_parens = open_parens - 1;
-            else if (ch == "[") open_brackets = open_brackets + 1;
-            else if (ch == "]") open_brackets = open_brackets - 1;
-            else if (ch == "{") open_braces = open_braces + 1;
-            else if (ch == "}") open_braces = open_braces - 1;
+            elif (ch == ")") open_parens = open_parens - 1;
+            elif (ch == "[") open_brackets = open_brackets + 1;
+            elif (ch == "]") open_brackets = open_brackets - 1;
+            elif (ch == "{") open_braces = open_braces + 1;
+            elif (ch == "}") open_braces = open_braces - 1;
 
             i = i + 1;
         }
@@ -288,14 +331,21 @@ frame Regex {
     }
 }
 
+/// Predefined common regular expression patterns.
 frame RegexPatterns {
     pub init() {}
+
+    /// Standard email address pattern.
     pub fn email(): Regex {
         return Regex("[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}", 0);
     }
+
+    /// Standard web URL pattern.
     pub fn url(): Regex {
         return Regex("https?://[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}(/[^\\s]*)?", 0);
     }
+
+    /// North American telephone number pattern.
     pub fn phone(): Regex {
         return Regex("\\(?([0-9]{3})\\)?[-.\\s]?([0-9]{3})[-.\\s]?([0-9]{4})", 0);
     }

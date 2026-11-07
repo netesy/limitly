@@ -3,14 +3,41 @@
 // Complete Archive management for TAR and ZIP formats.
 // Supports reading, creating, listing, and extracting archive entries.
 
+/// # Archive Module (`std.archive`)
+///
+/// Complete in-memory and filesystem archive management supporting TAR (USTAR)
+/// and ZIP container formats. Provides primitives to construct, inspect,
+/// compress, serialize, and extract multi-file archives.
+///
+/// @tip Use `Archive` to package assets or build deployable bundles in memory
+/// before committing them to disk or sending over network sockets.
+///
+/// @warning When extracting archives, paths are joined directly to `target_dir`.
+/// Ensure entry filenames do not escape intended directories (`../`).
+///
+/// @example
+/// import std.archive as archive;
+/// var arch = archive.Archive("bundle.tar");
+/// arch.add_file("app.conf", "port=8080\n");
+/// arch.add_directory("data/");
+/// arch.write_tar("output.tar");
+
 import std.io as io;
 import std.compress.zlib as zlib;
 
+/// Compression algorithm applied to archive entries.
+///
+/// @tip `Stored` (uncompressed) provides maximum read/write performance for pre-compressed assets.
+/// `Deflated` uses standard DEFLATE compression via zlib.
 enum CompressionMethod {
     Stored,
     Deflated
 }
 
+/// Converts a CompressionMethod enum variant into its numerical ZIP/TAR header code.
+///
+/// @param m The compression method enum variant.
+/// @return Returns 0 for Stored, 8 for Deflated.
 pub fn compression_method_code(m: CompressionMethod): int {
     match (m) {
         CompressionMethod.Stored => { return 0; },
@@ -18,6 +45,20 @@ pub fn compression_method_code(m: CompressionMethod): int {
     }
 }
 
+/// Represents a single file or directory node stored inside an archive.
+///
+/// @tip Query `is_directory` before attempting to read text or binary content.
+/// @note Instances store the entry payload, uncompressed byte size, and compression method.
+///
+/// @param name Relative path within the archive hierarchy (e.g. "docs/readme.txt").
+/// @param size Uncompressed byte size. Inferred automatically if content is provided.
+/// @param is_dir True if this entry represents a directory node.
+/// @param content Raw text or binary data contained within the entry.
+/// @param method Compression method applied (0 for Stored, 8 for Deflated).
+///
+/// @example
+/// var entry = Entry("hello.txt", content="Hello, World!");
+/// print("Size: {entry.size()} bytes");
 frame Entry {
     pub var filename: str;
     pub var uncompressed_size: int;
@@ -26,6 +67,8 @@ frame Entry {
     pub var compression_method: int; // 0 = stored, 8 = deflated
 
     pub init(name: str, size: int = 0, is_dir: bool = false, content: str = "", method: any = 0) {
+        contract(len(name) > 0, "Entry name must not be empty");
+        contract(size >= 0, "Entry size must be non-negative");
         self.filename = name;
         self.uncompressed_size = size;
         self.is_directory = is_dir;
@@ -40,6 +83,9 @@ frame Entry {
         }
     }
 
+    /// Returns the compression method (Stored or Deflated) applied to this entry.
+    ///
+    /// @return The CompressionMethod enum value.
     pub fn method(): CompressionMethod {
         if (self.compression_method == 8) {
             return CompressionMethod.Deflated;
@@ -47,15 +93,31 @@ frame Entry {
         return CompressionMethod.Stored;
     }
 
+    /// Returns the decoded text payload of this entry.
+    ///
+    /// @return Decoded entry contents as a string.
     pub fn text(): str {
         return self.data;
     }
 
+    /// Returns the uncompressed size of this entry in bytes.
+    ///
+    /// @return Uncompressed size as an integer.
     pub fn size(): int {
         return self.uncompressed_size;
     }
 }
 
+/// Multi-entry archive container supporting TAR (USTAR) and ZIP serialization.
+///
+/// @tip Methods like `add_file` and `add_directory` return `self` for fluent chaining.
+///
+/// @param path Optional default filesystem path associated with this archive.
+///
+/// @example
+/// var arch = Archive();
+/// arch.add_file("config.json", "{}");
+/// var zip_data = arch.to_zip_bytes();
 frame Archive {
     pub var entries: [Entry];
     pub var archive_path: str;
@@ -65,17 +127,35 @@ frame Archive {
         self.entries = [] as [Entry];
     }
 
+    /// Appends a pre-constructed `Entry` node into this archive.
+    ///
+    /// @pre entry != nil
+    /// @param entry The Entry node to append.
     pub fn add_entry(entry: Entry): nil {
+        contract(entry != nil, "Entry must not be nil");
         self.entries.append(entry);
     }
 
+    /// Appends a new file entry to the archive with raw text content.
+    ///
+    /// @pre len(name) > 0
+    /// @param name Relative path of the file within the archive hierarchy.
+    /// @param content File contents as a string.
+    /// @return Returns `self` for fluent method chaining.
     pub fn add_file(name: str, content: str): Archive {
+        contract(len(name) > 0, "File name must not be empty");
         var entry = Entry(name=name, size=len(content), is_dir=false, content=content, method=0);
         self.entries.append(entry);
         return self;
     }
 
+    /// Appends a new directory record to the archive, ensuring a trailing slash.
+    ///
+    /// @pre len(name) > 0
+    /// @param name Directory name or path to record.
+    /// @return Returns `self` for fluent method chaining.
     pub fn add_directory(name: str): Archive {
+        contract(len(name) > 0, "Directory name must not be empty");
         var dir_name = name;
         if (!_builtin_string_ends_with(dir_name, "/")) {
             dir_name = dir_name + "/";
@@ -85,7 +165,13 @@ frame Archive {
         return self;
     }
 
+    /// Finds and returns an entry matching the specified relative path.
+    ///
+    /// @pre len(name) > 0
+    /// @param name Relative path to look up.
+    /// @return Returns ok(Entry) on match, or nil if absent.
     pub fn get_entry(name: str): Entry? {
+        contract(len(name) > 0, "Entry name must not be empty");
         var i = 0;
         while (i < len(self.entries)) {
             if (self.entries[i].filename == name) {
@@ -96,7 +182,13 @@ frame Archive {
         return nil;
     }
 
+    /// Reads and returns the string content of an entry directly by name.
+    ///
+    /// @pre len(name) > 0
+    /// @param name Relative path of the entry to read.
+    /// @return Returns ok(content_str) on success, or nil if not found.
     pub fn read_text(name: str): str? {
+        contract(len(name) > 0, "Entry name must not be empty");
         var entry_opt = self.get_entry(name);
         if (entry_opt == nil) {
             var missing: str? = nil;
@@ -106,14 +198,26 @@ frame Archive {
         return ok(entry.data);
     }
 
+    /// Checks whether an entry with the given relative path exists in the archive.
+    ///
+    /// @pre len(name) > 0
+    /// @param name Relative path to check.
+    /// @return Returns true if found, false otherwise.
     pub fn has_entry(name: str): bool {
+        contract(len(name) > 0, "Entry name must not be empty");
         return self.get_entry(name) != nil;
     }
 
+    /// Returns the total number of entries currently stored in the archive.
+    ///
+    /// @return Number of entries as an integer.
     pub fn count(): int {
         return len(self.entries);
     }
 
+    /// Returns a list of filenames for all entries in the archive.
+    ///
+    /// @return List of entry names in order of addition.
     pub fn list(): [str] {
         var result: [str] = [];
         var i = 0;
@@ -124,7 +228,14 @@ frame Archive {
         return result;
     }
 
+    /// Extracts all archive entries into the specified target directory.
+    ///
+    /// @pre len(target_dir) > 0
+    /// @warning Does not validate entry paths against directory traversal (`../`).
+    /// @param target_dir Destination directory on the filesystem.
+    /// @return Returns true on success, false if writing fails.
     pub fn extract(target_dir: str): bool {
+        contract(len(target_dir) > 0, "Target directory must not be empty");
         if (!io.exists(target_dir)) {
             io.create_directory(target_dir);
         }
@@ -151,7 +262,15 @@ frame Archive {
         return true;
     }
 
+    /// Extracts a single entry by name into the specified directory.
+    ///
+    /// @pre len(name) > 0 and len(target_dir) > 0
+    /// @param name Relative filename of the entry inside the archive.
+    /// @param target_dir Destination directory on the filesystem.
+    /// @return Returns true if extracted successfully, false otherwise.
     pub fn extract_entry(name: str, target_dir: str): bool {
+        contract(len(name) > 0, "Entry name must not be empty");
+        contract(len(target_dir) > 0, "Target directory must not be empty");
         var entry_opt = self.get_entry(name);
         match (entry_opt) {
             val entry => {
@@ -177,7 +296,10 @@ frame Archive {
         }
     }
 
-    // Serialize entries into standard USTAR TAR binary format
+    /// Serializes all entries into standard POSIX.1-1988 USTAR TAR binary format.
+    ///
+    /// @tip Appends two 512-byte zero blocks at the end to conform with the TAR specification.
+    /// @return Byte array containing the serialized TAR archive.
     pub fn to_tar_bytes(): [int] {
         var bytes: [int] = [];
         var i = 0;
@@ -286,7 +408,13 @@ frame Archive {
         return bytes;
     }
 
+    /// Writes the archive as a TAR file to the specified filesystem path.
+    ///
+    /// @pre len(output_path) > 0
+    /// @param output_path Target file path on disk.
+    /// @return Returns true on success, false if file creation/write failed.
     pub fn write_tar(output_path: str): bool {
+        contract(len(output_path) > 0, "Output path must not be empty");
         var bytes = self.to_tar_bytes();
         var content = _builtin_string_from_bytes(bytes);
         var f_res = io.open(output_path, "w");
@@ -301,7 +429,10 @@ frame Archive {
         }
     }
 
-    // Serialize entries into standard uncompressed / stored ZIP format
+    /// Serializes all entries into PKZip format with standard Central Directory records.
+    ///
+    /// @tip Entries are encoded using Stored (uncompressed) method for deterministic output.
+    /// @return Byte array containing the serialized ZIP archive.
     pub fn to_zip_bytes(): [int] {
         var bytes: [int] = [];
         var cd_headers: [int] = [];
@@ -415,7 +546,13 @@ frame Archive {
         return bytes;
     }
 
+    /// Writes the archive as a ZIP file to the specified filesystem path.
+    ///
+    /// @pre len(output_path) > 0
+    /// @param output_path Target file path on disk.
+    /// @return Returns true on success, false if file creation/write failed.
     pub fn write_zip(output_path: str): bool {
+        contract(len(output_path) > 0, "Output path must not be empty");
         var bytes = self.to_zip_bytes();
         var content = _builtin_string_from_bytes(bytes);
         var f_res = io.open(output_path, "w");
@@ -431,7 +568,13 @@ frame Archive {
     }
 }
 
+/// Opens and parses a TAR archive from disk.
+///
+/// @pre len(path) > 0
+/// @param path Filesystem path to the TAR archive.
+/// @return Returns ok(Archive) on success, or nil if file not found or invalid.
 pub fn open_tar(path: str): Archive? {
+    contract(len(path) > 0, "TAR path must not be empty");
     var missing: Archive? = nil;
     if (!io.exists(path)) return missing;
     var f_res = io.open(path, "r");
@@ -444,6 +587,11 @@ pub fn open_tar(path: str): Archive? {
     return ok(read_tar_from_bytes(path, bytes));
 }
 
+/// Parses a byte array containing USTAR TAR formatted data into an Archive.
+///
+/// @param path Label path to associate with the parsed Archive.
+/// @param bytes In-memory byte array of TAR archive records.
+/// @return Populated Archive instance.
 pub fn read_tar_from_bytes(path: str, bytes: [int]): Archive {
     var arch = Archive(path);
     var offset = 0;
@@ -528,7 +676,13 @@ pub fn read_tar_from_bytes(path: str, bytes: [int]): Archive {
     return arch;
 }
 
+/// Opens and parses a ZIP archive from disk.
+///
+/// @pre len(path) > 0
+/// @param path Filesystem path to the ZIP archive.
+/// @return Returns ok(Archive) on success, or nil if file not found or invalid.
 pub fn open_zip(path: str): Archive? {
+    contract(len(path) > 0, "ZIP path must not be empty");
     var missing: Archive? = nil;
     if (!io.exists(path)) return missing;
     var f_res = io.open(path, "r");
@@ -541,6 +695,11 @@ pub fn open_zip(path: str): Archive? {
     return ok(read_zip_from_bytes(path, bytes));
 }
 
+/// Parses an in-memory byte array containing PKZip formatted data into an Archive.
+///
+/// @param path Label path to associate with the parsed Archive.
+/// @param bytes In-memory byte array of ZIP records.
+/// @return Populated Archive instance.
 pub fn read_zip_from_bytes(path: str, bytes: [int]): Archive {
     var arch = Archive(path);
     var offset = 0;
@@ -600,15 +759,31 @@ pub fn read_zip_from_bytes(path: str, bytes: [int]): Archive {
     return arch;
 }
 
+/// Creates a new, empty TAR archive builder.
+///
+/// @param path Optional target path.
+/// @return Fresh Archive container.
 pub fn create_tar(path: str = ""): Archive {
     return Archive(path);
 }
 
+/// Creates a new, empty ZIP archive builder.
+///
+/// @param path Optional target path.
+/// @return Fresh Archive container.
 pub fn create_zip(path: str = ""): Archive {
     return Archive(path);
 }
 
+/// Extracts an entire TAR archive on disk into the destination directory.
+///
+/// @pre len(archive_path) > 0 and len(target_dir) > 0
+/// @param archive_path Path to the source .tar file.
+/// @param target_dir Destination directory to unpack files into.
+/// @return Returns true if extracted successfully, false otherwise.
 pub fn extract_tar(archive_path: str, target_dir: str): bool {
+    contract(len(archive_path) > 0, "Archive path must not be empty");
+    contract(len(target_dir) > 0, "Target directory must not be empty");
     var arch_opt = open_tar(archive_path);
     match (arch_opt) {
         val arch => return (arch as Archive).extract(target_dir),
@@ -616,7 +791,15 @@ pub fn extract_tar(archive_path: str, target_dir: str): bool {
     }
 }
 
+/// Extracts an entire ZIP archive on disk into the destination directory.
+///
+/// @pre len(archive_path) > 0 and len(target_dir) > 0
+/// @param archive_path Path to the source .zip file.
+/// @param target_dir Destination directory to unpack files into.
+/// @return Returns true if extracted successfully, false otherwise.
 pub fn extract_zip(archive_path: str, target_dir: str): bool {
+    contract(len(archive_path) > 0, "Archive path must not be empty");
+    contract(len(target_dir) > 0, "Target directory must not be empty");
     var arch_opt = open_zip(archive_path);
     match (arch_opt) {
         val arch => return (arch as Archive).extract(target_dir),

@@ -1,7 +1,26 @@
-// Standard Library Random Submodule
+// std/random/random.lm
+// Pseudo-random number generator (Xorshift64*) and entropy-backed SecureRandom.
+
+/// # Random Number Generation (`std.random`)
+///
+/// Fast pseudo-random number generator (PRNG) powered by Xorshift64* algorithm,
+/// alongside hardware/system entropy-backed `SecureRandom` for cryptographic needs.
 
 import std.resource as res;
 
+/// High-performance pseudo-random number generator utilizing a 64-bit Xorshift PRNG.
+///
+/// @tip Provide an explicit non-zero seed for reproducible, deterministic sequences (e.g. testing, simulations).
+/// Pass `0` or omit to seed automatically from system entropy.
+///
+/// @warning `Random` is NOT cryptographically secure. Use `SecureRandom` for cryptographic tokens, nonces, or salts.
+///
+/// @param seed Initial 64-bit seed. Pass 0 to seed automatically from system entropy.
+///
+/// @example
+/// import std.random as rand;
+/// var rng = rand.Random(seed=42);
+/// var roll = rng.range_int(1, 7); // 1 to 6
 frame Random {
     var state: int;
 
@@ -29,6 +48,9 @@ frame Random {
         }
     }
 
+    /// Generates the next pseudo-random 64-bit integer.
+    ///
+    /// @return 64-bit pseudo-random integer.
     pub fn next_int(): int {
         var x = self.state;
         x = x ^ (x << 13);
@@ -38,24 +60,54 @@ frame Random {
         return x * 0x2545F4914F6CDD1D;
     }
 
+    /// Generates a pseudo-random floating-point value uniformly distributed in `[0.0, 1.0)`.
+    ///
+    /// @return Floating point value in range `[0.0, 1.0)`.
     pub fn next_float(): float {
         var i = self.next_int();
         if (i < 0) i = -i;
         return (i % 1000000000 as float) / 1000000000.0;
     }
 
-    pub fn next_bool(): bool { return self.next_int() % 2 == 0; }
+    /// Generates a pseudo-random boolean value with equal probability (50% true).
+    ///
+    /// @return Random boolean.
+    pub fn next_bool(): bool { 
+        return self.next_int() % 2 == 0; 
+    }
 
+    /// Generates a pseudo-random integer in the half-open interval `[min_val, max_val)`.
+    ///
+    /// @pre min_val <= max_val
+    /// @param min_val Lower bound (inclusive).
+    /// @param max_val Upper bound (exclusive).
+    /// @return Pseudo-random integer.
     pub fn range_int(min_val: int, max_val: int): int {
+        contract(min_val <= max_val, "min_val must not be greater than max_val");
         if (min_val >= max_val) return min_val;
         var r = self.next_int();
         if (r < 0) r = -r;
         return min_val + (r % (max_val - min_val));
     }
 
-    pub fn range_float(min_val: float, max_val: float): float { return min_val + (max_val - min_val) * self.next_float(); }
+    /// Generates a pseudo-random floating-point value in the interval `[min_val, max_val)`.
+    ///
+    /// @pre min_val <= max_val
+    /// @param min_val Lower bound (inclusive).
+    /// @param max_val Upper bound (exclusive).
+    /// @return Pseudo-random float.
+    pub fn range_float(min_val: float, max_val: float): float { 
+        contract(min_val <= max_val, "min_val must not be greater than max_val");
+        return min_val + (max_val - min_val) * self.next_float(); 
+    }
 
+    /// Generates an array of `count` pseudo-random bytes (0-255).
+    ///
+    /// @pre count >= 0
+    /// @param count Number of bytes to generate.
+    /// @return Array of integer byte values.
     pub fn next_bytes(count: int): [int] {
+        contract(count >= 0, "Byte count must be non-negative");
         var res_bytes: [int] = [] as [int];
         for (var i = 0; i < count; i = i + 1) {
             var b = self.next_int();
@@ -65,7 +117,15 @@ frame Random {
         return res_bytes;
     }
 
+    /// Generates a random alphanumeric or custom-alphabet string of length `len_val`.
+    ///
+    /// @pre len_val >= 0 and len(alphabet) > 0
+    /// @param len_val Length of the generated string.
+    /// @param alphabet Character set to sample from.
+    /// @return Random string.
     pub fn next_string(len_val: int, alphabet: str = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"): str {
+        contract(len_val >= 0, "String length must be non-negative");
+        contract(len(alphabet) > 0, "Alphabet must not be empty");
         var res_str = "";
         var a_len = len(alphabet);
         for (var i = 0; i < len_val; i = i + 1) {
@@ -76,6 +136,12 @@ frame Random {
     }
 }
 
+/// Cryptographically secure random number generator sourced directly from system entropy.
+///
+/// @tip Use for security-critical contexts such as generating session IDs, auth tokens,
+/// initialization vectors, and cryptographic nonces.
+///
+/// @note Reads from underlying OS entropy sources (`/dev/urandom` on POSIX, `BCryptGenRandom` on Windows).
 frame SecureRandom {
     var reader: res.Reader?;
 
@@ -92,6 +158,9 @@ frame SecureRandom {
         }
     }
 
+    /// Generates a cryptographically secure random integer.
+    ///
+    /// @return Secure random integer.
     pub fn next_int(): int {
         if (self.reader != nil) {
             var rd = self.reader as res.Reader;
@@ -102,13 +171,22 @@ frame SecureRandom {
         return 0;
     }
 
+    /// Generates a cryptographically secure random float in `[0.0, 1.0)`.
+    ///
+    /// @return Secure random float.
     pub fn next_float(): float {
         var i = self.next_int();
         if (i < 0) i = -i;
         return (i % 1000000000 as float) / 1000000000.0;
     }
 
+    /// Generates `count` cryptographically secure random bytes.
+    ///
+    /// @pre count >= 0
+    /// @param count Number of bytes to generate.
+    /// @return Array of secure random byte values (0-255).
     pub fn next_bytes(count: int): [int] {
+        contract(count >= 0, "Byte count must be non-negative");
         var res_bytes: [int] = [] as [int];
         for (var i = 0; i < count; i = i + 1) {
             var b = self.next_int();
@@ -121,8 +199,43 @@ frame SecureRandom {
 
 var _default_rng: Random = Random(seed=123456789);
 
-pub fn random_int(min_val: int, max_val: int): int { return _default_rng.range_int(min_val=min_val, max_val=max_val); }
-pub fn random_float(min_val: float, max_val: float): float { return _default_rng.range_float(min_val=min_val, max_val=max_val); }
-pub fn random_bool(): bool { return _default_rng.next_bool(); }
-pub fn random_bytes(count: int): [int] { return _default_rng.next_bytes(count=count); }
-pub fn random_string(len_val: int): str { return _default_rng.next_string(len_val=len_val); }
+/// Generates a random integer in `[min_val, max_val)` using the default PRNG.
+///
+/// @param min_val Inclusive minimum bound.
+/// @param max_val Exclusive maximum bound.
+/// @return Random integer.
+pub fn random_int(min_val: int, max_val: int): int { 
+    return _default_rng.range_int(min_val=min_val, max_val=max_val); 
+}
+
+/// Generates a random float in `[min_val, max_val)` using the default PRNG.
+///
+/// @param min_val Inclusive minimum bound.
+/// @param max_val Exclusive maximum bound.
+/// @return Random float.
+pub fn random_float(min_val: float, max_val: float): float { 
+    return _default_rng.range_float(min_val=min_val, max_val=max_val); 
+}
+
+/// Generates a random boolean using the default PRNG.
+///
+/// @return Random boolean.
+pub fn random_bool(): bool { 
+    return _default_rng.next_bool(); 
+}
+
+/// Generates `count` random bytes using the default PRNG.
+///
+/// @param count Number of bytes to generate.
+/// @return Random byte list.
+pub fn random_bytes(count: int): [int] { 
+    return _default_rng.next_bytes(count=count); 
+}
+
+/// Generates a random alphanumeric string of length `len_val` using the default PRNG.
+///
+/// @param len_val Length of the generated string.
+/// @return Random alphanumeric string.
+pub fn random_string(len_val: int): str { 
+    return _default_rng.next_string(len_val=len_val); 
+}

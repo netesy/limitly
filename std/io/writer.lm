@@ -1,11 +1,18 @@
-// Standard Library I/O Writer Submodule
+// std/io/writer.lm
+// Abstract writer interface for character and byte streams.
 
 import std.resource show Resource, Writer;
 
+/// Contract for writable stream handles.
 trait Writer {
-    fn write(args: [any]): any;
+    /// Writes argument data to the underlying stream.
+    ///
+    /// @param args Data payload list.
+    /// @return Fallible unit completion.
+    fn write(args: [any]): nil?;
 }
 
+/// Stream writer wrapper around an operating system resource handle.
 frame StreamWriter : Writer {
     pub var w: Writer;
 
@@ -13,7 +20,13 @@ frame StreamWriter : Writer {
         self.w = Writer(resource);
     }
 
-    pub fn write(args: [any]): any {
-        return self.w.write(args);
+    /// Writes data payload list to the underlying resource handle.
+    ///
+    /// @param args Data arguments to write.
+    /// @return Fallible unit completion.
+    pub fn write(args: [any]): nil? {
+        var success = self.w.write(args);
+        if (success == nil) return err();
+        return ok(nil);
     }
 }

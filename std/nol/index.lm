@@ -4,18 +4,34 @@
 import std.nol.parser as parser;
 import std.nol.writer as writer;
 import std.nol.document as document;
+import std.nol.value as value;
 
 pub import std.nol.value show Type, Value, make_null, make_bool, make_int, make_float, make_string, make_array, make_object, make_empty_object;
 pub import std.nol.document show Document, Builder;
 
+/// Parses a NOL serialized string into a structured `Document`.
+///
+/// @param text NOL source text.
+/// @return Parsed `Document` instance, or error if parsing failed.
+/// @example
+/// ```lymar
+/// var doc = nol.parse("[package]\nname: \"test\"")?;
+/// ```
 pub fn parse(text: str): document.Document? {
-    var res: any = parser.parse(text);
+    contract(len(text) >= 0, "text must be a valid string");
+    var res = parser.parse(text);
     if (res == nil) {
         return err();
     }
-    return ok(res as document.Document);
+    return ok(res);
 }
 
-pub fn stringify(val_any: any, indent: int = 2): str {
-    return writer.stringify(val_any, indent);
+/// Serializes a NOL value or root document to NOL text format.
+///
+/// @param val_obj Value AST node to serialize.
+/// @param indent Spaces per indentation level (default: 2).
+/// @return Formatted NOL string.
+pub fn stringify(val_obj: value.Value, indent: int = 2): str {
+    contract(indent >= 0, "indent must be non-negative");
+    return writer.stringify(val_obj, indent);
 }

@@ -1,7 +1,6 @@
 // std/ui/window.lm
 // Window submodule for std.ui. User interface widgets, layout engines, styling, and application framework.
 
-import std.ui.widget as widget;
 import std.ui.types as ui_types;
 
 frame Window {

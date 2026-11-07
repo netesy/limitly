@@ -3,6 +3,7 @@ import std.collections.hashmap as hashmap;
 
 pub import std.collections.hashmap show HashMap, hashmap;
 
+/// Hash map wrapper supporting dynamic key-value pairs.
 frame HashMapWrapper {
     pub impl: hashmap.HashMap;
 
@@ -10,39 +11,51 @@ frame HashMapWrapper {
         self.impl = hashmap.hashmap(initial_cap);
     }
 
+    /// Stores a key-value mapping.
     pub fn put(key: str, value: any) {
         self.impl.put(key, value);
     }
 
+    /// Retrieves value mapped to key.
     pub fn get(key: str): any? {
         return self.impl.get(key);
     }
 
+    /// Removes a key and its value.
     pub fn remove(key: str) {
         self.impl.remove(key);
     }
 
+    /// Tests if key exists in map.
     pub fn contains_key(key: str): bool {
         return self.impl.contains_key(key);
     }
 
+    /// Returns the element count.
     pub fn size(): int {
         return self.impl.size();
     }
 
+    /// Returns the element count.
     pub fn length(): int {
         return self.impl.size();
     }
 
+    /// Checks if map has zero entries.
     pub fn is_empty(): bool {
         return self.impl.is_empty();
     }
 
+    /// Clears all entries.
     pub fn clear() {
         self.impl.clear();
     }
 }
 
-pub fn Map(): HashMapWrapper {
-    return HashMapWrapper();
+/// Constructs a new Map instance backed by HashMapWrapper.
+///
+/// @param initial_cap Initial capacity for the underlying hash map table.
+/// @return New Map wrapper instance.
+pub fn Map(initial_cap: int = 16): HashMapWrapper {
+    return HashMapWrapper(initial_cap);
 }

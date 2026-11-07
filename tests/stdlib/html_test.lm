@@ -1,0 +1,21 @@
+import std.html as html;
+
+fn main(): int {
+    print("=== HTML Test Suite ===\n");
+    var raw = "<div class=\"hero\">&hello 'world'</div>";
+    var escaped = html.escape(raw);
+    assert(escaped == "&lt;div class=&quot;hero&quot;&gt;&amp;hello &#39;world&#39;&lt;/div&gt;", "escape mismatch");
+
+    var unescaped = html.unescape(escaped);
+    assert(unescaped == raw, "unescape mismatch");
+
+    var dom = html.parse("<div><p>Paragraph</p><br><img src=\"img.png\"></div>");
+    assert(dom.tag_name == "html", "root should be html");
+    assert(len(dom.children) == 1, "root should have 1 child (div)");
+    var div_node = dom.children[0] as html.Node;
+    assert(div_node.tag_name == "div", "child should be div");
+
+    print("HTML tests passed successfully!\n");
+    return 0;
+}
+

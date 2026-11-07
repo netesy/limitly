@@ -1,38 +1,71 @@
 // std/math/vector2.lm
-// Vector2 submodule for std.math. Mathematical constants, arithmetic functions, trigonometry, and statistics.
+// Two-dimensional floating-point geometric vector.
 
 import std.math.arithmetic as arith;
-import std.math show Addable, Scalable, Normalizable;
 
-frame Vector2 : Addable, Scalable, Normalizable {
+/// Represents a 2D Euclidean vector with x and y Cartesian coordinates.
+///
+/// Supports basic vector arithmetic (addition, subtraction, scalar scaling),
+/// dot product, magnitude calculation, and normalization.
+///
+/// @example
+/// import std.math.vector2 as v2;
+/// var a = v2.Vector2(3.0, 4.0);
+/// print(a.mag()); // 5.0
+/// var b = a.normalize();
+frame Vector2 {
     pub x: float;
     pub y: float;
 
-    pub init(x: float, y: float) {
+    pub init(x: float = 0.0, y: float = 0.0) {
         self.x = x;
         self.y = y;
     }
 
+    /// Adds another 2D vector to this vector.
+    ///
+    /// @param other Vector to add.
+    /// @return Component-wise sum vector.
     pub fn add(other: Vector2): Vector2 {
         return Vector2(self.x + other.x, self.y + other.y);
     }
 
+    /// Subtracts another 2D vector from this vector.
+    ///
+    /// @param other Vector to subtract.
+    /// @return Component-wise difference vector.
     pub fn sub(other: Vector2): Vector2 {
         return Vector2(self.x - other.x, self.y - other.y);
     }
 
+    /// Multiplies both components by a scalar value.
+    ///
+    /// @param s Scaling factor.
+    /// @return Scaled vector.
     pub fn scale(s: float): Vector2 {
         return Vector2(self.x * s, self.y * s);
     }
 
+    /// Computes the dot product of this vector and another 2D vector.
+    ///
+    /// @param other Vector to dot with.
+    /// @return Scalar dot product.
     pub fn dot(other: Vector2): float {
         return self.x * other.x + self.y * other.y;
     }
 
+    /// Computes the Euclidean magnitude (length) of the vector.
+    ///
+    /// @return Vector length.
     pub fn mag(): float {
         return arith.sqrt(self.x * self.x + self.y * self.y);
     }
 
+    /// Computes the unit-length direction vector.
+    ///
+    /// @tip Returns a zero vector if magnitude is zero.
+    ///
+    /// @return Normalized unit vector.
     pub fn normalize(): Vector2 {
         var m = self.mag();
         if (m == 0.0) {

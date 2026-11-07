@@ -137,14 +137,14 @@ pub fn assert_true(condition: bool, message: str = "Assertion failed"): nil {
     }
 }
 
-pub fn assert_eq(actual: any, expected: any, message: str = "Assertion failed: values not equal"): nil {
+pub fn assert_eq(actual, expected, message: str = "Assertion failed: values not equal"): nil {
     if (actual != expected) {
         print("{message} - expected {expected}, got {actual}");
         process.exit(1);
     }
 }
 
-pub fn assert_ne(actual: any, expected: any, message: str = "Assertion failed: values are equal"): nil {
+pub fn assert_ne(actual, expected, message: str = "Assertion failed: values are equal"): nil {
     if (actual == expected) {
         print("{message} - both are {actual}");
         process.exit(1);

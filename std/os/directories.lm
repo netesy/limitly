@@ -4,30 +4,48 @@
 import std.os.service as service;
 import std.internal.runtime as rt;
 
-// Current working directory. Empty string when unavailable.
+/// Returns the current working directory of the process.
+///
+/// @return Absolute working directory path, or empty string when unavailable.
 pub fn cwd(): str {
     var result = service.request(rt.OP_CWD);
     if (result == nil) return "";
     return result as str;
 }
 
+/// Changes the current working directory of the process.
+///
+/// @pre len(path) > 0
+/// @param path Target directory path.
+/// @return True if directory change succeeded, false otherwise.
 pub fn chdir(path: str): bool {
-    return service.request_with(rt.OP_CHDIR, [path]) == true;
+    contract(len(path) > 0, "Target directory path must not be empty");
+    var result = service.request_with(rt.OP_CHDIR, [path]);
+    if (result as bool) return true;
+    return false;
 }
 
+/// Returns the current user's home directory.
+///
+/// @return Absolute path to the user's home folder.
 pub fn home_dir(): str {
     var result = service.request(rt.OP_HOME_DIR);
     if (result == nil) return "";
     return result as str;
 }
 
+/// Returns the default temporary directory path for the host OS.
+///
+/// @return Temporary directory path.
 pub fn temp_dir(): str {
     var result = service.request(rt.OP_TEMP_DIR);
     if (result == nil) return "";
     return result as str;
 }
 
-// Path of the running executable (or of the compiler for `lymar run`).
+/// Returns the absolute path of the running executable.
+///
+/// @return Path to current executable binary.
 pub fn exe_path(): str {
     var result = service.request(rt.OP_EXE_PATH);
     if (result == nil) return "";

@@ -246,11 +246,9 @@ fn match_pattern(pattern: str, actual: str): bool {
     while (i < len(pattern_parts)) {
         var pp = pattern_parts[i];
         var ap = actual_parts[i];
-        if (len(pp) > 0 and _builtin_substring(pp, 0, 1) == ":") {
-            // parameter segment matches anything non-empty
-        } elif (pp == "*") {
-            // wildcard matches segment
-        } elif (pp != ap) {
+        var is_param = len(pp) > 0 and _builtin_substring(pp, 0, 1) == ":";
+        var is_wildcard = pp == "*";
+        if (not is_param and not is_wildcard and pp != ap) {
             return false;
         }
         i = i + 1;

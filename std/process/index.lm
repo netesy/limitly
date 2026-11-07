@@ -1,71 +1,110 @@
 // std/process/index.lm
 // Public facade for std.process: the process as an entity.
-//
-// No implementation lives here. std.process owns identity (id, program name,
-// arguments), lifecycle (exit), memory (resident set) and children (run, exec,
-// Command). Facts about the surrounding machine - environment variables, working
-// directory, home/temp locations, platform identity - belong to std.os.
+
+/// Operating system process inspection, child process spawning, command execution, and IPC pipes.
+///
+/// Encapsulates process identity (PID, arguments, invocation name), resource usage (RSS, peak RSS),
+/// exit lifecycle, and child process execution via `Command` or `run`.
+///
+/// @example
+/// import std.process as process;
+/// print("Process PID: {process.pid()}");
+/// print("Arguments: {process.args()}");
+/// print("Memory RSS: {process.memory()} KB");
 
 import std.process.process as proc;
 pub import std.process.command show Command, Output;
 pub import std.process.pipe show Pipe, PipeReader, PipeWriter, PipePair, create_pipe;
 
+/// Object-oriented interface to the current process identity and lifecycle.
 frame Process {
     pub init() {}
+
+    /// Terminates the current process with an exit code.
     pub fn exit(code: int): nil { return proc.exit(code); }
+
+    /// Spawns a command string and returns its exit code.
     pub fn run(cmd_str: str): int { return proc.run(cmd_str); }
+
+    /// Executes a program binary directly with arguments.
     pub fn exec(program: str, arguments: [str]): int { return proc.exec(program, arguments); }
+
+    /// Returns the operating system PID.
     pub fn id(): int { return proc.id(); }
+
+    /// Returns the operating system PID.
     pub fn pid(): int { return proc.pid(); }
+
+    /// Returns command line arguments.
     pub fn args(): [str] { return proc.args(); }
+
+    /// Returns program invocation name.
     pub fn command(): str { return proc.command(); }
+
+    /// Returns current resident set size in KB.
     pub fn memory(): int { return proc.memory(); }
+
+    /// Returns peak resident set size in KB.
     pub fn peak_memory(): int { return proc.peak_memory(); }
+
+    /// Alias for `memory()`.
     pub fn current_rss(): int { return proc.current_rss(); }
+
+    /// Alias for `peak_memory()`.
     pub fn peak_rss(): int { return proc.peak_rss(); }
 }
 
+/// Terminates the process immediately with the given exit code.
 pub fn exit(code: int): nil {
     return proc.exit(code);
 }
 
+/// Spawns a command string and waits for its integer exit code.
 pub fn run(cmd_str: str): int {
     return proc.run(cmd_str);
 }
 
+/// Executes a program binary directly with an argument list.
 pub fn exec(program: str, arguments: [str]): int {
     return proc.exec(program, arguments);
 }
 
+/// Returns the operating system PID.
 pub fn id(): int {
     return proc.id();
 }
 
+/// Returns the operating system PID.
 pub fn pid(): int {
     return proc.pid();
 }
 
+/// Returns the program's command line arguments.
 pub fn args(): [str] {
     return proc.args();
 }
 
+/// Returns the program name as invoked.
 pub fn command(): str {
     return proc.command();
 }
 
+/// Returns current memory usage in KB.
 pub fn memory(): int {
     return proc.memory();
 }
 
+/// Returns peak memory usage in KB.
 pub fn peak_memory(): int {
     return proc.peak_memory();
 }
 
-// Aliases for the names used before the shared OS layer; see std.process.memory.
+/// Alias for `memory()`.
 pub fn current_rss(): int {
     return proc.current_rss();
 }
 
+/// Alias for `peak_memory()`.
 pub fn peak_rss(): int {
     return proc.peak_rss();
 }

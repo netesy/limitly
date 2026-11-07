@@ -1,11 +1,36 @@
-// Path module - Cross-platform path manipulation
+// std/path/index.lm
+// Path module - Cross-platform path manipulation.
 //
 // The separator that gets written is the platform one (std.os.path_separator);
 // both "/" and "\" are always accepted when reading, so a POSIX path can be
 // manipulated on Windows and vice versa.
+
+/// # Cross-Platform Path Manipulation (`std.path`)
+///
+/// Flexible, cross-platform filesystem path manipulation. Accepts both POSIX (`/`)
+/// and Windows (`\`) separators transparently on any operating system, while normalizing
+/// and emitting the host platform separator (`os.path_separator()`).
+///
+/// @tip Use `Path` to construct, decompose, join, and normalize filesystem paths safely.
+///
+/// @example
+/// import std.path as path;
+/// var p = path.Path("src").join("main.lm");
+/// print("Path: {p.display()} (ext: {p.extension()})");
+
 import std.io as io;
 import std.os as os;
 
+/// Represents a filesystem path, providing methods for component decomposition,
+/// joining, normalization, and filesystem inspection.
+///
+/// @tip All join operations normalize redundant separators automatically.
+///
+/// @param value The raw string path backing this Path instance.
+///
+/// @example
+/// var p = Path("/usr/local/bin");
+/// print("Basename: {p.basename()}"); // "bin"
 frame Path {
     pub value: str;
 
@@ -13,11 +38,20 @@ frame Path {
         self.value = value;
     }
 
-    // Factory methods
+    /// Creates a new Path instance from a raw string.
+    ///
+    /// @param path Raw string path.
+    /// @return New Path instance.
     pub fn from_string(path: str): Path {
         return Path(path);
     }
 
+    /// Appends a child segment to this path, inserting the platform separator if needed.
+    ///
+    /// @tip Correctly prevents double separators and honors platform separator rules.
+    ///
+    /// @param other Path segment to append.
+    /// @return Joined Path instance.
     pub fn join(other: str): Path {
         if (self.value == "") return Path(other);
         if (other == "") return Path(self.value);
@@ -32,6 +66,10 @@ frame Path {
         return Path(joined + other);
     }
 
+    /// Sequentially joins multiple path segments to this path.
+    ///
+    /// @param parts Array of path segments to append in order.
+    /// @return Cumulative joined Path.
     pub fn join_multiple(parts: [str]): Path {
         var p = Path(self.value);
         var i: int = 0;
@@ -42,7 +80,9 @@ frame Path {
         return p;
     }
 
-    // Path components
+    /// Returns the parent directory path, or nil if at filesystem root or empty.
+    ///
+    /// @return Optional parent Path, or nil.
     pub fn parent(): Path? {
         if (len(self.value) == 0 or is_root_text(self.value)) {
             var fallback: Path? = nil;
@@ -50,16 +90,19 @@ frame Path {
         }
         
         var last_sep = last_separator_index(self.value);
-        if (last_sep == -1) return ok(Path(""));
+        if (last_sep == -1) return Path("");
         
         var parent_path = substring(self.value, 0, last_sep);
         if (parent_path != "") {
-            return ok(Path(parent_path));
+            return Path(parent_path);
         } else {
-            return ok(Path(os.path_separator()));
+            return Path(os.path_separator());
         }
     }
 
+    /// Returns the final component of the path (filename or leaf directory name).
+    ///
+    /// @return Basename string.
     pub fn basename(): str {
         if (len(self.value) == 0 or is_root_text(self.value)) return self.value;
         
@@ -73,6 +116,9 @@ frame Path {
         }
     }
 
+    /// Returns the file stem (the basename without its final file extension).
+    ///
+    /// @return File stem string.
     pub fn stem(): str {
         var base = self.basename();
         var last_dot = last_index_of(base, ".");
@@ -81,6 +127,9 @@ frame Path {
         return substring(base, 0, last_dot);
     }
 
+    /// Returns the file extension without the leading dot, or empty string if none.
+    ///
+    /// @return File extension string (e.g. "lm", "txt", "tar").
     pub fn extension(): str {
         var base = self.basename();
         var last_dot = last_index_of(base, ".");
@@ -89,9 +138,11 @@ frame Path {
         return substring(base, last_dot + 1, len(base));
     }
 
-    // Path normalization: collapse repeated separators, resolve "." and "..",
-    // drop the trailing separator and rewrite the result with the platform
-    // separator. UNC prefixes are not special-cased.
+    /// Normalizes path syntax: resolves `.` and `..`, collapses duplicate separators,
+    /// and ensures uniform host platform separators.
+    ///
+    /// @tip Normalization operates purely on strings without filesystem I/O.
+    /// @return Normalized Path instance.
     pub fn normalize(): Path {
         var text = self.value;
         if (len(text) == 0) return Path("");
@@ -153,24 +204,38 @@ frame Path {
         return Path(result);
     }
 
+    /// Resolves redundant components in the path (alias for `normalize()`).
+    ///
+    /// @return Normalized Path instance.
     pub fn resolve(): Path {
         return self.normalize();
     }
 
-    // Path properties
+    /// Checks whether the path begins with a root separator or drive specification.
+    ///
+    /// @return True if absolute, false if relative.
     pub fn is_absolute(): bool {
         return is_absolute_text(self.value);
     }
 
+    /// Checks whether the path is relative to the current working directory.
+    ///
+    /// @return True if relative, false if absolute.
     pub fn is_relative(): bool {
         return not self.is_absolute();
     }
 
+    /// Checks whether this path exists on the host filesystem.
+    ///
+    /// @return True if the file or directory exists.
     pub fn exists(): bool {
         return io.exists(self.value);
     }
 
-    // Path operations
+    /// Returns a new Path with the file extension replaced by the given one.
+    ///
+    /// @param extension New file extension string (without leading dot).
+    /// @return Updated Path.
     pub fn with_extension(extension: str): Path {
         var base = self.stem();
         var parent_val = self.parent();
@@ -180,6 +245,10 @@ frame Path {
         }
     }
 
+    /// Returns a new Path with its leaf filename replaced by the given one.
+    ///
+    /// @param basename New basename string.
+    /// @return Updated Path.
     pub fn with_basename(basename: str): Path {
         var parent_val = self.parent();
         match (parent_val) {
@@ -188,34 +257,63 @@ frame Path {
         }
     }
 
-    // Comparison
+    /// Compares two paths for semantic equivalence after normalization.
+    ///
+    /// @pre other != nil
+    /// @param other The target Path to compare against.
+    /// @return True if both normalized paths are identical.
     pub fn equals(other: Path): bool {
+        contract(other != nil, "Comparison target must not be nil");
         return self.normalize().value == other.normalize().value;
     }
 
+    /// Checks whether this normalized path starts with the given prefix path.
+    ///
+    /// @pre prefix != nil
+    /// @param prefix Prefix Path to test.
+    /// @return True if this path begins with prefix.
     pub fn starts_with(prefix: Path): bool {
+        contract(prefix != nil, "Prefix must not be nil");
         return starts_with(self.normalize().value, prefix.normalize().value);
     }
 
+    /// Checks whether this normalized path ends with the given suffix path.
+    ///
+    /// @pre suffix != nil
+    /// @param suffix Suffix Path to test.
+    /// @return True if this path ends with suffix.
     pub fn ends_with(suffix: Path): bool {
+        contract(suffix != nil, "Suffix must not be nil");
         return ends_with(self.normalize().value, suffix.normalize().value);
     }
 
-    // Formatting
+    /// Returns the raw underlying string representation of this path.
+    ///
+    /// @return String representation.
     pub fn to_string(): str {
         return self.value;
     }
 
+    /// Returns the display string for printing and log outputs.
+    ///
+    /// @return Display string.
     pub fn display(): str {
         return self.to_string();
     }
 }
 
-// Utility functions
+/// Creates a new Path instance from a raw string.
+///
+/// @param v Raw path string.
+/// @return New Path instance.
 pub fn from_string(v: str): Path { 
     return Path.from_string(v); 
 }
 
+/// Joins an array of path strings using platform separator logic.
+///
+/// @param paths Array of path segments.
+/// @return Joined Path instance.
 pub fn join(paths: [str]): Path {
     if (len(paths) == 0) return Path("");
     if (len(paths) == 1) return Path.from_string(paths[0]);
@@ -229,10 +327,18 @@ pub fn join(paths: [str]): Path {
     return result;
 }
 
+/// Normalizes a path string, resolving `.` and `..` segments.
+///
+/// @param path_str Raw path string.
+/// @return Normalized Path instance.
 pub fn normalize(path_str: str): Path {
     return Path.from_string(path_str).normalize();
 }
 
+/// Checks whether a path string represents a relative path.
+///
+/// @param path_str Path string to inspect.
+/// @return True if relative, false if absolute.
 pub fn is_relative(path_str: str): bool {
     return Path(path_str).is_relative();
 }
@@ -317,17 +423,24 @@ fn is_absolute_text(s: str): bool {
     return has_drive_prefix(s);
 }
 
-// The separator this platform writes paths with.
+/// The platform separator used for writing paths (`\` on Windows, `/` on POSIX).
+///
+/// @return Host platform path separator string.
 pub fn separator(): str {
     return os.path_separator();
 }
 
-// The separator between entries of a search-path variable such as PATH.
+/// The separator between entries of a search-path environment variable (`:` on POSIX, `;` on Windows).
+///
+/// @return Search list separator string.
 pub fn list_separator(): str {
     return os.path_list_separator();
 }
 
-// Absolute path of the current working directory joined with `parts`.
+/// Resolves an array of subpaths relative to the process's current working directory.
+///
+/// @param parts Subpath components to join with the current directory.
+/// @return Absolute Path instance.
 pub fn absolute(parts: [str]): Path {
     var base = Path(os.cwd());
     return base.join_multiple(parts);

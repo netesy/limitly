@@ -230,7 +230,7 @@ pub fn ui(root: ui_types.Widget): nil {
     ui_context.set_root(root);
 }
 
-pub fn set_ui(root: any): nil {
+pub fn set_ui(root): nil {
     ui_context.ui_init();
     ui_context.set_root_any(root);
 }

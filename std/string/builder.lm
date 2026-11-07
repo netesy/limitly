@@ -1,6 +1,7 @@
 // std/string/builder.lm
 // Builder submodule for std.string. String manipulation, UTF-8 text processing, and string builders.
 
+/// Efficient string concatenation accumulator.
 frame Builder {
     pub var parts: [str] = [] as [str];
 
@@ -8,31 +9,44 @@ frame Builder {
         self.parts = [] as [str];
     }
 
-    // Append a fragment. Returns nil (not the builder) on purpose: returning a
-    // `Builder` by value deep-copies the growing `parts` list on every call,
-    // which made repeated appends quadratic. Callers use these as statements.
+    /// Appends a string slice to the builder buffer.
+    ///
+    /// @param s Fragment string to append.
     pub fn append(s: str): nil {
         self.parts.append(s);
     }
 
+    /// Appends a string slice (alias for `append`).
+    ///
+    /// @param s Fragment string to append.
     pub fn append_str(s: str): nil {
         self.append(s);
     }
 
+    /// Appends a string slice followed by a newline `\n`.
+    ///
+    /// @param s Line string to append.
     pub fn append_line(s: str): nil {
         self.parts.append(s);
         self.parts.append("\n");
     }
 
+    /// Appends a Unicode codepoint character.
+    ///
+    /// @param cp Integer character code.
     pub fn append_char(cp: int): nil {
         var ch = _builtin_string_from_bytes([cp]);
         self.parts.append(ch);
     }
 
+    /// Clears all accumulated fragments in the builder.
     pub fn clear(): nil {
         self.parts = [] as [str];
     }
 
+    /// Computes the total byte length of all accumulated parts.
+    ///
+    /// @return Cumulative byte count.
     pub fn length(): int {
         var total = 0;
         var i = 0;
@@ -43,11 +57,17 @@ frame Builder {
         return total;
     }
 
+    /// Materializes and returns the concatenated string.
+    ///
+    /// @return Full accumulated string.
     pub fn to_string(): str {
         return _builtin_string_join(self.parts, "");
     }
 }
 
+/// Creates a new empty `Builder` instance.
+///
+/// @return Initialized `Builder`.
 pub fn builder(): Builder {
     return Builder();
 }

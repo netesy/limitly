@@ -1,0 +1,19 @@
+import std.xml as xml;
+
+fn main(): int {
+    print("=== XML Test Suite ===\n");
+    var xml_src = "<user id=\"42\"><name>Alice</name></user>";
+    var doc = xml.parse(xml_src);
+    assert(doc.root != nil, "root should not be nil");
+    assert(doc.root.name == "user", "root name should be user");
+    assert(len(doc.root.attrs_keys) == 1, "attrs count should be 1");
+    assert(doc.root.attrs_keys[0] == "id", "attr key should be id");
+    assert(doc.root.attrs_vals[0] == "42", "attr val should be 42");
+
+    var out = xml.stringify(doc.root);
+    assert(len(out) > 0, "xml stringify should produce output");
+
+    print("XML tests passed successfully!\n");
+    return 0;
+}
+

@@ -184,7 +184,10 @@ frame Parser {
         return value.make_string(word);
     }
 
-    pub fn parse_value(): any {
+    /// Parses an expression value (primitive scalar, array, or object).
+    ///
+    /// @return Parsed `Value` node.
+    pub fn parse_value(): value.Value {
         self.skip_ws();
         var c = self.peek();
         if (c == "{") {
@@ -205,7 +208,7 @@ frame Parser {
                         if (self.peek() == ":") self.advance();
                         var v = self.parse_value();
                         keys.append(k);
-                        vals.append(v);
+                        vals.append(v as any);
                         self.skip_ws();
                         if (self.peek() == ",") self.advance();
                     }
@@ -223,7 +226,7 @@ frame Parser {
                     in_arr = false;
                 } else {
                     var elem = self.parse_value();
-                    items.append(elem);
+                    items.append(elem as any);
                     self.skip_ws();
                     if (self.peek() == ",") self.advance();
                 }
@@ -257,14 +260,17 @@ frame Parser {
                     if (self.peek() == ":") self.advance();
                     var v = self.parse_value();
                     keys.append(k);
-                    vals.append(v);
+                    vals.append(v as any);
                 }
             }
         }
         return value.make_object(keys, vals);
     }
 
-    pub fn parse_doc(): any {
+    /// Parses the entire document text into a `Document` instance.
+    ///
+    /// @return Constructed `Document`.
+    pub fn parse_doc(): document.Document {
         var root_keys: [str] = [];
         var root_vals: [any] = [];
         var in_doc = true;
@@ -312,17 +318,22 @@ frame Parser {
                     if (self.peek() == ":") self.advance();
                     var v = self.parse_value();
                     root_keys.append(k);
-                    root_vals.append(v);
+                    root_vals.append(v as any);
                 }
             }
         }
 
         var root = value.make_object(root_keys, root_vals);
-        return document.Document(root) as any;
+        return document.Document(root);
     }
 }
 
-pub fn parse(text: str): any {
+/// Parses NOL source text into a `Document`.
+///
+/// @param text NOL document source string.
+/// @return Parsed `Document`.
+pub fn parse(text: str): document.Document {
+    contract(len(text) >= 0, "text must be a valid string");
     var p = Parser(text);
     return p.parse_doc();
 }

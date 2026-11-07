@@ -1,19 +1,38 @@
 // std/string/casing.lm
 // Case conversion helpers.
 
+/// Converts all ASCII characters in `value` to lowercase.
+///
+/// @param value The input string.
+/// @return New lowercase string.
 pub fn to_lower(value: str): str {
+    contract(len(value) >= 0, "value must be a valid string");
     return _builtin_string_to_lower(value);
 }
 
+/// Converts all ASCII characters in `value` to uppercase.
+///
+/// @param value The input string.
+/// @return New uppercase string.
 pub fn to_upper(value: str): str {
+    contract(len(value) >= 0, "value must be a valid string");
     return _builtin_string_to_upper(value);
 }
 
-// Alias kept for callers that prefer the word "uppercase".
+/// Alias for `to_upper`.
+///
+/// @param value The input string.
+/// @return New uppercase string.
 pub fn uppercase(value: str): str {
+    contract(len(value) >= 0, "value must be a valid string");
     return _builtin_string_to_upper(value);
 }
 
+/// Alias for `to_lower`.
+///
+/// @param value The input string.
+/// @return New lowercase string.
 pub fn lowercase(value: str): str {
+    contract(len(value) >= 0, "value must be a valid string");
     return _builtin_string_to_lower(value);
 }

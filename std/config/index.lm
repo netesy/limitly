@@ -3,11 +3,28 @@
 
 import std.env as env;
 
+pub import std.config.loader show load_json;
+pub import std.config.environment show load_from_env;
+
+/// In-memory configuration store supporting type-coerced lookups.
 frame Config {
     pub keys: [str];
     pub vals: [str];
 
+    /// Retrieves a configuration property with typed fallback default.
+    ///
+    /// Automatically converts string storage representations to boolean or integer
+    /// if the value matches numeric or boolean literal patterns.
+    ///
+    /// @param key Property key name.
+    /// @param default_val Fallback value returned if key is missing.
+    /// @return Coerced value or default_val.
+    /// @example
+    /// ```lymar
+    /// var port = cfg.get("port", 8080) as int;
+    /// ```
     pub fn get(key: str, default_val: any): any {
+        contract(len(key) > 0, "key cannot be empty");
         var i = 0;
         var length = len(self.keys);
         while (i < length) {
@@ -22,7 +39,7 @@ frame Config {
                 var val_len = len(val_str);
                 if (val_len == 0) is_num = false;
                 while (j < val_len) {
-                    var ch = val_str[j];
+                    var ch = _builtin_substring(val_str, j, j + 1);
                     if (ch < "0" or ch > "9") {
                         is_num = false;
                     }
@@ -38,17 +55,13 @@ frame Config {
         return default_val;
     }
 
+    /// Sets or updates a configuration key with a typed value.
+    ///
+    /// @param key Property key name.
+    /// @param val_any Value to serialize and store.
     pub fn set(key: str, val_any: any) {
-        var val_str = "";
-        if (val_any as str != nil) {
-            val_str = val_any as str;
-        } elif (val_any as bool == true or val_any as bool == false) {
-            var val_bool = val_any as bool;
-            val_str = "{val_bool}";
-        } else {
-            var val_int = val_any as int;
-            val_str = "{val_int}";
-        }
+        contract(len(key) > 0, "key cannot be empty");
+        var val_str = "{val_any}";
 
         // Find existing or append
         var i = 0;
@@ -65,7 +78,12 @@ frame Config {
         return nil;
     }
 
+    /// Checks if a configuration key exists.
+    ///
+    /// @param key Property key to query.
+    /// @return `true` if key is present, `false` otherwise.
     pub fn has(key: str): bool {
+        contract(len(key) > 0, "key cannot be empty");
         var i = 0;
         var length = len(self.keys);
         while (i < length) {
@@ -76,56 +94,64 @@ frame Config {
     }
 }
 
+/// Creates a new empty configuration instance.
+///
+/// @return Initialized `Config` instance.
 pub fn new_config(): Config {
     var k: [str] = [];
     var v: [str] = [];
     return Config(keys=k, vals=v);
 }
 
+/// Parses a simple JSON string representation into a `Config` object.
+///
+/// @param json_str JSON formatted text.
+/// @return Populated `Config` instance.
 pub fn load_json(json_str: str): Config {
+    contract(len(json_str) >= 0, "json_str must be a valid string");
     var cfg = new_config();
-    // A simple parser of key-value JSON pairs
     var i: int = 0;
     var length = len(json_str);
     while (i < length) {
-        var ch = json_str[i];
+        var ch = _builtin_substring(json_str, i, i + 1);
         if (ch == "\"") {
             // Read key
             var key_start = i + 1;
             i = i + 1;
-            while (i < length and json_str[i] != "\"") {
+            while (i < length and _builtin_substring(json_str, i, i + 1) != "\"") {
                 i = i + 1;
             }
             var key = _builtin_substring(json_str, key_start, i);
             i = i + 1; // skip closing quote
 
             // Find colon
-            while (i < length and json_str[i] != ":") {
+            while (i < length and _builtin_substring(json_str, i, i + 1) != ":") {
                 i = i + 1;
             }
             i = i + 1; // skip colon
 
             // Skip spaces
-            while (i < length and (json_str[i] == " " or json_str[i] == "\t" or json_str[i] == "\n" or json_str[i] == "\r")) {
+            while (i < length and (_builtin_substring(json_str, i, i + 1) == " " or _builtin_substring(json_str, i, i + 1) == "\t" or _builtin_substring(json_str, i, i + 1) == "\n" or _builtin_substring(json_str, i, i + 1) == "\r")) {
                 i = i + 1;
             }
 
             // Read value
             if (i < length) {
-                if (json_str[i] == "\"") {
+                var c = _builtin_substring(json_str, i, i + 1);
+                if (c == "\"") {
                     // String value
                     var val_start = i + 1;
                     i = i + 1;
-                    while (i < length and json_str[i] != "\"") {
+                    while (i < length and _builtin_substring(json_str, i, i + 1) != "\"") {
                         i = i + 1;
                     }
                     var val_str = _builtin_substring(json_str, val_start, i);
                     cfg.set(key, val_str);
                     i = i + 1;
-                } else if (json_str[i] == "t" or json_str[i] == "f") {
+                } elif (c == "t" or c == "f") {
                     // Boolean value
                     var val_start = i;
-                    while (i < length and json_str[i] >= "a" and json_str[i] <= "z") {
+                    while (i < length and _builtin_substring(json_str, i, i + 1) >= "a" and _builtin_substring(json_str, i, i + 1) <= "z") {
                         i = i + 1;
                     }
                     var val_str = _builtin_substring(json_str, val_start, i);
@@ -134,11 +160,16 @@ pub fn load_json(json_str: str): Config {
                     } else {
                         cfg.set(key, false);
                     }
-                } else if ((json_str[i] >= "0" and json_str[i] <= "9") or json_str[i] == "-") {
+                } elif ((c >= "0" and c <= "9") or c == "-") {
                     // Number value
                     var val_start = i;
-                    while (i < length and ((json_str[i] >= "0" and json_str[i] <= "9") or json_str[i] == "." or json_str[i] == "-")) {
-                        i = i + 1;
+                    while (i < length) {
+                        var num_c = _builtin_substring(json_str, i, i + 1);
+                        if ((num_c >= "0" and num_c <= "9") or num_c == "." or num_c == "-") {
+                            i = i + 1;
+                        } else {
+                            break;
+                        }
                     }
                     var val_str = _builtin_substring(json_str, val_start, i);
                     var val_int = val_str as int;
@@ -152,14 +183,17 @@ pub fn load_json(json_str: str): Config {
     return cfg;
 }
 
+/// Loads specific environment variables into a `Config` instance.
+///
+/// @param keys List of environment variable names to import.
+/// @return `Config` containing resolved environment variables.
 pub fn load_from_env(keys: [str]): Config {
+    contract(len(keys) >= 0, "keys must be a valid list");
     var cfg = new_config();
     var e = env.Env() as env.Env;
     var i = 0;
     while (i < len(keys)) {
         var key = keys[i];
-        // get_or yields a plain str; Env.get returns an optional that `as str`
-        // would stringify as "ok(...)" rather than unwrap.
         var value = e.get_or(key, "");
         if (value != "") {
             cfg.set(key, value);

@@ -1,5 +1,14 @@
-// Standard Library Filesystem Permissions Submodule
+// std/fs/permissions.lm
+// Filesystem permissions and access flags.
 
+/// Represents file or directory access permissions.
+///
+/// Encapsulates read-only status and access control attributes.
+///
+/// @example
+/// import std.fs.permissions as perm;
+/// var p = perm.Permissions(false);
+/// print(p.is_readonly()); // false
 frame Permissions {
     pub var readonly: bool;
 
@@ -7,6 +16,9 @@ frame Permissions {
         self.readonly = readonly;
     }
 
+    /// Checks whether the resource is marked read-only.
+    ///
+    /// @return True if read-only, false if writable.
     pub fn is_readonly(): bool {
         return self.readonly;
     }

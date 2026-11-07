@@ -59,7 +59,7 @@ pub fn menu_items(items: [MenuItem]): ui_types.Widget {
             .width(180.0)
             .height(32.0)
             .on_click(mi.action);
-        if (mi.enabled == false) {
+        if (not mi.enabled) {
             btn = btn.disabled();
         }
         item_widgets.append(btn);

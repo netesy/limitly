@@ -1,23 +1,27 @@
-// YAML Writer Module
+// std/yaml/writer.lm
+// YAML document serializer.
 
 import std.yaml.value as value;
 
-pub fn stringify(val_any: any): str {
-    var jval = val_any as value.Value;
-    if (jval == nil) {
+/// Serializes a YAML `Value` node into YAML document text.
+///
+/// @param val_obj Value AST node to format.
+/// @return Serialized YAML text.
+pub fn stringify(val_obj: value.Value): str {
+    if (val_obj == nil) {
         return "";
     }
 
-    match (jval.kind) {
+    match (val_obj.kind) {
         value.Type.String => {
-            return "\"" + jval.str_val + "\"";
+            return val_obj.str_val;
         },
         value.Type.Number => {
-            var num = jval.num_val;
+            var num = val_obj.num_val;
             return "{num}";
         },
         value.Type.Bool => {
-            if (jval.bool_val == true) {
+            if (val_obj.bool_val) {
                 return "true";
             }
             return "false";
@@ -25,9 +29,10 @@ pub fn stringify(val_any: any): str {
         value.Type.Object => {
             var res = "";
             var i = 0;
-            var keys_len = len(jval.obj_keys);
+            var keys_len = len(val_obj.obj_keys);
             while (i < keys_len) {
-                res = res + jval.obj_keys[i] + ": " + stringify(jval.obj_vals[i]) + "\n";
+                var child_val = val_obj.obj_vals[i] as value.Value;
+                res = res + val_obj.obj_keys[i] + ": " + stringify(child_val) + "\n";
                 i = i + 1;
             }
             return res;

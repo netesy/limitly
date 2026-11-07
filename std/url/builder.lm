@@ -3,6 +3,21 @@
 
 import std.url.url as url;
 
+/// Fluent builder for constructing and configuring RFC 3986 URLs.
+///
+/// Provides a chainable interface to set individual URL components (scheme, host, port, path, query, fragment, credentials)
+/// before producing an immutable `URL` instance.
+///
+/// @tip Use this builder when assembling URLs dynamically with optional queries and authentication parameters.
+///
+/// @example
+/// import std.url.builder as builder;
+/// var u = builder.Builder()
+///     .set_scheme("https")
+///     .set_host("api.example.com")
+///     .set_path("/v1/items")
+///     .set_query("limit=50")
+///     .build();
 frame Builder {
     pub fragment: str;
     pub host: str;
@@ -24,46 +39,87 @@ frame Builder {
         self.username = "";
     }
 
+    /// Sets the URL scheme (e.g. "https", "http", "ftp").
+    ///
+    /// @pre len(scheme) > 0
+    /// @param scheme Target scheme string.
+    /// @return Current Builder instance for chaining.
     pub fn set_scheme(scheme: str): Builder {
+        contract(len(scheme) > 0, "Scheme must not be empty");
         self.scheme = scheme;
         return self;
     }
 
+    /// Sets the network host or IP address.
+    ///
+    /// @pre len(host) > 0
+    /// @param host Hostname, IPv4, or IPv6 literal.
+    /// @return Current Builder instance for chaining.
     pub fn set_host(host: str): Builder {
+        contract(len(host) > 0, "Host must not be empty");
         self.host = host;
         return self;
     }
 
+    /// Sets the network port number.
+    ///
+    /// @pre port == -1 or (port > 0 and port <= 65535)
+    /// @param port TCP port number, or -1 to infer scheme default.
+    /// @return Current Builder instance for chaining.
     pub fn set_port(port: int): Builder {
+        contract(port == -1 or (port > 0 and port <= 65535), "Port must be -1 or between 1 and 65535");
         self.port = port;
         return self;
     }
 
+    /// Sets the hierarchical resource path.
+    ///
+    /// @param path Resource path string.
+    /// @return Current Builder instance for chaining.
     pub fn set_path(path: str): Builder {
         self.path = path;
         return self;
     }
 
+    /// Sets the raw URL query string (without leading '?').
+    ///
+    /// @param query Query parameter string.
+    /// @return Current Builder instance for chaining.
     pub fn set_query(query: str): Builder {
         self.query = query;
         return self;
     }
 
+    /// Sets the URL fragment identifier (without leading '#').
+    ///
+    /// @param fragment Section or anchor fragment.
+    /// @return Current Builder instance for chaining.
     pub fn set_fragment(fragment: str): Builder {
         self.fragment = fragment;
         return self;
     }
 
+    /// Sets the username for authority authentication.
+    ///
+    /// @param username User credential name.
+    /// @return Current Builder instance for chaining.
     pub fn set_username(username: str): Builder {
         self.username = username;
         return self;
     }
 
+    /// Sets the password for authority authentication.
+    ///
+    /// @param password User credential secret.
+    /// @return Current Builder instance for chaining.
     pub fn set_password(password: str): Builder {
         self.password = password;
         return self;
     }
 
+    /// Assembles and returns the configured URL instance.
+    ///
+    /// @return Newly constructed `url.URL` object.
     pub fn build(): url.URL {
         var u = url.URL("");
         u.scheme = self.scheme;

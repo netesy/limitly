@@ -1,31 +1,37 @@
-// std/parse/index.lm
-// Public entrypoint and facade for std.parse. Parsing helpers for numbers, booleans, dates, and text tokens.
+// Standard Library Parsing Module
+//
+// String to primitive numbers, booleans, and date-time converters.
 
-import std.parse.numbers as numbers;
-import std.parse.bool as bool_parser;
+import std.parse.bool as b;
+import std.parse.numbers as n;
+import std.parse.datetime as dt;
 import std.time.datetime as datetime;
 
-pub import std.time.datetime show DateTime;
-
+/// Facade frame for parsing operations.
 frame Parse {
     pub init() {}
-    pub fn parse_int(value: str): any { return numbers.parse_int(value); }
-    pub fn parse_float(value: str): any { return numbers.parse_float(value); }
-    pub fn parse_bool(value: str): bool { return bool_parser.parse_bool(value); }
+    pub fn parse_bool(value: str): bool { return b.parse_bool(value); }
+    pub fn parse_int(value: str): int? { return n.parse_int(value); }
+    pub fn parse_float(value: str): str? { return n.parse_float(value); }
+    pub fn parse_datetime(value: str): datetime.DateTime? { return dt.parse_datetime(value); }
 }
 
-pub fn parse_int(value: str): any {
-    return numbers.parse_int(value);
-}
-
-pub fn parse_float(value: str): any {
-    return numbers.parse_float(value);
-}
-
+/// Parses a boolean literal ("true", "false", "1", "0").
 pub fn parse_bool(value: str): bool {
-    return bool_parser.parse_bool(value);
+    return b.parse_bool(value);
 }
 
+/// Parses a signed integer from string.
+pub fn parse_int(value: str): int? {
+    return n.parse_int(value);
+}
+
+/// Parses a float from string.
+pub fn parse_float(value: str): str? {
+    return n.parse_float(value);
+}
+
+/// Parses a date-time string in ISO format.
 pub fn parse_datetime(value: str): datetime.DateTime? {
-    return datetime.parse_datetime(value);
+    return dt.parse_datetime(value);
 }

@@ -1,0 +1,31 @@
+// Test std.toml and std.yaml parsing and stringifying
+import std.toml as toml;
+import std.yaml as yaml;
+
+fn test_toml_roundtrip() {
+    print("Testing TOML...");
+    var input_toml = "title = \"Limitless App\"\nport = 8080\nenabled = true\n";
+    var doc = toml.parse(input_toml);
+    assert(doc.is_object(), "TOML doc is object");
+    assert(len(doc.obj_keys) == 3, "TOML 3 keys");
+    var out_toml = toml.stringify(doc);
+    var doc2 = toml.parse(out_toml);
+    assert(len(doc2.obj_keys) == 3, "TOML roundtrip keys");
+}
+
+fn test_yaml_roundtrip() {
+    print("Testing YAML...");
+    var input_yaml = "name: Limitless\nworkers: 4\ndebug: true\n";
+    var doc = yaml.parse(input_yaml);
+    assert(doc.is_object(), "YAML doc is object");
+    assert(len(doc.obj_keys) == 3, "YAML 3 keys");
+    var out_yaml = yaml.stringify(doc);
+    var doc2 = yaml.parse(out_yaml);
+    assert(len(doc2.obj_keys) == 3, "YAML roundtrip keys");
+}
+
+print("=== Running TOML / YAML Test Suite ===");
+test_toml_roundtrip();
+test_yaml_roundtrip();
+print("=== All TOML / YAML Tests Passed ===");
+

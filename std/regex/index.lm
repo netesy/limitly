@@ -5,44 +5,83 @@ import std.regex.regex as regex;
 
 pub import std.regex.regex show Match, Regex, RegexPatterns;
 
-pub fn Match(is_matched: bool = false, value: str = "", start: int = -1, end: int = -1, index: int = -1): regex.Match {
-    return regex.Match(is_matched, value, start, end, index);
-}
-
-pub fn Regex(pattern: str, flags: int = 0): regex.Regex {
-    return regex.Regex(pattern, flags);
-}
-
-pub fn RegexPatterns(): regex.RegexPatterns {
-    return regex.RegexPatterns();
-}
-
+/// Finds the first match of a regular expression pattern within target text.
+///
+/// @param pattern Regular expression pattern string.
+/// @param text Subject string to search.
+/// @return `Match` result object containing match status, offset, and captured substring.
+/// @example
+/// ```lymar
+/// var m = regex.first_match("[0-9]+", "id: 42");
+/// if (m.is_valid()) {
+///     print("Found match: {m.value}\n");
+/// }
+/// ```
 pub fn first_match(pattern: str, text: str): regex.Match {
+    contract(len(pattern) > 0, "pattern cannot be empty");
+    contract(len(text) >= 0, "text must be a valid string");
     var r = regex.Regex(pattern, 0);
     return r.find_match(text, 0);
 }
 
+/// Finds all occurrences of a regular expression pattern within target text.
+///
+/// @param pattern Regular expression pattern string.
+/// @param text Subject string to search.
+/// @return List of `Match` objects for every matching substring.
 pub fn all_matches(pattern: str, text: str): [regex.Match] {
+    contract(len(pattern) > 0, "pattern cannot be empty");
+    contract(len(text) >= 0, "text must be a valid string");
     var r = regex.Regex(pattern, 0);
     return r.find_matches(text);
 }
 
+/// Tests whether a regular expression matches any portion of the input string.
+///
+/// @param pattern Regular expression pattern string.
+/// @param text Subject string to evaluate.
+/// @return `true` if pattern matches anywhere in text, `false` otherwise.
 pub fn is_match(pattern: str, text: str): bool {
+    contract(len(pattern) > 0, "pattern cannot be empty");
+    contract(len(text) >= 0, "text must be a valid string");
     var r = regex.Regex(pattern, 0);
     return r.is_match(text);
 }
 
+/// Replaces the first match of pattern with a replacement string.
+///
+/// @param pattern Pattern to search for.
+/// @param text Source string to perform substitution on.
+/// @param replacement Replacement string.
+/// @return Modified string with first match replaced.
 pub fn replace(pattern: str, text: str, replacement: str): str {
+    contract(len(pattern) > 0, "pattern cannot be empty");
+    contract(len(text) >= 0, "text must be a valid string");
     var r = regex.Regex(pattern, 0);
     return r.replace(text, replacement);
 }
 
+/// Replaces all matches of pattern with a replacement string.
+///
+/// @param pattern Pattern to search for.
+/// @param text Source string to perform substitution on.
+/// @param replacement Replacement string.
+/// @return Modified string with all matches replaced.
 pub fn replace_all(pattern: str, text: str, replacement: str): str {
+    contract(len(pattern) > 0, "pattern cannot be empty");
+    contract(len(text) >= 0, "text must be a valid string");
     var r = regex.Regex(pattern, 0);
     return r.replace_all(text, replacement);
 }
 
+/// Splits input text by regular expression delimiter.
+///
+/// @param pattern Regular expression delimiter.
+/// @param text String to split.
+/// @return List of string tokens.
 pub fn split(pattern: str, text: str): [str] {
+    contract(len(pattern) > 0, "pattern cannot be empty");
+    contract(len(text) >= 0, "text must be a valid string");
     var r = regex.Regex(pattern, 0);
     return r.split(text);
 }

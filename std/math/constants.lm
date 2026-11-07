@@ -1,9 +1,28 @@
-// Standard Library Math Constants
+// std/math/constants.lm
+// Standard mathematical constants conforming to IEEE 754 floating-point definitions.
 
+/// Mathematical constants module providing standard floating-point approximations.
+///
+/// Includes circle constants (π, τ), natural logarithm base (e), golden ratio (φ),
+/// infinity, machine epsilon, and not-a-number definitions.
+
+/// The mathematical ratio of a circle's circumference to its diameter (π).
 pub const PI: float = 3.14159265358979323846;
+
+/// Euler's number, the base of the natural logarithm (e).
 pub const E: float = 2.71828182845904523536;
+
+/// The circle constant representing the ratio of circumference to radius (τ = 2π).
 pub const TAU: float = 6.28318530717958647692;
+
+/// The golden ratio (φ = (1 + √5) / 2).
 pub const PHI: float = 1.61803398874989484820;
+
+/// Positive infinity approximation for 64-bit floating-point numbers.
 pub const INF: float = 1e300;
+
+/// Representation of Not-a-Number (NaN) for float operations.
 pub const NAN: float = 0.0;
+
+/// Machine epsilon for 64-bit IEEE 754 floats (approximate difference between 1.0 and next representable float).
 pub const EPSILON: float = 0.00000000000000022204;

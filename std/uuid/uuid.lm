@@ -1,15 +1,34 @@
 // std/uuid/uuid.lm
-// Uuid submodule for std.uuid. Universally Unique Identifier (UUID) generation and parsing.
+// RFC 4122 Universally Unique Identifier (UUID) representation and parsing.
 
+/// Represents a 128-bit RFC 4122 Universally Unique Identifier (UUID).
+///
+/// @tip Use `uuid.generate_v4()` to create random UUIDs or `uuid.parse(str)` to parse from strings.
+/// @note Instances represent 16 raw bytes along with a validation status flag.
+///
+/// @param bytes 16-element byte array or empty if invalid.
+/// @param is_valid Boolean indicating whether the UUID represents a parsed/valid identifier.
+///
+/// @example
+/// import std.uuid as uuid;
+/// var id = uuid.generate_v4();
+/// print("Generated: {id.to_string()} (v{id.version()})");
 frame UUID {
     pub bytes: [int];
     pub is_valid: bool;
 
     pub init(bytes: [int], is_valid: bool) {
+        contract(len(bytes) == 16 or not is_valid, "Valid UUID must contain exactly 16 bytes");
         self.bytes = bytes;
         self.is_valid = is_valid;
     }
 
+    /// Formats the UUID into its standard canonical 8-4-4-4-12 lowercase string.
+    ///
+    /// @return Canonical 36-character hyphenated UUID string, or empty string if invalid.
+    ///
+    /// @example
+    /// var s = id.to_string(); // "f81d4fae-7dec-11d0-a765-00a0c91e6bf6"
     pub fn to_string(): str {
         if (not self.is_valid or len(self.bytes) != 16) {
             return "";
@@ -38,6 +57,9 @@ frame UUID {
         return res;
     }
 
+    /// Extracts the UUID specification version number (bits 4-7 of octet 6).
+    ///
+    /// @return Version number (e.g. 4 for pseudo-random UUIDs, 1 for time-based, 0 if invalid).
     pub fn version(): int {
         if (not self.is_valid or len(self.bytes) != 16) {
             return 0;
@@ -45,6 +67,9 @@ frame UUID {
         return (self.bytes[6] >> 4) & 0x0F;
     }
 
+    /// Extracts the RFC 4122 variant code.
+    ///
+    /// @return 1 for RFC 4122 (Leach-Salz), 0 for NCS backwards compatibility, 2 for Microsoft GUID.
     pub fn variant(): int {
         if (not self.is_valid or len(self.bytes) != 16) {
             return 0;
@@ -62,6 +87,10 @@ frame UUID {
         return 3;
     }
 
+    /// Compares two UUID instances for 128-bit equality.
+    ///
+    /// @param other The target UUID to compare against.
+    /// @return True if both UUIDs are valid and all 16 bytes match identically.
     pub fn equals(other: UUID): bool {
         if (not self.is_valid or not other.is_valid) {
             return false;
@@ -80,6 +109,18 @@ frame UUID {
     }
 }
 
+/// Parses a 36-character hyphenated UUID string (or 38-character braced format) into a UUID.
+///
+/// @tip Tolerates uppercase and lowercase hexadecimal digits, surrounding whitespace, and `{...}` braces.
+///
+/// @param uuid_str The UUID string to parse.
+/// @return Parsed UUID object; check `result.is_valid` for success.
+///
+/// @example
+/// var id = uuid.parse("f81d4fae-7dec-11d0-a765-00a0c91e6bf6");
+/// if (id.is_valid) {
+///     print("Version: {id.version()}");
+/// }
 pub fn parse(uuid_str: str): UUID {
     var s = to_lower(trim(uuid_str));
     if (len(s) == 38 and _builtin_substring(s, 0, 1) == "{" and _builtin_substring(s, 37, 38) == "}") {

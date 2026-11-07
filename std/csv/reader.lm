@@ -1,7 +1,14 @@
-// CSV Reader Module
+// std/csv/reader.lm
+// CSV tabular text reader and parser.
 
 import std.string.split as split;
 
+/// Parses RFC 4180-style comma-separated text into a 2D matrix of strings.
+///
+/// Strips optional carriage returns (\r) and ignores empty trailing lines.
+///
+/// @param text Raw CSV formatted string.
+/// @return 2D list of row records and column field strings.
 pub fn parse_csv(text: str): [[str]] {
     var rows: [[str]] = [];
     var lines = split.split(text, "\n");

@@ -1,5 +1,7 @@
-// TOML Value representation
+// std/toml/value.lm
+// TOML Value AST node representation and primitive constructors.
 
+/// Enumeration of TOML value kinds.
 enum Type {
     String,
     Number,
@@ -7,6 +9,9 @@ enum Type {
     Object
 }
 
+/// Represents an immutable TOML value AST node.
+///
+/// Encapsulates string, integer, boolean, and key-value table objects.
 frame Value {
     pub kind: Type;
     pub str_val: str;
@@ -15,30 +20,56 @@ frame Value {
     pub obj_keys: [str];
     pub obj_vals: [any];
 
+    /// Checks if the value is a string.
     pub fn is_string(): bool { return self.kind == Type.String; }
+
+    /// Checks if the value is an integer number.
     pub fn is_number(): bool { return self.kind == Type.Number; }
+
+    /// Checks if the value is a boolean.
     pub fn is_bool(): bool { return self.kind == Type.Bool; }
+
+    /// Checks if the value is a key-value object/table.
     pub fn is_object(): bool { return self.kind == Type.Object; }
 }
 
+/// Constructs a TOML string value node.
+///
+/// @param v String content.
+/// @return Populated `Value` node.
 pub fn make_string(v: str): Value {
     var keys: [str] = [];
     var vals: [any] = [];
     return Value(kind=Type.String, str_val=v, num_val=0, bool_val=false, obj_keys=keys, obj_vals=vals);
 }
 
+/// Constructs a TOML integer number value node.
+///
+/// @param v Integer value.
+/// @return Populated `Value` node.
 pub fn make_number(v: int): Value {
     var keys: [str] = [];
     var vals: [any] = [];
     return Value(kind=Type.Number, str_val="", num_val=v, bool_val=false, obj_keys=keys, obj_vals=vals);
 }
 
+/// Constructs a TOML boolean value node.
+///
+/// @param v Boolean value.
+/// @return Populated `Value` node.
 pub fn make_bool(v: bool): Value {
     var keys: [str] = [];
     var vals: [any] = [];
     return Value(kind=Type.Bool, str_val="", num_val=0, bool_val=v, obj_keys=keys, obj_vals=vals);
 }
 
+/// Constructs a TOML table/object value node.
+///
+/// @pre len(k) == len(v)
+/// @param k List of string keys.
+/// @param v Parallel list of value nodes.
+/// @return Populated `Value` node.
 pub fn make_object(k: [str], v: [any]): Value {
+    contract(len(k) == len(v), "Key and value counts must match");
     return Value(kind=Type.Object, str_val="", num_val=0, bool_val=false, obj_keys=k, obj_vals=v);
 }

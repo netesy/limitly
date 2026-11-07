@@ -1,5 +1,7 @@
-// Hex Encoding Module
+// std/encoding/hex.lm
+// Hexadecimal Encoding and Decoding.
 
+/// Converts a single hexadecimal ASCII character to its 0-15 integer nibble value.
 fn hex_char_to_val(ch: str): int {
     if (ch == "0") return 0;
     if (ch == "1") return 1;
@@ -20,6 +22,17 @@ fn hex_char_to_val(ch: str): int {
     return 0;
 }
 
+/// Encodes an array of bytes into a lowercase hexadecimal string.
+///
+/// @tip Every byte produces exactly two hexadecimal characters.
+///
+/// @param bytes Array of byte values (0-255).
+/// @return Lowercase hexadecimal representation.
+///
+/// @example
+/// import std.encoding.hex as hex;
+/// var h = hex.to_hex([255, 0, 127]);
+/// print("Hex: {h}"); // "ff007f"
 pub fn to_hex(bytes: [int]): str {
     var hex: str = "0123456789abcdef";
     var res: str = "";
@@ -36,7 +49,20 @@ pub fn to_hex(bytes: [int]): str {
     return res;
 }
 
+/// Decodes a hexadecimal string into an array of byte integers.
+///
+/// @pre len(s) % 2 == 0
+/// @tip Case-insensitive; accepts uppercase (A-F) and lowercase (a-f) characters.
+///
+/// @param s Hexadecimal string (must have an even length).
+/// @return Decoded byte array [int].
+///
+/// @example
+/// import std.encoding.hex as hex;
+/// var bytes = hex.from_hex("48656c6c6f");
+/// print("Decoded byte count: {len(bytes)}");
 pub fn from_hex(s: str): [int] {
+    contract(len(s) % 2 == 0, "Hex string length must be even");
     var res: [int] = [];
     var i: int = 0;
     var length = len(s);
@@ -51,14 +77,32 @@ pub fn from_hex(s: str): [int] {
     return res;
 }
 
+/// Converts a single byte integer into a 2-character lowercase hex string.
+///
+/// @pre b >= 0 and b <= 255
+/// @param b Byte value between 0 and 255.
+/// @return 2-character lowercase hex string.
+///
+/// @example
+/// print("Hex: {hex.byte_to_hex(254)}"); // "fe"
 pub fn byte_to_hex(b: int): str {
+    contract(b >= 0 and b <= 255, "Byte value must be within range 0-255");
     var hex: str = "0123456789abcdef";
     var hi: int = (b >> 4) & 15;
     var lo: int = b & 15;
     return _builtin_substring(hex, hi, hi + 1) + _builtin_substring(hex, lo, lo + 1);
 }
 
+/// Parses a 2-character hex string into a single byte integer (0-255).
+///
+/// @pre len(h) >= 2
+/// @param h Hex string of at least 2 characters.
+/// @return Parsed byte integer.
+///
+/// @example
+/// print("Byte: {hex.hex_to_byte(\"ff\")}"); // 255
 pub fn hex_to_byte(h: str): int {
+    contract(len(h) >= 2, "Hex string must have at least 2 characters");
     if (len(h) < 2) {
         return 0;
     }

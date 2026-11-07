@@ -1,7 +1,16 @@
-// Standard Library I/O Console Submodule
+// std/io/console.lm
+// Standard input and output console management.
 
 import std.resource as res;
 
+/// Standard console stream manager for terminal output and user input.
+///
+/// Encapsulates standard output (stdout) and standard input (stdin) operations.
+///
+/// @example
+/// import std.io.console as console;
+/// var c = console.Console();
+/// c.print("Hello from Console!");
 frame Console {
     var resource: res.Resource;
     var writer: res.Writer;
@@ -11,10 +20,16 @@ frame Console {
         self.writer = res.Writer(r=self.resource);
     }
 
-    pub fn print(msg: any): nil {
+    /// Prints a message string to standard output.
+    ///
+    /// @param msg Message text to display.
+    pub fn print(msg: str): nil {
         self.writer.write(args=[msg]);
     }
 
+    /// Reads a single line of text from standard input.
+    ///
+    /// @return Line of text entered by user.
     pub fn read_line(): str {
         return input("");
     }

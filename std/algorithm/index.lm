@@ -1,145 +1,21 @@
-// std/algorithm/index.lm
-// Public entrypoint and facade for std.algorithm. Algorithmic utilities, searching, filtering, and sequence manipulation.
+// Standard Library Algorithm Module
+//
+// Searching, sorting, sequence manipulation, filtering, and numerical utilities.
 
-import std.algorithm.search as search;
-import std.algorithm.sort as sort;
-import std.algorithm.partition as partition;
-import std.algorithm.transform as transform;
-import std.algorithm.reduce as reduce;
-import std.algorithm.filter as filter;
-import std.algorithm.unique as unique;
-import std.algorithm.shuffle as shuffle;
-import std.algorithm.binary_search as binary_search;
+pub import std.algorithm.search show find, find_if, any_match, none, all, count, linear_search, interpolation_search;
+pub import std.algorithm.sort show sort, quicksort, quicksort_descending, mergesort, heapsort, insertion_sort, counting_sort, radix_sort, timsort, stable_sort, partial_sort, compare_ordering;
+pub import std.algorithm.partition show partition, partition_copy, is_partitioned;
+pub import std.algorithm.transform show map, zip, unzip, transform, reverse, rotate;
+pub import std.algorithm.reduce show reduce, fold;
+pub import std.algorithm.filter show filter, remove_if;
+pub import std.algorithm.unique show unique;
+pub import std.algorithm.shuffle show shuffle;
+pub import std.algorithm.binary_search show binary_search, lower_bound, upper_bound, equal_range;
 
-// Search re-exports
-pub fn find(items: [any], value: any): int {
-    return search.find(items, value);
-}
-pub fn find_if(items: [any], p: fn(any): bool): int {
-    return search.find_if(items, p);
-}
-pub fn any_match(items: [any], p: fn(any): bool): bool {
-    return search.any_match(items, p);
-}
-pub fn none(items: [any], p: fn(any): bool): bool {
-    return search.none(items, p);
-}
-pub fn all(items: [any], p: fn(any): bool): bool {
-    return search.all(items, p);
-}
-pub fn count(items: [any], value: any): int {
-    return search.count(items, value);
-}
-pub fn linear_search(items: [any], value: any): int {
-    return search.linear_search(items, value);
-}
-
-// Sort re-exports
-pub fn sort(items: [any]) {
-    sort.sort(items);
-}
-pub fn quicksort(items: [any]) {
-    sort.quicksort(items);
-}
-pub fn quicksort_descending(items: [any]) {
-    sort.quicksort_descending(items);
-}
-pub fn mergesort(items: [any]) {
-    sort.mergesort(items);
-}
-pub fn heapsort(items: [any]) {
-    sort.heapsort(items);
-}
-pub fn insertion_sort(items: [any]) {
-    sort.insertion_sort(items);
-}
-pub fn counting_sort(items: [int]) {
-    sort.counting_sort(items);
-}
-pub fn radix_sort(items: [int]) {
-    sort.radix_sort(items);
-}
-pub fn timsort(items: [any]) {
-    sort.timsort(items);
-}
-pub fn stable_sort(items: [any]) {
-    sort.stable_sort(items);
-}
-pub fn partial_sort(items: [any], count: int) {
-    sort.partial_sort(items, count);
-}
-
-// Partition re-exports
-pub fn partition(items: [any], p: fn(any): bool): int {
-    return partition.partition(items, p);
-}
-pub fn partition_copy(items: [any], p: fn(any): bool): ([any], [any]) {
-    return partition.partition_copy(items, p);
-}
-pub fn is_partitioned(items: [any], p: fn(any): bool): bool {
-    return partition.is_partitioned(items, p);
-}
-
-// Transform re-exports
-pub fn map(items: [any], f: fn(any): any): [any] {
-    return transform.map(items, f);
-}
-pub fn zip(left: [any], right: [any]): [any] {
-    return transform.zip(left, right);
-}
-pub fn unzip(pairs: [any]): ([any], [any]) {
-    return transform.unzip(pairs);
-}
-pub fn transform(items: [any], f: fn(any): any): [any] {
-    return transform.transform(items, f);
-}
-pub fn reverse(items: [any]) {
-    transform.reverse(items);
-}
-pub fn rotate(items: [any], k: int) {
-    transform.rotate(items, k);
-}
-
-// Reduce re-exports
-pub fn reduce(items: [any], f: fn(any, any): any, initial: any): any {
-    return reduce.reduce(items, f, initial);
-}
-pub fn fold(items: [any], initial: any, f: fn(any, any): any): any {
-    return reduce.fold(items, initial, f);
-}
-
-// Filter re-exports
-pub fn filter(items: [any], p: fn(any): bool): [any] {
-    return filter.filter(items, p);
-}
-pub fn remove_if(items: [any], p: fn(any): bool): [any] {
-    return filter.remove_if(items, p);
-}
-
-// Unique re-exports
-pub fn unique(items: [any]): [any] {
-    return unique.unique(items);
-}
-
-// Shuffle re-exports
-pub fn shuffle(items: [any]) {
-    shuffle.shuffle(items);
-}
-
-// Binary Search re-exports
-pub fn binary_search(items: [any], value: any): int {
-    return binary_search.binary_search(items, value);
-}
-pub fn lower_bound(items: [any], value: any): int {
-    return binary_search.lower_bound(items, value);
-}
-pub fn upper_bound(items: [any], value: any): int {
-    return binary_search.upper_bound(items, value);
-}
-pub fn equal_range(items: [any], value: any): (int, int) {
-    return binary_search.equal_range(items, value);
-}
-
+/// Tests whether an integer is a prime number.
+///
+/// @param n Integer number to test.
+/// @return `true` if prime, `false` otherwise.
 pub fn is_prime(n: int): bool {
     if (n <= 1) return false;
     if (n <= 3) return true;

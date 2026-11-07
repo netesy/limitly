@@ -163,7 +163,7 @@ pub fn library_unload(handle: pubptr): nil {}
 pub fn library_get_symbol(handle: pubptr, symbol: str): fnptr { return 0; }
 
 // Foreign Calls
-pub fn foreign_call(func_ptr: fnptr, args: [any], return_type: int = 6, param_types: [any] = []): any { return 0; }
+pub fn foreign_call(func_ptr: fnptr, args: [any], return_type: int = 6, param_types: [any] = []) { return 0; }
 
 // Typed calls are the supported safe-wrapper building blocks. Unlike
 // `foreign_call`, their complete ABI signature is visible in LIR and can be

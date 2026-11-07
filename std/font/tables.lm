@@ -513,13 +513,13 @@ pub fn parse_tables(reader: r.ByteReader): Info? {
     if (kern_offset >= 0) {
         reader.seek(kern_offset);
         var version = reader.read_u16();
-        var num_tables = reader.read_u16();
+        var num_kern_tables = reader.read_u16();
 
         // Look for horizontal format 0 table
-        if (num_tables > 0) {
+        if (num_kern_tables > 0) {
             var kern_found = false;
             var k = 0;
-            while (k < num_tables and !kern_found) {
+            while (k < num_kern_tables and !kern_found) {
                 var subtable_start = reader.tell();
                 var subtable_length = reader.read_u32();
                 var coverage = reader.read_u16();

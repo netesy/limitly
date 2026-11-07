@@ -1,36 +1,65 @@
 // std/math/vector3.lm
-// Vector3 submodule for std.math. Mathematical constants, arithmetic functions, trigonometry, and statistics.
+// Three-dimensional floating-point geometric vector.
 
 import std.math.arithmetic as arith;
-import std.math show Addable, Scalable, Normalizable;
 
-frame Vector3 : Addable, Scalable, Normalizable {
+/// Represents a 3D Euclidean vector with x, y, and z Cartesian coordinates.
+///
+/// Supports component-wise addition and subtraction, scalar scaling,
+/// dot product, 3D cross product, magnitude calculation, and normalization.
+///
+/// @example
+/// import std.math.vector3 as v3;
+/// var right = v3.Vector3(1.0, 0.0, 0.0);
+/// var up = v3.Vector3(0.0, 1.0, 0.0);
+/// var forward = right.cross(up); // Vector3(0.0, 0.0, 1.0)
+frame Vector3 {
     pub x: float;
     pub y: float;
     pub z: float;
 
-    pub init(x: float, y: float, z: float) {
+    pub init(x: float = 0.0, y: float = 0.0, z: float = 0.0) {
         self.x = x;
         self.y = y;
         self.z = z;
     }
 
+    /// Adds another 3D vector to this vector.
+    ///
+    /// @param other Vector to add.
+    /// @return Component-wise sum vector.
     pub fn add(other: Vector3): Vector3 {
         return Vector3(self.x + other.x, self.y + other.y, self.z + other.z);
     }
 
+    /// Subtracts another 3D vector from this vector.
+    ///
+    /// @param other Vector to subtract.
+    /// @return Component-wise difference vector.
     pub fn sub(other: Vector3): Vector3 {
         return Vector3(self.x - other.x, self.y - other.y, self.z - other.z);
     }
 
+    /// Multiplies all components by a scalar value.
+    ///
+    /// @param s Scaling factor.
+    /// @return Scaled vector.
     pub fn scale(s: float): Vector3 {
         return Vector3(self.x * s, self.y * s, self.z * s);
     }
 
+    /// Computes the dot product of this vector and another 3D vector.
+    ///
+    /// @param other Vector to dot with.
+    /// @return Scalar dot product.
     pub fn dot(other: Vector3): float {
         return self.x * other.x + self.y * other.y + self.z * other.z;
     }
 
+    /// Computes the 3D cross product (vector product) of this vector and another.
+    ///
+    /// @param other Vector to cross with.
+    /// @return Perpendicular vector following the right-hand rule.
     pub fn cross(other: Vector3): Vector3 {
         return Vector3(
             self.y * other.z - self.z * other.y,
@@ -39,10 +68,18 @@ frame Vector3 : Addable, Scalable, Normalizable {
         );
     }
 
+    /// Computes the Euclidean magnitude (length) of the vector.
+    ///
+    /// @return Vector length.
     pub fn mag(): float {
         return arith.sqrt(self.x * self.x + self.y * self.y + self.z * self.z);
     }
 
+    /// Computes the unit-length direction vector.
+    ///
+    /// @tip Returns a zero vector if magnitude is zero.
+    ///
+    /// @return Normalized unit vector.
     pub fn normalize(): Vector3 {
         var m = self.mag();
         if (m == 0.0) {

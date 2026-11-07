@@ -1,29 +1,36 @@
-// std/search/index.lm
-// Search algorithms and binary search utilities
+// Standard Library Search Module
+//
+// Linear search, binary search, bounds, and interpolation search algorithms.
 
 import std.algorithm.search as search;
 import std.algorithm.binary_search as bs;
 
-pub fn linear_search(items: [any], target: any): int {
+/// Performs linear search on an arbitrary sequence.
+pub fn linear_search(items: [any], target): int {
     return search.linear_search(items, target);
 }
 
-pub fn binary_search(items: [any], target: any): int {
+/// Performs binary search on a sorted sequence.
+pub fn binary_search(items: [any], target): int {
     return bs.binary_search(items, target);
 }
 
-pub fn lower_bound(items: [any], target: any): int {
+/// Finds lower bound index in a sorted sequence.
+pub fn lower_bound(items: [any], target): int {
     return bs.lower_bound(items, target);
 }
 
-pub fn upper_bound(items: [any], target: any): int {
+/// Finds upper bound index in a sorted sequence.
+pub fn upper_bound(items: [any], target): int {
     return bs.upper_bound(items, target);
 }
 
-pub fn equal_range(items: [any], target: any): (int, int) {
+/// Computes (lower_bound, upper_bound) range tuple.
+pub fn equal_range(items: [any], target): (int, int) {
     return bs.equal_range(items, target);
 }
 
+/// Fast interpolation search on uniformly distributed integers.
 pub fn interpolation_search(items: [int], target: int): int {
     return search.interpolation_search(items, target);
 }

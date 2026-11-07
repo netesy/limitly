@@ -24,32 +24,32 @@ frame GestureState {
 pub var gesture_states: {str: GestureState} = {};
 
 // Detect and handle tap gesture
-pub fn detect_tap(child: ui_types.Widget, on_tap: any): ui_types.Widget {
+pub fn detect_tap(child: ui_types.Widget, on_tap): ui_types.Widget {
     child.on_click_action = on_tap;
     return child;
 }
 
 // Detect and handle long press (hold for 500ms)
-pub fn detect_long_press(child: ui_types.Widget, on_long_press: any): ui_types.Widget {
+pub fn detect_long_press(child: ui_types.Widget, on_long_press): ui_types.Widget {
     child.on_change_action = on_long_press;
     return child;
 }
 
 // Detect double tap (two taps within 300ms)
-pub fn detect_double_tap(child: ui_types.Widget, on_double_tap: any): ui_types.Widget {
+pub fn detect_double_tap(child: ui_types.Widget, on_double_tap): ui_types.Widget {
     child.placeholder_val = "double_tap";
     child.on_click_action = on_double_tap;
     return child;
 }
 
 // Detect swipe gesture (fast drag in one direction)
-pub fn detect_swipe(child: ui_types.Widget, on_swipe: any): ui_types.Widget {
+pub fn detect_swipe(child: ui_types.Widget, on_swipe): ui_types.Widget {
     child.a11y_hint = "swipe_gesture";
     return child;
 }
 
 // Detect pan/drag gesture (continuous movement)
-pub fn detect_pan(child: ui_types.Widget, on_pan: any): ui_types.Widget {
+pub fn detect_pan(child: ui_types.Widget, on_pan): ui_types.Widget {
     child.a11y_live = "pan_gesture";
     return child;
 }

@@ -1,4 +1,5 @@
-// TOML Parser Module
+// std/toml/parser.lm
+// Line-based TOML document parser.
 
 import std.toml.value as value;
 import std.string as std_string;
@@ -19,10 +20,12 @@ fn is_digit_char(ch: str): bool {
     }
 }
 
+/// Line-based TOML document parser.
 frame Parser {
     pub idx: int;
     pub text: str;
 
+    /// Parses key-value pairs from the TOML text.
     pub fn parse_value(): value.Value {
         var keys: [str] = [];
         var vals: [any] = [];
@@ -37,7 +40,7 @@ frame Parser {
             } else {
                 var key_start = self.idx;
                 var find_eq = true;
-                while (self.idx < length and find_eq == true) {
+                while (self.idx < length and find_eq) {
                     var cur_ch = _builtin_substring(self.text, self.idx, self.idx + 1);
                     if (cur_ch == "=") {
                         find_eq = false;
@@ -51,7 +54,7 @@ frame Parser {
                 var key = std_string.trim(key_raw);
 
                 var skip_val_spaces = true;
-                while (self.idx < length and skip_val_spaces == true) {
+                while (self.idx < length and skip_val_spaces) {
                     var cur_ch = _builtin_substring(self.text, self.idx, self.idx + 1);
                     if (cur_ch == " " or cur_ch == "\t") {
                         self.idx = self.idx + 1;
@@ -62,7 +65,7 @@ frame Parser {
 
                 var val_start = self.idx;
                 var find_val_end = true;
-                while (self.idx < length and find_val_end == true) {
+                while (self.idx < length and find_val_end) {
                     var cur_ch = _builtin_substring(self.text, self.idx, self.idx + 1);
                     if (cur_ch == "\n" or cur_ch == "\r") {
                         find_val_end = false;
@@ -100,15 +103,20 @@ frame Parser {
                         var val_int = val_trimmed as int;
                         val_obj = value.make_number(val_int);
                     }
-                    keys.append(key);
-                    vals.append(val_obj as any);
                 }
+
+                keys.append(key);
+                vals.append(val_obj);
             }
         }
         return value.make_object(keys, vals);
     }
 }
 
+/// Parses TOML formatted document string into an AST `Value` node.
+///
+/// @param text Raw TOML text.
+/// @return Root `value.Value` table object.
 pub fn parse(text: str): value.Value {
     var p = Parser(idx=0, text=text);
     return p.parse_value();

@@ -1,7 +1,7 @@
-import std.collections.queue as q;
+import std.collections as col;
 
 fn main(): int {
-    var queue = q.Queue();
+    var queue: col.Queue(int) = col.Queue();
     queue.enqueue(1);
     queue.enqueue(2);
     
@@ -11,7 +11,7 @@ fn main(): int {
     assert(queue.dequeue() == 2, "Dequeue should return 2");
     assert(queue.dequeue() == nil, "Dequeue on empty queue should return nil");
     
-    var stack = q.Stack();
+    var stack: col.Stack(int) = col.Stack();
     stack.push(1);
     stack.push(2);
     
@@ -21,7 +21,7 @@ fn main(): int {
     assert(stack.pop() == 1, "Pop should return 1");
     assert(stack.pop() == nil, "Pop on empty stack should return nil");
     
-    var bitset = q.BitSet(100);
+    var bitset = col.BitSet(100);
     bitset.set(10);
     bitset.set(20);
     assert(bitset.contains(10), "BitSet should contain bit 10");

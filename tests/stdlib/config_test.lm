@@ -1,0 +1,40 @@
+import std.config as config;
+
+fn main(): int {
+    print("=== Running Config Module Test ===\n");
+
+    var cfg = config.new_config();
+    cfg.set("app_name", "LimitlessApp");
+    cfg.set("port", 8080);
+    cfg.set("debug", true);
+
+    assert(cfg.has("app_name"), "app_name should exist");
+    assert(cfg.has("port"), "port should exist");
+    assert(cfg.has("debug"), "debug should exist");
+    assert(not cfg.has("missing"), "missing should not exist");
+
+    var name = cfg.get("app_name", "") as str;
+    assert(name == "LimitlessApp", "app_name should match");
+
+    var port = cfg.get("port", 0) as int;
+    assert(port == 8080, "port should match");
+
+    var dbg = cfg.get("debug", false) as bool;
+    assert(dbg, "debug should be true");
+
+    var fallback = cfg.get("unknown_key", "default_val") as str;
+    assert(fallback == "default_val", "fallback should match");
+
+    // JSON parsing
+    var ob = "{";
+    var cb = "}";
+    var json_input = ob + "\"host\": \"localhost\", \"workers\": 4, \"tls\": false" + cb;
+    var json_cfg = config.load_json(json_input);
+    assert(json_cfg.has("host"), "host should exist");
+    assert(json_cfg.get("host", "") as str == "localhost", "host should match");
+    assert(json_cfg.get("workers", 0) as int == 4, "workers should match");
+    assert(not (json_cfg.get("tls", true) as bool), "tls should be false");
+
+    print("Config tests passed successfully!\n");
+    return 0;
+}

@@ -1,20 +1,5 @@
-// std/algorithms/index.lm
-// General algorithm suite
+// Standard Library Algorithms Module (Plural Alias)
+//
+// Re-exports algorithm utilities from std.algorithm.
 
-import std.algorithm as algo;
-
-pub fn is_prime(n: int): bool {
-    return algo.is_prime(n);
-}
-
-pub fn sort(items: [any]) {
-    algo.sort(items);
-}
-
-pub fn find(items: [any], value: any): int {
-    return algo.find(items, value);
-}
-
-pub fn binary_search(items: [any], value: any): int {
-    return algo.binary_search(items, value);
-}
+pub import std.algorithm show is_prime, sort, find, binary_search;

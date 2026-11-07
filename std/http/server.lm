@@ -1,8 +1,6 @@
 // HTTP Server Module
 // Built on the standard resource abstraction.
 
-import std.core as core;
-import std.core show Error;
 import std.resource as res;
 import std.http.common as common;
 
@@ -250,7 +248,7 @@ frame Server {
             bytes.append(_builtin_string_byte_at(raw, i));
             i = i + 1;
         }
-        return writer.write(args=[bytes]) == true;
+        return writer.write(args=[bytes]) as bool;
     }
 
     pub fn serve(handler: any): bool {

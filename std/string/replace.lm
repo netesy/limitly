@@ -1,6 +1,19 @@
 // std/string/replace.lm
 // Substring replacement, backed by the compiler intrinsic.
 
+/// Replaces all occurrences of `old` within `value` with `replacement`.
+///
+/// @param value The target string.
+/// @param old Substring to find and replace.
+/// @param replacement String to substitute in place of `old`.
+/// @return Resulting modified string.
+/// @example
+/// ```lymar
+/// var res = replace.replace("foo bar foo", "foo", "baz");
+/// ```
 pub fn replace(value: str, old: str, replacement: str): str {
+    contract(len(value) >= 0, "value must be a valid string");
+    contract(len(old) > 0, "old substring cannot be empty");
+    contract(len(replacement) >= 0, "replacement must be a valid string");
     return _builtin_string_replace(value, old, replacement);
 }

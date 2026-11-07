@@ -5,9 +5,7 @@ import std.app as app;
 import std.gg as gg;
 
 
-import std.time as time;
-import std.time.timer show Timer;
-import std.math as math;
+import std.time.timer show Timer, Duration;
 import std.game.gui show GUI;
 import std.game.types as types;
 import std.game.input show InputManager;
@@ -111,7 +109,7 @@ frame Game {
 
     pub fn begin_frame(): nil {
         // High-precision frame delta calculation
-        var el = self.timer.elapsed();
+        var el: Duration = self.timer.elapsed();
         self.timer.reset();
         var raw_dt = el.to_seconds();
         if (raw_dt <= 0.00001) {

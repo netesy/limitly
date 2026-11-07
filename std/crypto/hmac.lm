@@ -4,33 +4,73 @@
 import std.ffi as ffi;
 import std.crypto.hash as hash;
 
+/// Namespace helper frame for HMAC message authentication operations.
 frame HMAC {
+    /// Computes an HMAC digest with customizable algorithm.
+    ///
+    /// @param key Secret key string.
+    /// @param data Message payload to authenticate.
+    /// @param algo Digest algorithm (default: `"sha256"`).
+    /// @return Hexadecimal HMAC signature.
     pub fn compute(key: str, data: str, algo: str = "sha256"): str {
         return hmac(algo, key, data);
     }
 
+    /// Computes an HMAC-SHA256 signature.
+    ///
+    /// @param key Secret key string.
+    /// @param data Message payload.
+    /// @return 64-character hex signature.
     pub fn sha256(key: str, data: str): str {
         return hmac("sha256", key, data);
     }
 
+    /// Computes an HMAC-SHA512 signature.
+    ///
+    /// @param key Secret key string.
+    /// @param data Message payload.
+    /// @return 128-character hex signature.
     pub fn sha512(key: str, data: str): str {
         return hmac("sha512", key, data);
     }
 
+    /// Computes an HMAC-SHA384 signature.
+    ///
+    /// @param key Secret key string.
+    /// @param data Message payload.
+    /// @return 96-character hex signature.
     pub fn sha384(key: str, data: str): str {
         return hmac("sha384", key, data);
     }
 
+    /// Computes an HMAC-MD5 signature.
+    ///
+    /// @param key Secret key string.
+    /// @param data Message payload.
+    /// @return 32-character hex signature.
     pub fn md5(key: str, data: str): str {
         return hmac("md5", key, data);
     }
 
+    /// Computes an HMAC-SHA1 signature.
+    ///
+    /// @param key Secret key string.
+    /// @param data Message payload.
+    /// @return 40-character hex signature.
     pub fn sha1(key: str, data: str): str {
         return hmac("sha1", key, data);
     }
 }
 
+/// Computes an HMAC signature using OpenSSL EVP_MAC for arbitrary digest algorithms.
+///
+/// @param algo Digest algorithm name (e.g. `"sha256"`, `"sha512"`).
+/// @param key Secret key string.
+/// @param data Message payload to authenticate.
+/// @return Hexadecimal HMAC signature string.
 pub fn hmac(algo: str, key: str, data: str): str {
+    contract(len(algo) > 0, "algo cannot be empty");
+    contract(len(key) > 0, "key cannot be empty");
     var out_str: str = "";
     unsafe {
         var lib = hash._open_lib();
@@ -63,18 +103,32 @@ pub fn hmac(algo: str, key: str, data: str): str {
                     out_str = ffi.cstring_to_string(out_buf);
                 }
 
+                ffi.free(out_buf);
                 ffi.cstring_free(cs_algo);
                 ffi.cstring_free(cs_key);
                 ffi.cstring_free(cs_data);
-                ffi.free(out_buf);
             }
         }
     }
     return out_str;
 }
 
-pub fn sha256(key: str, data: str): str { return hmac("sha256", key, data); }
-pub fn sha512(key: str, data: str): str { return hmac("sha512", key, data); }
-pub fn sha384(key: str, data: str): str { return hmac("sha384", key, data); }
-pub fn sha1(key: str, data: str): str   { return hmac("sha1", key, data); }
-pub fn md5(key: str, data: str): str    { return hmac("md5", key, data); }
+/// Computes an HMAC-SHA256 signature for message authentication.
+///
+/// @param key Secret key string.
+/// @param data Message payload.
+/// @return 64-character lowercase hex signature.
+pub fn sha256(key: str, data: str): str {
+    contract(len(key) > 0, "key cannot be empty");
+    return hmac("sha256", key, data);
+}
+
+/// Computes an HMAC-SHA512 signature for message authentication.
+///
+/// @param key Secret key string.
+/// @param data Message payload.
+/// @return 128-character lowercase hex signature.
+pub fn sha512(key: str, data: str): str {
+    contract(len(key) > 0, "key cannot be empty");
+    return hmac("sha512", key, data);
+}

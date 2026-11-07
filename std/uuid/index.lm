@@ -1,19 +1,35 @@
 // std/uuid/index.lm
 // Public entrypoint and facade for std.uuid. Universally Unique Identifier (UUID) generation and parsing.
 
+/// # UUID Module (`std.uuid`)
+///
+/// Generation and parsing of RFC 4122 Universally Unique Identifiers (UUIDs).
+/// Supports random Version 4 UUID generation, standard hyphenated string serialization,
+/// and tolerant parsing of braced/lowercase/uppercase UUID formats.
+///
+/// @tip Use `uuid.generate_v4()` to generate random unique identifiers.
+///
+/// @example
+/// import std.uuid as uuid;
+/// var id = uuid.generate_v4();
+/// print("Generated UUID: {id.to_string()}");
+
 import std.uuid.uuid as uuid;
 import std.uuid.generator as generator;
 
 pub import std.uuid.uuid show UUID;
 
-pub fn UUID(bytes: [int], is_valid: bool): uuid.UUID {
-    return uuid.UUID(bytes, is_valid);
-}
-
+/// Parses a string representation of a UUID into a UUID instance.
+///
+/// @param uuid_str Hyphenated or braced UUID string.
+/// @return Parsed UUID; check `is_valid` for success.
 pub fn parse(uuid_str: str): uuid.UUID {
     return uuid.parse(uuid_str);
 }
 
+/// Generates a fresh RFC 4122 Version 4 random UUID.
+///
+/// @return Random UUID instance.
 pub fn generate_v4(): uuid.UUID {
     return generator.generate_v4();
 }

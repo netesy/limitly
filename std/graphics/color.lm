@@ -1,7 +1,5 @@
 // std/graphics/color.lm
 // Re-exports canonical Color definitions from std.color.
 
-import std.color as color;
-
 pub import std.color show Color, rgb, rgba, hex, color_rgb, color_rgba, lerp,
     white, black, transparent, red, green, blue, indigo, yellow, cyan, gray, dark_gray;

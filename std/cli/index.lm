@@ -1,21 +1,41 @@
-// std/cli/index.lm
-// Public entrypoint and facade for std.cli. Command-line argument parsing, options, and CLI flag handling.
+// Standard Library Command-Line Interface (CLI) Module
+//
+// Provides command-line argument parsing, flag evaluation, and positional option extraction.
 
 import std.string as string;
-import std.collections.hash as hash;
 
+/// Parser for command-line arguments and boolean execution flags.
+///
+/// @example
+/// ```lymar
+/// var parser = ArgParser("myapp");
+/// parser.parse(["myapp", "-v", "input.txt"]);
+/// if (parser.has_flag("-v")) {
+///     print("Verbose mode enabled");
+/// }
+/// ```
 frame ArgParser {
-    var program_name: str;
-    var options: {str: bool};
-    pub var args: [str];
-    
+    pub program_name: str;
+    pub options: {str: bool};
+    pub args: [str];
+
+    /// Initializes a new command-line argument parser.
+    ///
+    /// @param name Application or binary program name.
     pub init(name: str = "app") {
+        contract(len(name) > 0, "program name must not be empty");
         self.program_name = name;
         self.options = {};
         self.args = [];
     }
-    
+
+    /// Parses command-line argument tokens.
+    ///
+    /// Identifies option flags starting with '-' and records remaining tokens as positional arguments.
+    ///
+    /// @param argv Token list starting with program binary name at index 0.
     pub fn parse(argv: [str]) {
+        contract(len(argv) >= 0, "argv argument list must be valid");
         for (var i = 1; i < len(argv); i = i + 1) {
             var arg = argv[i];
             if (string.String(arg).starts_with("-")) {
@@ -25,12 +45,21 @@ frame ArgParser {
             }
         }
     }
-    
+
+    /// Checks whether a specific command-line flag was supplied.
+    ///
+    /// @param flag Flag string (e.g. `"-v"` or `"--verbose"`).
+    /// @return `true` if flag is present, `false` otherwise.
     pub fn has_flag(flag: str): bool {
+        contract(len(flag) > 0, "flag identifier must not be empty");
         return self.options[flag] != nil;
     }
-    
+
+    /// Returns parsed positional argument values.
+    ///
+    /// @return List of positional strings.
     pub fn get_args(): [str] {
         return self.args;
     }
 }
+

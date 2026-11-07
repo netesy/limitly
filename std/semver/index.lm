@@ -1,5 +1,21 @@
-// Semantic Versioning (SemVer 2.0.0) standard library module
+// std/semver/index.lm
+// Semantic Versioning (SemVer 2.0.0) standard library module.
 
+/// Semantic Versioning 2.0.0 parser, comparator, and dependency compatibility engine.
+///
+/// Implements SemVer 2.0.0 specification rules for version precedence, pre-release tags,
+/// build metadata, and caret compatibility checking.
+///
+/// @tip Use `parse` to safely convert version strings into structured `Version` instances.
+///
+/// @example
+/// import std.semver as semver;
+/// var v = semver.parse("1.2.3-beta.1+20261107")? else { return; };
+/// print("Major: {v.major}, Minor: {v.minor}");
+/// var target = semver.parse("1.3.0")? else { return; };
+/// print(v.is_compatible(target)); // true
+
+/// Represents a parsed semantic version conforming to SemVer 2.0.0.
 frame Version {
     pub major: int;
     pub minor: int;
@@ -8,6 +24,7 @@ frame Version {
     pub build: str;
 
     pub init(major: int, minor: int, patch: int, prerelease: str, build: str) {
+        contract(major >= 0 and minor >= 0 and patch >= 0, "Version components must be non-negative");
         self.major = major;
         self.minor = minor;
         self.patch = patch;
@@ -15,7 +32,13 @@ frame Version {
         self.build = build;
     }
 
+    /// Compares precedence between this version and another according to SemVer 2.0.0 rules.
+    ///
+    /// @pre other != nil
+    /// @param other Comparison candidate version.
+    /// @return 1 if self > other, -1 if self < other, 0 if equal precedence.
     pub fn compare(other: Version): int {
+        contract(other != nil, "Comparison target must not be nil");
         if (self.major > other.major) return 1;
         if (self.major < other.major) return -1;
 
@@ -67,23 +90,39 @@ frame Version {
         return 0;
     }
 
+    /// Checks whether this version has equal precedence to another version.
+    ///
+    /// @param other Comparison candidate version.
+    /// @return True if versions have equal precedence.
     pub fn equals(other: Version): bool {
         return self.compare(other) == 0;
     }
 
+    /// Checks whether this version has strictly greater precedence than another.
+    ///
+    /// @param other Comparison candidate version.
+    /// @return True if self > other.
     pub fn greater_than(other: Version): bool {
         return self.compare(other) == 1;
     }
 
+    /// Checks whether this version has strictly lower precedence than another.
+    ///
+    /// @param other Comparison candidate version.
+    /// @return True if self < other.
     pub fn less_than(other: Version): bool {
         return self.compare(other) == -1;
     }
 
+    /// Evaluates caret range compatibility (^self) against `other`.
+    ///
+    /// Allows updates that do not modify the leftmost non-zero digit.
+    ///
+    /// @pre other != nil
+    /// @param other Candidate version.
+    /// @return True if `other` is semver-compatible with `self`.
     pub fn is_compatible(other: Version): bool {
-        // Caret range logic: other is compatible with self if:
-        // - major > 0: other.major == self.major and other >= self
-        // - major == 0, minor > 0: other.major == 0 and other.minor == self.minor and other >= self
-        // - major == 0, minor == 0: other == self
+        contract(other != nil, "Comparison target must not be nil");
         if (self.major > 0) {
             if (other.major != self.major) return false;
             return other.compare(self) >= 0;
@@ -95,6 +134,9 @@ frame Version {
         return other.compare(self) == 0;
     }
 
+    /// Formats the version back into a standard SemVer 2.0.0 string.
+    ///
+    /// @return Formatted version string (e.g. "1.2.3-alpha.1+build.4").
     pub fn to_string(): str {
         var res = "{self.major}.{self.minor}.{self.patch}";
         if (self.prerelease != "") {
@@ -107,6 +149,13 @@ frame Version {
     }
 }
 
+/// Parses a SemVer 2.0.0 compliant string into a structured `Version` object.
+///
+/// Enforces numeric core segments, forbids leading zeros on numbers, and validates
+/// identifiers for pre-release and build tags.
+///
+/// @param s Candidate semantic version string.
+/// @return Fallible Version object or err() if invalid.
 pub fn parse(s: str): Version? {
     if (s == "") return err();
 
@@ -169,11 +218,25 @@ pub fn parse(s: str): Version? {
     return ok(Version(major, minor, patch, prerelease, build));
 }
 
+/// Compares two Version instances.
+///
+/// @pre v1 != nil and v2 != nil
+/// @param v1 First version.
+/// @param v2 Second version.
+/// @return 1 if v1 > v2, -1 if v1 < v2, 0 if equal.
 pub fn compare(v1: Version, v2: Version): int {
+    contract(v1 != nil and v2 != nil, "Version operands must not be nil");
     return v1.compare(v2);
 }
 
+/// Evaluates whether `v2` is caret-compatible with `v1`.
+///
+/// @pre v1 != nil and v2 != nil
+/// @param v1 Base version.
+/// @param v2 Target version.
+/// @return True if compatible.
 pub fn is_compatible(v1: Version, v2: Version): bool {
+    contract(v1 != nil and v2 != nil, "Version operands must not be nil");
     return v1.is_compatible(v2);
 }
 

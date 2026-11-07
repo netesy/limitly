@@ -1,7 +1,18 @@
-// std/algorithm/search.lm
-// Search submodule for std.algorithm. Algorithmic utilities, searching, filtering, and sequence manipulation.
+// Standard Library Sequence Search Submodule
+//
+// Linear search, predicate search, quantifiers (all, any, none), and interpolation search.
 
-pub fn linear_search(items: [any], value: any): int {
+/// Finds the first index of a matching value using linear traversal.
+///
+/// @param items Sequence to search.
+/// @param value Target element to find.
+/// @return Index if found, or -1 if not present.
+///
+/// @example
+/// ```lymar
+/// var idx = linear_search(["a", "b", "c"], "b"); // 1
+/// ```
+pub fn linear_search(items: [any], value): int {
     var i = 0;
     while (i < len(items)) {
         if (items[i] == value) {
@@ -12,10 +23,20 @@ pub fn linear_search(items: [any], value: any): int {
     return -1;
 }
 
-pub fn find(items: [any], value: any): int {
+/// Alias for linear_search to find a matching value.
+///
+/// @param items Sequence to search.
+/// @param value Target element.
+/// @return Index if found, or -1.
+pub fn find(items: [any], value): int {
     return linear_search(items, value);
 }
 
+/// Finds the index of the first element satisfying a predicate function.
+///
+/// @param items Sequence to search.
+/// @param p Predicate callback returning boolean.
+/// @return Index of matching item, or -1 if none match.
 pub fn find_if(items: [any], p: fn(any): bool): int {
     var i = 0;
     while (i < len(items)) {
@@ -27,6 +48,11 @@ pub fn find_if(items: [any], p: fn(any): bool): int {
     return -1;
 }
 
+/// Checks whether at least one element satisfies the predicate.
+///
+/// @param items Sequence to inspect.
+/// @param p Predicate callback.
+/// @return `true` if any element satisfies `p`, `false` otherwise.
 pub fn any_match(items: [any], p: fn(any): bool): bool {
     var i = 0;
     while (i < len(items)) {
@@ -38,14 +64,24 @@ pub fn any_match(items: [any], p: fn(any): bool): bool {
     return false;
 }
 
+/// Checks whether no elements satisfy the predicate.
+///
+/// @param items Sequence to inspect.
+/// @param p Predicate callback.
+/// @return `true` if no element satisfies `p`, `false` otherwise.
 pub fn none(items: [any], p: fn(any): bool): bool {
-    return !any_match(items, p);
+    return not any_match(items, p);
 }
 
+/// Checks whether all elements satisfy the predicate.
+///
+/// @param items Sequence to inspect.
+/// @param p Predicate callback.
+/// @return `true` if every element satisfies `p`, `false` otherwise.
 pub fn all(items: [any], p: fn(any): bool): bool {
     var i = 0;
     while (i < len(items)) {
-        if (!p(items[i])) {
+        if (not p(items[i])) {
             return false;
         }
         i = i + 1;
@@ -53,7 +89,12 @@ pub fn all(items: [any], p: fn(any): bool): bool {
     return true;
 }
 
-pub fn count(items: [any], value: any): int {
+/// Counts the number of occurrences of value within items.
+///
+/// @param items Sequence to scan.
+/// @param value Value to count.
+/// @return Occurrence count.
+pub fn count(items: [any], value): int {
     var c = 0;
     var i = 0;
     while (i < len(items)) {
@@ -65,6 +106,11 @@ pub fn count(items: [any], value: any): int {
     return c;
 }
 
+/// Fast interpolation search on uniformly distributed sorted integer arrays.
+///
+/// @param items Sorted list of integer values.
+/// @param target Integer value to locate.
+/// @return Index if found, or -1 if absent.
 pub fn interpolation_search(items: [int], target: int): int {
     var low = 0;
     var high = len(items) - 1;

@@ -170,7 +170,7 @@ frame Server {
             if (h > 0) {
                 var r = res.Resource(h=h, k=-1); // Temporary wrapper for raw handle
                 var writer = res.Writer(r=r);
-                if (writer.write(args=[message]) == true) {
+                if (writer.write(args=[message])) {
                     sent = sent + 1;
                 } else {
                     failed = failed + 1;

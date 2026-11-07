@@ -1,5 +1,22 @@
 // Standard Library Core Disposable Trait
+//
+// Behavioral contract for deterministic resource reclamation.
 
+/// Interface for objects holding unmanaged system handles or resources.
+///
+/// @example
+/// ```lymar
+/// frame FileStream : Disposable {
+///     pub handle: int;
+///     pub fn dispose(): nil {
+///         if (self.handle != 0) {
+///             // close handle
+///             self.handle = 0;
+///         }
+///     }
+/// }
+/// ```
 trait Disposable {
+    /// Deterministically releases underlying resources held by the object.
     fn dispose(): nil;
 }

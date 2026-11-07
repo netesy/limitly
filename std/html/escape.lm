@@ -1,6 +1,16 @@
+// std/html/escape.lm
 // HTML Entity Escape and Unescape Module
 
+/// Escapes special HTML characters (`&`, `<`, `>`, `"`, `'`) into their corresponding entity references.
+///
+/// @param text Plain text containing potentially unsafe HTML characters.
+/// @return Escaped string safe for insertion into HTML markup.
+/// @example
+/// ```lymar
+/// var safe = html.escape("<script>alert('xss')</script>");
+/// ```
 pub fn escape(text: str): str {
+    contract(len(text) >= 0, "text must be a valid string");
     var res = "";
     var i = 0;
     var length = len(text);
@@ -24,7 +34,16 @@ pub fn escape(text: str): str {
     return res;
 }
 
+/// Unescapes common HTML entities back to their corresponding raw characters.
+///
+/// @param text HTML text containing entity references (e.g. `&lt;`, `&amp;`).
+/// @return Unescaped raw string.
+/// @example
+/// ```lymar
+/// var raw = html.unescape("&lt;div&gt;");
+/// ```
 pub fn unescape(text: str): str {
+    contract(len(text) >= 0, "text must be a valid string");
     var res = "";
     var i = 0;
     var length = len(text);

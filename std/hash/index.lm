@@ -1,10 +1,32 @@
+// std/hash/index.lm
 // Non-cryptographic hash functions for hash tables, checksums, and general use.
 // For cryptographic hashing (SHA-256, SHA-512, MD5, SHA-1), see std/crypto/hash.lm.
 
-import std.encoding as encoding;
+/// # Non-Cryptographic Hash Module (`std.hash`)
+///
+/// Fast non-cryptographic hashing algorithms suitable for hash tables,
+/// data structures, bloom filters, and checksums.
+///
+/// Includes implementations of FNV-1a (32-bit & 64-bit), DJB2, SDBM,
+/// Jenkins One-At-A-Time, MurmurHash3 (32-bit), CRC32, Adler-32, and
+/// Boost-style hash combiners.
+///
+/// @warning These algorithms are NOT cryptographically secure. For collision-resistant
+/// or tamper-evident hashing (SHA-256, SHA-512, etc.), use `std.crypto`.
+///
+/// @example
+/// import std.hash as hash;
+/// var h = hash.hash_string("hello");
+/// var crc = hash.crc32("hello");
+/// print("FNV: {h}, CRC32: {crc}");
 
-// ---- FNV-1a 32-bit ----
-fn fnv1a_32(data: [int]): int {
+/// Computes the 32-bit Fowler-Noll-Vo (FNV-1a) hash of a byte array.
+///
+/// @tip Fast, excellent avalanche properties for short keys in hash maps.
+///
+/// @param data Array of byte integers.
+/// @return 32-bit unsigned integer hash value.
+pub fn fnv1a_32(data: [int]): int {
     var h: int = 0x811C9DC5;
     var i: int = 0;
     while (i < len(data)) {
@@ -15,13 +37,16 @@ fn fnv1a_32(data: [int]): int {
     return h;
 }
 
-fn fnv1a_32_str(s: str): int {
+/// Computes the 32-bit Fowler-Noll-Vo (FNV-1a) hash of an ASCII string.
+///
+/// @param s Source ASCII string.
+/// @return 32-bit integer hash value.
+pub fn fnv1a_32_str(s: str): int {
     var h: int = 0x811C9DC5;
     var i: int = 0;
     while (i < len(s)) {
         var c: int = 0;
         var ch: str = substring(s, i, i + 1);
-        // Convert single char to byte value
         c = byte_value(ch);
         h = h ^ c;
         h = (h * 0x01000193) & 0xFFFFFFFF;
@@ -30,8 +55,11 @@ fn fnv1a_32_str(s: str): int {
     return h;
 }
 
-// ---- FNV-1a 64-bit (simulated with two 32-bit halves) ----
-fn fnv1a_64_str(s: str): int {
+/// Computes a 64-bit FNV-1a hash of a string, returning the lower 32-bit slice.
+///
+/// @param s Source string.
+/// @return 32-bit integer hash value.
+pub fn fnv1a_64_str(s: str): int {
     var lo: int = 0xCBF29CE4;
     var hi: int = 0x84222325;
     var prime_lo: int = 0x000001B3;
@@ -39,9 +67,7 @@ fn fnv1a_64_str(s: str): int {
     var i: int = 0;
     while (i < len(s)) {
         var c: int = byte_value(substring(s, i, i + 1));
-        // XOR low byte into low word
         lo = lo ^ c;
-        // Multiply by FNV prime (64-bit): (hi:lo) * (prime_hi:prime_lo)
         var old_lo: int = lo;
         lo = (lo * prime_lo) & 0xFFFFFFFF;
         var cross: int = (old_lo * prime_hi) & 0xFFFFFFFF;
@@ -53,12 +79,16 @@ fn fnv1a_64_str(s: str): int {
         hi = hi & 0xFFFFFFFF;
         i = i + 1;
     }
-    // Combine into single int (lower 32 bits of the 64-bit result)
     return lo;
 }
 
-// ---- DJB2 (Daniel J. Bernstein) ----
-fn djb2(s: str): int {
+/// Computes the classic DJB2 hash of a string (by Dan Bernstein).
+///
+/// @tip Highly efficient for string keys in hash tables with good distribution.
+///
+/// @param s Source string.
+/// @return Positive 31-bit integer hash value.
+pub fn djb2(s: str): int {
     var h: int = 5381;
     var i: int = 0;
     while (i < len(s)) {
@@ -69,8 +99,11 @@ fn djb2(s: str): int {
     return h;
 }
 
-// ---- SDBM Hash ----
-fn sdbm(s: str): int {
+/// Computes the SDBM hash of a string (used in Sleepycat DB / Berkeley DB).
+///
+/// @param s Source string.
+/// @return Positive 31-bit integer hash value.
+pub fn sdbm(s: str): int {
     var h: int = 0;
     var i: int = 0;
     while (i < len(s)) {
@@ -82,8 +115,11 @@ fn sdbm(s: str): int {
     return h;
 }
 
-// ---- Jenkins One-At-A-Time ----
-fn jenkins_oaat(s: str): int {
+/// Computes the Jenkins One-At-A-Time hash of a string.
+///
+/// @param s Source string.
+/// @return Positive 31-bit integer hash value.
+pub fn jenkins_oaat(s: str): int {
     var h: int = 0;
     var i: int = 0;
     while (i < len(s)) {
@@ -98,8 +134,17 @@ fn jenkins_oaat(s: str): int {
     return h & 0x7FFFFFFF;
 }
 
-// ---- MurmurHash3 (32-bit, x86_32 variant) ----
-fn murmur3_32(s: str, seed: int): int {
+/// Computes the 32-bit MurmurHash3 (x86_32 variant) with a customizable seed.
+///
+/// @tip Excellent hash uniformity and collision resistance for hash tables.
+///
+/// @param s Source string.
+/// @param seed Integer seed value (default is 0).
+/// @return 32-bit integer hash value.
+///
+/// @example
+/// var h = hash.murmur3_32("data", 42);
+pub fn murmur3_32(s: str, seed: int = 0): int {
     var c1: int = 0xCC9E2D51;
     var c2: int = 0x1B873593;
     var h1: int = seed;
@@ -151,8 +196,13 @@ fn murmur3_32(s: str, seed: int): int {
     return h1;
 }
 
-// ---- CRC32 (table-based) ----
-fn crc32(s: str): int {
+/// Computes standard table-driven IEEE 802.3 CRC32 checksum of a string.
+///
+/// @tip Commonly used in network protocols (Ethernet) and container formats (ZIP, PNG).
+///
+/// @param s Input string.
+/// @return 32-bit CRC checksum integer.
+pub fn crc32(s: str): int {
     var table: [int] = [];
     var i: int = 0;
     while (i < 256) {
@@ -181,8 +231,11 @@ fn crc32(s: str): int {
     return crc ^ 0xFFFFFFFF;
 }
 
-// ---- Adler-32 Checksum ----
-fn adler32(s: str): int {
+/// Computes the Adler-32 checksum of a string (RFC 1950, zlib).
+///
+/// @param s Input string.
+/// @return 32-bit Adler-32 checksum integer.
+pub fn adler32(s: str): int {
     var a: int = 1;
     var b: int = 0;
     var mod: int = 65521;
@@ -195,29 +248,43 @@ fn adler32(s: str): int {
     return (b << 16) | a;
 }
 
-// ---- Combine / utility functions ----
-fn combine_hashes(h1: int, h2: int): int {
-    // Boost-style hash combination
+/// Combines two 32-bit hashes using the Boost `hash_combine` golden-ratio formula.
+///
+/// @param h1 First hash value.
+/// @param h2 Second hash value.
+/// @return Combined 31-bit integer hash.
+pub fn combine_hashes(h1: int, h2: int): int {
     var combined: int = h1 ^ (h2 + 0x9E3779B9 + (h1 << 6) + (h1 >> 2));
     return combined & 0x7FFFFFFF;
 }
 
-fn hash_bytes(data: [int]): int {
+/// Computes the default hash for a byte array using FNV-1a.
+///
+/// @param data Byte array.
+/// @return 32-bit integer hash.
+pub fn hash_bytes(data: [int]): int {
     return fnv1a_32(data);
 }
 
-fn hash_string(s: str): int {
+/// Computes the default hash for a string using FNV-1a.
+///
+/// @param s Input string.
+/// @return 32-bit integer hash.
+pub fn hash_string(s: str): int {
     return fnv1a_32_str(s);
 }
 
-fn hash_with_seed(s: str, seed: int): int {
+/// Computes a seeded hash for a string using MurmurHash3.
+///
+/// @param s Input string.
+/// @param seed Integer seed.
+/// @return 32-bit integer hash.
+pub fn hash_with_seed(s: str, seed: int): int {
     return murmur3_32(s, seed);
 }
 
 // ---- Internal helper: convert single char to byte value ----
 fn byte_value(ch: str): int {
-    // Simple byte value extraction for ASCII characters
-    // Uses ordinal mapping for common characters
     if (ch == "a") return 97;
     if (ch == "b") return 98;
     if (ch == "c") return 99;

@@ -1,11 +1,15 @@
-// YAML Parser Module
+// std/yaml/parser.lm
+// Line-based YAML document parser.
 
 import std.yaml.value as value;
+import std.string as std_string;
 
+/// Line-based YAML document parser.
 frame Parser {
     pub idx: int;
     pub text: str;
 
+    /// Parses key-value mapping pairs from YAML text.
     pub fn parse_value(): value.Value {
         var keys: [str] = [];
         var vals: [any] = [];
@@ -20,7 +24,7 @@ frame Parser {
             } else {
                 var key_start = self.idx;
                 var find_colon = true;
-                while (self.idx < length and find_colon == true) {
+                while (self.idx < length and find_colon) {
                     var cur_ch = _builtin_substring(self.text, self.idx, self.idx + 1);
                     if (cur_ch == ":") {
                         find_colon = false;
@@ -31,19 +35,10 @@ frame Parser {
                 var key_raw = _builtin_substring(self.text, key_start, self.idx);
                 self.idx = self.idx + 1; // skip ':'
 
-                var key = "";
-                var k_len = len(key_raw);
-                var k_idx = 0;
-                while (k_idx < k_len) {
-                    var k_ch = _builtin_substring(key_raw, k_idx, k_idx + 1);
-                    if (k_ch != " " and k_ch != "\t") {
-                        key = key + k_ch;
-                    }
-                    k_idx = k_idx + 1;
-                }
+                var key = std_string.trim(key_raw);
 
                 var skip_val_spaces = true;
-                while (self.idx < length and skip_val_spaces == true) {
+                while (self.idx < length and skip_val_spaces) {
                     var cur_ch = _builtin_substring(self.text, self.idx, self.idx + 1);
                     if (cur_ch == " " or cur_ch == "\t") {
                         self.idx = self.idx + 1;
@@ -54,7 +49,7 @@ frame Parser {
 
                 var val_start = self.idx;
                 var find_val_end = true;
-                while (self.idx < length and find_val_end == true) {
+                while (self.idx < length and find_val_end) {
                     var cur_ch = _builtin_substring(self.text, self.idx, self.idx + 1);
                     if (cur_ch == "\n" or cur_ch == "\r") {
                         find_val_end = false;
@@ -92,15 +87,20 @@ frame Parser {
                         var val_int = val_trimmed as int;
                         val_obj = value.make_number(val_int);
                     }
-                    keys.append(key);
-                    vals.append(val_obj as any);
                 }
+
+                keys.append(key);
+                vals.append(val_obj);
             }
         }
         return value.make_object(keys, vals);
     }
 }
 
+/// Parses YAML formatted text into an AST `Value` node.
+///
+/// @param text Raw YAML text.
+/// @return Root `value.Value` object node.
 pub fn parse(text: str): value.Value {
     var p = Parser(idx=0, text=text);
     return p.parse_value();

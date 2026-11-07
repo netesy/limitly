@@ -1,6 +1,16 @@
-// std/unicode/category.lm
-// Category submodule for std.unicode. Unicode character classification, normalization, and rune operations.
+// Standard Library Unicode Character Category Module
+//
+// Unicode character classification, letter casing checks, digit and whitespace detection.
 
+/// Checks whether the first character of the string is an uppercase ASCII/Unicode letter.
+///
+/// @param ch Input string whose initial character is checked.
+/// @return `true` if uppercase, `false` otherwise.
+///
+/// @example
+/// ```lymar
+/// var ok = is_upper("Hello"); // true
+/// ```
 pub fn is_upper(ch: str): bool {
     if (len(ch) == 0) return false;
     var c = _builtin_substring(ch, 0, 1);
@@ -13,6 +23,15 @@ pub fn is_upper(ch: str): bool {
     return false;
 }
 
+/// Checks whether the first character of the string is a lowercase ASCII/Unicode letter.
+///
+/// @param ch Input string whose initial character is checked.
+/// @return `true` if lowercase, `false` otherwise.
+///
+/// @example
+/// ```lymar
+/// var ok = is_lower("world"); // true
+/// ```
 pub fn is_lower(ch: str): bool {
     if (len(ch) == 0) return false;
     var c = _builtin_substring(ch, 0, 1);
@@ -25,6 +44,15 @@ pub fn is_lower(ch: str): bool {
     return false;
 }
 
+/// Checks whether the first character of the string is a decimal digit ('0' through '9').
+///
+/// @param ch Input string whose initial character is checked.
+/// @return `true` if digit, `false` otherwise.
+///
+/// @example
+/// ```lymar
+/// var ok = is_digit("7"); // true
+/// ```
 pub fn is_digit(ch: str): bool {
     if (len(ch) == 0) return false;
     var c = _builtin_substring(ch, 0, 1);
@@ -37,14 +65,26 @@ pub fn is_digit(ch: str): bool {
     return false;
 }
 
+/// Checks whether the first character is an alphabetic letter.
+///
+/// @param ch Input string.
+/// @return `true` if upper or lowercase letter, `false` otherwise.
 pub fn is_alpha(ch: str): bool {
     return is_upper(ch) or is_lower(ch);
 }
 
+/// Checks whether the first character is an alphanumeric character (letter or digit).
+///
+/// @param ch Input string.
+/// @return `true` if letter or digit, `false` otherwise.
 pub fn is_alphanumeric(ch: str): bool {
     return is_alpha(ch) or is_digit(ch);
 }
 
+/// Checks whether the first character is a whitespace delimiter (space, tab, newline, carriage return).
+///
+/// @param ch Input string.
+/// @return `true` if whitespace, `false` otherwise.
 pub fn is_whitespace(ch: str): bool {
     if (len(ch) == 0) return false;
     var c = _builtin_substring(ch, 0, 1);

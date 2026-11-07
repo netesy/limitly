@@ -1,22 +1,53 @@
 // std/url/index.lm
 // Public entrypoint and facade for std.url. URL parsing, URL encoding, query strings, and URI resolution.
 
+/// RFC 3986 Uniform Resource Identifier (URI) and URL module.
+///
+/// Provides robust parsing, resolution, component decomposition, fluent building,
+/// and query string encoding/decoding.
+///
+/// @example
+/// import std.url as url;
+/// var u = url.parse("https://api.github.com/repos?owner=lymar#readme");
+/// print(u.host); // "api.github.com"
+/// print(u.path); // "/repos"
+
 import std.url.url as url;
-import std.url.builder as builder;
 import std.url.query as query;
 
 pub import std.url.url show URL;
 pub import std.url.builder show Builder;
 pub import std.url.query show QueryParams;
 
+/// Parses a URL string into its discrete RFC 3986 components.
+///
+/// @param url_str Target URL string to parse.
+/// @return Configured `URL` instance.
 pub fn parse(url_str: str): url.URL {
     return url.URL(url_str);
 }
 
+/// Parses an `application/x-www-form-urlencoded` query string into a `QueryParams` object.
+///
+/// @param qs Raw query string (with or without leading '?').
+/// @return Populated `QueryParams` instance.
 pub fn parse_query(qs: str): query.QueryParams {
     return query.parse(qs);
 }
 
+/// Constructs a URL object directly from discrete components.
+///
+/// @pre len(scheme) > 0
+/// @pre port == -1 or (port > 0 and port <= 65535)
+/// @param scheme URL scheme (e.g. "https", "http").
+/// @param host Hostname or IP address.
+/// @param port Integer port (-1 for default).
+/// @param path Hierarchical resource path.
+/// @param query Query parameter string.
+/// @param fragment Section anchor fragment.
+/// @return Configured `URL` instance.
 pub fn build(scheme: str, host: str, port: int, path: str, query: str, fragment: str): url.URL {
+    contract(len(scheme) > 0, "Scheme must not be empty");
+    contract(port == -1 or (port > 0 and port <= 65535), "Port must be -1 or between 1 and 65535");
     return url.build(scheme, host, port, path, query, fragment);
 }

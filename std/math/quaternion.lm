@@ -1,37 +1,66 @@
 // std/math/quaternion.lm
-// Quaternion submodule for std.math. Mathematical constants, arithmetic functions, trigonometry, and statistics.
+// Quaternion representation for 3D orientation and rotation.
 
 import std.math.arithmetic as arith;
 
+/// Represents a Hamiltonian quaternion q = w + xi + yj + zk.
+///
+/// Widely used in 3D graphics, robotics, and physics engines for representing
+/// spatial orientations and smooth spherical linear interpolations without gimbal lock.
+///
+/// @example
+/// import std.math.quaternion as quat;
+/// var q = quat.Quaternion(0.0, 0.0, 0.0, 1.0); // Identity quaternion
+/// print(q.mag()); // 1.0
 frame Quaternion {
     pub x: float;
     pub y: float;
     pub z: float;
     pub w: float;
 
-    pub init(x: float, y: float, z: float, w: float) {
+    pub init(x: float = 0.0, y: float = 0.0, z: float = 0.0, w: float = 0.0) {
         self.x = x;
         self.y = y;
         self.z = z;
         self.w = w;
     }
 
+    /// Adds another quaternion to this quaternion.
+    ///
+    /// @param other Quaternion to add.
+    /// @return Component-wise sum quaternion.
     pub fn add(other: Quaternion): Quaternion {
         return Quaternion(self.x + other.x, self.y + other.y, self.z + other.z, self.w + other.w);
     }
 
+    /// Subtracts another quaternion from this quaternion.
+    ///
+    /// @param other Quaternion to subtract.
+    /// @return Component-wise difference quaternion.
     pub fn sub(other: Quaternion): Quaternion {
         return Quaternion(self.x - other.x, self.y - other.y, self.z - other.z, self.w - other.w);
     }
 
+    /// Multiplies all components by a scalar value.
+    ///
+    /// @param s Scaling factor.
+    /// @return Scaled quaternion.
     pub fn scale(s: float): Quaternion {
         return Quaternion(self.x * s, self.y * s, self.z * s, self.w * s);
     }
 
+    /// Computes the magnitude (norm) of the quaternion.
+    ///
+    /// @return Euclidean norm.
     pub fn mag(): float {
         return arith.sqrt(self.x * self.x + self.y * self.y + self.z * self.z + self.w * self.w);
     }
 
+    /// Computes the normalized unit quaternion.
+    ///
+    /// @tip Returns the identity quaternion (0, 0, 0, 1) if the norm is zero.
+    ///
+    /// @return Unit-length quaternion.
     pub fn normalize(): Quaternion {
         var m = self.mag();
         if (m == 0.0) {

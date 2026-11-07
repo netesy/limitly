@@ -1,7 +1,20 @@
-// std/algorithm/reduce.lm
-// Reduce submodule for std.algorithm. Algorithmic utilities, searching, filtering, and sequence manipulation.
+// Standard Library Sequence Reduction Submodule
+//
+// Left-associative accumulation and fold operations.
 
-pub fn reduce(items: [any], f: fn(any, any): any, initial: any): any {
+/// Reduces a sequence to a single accumulated value using a binary reducer function.
+///
+/// @param items Sequence of elements to accumulate.
+/// @param f Binary reducer function `f(accumulator, current_item)`.
+/// @param initial Initial accumulator starting value.
+/// @return Final accumulated value.
+///
+/// @example
+/// ```lymar
+/// fn add(a: any, b: any): any { return (a as int) + (b as int); }
+/// var sum = reduce([1, 2, 3, 4], add, 0); // 10
+/// ```
+pub fn reduce(items: [any], f: fn(any, any): any, initial) {
     var acc = initial;
     var i = 0;
     while (i < len(items)) {
@@ -11,6 +24,12 @@ pub fn reduce(items: [any], f: fn(any, any): any, initial: any): any {
     return acc;
 }
 
-pub fn fold(items: [any], initial: any, f: fn(any, any): any): any {
+/// Folds a sequence starting from an initial value using a binary accumulation function.
+///
+/// @param items Sequence of elements.
+/// @param initial Initial starting value.
+/// @param f Binary folding function `f(accumulator, item)`.
+/// @return Final accumulated value.
+pub fn fold(items: [any], initial, f: fn(any, any): any) {
     return reduce(items, f, initial);
 }

@@ -2,6 +2,7 @@
 
 import std.collections.tree as tree;
 
+/// Ordered set data structure backed by an underlying binary search tree.
 frame BTreeSetWrapper {
     pub impl: tree.TreeSet;
 
@@ -9,19 +10,25 @@ frame BTreeSetWrapper {
         self.impl = tree.TreeSet();
     }
 
+    /// Adds an element to the set.
     pub fn add(item: any) {
         self.impl.add(item);
     }
 
+    /// Checks if set contains the element.
     pub fn contains(item: any): bool {
         return self.impl.contains(item);
     }
 
+    /// Returns the element count.
     pub fn length(): int {
         return self.impl.length();
     }
 }
 
+/// Constructs a new BTreeSet instance backed by BTreeSetWrapper.
+///
+/// @return New ordered set instance.
 pub fn BTreeSet(): BTreeSetWrapper {
     return BTreeSetWrapper();
 }

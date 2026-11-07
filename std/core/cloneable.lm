@@ -1,5 +1,23 @@
 // Standard Library Core Cloneable Trait
+//
+// Behavioral contract for types supporting deep or shallow replication.
 
+/// Interface for objects that can produce an independent copy of themselves.
+///
+/// @example
+/// ```lymar
+/// frame Config : Cloneable {
+///     pub name: str;
+///     pub fn clone(): any {
+///         var c = Config();
+///         c.name = self.name;
+///         return c;
+///     }
+/// }
+/// ```
 trait Cloneable {
+    /// Produces a copy of the receiver instance.
+    ///
+    /// @return Replicated instance.
     fn clone(): any;
 }

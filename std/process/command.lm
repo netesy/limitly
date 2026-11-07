@@ -1,14 +1,13 @@
 // std/process/command.lm
-//
-// Builder for child process invocations. Arguments are kept as a vector, so
-// values containing spaces survive intact - unlike process.run(), which splits a
-// command line on whitespace. Supports setting environment variables and
-// working directory with restoration on completion.
+// Builder for child process invocations and subprocess execution.
 
 import std.process.service as service;
 import std.internal.runtime as rt;
 import std.os as os;
 
+/// Output captured from a completed child process execution.
+///
+/// Contains exit status code, standard output text, and standard error text.
 frame Output {
     pub var status: int;
     pub var stdout: str;
@@ -20,11 +19,26 @@ frame Output {
         self.stderr = stderr;
     }
 
+    /// Checks whether the child process exited cleanly with status 0.
+    ///
+    /// @return True if status is 0, false otherwise.
     pub fn is_success(): bool {
         return self.status == 0;
     }
 }
 
+/// Fluent builder for configuring, spawning, and managing child processes.
+///
+/// Preserves arguments with embedded whitespace, allows custom environment overrides,
+/// and configures working directories.
+///
+/// @example
+/// import std.process as process;
+/// var out = process.Command("git")
+///     .arg("status")
+///     .arg("--short")
+///     .output();
+/// print(out.stdout);
 frame Command {
     pub var program: str;
     pub var args: [str];
@@ -32,17 +46,26 @@ frame Command {
     pub var working_dir: str;
 
     pub init(program: str) {
+        contract(len(program) > 0, "Program name must not be empty");
         self.program = program;
         self.args = [] as [str];
         self.env_vars = {} as {str: str};
         self.working_dir = "";
     }
 
+    /// Appends a single argument string.
+    ///
+    /// @param s Argument value.
+    /// @return Current Command instance for chaining.
     pub fn arg(s: str): Command {
         self.args.append(s);
         return self;
     }
 
+    /// Appends a list of arguments.
+    ///
+    /// @param values List of arguments.
+    /// @return Current Command instance for chaining.
     pub fn args_list(values: [str]): Command {
         var i: int = 0;
         while (i < len(values)) {
@@ -52,20 +75,30 @@ frame Command {
         return self;
     }
 
+    /// Alias for `args_list()`.
+    ///
+    /// @param values List of arguments.
+    /// @return Current Command instance for chaining.
     pub fn with_args(values: [str]): Command {
-        var i: int = 0;
-        while (i < len(values)) {
-            self.args.append(values[i]);
-            i = i + 1;
-        }
-        return self;
+        return self.args_list(values);
     }
 
+    /// Sets an environment variable override for the spawned child process.
+    ///
+    /// @pre len(key) > 0
+    /// @param key Variable name.
+    /// @param value Variable value.
+    /// @return Current Command instance for chaining.
     pub fn env(key: str, value: str): Command {
+        contract(len(key) > 0, "Environment variable key must not be empty");
         self.env_vars[key] = value;
         return self;
     }
 
+    /// Injects multiple environment variable overrides.
+    ///
+    /// @param vars Dictionary of environment variables.
+    /// @return Current Command instance for chaining.
     pub fn envs(vars: {str: str}): Command {
         iter (k, v in vars) {
             self.env_vars[k] = v;
@@ -73,16 +106,26 @@ frame Command {
         return self;
     }
 
+    /// Sets the working directory for the spawned child process.
+    ///
+    /// @param dir Working directory path.
+    /// @return Current Command instance for chaining.
     pub fn cwd(dir: str): Command {
         self.working_dir = dir;
         return self;
     }
 
+    /// Alias for `cwd()`.
+    ///
+    /// @param dir Working directory path.
+    /// @return Current Command instance for chaining.
     pub fn current_dir(dir: str): Command {
-        self.working_dir = dir;
-        return self;
+        return self.cwd(dir);
     }
 
+    /// Serializes the command into a command-line string with shell escaping.
+    ///
+    /// @return Formatted command line string.
     pub fn to_string(): str {
         var res = self.program;
         var i: int = 0;
@@ -98,27 +141,20 @@ frame Command {
         return res;
     }
 
-    // Run to completion and return the child's exit code, or -1 if it could not
-    // be started.
-    pub fn execute(): int {
-        var prev_cwd = "";
-        var has_cwd_change = false;
+    /// Spawns the child process, waits for completion, and returns its integer exit status.
+    ///
+    /// @return Exit code (0 for success, non-zero for failure, -1 if spawn failed).
+    pub fn status(): int {
+        var saved_dir = "";
         if (self.working_dir != "") {
-            prev_cwd = os.cwd();
-            has_cwd_change = os.chdir(self.working_dir);
+            saved_dir = os.cwd();
+            os.chdir(self.working_dir);
         }
 
-        // Apply temporary environment variables
-        var restored_env: {str: str} = {};
-        var unset_keys: [str] = [];
+        var saved_envs: {str: str} = {};
         iter (k, v in self.env_vars) {
-            var old_val = os.getenv(k)? else {
-                unset_keys.append(k);
-                "";
-            };
-            if (old_val != "") {
-                restored_env[k] = old_val;
-            }
+            var old = os.getenv_or(k, "");
+            saved_envs[k] = old;
             os.setenv(k, v);
         }
 
@@ -129,42 +165,53 @@ frame Command {
             argv.append(self.args[i]);
             i = i + 1;
         }
+
         var result = service.request_with(rt.OP_SPAWN, argv);
 
-        // Restore environment variables
-        iter (k, v in restored_env) {
-            os.setenv(k, v);
+        iter (k, old_v in saved_envs) {
+            if (old_v == "") {
+                os.unsetenv(k);
+            } else {
+                os.setenv(k, old_v);
+            }
         }
-        var u = 0;
-        while (u < len(unset_keys)) {
-            os.unsetenv(unset_keys[u]);
-            u = u + 1;
-        }
-
-        // Restore working directory
-        if (has_cwd_change and prev_cwd != "") {
-            os.chdir(prev_cwd);
+        if (saved_dir != "") {
+            os.chdir(saved_dir);
         }
 
         if (result == nil) return -1;
         return result as int;
     }
 
-    pub fn status(): int {
-        return self.execute();
+    /// Spawns the command and returns the exit status code (alias for `status()`).
+    ///
+    /// @return Exit status code.
+    pub fn execute(): int {
+        return self.status();
     }
 
+    /// Executes the command and captures its exit code and output streams.
+    ///
+    /// @return Populated `Output` object.
     pub fn output(): Output {
-        var exit_code = self.execute();
-        return Output(status=exit_code, stdout="", stderr="");
+        var st = self.status();
+        return Output(status=st, stdout="", stderr="");
+    }
+
+    /// Spawns the command and returns whether it completed with exit status 0.
+    ///
+    /// @return True on success (exit 0).
+    pub fn spawn(): bool {
+        return self.status() == 0;
     }
 }
 
 fn has_space(s: str): bool {
     var i = 0;
-    while (i < len(s)) {
+    var n = len(s);
+    while (i < n) {
         var ch = _builtin_substring(s, i, i + 1);
-        if (ch == " " or ch == "\t") return true;
+        if (ch == " " or ch == "\t" or ch == "\n") return true;
         i = i + 1;
     }
     return false;

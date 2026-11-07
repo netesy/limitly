@@ -1,6 +1,7 @@
 // Standard Library NOL Value Representation
 // Netesy Object Language (NOL)
 
+/// Identifies the runtime data type of a NOL value node.
 enum Type {
     Null,
     Bool,
@@ -11,6 +12,10 @@ enum Type {
     Object
 }
 
+/// Represents an abstract syntax tree (AST) node for a NOL value.
+///
+/// Encapsulates primitives (null, booleans, integers, floats, strings) and
+/// structured composite containers (arrays and objects).
 frame Value {
     pub kind: Type;
     pub bool_val: bool;
@@ -21,20 +26,84 @@ frame Value {
     pub obj_keys: [str];
     pub obj_vals: [any];
 
+    /// Checks if this node represents a null literal.
+    ///
+    /// @return `true` if null, `false` otherwise.
     pub fn is_null(): bool { return self.kind == Type.Null; }
+
+    /// Checks if this node represents a boolean.
+    ///
+    /// @return `true` if boolean, `false` otherwise.
     pub fn is_bool(): bool { return self.kind == Type.Bool; }
+
+    /// Checks if this node represents an integer.
+    ///
+    /// @return `true` if integer, `false` otherwise.
     pub fn is_int(): bool { return self.kind == Type.Int; }
+
+    /// Checks if this node represents a floating-point number.
+    ///
+    /// @return `true` if float, `false` otherwise.
     pub fn is_float(): bool { return self.kind == Type.Float; }
+
+    /// Checks if this node represents a string literal.
+    ///
+    /// @return `true` if string, `false` otherwise.
     pub fn is_string(): bool { return self.kind == Type.String; }
+
+    /// Checks if this node represents an array list.
+    ///
+    /// @return `true` if array, `false` otherwise.
     pub fn is_array(): bool { return self.kind == Type.Array; }
+
+    /// Checks if this node represents an object map.
+    ///
+    /// @return `true` if object, `false` otherwise.
     pub fn is_object(): bool { return self.kind == Type.Object; }
 
-    pub fn as_bool(): bool { return self.bool_val; }
-    pub fn as_int(): int { return self.int_val; }
-    pub fn as_float(): float { return self.float_val; }
-    pub fn as_string(): str { return self.str_val; }
-    pub fn as_array(): [any] { return self.array_val; }
+    /// Extracts the boolean primitive value.
+    ///
+    /// @return Raw boolean value.
+    pub fn as_bool(): bool {
+        contract(self.kind == Type.Bool, "Value must be a boolean");
+        return self.bool_val;
+    }
 
+    /// Extracts the integer primitive value.
+    ///
+    /// @return Raw integer value.
+    pub fn as_int(): int {
+        contract(self.kind == Type.Int, "Value must be an integer");
+        return self.int_val;
+    }
+
+    /// Extracts the float primitive value.
+    ///
+    /// @return Raw float value.
+    pub fn as_float(): float {
+        contract(self.kind == Type.Float, "Value must be a float");
+        return self.float_val;
+    }
+
+    /// Extracts the string primitive value.
+    ///
+    /// @return Raw string value.
+    pub fn as_string(): str {
+        contract(self.kind == Type.String, "Value must be a string");
+        return self.str_val;
+    }
+
+    /// Extracts the inner array list of elements.
+    ///
+    /// @return Raw list of child nodes.
+    pub fn as_array(): [any] {
+        contract(self.kind == Type.Array, "Value must be an array");
+        return self.array_val;
+    }
+
+    /// Returns the element count for array or object nodes.
+    ///
+    /// @return Number of elements in array or key-value entries in object; 0 for scalar types.
     pub fn count(): int {
         if (self.kind == Type.Array) {
             return len(self.array_val);
@@ -44,6 +113,10 @@ frame Value {
         return 0;
     }
 
+    /// Retrieves an object member value by key name.
+    ///
+    /// @param key Member key name.
+    /// @return Child value node if found, or `nil` if missing.
     pub fn get(key: str): any {
         if (self.kind != Type.Object) return nil;
         var total = len(self.obj_keys);
@@ -57,6 +130,10 @@ frame Value {
         return nil;
     }
 
+    /// Sets or replaces an object member value by key name.
+    ///
+    /// @param key Member key name.
+    /// @param value_node Target value node to store.
     pub fn set(key: str, value_node: any) {
         if (self.kind != Type.Object) return;
         var total = len(self.obj_keys);
@@ -73,6 +150,9 @@ frame Value {
     }
 }
 
+/// Creates a new NOL null literal value node.
+///
+/// @return `Value` instance of kind `Null`.
 pub fn make_null(): Value {
     var arr: [any] = [];
     var keys: [str] = [];
@@ -80,6 +160,10 @@ pub fn make_null(): Value {
     return Value(kind=Type.Null, bool_val=false, int_val=0, float_val=0.0, str_val="", array_val=arr, obj_keys=keys, obj_vals=vals);
 }
 
+/// Creates a new NOL boolean value node.
+///
+/// @param v Boolean primitive value.
+/// @return `Value` instance of kind `Bool`.
 pub fn make_bool(v: bool): Value {
     var arr: [any] = [];
     var keys: [str] = [];
@@ -87,6 +171,10 @@ pub fn make_bool(v: bool): Value {
     return Value(kind=Type.Bool, bool_val=v, int_val=0, float_val=0.0, str_val="", array_val=arr, obj_keys=keys, obj_vals=vals);
 }
 
+/// Creates a new NOL integer value node.
+///
+/// @param v Integer primitive value.
+/// @return `Value` instance of kind `Int`.
 pub fn make_int(v: int): Value {
     var arr: [any] = [];
     var keys: [str] = [];
@@ -94,6 +182,10 @@ pub fn make_int(v: int): Value {
     return Value(kind=Type.Int, bool_val=false, int_val=v, float_val=0.0, str_val="", array_val=arr, obj_keys=keys, obj_vals=vals);
 }
 
+/// Creates a new NOL float value node.
+///
+/// @param v Float primitive value.
+/// @return `Value` instance of kind `Float`.
 pub fn make_float(v: float): Value {
     var arr: [any] = [];
     var keys: [str] = [];
@@ -101,6 +193,10 @@ pub fn make_float(v: float): Value {
     return Value(kind=Type.Float, bool_val=false, int_val=0, float_val=v, str_val="", array_val=arr, obj_keys=keys, obj_vals=vals);
 }
 
+/// Creates a new NOL string value node.
+///
+/// @param v String text value.
+/// @return `Value` instance of kind `String`.
 pub fn make_string(v: str): Value {
     var arr: [any] = [];
     var keys: [str] = [];
@@ -108,17 +204,29 @@ pub fn make_string(v: str): Value {
     return Value(kind=Type.String, bool_val=false, int_val=0, float_val=0.0, str_val=v, array_val=arr, obj_keys=keys, obj_vals=vals);
 }
 
+/// Creates a new NOL array value node.
+///
+/// @param v List of child value elements.
+/// @return `Value` instance of kind `Array`.
 pub fn make_array(v: [any]): Value {
     var keys: [str] = [];
     var vals: [any] = [];
     return Value(kind=Type.Array, bool_val=false, int_val=0, float_val=0.0, str_val="", array_val=v, obj_keys=keys, obj_vals=vals);
 }
 
+/// Creates a new NOL object value node from parallel keys and values.
+///
+/// @param keys List of object field keys.
+/// @param vals List of object field values.
+/// @return `Value` instance of kind `Object`.
 pub fn make_object(keys: [str], vals: [any]): Value {
     var arr: [any] = [];
     return Value(kind=Type.Object, bool_val=false, int_val=0, float_val=0.0, str_val="", array_val=arr, obj_keys=keys, obj_vals=vals);
 }
 
+/// Creates a new empty NOL object value node.
+///
+/// @return Empty `Value` instance of kind `Object`.
 pub fn make_empty_object(): Value {
     var keys: [str] = [];
     var vals: [any] = [];

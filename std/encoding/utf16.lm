@@ -1,5 +1,7 @@
-// Standard Library UTF-16 Encoding Module
+// std/encoding/utf16.lm
+// UTF-16 Encoding and Decoding (Code Units, BE, LE, Surrogate Pairs).
 
+/// Helper function to convert a Unicode code point to UTF-8 bytes.
 fn cp_to_utf8_bytes(cp: int): [int] {
     var bytes: [int] = [];
     if (cp < 128) {
@@ -20,6 +22,18 @@ fn cp_to_utf8_bytes(cp: int): [int] {
     return bytes;
 }
 
+/// Encodes a UTF-8 string into a sequence of 16-bit UTF-16 code units.
+///
+/// @tip Supplementary characters outside the BMP (>= U+10000) are automatically split
+/// into surrogate pairs (high surrogate: 0xD800-0xDBFF, low surrogate: 0xDC00-0xDFFF).
+///
+/// @param s Source Unicode string.
+/// @return Array of 16-bit code units [int].
+///
+/// @example
+/// import std.encoding.utf16 as utf16;
+/// var units = utf16.encode_utf16("Hello");
+/// print("Code units: {len(units)}");
 pub fn encode_utf16(s: str): [int] {
     var units: [int] = [];
     iter (cp in s) {
@@ -36,6 +50,10 @@ pub fn encode_utf16(s: str): [int] {
     return units;
 }
 
+/// Encodes a UTF-8 string into big-endian UTF-16 bytes (2 bytes per unit).
+///
+/// @param s Source Unicode string.
+/// @return Array of big-endian bytes [int].
 pub fn encode_utf16_be(s: str): [int] {
     var units: [int] = encode_utf16(s);
     var bytes: [int] = [];
@@ -50,6 +68,10 @@ pub fn encode_utf16_be(s: str): [int] {
     return bytes;
 }
 
+/// Encodes a UTF-8 string into little-endian UTF-16 bytes (2 bytes per unit).
+///
+/// @param s Source Unicode string.
+/// @return Array of little-endian bytes [int].
 pub fn encode_utf16_le(s: str): [int] {
     var units: [int] = encode_utf16(s);
     var bytes: [int] = [];
@@ -64,6 +86,12 @@ pub fn encode_utf16_le(s: str): [int] {
     return bytes;
 }
 
+/// Decodes an array of 16-bit UTF-16 code units into a UTF-8 string.
+///
+/// @tip Correctly combines high and low surrogate pairs back into 32-bit code points.
+///
+/// @param units Array of 16-bit code units.
+/// @return Decoded UTF-8 string.
 pub fn decode_utf16(units: [int]): str {
     var utf8_bytes: [int] = [];
     var i = 0;
@@ -103,7 +131,13 @@ pub fn decode_utf16(units: [int]): str {
     return _builtin_string_from_bytes(utf8_bytes);
 }
 
+/// Decodes an array of big-endian UTF-16 bytes into a UTF-8 string.
+///
+/// @pre len(bytes) % 2 == 0
+/// @param bytes Big-endian byte array.
+/// @return Decoded UTF-8 string.
 pub fn decode_utf16_be(bytes: [int]): str {
+    contract(len(bytes) % 2 == 0, "UTF-16 BE byte length must be even");
     var units: [int] = [];
     var i = 0;
     var length = len(bytes);
@@ -116,7 +150,13 @@ pub fn decode_utf16_be(bytes: [int]): str {
     return decode_utf16(units);
 }
 
+/// Decodes an array of little-endian UTF-16 bytes into a UTF-8 string.
+///
+/// @pre len(bytes) % 2 == 0
+/// @param bytes Little-endian byte array.
+/// @return Decoded UTF-8 string.
 pub fn decode_utf16_le(bytes: [int]): str {
+    contract(len(bytes) % 2 == 0, "UTF-16 LE byte length must be even");
     var units: [int] = [];
     var i = 0;
     var length = len(bytes);

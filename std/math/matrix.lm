@@ -1,6 +1,15 @@
 // std/math/matrix.lm
-// Matrix submodule for std.math. Mathematical constants, arithmetic functions, trigonometry, and statistics.
+// 4x4 row-major transformation matrix.
 
+/// Represents a 4x4 floating-point transformation matrix stored in row-major order.
+///
+/// Defaults to an identity matrix upon initialization.
+///
+/// @example
+/// import std.math.matrix as mat;
+/// var m = mat.Matrix();
+/// print(m.get(0, 0)); // 1.0
+/// m.set(0, 3, 10.0);  // set X translation
 frame Matrix {
     pub data: [float];
 
@@ -13,11 +22,25 @@ frame Matrix {
         ];
     }
 
+    /// Retrieves an entry from the matrix at the given row and column.
+    ///
+    /// @pre row >= 0 and row < 4 and col >= 0 and col < 4
+    /// @param row Zero-based row index (0..3).
+    /// @param col Zero-based column index (0..3).
+    /// @return Matrix element value.
     pub fn get(row: int, col: int): float {
+        contract(row >= 0 and row < 4 and col >= 0 and col < 4, "Matrix row and col must be in range [0, 3]");
         return self.data[row * 4 + col];
     }
 
+    /// Updates an entry in the matrix at the given row and column.
+    ///
+    /// @pre row >= 0 and row < 4 and col >= 0 and col < 4
+    /// @param row Zero-based row index (0..3).
+    /// @param col Zero-based column index (0..3).
+    /// @param value_val New value to write.
     pub fn set(row: int, col: int, value_val: float) {
+        contract(row >= 0 and row < 4 and col >= 0 and col < 4, "Matrix row and col must be in range [0, 3]");
         self.data[row * 4 + col] = value_val;
     }
 }

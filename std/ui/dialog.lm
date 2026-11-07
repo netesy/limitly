@@ -5,7 +5,7 @@ import std.ui.viewport as viewport;
 
 // Modal dialog with title, content, close button, and dynamic viewport centering
 pub fn dialog(title: str, content: ui_types.Widget, is_open: bool = true, width: float = 400.0, height: float = 300.0, on_close: any = nil): ui_types.Widget {
-    if (is_open == false) {
+    if (not is_open) {
         return ui_types.empty();
     }
     

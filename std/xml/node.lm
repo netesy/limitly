@@ -1,9 +1,19 @@
+// std/xml/node.lm
 // XML Node re-export module
 
 import std.xml.document as doc;
 
 pub import std.xml.document show Node;
 
-pub fn make_node(name: str, text: str, keys: [str], vals: [str], children: [any]): Node {
+/// Constructs a new XML element node.
+///
+/// @param name Element tag name.
+/// @param text Inner textual content.
+/// @param keys Attribute names.
+/// @param vals Attribute values.
+/// @param children List of nested child nodes.
+/// @return Configured `Node` instance.
+pub fn make_node(name: str, text: str, keys: [str], vals: [str], children: [any]): doc.Node {
+    contract(len(name) > 0, "name cannot be empty");
     return doc.make_node(name, text, keys, vals, children);
 }

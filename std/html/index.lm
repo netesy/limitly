@@ -1,17 +1,34 @@
+// std/html/index.lm
 // HTML Module Gateway Index
 
 import std.html.escape as esc;
 import std.html.parser as parser;
-pub import std.html.parser show Node;
 
+pub import std.html.parser show Node, create_text_node, is_void_element;
+
+/// Escapes HTML-sensitive characters (`&`, `<`, `>`, `"`, `'`) to prevent XSS.
+///
+/// @param text Raw unescaped text string.
+/// @return Escaped HTML text safe for interpolation.
 pub fn escape(text: str): str {
+    contract(len(text) >= 0, "text must be a valid string");
     return esc.escape(text);
 }
 
+/// Unescapes common HTML entities back into their raw literal characters.
+///
+/// @param text HTML markup containing entity codes.
+/// @return Unescaped raw string.
 pub fn unescape(text: str): str {
+    contract(len(text) >= 0, "text must be a valid string");
     return esc.unescape(text);
 }
 
-pub fn parse(text: str): Node {
+/// Parses an HTML source text into a DOM `Node` element tree.
+///
+/// @param text HTML markup string.
+/// @return Root `Node` representing the document hierarchy.
+pub fn parse(text: str): parser.Node {
+    contract(len(text) >= 0, "text must be a valid string");
     return parser.parse(text);
 }

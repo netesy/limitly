@@ -1,0 +1,58 @@
+// tests/stdlib/non_crypto_hash_test.lm
+// Test suite for std.hash non-cryptographic hash functions.
+
+import std.hash as hash;
+
+print("=== std.hash Non-Cryptographic Hash Tests ===");
+
+// FNV-1a string
+var h1 = hash.fnv1a_32_str("hello");
+var h2 = hash.hash_string("hello");
+assert(h1 == h2, "hash_string matches fnv1a_32_str");
+assert(h1 != 0, "fnv1a_32 hash is non-zero");
+
+// Different strings produce different hashes
+var h3 = hash.fnv1a_32_str("world");
+assert(h1 != h3, "different inputs produce different fnv1a hashes");
+
+// DJB2
+var djb_1 = hash.djb2("hello");
+var djb_2 = hash.djb2("world");
+assert(djb_1 > 0, "djb2 produces positive hash");
+assert(djb_1 != djb_2, "djb2 distinguishes strings");
+
+// SDBM
+var s1 = hash.sdbm("hello");
+var s2 = hash.sdbm("world");
+assert(s1 != s2, "sdbm distinguishes strings");
+
+// Jenkins OAAT
+var j1 = hash.jenkins_oaat("hello");
+var j2 = hash.jenkins_oaat("world");
+assert(j1 != j2, "jenkins distinguishes strings");
+
+// MurmurHash3
+var m1 = hash.murmur3_32("hello", 0);
+var m2 = hash.hash_with_seed("hello", 0);
+assert(m1 == m2, "hash_with_seed matches murmur3_32");
+var m3 = hash.murmur3_32("hello", 42);
+assert(m1 != m3, "seed changes murmur3 hash");
+
+// CRC32
+var c1 = hash.crc32("hello");
+var c2 = hash.crc32("hello");
+assert(c1 == c2, "crc32 is deterministic");
+var c3 = hash.crc32("world");
+assert(c1 != c3, "crc32 distinguishes strings");
+
+// Adler32
+var a1 = hash.adler32("hello");
+var a2 = hash.adler32("world");
+assert(a1 != a2, "adler32 distinguishes strings");
+
+// Hash combination
+var comb1 = hash.combine_hashes(h1, djb_1);
+var comb2 = hash.combine_hashes(djb_1, h1);
+assert(comb1 != comb2, "combine_hashes is order-sensitive");
+
+print("All std.hash tests passed successfully!");

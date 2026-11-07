@@ -1,7 +1,21 @@
-// Standard Library Time Instant Submodule
+// std/time/instant.lm
+// Monotonic time measurement and elapsed interval calculation.
 
 import std.time.duration as dur;
 
+/// Represents a point-in-time timestamp used for high-precision latency and interval measurements.
+///
+/// @tip Call `Instant.now()` before a task and `instant.elapsed()` after to measure duration.
+/// @note Operates on system monotonic time in milliseconds.
+///
+/// @param timestamp_ms Milliseconds timestamp value as a float.
+///
+/// @example
+/// import std.time as time;
+/// var start = time.Instant.now();
+/// // ... perform workload ...
+/// var took = start.elapsed();
+/// print("Completed in: {took.human_readable()}");
 frame Instant {
     pub timestamp_ms: float;
 
@@ -9,6 +23,9 @@ frame Instant {
         self.timestamp_ms = timestamp_ms;
     }
 
+    /// Captures the current monotonic timestamp.
+    ///
+    /// @return Fresh Instant capturing the current moment.
     pub fn now(): Instant {
         var current_time = time();
         var current_float = current_time as float;
@@ -16,6 +33,9 @@ frame Instant {
         return Instant(result_ms);
     }
 
+    /// Returns the elapsed duration since this Instant was recorded.
+    ///
+    /// @return Duration elapsed between this Instant and the current moment.
     pub fn elapsed(): dur.Duration {
         var current_time = time();
         var current_float = current_time as float;

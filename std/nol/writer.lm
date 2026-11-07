@@ -30,45 +30,54 @@ fn _escape_str(s: str): str {
     return res + "\"";
 }
 
-pub fn dump(val_any: any, indent: int = 2, level: int = 0, is_root: bool = true): str {
-    var node = val_any as value.Value;
-    if (node == nil) return "null";
+/// Dumps a NOL `Value` AST node to its text representation.
+///
+/// @param val_obj Target value node to format.
+/// @param indent Spaces per indentation level (default: 2).
+/// @param level Current indentation nesting level (default: 0).
+/// @param is_root True if formatting root level of document (default: true).
+/// @return Serialized NOL string representation.
+pub fn dump(val_obj: value.Value, indent: int = 2, level: int = 0, is_root: bool = true): str {
+    contract(indent >= 0, "indent must be non-negative");
+    contract(level >= 0, "level must be non-negative");
+    if (val_obj == nil) return "null";
 
     var lbrace = "{";
     var rbrace = "}";
 
-    match (node.kind) {
+    match (val_obj.kind) {
         value.Type.Null => {
             return "null";
         },
         value.Type.Bool => {
-            if (node.bool_val) return "true";
+            if (val_obj.bool_val) return "true";
             return "false";
         },
         value.Type.Int => {
-            var num = node.int_val;
+            var num = val_obj.int_val;
             return "{num}";
         },
         value.Type.Float => {
-            var fl = node.float_val;
+            var fl = val_obj.float_val;
             return "{fl}";
         },
         value.Type.String => {
-            return _escape_str(node.str_val);
+            return _escape_str(val_obj.str_val);
         },
         value.Type.Array => {
             var res = "[";
-            var total = len(node.array_val);
+            var total = len(val_obj.array_val);
             var i = 0;
             while (i < total) {
-                res = res + dump(node.array_val[i], indent, level + 1, false);
+                var elem = val_obj.array_val[i] as value.Value;
+                res = res + dump(elem, indent, level + 1, false);
                 if (i + 1 < total) res = res + ", ";
                 i = i + 1;
             }
             return res + "]";
         },
         value.Type.Object => {
-            var total = len(node.obj_keys);
+            var total = len(val_obj.obj_keys);
             if (total == 0) {
                 if (is_root) return "";
                 return lbrace + rbrace;
@@ -81,8 +90,8 @@ pub fn dump(val_any: any, indent: int = 2, level: int = 0, is_root: bool = true)
 
             var i = 0;
             while (i < total) {
-                var k = node.obj_keys[i];
-                var v = node.obj_vals[i];
+                var k = val_obj.obj_keys[i];
+                var v = val_obj.obj_vals[i] as value.Value;
 
                 if (!is_root) s = s + next_pad;
                 s = s + k + ": " + dump(v, indent, level + 1, false);
@@ -105,6 +114,12 @@ pub fn dump(val_any: any, indent: int = 2, level: int = 0, is_root: bool = true)
     }
 }
 
-pub fn stringify(val_any: any, indent: int = 2): str {
-    return dump(val_any, indent, 0, true);
+/// Serializes a NOL `Value` into formatted text.
+///
+/// @param val_obj Target value node to serialize.
+/// @param indent Spaces per indentation level (default: 2).
+/// @return Formatted NOL string.
+pub fn stringify(val_obj: value.Value, indent: int = 2): str {
+    contract(indent >= 0, "indent must be non-negative");
+    return dump(val_obj, indent, 0, true);
 }

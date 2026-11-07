@@ -4,6 +4,7 @@
 import std.ffi as ffi;
 import std.crypto.hash as hash;
 
+/// Container holding AEAD ciphertext and its matching authentication tag.
 frame GcmCipher {
     pub var ciphertext: str;
     pub var tag: str;
@@ -14,25 +15,39 @@ frame GcmCipher {
     }
 }
 
+/// AES encryption and decryption operations helper namespace.
 frame AES {
+    /// Encrypts plaintext with AES-GCM.
     pub fn encrypt_gcm(key: str, iv: str, plaintext: str, aad: str = ""): GcmCipher? {
         return encrypt_gcm(key, iv, plaintext, aad);
     }
 
+    /// Decrypts ciphertext with AES-GCM.
     pub fn decrypt_gcm(key: str, iv: str, ciphertext: str, tag: str, aad: str = ""): str? {
         return decrypt_gcm(key, iv, ciphertext, tag, aad);
     }
 
+    /// Encrypts plaintext with AES-CBC.
     pub fn encrypt_cbc(key: str, iv: str, plaintext: str): str? {
         return encrypt_cbc(key, iv, plaintext);
     }
 
+    /// Decrypts ciphertext with AES-CBC.
     pub fn decrypt_cbc(key: str, iv: str, ciphertext: str): str? {
         return decrypt_cbc(key, iv, ciphertext);
     }
 }
 
+/// Encrypts plaintext using AES-GCM authenticated encryption.
+///
+/// @param key Hex-encoded encryption key.
+/// @param iv Hex-encoded initialization vector.
+/// @param plaintext Plain text data to encrypt.
+/// @param aad Optional additional authenticated data.
+/// @return Fallible `GcmCipher` holding ciphertext and authentication tag.
 pub fn encrypt_gcm(key: str, iv: str, plaintext: str, aad: str = ""): GcmCipher? {
+    contract(len(key) > 0, "key cannot be empty");
+    contract(len(iv) > 0, "iv cannot be empty");
     unsafe {
         var lib = hash._open_lib();
         if (lib != nil and lib != 0) {
@@ -88,7 +103,18 @@ pub fn encrypt_gcm(key: str, iv: str, plaintext: str, aad: str = ""): GcmCipher?
     return err();
 }
 
+/// Decrypts AES-GCM authenticated ciphertext.
+///
+/// @param key Hex-encoded encryption key.
+/// @param iv Hex-encoded initialization vector.
+/// @param ciphertext Hex-encoded ciphertext string.
+/// @param tag Hex-encoded authentication tag.
+/// @param aad Optional additional authenticated data.
+/// @return Fallible decrypted plaintext string.
 pub fn decrypt_gcm(key: str, iv: str, ciphertext: str, tag: str, aad: str = ""): str? {
+    contract(len(key) > 0, "key cannot be empty");
+    contract(len(iv) > 0, "iv cannot be empty");
+    contract(len(tag) > 0, "tag cannot be empty");
     unsafe {
         var lib = hash._open_lib();
         if (lib != nil and lib != 0) {
@@ -141,7 +167,15 @@ pub fn decrypt_gcm(key: str, iv: str, ciphertext: str, tag: str, aad: str = ""):
     return err();
 }
 
+/// Encrypts plaintext using AES-CBC mode with PKCS#7 padding.
+///
+/// @param key Hex-encoded encryption key.
+/// @param iv Hex-encoded 16-byte initialization vector.
+/// @param plaintext Plain text data to encrypt.
+/// @return Fallible hex-encoded ciphertext string.
 pub fn encrypt_cbc(key: str, iv: str, plaintext: str): str? {
+    contract(len(key) > 0, "key cannot be empty");
+    contract(len(iv) > 0, "iv cannot be empty");
     unsafe {
         var lib = hash._open_lib();
         if (lib != nil and lib != 0) {
@@ -188,7 +222,15 @@ pub fn encrypt_cbc(key: str, iv: str, plaintext: str): str? {
     return err();
 }
 
+/// Decrypts hex-encoded AES-CBC ciphertext with PKCS#7 unpadding.
+///
+/// @param key Hex-encoded encryption key.
+/// @param iv Hex-encoded 16-byte initialization vector.
+/// @param ciphertext Hex-encoded ciphertext string.
+/// @return Fallible decrypted plaintext string.
 pub fn decrypt_cbc(key: str, iv: str, ciphertext: str): str? {
+    contract(len(key) > 0, "key cannot be empty");
+    contract(len(iv) > 0, "iv cannot be empty");
     unsafe {
         var lib = hash._open_lib();
         if (lib != nil and lib != 0) {

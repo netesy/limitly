@@ -1,47 +1,63 @@
 // std/env/variables.lm
-//
-// Environment variables, delegated to std.os (which owns the RT_OS resource).
-//
-// std.env is deliberately focused on environment variables: get, set, unset,
-// inspection, conversions (int, bool), dictionary view, and .env file loading.
+// Process environment variables, parsing, and .env file configuration.
 
 import std.os as os;
 import std.io as io;
 
-// Returns nil when the variable is unset. Unwrap the payload with `?` or with
-// `match (value) { val v => ... }`; `value as str` does NOT unwrap, it produces
-// the text "ok(...)". Use get_or() when a default is acceptable - it returns a
-// plain str. Windows reports a variable set to "" as unset, because its
-// environment block cannot store an empty value.
+/// Retrieves the string value of an environment variable, returning nil if unset.
+///
+/// @pre len(key) > 0
+/// @param key Environment variable name.
+/// @return Fallible string value or nil.
 pub fn get(key: str): str? {
+    contract(len(key) > 0, "Environment variable key must not be empty");
     return os.getenv(key);
 }
 
-// Look up a variable with a default, returning a plain str.
+/// Retrieves an environment variable or returns a fallback string if absent.
+///
+/// @pre len(key) > 0
+/// @param key Environment variable name.
+/// @param fallback Default string value.
+/// @return Variable value or fallback.
 pub fn get_or(key: str, fallback: str): str {
+    contract(len(key) > 0, "Environment variable key must not be empty");
     return os.getenv_or(key, fallback);
 }
 
-// Check whether an environment variable exists.
+/// Checks whether an environment variable exists.
+///
+/// @pre len(key) > 0
+/// @param key Environment variable name.
+/// @return True if key is defined in the environment.
 pub fn has(key: str): bool {
+    contract(len(key) > 0, "Environment variable key must not be empty");
     var val_opt = os.getenv(key);
     return val_opt != nil;
 }
 
-// Alias for has.
+/// Alias for `has()`.
+///
+/// @pre len(key) > 0
+/// @param key Environment variable name.
+/// @return True if key is defined.
 pub fn contains(key: str): bool {
+    contract(len(key) > 0, "Environment variable key must not be empty");
     return has(key);
 }
 
-// Parse integer environment variable or fallback if absent / invalid.
+/// Parses an environment variable as an integer, falling back to a default if absent or invalid.
+///
+/// @pre len(key) > 0
+/// @param key Environment variable name.
+/// @param fallback Default integer value.
+/// @return Parsed integer or fallback.
 pub fn get_int(key: str, fallback: int = 0): int {
+    contract(len(key) > 0, "Environment variable key must not be empty");
     var raw = get_or(key, "");
     if (raw == "") return fallback;
-    // Check if numeric
     var i = 0;
-    var start = 0;
     if (len(raw) > 0 and _builtin_substring(raw, 0, 1) == "-") {
-        start = 1;
         i = 1;
     }
     if (i >= len(raw)) return fallback;
@@ -53,8 +69,14 @@ pub fn get_int(key: str, fallback: int = 0): int {
     return raw as int;
 }
 
-// Parse boolean environment variable or fallback. Recognizes "1", "true", "yes", "on".
+/// Parses a boolean environment variable ("1", "true", "yes", "on" vs "0", "false", "no", "off").
+///
+/// @pre len(key) > 0
+/// @param key Environment variable name.
+/// @param fallback Default boolean value.
+/// @return Parsed boolean or fallback.
 pub fn get_bool(key: str, fallback: bool = false): bool {
+    contract(len(key) > 0, "Environment variable key must not be empty");
     var raw = get_or(key, "");
     if (raw == "") return fallback;
     var lower = _builtin_string_to_lower(raw);
@@ -67,20 +89,37 @@ pub fn get_bool(key: str, fallback: bool = false): bool {
     return fallback;
 }
 
+/// Sets or updates an environment variable for the process.
+///
+/// @pre len(key) > 0
+/// @param key Environment variable name.
+/// @param value Target value string.
+/// @return True if successfully set.
 pub fn set(key: str, value: str): bool {
+    contract(len(key) > 0, "Environment variable key must not be empty");
     return os.setenv(key, value);
 }
 
+/// Deletes an environment variable from the process environment.
+///
+/// @pre len(key) > 0
+/// @param key Environment variable name.
+/// @return True if successfully removed.
 pub fn unset(key: str): bool {
+    contract(len(key) > 0, "Environment variable key must not be empty");
     return os.unsetenv(key);
 }
 
-// Every variable as a list of "KEY=VALUE" strings.
+/// Returns all environment variables formatted as a list of "KEY=VALUE" strings.
+///
+/// @return List of raw environment entries.
 pub fn vars(): [str] {
     return os.env_vars();
 }
 
-// Parses all environment variables into a dictionary mapping {KEY: VALUE}.
+/// Parses all environment variables into a dictionary mapping {KEY: VALUE}.
+///
+/// @return Dictionary of environment variables.
 pub fn to_dict(): {str: str} {
     var all = vars();
     var dict: {str: str} = {};
@@ -98,7 +137,9 @@ pub fn to_dict(): {str: str} {
     return dict;
 }
 
-// Returns a list of all variable names.
+/// Returns a list of all environment variable names.
+///
+/// @return List of variable key strings.
 pub fn keys(): [str] {
     var all = vars();
     var result: [str] = [];
@@ -114,7 +155,9 @@ pub fn keys(): [str] {
     return result;
 }
 
-// Returns a list of all variable values.
+/// Returns a list of all environment variable values.
+///
+/// @return List of variable value strings.
 pub fn values(): [str] {
     var all = vars();
     var result: [str] = [];
@@ -130,7 +173,10 @@ pub fn values(): [str] {
     return result;
 }
 
-// Parse a .env formatted string into a dictionary.
+/// Parses a `.env` file content string into a key-value dictionary.
+///
+/// @param content Raw .env text content.
+/// @return Dictionary of parsed configuration variables.
 pub fn parse_env(content: str): {str: str} {
     var result: {str: str} = {};
     var lines: [str] = [];
@@ -158,7 +204,6 @@ pub fn parse_env(content: str): {str: str} {
             if (eq > 0) {
                 var k = _builtin_string_trim(_builtin_substring(line, 0, eq));
                 var v = _builtin_string_trim(_builtin_substring(line, eq + 1, len(line)));
-                // Strip surrounding quotes if present
                 if (len(v) >= 2) {
                     var q1 = _builtin_substring(v, 0, 1);
                     var q2 = _builtin_substring(v, len(v) - 1, len(v));
@@ -176,7 +221,10 @@ pub fn parse_env(content: str): {str: str} {
     return result;
 }
 
-// Load .env content into the process environment. Returns count loaded.
+/// Parses `.env` content and injects variables into the current process environment.
+///
+/// @param content Raw .env file content.
+/// @return Number of variables successfully set.
 pub fn load_dotenv(content: str): int {
     var parsed = parse_env(content);
     var count = 0;
@@ -188,8 +236,13 @@ pub fn load_dotenv(content: str): int {
     return count;
 }
 
-// Read and load a .env file from disk. Returns count loaded, or 0 if unreadable.
+/// Reads a `.env` file from disk and loads its variables into the process environment.
+///
+/// @pre len(path) > 0
+/// @param path Filesystem path to the .env file.
+/// @return Number of variables loaded, or 0 if unreadable.
 pub fn load_file(path: str): int {
+    contract(len(path) > 0, "File path must not be empty");
     var f_res = io.open(path, "r");
     match (f_res) {
         val file_obj => {
@@ -216,74 +269,55 @@ fn find_char(s: str, needle: str): int {
     return -1;
 }
 
+/// Object-oriented interface to environment variable management.
 frame Env {
     pub init() {}
 
-    pub fn get(key: str): str? {
-        return get(key);
-    }
+    /// Retrieves an environment variable or nil if absent.
+    pub fn get(key: str): str? { return get(key); }
 
-    pub fn get_or(key: str, fallback: str): str {
-        return get_or(key, fallback);
-    }
+    /// Retrieves an environment variable with a fallback default.
+    pub fn get_or(key: str, fallback: str): str { return get_or(key, fallback); }
 
-    pub fn get_int(key: str, fallback: int = 0): int {
-        return get_int(key, fallback);
-    }
+    /// Parses an environment variable as an integer.
+    pub fn get_int(key: str, fallback: int = 0): int { return get_int(key, fallback); }
 
-    pub fn get_bool(key: str, fallback: bool = false): bool {
-        return get_bool(key, fallback);
-    }
+    /// Parses an environment variable as a boolean.
+    pub fn get_bool(key: str, fallback: bool = false): bool { return get_bool(key, fallback); }
 
-    pub fn has(key: str): bool {
-        return has(key);
-    }
+    /// Checks if a variable is present.
+    pub fn has(key: str): bool { return has(key); }
 
-    pub fn contains(key: str): bool {
-        return has(key);
-    }
+    /// Checks if a variable is present.
+    pub fn contains(key: str): bool { return has(key); }
 
-    pub fn set(key: str, value: str): bool {
-        return set(key, value);
-    }
+    /// Sets or updates a variable.
+    pub fn set(key: str, value: str): bool { return set(key, value); }
 
-    pub fn unset(key: str): bool {
-        return unset(key);
-    }
+    /// Deletes a variable.
+    pub fn unset(key: str): bool { return unset(key); }
 
-    pub fn vars(): [str] {
-        return vars();
-    }
+    /// Lists all environment entries as "KEY=VALUE".
+    pub fn vars(): [str] { return vars(); }
 
-    pub fn to_dict(): {str: str} {
-        return to_dict();
-    }
+    /// Returns a dictionary of all environment variables.
+    pub fn to_dict(): {str: str} { return to_dict(); }
 
-    pub fn keys(): [str] {
-        return keys();
-    }
+    /// Lists all variable names.
+    pub fn keys(): [str] { return keys(); }
 
-    pub fn values(): [str] {
-        return values();
-    }
+    /// Lists all variable values.
+    pub fn values(): [str] { return values(); }
 
-    pub fn parse_env(content: str): {str: str} {
-        return parse_env(content);
-    }
+    /// Parses raw .env content into a dictionary.
+    pub fn parse_env(content: str): {str: str} { return parse_env(content); }
 
-    pub fn load_dotenv(content: str): int {
-        return load_dotenv(content);
-    }
+    /// Loads raw .env content into the process environment.
+    pub fn load_dotenv(content: str): int { return load_dotenv(content); }
 
-    pub fn load_file(path: str): int {
-        return load_file(path);
-    }
+    /// Reads and loads a .env file from disk.
+    pub fn load_file(path: str): int { return load_file(path); }
 
-    // Read PATH, or fallback when it is unset. PATH is an environment variable,
-    // so it stays in scope for a variables-only facade. Home/temp directories and
-    // platform/arch identity live in std.os (home_dir/temp_dir/platform/arch);
-    // they are not environment variables and are intentionally not re-exported here.
-    pub fn path(fallback: str): str {
-        return get_or("PATH", fallback);
-    }
+    /// Reads the system PATH variable or returns a fallback if unset.
+    pub fn path(fallback: str): str { return get_or("PATH", fallback); }
 }

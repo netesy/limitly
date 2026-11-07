@@ -1,0 +1,37 @@
+// tests/stdlib/bytes_test.lm
+// Test suite for std.bytes ByteBuffer and endian encoding/decoding.
+
+import std.bytes as bytes;
+
+print("=== std.bytes Tests ===");
+
+var buf = bytes.ByteBuffer();
+assert(buf.len() == 0, "initial len is 0");
+
+buf.append(0x12);
+buf.append(0x34);
+assert(buf.len() == 2, "len after appends is 2");
+assert(buf.get(0) == 0x12, "first byte matches");
+assert(buf.get(1) == 0x34, "second byte matches");
+assert(buf.to_hex() == "1234", "hex representation matches");
+
+buf.append_all([0xAB, 0xCD]);
+assert(buf.len() == 4, "len after append_all is 4");
+assert(buf.to_hex() == "1234abcd", "hex representation matches after append_all");
+
+// Endian tests
+var val_num = 0x12345678;
+var be_bytes = bytes.encode_i32_be(val_num);
+assert(len(be_bytes) == 4, "be_bytes length is 4");
+assert(be_bytes[0] == 0x12 and be_bytes[1] == 0x34 and be_bytes[2] == 0x56 and be_bytes[3] == 0x78, "big endian order");
+var decoded_be = bytes.decode_i32_be(be_bytes);
+assert(decoded_be == val_num, "roundtrip big endian");
+
+var le_bytes = bytes.encode_i32_le(val_num);
+assert(len(le_bytes) == 4, "le_bytes length is 4");
+assert(le_bytes[0] == 0x78 and le_bytes[1] == 0x56 and le_bytes[2] == 0x34 and le_bytes[3] == 0x12, "little endian order");
+var decoded_le = bytes.decode_i32_le(le_bytes);
+assert(decoded_le == val_num, "roundtrip little endian");
+
+print("All std.bytes tests passed successfully!");
+

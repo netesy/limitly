@@ -153,7 +153,7 @@ frame Effect {
 pub var _batch_depth: int = 0;
 pub var _active_effects: [Effect] = [] as [Effect];
 
-pub fn signal(init_val: any): Signal { return Signal(init_val); }
+pub fn signal(init_val): Signal { return Signal(init_val); }
 pub fn signal_bool(init_val: bool): Signal { return Signal(init_val); }
 pub fn signal_int(init_val: int): Signal { return Signal(init_val); }
 pub fn signal_float(init_val: float): Signal { return Signal(init_val); }

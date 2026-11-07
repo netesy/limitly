@@ -1464,11 +1464,11 @@ frame GUI {
             var pbg = self.get_style_color(types.COLOR_PANEL_BG);
             gg.draw_rect_primitive(bx, popup_y, w, popup_h, pbg.r, pbg.g, pbg.b, pbg.a);
 
-            var border = self.get_style_color(types.COLOR_ACCENT);
-            gg.draw_rect_primitive(bx, popup_y, w, 1.0, border.r, border.g, border.b, border.a);
-            gg.draw_rect_primitive(bx, popup_y + popup_h - 1.0, w, 1.0, border.r, border.g, border.b, border.a);
-            gg.draw_rect_primitive(bx, popup_y, 1.0, popup_h, border.r, border.g, border.b, border.a);
-            gg.draw_rect_primitive(bx + w - 1.0, popup_y, 1.0, popup_h, border.r, border.g, border.b, border.a);
+            var popup_border = self.get_style_color(types.COLOR_ACCENT);
+            gg.draw_rect_primitive(bx, popup_y, w, 1.0, popup_border.r, popup_border.g, popup_border.b, popup_border.a);
+            gg.draw_rect_primitive(bx, popup_y + popup_h - 1.0, w, 1.0, popup_border.r, popup_border.g, popup_border.b, popup_border.a);
+            gg.draw_rect_primitive(bx, popup_y, 1.0, popup_h, popup_border.r, popup_border.g, popup_border.b, popup_border.a);
+            gg.draw_rect_primitive(bx + w - 1.0, popup_y, 1.0, popup_h, popup_border.r, popup_border.g, popup_border.b, popup_border.a);
 
             var k = 0;
             while (k < item_count) {

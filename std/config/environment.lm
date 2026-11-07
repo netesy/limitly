@@ -1,8 +1,18 @@
+// std/config/environment.lm
 // Configuration Environment Module
 
 import std.env as env;
 
+/// Loads configuration key-value mappings from environment variables.
+///
+/// @param keys List of environment variable names to query.
+/// @return Dictionary mapping found environment variables to their string values.
+/// @example
+/// ```lymar
+/// var env_cfg = environment.load_from_env(["PORT", "HOST"]);
+/// ```
 pub fn load_from_env(keys: [str]): {str: str} {
+    contract(len(keys) >= 0, "keys must be a valid list");
     var result = {"_Lymar_init": "nil"};
     var e = env.Env() as env.Env;
     var i: int = 0;

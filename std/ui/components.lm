@@ -12,7 +12,6 @@
 
 import std.color as color;
 import std.math as math;
-import std.ui.event as event;
 pub import std.color show Color;
 pub import std.ui.event show EventResult;
 

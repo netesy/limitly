@@ -1,5 +1,7 @@
-// Standard Library Time Duration Submodule
+// std/time/duration.lm
+// High-resolution time span representation (seconds and microsecond precision).
 
+/// Formats an integer with leading zero padding up to `width`.
 pub fn pad_int(n: int, width: int): str {
     var s: str = "{n}";
     while (len(s) < width) {
@@ -8,6 +10,20 @@ pub fn pad_int(n: int, width: int): str {
     return s;
 }
 
+/// Represents an elapsed duration of time with microsecond resolution.
+///
+/// @tip Construct durations via fluent factory methods like `Duration.from_seconds(10)`
+/// or `Duration.from_milliseconds(250)`.
+///
+/// @note Durations can represent both positive time advances and negative offsets.
+///
+/// @param seconds Whole seconds component.
+/// @param microseconds Sub-second fractional microseconds component (0-999999).
+///
+/// @example
+/// import std.time as time;
+/// var d = time.Duration.from_seconds(90);
+/// print("Duration: {d.human_readable()}"); // "1m 30s"
 frame Duration {
     pub microseconds: int;
     pub seconds: int;
@@ -17,33 +33,63 @@ frame Duration {
         self.microseconds = microseconds;
     }
 
-    // Factory methods
+    /// Creates a Duration from a specified number of days.
+    ///
+    /// @param days Number of days.
+    /// @return Duration instance.
     pub fn from_days(days: int): Duration {
         return Duration(days * 86400, 0);
     }
 
+    /// Creates a Duration from a specified number of hours.
+    ///
+    /// @param hours Number of hours.
+    /// @return Duration instance.
     pub fn from_hours(hours: int): Duration {
         return Duration(hours * 3600, 0);
     }
 
+    /// Creates a Duration from a specified number of minutes.
+    ///
+    /// @param minutes Number of minutes.
+    /// @return Duration instance.
     pub fn from_minutes(minutes: int): Duration {
         return Duration(minutes * 60, 0);
     }
 
+    /// Creates a Duration from a specified number of seconds.
+    ///
+    /// @param seconds Number of seconds.
+    /// @return Duration instance.
     pub fn from_seconds(seconds: int): Duration {
         return Duration(seconds, 0);
     }
 
+    /// Creates a Duration from a specified number of milliseconds.
+    ///
+    /// @param ms Number of milliseconds.
+    /// @return Duration instance.
     pub fn from_milliseconds(ms: int): Duration {
         return Duration(ms / 1000, (ms % 1000) * 1000);
     }
 
+    /// Creates a Duration from a specified number of microseconds.
+    ///
+    /// @param us Number of microseconds.
+    /// @return Duration instance.
     pub fn from_microseconds(us: int): Duration {
         return Duration(us / 1000000, us % 1000000);
     }
 
     // Arithmetic operations
+
+    /// Adds another duration to this duration.
+    ///
+    /// @pre other != nil
+    /// @param other Duration to add.
+    /// @return New combined Duration.
     pub fn add(other: Duration): Duration {
+        contract(other != nil, "Duration to add must not be nil");
         var total_microseconds: int = self.microseconds + other.microseconds;
         var carry: int = 0;
         if (total_microseconds >= 1000000) {
@@ -60,10 +106,20 @@ frame Duration {
         );
     }
 
+    /// Subtracts another duration from this duration.
+    ///
+    /// @pre other != nil
+    /// @param other Duration to subtract.
+    /// @return New Duration difference.
     pub fn subtract(other: Duration): Duration {
+        contract(other != nil, "Duration to subtract must not be nil");
         return self.add(Duration(-other.seconds, -other.microseconds));
     }
 
+    /// Multiplies this duration by an integer scalar factor.
+    ///
+    /// @param factor Scalar multiplier.
+    /// @return Scaled Duration.
     pub fn multiply(factor: int): Duration {
         var total_us: int = self.seconds * 1000000 * factor + self.microseconds * factor;
         return Duration(
@@ -73,41 +129,79 @@ frame Duration {
     }
 
     // Comparison
+
+    /// Compares two durations for exact temporal equality.
+    ///
+    /// @pre other != nil
+    /// @param other Target Duration.
+    /// @return True if equal, false otherwise.
     pub fn equals(other: Duration): bool {
+        contract(other != nil, "Duration to compare must not be nil");
         var diff: Duration = self.subtract(other);
         return diff.seconds == 0 and diff.microseconds == 0;
     }
 
+    /// Checks if this duration is strictly greater than `other`.
+    ///
+    /// @pre other != nil
+    /// @param other Target Duration.
+    /// @return True if self > other.
     pub fn greater_than(other: Duration): bool {
+        contract(other != nil, "Duration to compare must not be nil");
         if (self.seconds > other.seconds) return true;
         if (self.seconds < other.seconds) return false;
         return self.microseconds > other.microseconds;
     }
 
+    /// Checks if this duration is strictly less than `other`.
+    ///
+    /// @pre other != nil
+    /// @param other Target Duration.
+    /// @return True if self < other.
     pub fn less_than(other: Duration): bool {
-        if (self.seconds < other.seconds) return true;
+        contract(other != nil, "Duration to compare must not be nil");
         if (self.seconds > other.seconds) return false;
+        if (self.seconds < other.seconds) return true;
         return self.microseconds < other.microseconds;
     }
 
     // Conversion
+
+    /// Converts the duration into fractional seconds.
+    ///
+    /// @return Float value in seconds.
     pub fn to_seconds(): float {
-        return self.seconds as float + (self.microseconds as float) / 1000000.0;
+        var sec = self.seconds as float;
+        var frac = (self.microseconds as float) / 1000000.0;
+        return sec + frac;
     }
 
+    /// Converts the duration into total whole milliseconds.
+    ///
+    /// @return Milliseconds integer.
     pub fn to_milliseconds(): int {
         return self.seconds * 1000 + self.microseconds / 1000;
     }
 
+    /// Converts the duration into total whole microseconds.
+    ///
+    /// @return Microseconds integer.
     pub fn to_microseconds(): int {
         return self.seconds * 1000000 + self.microseconds;
     }
 
+    /// Returns the integer whole seconds part of the duration.
+    ///
+    /// @return Seconds integer.
     pub fn total_seconds(): int {
         return self.seconds;
     }
 
     // Formatting
+
+    /// Formats the duration as a standard fractional seconds string (e.g. `1.250s`).
+    ///
+    /// @return Formatted string.
     pub fn to_string(): str {
         var abs_sec: int = self.seconds;
         var abs_us: int = self.microseconds;
@@ -123,6 +217,9 @@ frame Duration {
         return "{abs_sec}." + pad_int(ms, 3) + "s";
     }
 
+    /// Formats the duration into a human-friendly string (e.g. `1d 2h 30m 15s`).
+    ///
+    /// @return Human-readable duration string.
     pub fn human_readable(): str {
         var total_sec: int = self.seconds;
         if (total_sec < 0) total_sec = -total_sec;

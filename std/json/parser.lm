@@ -1,4 +1,5 @@
-// JSON Parser Module
+// std/json/parser.lm
+// Recursive descent JSON text parser producing structured Value ASTs.
 
 import std.json.value as value;
 
@@ -18,14 +19,16 @@ fn is_digit_char(ch: str): bool {
     }
 }
 
+/// Recursive descent JSON text parser.
 frame Parser {
     pub idx: int;
     pub text: str;
 
+    /// Skips whitespace characters (space, tab, newline, carriage return).
     pub fn skip_whitespace() {
         var length = len(self.text);
         var skip = true;
-        while (self.idx < length and skip == true) {
+        while (self.idx < length and skip) {
             var ch = _builtin_substring(self.text, self.idx, self.idx + 1);
             if (ch == " " or ch == "\t" or ch == "\n" or ch == "\r") {
                 self.idx = self.idx + 1;
@@ -35,52 +38,57 @@ frame Parser {
         }
     }
 
+    /// Peeks at the next non-whitespace character without consuming it.
     pub fn peek_char(): str {
         self.skip_whitespace();
         if (self.idx >= len(self.text)) return "";
         return _builtin_substring(self.text, self.idx, self.idx + 1);
     }
 
-    pub fn parse_value(): any {
+    /// Parses the next JSON value from the input text stream.
+    ///
+    /// @return Parsed `value.Value` node.
+    pub fn parse_value(): value.Value {
         self.skip_whitespace();
         var length = len(self.text);
-        if (self.idx >= length) return value.make_null() as any;
+        if (self.idx >= length) return value.make_null();
 
         var ch = _builtin_substring(self.text, self.idx, self.idx + 1);
         match (ch) {
             "\"" => {
-                return self.parse_string() as any;
+                return self.parse_string();
             },
             "{" => {
-                return self.parse_object() as any;
+                return self.parse_object();
             },
             "[" => {
-                return self.parse_array() as any;
+                return self.parse_array();
             },
             "t" => {
-                return self.parse_bool() as any;
+                return self.parse_bool();
             },
             "f" => {
-                return self.parse_bool() as any;
+                return self.parse_bool();
             },
             "n" => {
-                return self.parse_null() as any;
+                return self.parse_null();
             },
             _ => {
-                if (ch == "-" or is_digit_char(ch) == true) {
-                    return self.parse_number() as any;
+                if (ch == "-" or is_digit_char(ch)) {
+                    return self.parse_number();
                 }
-                return value.make_null() as any;
+                return value.make_null();
             }
         }
     }
 
+    /// Parses a double-quoted JSON string token.
     pub fn parse_string(): value.Value {
         self.idx = self.idx + 1; // skip leading "
         var start = self.idx;
         var length = len(self.text);
         var keep_going = true;
-        while (self.idx < length and keep_going == true) {
+        while (self.idx < length and keep_going) {
             var ch = _builtin_substring(self.text, self.idx, self.idx + 1);
             if (ch == "\"") {
                 keep_going = false;
@@ -93,6 +101,7 @@ frame Parser {
         return value.make_string(s);
     }
 
+    /// Parses a JSON boolean token (true / false).
     pub fn parse_bool(): value.Value {
         var ch = _builtin_substring(self.text, self.idx, self.idx + 1);
         if (ch == "t") {
@@ -104,18 +113,20 @@ frame Parser {
         }
     }
 
+    /// Parses a JSON null token.
     pub fn parse_null(): value.Value {
         self.idx = self.idx + 4; // skip null
         return value.make_null();
     }
 
+    /// Parses a JSON integer number token.
     pub fn parse_number(): value.Value {
         var start = self.idx;
         var length = len(self.text);
         var keep_going = true;
-        while (self.idx < length and keep_going == true) {
+        while (self.idx < length and keep_going) {
             var ch = _builtin_substring(self.text, self.idx, self.idx + 1);
-            if (ch == "-" or ch == "." or is_digit_char(ch) == true) {
+            if (ch == "-" or ch == "." or is_digit_char(ch)) {
                 self.idx = self.idx + 1;
             } else {
                 keep_going = false;
@@ -126,6 +137,7 @@ frame Parser {
         return value.make_number(num_val);
     }
 
+    /// Parses a JSON bracketed array token [ ... ].
     pub fn parse_array(): value.Value {
         self.idx = self.idx + 1; // skip [
         var list: [any] = [];
@@ -137,7 +149,7 @@ frame Parser {
         }
 
         var keep_going = true;
-        while (keep_going == true) {
+        while (keep_going) {
             var item_val = self.parse_value();
             list.append(item_val);
             self.skip_whitespace();
@@ -155,6 +167,7 @@ frame Parser {
         return value.make_array(list);
     }
 
+    /// Parses a JSON braced object token { "key": val, ... }.
     pub fn parse_object(): value.Value {
         self.idx = self.idx + 1; // skip {
         var keys: [str] = [];
@@ -167,7 +180,7 @@ frame Parser {
         }
 
         var keep_going = true;
-        while (keep_going == true) {
+        while (keep_going) {
             self.skip_whitespace();
             var key_ch = _builtin_substring(self.text, self.idx, self.idx + 1);
             var key = "";
@@ -200,7 +213,11 @@ frame Parser {
     }
 }
 
-pub fn parse(text: str): any {
+/// Parses raw JSON text into an immutable `Value` AST node.
+///
+/// @param text Raw JSON text.
+/// @return Parsed `value.Value` root node.
+pub fn parse(text: str): value.Value {
     var p = Parser(idx=0, text=text);
     return p.parse_value();
 }

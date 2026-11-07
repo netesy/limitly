@@ -79,7 +79,7 @@ pub fn make_key_event(k: EventKind, key: int): UIEvent {
 // Invoke a widget's `fn(): nil` action slot fallibly. A nil action is not an
 // error condition -- it is simply `Unhandled`, which removes the
 // `if (w.on_click_action != nil)` guard from every dispatch site.
-pub fn fire_action(action: any): EventResult? {
+pub fn fire_action(action): EventResult? {
     if (action == nil) {
         return ok(EventResult.Ignored);
     }
@@ -95,7 +95,7 @@ pub fn fire_action(action: any): EventResult? {
 // Route an actionable event: fire the handler if one is bound (best-effort),
 // then report the event as consumed. A nil handler is not a failure of routing
 // -- the event was still handled by reaching a target.
-fn route(handler: any): EventResult? {
+fn route(handler): EventResult? {
     fire_action(handler)? else { };
     return ok(EventResult.Handled);
 }

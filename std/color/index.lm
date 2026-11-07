@@ -1,17 +1,28 @@
-// std/color/index.lm
-// Canonical Color frame, constructors, operations, palettes, and palette integration.
+// Standard Library Color Module
+//
+// Canonical Color frame, RGBA / Hex / HSL constructors, linear interpolation, and Tailwind-inspired shade palettes.
 
-// Color Palette Integration
 pub import std.color.palette show Shades, shade, palette, slate, zinc, neutral, stone, orange, amber, lime, emerald, teal, sky, violet, purple, fuchsia, pink, rose, crimson, cool_gray, warm_gray, tw;
 
-import std.math as math;
-
+/// Canonical 4-channel RGBA floating-point color representation (0.0 to 1.0).
+///
+/// @example
+/// ```lymar
+/// var c = Color(1.0, 0.5, 0.0, 1.0);
+/// var hex_code = c.to_hex();
+/// ```
 frame Color {
-    pub var r: float; // 0.0 to 1.0
-    pub var g: float;
-    pub var b: float;
-    pub var a: float;
+    pub var r: float; // Red channel (0.0 to 1.0)
+    pub var g: float; // Green channel (0.0 to 1.0)
+    pub var b: float; // Blue channel (0.0 to 1.0)
+    pub var a: float; // Alpha channel (0.0 to 1.0)
 
+    /// Constructs a color with red, green, blue, and alpha components.
+    ///
+    /// @param r Red component (0.0 to 1.0).
+    /// @param g Green component (0.0 to 1.0).
+    /// @param b Blue component (0.0 to 1.0).
+    /// @param a Opacity component (0.0 to 1.0).
     pub init(r: float = 0.0, g: float = 0.0, b: float = 0.0, a: float = 1.0) {
         self.r = r;
         self.g = g;
@@ -19,6 +30,9 @@ frame Color {
         self.a = a;
     }
 
+    /// Converts the color to a standard `#rrggbb` hex string.
+    ///
+    /// @return Hex color string formatted with leading `#`.
     pub fn to_hex(): str {
         var ri = (self.r * 255.0) as int;
         var gi = (self.g * 255.0) as int;
@@ -32,7 +46,12 @@ frame Color {
         return "#" + hex_byte(ri) + hex_byte(gi) + hex_byte(bi);
     }
 
+    /// Creates a copy of this color with a modified alpha value.
+    ///
+    /// @param new_a New opacity value between 0.0 and 1.0.
+    /// @return New Color instance with updated alpha.
     pub fn with_alpha(new_a: float): Color {
+        contract(new_a >= 0.0 and new_a <= 1.0, "alpha must be in range [0.0, 1.0]");
         return Color(r=self.r, g=self.g, b=self.b, a=new_a);
     }
 }
@@ -64,25 +83,64 @@ fn hex_byte(v: int): str {
     return hex_digit(hi) + hex_digit(lo);
 }
 
+/// Constructs a color from integer byte components [0, 255].
+///
+/// @param r Red value in range 0-255.
+/// @param g Green value in range 0-255.
+/// @param b Blue value in range 0-255.
+/// @return Full opacity Color instance.
 pub fn rgb(r: int, g: int, b: int): Color {
+    contract(r >= 0 and r <= 255, "red component must be in 0..255");
+    contract(g >= 0 and g <= 255, "green component must be in 0..255");
+    contract(b >= 0 and b <= 255, "blue component must be in 0..255");
     return Color(r=(r as float) / 255.0, g=(g as float) / 255.0, b=(b as float) / 255.0, a=1.0);
 }
 
+/// Constructs a color from integer byte components [0, 255] and float alpha [0.0, 1.0].
+///
+/// @param r Red value in range 0-255.
+/// @param g Green value in range 0-255.
+/// @param b Blue value in range 0-255.
+/// @param a Opacity in range 0.0-1.0.
+/// @return Color instance.
 pub fn rgba(r: int, g: int, b: int, a: float): Color {
+    contract(r >= 0 and r <= 255, "red component must be in 0..255");
+    contract(g >= 0 and g <= 255, "green component must be in 0..255");
+    contract(b >= 0 and b <= 255, "blue component must be in 0..255");
+    contract(a >= 0.0 and a <= 1.0, "alpha component must be in 0.0..1.0");
     return Color(r=(r as float) / 255.0, g=(g as float) / 255.0, b=(b as float) / 255.0, a=a);
 }
 
+/// Constructs a color from a 24-bit integer hex code (e.g. `0xff55aa`).
+///
+/// @param c 24-bit RGB integer literal (0x000000 - 0xffffff).
+/// @param a Optional alpha opacity between 0.0 and 1.0.
+/// @return Color instance.
 pub fn hex(c: int, a: float = 1.0): Color {
+    contract(a >= 0.0 and a <= 1.0, "alpha component must be in 0.0..1.0");
     var r = (c >> 16) & 255;
     var g = (c >> 8) & 255;
     var b = c & 255;
     return Color(r=(r as float) / 255.0, g=(g as float) / 255.0, b=(b as float) / 255.0, a=a);
 }
 
+/// Constructs a color from normalized float components [0.0, 1.0] with full opacity.
+///
+/// @param r Red value in range 0.0-1.0.
+/// @param g Green value in range 0.0-1.0.
+/// @param b Blue value in range 0.0-1.0.
+/// @return Full opacity Color instance.
 pub fn color_rgb(r: float, g: float, b: float): Color {
     return Color(r=r, g=g, b=b, a=1.0);
 }
 
+/// Constructs a color from normalized float components [0.0, 1.0] and alpha opacity.
+///
+/// @param r Red value in range 0.0-1.0.
+/// @param g Green value in range 0.0-1.0.
+/// @param b Blue value in range 0.0-1.0.
+/// @param a Alpha opacity in range 0.0-1.0.
+/// @return Color instance.
 pub fn color_rgba(r: float, g: float, b: float, a: float): Color {
     return Color(r=r, g=g, b=b, a=a);
 }
@@ -97,6 +155,12 @@ fn hue_to_rgb(p: float, q: float, t: float): float {
     return p;
 }
 
+/// Constructs a color from Hue, Saturation, and Lightness values.
+///
+/// @param h Hue angle in degrees (0.0 to 360.0).
+/// @param s Saturation percentage (0.0 to 1.0).
+/// @param l Lightness percentage (0.0 to 1.0).
+/// @return Color representation in RGBA.
 pub fn hsl(h: float, s: float, l: float): Color {
     var hn = h;
     while (hn < 0.0) { hn = hn + 360.0; }
@@ -127,6 +191,12 @@ pub fn hsl(h: float, s: float, l: float): Color {
     return Color(r = r, g = g, b = b, a = 1.0);
 }
 
+/// Linearly interpolates between two colors.
+///
+/// @param c1 Starting color at t = 0.0.
+/// @param c2 Ending color at t = 1.0.
+/// @param t Interpolation progress (0.0 to 1.0).
+/// @return Blended intermediate Color.
 pub fn lerp(c1: Color, c2: Color, t: float): Color {
     return Color(
         c1.r + (c2.r - c1.r) * t,

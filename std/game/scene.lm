@@ -1,9 +1,7 @@
 // std/game/scene.lm
 // State machine, scene graph lifecycle hooks, scene stack, and transition engine
 
-import std.math as math;
 import std.gg as gg;
-import std.game.types as types;
 import std.color as color;
 import std.game.traits as gtraits;
 

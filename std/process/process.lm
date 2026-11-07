@@ -1,84 +1,90 @@
 // std/process/process.lm
-//
-// Facts about the running process itself: identity, arguments, memory and
-// termination. Anything about the machine or the environment around the process
-// lives in std.os instead.
+// Process identity, arguments, memory inspection, and subprocess execution.
 
 import std.process.service as service;
 import std.internal.runtime as rt;
 
-// Exit the process immediately with `code`.
-//
-// This does NOT return. It flushes standard streams and exits at the OS level,
-// so frame deinitializers and pending cleanup do not run - the same trade-off
-// as Go's os.Exit. Return a value from main() instead when cleanup matters.
+/// Terminates the process immediately with the given exit code.
+///
+/// @warning Flushes standard streams and terminates without executing frame destructors.
+///
+/// @param code Operating system exit code.
 pub fn exit(code: int): nil {
     service.request_with(rt.OP_PROC_EXIT, [code]);
     return nil;
 }
 
-// Operating-system process id. 0 when unavailable.
+/// Returns the operating system Process ID (PID).
+///
+/// @return Process ID integer (0 when unavailable).
 pub fn id(): int {
     var result = service.request(rt.OP_PROC_ID);
     if (result == nil) return 0;
     return result as int;
 }
 
-// Canonical alias for id().
+/// Alias for `id()`.
+///
+/// @return Process ID integer.
 pub fn pid(): int {
     return id();
 }
 
-// Arguments passed to the program, excluding the program name.
+/// Returns the command line arguments passed to the program, excluding the binary name.
+///
+/// @return List of argument strings.
 pub fn args(): [str] {
     var result = service.request(rt.OP_PROC_ARGS);
     if (result == nil) return [] as [str];
     return result as [str];
 }
 
-// The program name as invoked (argv[0]).
+/// Returns the program name as invoked (argv[0]).
+///
+/// @return Executable invocation name.
 pub fn command(): str {
     var result = service.request(rt.OP_PROC_COMMAND);
     if (result == nil) return "";
     return result as str;
 }
 
-// Current resident set size in kilobytes. 0 when the platform cannot report it.
+/// Returns the current resident set size (RSS) in kilobytes.
+///
+/// @return Memory usage in KB.
 pub fn memory(): int {
     var result = service.request(rt.OP_PROC_RSS);
     if (result == nil) return 0;
     return result as int;
 }
 
-// Peak resident set size in kilobytes since the process started.
+/// Returns the peak resident set size (RSS) in kilobytes since launch.
+///
+/// @return Peak memory usage in KB.
 pub fn peak_memory(): int {
     var result = service.request(rt.OP_PROC_PEAK_RSS);
     if (result == nil) return 0;
     return result as int;
 }
 
-// The names this API shipped under before the OS layer was shared: kept as
-// aliases so existing callers still resolve. memory() and peak_memory() are the
-// preferred spellings. Both now report a measured value; on Linux-only builds
-// of the old backend the figure was an estimate when it could not be read.
+/// Alias for `memory()`.
+///
+/// @return Resident set size in KB.
 pub fn current_rss(): int {
     return memory();
 }
 
+/// Alias for `peak_memory()`.
+///
+/// @return Peak resident set size in KB.
 pub fn peak_rss(): int {
     return peak_memory();
 }
 
-// True when the single character at `index` of `text` separates words.
-// Indexing a string yields its character code, so the character is taken as a
-// substring to stay in the str type.
 fn is_space_at(text: str, index: int): bool {
     var character = _builtin_substring(text, index, index + 1);
     return character == " " or character == "\t";
 }
 
-// Split a command line into words on single spaces.
-// Quoting is not honoured - use Command for arguments that contain spaces.
 fn to_argv(command_line: str): [any] {
     var argv = [] as [any];
     var i: int = 0;
@@ -97,18 +103,26 @@ fn to_argv(command_line: str): [any] {
     return argv;
 }
 
-// Run a program to completion and return its exit code.
-//
-// The argument is a command line split on whitespace. A non-zero return is the
-// child's exit status; -1 means the child could not be started at all.
+/// Spawns a shell or process command string and waits for its exit code.
+///
+/// @pre len(command_line) > 0
+/// @param command_line Raw command string to execute.
+/// @return Exit code (0 for success, non-zero for error, -1 if spawn failed).
 pub fn run(command_line: str): int {
+    contract(len(command_line) > 0, "Command line must not be empty");
     var result = service.request_with(rt.OP_SPAWN, to_argv(command_line));
     if (result == nil) return -1;
     return result as int;
 }
 
-// Run an explicit program plus argument vector and return its exit code.
+/// Executes a program binary directly with discrete arguments and waits for its exit code.
+///
+/// @pre len(program) > 0
+/// @param program Executable binary name or path.
+/// @param arguments Vector of arguments.
+/// @return Exit code.
 pub fn exec(program: str, arguments: [str]): int {
+    contract(len(program) > 0, "Program name must not be empty");
     var argv = [] as [any];
     argv.append(program);
     var i = 0;

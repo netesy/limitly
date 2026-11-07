@@ -1,9 +1,15 @@
 // std/env/index.lm
 // Public facade for std.env: environment variables.
-//
-// No implementation lives here. Program arguments are std.process.args(); the
-// working directory is std.os.cwd(); the raw getenv/setenv surface is std.os.
-// This module provides the conventional `KEY=VALUE` variable API, typed getters,
-// dictionary representation, and .env file parsing.
+
+/// Process environment variables, typed values, dictionary views, and .env configuration.
+///
+/// Provides access to ambient process configuration, integer/boolean parsing,
+/// and `.env` format loading.
+///
+/// @example
+/// import std.env as env;
+/// var port = env.get_int("PORT", 8080);
+/// var is_prod = env.get_bool("PRODUCTION", false);
+/// print("Listening on port {port}");
 
 pub import std.env.variables show Env, get, get_or, get_int, get_bool, has, contains, set, unset, vars, to_dict, keys, values, parse_env, load_dotenv, load_file;

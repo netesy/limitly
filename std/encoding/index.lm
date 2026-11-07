@@ -1,12 +1,27 @@
 // std/encoding/index.lm
 // Public entrypoint and facade for std.encoding. Data encodings: Base64, Hex, URL percent, UTF-16, and UTF-32.
 
+/// # Data Encoding Module (`std.encoding`)
+///
+/// Comprehensive text and binary encoding transformations including RFC 4648 Base64,
+/// Hexadecimal, URL percent-encoding (RFC 3986), UTF-16, and UTF-32.
+///
+/// @tip Functions are available both top-level (`encoding.hex_encode(...)`) and
+/// via the static `Encoding` frame namespace (`Encoding.hex_encode(...)`).
+///
+/// @example
+/// import std.encoding as enc;
+/// var b64 = enc.base64_encode([72, 105]); // "SGk="
+/// var hex = enc.hex_encode([255, 128]);   // "ff80"
+/// print("Base64: {b64}, Hex: {hex}");
+
 import std.encoding.base64 as base64;
 import std.encoding.hex as hex;
 import std.encoding.percent as percent;
 import std.encoding.utf16 as utf16;
 import std.encoding.utf32 as utf32;
 
+/// Static namespace wrapper providing data encoding and decoding routines.
 frame Encoding {
     pub static fn base64_encode(data: [int]): str { return base64.encode_base64(data); }
     pub static fn base64_decode(data: str): [int] { return base64.decode_base64(data); }
@@ -32,25 +47,62 @@ frame Encoding {
     pub static fn utf32_decode_le(bytes: [int]): str { return utf32.decode_utf32_le(bytes); }
 }
 
+/// Encodes binary bytes into an RFC 4648 Base64 string.
 pub fn base64_encode(data: [int]): str { return base64.encode_base64(data); }
+
+/// Decodes an RFC 4648 Base64 string into a byte array.
 pub fn base64_decode(data: str): [int] { return base64.decode_base64(data); }
+
+/// Encodes binary bytes into a lowercase hexadecimal string.
 pub fn hex_encode(data: [int]): str { return hex.to_hex(data); }
+
+/// Decodes a hexadecimal string into a byte array.
 pub fn hex_decode(data: str): [int] { return hex.from_hex(data); }
+
+/// Converts a single byte value (0-255) to a two-character hex string.
 pub fn byte_to_hex(b: int): str { return hex.byte_to_hex(b); }
+
+/// Parses a two-character hex string into a single byte value.
 pub fn hex_to_byte(h: str): int { return hex.hex_to_byte(h); }
+
+/// Encodes reserved URL characters into percent-encoded form.
 pub fn url_encode(s: str): str { return percent.encode(s); }
+
+/// Decodes percent-encoded sequences in a URL string.
 pub fn url_decode(s: str): str { return percent.decode(s); }
 
+/// Encodes a string into 16-bit UTF-16 code units.
 pub fn utf16_encode(s: str): [int] { return utf16.encode_utf16(s); }
+
+/// Encodes a string into big-endian UTF-16 bytes.
 pub fn utf16_encode_be(s: str): [int] { return utf16.encode_utf16_be(s); }
+
+/// Encodes a string into little-endian UTF-16 bytes.
 pub fn utf16_encode_le(s: str): [int] { return utf16.encode_utf16_le(s); }
+
+/// Decodes 16-bit UTF-16 code units into a UTF-8 string.
 pub fn utf16_decode(units: [int]): str { return utf16.decode_utf16(units); }
+
+/// Decodes big-endian UTF-16 bytes into a UTF-8 string.
 pub fn utf16_decode_be(bytes: [int]): str { return utf16.decode_utf16_be(bytes); }
+
+/// Decodes little-endian UTF-16 bytes into a UTF-8 string.
 pub fn utf16_decode_le(bytes: [int]): str { return utf16.decode_utf16_le(bytes); }
 
+/// Encodes a string into 32-bit Unicode code points.
 pub fn utf32_encode(s: str): [int] { return utf32.encode_utf32(s); }
+
+/// Encodes a string into big-endian UTF-32 bytes.
 pub fn utf32_encode_be(s: str): [int] { return utf32.encode_utf32_be(s); }
+
+/// Encodes a string into little-endian UTF-32 bytes.
 pub fn utf32_encode_le(s: str): [int] { return utf32.encode_utf32_le(s); }
+
+/// Decodes 32-bit Unicode code points into a UTF-8 string.
 pub fn utf32_decode(cps: [int]): str { return utf32.decode_utf32(cps); }
+
+/// Decodes big-endian UTF-32 bytes into a UTF-8 string.
 pub fn utf32_decode_be(bytes: [int]): str { return utf32.decode_utf32_be(bytes); }
+
+/// Decodes little-endian UTF-32 bytes into a UTF-8 string.
 pub fn utf32_decode_le(bytes: [int]): str { return utf32.decode_utf32_le(bytes); }

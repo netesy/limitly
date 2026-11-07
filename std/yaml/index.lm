@@ -1,14 +1,31 @@
-// YAML Module Gateway Index
+// std/yaml/index.lm
+// Public facade for std.yaml: YAML parsing and serialization.
+
+/// YAML (YAML Ain't Markup Language) data serialization and configuration library.
+///
+/// @example
+/// import std.yaml as yaml;
+/// var doc = yaml.parse("app: Limitless\nport: 9000");
+/// print(doc.is_object()); // true
 
 import std.yaml.parser as parser;
 import std.yaml.writer as writer;
+import std.yaml.value as value;
 
 pub import std.yaml.value show Value, Type, make_string, make_number, make_bool, make_object;
 
-pub fn parse(text: str): Value {
+/// Parses YAML formatted text into an AST `Value` node.
+///
+/// @param text Raw YAML text.
+/// @return Root `Value` object node.
+pub fn parse(text: str): value.Value {
     return parser.parse(text);
 }
 
-pub fn stringify(val_any: any): str {
-    return writer.stringify(val_any);
+/// Serializes a YAML `Value` node into a YAML formatted document string.
+///
+/// @param val_obj Target value node.
+/// @return Formatted YAML text.
+pub fn stringify(val_obj: value.Value): str {
+    return writer.stringify(val_obj);
 }

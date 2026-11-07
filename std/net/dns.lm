@@ -1,10 +1,32 @@
 // std/net/dns.lm
 // DNS resolution and IP address validation module.
 
-import std.core as core;
-import std.core show Error;
 import std.resource as res;
 
+/// Represents an error encountered during DNS resolution or IP parsing.
+frame DNSError {
+    pub var code: str;
+    pub var message: str;
+
+    pub init(code: str, message: str) {
+        self.code = code;
+        self.message = message;
+    }
+}
+
+/// Represents a single DNS resource record returned from resolution queries.
+///
+/// @tip Use standard record types ("A", "AAAA", "CNAME", "TXT") for consistent protocol handling.
+/// @note Instances are immutable value containers representing point-in-time DNS state.
+///
+/// @param name The domain name or fully-qualified domain name (FQDN).
+/// @param record_type The DNS record type identifier (e.g. "A", "AAAA", "TXT"). Default is "A".
+/// @param value The resolved IP address or text payload. Default is empty string.
+/// @param ttl Time-to-live in seconds for caching policies. Default is 300.
+///
+/// @example
+/// var rec = DNSRecord("example.com", "A", "93.184.216.34", 300);
+/// print("Record: {rec.name} -> {rec.value} (TTL: {rec.ttl}s)");
 frame DNSRecord {
     pub var name: str;
     pub var record_type: str;
@@ -12,6 +34,8 @@ frame DNSRecord {
     pub var ttl: int;
 
     pub init(name: str, record_type: str = "A", value: str = "", ttl: int = 300) {
+        contract(len(name) > 0, "Record name must not be empty");
+        contract(ttl >= 0, "TTL must be non-negative");
         self.name = name;
         self.record_type = record_type;
         self.value = value;
@@ -19,150 +43,312 @@ frame DNSRecord {
     }
 }
 
+/// In-memory caching DNS resolver with configurable query timeouts.
+///
+/// @tip Reusing a single `Resolver` instance across worker tasks avoids redundant
+/// round-trips to upstream DNS nameservers by utilizing its internal cache.
+///
+/// @warning Clear cache periodically with `clear_cache()` in long-running processes
+/// to honor TTL expirations and dynamic IP updates.
+///
+/// @note Thread-safe within cooperative async event loops; allocates cached strings on lookup.
+///
+/// @example
+/// var resolver = Resolver(timeout=3000);
+/// var ip = resolver.resolve("example.com")? else {
+///     print("Resolution failed: {err}");
+///     return;
+/// };
+/// print("Resolved IP: {ip}");
 frame Resolver {
     pub var cache: {str: str};
     pub var timeout_ms: int;
 
+    /// Initializes a caching DNS resolver with an optional network timeout limit.
+    ///
+    /// @pre timeout > 0
+    /// @param timeout Maximum query wait time in milliseconds. Default is 5000.
     pub init(timeout: int = 5000) {
+        contract(timeout > 0, "Timeout must be strictly positive");
         self.cache = {} as {str: str};
         self.timeout_ms = timeout;
     }
 
-    pub fn resolve(host: str): str?Error {
-        if (host == "") return err(Error(code="InvalidHost", message="host cannot be empty"));
+    /// Resolves a domain name into its primary IPv4/IPv6 address, querying cache first.
+    ///
+    /// @pre len(host) > 0
+    /// @param host The hostname or FQDN to query.
+    /// @return Returns ok(ip_str) on success, or err(Error) on failure.
+    pub fn resolve(host: str): str?DNSError {
+        contract(len(host) > 0, "Host name must not be empty");
+        if (host == "") return err(DNSError(code="InvalidHost", message="host cannot be empty"));
         if (self.cache[host] != nil) {
             return ok(self.cache[host]);
         }
         var r = res.create_dns_resolver()?;
         var result = res._call(h=r.handle, op=res.OP_RESOLVE, args=[host]);
         r.close();
-        if (result == nil) return err(Error(code="DNSError", message="failed to resolve host: " + host));
+        if (result == nil) return err(DNSError(code="DNSError", message="failed to resolve host: " + host));
         var ip = result as str;
         self.cache[host] = ip;
         return ok(ip);
     }
 
-    pub fn resolve_all(host: str): [str]?Error {
-        if (host == "") return err(Error(code="InvalidHost", message="host cannot be empty"));
+    /// Resolves a domain name and returns all available address entries as a list.
+    ///
+    /// @pre len(host) > 0
+    /// @param host The hostname or FQDN to query.
+    /// @return Returns ok([ip_str]) list on success, or err(DNSError).
+    pub fn resolve_all(host: str): [str]?DNSError {
+        contract(len(host) > 0, "Host name must not be empty");
+        if (host == "") return err(DNSError(code="InvalidHost", message="host cannot be empty"));
         var single = self.resolve(host)?;
         var list: [str] = [];
         list.append(single);
         return ok(list);
     }
 
-    pub fn resolve_or_passthrough(host: str): str?Error {
+    /// Returns the host as-is if it is already an IP address, or resolves it via DNS.
+    ///
+    /// @tip Use this method to accept user-provided addresses that may be raw IPs or hostnames.
+    /// @pre len(host) > 0
+    /// @param host The candidate hostname or IP address.
+    /// @return Returns ok(resolved_ip) or err(DNSError).
+    pub fn resolve_or_passthrough(host: str): str?DNSError {
+        contract(len(host) > 0, "Host name must not be empty");
         if (is_ipv4(host) or is_ipv6(host)) return ok(host);
         return self.resolve(host);
     }
 
-    pub fn reverse_lookup(ip: str): str?Error {
+    /// Performs reverse DNS pointer lookup to find the canonical hostname for an IP.
+    ///
+    /// @warning May return the raw IP address if no PTR record is provisioned upstream.
+    /// @pre len(ip) > 0
+    /// @param ip A valid IPv4 or IPv6 address string.
+    /// @return Returns ok(hostname) on success, or err(DNSError) on invalid IP format.
+    pub fn reverse_lookup(ip: str): str?DNSError {
+        contract(len(ip) > 0, "IP address must not be empty");
         if (!is_ipv4(ip) and !is_ipv6(ip)) {
-            return err(Error(code="InvalidIP", message="not a valid IP address"));
+            return err(DNSError(code="InvalidIP", message="not a valid IP address"));
         }
         if (ip == "127.0.0.1" or ip == "::1") return ok("localhost");
         return ok(ip);
     }
 
+    /// Flushes all cached DNS mappings from memory.
+    ///
+    /// @tip Call after receiving network reconnection events or DNS cache invalidation signals.
     pub fn clear_cache(): nil {
         self.cache = {} as {str: str};
     }
 }
 
+/// Static namespace wrapper providing convenient DNS resolution and IP address validation.
+///
+/// @tip Call static methods directly via `dns.resolve(host)` or `DNS.resolve(host)`.
+/// @note Relies on the underlying system socket resolver mechanisms.
+///
+/// @example
+/// import std.net.dns as dns;
+/// if (dns.is_ipv4("192.168.1.1")) {
+///     print("Valid IPv4 gateway");
+/// }
 frame DNS {
     pub init() {}
 
-    pub fn resolve(host: str): str?Error {
+    /// Resolves a hostname to an IP address.
+    pub fn resolve(host: str): str?DNSError {
         return resolve(host);
     }
 
-    pub fn resolve_all(host: str): [str]?Error {
+    /// Resolves a hostname to all associated IP addresses.
+    pub fn resolve_all(host: str): [str]?DNSError {
         return resolve_all(host);
     }
 
-    pub fn lookup(host: str): str?Error {
+    /// Alias for `resolve`.
+    pub fn lookup(host: str): str?DNSError {
         return resolve(host);
     }
 
+    /// Checks if a string is a valid IPv4 or IPv6 address.
     pub fn is_ip(address: str): bool {
         return is_ip(address);
     }
 
+    /// Checks if a string conforms to IPv4 dotted-quad format.
     pub fn is_ipv4(address: str): bool {
         return is_ipv4(address);
     }
 
+    /// Checks if a string conforms to IPv6 hexadecimal format.
     pub fn is_ipv6(address: str): bool {
         return is_ipv6(address);
     }
 
+    /// Checks if an address represents a loopback interface.
     pub fn is_loopback(address: str): bool {
         return is_loopback(address);
     }
 
+    /// Checks if an address belongs to private or link-local ranges.
     pub fn is_private(address: str): bool {
         return is_private(address);
     }
 
+    /// Checks if an address is in a multicast range.
     pub fn is_multicast(address: str): bool {
         return is_multicast(address);
     }
 
+    /// Parses an IPv4 dotted string into a list of 4 integer octets.
     pub fn parse_ipv4(address: str): [int]? {
         return parse_ipv4(address);
     }
 
+    /// Formats a list of 4 integer octets into an IPv4 string.
     pub fn format_ipv4(octets: [int]): str {
         return format_ipv4(octets);
     }
 
-    pub fn resolve_or_passthrough(host: str): str?Error {
+    /// Bypasses DNS lookup if address is already an IP, otherwise resolves it.
+    pub fn resolve_or_passthrough(host: str): str?DNSError {
         return resolve_or_passthrough(host);
     }
 
-    pub fn reverse_lookup(ip: str): str?Error {
+    /// Performs reverse lookup of an IP address.
+    pub fn reverse_lookup(ip: str): str?DNSError {
         return reverse_lookup(ip);
     }
 }
 
-pub fn resolve(host: str): str?Error {
-    if (host == "") return err(Error(code="InvalidHost", message="host cannot be empty"));
+/// Resolves a hostname into an IPv4 or IPv6 address using the system DNS resolver.
+///
+/// @tip For applications handling mixed IP/hostname inputs, prefer `resolve_or_passthrough`
+/// to eliminate redundant resolution overhead.
+///
+/// @warning This is a blocking network call bounded by socket resolver timeouts.
+///
+/// @note Resolves through standard OS name resolution services (`getaddrinfo`).
+///
+/// @pre len(host) > 0
+/// @param host The domain name or FQDN to query.
+/// @return Returns ok(ip_str) on success, or err(DNSError) on DNS failure.
+///
+/// @example
+/// var ip = resolve("localhost")? else {
+///     print("Could not resolve: {err}");
+///     return;
+/// };
+/// print("Resolved localhost: {ip}");
+pub fn resolve(host: str): str?DNSError {
+    contract(len(host) > 0, "Host name must not be empty");
+    if (host == "") return err(DNSError(code="InvalidHost", message="host cannot be empty"));
     if (host == "localhost") return ok("127.0.0.1");
     var r = res.create_dns_resolver()?;
     var result = res._call(h=r.handle, op=res.OP_RESOLVE, args=[host]);
     r.close();
-    if (result == nil) return err(Error(code="DNSError", message="failed to resolve host: " + host));
+    if (result == nil) return err(DNSError(code="DNSError", message="failed to resolve host: " + host));
     return ok(result as str);
 }
 
-pub fn resolve_all(host: str): [str]?Error {
-    if (host == "") return err(Error(code="InvalidHost", message="host cannot be empty"));
+/// Resolves a hostname and returns all available IP addresses as a list.
+///
+/// @tip Useful for client-side load balancing, round-robin dispatch, and failover topologies.
+///
+/// @pre len(host) > 0
+/// @param host The domain name or FQDN to query.
+/// @return Returns ok([ip_str]) on success, or err(DNSError) on DNS failure.
+///
+/// @example
+/// var ips = resolve_all("localhost")? else {
+///     print("Resolution error: {err}");
+///     return;
+/// };
+/// print("Found {len(ips)} IP addresses");
+pub fn resolve_all(host: str): [str]?DNSError {
+    contract(len(host) > 0, "Host name must not be empty");
+    if (host == "") return err(DNSError(code="InvalidHost", message="host cannot be empty"));
     var ip = resolve(host)?;
     var result: [str] = [];
     result.append(ip);
     return ok(result);
 }
 
-pub fn lookup(host: str): str?Error {
+/// Convenience lookup function; alias for `resolve(host)`.
+///
+/// @tip Standard idiom for simple single-IP DNS resolution.
+///
+/// @pre len(host) > 0
+/// @param host The domain name or FQDN to query.
+/// @return Returns ok(ip_str) on success, or err(DNSError) on DNS failure.
+pub fn lookup(host: str): str?DNSError {
+    contract(len(host) > 0, "Host name must not be empty");
     return resolve(host);
 }
 
-pub fn resolve_or_passthrough(host: str): str?Error {
+/// Returns the host as-is if already an IP address, or resolves it via DNS.
+///
+/// @tip Optimal for HTTP clients and socket connection logic that accept both
+/// raw IP addresses (e.g. "127.0.0.1") and hostnames (e.g. "api.service.com").
+///
+/// @pre len(host) > 0
+/// @param host The candidate hostname or IP address.
+/// @return Returns ok(ip_str) on success, or err(DNSError) on failure.
+///
+/// @example
+/// var ip1 = resolve_or_passthrough("192.168.1.100")?; // No DNS query
+/// var ip2 = resolve_or_passthrough("localhost")?;     // Resolves to 127.0.0.1
+pub fn resolve_or_passthrough(host: str): str?DNSError {
+    contract(len(host) > 0, "Host name must not be empty");
     if (is_ipv4(host) or is_ipv6(host)) return ok(host);
     return resolve(host);
 }
 
-pub fn reverse_lookup(ip: str): str?Error {
+/// Performs a reverse DNS lookup to find the canonical hostname corresponding to an IP.
+///
+/// @warning If no reverse PTR mapping exists, this may return the IP address itself.
+///
+/// @pre len(ip) > 0
+/// @param ip A valid IPv4 or IPv6 address string.
+/// @return Returns ok(hostname) on success, or err(DNSError) if the IP syntax is invalid.
+///
+/// @example
+/// var host = reverse_lookup("127.0.0.1")?;
+/// print("Host: {host}"); // "localhost"
+pub fn reverse_lookup(ip: str): str?DNSError {
+    contract(len(ip) > 0, "IP address must not be empty");
     if (!is_ipv4(ip) and !is_ipv6(ip)) {
-        return err(Error(code="InvalidIP", message="not a valid IP address"));
+        return err(DNSError(code="InvalidIP", message="not a valid IP address"));
     }
     if (ip == "127.0.0.1" or ip == "::1") return ok("localhost");
     return ok(ip);
 }
 
+/// Checks whether the provided string is a valid IPv4 or IPv6 address.
+///
+/// @tip Fast local syntactic validation that incurs zero network or DNS overhead.
+///
+/// @param address The candidate IP address string to check.
+/// @return Returns true if the address is a valid IPv4 or IPv6 format, false otherwise.
+///
+/// @example
+/// print("Is IP: {is_ip(\"10.0.0.1\")}"); // true
+/// print("Is IP: {is_ip(\"example.com\")}"); // false
 pub fn is_ip(address: str): bool {
     return is_ipv4(address) or is_ipv6(address);
 }
 
+/// Validates whether a string strictly conforms to IPv4 dotted-quad notation.
+///
+/// @note Rejects leading zeroes (e.g. "01"), out-of-range octets (> 255), and negative numbers.
+///
+/// @param address The candidate string to inspect.
+/// @return Returns true if strictly valid IPv4, false otherwise.
+///
+/// @example
+/// print("Valid: {is_ipv4(\"172.16.254.1\")}"); // true
+/// print("Valid: {is_ipv4(\"256.0.0.1\")}");     // false
 pub fn is_ipv4(address: str): bool {
     var parts: [str] = split_string(address, ".");
     if (len(parts) != 4) return false;
@@ -185,6 +371,19 @@ pub fn is_ipv4(address: str): bool {
     return true;
 }
 
+/// Parses an IPv4 dotted string into a list of 4 integer octets [0-255].
+///
+/// @tip Useful for binary subnet mask arithmetic, CIDR matching, and network telemetry.
+///
+/// @param address The candidate IPv4 string to parse.
+/// @return Returns ok([o0, o1, o2, o3]) on success, or nil if invalid IPv4 syntax.
+///
+/// @example
+/// var octets = parse_ipv4("192.168.1.1");
+/// if (octets != nil) {
+///     var o = octets as [int];
+///     print("First octet: {o[0]}"); // 192
+/// }
 pub fn parse_ipv4(address: str): [int]? {
     if (!is_ipv4(address)) return nil;
     var parts: [str] = split_string(address, ".");
@@ -197,11 +396,31 @@ pub fn parse_ipv4(address: str): [int]? {
     return octets;
 }
 
+/// Formats a list of 4 integer octets into a canonical IPv4 dotted-quad string.
+///
+/// @pre len(octets) == 4
+/// @param octets An array containing exactly 4 integer octets (0-255).
+/// @return Formatted dotted-decimal IPv4 string, or empty string on length mismatch.
+///
+/// @example
+/// var ip_str = format_ipv4([127, 0, 0, 1]);
+/// print("Formatted IP: {ip_str}"); // "127.0.0.1"
 pub fn format_ipv4(octets: [int]): str {
+    contract(len(octets) == 4, "IPv4 octets list must have exactly 4 elements");
     if (len(octets) != 4) return "";
     return (octets[0] as str) + "." + (octets[1] as str) + "." + (octets[2] as str) + "." + (octets[3] as str);
 }
 
+/// Validates whether a string conforms to IPv6 hexadecimal notation.
+///
+/// @note Recognizes standard 8-group notation and `::` zero-compaction (RFC 4291).
+///
+/// @param address The candidate string to inspect.
+/// @return Returns true if valid IPv6 format, false otherwise.
+///
+/// @example
+/// print("Valid IPv6: {is_ipv6(\"2001:db8::1\")}"); // true
+/// print("Valid IPv6: {is_ipv6(\"::1\")}");          // true
 pub fn is_ipv6(address: str): bool {
     if (len(address) < 2) return false;
     var colon_count: int = 0;
@@ -224,6 +443,16 @@ pub fn is_ipv6(address: str): bool {
     return true;
 }
 
+/// Checks whether an IP address belongs to the loopback interface range.
+///
+/// @tip Correctly handles IPv4 127.0.0.0/8 subnet and IPv6 ::1 loopback representation.
+///
+/// @param address The IPv4 or IPv6 address to verify.
+/// @return Returns true if loopback, false otherwise.
+///
+/// @example
+/// print("Loopback: {is_loopback(\"127.0.0.1\")}"); // true
+/// print("Loopback: {is_loopback(\"::1\")}");       // true
 pub fn is_loopback(address: str): bool {
     if (address == "::1" or address == "0:0:0:0:0:0:0:1") return true;
     if (!is_ipv4(address)) return false;
@@ -233,6 +462,20 @@ pub fn is_loopback(address: str): bool {
     return o[0] == 127;
 }
 
+/// Checks whether an IP address belongs to private or link-local network ranges.
+///
+/// @tip Evaluates RFC 1918 private subnets (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16),
+/// RFC 3927 link-local (169.254.0.0/16), loopback, and IPv6 ULA (fc00::/7) / link-local (fe80::/10).
+///
+/// @warning Useful for SSRF protection and validating that user-supplied URLs do not target internal networks.
+///
+/// @param address The IP address string to inspect.
+/// @return Returns true if private or link-local, false if publicly routable.
+///
+/// @example
+/// if (is_private("192.168.1.1")) {
+///     print("Internal network address");
+/// }
 pub fn is_private(address: str): bool {
     if (!is_ipv4(address)) {
         if (len(address) >= 2) {
@@ -252,6 +495,15 @@ pub fn is_private(address: str): bool {
     return false;
 }
 
+/// Checks whether an address is within the Class D (IPv4) or IPv6 multicast range.
+///
+/// @tip Detects IPv4 224.0.0.0 to 239.255.255.255 and IPv6 ff00::/8.
+///
+/// @param address The IP address string to check.
+/// @return Returns true if multicast, false otherwise.
+///
+/// @example
+/// print("Multicast: {is_multicast(\"224.0.0.1\")}"); // true
 pub fn is_multicast(address: str): bool {
     if (is_ipv4(address)) {
         var octets = parse_ipv4(address);

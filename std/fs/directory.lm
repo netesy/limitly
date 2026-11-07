@@ -1,11 +1,24 @@
-// Standard Library Filesystem Directory Submodule
+// std/fs/directory.lm
+// Filesystem directory manipulation helpers.
 
 import std.io as io;
 
+/// Creates a new directory at the target path.
+///
+/// @pre len(path_str) > 0
+/// @param path_str Target directory path string.
+/// @return Fallible unit result.
 pub fn create_dir(path_str: str): nil? {
+    contract(len(path_str) > 0, "Directory path must not be empty");
     return io.create_directory(path_str);
 }
 
+/// Lists all immediate entry names in a directory.
+///
+/// @pre len(path_str) > 0
+/// @param path_str Target directory path string.
+/// @return Fallible list of filename strings.
 pub fn list_dir(path_str: str): [str]? {
+    contract(len(path_str) > 0, "Directory path must not be empty");
     return io.list_directory(path_str);
 }

@@ -201,7 +201,7 @@ pub fn open_file(path: str, mode: str): Resource? {
     var h = rt.create(rt.RT_FILE, []);
     if (h == -1) return err();
     var success = rt.call(h, rt.OP_OPEN, [path, mode]);
-    if (success != true) {
+    if (not success) {
         rt.destroy(h);
         return err();
     }

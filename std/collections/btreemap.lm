@@ -2,6 +2,7 @@
 
 import std.collections.tree as tree;
 
+/// Ordered map data structure backed by an underlying binary search tree.
 frame BTreeMapWrapper {
     pub impl: tree.TreeMap;
 
@@ -9,36 +10,48 @@ frame BTreeMapWrapper {
         self.impl = tree.TreeMap();
     }
 
-    pub fn put(key: any, value: any): BTreeMapWrapper {
+    /// Associates `key` with `value` in sorted order.
+    pub fn put(key: any, value: any) {
         self.impl.put(key, value);
-        return self;
     }
 
+    /// Retrieves value associated with `key`.
     pub fn get(key: any): any {
         return self.impl.get(key);
     }
 
+    /// Checks if map contains `key`.
     pub fn contains(key: any): bool {
         return (self.get(key) != nil);
     }
 
+    /// Returns the number of key-value pairs stored.
     pub fn length(): int {
         return self.impl.length();
     }
 
+    /// Checks if map is empty.
     pub fn is_empty(): bool {
         return (self.length() == 0);
     }
 
+    /// Removes all mappings.
     pub fn clear(): nil {
         self.impl = tree.TreeMap();
     }
 }
 
+/// Constructs a new BTreeMap instance backed by BTreeMapWrapper.
+///
+/// @return New ordered map instance.
 pub fn BTreeMap(): BTreeMapWrapper {
     return BTreeMapWrapper();
 }
 
+/// Constructs a new SortedMap instance backed by BTreeMapWrapper.
+///
+/// @return New sorted map instance.
 pub fn SortedMap(): BTreeMapWrapper {
     return BTreeMapWrapper();
 }
+

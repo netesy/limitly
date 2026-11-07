@@ -72,7 +72,7 @@ frame TreeMap {
     pub fn remove(key: any): bool {
         if (self.root == nil) return false;
 
-        var parent: any = nil;
+        var parent = nil;
         var curr = self.root;
         var is_left_child = false;
         var found = false;

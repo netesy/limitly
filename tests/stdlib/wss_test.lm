@@ -1,25 +1,11 @@
 // WebSocket tests - frame opcodes, close codes, URL validation, resource lifecycle
 
 fn str_len(s: str): int {
-    if (s == "") { return 0; }
-    var count: int = 0;
-    var i: int = 0;
-    while (i < 10000) {
-        if (s[i] == nil) { return count; }
-        count = count + 1;
-        i = i + 1;
-    }
-    return count;
+    return len(s);
 }
 
 fn substr(s: str, start: int, end: int): str {
-    var result: str = "";
-    var i: int = start;
-    while (i < end) {
-        result = result + s[i];
-        i = i + 1;
-    }
-    return result;
+    return _builtin_substring(s, start, end);
 }
 
 print("=== WSS Tests ===");
@@ -91,11 +77,13 @@ var max_payload: int = 10485760;
 assert(max_payload == 10485760, "10MB limit");
 
 // WebSocket resource lifecycle (type 15)
-var ws = resource_create(15);
-assert(ws > 0, "ws handle positive");
-var ws_conn = resource_call(ws, 6, "not-a-url");
-assert(ws_conn != true, "ws connect invalid fails");
-resource_call(ws, 1, "x");
-resource_destroy(ws);
+unsafe {
+    var ws = resource_create(15);
+    assert(ws > 0, "ws handle positive");
+    var ws_conn = resource_call(ws, 6, "not-a-url");
+    assert(ws_conn != true, "ws connect invalid fails");
+    resource_call(ws, 1, "x");
+    resource_destroy(ws);
+}
 
 print("WSS tests passed!");

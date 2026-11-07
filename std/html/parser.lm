@@ -1,8 +1,8 @@
+// std/html/parser.lm
 // HTML5 Tokenizer and Hierarchical DOM Parser Module
 // Supports HTML void elements (<br>, <img>, <hr>, <input>, <meta>, <link>), attribute parsing, and nested trees.
 
-import std.xml.node as xml_node;
-
+/// Represents a DOM element or text node in an HTML document tree.
 frame Node {
     pub var tag_name: str;
     pub var attributes: {str: str};
@@ -19,6 +19,10 @@ frame Node {
     }
 }
 
+/// Creates a new DOM node representing plain text.
+///
+/// @param t Inner text content.
+/// @return Configured text `Node`.
 pub fn create_text_node(t: str): Node {
     var n = Node("");
     n.text_content = t;
@@ -26,6 +30,10 @@ pub fn create_text_node(t: str): Node {
     return n;
 }
 
+/// Checks whether an HTML tag is a self-closing void element according to the HTML5 specification.
+///
+/// @param tag Lowercase tag name (e.g. `"br"`, `"img"`, `"hr"`).
+/// @return `true` if element does not accept closing tag, `false` otherwise.
 pub fn is_void_element(tag: str): bool {
     if (tag == "br" or tag == "img" or tag == "hr" or tag == "input" or tag == "meta" or tag == "link") {
         return true;
@@ -33,7 +41,16 @@ pub fn is_void_element(tag: str): bool {
     return false;
 }
 
+/// Parses raw HTML markup into a tree of `Node` elements rooted at `<html>`.
+///
+/// @param html_str Raw HTML source string.
+/// @return Root `Node` of the parsed document hierarchy.
+/// @example
+/// ```lymar
+/// var dom = parser.parse("<div><p>Hello</p><br></div>");
+/// ```
 pub fn parse(html_str: str): Node {
+    contract(len(html_str) >= 0, "html_str must be a valid string");
     var root = Node("html");
     var stack = [root];
 
@@ -78,7 +95,7 @@ pub fn parse(html_str: str): Node {
                     var current_parent = stack[len(stack) - 1];
                     current_parent.children.append(node);
 
-                    if (!is_void_element(name) and substring(tag_body, len(tag_body) - 1, len(tag_body)) != "/") {
+                    if (not is_void_element(name) and substring(tag_body, len(tag_body) - 1, len(tag_body)) != "/") {
                         stack.append(node);
                     }
                 }

@@ -1,42 +1,73 @@
 // std/math/vector4.lm
-// Vector4 submodule for std.math. Mathematical constants, arithmetic functions, trigonometry, and statistics.
+// Four-dimensional floating-point geometric or homogeneous vector.
 
 import std.math.arithmetic as arith;
-import std.math show Addable, Scalable, Normalizable;
 
-frame Vector4 : Addable, Scalable, Normalizable {
+/// Represents a 4D vector or homogeneous coordinate tuple (x, y, z, w).
+///
+/// Supports basic vector arithmetic, dot product, magnitude calculation, and normalization.
+///
+/// @example
+/// import std.math.vector4 as v4;
+/// var v = v4.Vector4(1.0, 2.0, 3.0, 1.0);
+/// print(v.mag());
+frame Vector4 {
     pub x: float;
     pub y: float;
     pub z: float;
     pub w: float;
 
-    pub init(x: float, y: float, z: float, w: float) {
+    pub init(x: float = 0.0, y: float = 0.0, z: float = 0.0, w: float = 0.0) {
         self.x = x;
         self.y = y;
         self.z = z;
         self.w = w;
     }
 
+    /// Adds another 4D vector to this vector.
+    ///
+    /// @param other Vector to add.
+    /// @return Component-wise sum vector.
     pub fn add(other: Vector4): Vector4 {
         return Vector4(self.x + other.x, self.y + other.y, self.z + other.z, self.w + other.w);
     }
 
+    /// Subtracts another 4D vector from this vector.
+    ///
+    /// @param other Vector to subtract.
+    /// @return Component-wise difference vector.
     pub fn sub(other: Vector4): Vector4 {
         return Vector4(self.x - other.x, self.y - other.y, self.z - other.z, self.w - other.w);
     }
 
+    /// Multiplies all components by a scalar value.
+    ///
+    /// @param s Scaling factor.
+    /// @return Scaled vector.
     pub fn scale(s: float): Vector4 {
         return Vector4(self.x * s, self.y * s, self.z * s, self.w * s);
     }
 
+    /// Computes the dot product of this vector and another 4D vector.
+    ///
+    /// @param other Vector to dot with.
+    /// @return Scalar dot product.
     pub fn dot(other: Vector4): float {
         return self.x * other.x + self.y * other.y + self.z * other.z + self.w * other.w;
     }
 
+    /// Computes the Euclidean magnitude (length) of the 4D vector.
+    ///
+    /// @return Vector length.
     pub fn mag(): float {
         return arith.sqrt(self.x * self.x + self.y * self.y + self.z * self.z + self.w * self.w);
     }
 
+    /// Computes the unit-length direction vector.
+    ///
+    /// @tip Returns a zero vector if magnitude is zero.
+    ///
+    /// @return Normalized unit vector.
     pub fn normalize(): Vector4 {
         var m = self.mag();
         if (m == 0.0) {

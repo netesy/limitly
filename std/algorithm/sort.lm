@@ -3,7 +3,12 @@
 
 import std.types show Ordering;
 
-pub fn compare_ordering(a: any, b: any): Ordering {
+/// Compares two elements and yields an Ordering enum value.
+///
+/// @param a First element.
+/// @param b Second element.
+/// @return Ordering value (Less, Greater, or Equal).
+pub fn compare_ordering(a, b): Ordering {
     if (a < b) {
         return Ordering.Less;
     } elif (a > b) {
@@ -13,7 +18,7 @@ pub fn compare_ordering(a: any, b: any): Ordering {
     }
 }
 
-pub fn _compare(a: any, b: any, descending: bool = false, cmp: fn(any, any): int = nil): int {
+pub fn _compare(a, b, descending: bool = false, cmp: fn(any, any): int = nil): int {
     var result: int = 0;
     if (cmp != nil) {
         var res = cmp(a, b);
@@ -25,7 +30,7 @@ pub fn _compare(a: any, b: any, descending: bool = false, cmp: fn(any, any): int
             Ordering.Equal => { result = 0; }
         }
     }
-    if (descending == true) {
+    if (descending) {
         return 0 - result;
     }
     return result;
@@ -159,7 +164,7 @@ pub fn heapsort(items: [any], descending: bool = false, cmp: fn(any, any): int =
         _heapify(items, i, 0, descending, cmp);
         i = i - 1;
     }
-    if (descending == false) {
+    if (not descending) {
         return;
     }
     var a = 0;
@@ -204,7 +209,7 @@ pub fn counting_sort(items: [int], descending: bool = false) {
     var c = 0;
     while (c < len(counts)) {
         while (counts[c] > 0) {
-            if (descending == true) {
+            if (descending) {
                 items[out] = max_value - c;
             } else {
                 items[out] = min_value + c;

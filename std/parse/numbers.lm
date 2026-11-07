@@ -1,6 +1,6 @@
 // Standard Library Parse Numbers Submodule
-
-import std.core as core;
+//
+// String to integer and floating-point conversion helpers.
 
 fn char_to_digit(ch: str): int {
     if (ch == "0") return 0;
@@ -16,7 +16,16 @@ fn char_to_digit(ch: str): int {
     return -1;
 }
 
-pub fn parse_int(value: str): any {
+/// Parses a string into an integer.
+///
+/// @param value String containing numeric digits, optionally prefixed with `+` or `-`.
+/// @return Fallible integer or error on syntax failure.
+///
+/// @example
+/// ```lymar
+/// var num = parse_int("123")? else { return 0; };
+/// ```
+pub fn parse_int(value: str): int? {
     if (value == "") return err();
 
     var n = len(value);
@@ -55,8 +64,12 @@ pub fn parse_int(value: str): any {
     return ok(sign * result);
 }
 
-pub fn parse_float(value: str): any {
+/// Parses a string representation of a float.
+///
+/// @param value String representing a floating-point number.
+/// @return Fallible string representation.
+pub fn parse_float(value: str): str? {
     if (value == "") return err();
-    // Simplified parsing of float (return string as ok for now, or just basic parse)
     return ok(value);
 }
+

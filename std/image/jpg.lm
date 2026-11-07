@@ -1,7 +1,6 @@
 // std/image/jpg.lm
 // JPEG-specific load/save API.
 
-import std.ffi as ffi;
 import std.image.index as image;
 
 pub const DEFAULT_QUALITY: int = 90;

@@ -1,7 +1,20 @@
 // std/string/split.lm
 // Splitting a string on a delimiter.
 
+/// Splits a string into substrings using a separator string.
+///
+/// If `delimiter` is empty, splits the string into individual single-character tokens.
+///
+/// @param value The string to split.
+/// @param delimiter Separator string.
+/// @return List of split string segments.
+/// @example
+/// ```lymar
+/// var parts = split.split("apple,banana,orange", ",");
+/// ```
 pub fn split(value: str, delimiter: str): [str] {
+    contract(len(value) >= 0, "value must be a valid string");
+    contract(len(delimiter) >= 0, "delimiter must be a valid string");
     var dlen = len(delimiter);
     var vlen = len(value);
     var parts: [str] = [];

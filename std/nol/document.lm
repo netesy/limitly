@@ -4,30 +4,7 @@
 import std.nol.value as value;
 import std.string as str_mod;
 
-fn _resolve(curr: any, parts: [str], idx: int): any {
-    if (curr == nil or idx >= len(parts)) return curr;
-    var node = curr as value.Value;
-    if (!node.is_object()) return nil;
-    var next_val = node.get(parts[idx]);
-    return _resolve(next_val, parts, idx + 1);
-}
-
-fn _builder_set(curr: any, parts: [str], idx: int, value_node: any) {
-    if (curr == nil or idx >= len(parts)) return;
-    var node = curr as value.Value;
-    if (idx == len(parts) - 1) {
-        node.set(parts[idx], value_node);
-        return;
-    }
-    var next_val = node.get(parts[idx]);
-    if (next_val == nil) {
-        var new_obj = value.make_empty_object();
-        node.set(parts[idx], new_obj);
-        next_val = node.get(parts[idx]);
-    }
-    _builder_set(next_val, parts, idx + 1, value_node);
-}
-
+/// Represents a parsed NOL configuration document with path querying.
 frame Document {
     pub root: value.Value;
 
@@ -35,20 +12,46 @@ frame Document {
         self.root = root;
     }
 
-    pub fn get(path: str): any {
-        var parts = str_mod.split(path, ".");
-        return _resolve(self.root as any, parts, 0);
+    fn resolve_node(curr: any, parts: [str], idx: int): any {
+        if (curr == nil or idx >= len(parts)) return curr;
+        var node = curr as value.Value;
+        if (!node.is_object()) return nil;
+        var next_val = node.get(parts[idx]);
+        return self.resolve_node(next_val, parts, idx + 1);
     }
 
+    /// Retrieves a nested value by dot-delimited path.
+    ///
+    /// @param path Dot-delimited property path (e.g., `"package.name"`).
+    /// @return Target value if found, or `nil` if missing.
+    /// @example
+    /// ```lymar
+    /// var name = doc.get("package.name") as Value;
+    /// ```
+    pub fn get(path: str): any {
+        contract(len(path) > 0, "path cannot be empty");
+        var parts = str_mod.split(path, ".");
+        return self.resolve_node(self.root as any, parts, 0);
+    }
+
+    /// Checks whether a dot-delimited path exists within the document.
+    ///
+    /// @param path Dot-delimited property path.
+    /// @return `true` if path exists and resolves to non-nil, `false` otherwise.
     pub fn exists(path: str): bool {
+        contract(len(path) > 0, "path cannot be empty");
         return self.get(path) != nil;
     }
 
+    /// Returns the root value of the document.
+    ///
+    /// @return Root `Value` node.
     pub fn data(): value.Value {
         return self.root;
     }
 }
 
+/// Fluent builder for constructing NOL documents programmatically.
 frame Builder {
     pub root: value.Value;
 
@@ -56,12 +59,37 @@ frame Builder {
         self.root = value.make_empty_object();
     }
 
+    fn builder_set(curr: any, parts: [str], idx: int, value_node: any) {
+        if (curr == nil or idx >= len(parts)) return;
+        var node = curr as value.Value;
+        if (idx == len(parts) - 1) {
+            node.set(parts[idx], value_node);
+            return;
+        }
+        var next_val = node.get(parts[idx]);
+        if (next_val == nil) {
+            var new_obj = value.make_empty_object();
+            node.set(parts[idx], new_obj);
+            next_val = node.get(parts[idx]);
+        }
+        self.builder_set(next_val, parts, idx + 1, value_node);
+    }
+
+    /// Sets a value at a dot-delimited path, automatically creating parent objects.
+    ///
+    /// @param path Dot-delimited target path.
+    /// @param value_node Value node to attach.
+    /// @return Reference to self for chaining.
     pub fn set(path: str, value_node: any): Builder {
+        contract(len(path) > 0, "path cannot be empty");
         var parts = str_mod.split(path, ".");
-        _builder_set(self.root as any, parts, 0, value_node);
+        self.builder_set(self.root as any, parts, 0, value_node);
         return self;
     }
 
+    /// Finalizes the built document.
+    ///
+    /// @return Constructed `Document` instance.
     pub fn build(): Document {
         return Document(self.root);
     }

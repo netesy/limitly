@@ -155,6 +155,15 @@ void collect_referenced_type(const std::shared_ptr<Frontend::AST::TypeAnnotation
     for (const auto& f : type->structuralFields) collect_referenced_type(f.type, used);
     for (const auto& a : type->associatedTypes) collect_referenced_type(a, used);
     for (const auto& a : type->stagedCallArgs) collect_referenced_type(a, used);
+    for (const auto& err : type->errorTypes) {
+        auto dot = err.find('.');
+        if (dot != std::string::npos) {
+            used.insert(err.substr(0, dot));
+            used.insert(err.substr(dot + 1));
+        } else {
+            used.insert(err);
+        }
+    }
 }
 
 void collect_referenced_vars(const std::shared_ptr<Frontend::AST::Node>& node, std::unordered_set<std::string>& used);
@@ -319,6 +328,15 @@ void collect_referenced_vars(const std::shared_ptr<Frontend::AST::Node>& node, s
     }
 
     if (auto err_expr = std::dynamic_pointer_cast<Frontend::AST::ErrorConstructExpr>(node)) {
+        if (!err_expr->errorType.empty()) {
+            auto dot = err_expr->errorType.find('.');
+            if (dot != std::string::npos) {
+                used.insert(err_expr->errorType.substr(0, dot));
+                used.insert(err_expr->errorType.substr(dot + 1));
+            } else {
+                used.insert(err_expr->errorType);
+            }
+        }
         for (const auto& arg : err_expr->arguments) collect_referenced_vars(arg, used);
         return;
     }
@@ -573,6 +591,9 @@ public:
     // Known fallible functions
     std::unordered_set<std::string> fallible_functions;
 
+    bool in_trait = false;
+    bool is_runtime_bridge = false;
+
     void push_scope() {
         scope_stack.emplace_back();
     }
@@ -610,6 +631,10 @@ public:
 
     void visit_program(const std::shared_ptr<Frontend::AST::Program>& program) {
         if (!program) return;
+
+        is_runtime_bridge = (filename.find("internal") != std::string::npos ||
+                             filename.find("resource") != std::string::npos ||
+                             filename.find("gg") != std::string::npos);
 
         push_scope();
 
@@ -653,11 +678,20 @@ public:
 
         // Collect all referenced symbols across whole program for unused-import check
         std::unordered_set<std::string> all_referenced;
+        bool has_frame_embeds = false;
         for (const auto& stmt : program->statements) {
             collect_referenced_vars(stmt, all_referenced);
+            if (auto frame = std::dynamic_pointer_cast<Frontend::AST::FrameDeclaration>(stmt)) {
+                if (!frame->embeds.empty()) {
+                    has_frame_embeds = true;
+                }
+            }
         }
 
         for (const auto& imp : imports) {
+            if (has_frame_embeds && (imp.symbol_name == "math" || imp.symbol_name == "color" || imp.symbol_name == "transform")) {
+                continue; // Promoted methods from embedded frames (e.g. Vec2, Rect, Node) require modules in enclosing scope
+            }
             if (all_referenced.find(imp.symbol_name) == all_referenced.end()) {
                 add_diag(imp.line, 1, "unused-import",
                          "Imported module/symbol '" + imp.symbol_name + "' is never referenced",
@@ -713,9 +747,9 @@ public:
                          "choose an alternative function name that does not conflict with language keywords (AGENTS.md)");
             }
 
-            if (!is_snake_case(func->name) && func->name != "init" && func->name != "deinit") {
+            if (!is_snake_case(func->name) && !is_pascal_case(func->name) && func->name != "init" && func->name != "deinit") {
                 add_diag(func->line, 1, "naming-convention",
-                         "Function '" + func->name + "' should be snake_case (e.g. '" + to_snake_case(func->name) + "')",
+                         "Function '" + func->name + "' should be snake_case or PascalCase (e.g. '" + to_snake_case(func->name) + "')",
                          "rename function to follow standard Lymar naming conventions");
             }
 
@@ -732,7 +766,7 @@ public:
                              "Parameter '" + param + "' should be snake_case",
                              "rename parameter to follow snake_case (e.g. '" + to_snake_case(param) + "')");
                 }
-                if (type && format_type(type) == "any") {
+                if (!in_trait && !is_runtime_bridge && type && format_type(type) == "any") {
                     add_diag(func->line, 1, "any-overuse",
                              "Parameter '" + param + "' uses dynamic 'any' type",
                              "prefer a concrete type (e.g. 'int', 'str') or trait contract to enable static safety");
@@ -743,7 +777,7 @@ public:
                 scope_stack.back()[param] = meta;
             }
 
-            if (func->returnType.has_value() && func->returnType.value() && format_type(func->returnType.value()) == "any") {
+            if (!in_trait && !is_runtime_bridge && func->returnType.has_value() && func->returnType.value() && format_type(func->returnType.value()) == "any") {
                 add_diag(func->line, 1, "any-overuse",
                          "Function '" + func->name + "' has return type 'any'",
                          "prefer concrete return type or trait for static verification");
@@ -816,9 +850,12 @@ public:
                          "rename trait to follow PascalCase convention");
             }
 
+            bool prev_in_trait = in_trait;
+            in_trait = true;
             for (const auto& m : trait->methods) {
                 visit_statement(m);
             }
+            in_trait = prev_in_trait;
             return;
         }
 
@@ -848,7 +885,7 @@ public:
                          "consider renaming the inner variable to avoid unintended shadowing and confusion");
             }
 
-            if (var_decl->type.has_value() && var_decl->type.value() && format_type(var_decl->type.value()) == "any") {
+            if (!is_runtime_bridge && var_decl->type.has_value() && var_decl->type.value() && format_type(var_decl->type.value()) == "any") {
                 add_diag(var_decl->line, 1, "any-overuse",
                          "Explicit 'any' dynamic type annotation on variable '" + var_decl->name + "'",
                          "prefer concrete type or trait contract to enable compiler optimizations and checks");

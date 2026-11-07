@@ -1,11 +1,18 @@
-// Standard Library I/O Reader Submodule
+// std/io/reader.lm
+// Abstract reader interface for character and byte streams.
 
 import std.resource show Resource, Reader;
 
+/// Contract for readable stream handles.
 trait Reader {
-    fn read(args: [any]): any;
+    /// Reads content from the underlying stream into a string result.
+    ///
+    /// @param args Optional read arguments.
+    /// @return Fallible string content.
+    fn read(args: [any]): str?;
 }
 
+/// Stream reader wrapper around an operating system resource handle.
 frame StreamReader : Reader {
     pub var r: Reader;
 
@@ -13,7 +20,13 @@ frame StreamReader : Reader {
         self.r = Reader(resource);
     }
 
-    pub fn read(args: [any]): any {
-        return self.r.read(args);
+    /// Reads content from the underlying resource handle.
+    ///
+    /// @param args Optional read arguments.
+    /// @return Fallible string result.
+    pub fn read(args: [any] = [] as [any]): str? {
+        var res_data = self.r.read(args);
+        if (res_data == nil) return err();
+        return ok(res_data as str);
     }
 }

@@ -1,9 +1,22 @@
 // std/url/url.lm
-// Url submodule for std.url. URL parsing, URL encoding, query strings, and URI resolution.
+// RFC 3986 Uniform Resource Identifier (URI) / URL parser and resolver.
 
 import std.encoding.percent as percent;
 import std.url.query as query;
 
+/// Represents a parsed Uniform Resource Locator (URL) conforming to RFC 3986.
+///
+/// Decomposes URLs into scheme, user credentials, host, port, path, query, and fragment.
+/// Supports IPv6 bracketed hosts, default port inference, query parsing, and relative path resolution.
+///
+/// @tip Use `url.resolve("...")` to resolve relative hyperlinks against a base document URL.
+///
+/// @param url_str Optional candidate URL string to parse immediately upon instantiation.
+///
+/// @example
+/// import std.url as url;
+/// var u = url.URL("https://user:pass@example.com:8080/api/v1?page=1#section");
+/// print("Host: {u.host}, Port: {u.port}, Path: {u.path}");
 frame URL {
     pub fragment: str;
     pub host: str;
@@ -30,7 +43,9 @@ frame URL {
         }
     }
 
-    // Parse a URL string into its components
+    /// Parses a URL string into its discrete RFC 3986 components.
+    ///
+    /// @param url_str The URL string to parse.
     pub fn parse(url_str: str) {
         var remaining: str = url_str;
         var i: int = 0;
@@ -139,7 +154,11 @@ frame URL {
         self.is_valid = (self.host != "" or self.scheme == "file" or self.scheme == "data");
     }
 
-    // Reconstruct the URL from components
+    /// Reconstructs the canonical URL string from its parsed components.
+    ///
+    /// @tip Omits standard default ports (80 for http/ws, 443 for https/wss).
+    ///
+    /// @return Reconstructed URL string.
     pub fn to_string(): str {
         var result: str = "";
         if (self.scheme != "") {
@@ -173,12 +192,16 @@ frame URL {
         return result;
     }
 
-    // Parse the query string into key-value pairs
+    /// Parses the query component into a `QueryParams` key-value collection.
+    ///
+    /// @return QueryParams instance.
     pub fn query_params(): query.QueryParams {
         return query.parse(self.query);
     }
 
-    // Get the origin (scheme + host + port)
+    /// Computes the origin of this URL (scheme, host, and non-default port).
+    ///
+    /// @return Origin string (e.g. `https://api.example.com:8443`).
     pub fn origin(): str {
         var result: str = self.scheme + "://" + self.host;
         if (self.port != -1) {
@@ -192,8 +215,13 @@ frame URL {
         return result;
     }
 
-    // Resolve a relative URL against this base URL
+    /// Resolves a relative URL against this base URL.
+    ///
+    /// @pre len(relative) > 0
+    /// @param relative Relative or absolute target path.
+    /// @return Resolved URL object.
     pub fn resolve(relative: str): URL {
+        contract(len(relative) > 0, "Relative target must not be empty");
         // Simple absolute/relative resolution
         if (index_of(relative, "://") != -1) {
             return URL(relative);
@@ -260,6 +288,15 @@ frame URL {
     }
 }
 
+/// Constructs a URL object directly from discrete components.
+///
+/// @param scheme URL scheme (e.g. "https", "http").
+/// @param host Hostname or IP.
+/// @param port Integer port (-1 for default).
+/// @param path Resource path.
+/// @param query Query string without leading '?'.
+/// @param fragment Fragment without leading '#'.
+/// @return Configured URL instance.
 pub fn build(scheme: str, host: str, port: int, path: str, query: str, fragment: str): URL {
     var u = URL("") as URL;
     u.scheme = scheme;
@@ -299,9 +336,7 @@ fn normalize_path(path_val: str): str {
     var i: int = 0;
     while (i < len(segments)) {
         var seg: str = segments[i];
-        if (seg == "" or seg == ".") {
-            // Skip empty segments or dot
-        } else if (seg == "..") {
+        if (seg == "..") {
             if (len(parts) > 0) {
                 // Remove last segment (but not the root)
                 var new_parts: [str] = [] as [str];
@@ -312,7 +347,7 @@ fn normalize_path(path_val: str): str {
                 }
                 parts = new_parts;
             }
-        } else {
+        } elif (seg != "" and seg != ".") {
             parts.append(seg);
         }
         i = i + 1;

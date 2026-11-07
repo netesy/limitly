@@ -11,12 +11,10 @@ import std.animation as anim;
 import std.string as std_string;
 import std.text.controller as text_ctrl;
 import std.focus.manager as focus;
-import std.gg as gg;
 import std.graphics.canvas as canvas;
 import std.graphics.paint as paint;
 import std.graphics.color as color;
 import std.graphics.rect as rect;
-import std.graphics.shadow as shadow;
 import std.ui.state as state;
 import std.ui.viewport as viewport;
 import std.ui.builder as builder;
@@ -147,7 +145,7 @@ pub fn update_blueprint(bp: ui_types.Blueprint): nil {
     global_ui_context.dirty = 1;
 }
 
-pub fn set_root_any(root: any): nil {
+pub fn set_root_any(root): nil {
     if (root == nil) {
         return;
     }
@@ -2033,14 +2031,16 @@ if (w.kind == ui.KIND_INPUT) {
 
 pub fn update_animations_recursive(w: ui.Widget, dt: float): nil {
     if (w.anim_property != nil) {
-        w.anim_property.update(dt);
+        var p_anim: anim.PropertyAnimation = w.anim_property as anim.PropertyAnimation;
+        p_anim.update(dt);
         mark_element_dirty(1);
     }
     if (w.active_transition != nil) {
-        if (w.active_transition.active) {
-            w.active_transition.update(dt);
+        var trans: anim.Transition = w.active_transition as anim.Transition;
+        if (trans.active) {
+            trans.update(dt);
             mark_element_dirty(1);
-            if (w.active_transition.opacity_anim.state == 3) { // STATE_COMPLETED
+            if (trans.opacity_anim.state == 3) { // STATE_COMPLETED
                 if (w.lifecycle_state == ui.LIFECYCLE_ENTERING) {
                     w.lifecycle_state = ui.LIFECYCLE_ACTIVE;
                 } elif (w.lifecycle_state == ui.LIFECYCLE_EXITING) {

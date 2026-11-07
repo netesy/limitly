@@ -44,9 +44,10 @@ pub fn draw_rounded_rect(cvs: canvas.Canvas, r: rect.Rect, radius: float, bg_col
 
 // Get button background color based on state
 pub fn get_button_bg_color(w: ui_types.Widget, theme: Theme): ui_types.Color {
+    var colors: ColorPalette = theme.colors;
     var bg = w.background_color;
     if (bg.a <= 0.0) {
-        bg = theme.colors.primary;
+        bg = colors.primary;
     }
     if (w.is_pressed == 1) {
         if (w.pressed_style_val.has_bg) {
@@ -64,10 +65,11 @@ pub fn get_button_bg_color(w: ui_types.Widget, theme: Theme): ui_types.Color {
 
 // Get input border color based on state and focus
 pub fn get_input_border_color(w: ui_types.Widget, has_focus: bool, theme: Theme): ui_types.Color {
+    var colors: ColorPalette = theme.colors;
     if (has_focus or w.is_focused == 1) {
-        return theme.colors.focus_ring;
+        return colors.focus_ring;
     } elif (w.is_hovered == 1) {
-        return theme.colors.border;
+        return colors.border;
     }
     return color.rgb(55, 60, 75);
 }

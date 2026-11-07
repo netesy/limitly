@@ -159,7 +159,7 @@ frame HitZone {
     }
 }
 
-pub fn make_button_zone(id: str, x: float, y: float, w: float, h: float, on_click: any, widget: any = nil): HitZone {
+pub fn make_button_zone(id: str, x: float, y: float, w: float, h: float, on_click, widget = nil): HitZone {
     var hz = HitZone();
     hz.id = id; hz.kind = HitZoneKind.Button;
     hz.x = x; hz.y = y; hz.w = w; hz.h = h;
@@ -168,7 +168,7 @@ pub fn make_button_zone(id: str, x: float, y: float, w: float, h: float, on_clic
     return hz;
 }
 
-pub fn make_slider_zone(id: str, x: float, y: float, w: float, h: float, min_v: float, max_v: float, cur_v: float, on_change: any, widget: any = nil): HitZone {
+pub fn make_slider_zone(id: str, x: float, y: float, w: float, h: float, min_v: float, max_v: float, cur_v: float, on_change, widget = nil): HitZone {
     var hz = HitZone();
     hz.id = id; hz.kind = HitZoneKind.Slider;
     hz.x = x; hz.y = y; hz.w = w; hz.h = h;
@@ -178,7 +178,7 @@ pub fn make_slider_zone(id: str, x: float, y: float, w: float, h: float, min_v: 
     return hz;
 }
 
-pub fn make_checkbox_zone(id: str, x: float, y: float, w: float, h: float, checked: int, on_change: any, widget: any = nil): HitZone {
+pub fn make_checkbox_zone(id: str, x: float, y: float, w: float, h: float, checked: int, on_change, widget = nil): HitZone {
     var hz = HitZone();
     hz.id = id; hz.kind = HitZoneKind.Checkbox;
     hz.x = x; hz.y = y; hz.w = w; hz.h = h;
