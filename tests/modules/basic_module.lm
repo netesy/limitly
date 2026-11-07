@@ -1,5 +1,5 @@
 // Basic module for testing
-pub var moduleVar = "Hello from basic module";
+pub var module_var = "Hello from basic module";
 pub var number = 42;
 
 pub fn greet() {
@@ -10,6 +10,6 @@ pub fn add(a: int, b: int): int {
     return a + b;
 }
 
-pub fn getModuleVar():str {
-    return moduleVar;
+pub fn get_module_var():str {
+    return module_var;
 }

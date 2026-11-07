@@ -5,17 +5,17 @@ print("=== Closure Tests ===");
 
 // Test 1: Simple closure with variable capture
 print("\n--- Test 1: Simple Closure ---");
-fn createGreeter(greeting: str): fn(str): str {
+fn create_greeter(greeting: str): fn(str): str {
     return fn(name: str): str {
         return greeting + ", " + name + "!";
     };
 }
 
-var sayHello = createGreeter("Hello");
-var sayGoodbye = createGreeter("Goodbye");
+var say_hello = create_greeter("Hello");
+var say_goodbye = create_greeter("Goodbye");
 
-var greeting1 = sayHello("World");
-var greeting2 = sayGoodbye("Friend");
+var greeting1 = say_hello("World");
+var greeting2 = say_goodbye("Friend");
 print("sayHello('World') = {greeting1}");
 print("sayGoodbye('Friend') = {greeting2}");
 
@@ -24,7 +24,7 @@ assert(greeting2 == "Goodbye, Friend!", "Closure should maintain separate captur
 
 // Test 2: Counter closure with state modification
 print("\n--- Test 2: Counter Closure ---");
-fn createCounter(): fn(): int {
+fn create_counter(): fn(): int {
     var count: int = 0;
     return fn(): int {
         count = count + 1;
@@ -32,8 +32,8 @@ fn createCounter(): fn(): int {
     };
 }
 
-var counter1 = createCounter();
-var counter2 = createCounter();
+var counter1 = create_counter();
+var counter2 = create_counter();
 
 var c1_1 = counter1();
 var c1_2 = counter1();
@@ -52,7 +52,7 @@ assert(c2_2 == 2, "Second counter should increment independently to 2");
 
 // Test 3: Closure with multiple captured variables
 print("\n--- Test 3: Multiple Variable Capture ---");
-fn createCalculator(initial: int): fn(int): int {
+fn create_calculator(initial: int): fn(int): int {
     var value: int = initial;
     return fn(x: int): int {
         value = value + x;
@@ -60,7 +60,7 @@ fn createCalculator(initial: int): fn(int): int {
     };
 }
 
-var calc = createCalculator(10);
+var calc = create_calculator(10);
 var calc1 = calc(5);
 var calc2 = calc(3);
 var calc3 = calc(7);
@@ -72,11 +72,11 @@ assert(calc3 == 25, "Calculator should add 7 to previous 18");
 
 // Test 4: Nested closures
 print("\n--- Test 4: Nested Closures ---");
-fn createNestedCounter(step: int): fn(): fn(): int {
-    var outerCount: int = 0;
+fn create_nested_counter(step: int): fn(): fn(): int {
+    var outer_count: int = 0;
     return fn(): fn(): int {
-        outerCount = outerCount + step;
-        var innerCount: int = outerCount;
+        outer_count = outer_count + step;
+        var innerCount: int = outer_count;
         return fn(): int {
             innerCount = innerCount + 1;
             return innerCount;
@@ -84,9 +84,9 @@ fn createNestedCounter(step: int): fn(): fn(): int {
     };
 }
 
-var nestedFactory = createNestedCounter(10);
-var inner1 = nestedFactory();
-var inner2 = nestedFactory();
+var nested_factory = create_nested_counter(10);
+var inner1 = nested_factory();
+var inner2 = nested_factory();
 
 var i1_1 = inner1();
 var i1_2 = inner1();
@@ -103,20 +103,20 @@ assert(i2_2 == 22, "Second inner closure should increment to 22");
 
 // Test 5: Closure with arithmetic operations
 print("\n--- Test 5: Arithmetic Closures ---");
-fn createAdder(x: int): fn(int): int {
+fn create_adder(x: int): fn(int): int {
     return fn(y: int): int {
         return x + y;
     };
 }
 
-fn createMultiplier(factor: int): fn(int): int {
+fn create_multiplier(factor: int): fn(int): int {
     return fn(value: int): int {
         return value * factor;
     };
 }
 
-var add5 = createAdder(5);
-var mult3 = createMultiplier(3);
+var add5 = create_adder(5);
+var mult3 = create_multiplier(3);
 
 var add_result = add5(7);
 var mult_result = mult3(4);
@@ -128,7 +128,7 @@ assert(mult_result == 12, "Multiplier closure should multiply 4 by 3");
 
 // Test 6: Closure memory management
 print("\n--- Test 6: Closure Memory Management ---");
-fn createTemporaryClosure(value: int): fn(): int {
+fn create_temporary_closure(value: int): fn(): int {
     var captured: int = value;
     return fn(): int {
         return captured * 2;
@@ -136,15 +136,15 @@ fn createTemporaryClosure(value: int): fn(): int {
 }
 
 for (var i = 1; i < 5; i += 1) {
-    var tempClosure = createTemporaryClosure(i);
-    var result = tempClosure();
+    var temp_closure = create_temporary_closure(i);
+    var result = temp_closure();
     print("Temporary closure {i} result: {result}");
     assert(result == i * 2, "Temporary closure should double captured value");
 }
 
 // Test 7: Closure with conditional logic
 print("\n--- Test 7: Conditional Closures ---");
-fn createConditionalClosure(threshold: int): fn(int): str {
+fn create_conditional_closure(threshold: int): fn(int): str {
     return fn(value: int): str {
         if (value > threshold) {
             return "Above threshold: {value} > {threshold}";
@@ -154,7 +154,7 @@ fn createConditionalClosure(threshold: int): fn(int): str {
     };
 }
 
-var checker = createConditionalClosure(10);
+var checker = create_conditional_closure(10);
 var check1 = checker(15);
 var check2 = checker(5);
 print(check1);

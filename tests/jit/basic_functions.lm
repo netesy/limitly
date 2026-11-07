@@ -7,12 +7,12 @@ print("=== Basic Function Tests ===");
 
 // Test 1: Simple function declaration and call
 print("\n--- Test 1: Simple Functions ---");
-fn sayHello() {
+fn say_hello() {
     print("Hello from function!");
 }
 
 
-sayHello();
+say_hello();
 
 
 // Test 2: Function with parameters
@@ -60,8 +60,8 @@ fn calculate(x: int, y: int): int {
 }
 
 
-var calcResult = calculate(3, 4);
-print("calculate(3, 4) = {calcResult}");
+var calc_result = calculate(3, 4);
+print("calculate(3, 4) = {calc_result}");
 
 // Test 6: Recursive function
 print("\n--- Test 6: Recursion ---");
@@ -89,21 +89,21 @@ fn multiply(a: int, b: int): int {
 }
 
 
-fn isEven(n: int): bool {
+fn is_even(n: int): bool {
     return (n % 2) == 0;
 }
 
 
-var subResult = subtract(10, 3);
-var multResult = multiply(6, 7);
-var evenCheck = isEven(8);
-var oddCheck = isEven(9);
+var sub_result = subtract(10, 3);
+var mult_result = multiply(6, 7);
+var even_check = is_even(8);
+var odd_check = is_even(9);
 
 
-print("subtract(10, 3) = {subResult}");
-print("multiply(6, 7) = {multResult}");
-print("isEven(8) = {evenCheck}");
-print("isEven(9) = {oddCheck}");
+print("subtract(10, 3) = {sub_result}");
+print("multiply(6, 7) = {mult_result}");
+print("isEven(8) = {even_check}");
+print("isEven(9) = {odd_check}");
 
 
 print("\n=== Basic Function Tests Complete ===");

@@ -9,12 +9,12 @@ fn divide(a: int, b: int): int?DivisionByZero {
 }
 
 // 2. Function that correctly propagates built-in errors
-fn safeDivision(x: int, y: int): int?DivisionByZero {
+fn safe_division(x: int, y: int): int?DivisionByZero {
     return divide(x, y)?;
 }
 
 // 3. Function with multiple built-in error types
-fn arrayAccess(arr: [int], index: int): int?IndexOutOfBounds, DivisionByZero {
+fn array_access(arr: [int], index: int): int?IndexOutOfBounds, DivisionByZero {
     if (index < 0) {
         return err(IndexOutOfBounds);
     }
@@ -22,20 +22,20 @@ fn arrayAccess(arr: [int], index: int): int?IndexOutOfBounds, DivisionByZero {
 }
 
 // 4. Function that calls multiple fallible functions with built-in errors
-fn complexOperation(arr: [int], index: int): int?IndexOutOfBounds, DivisionByZero {
-    var value = arrayAccess(arr, index)?;
+fn complex_operation(arr: [int], index: int): int?IndexOutOfBounds, DivisionByZero {
+    var value = array_access(arr, index)?;
     return divide(value, 3)?;
 }
 
 print("Testing function signature validation with built-in error types");
 
 // Test the functions - these should work correctly
-match (safeDivision(10, 2)) {
+match (safe_division(10, 2)) {
     val result => print("Division result: {result}"),
     err error => print("Division error: {error}")
 }
 
-match (safeDivision(10, 0)) {
+match (safe_division(10, 0)) {
     val result => print("Division result: {result}"),
     err error => print("Division error: {error}")
 }

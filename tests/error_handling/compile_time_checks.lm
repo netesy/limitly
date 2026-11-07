@@ -9,37 +9,37 @@ fn divide(a: int, b: int): int?DivisionByZero {
 }
 
 // Test 2: Function that propagates errors correctly
-fn safeDivide(x: int, y: int): int?DivisionByZero {
+fn safe_divide(x: int, y: int): int?DivisionByZero {
     var result = divide(x, y)?;  // Should work - compatible error types
     return ok(result);
 }
 
 // Test 3: Function that tries to propagate incompatible error types (should fail)
-fn incompatiblePropagate(x: int, y: int): int?IndexOutOfBounds {
+fn incompatible_propagate(x: int, y: int): int?IndexOutOfBounds {
     var result = divide(x, y)?;  // Should fail - DivisionByZero not compatible with IndexOutOfBounds
     return ok(result);
 }
 
 // Test 4: Non-fallible function trying to use ? operator (should fail)
-fn nonFallibleWithPropagation(x: int, y: int): int {
+fn non_fallible_with_propagation(x: int, y: int): int {
     var result = divide(x, y)?;  // Should fail - cannot propagate in non-fallible function
     return result;
 }
 
 // Test 5: Unhandled fallible expression (should fail)
-fn unhandledFallible(x: int, y: int): nil {
+fn unhandled_fallible(x: int, y: int): nil {
     divide(x, y);  // Should fail - fallible expression not handled
 }
 
 // Test 6: Properly handled fallible expression with match
-fn properlyHandled(x: int, y: int): int {
+fn properly_handled(x: int, y: int): int {
     match (divide(x, y)) {
         _ => return 0;  // Simplified pattern for now
     }
 }
 
 // Test 7: Function with generic error type
-fn genericError(flag: bool): int? {
+fn generic_error(flag: bool): int? {
     if (flag) {
         return err(DivisionByZero);
     }
@@ -47,13 +47,13 @@ fn genericError(flag: bool): int? {
 }
 
 // Test 8: Function that can propagate from generic error
-fn propagateGeneric(flag: bool): int?DivisionByZero {
-    var result = genericError(flag)?;  // Should work - generic can be narrowed
+fn propagate_generic(flag: bool): int?DivisionByZero {
+    var result = generic_error(flag)?;  // Should work - generic can be narrowed
     return ok(result);
 }
 
 // Test 9: Multiple error types in function signature
-fn multipleErrors(x: int): int?DivisionByZero, IndexOutOfBounds {
+fn multiple_errors(x: int): int?DivisionByZero, IndexOutOfBounds {
     if (x < 0) {
         return err(DivisionByZero);
     }
@@ -64,15 +64,15 @@ fn multipleErrors(x: int): int?DivisionByZero, IndexOutOfBounds {
 }
 
 // Test 10: Function that handles multiple error types
-fn handleMultiple(x: int): int {
-    match (multipleErrors(x)) {
+fn handle_multiple(x: int): int {
+    match (multiple_errors(x)) {
         _ => return 0;  // Simplified pattern for now
     }
 }
 
 // Test 11: Non-exhaustive match (should fail)
-fn nonExhaustiveMatch(x: int): int {
-    match (multipleErrors(x)) {
+fn non_exhaustive_match(x: int): int {
+    match (multiple_errors(x)) {
         val result => return result;
         err(DivisionByZero) => return -1;
         // Missing IndexOutOfBounds case - should fail
@@ -80,23 +80,23 @@ fn nonExhaustiveMatch(x: int): int {
 }
 
 // Test 12: Error construction with unknown error type (should fail)
-fn unknownErrorType(): int?UnknownError {
+fn unknown_error_type(): int?UnknownError {
     return err(UnknownError);  // Should fail - UnknownError not defined
 }
 
 // Test 13: Type mismatch in error union assignment
-fn typeMismatch(): nil {
+fn type_mismatch(): nil {
     var _x: int?DivisionByZero = "hello";  // Should fail - string not compatible with int?DivisionByZero
 }
 
 // Test 14: Correct error union assignment
-fn correctAssignment(): nil {
+fn correct_assignment(): nil {
     var _x: int?DivisionByZero = ok(42);  // Should work
     var _y: int?DivisionByZero = err(DivisionByZero);  // Should work
 }
 
 // Test 15: Function call with wrong argument types
-fn wrongArguments(): nil {
+fn wrong_arguments(): nil {
     divide("hello", "world");  // Should fail - string arguments not compatible with int parameters
 }
 
@@ -105,9 +105,9 @@ fn main(): nil {
     print("Testing compile-time error checking");
 
     // These should work
-    var _result1 = safeDivide(10, 2);
-    var _result2 = properlyHandled(10, 0);
-    var _result3 = handleMultiple(50);
+    var _result1 = safe_divide(10, 2);
+    var _result2 = properly_handled(10, 0);
+    var _result3 = handle_multiple(50);
 
     // Test proper error handling
     match (divide(10, 0)) {

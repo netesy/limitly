@@ -9,30 +9,30 @@ fn divide(a: int, b: int): int?DivisionByZero {
 }
 
 // Test 2: Function that propagates errors correctly
-fn safeDivide(x: int, y: int): int?DivisionByZero {
+fn safe_divide(x: int, y: int): int?DivisionByZero {
     var result = divide(x, y)?;  // Should work - compatible error types
     return ok(result);
 }
 
 // Test 3: Function that tries to propagate incompatible error types (should fail)
-fn incompatiblePropagate(x: int, y: int): int?IndexOutOfBounds {
+fn incompatible_propagate(x: int, y: int): int?IndexOutOfBounds {
     var result = divide(x, y)?;  // Should fail - DivisionByZero not compatible with IndexOutOfBounds
     return ok(result);
 }
 
 // Test 4: Non-fallible function trying to use ? operator (should fail)
-fn nonFallibleWithPropagation(x: int, y: int): int {
+fn non_fallible_with_propagation(x: int, y: int): int {
     var result = divide(x, y)?;  // Should fail - cannot propagate in non-fallible function
     return result;
 }
 
 // Test 5: Unhandled fallible expression (should fail)
-fn unhandledFallible(x: int, y: int): nil {
+fn unhandled_fallible(x: int, y: int): nil {
     divide(x, y);  // Should fail - fallible expression not handled
 }
 
 // Test 6: Function with generic error type
-fn genericError(flag: bool): int? {
+fn generic_error(flag: bool): int? {
     if (flag) {
         return err(DivisionByZero);
     }
@@ -40,13 +40,13 @@ fn genericError(flag: bool): int? {
 }
 
 // Test 7: Function that can propagate from generic error
-fn propagateGeneric(flag: bool): int?DivisionByZero {
-    var result = genericError(flag)?;  // Should work - generic can be narrowed
+fn propagate_generic(flag: bool): int?DivisionByZero {
+    var result = generic_error(flag)?;  // Should work - generic can be narrowed
     return ok(result);
 }
 
 // Test 8: Multiple error types in function signature
-fn multipleErrors(x: int): int?DivisionByZero, IndexOutOfBounds {
+fn multiple_errors(x: int): int?DivisionByZero, IndexOutOfBounds {
     if (x < 0) {
         return err(DivisionByZero);
     }
@@ -57,17 +57,17 @@ fn multipleErrors(x: int): int?DivisionByZero, IndexOutOfBounds {
 }
 
 // Test 9: Error construction with unknown error type (should fail)
-fn unknownErrorType(): int?UnknownError {
+fn unknown_error_type(): int?UnknownError {
     return err(UnknownError);  // Should fail - UnknownError not defined
 }
 
 // Test 10: Type mismatch in error union assignment
-fn typeMismatch(): nil {
+fn type_mismatch(): nil {
     var _x: int?DivisionByZero = "hello";  // Should fail - string not compatible with int?DivisionByZero
 }
 
 // Test 11: Correct error union assignment
-fn correctAssignment(): nil {
+fn correct_assignment(): nil {
     var _x: int?DivisionByZero = 42;  // Should work
     var _y: int?DivisionByZero = err();  // Should work
 }
@@ -82,8 +82,8 @@ fn correctAssignment(): nil {
     print("Testing basic compile-time error checking");
 
     // These should work
-    var result1 = safeDivide(10, 2);
-    var result2 = propagateGeneric(false);
+    var result1 = safe_divide(10, 2);
+    var result2 = propagate_generic(false);
 
     assert(result1.isOk(), "safeDivide(10, 2) should succeed");
     assert(result1.unwrap() == 5, "safeDivide(10, 2) should return 5");

@@ -7,10 +7,10 @@ print("Multi-feature test:");
 // Variables and expressions
 var name = "Lymar";
 var version = 1.0;
-var isStable = true;
+var is_stable = true;
 
 print("Language: {name} v{version}");
-print("Stable: {isStable}");
+print("Stable: {is_stable}");
 
 // Control flow with loops
 print("Feature matrix:");

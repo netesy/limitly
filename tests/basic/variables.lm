@@ -5,34 +5,34 @@ print("=== Variable Declaration Tests ===");
 var x = 42;
 var y = 3.14;
 var name = "Lymar";
-var isActive = true;
+var is_active = true;
 
 assert(x == 42, "Variable x should be 42");
 assert(y == 3.14, "Variable y should be 3.14");
 assert(name == "Lymar", "Variable name should be 'Lymar'");
-assert(isActive, "Variable isActive should be true");
+assert(is_active, "Variable isActive should be true");
 
 print("Integer: {x}");
 print("Float: {y}");
 print("String: {name}");
-print("Boolean: {isActive}");
+print("Boolean: {is_active}");
 
 // Variable reassignment
 x = 100;
 y = 2.71;
 name = "Language";
-isActive = false;
+is_active = false;
 
 assert(x == 100, "Reassigned x should be 100");
 assert(y == 2.71, "Reassigned y should be 2.71");
 assert(name == "Language", "Reassigned name should be 'Language'");
-assert(not isActive, "Reassigned isActive should be false");
+assert(not is_active, "Reassigned isActive should be false");
 
 print("After reassignment:");
 print("Integer: {x}");
 print("Float: {y}");
 print("String: {name}");
-print("Boolean: {isActive}");
+print("Boolean: {is_active}");
 
 // Multiple declarations
 var a = 1;

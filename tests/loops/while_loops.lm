@@ -4,57 +4,57 @@ print("=== While Loop Tests ===");
 // Basic while loop
 print("Basic while loop:");
 var i = 0;
-var basicCount = 0;
-var basicSum = 0;
+var basic_count = 0;
+var basic_sum = 0;
 while (i < 5) {
     print("i = {i}");
-    basicCount += 1;
-    basicSum += i;
+    basic_count += 1;
+    basic_sum += i;
     i += 1;
 }
-assert(basicCount == 5, "Basic while loop should iterate 5 times");
-assert(basicSum == 10, "Sum of 0+1+2+3+4 should be 10");
+assert(basic_count == 5, "Basic while loop should iterate 5 times");
+assert(basic_sum == 10, "Sum of 0+1+2+3+4 should be 10");
 assert(i == 5, "Loop variable should end at 5");
 
 // While loop with complex condition
 print("While with complex condition:");
 var x = 1;
-var complexCount = 0;
-var complexSum = 0;
+var complex_count = 0;
+var complex_sum = 0;
 while (x * x < 100) {
     print("x = {x}, x² = {x * x}");
-    complexCount += 1;
-    complexSum += x;
+    complex_count += 1;
+    complex_sum += x;
     x += 1;
 }
-assert(complexCount == 9, "Complex while should iterate 9 times (1-9)");
-assert(complexSum == 45, "Sum of 1+2+...+9 should be 45");
+assert(complex_count == 9, "Complex while should iterate 9 times (1-9)");
+assert(complex_sum == 45, "Sum of 1+2+...+9 should be 45");
 assert(x == 10, "x should end at 10 (10² = 100 >= 100)");
 
 // Nested while loops
 print("Nested while loops:");
 var outer = 0;
-var nestedCount = 0;
-var totalPairs = 0;
+var nested_count = 0;
+var total_pairs = 0;
 while (outer < 2) {
     var inner = 0;
     while (inner < 3) {
         print("({outer}, {inner})");
-        nestedCount += 1;
-        totalPairs += outer + inner;
+        nested_count += 1;
+        total_pairs += outer + inner;
         inner += 1;
     }
     outer += 1;
 }
-print("pair of Sum should be {totalPairs}");
-assert(nestedCount == 6, "Nested while should iterate 6 times (2x3)");
+print("pair of Sum should be {total_pairs}");
+assert(nested_count == 6, "Nested while should iterate 6 times (2x3)");
 assert(outer == 2, "Outer should end at 2");
-assert(totalPairs == 9, "Sum of pairs should be 9");
+assert(total_pairs == 9, "Sum of pairs should be 9");
 
 // While loop with break/continue
 print("While with early termination:");
 var count = 0;
-var breakCount = 0;
+var break_count = 0;
 while (count < 10) {
     if (count == 3) {
         count += 1;
@@ -64,41 +64,41 @@ while (count < 10) {
         break;
     }
     print("count = {count}");
-    breakCount += 1;
+    break_count += 1;
     count += 1;
 }
-assert(breakCount == 6, "While loop should execute 6 times (skip 3, break at 7)");
+assert(break_count == 6, "While loop should execute 6 times (skip 3, break at 7)");
 assert(count == 7, "Count should be 7 when loop breaks");
 
 // While loop with decrement
 print("While loop with decrement:");
 var countdown = 5;
-var countdownCount = 0;
-var countdownSum = 0;
+var countdown_count = 0;
+var countdown_sum = 0;
 while (countdown > 0) {
     print("countdown = {countdown}");
-    countdownCount += 1;
-    countdownSum += countdown;
+    countdown_count += 1;
+    countdown_sum += countdown;
     countdown -= 1;
 }
-assert(countdownCount == 5, "Countdown while should iterate 5 times");
-assert(countdownSum == 15, "Sum of 5+4+3+2+1 should be 15");
+assert(countdown_count == 5, "Countdown while should iterate 5 times");
+assert(countdown_sum == 15, "Sum of 5+4+3+2+1 should be 15");
 assert(countdown == 0, "Countdown should end at 0");
 
 // While loop with boolean condition
 print("While with boolean condition:");
 var flag = true;
-var boolCount = 0;
+var bool_count = 0;
 var toggle = 0;
 while (flag) {
-    boolCount += 1;
+    bool_count += 1;
     toggle += 1;
     if (toggle >= 4) {
         flag = false;
     }
-    print("Boolean iteration: {boolCount}");
+    print("Boolean iteration: {bool_count}");
 }
-assert(boolCount == 4, "Boolean while should iterate 4 times");
+assert(bool_count == 4, "Boolean while should iterate 4 times");
 assert(not flag, "Flag should be false at end");
 
 print("=== While Loop Tests Complete ===");

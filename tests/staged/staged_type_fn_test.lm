@@ -8,8 +8,8 @@ frame Money {
 }
 
 // 1. Type parameter + union return: nullable(T) = T | nil
-staged fn nullable(T: type): type {
-    return T | nil;
+staged fn nullable(t: type): type {
+    return t | nil;
 }
 
 var nv: nullable(int) = 42;
@@ -23,8 +23,8 @@ var ao: IntOpt = 7;
 assert(ao == 7);
 
 // 2. A type parameter passed straight through carries the real type: fields resolve.
-staged fn only(T: type): type {
-    return T;
+staged fn only(t: type): type {
+    return t;
 }
 
 var m: only(Money) = Money();
@@ -32,8 +32,8 @@ m.cents = 25;
 assert(m.cents == 25);
 
 // 3. Multiple type parameters: either(T, U) = T | U
-staged fn either(T: type, U: type): type {
-    return T | U;
+staged fn either(t: type, u: type): type {
+    return t | u;
 }
 
 var ev: either(int, str) = "union-value";
@@ -42,8 +42,8 @@ var ei: either(int, str) = 3;
 assert(ei == 3);
 
 // 4. Structural type result: pair(T, U) = { first: T, second: U }
-staged fn pair(T: type, U: type): type {
-    return type { first: T, second: U };
+staged fn pair(t: type, u: type): type {
+    return type { first: t, second: u };
 }
 
 fn use_pair(p: pair(int, str)): int {
@@ -61,11 +61,11 @@ pi.second = "ok";
 assert(use_pair(pi) == 11);
 
 // 5. Conditional type selection driven by a compile-time value parameter.
-staged fn pick(flag: int, T: type, U: type): type {
+staged fn pick(flag: int, t: type, u: type): type {
     if (flag == 0) {
-        return T;
+        return t;
     }
-    return U;
+    return u;
 }
 
 var pa: pick(0, Money, int) = Money();
@@ -81,25 +81,25 @@ assert(w == "nested");
 // 7. Shadowing inside the type fold: the inner constructor binds the SAME parameter
 //    name 'T' to int; outer's own T must survive it (the nested-call leak class at
 //    the type level). If T leaked, outer(str) would fold to int and reject a str.
-staged fn inner(T: type): type {
-    return T;
+staged fn inner(t: type): type {
+    return t;
 }
 
-staged fn outer(T: type): type {
+staged fn outer(t: type): type {
     var dup: type = inner(int);
-    return either(T, dup);
+    return either(t, dup);
 }
 
 var os: outer(str) = "survived";
 assert(os == "survived");
 
 // 8. Type-valued local bound to a frame type, then combined with the parameter.
-staged fn withLocal(T: type): type {
+staged fn with_local(t: type): type {
     var other: type = Money;
-    return either(T, other);
+    return either(t, other);
 }
 
-var lw: withLocal(int) = 42;
+var lw: with_local(int) = 42;
 assert(lw == 42);
 
 // 9. The same constructor folded at two different instantiations.
@@ -133,11 +133,11 @@ fn describe(s: nullable(Status)): str {
     return "end";
 }
 
-staged fn statusType(): type {
+staged fn status_type(): type {
     return Status;
 }
 
-fn useStatus(s: statusType()): str {
+fn use_status(s: status_type()): str {
     match (s) {
         Status.Active => {
             return "direct";
@@ -154,20 +154,20 @@ assert(describe(bound) == "active");
 var nilbound: nullable(Status) = nil;
 assert(describe(nilbound) == "none");
 assert(describe(Status.Inactive) == "inactive");
-assert(useStatus(Status.Active) == "direct");
+assert(use_status(Status.Active) == "direct");
 
 // A type argument selected by a compile-time value condition.
 var p: pick(0, Status, int) = Status.Active;
-assert(useStatus(p) == "direct");
+assert(use_status(p) == "direct");
 
 // 11. kind bounds: `: enum` and `: frame` restrict which type argument a
 // constructor accepts (docs/staged.md Example A). Verified structurally by passing a
 // frame whose fields match the folded type, as object literals are not checker-supported.
-staged fn result_of(OkType: type, ErrType: enum): type {
+staged fn result_of(ok_type: type, err_type: enum): type {
     return type {
         is_ok: bool,
-        ok_value: OkType,
-        err_value: ErrType
+        ok_value: ok_type,
+        err_value: err_type
     };
 }
 
@@ -185,10 +185,10 @@ var ri = ResImpl();
 ri.ok_value = 7;
 assert(take_result(ri) == "ok");
 
-staged fn boxed(T: frame, U: type): type {
+staged fn boxed(t: frame, u: type): type {
     return type {
-        item: T,
-        tag: U
+        item: t,
+        tag: u
     };
 }
 

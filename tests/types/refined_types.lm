@@ -64,32 +64,32 @@ print("Short string: {str3}");
 
 // Test 5: Refined type in function parameters
 print("\n--- Test 5: Refined Type in Function Parameters ---");
-fn processPositive(value: PositiveInt): int {
+fn process_positive(value: PositiveInt): int {
     return value * 2;
 }
 
-fn processLarge(value: LargeInt): int {
+fn process_large(value: LargeInt): int {
     return value + 50;
 }
 
-var result1 = processPositive(10);
-var result2 = processLarge(150);
+var result1 = process_positive(10);
+var result2 = process_large(150);
 
 print("Process positive result: {result1}");
 print("Process large result: {result2}");
 
 // Test 6: Refined type in function return
 print("\n--- Test 6: Refined Type in Function Return ---");
-fn getPositiveNumber(): PositiveInt {
+fn get_positive_number(): PositiveInt {
     return 42;
 }
 
-fn getLargeNumber(): LargeInt {
+fn get_large_number(): LargeInt {
     return 500;
 }
 
-var num1 = getPositiveNumber();
-var num2 = getLargeNumber();
+var num1 = get_positive_number();
+var num2 = get_large_number();
 
 print("Positive number: {num1}");
 print("Large number: {num2}");
@@ -161,16 +161,16 @@ print("Refined alias 2: {refined2}");
 
 // Test 12: Refined type with function calls
 print("\n--- Test 12: Refined Type with Function Calls ---");
-fn isPositive(value: int): bool {
+fn is_positive(value: int): bool {
     return value > 0;
 }
 
-fn isLarge(value: int): bool {
+fn is_large(value: int): bool {
     return value > 100;
 }
 
-var check1 = isPositive(42);
-var check2 = isLarge(500);
+var check1 = is_positive(42);
+var check2 = is_large(500);
 
 print("Is positive: {check1}");
 print("Is large: {check2}");
@@ -195,21 +195,21 @@ type NotMultiple = int where value % 5 != 0;
 
 var mult1: Multiple = 10;
 var mult2: Multiple = 25;
-var notMult1: NotMultiple = 7;
-var notMult2: NotMultiple = 13;
+var not_mult1: NotMultiple = 7;
+var not_mult2: NotMultiple = 13;
 
 print("Multiple 1: {mult1}");
 print("Multiple 2: {mult2}");
-print("Not multiple 1: {notMult1}");
-print("Not multiple 2: {notMult2}");
+print("Not multiple 1: {not_mult1}");
+print("Not multiple 2: {not_mult2}");
 
 // Test 15: Refined type in dictionaries
 print("\n--- Test 15: Refined Type in Dictionaries ---");
-var ageMap: {str: ValidAge} = {"Alice": 25, "Bob": 30, "Charlie": 35};
-var scoreMap: {str: PositiveInt} = {"player1": 100, "player2": 250};
+var age_map: {str: ValidAge} = {"Alice": 25, "Bob": 30, "Charlie": 35};
+var score_map: {str: PositiveInt} = {"player1": 100, "player2": 250};
 
-print("Age map: {ageMap}");
-print("Score map: {scoreMap}");
+print("Age map: {age_map}");
+print("Score map: {score_map}");
 
 // Test 16: Refined type with subtraction
 print("\n--- Test 16: Refined Type with Subtraction ---");
@@ -246,7 +246,7 @@ print("Product small: {ps1}");
 
 // Test 19: Refined type in function with conditionals
 print("\n--- Test 19: Refined Type in Function with Conditionals ---");
-fn validatePositive(value: PositiveInt): str {
+fn validate_positive(value: PositiveInt): str {
     if (value > 50) {
         return "Large positive";
     } else if (value > 10) {
@@ -256,9 +256,9 @@ fn validatePositive(value: PositiveInt): str {
     }
 }
 
-var val1 = validatePositive(5);
-var val2 = validatePositive(25);
-var val3 = validatePositive(100);
+var val1 = validate_positive(5);
+var val2 = validate_positive(25);
+var val3 = validate_positive(100);
 
 print("Validate 1: {val1}");
 print("Validate 2: {val2}");
@@ -270,12 +270,12 @@ type RangeType = int where value > 0;
 type LymarType = int where value < 1000;
 type MidType = int where value > 100;
 
-fn processRefined(r: RangeType, l: LymarType, m: MidType): int {
+fn process_refined(r: RangeType, l: LymarType, m: MidType): int {
     return r + l + m;
 }
 
-var r1 = processRefined(10, 500, 200);
-var r2 = processRefined(50, 900, 300);
+var r1 = process_refined(10, 500, 200);
+var r2 = process_refined(50, 900, 300);
 
 print("Refined result 1: {r1}");
 print("Refined result 2: {r2}");

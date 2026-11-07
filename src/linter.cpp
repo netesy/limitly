@@ -99,9 +99,15 @@ std::string to_snake_case(const std::string& s) {
     std::string res;
     for (size_t i = 0; i < s.size(); ++i) {
         char c = s[i];
-        if (std::isupper(c)) {
-            if (i > 0 && s[i - 1] != '_') res += '_';
-            res += static_cast<char>(std::tolower(c));
+        if (std::isupper(static_cast<unsigned char>(c))) {
+            if (i > 0 && s[i - 1] != '_') {
+                bool prev_lower = std::islower(static_cast<unsigned char>(s[i - 1])) || std::isdigit(static_cast<unsigned char>(s[i - 1]));
+                bool next_lower = (i + 1 < s.size() && std::islower(static_cast<unsigned char>(s[i + 1])));
+                if (prev_lower || next_lower) {
+                    res += '_';
+                }
+            }
+            res += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
         } else {
             res += c;
         }
@@ -634,8 +640,7 @@ public:
 
         is_runtime_bridge = (filename.find("internal") != std::string::npos ||
                              filename.find("resource") != std::string::npos ||
-                             filename.find("gg") != std::string::npos ||
-                             filename.find("box_test") != std::string::npos);
+                             filename.find("gg") != std::string::npos);
 
         push_scope();
 
@@ -756,23 +761,6 @@ public:
 
             push_scope();
 
-            bool is_generic_callback = false;
-            if (func->params.size() == 1) {
-                auto ptype = (func->params[0].second) ? format_type(func->params[0].second) : "";
-                auto rtype = (func->returnType.has_value() && func->returnType.value()) ? format_type(func->returnType.value()) : "";
-                if (ptype == "any" && (rtype == "bool" || rtype == "any")) {
-                    is_generic_callback = true;
-                }
-            } else if (func->params.size() == 2) {
-                auto p1type = (func->params[0].second) ? format_type(func->params[0].second) : "";
-                auto p2type = (func->params[1].second) ? format_type(func->params[1].second) : "";
-                auto rtype = (func->returnType.has_value() && func->returnType.value()) ? format_type(func->returnType.value()) : "";
-                if (p1type == "any" && p2type == "any" && (rtype == "int" || rtype == "any")) {
-                    is_generic_callback = true;
-                }
-            }
-            bool allow_any = in_trait || is_runtime_bridge || is_generic_callback;
-
             for (const auto& [param, type] : func->params) {
                 if (is_reserved_keyword(param)) {
                     add_diag(func->line, 1, "reserved-identifier",
@@ -784,7 +772,7 @@ public:
                              "Parameter '" + param + "' should be snake_case",
                              "rename parameter to follow snake_case (e.g. '" + to_snake_case(param) + "')");
                 }
-                if (!allow_any && type && format_type(type) == "any") {
+                if (!in_trait && !is_runtime_bridge && type && format_type(type) == "any") {
                     add_diag(func->line, 1, "any-overuse",
                              "Parameter '" + param + "' uses dynamic 'any' type",
                              "prefer a concrete type (e.g. 'int', 'str') or trait contract to enable static safety");
@@ -795,7 +783,7 @@ public:
                 scope_stack.back()[param] = meta;
             }
 
-            if (!allow_any && func->returnType.has_value() && func->returnType.value() && format_type(func->returnType.value()) == "any") {
+            if (!in_trait && !is_runtime_bridge && func->returnType.has_value() && func->returnType.value() && format_type(func->returnType.value()) == "any") {
                 add_diag(func->line, 1, "any-overuse",
                          "Function '" + func->name + "' has return type 'any'",
                          "prefer concrete return type or trait for static verification");
@@ -1437,6 +1425,66 @@ int Linter::runFix(int argc, char** argv) {
     size_t total_fixes = 0;
     size_t files_modified = 0;
 
+    auto rename_identifiers_in_line = [&](std::string& line, const std::string& sym, const std::string& target) -> bool {
+        bool line_modified = false;
+        bool in_str = false;
+        char quote = 0;
+        int interp_depth = 0;
+
+        size_t i = 0;
+        while (i < line.length()) {
+            if (in_str) {
+                if (line[i] == '\\' && i + 1 < line.length()) {
+                    i += 2;
+                    continue;
+                }
+                if (line[i] == quote && interp_depth == 0) {
+                    in_str = false;
+                    i++;
+                    continue;
+                }
+                if (line[i] == '{') {
+                    interp_depth++;
+                    i++;
+                    continue;
+                }
+                if (line[i] == '}' && interp_depth > 0) {
+                    interp_depth--;
+                    i++;
+                    continue;
+                }
+                if (interp_depth == 0) {
+                    i++;
+                    continue;
+                }
+            } else {
+                if (line[i] == '"' || line[i] == '\'') {
+                    in_str = true;
+                    quote = line[i];
+                    interp_depth = 0;
+                    i++;
+                    continue;
+                }
+                if (line[i] == '/' && i + 1 < line.length() && line[i + 1] == '/') {
+                    break;
+                }
+            }
+
+            if (line.compare(i, sym.length(), sym) == 0) {
+                bool left_boundary = (i == 0 || (!isalnum(static_cast<unsigned char>(line[i - 1])) && line[i - 1] != '_'));
+                bool right_boundary = (i + sym.length() >= line.length() || (!isalnum(static_cast<unsigned char>(line[i + sym.length()])) && line[i + sym.length()] != '_'));
+                if (left_boundary && right_boundary) {
+                    line.replace(i, sym.length(), target);
+                    i += target.length();
+                    line_modified = true;
+                    continue;
+                }
+            }
+            i++;
+        }
+        return line_modified;
+    };
+
     Options lint_opts;
     for (const auto& file : files_to_fix) {
         std::ifstream in(file);
@@ -1458,6 +1506,7 @@ int Linter::runFix(int argc, char** argv) {
 
         int file_fixes = 0;
         std::unordered_set<int> fixed_redundant_bool_lines;
+        std::unordered_set<std::string> fixed_naming_symbols;
         for (const auto& d : diags) {
             if (d.line <= 0 || static_cast<size_t>(d.line) > lines.size()) continue;
             std::string& line = lines[d.line - 1];
@@ -1755,6 +1804,40 @@ int Linter::runFix(int argc, char** argv) {
                         file_fixes++;
                         if (opts.verbose) {
                             std::cout << cyan << "  [fix] " << reset << file << ":" << d.line << ": prefixed unused variable '" << var_name << "' with '_'\n";
+                        }
+                    }
+                }
+            } else if (d.rule == "naming-convention") {
+                std::string sym;
+                auto q1 = d.message.find('\'');
+                if (q1 != std::string::npos) {
+                    auto q2 = d.message.find('\'', q1 + 1);
+                    if (q2 != std::string::npos) {
+                        sym = d.message.substr(q1 + 1, q2 - q1 - 1);
+                    }
+                }
+                if (!sym.empty() && fixed_naming_symbols.find(sym) == fixed_naming_symbols.end()) {
+                    fixed_naming_symbols.insert(sym);
+
+                    std::string target;
+                    if (d.message.find("Frame '") != std::string::npos || d.message.find("Trait '") != std::string::npos) {
+                        target = to_pascal_case(sym);
+                    } else {
+                        target = to_snake_case(sym);
+                    }
+
+                    if (!target.empty() && target != sym) {
+                        bool any_renamed = false;
+                        for (auto& file_line : lines) {
+                            if (rename_identifiers_in_line(file_line, sym, target)) {
+                                any_renamed = true;
+                            }
+                        }
+                        if (any_renamed) {
+                            file_fixes++;
+                            if (opts.verbose) {
+                                std::cout << cyan << "  [fix] " << reset << file << ":" << d.line << ": renamed '" << sym << "' to '" << target << "'\n";
+                            }
                         }
                     }
                 }

@@ -10,15 +10,15 @@ print("\n --- Test 1: Basic Union Types --- ");
 type NumberOrString = int | str;
 type BoolOrFloat = bool | float;
 
-var numStr1: NumberOrString = 42;
-var numStr2: NumberOrString = "hello";
-var boolFloat1: BoolOrFloat = true;
-var boolFloat2: BoolOrFloat = 3.14;
+var num_str1: NumberOrString = 42;
+var num_str2: NumberOrString = "hello";
+var bool_float1: BoolOrFloat = true;
+var bool_float2: BoolOrFloat = 3.14;
 
-print("NumberOrString (int): {numStr1}");
-print("NumberOrString (str): {numStr2}");
-print("BoolOrFloat (bool): {boolFloat1}");
-print("BoolOrFloat (float): {boolFloat2}");
+print("NumberOrString (int): {num_str1}");
+print("NumberOrString (str): {num_str2}");
+print("BoolOrFloat (bool): {bool_float1}");
+print("BoolOrFloat (float): {bool_float2}");
 
 // Test 2: Three-way union types
 print("\n --- Test 2: Three - way Union Types --- ");
@@ -37,11 +37,11 @@ print("\n --- Test 3: Option - like Union Types --- ");
 type MaybeInt = int | nil;
 type MaybeString = str | nil;
 
-var maybeInt1: MaybeInt = 42;
-var maybeString1: MaybeString = "hello";
+var maybe_int1: MaybeInt = 42;
+var maybe_string1: MaybeString = "hello";
 
-print("Maybe int (value): {maybeInt1}");
-print("Maybe string (value): {maybeString1}");
+print("Maybe int (value): {maybe_int1}");
+print("Maybe string (value): {maybe_string1}");
 
 // Test 4: Complex union combinations
 print("\n --- Test 4: Complex Union Combinations --- ");
@@ -110,11 +110,11 @@ print("\n --- Test 8: Union Type Compatibility --- ");
 type IntOrStr = int | str;
 type StrOrBool = str | bool;
 
-var intStr: IntOrStr = 100;
-var strBool: StrOrBool = "shared";
+var int_str: IntOrStr = 100;
+var str_bool: StrOrBool = "shared";
 
-print("IntOrStr: {intStr}");
-print("StrOrBool: {strBool}");
+print("IntOrStr: {int_str}");
+print("StrOrBool: {str_bool}");
 
 // Test 9: Nested union type aliases
 print("\n --- Test 9: Nested Union Type Aliases --- ");

@@ -2,60 +2,60 @@
 print("=== Large Literal Tests ===");
 
 // Test maximum values for different types
-var maxI64: i64 = 9223372036854775807;
-var maxU64: u64 = 18446744073709551615;
-var largeFloat: float = 1.7976931348623157e+308;
+var max_i64: i64 = 9223372036854775807;
+var max_u64: u64 = 18446744073709551615;
+var large_float: float = 1.7976931348623157e+308;
 
 print("---------Large literal test:------------");
-print("Max I64:", maxI64);
-print("Max U64:", maxU64);
-print("Large Float:", largeFloat);
+print("Max I64:", max_i64);
+print("Max U64:", max_u64);
+print("Large Float:", large_float);
 
-assert(maxI64 == 9223372036854775807, "Max i64 should be 9223372036854775807");
-assert(maxU64 == 18446744073709551615, "Max u64 should be 18446744073709551615");
-assert(largeFloat == 1.7976931348623157e+308, "Large float should be 1.7976931348623157e+308");
+assert(max_i64 == 9223372036854775807, "Max i64 should be 9223372036854775807");
+assert(max_u64 == 18446744073709551615, "Max u64 should be 18446744073709551615");
+assert(large_float == 1.7976931348623157e+308, "Large float should be 1.7976931348623157e+308");
 
 // Test very small values
-var smallFloat: f64 = 2.2250738585072014e-308;
-var tinyFloat: f64 = 1e-100;
+var small_float: f64 = 2.2250738585072014e-308;
+var tiny_float: f64 = 1e-100;
 
 print("-------Small literal test:-----------");
-print("Small Float:", smallFloat);
-print("Tiny Float:", tinyFloat);
+print("Small Float:", small_float);
+print("Tiny Float:", tiny_float);
 
-assert(smallFloat == 2.2250738585072014e-308, "Small float should be 2.2250738585072014e-308");
-assert(tinyFloat == 1e-100, "Tiny float should be 1e-100");
+assert(small_float == 2.2250738585072014e-308, "Small float should be 2.2250738585072014e-308");
+assert(tiny_float == 1e-100, "Tiny float should be 1e-100");
 
 // Test negative large values
-var posLarge: i64 = 123456789;   // Positive integer
-var negLarge: i64 = -123456789;  // Simple negative integer
-var negFloat: f64 = -1.7976931348623157e+308;
+var pos_large: i64 = 123456789;   // Positive integer
+var neg_large: i64 = -123456789;  // Simple negative integer
+var neg_float: f64 = -1.7976931348623157e+308;
 
 print("------Negative large literal test: -------");
-print("Negative Large I64:", negLarge);
-print("Negative Large Float:", negFloat);
+print("Negative Large I64:", neg_large);
+print("Negative Large Float:", neg_float);
 
-assert(posLarge == 123456789, "Positive large integer should be 123456789");
-assert(negLarge == -123456789, "Negative large integer should be -123456789");
-assert(negFloat == -1.7976931348623157e+308, "Negative large float should be -1.7976931348623157e+308");
+assert(pos_large == 123456789, "Positive large integer should be 123456789");
+assert(neg_large == -123456789, "Negative large integer should be -123456789");
+assert(neg_float == -1.7976931348623157e+308, "Negative large float should be -1.7976931348623157e+308");
 
 // Test arithmetic with large literals
-var sumLarge = posLarge + 876543211;
-var diffLarge = maxU64 - posLarge;
-var productLarge = posLarge * 1000;
+var sum_large = pos_large + 876543211;
+var diff_large = max_u64 - pos_large;
+var product_large = pos_large * 1000;
 
 print("------Arithmetic with large literals:------");
-print("Sum large:", sumLarge);
-print("Diff large:", diffLarge);
-print("Product large:", productLarge);
+print("Sum large:", sum_large);
+print("Diff large:", diff_large);
+print("Product large:", product_large);
 
-assert(sumLarge == 1000000000, "Sum of large integers should work");
-assert(productLarge == 123456789000, "Product of large integers should work");
+assert(sum_large == 1000000000, "Sum of large integers should work");
+assert(product_large == 123456789000, "Product of large integers should work");
 
 // Test comparison with large literals
-var comp1 = maxI64 > posLarge;
-var comp2 = negLarge < posLarge;
-var comp3 = largeFloat > 0.0;
+var comp1 = max_i64 > pos_large;
+var comp2 = neg_large < pos_large;
+var comp3 = large_float > 0.0;
 
 print("------Comparisons with large literals:----");
 print("maxI64 > posLarge:", comp1);

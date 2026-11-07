@@ -49,7 +49,7 @@ enum Result {
 var result1 = Result.Success("Operation completed");
 var result2 = Result.Error("Something went wrong");
 
-fn describeResult(r: Result) {
+fn describe_result(r: Result) {
     match (r) {
         Result.Success(msg) => { print("Success: {msg}"); },
         Result.Error(msg) => { print("Error Result: {msg}"); },
@@ -57,8 +57,8 @@ fn describeResult(r: Result) {
     }
 }
 
-describeResult(result1);
-describeResult(result2);
+describe_result(result1);
+describe_result(result2);
 
 // Test 5: Frame pattern matching
 print("\n--- Test 5: Frame Pattern Matching ---");
@@ -117,8 +117,8 @@ match (shape) {
 
 // Test 8: Match in function with return
 print("\n--- Test 8: Match with Return Values ---");
-fn getDayName(dayNum: int): str {
-    match (dayNum) {
+fn get_day_name(day_num: int): str {
+    match (day_num) {
         1 => { return "Monday"; },
         2 => { return "Tuesday"; },
         3 => { return "Wednesday"; },
@@ -130,9 +130,9 @@ fn getDayName(dayNum: int): str {
     }
 }
 
-var day1 = getDayName(1);
-var day5 = getDayName(5);
-var day10 = getDayName(10);
+var day1 = get_day_name(1);
+var day5 = get_day_name(5);
+var day10 = get_day_name(10);
 
 assert(day1 == "Monday", "Day 1 should be Monday");
 assert(day5 == "Friday", "Day 5 should be Friday");
@@ -150,7 +150,7 @@ enum Message {
     Write(str)
 }
 
-fn processMessage(msg: Message): str {
+fn process_message(msg: Message): str {
     match (msg) {
         Message.Quit => { return "Quitting application..."; },
         Message.Move(x, y) => { return "Moving to position ({x}, {y})"; },
@@ -158,9 +158,9 @@ fn processMessage(msg: Message): str {
     }
 }
 
-var msg1 = processMessage(Message.Quit);
-var msg2 = processMessage(Message.Move(10, 20));
-var msg3 = processMessage(Message.Write("Hello, World!"));
+var msg1 = process_message(Message.Quit);
+var msg2 = process_message(Message.Move(10, 20));
+var msg3 = process_message(Message.Write("Hello, World!"));
 
 assert(msg1 == "Quitting application...", "Quit message failed");
 assert(msg2 == "Moving to position (10, 20)", "Move message failed");
@@ -172,21 +172,21 @@ print("Message 3: {msg3}");
 
 // Test 10: Guard clauses
 print("\n--- Test 10: Guard Clauses ---");
-fn getGuard(ans: int): str {
+fn get_guard(ans: int): str {
     match(ans) {
         x where x > 10 => { return "greater than 10"; },
         x where x < 10 => { return "less than 10"; },
         x => { return "exactly 10"; }
     }
 }
-var result10 =  getGuard(10);
+var result10 =  get_guard(10);
 assert(result10 == "exactly 10", "Guard clause test for 10 failed");
 
-var result15 = getGuard(15);
+var result15 = get_guard(15);
 
 assert(result15 == "greater than 10", "Guard clause test for 15 failed");
 
-var result5 = getGuard(5);
+var result5 = get_guard(5);
 
 assert(result5 == "less than 10", "Guard clause test for 5 failed");
 

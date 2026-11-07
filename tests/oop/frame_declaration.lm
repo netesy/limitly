@@ -53,14 +53,14 @@ frame Config {
 
 // Frame with visibility modifiers
 frame BankAccount {
-    pub accountNumber: str;
+    pub account_number: str;
     prot balance: int;
 
     pub fn deposit(amount: int) {
         self.balance = self.balance + amount;
     }
 
-    prot fn calculateInterest(): int {
+    prot fn calculate_interest(): int {
         return self.balance / 100;
     }
 }

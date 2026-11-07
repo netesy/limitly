@@ -5,7 +5,7 @@ print("=== Advanced Function Tests ===");
 
 // Test 1: Optional parameters
 print("\n--- Test 1: Optional Parameters ---");
-fn greetOptional(name: str?) {
+fn greet_optional(name: str?) {
     if (name) {
         print("Hello, {name}!");
     } else {
@@ -13,27 +13,27 @@ fn greetOptional(name: str?) {
     }
 }
 
-greetOptional("Charlie");
-greetOptional();
+greet_optional("Charlie");
+greet_optional();
 
 // Test 2: Default parameters
 print("\n--- Test 2: Default Parameters ---");
-fn greetWithDefault(name: str = "World") {
+fn greet_with_default(name: str = "World") {
     print("Hello, {name}!");
 }
 
-greetWithDefault();
-greetWithDefault("Alice");
+greet_with_default();
+greet_with_default("Alice");
 
 // Test 3: Multiple optional parameters
 print("\n--- Test 3: Multiple Optional Parameters ---");
-fn createUser(name: str, age: int = 18, active: bool = true) {
+fn create_user(name: str, age: int = 18, active: bool = true) {
     print("User: {name}, Age: {age}, Active: {active}");
 }
 
-createUser("Bob");
-createUser("Charlie", 25);
-createUser("Diana", 30, false);
+create_user("Bob");
+create_user("Charlie", 25);
+create_user("Diana", 30, false);
 
 // Test 4: Optional math parameters
 print("\n--- Test 4: Optional Math Parameters ---");
@@ -52,7 +52,7 @@ print("power(3, 4) = {power2}");
 
 // Test 5: Complex function signatures
 print("\n--- Test 5: Complex Signatures ---");
-fn processData(datas: str, transform: bool = false, multiplier: int = 1): str {
+fn process_data(datas: str, transform: bool = false, multiplier: int = 1): str {
     var result = datas;
     if (transform) {
         result = "TRANSFORMED: " + result;
@@ -66,30 +66,30 @@ fn processData(datas: str, transform: bool = false, multiplier: int = 1): str {
     return result;
 }
 
-var proc1 = processData("test");
-var proc2 = processData("test", true);
-var proc3 = processData("test", false, 2);
+var proc1 = process_data("test");
+var proc2 = process_data("test", true);
+var proc3 = process_data("test", false, 2);
 print("processData('test') = {proc1}");
 print("processData('test', true) = {proc2}");
 print("processData('test', false, 2) = {proc3}");
 
 // Test 6: Function overloading simulation
 print("\n--- Test 6: Function Variants ---");
-fn formatNumber(n: int): str {
+fn format_number(n: int): str {
     return "Number: {n}";
 }
 
-fn formatFloat(f: float): str {
+fn format_float(f: float): str {
     return "Float: {f}";
 }
 
-fn formatBool(b: bool): str {
+fn format_bool(b: bool): str {
     return "Boolean: {b}";
 }
 
-var fmt1 = formatNumber(42);
-var fmt2 = formatFloat(3.14);
-var fmt3 = formatBool(true);
+var fmt1 = format_number(42);
+var fmt2 = format_float(3.14);
+var fmt3 = format_bool(true);
 print(fmt1);
 print(fmt2);
 print(fmt3);
@@ -100,12 +100,12 @@ fn double(x: int): int {
     return x * 2;
 }
 
-fn addOne(x: int): int {
+fn add_one(x: int): int {
     return x + 1;
 }
 
-var nested1 = double(addOne(5));
-var nested2 = addOne(double(5));
+var nested1 = double(add_one(5));
+var nested2 = add_one(double(5));
 print("double(addOne(5)) = {nested1}");
 print("addOne(double(5)) = {nested2}");
 

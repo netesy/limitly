@@ -39,30 +39,30 @@ print(nil);
 var x = 42;
 var y = 3.14;
 var name = "Lymar";
-var isActive = true;
+var is_active = true;
 
 assert(x == 42, "Variable x should be 42");
 assert(y == 3.14, "Variable y should be 3.14");
 assert(name == "Lymar", "Variable name should be 'Lymar'");
-assert(isActive, "Variable isActive should be true");
+assert(is_active, "Variable isActive should be true");
 
 print("Variables:");
 print("Integer: {x}");
 print("Float: {y}");
 print("String: {name}");
-print("Boolean: {isActive}");
+print("Boolean: {is_active}");
 
 // Variable reassignment
 x = 100;
 y = 2.71;
 name = "Language";
-isActive = false;
+is_active = false;
 
 print("After reassignment:");
 print("Integer: {x}");
 print("Float: {y}");
 print("String: {name}");
-print("Boolean: {isActive}");
+print("Boolean: {is_active}");
 
 // ==========================================
 // 2. EXPRESSIONS AND OPERATORS
@@ -111,26 +111,26 @@ print("Complex: ({a} + {b}) * 2 - {a} / {b} = {result}");
 // ==========================================
 print("\n=== 3. STRING INTERPOLATION ===");
 
-var userName = "Alice";
-var userAge = 25;
+var user_name = "Alice";
+var user_age = 25;
 var pi = 3.14159;
 
 // Basic interpolation
-print("Hello, {userName}!");
-print("Age: {userAge}");
+print("Hello, {user_name}!");
+print("Age: {user_age}");
 print("Pi: {pi}");
 
 // Expression interpolation
-print("Next year: {userAge + 1}");
+print("Next year: {user_age + 1}");
 print("Area of circle: {pi * 2 * 2}");
 
 // Multiple interpolations
-print("Name: {userName}, Age: {userAge}");
-print("{userName} is {userAge} years old");
+print("Name: {user_name}, Age: {user_age}");
+print("{user_name} is {user_age} years old");
 
 // Interpolation at start
-print("{userName} says hello");
-print("{userAge} is the age");
+print("{user_name} says hello");
+print("{user_age} is the age");
 
 // Complex expressions in interpolation
 var x1 = 10;
@@ -261,12 +261,12 @@ iter (x in 0..4) {
                 print("\n=== 8. FUNCTIONS - BASIC ===");
 
                 // Simple function without parameters
-                fn sayHello(): nil {
+                fn say_hello(): nil {
                     print("Hello from function!");
                 }
 
                 print("Calling simple function:");
-                sayHello();
+                say_hello();
 
                 // Function with parameters
                 fn add(a: int, b: int): int {
@@ -274,9 +274,9 @@ iter (x in 0..4) {
                 }
 
                 print("Function with parameters:");
-                var addResult: int = add(5, 3);
-                assert(addResult == 8, "add(5, 3) should return 8");
-                print("add(5, 3) = {addResult}");
+                var add_result: int = add(5, 3);
+                assert(add_result == 8, "add(5, 3) should return 8");
+                print("add(5, 3) = {add_result}");
 
                 // Function with return value
                 fn square(x: int): int {
@@ -309,9 +309,9 @@ iter (x in 0..4) {
                 }
 
                 print("Function with locals:");
-                var calcResult: int = calculate(3, 4);
-                assert(calcResult == (3 + 4) * (3 * 4), "calculate(3, 4) should return 84");
-                print("Result: {calcResult}");
+                var calc_result: int = calculate(3, 4);
+                assert(calc_result == (3 + 4) * (3 * 4), "calculate(3, 4) should return 84");
+                print("Result: {calc_result}");
 
                 // Recursive function
                 fn factorial(n: int): int {
@@ -330,7 +330,7 @@ iter (x in 0..4) {
                 print("\n=== 9. FUNCTIONS - OPTIONAL PARAMETERS ===");
 
                 // Function with optional parameter
-                fn greetOptional(name: str?): str {
+                fn greet_optional(name: str?): str {
                     if (name) {
                         print("Hello, {name}!");
                         return "greeted {name}";
@@ -341,11 +341,11 @@ iter (x in 0..4) {
                 }
 
                 print("Testing optional parameter:");
-                greetOptional("Charlie"); // Should print "Hello, Charlie!"
-                greetOptional(); // Should print "Hello, stranger!"
+                greet_optional("Charlie"); // Should print "Hello, Charlie!"
+                greet_optional(); // Should print "Hello, stranger!"
 
                 // Function with multiple optional parameters
-                fn createUser(username: str, email: str?, age: int?): str {
+                fn create_user(username: str, email: str?, age: int?): str {
                     print("Creating user: {username}");
                     if (email) {
                         print("Email: {email}");
@@ -357,9 +357,9 @@ iter (x in 0..4) {
                 }
 
                 print("Testing multiple optional parameters:");
-                createUser("alice"); // Only username
-                createUser("bob", "bob@email.com"); // Username and email
-                createUser("charlie", "charlie@email.com", 25); // All parameters
+                create_user("alice"); // Only username
+                create_user("bob", "bob@email.com"); // Username and email
+                create_user("charlie", "charlie@email.com", 25); // All parameters
 
                 // ==========================================
                 // 10. FUNCTIONS - DEFAULT PARAMETERS
@@ -367,27 +367,27 @@ iter (x in 0..4) {
                 print("\n=== 10. FUNCTIONS - DEFAULT PARAMETERS ===");
 
                 // Function with default parameter value
-                fn greetDefault(name: str = "World"): str {
+                fn greet_default(name: str = "World"): str {
                     print("Hello, {name}!");
                     return "greeted {name}";
                 }
 
                 print("Testing default parameter:");
-                greetDefault(); // Should print "Hello, World!"
-                greetDefault("Dave"); // Should print "Hello, Dave!"
+                greet_default(); // Should print "Hello, World!"
+                greet_default("Dave"); // Should print "Hello, Dave!"
 
                 // Function with multiple default parameters
-                fn createMessage(greeting: str = "Hello", name: str = "User", punctuation: str = "!"): str {
+                fn create_message(greeting: str = "Hello", name: str = "User", punctuation: str = "!"): str {
                     var message = "{greeting}, {name}{punctuation}";
                     print(message);
                     return message;
                 }
 
                 print("Testing multiple default parameters:");
-                createMessage(); // All defaults
-                createMessage("Hi"); // Custom greeting
-                createMessage("Hey", "Alice"); // Custom greeting and name
-                createMessage("Greetings", "Bob", "."); // All custom
+                create_message(); // All defaults
+                create_message("Hi"); // Custom greeting
+                create_message("Hey", "Alice"); // Custom greeting and name
+                create_message("Greetings", "Bob", "."); // All custom
 
                 // ==========================================
                 // 11. TYPE SYSTEM - TYPE ALIASES
@@ -402,18 +402,18 @@ iter (x in 0..4) {
                 type IsActive = bool;
 
                 // Test usage of type aliases
-                var userId: Id = 12345;
-                var userName: Name = "Alice";
-                var userAge: Age = 25;
-                var userScore: Score = 95.5;
-                var isUserActive: IsActive = true;
+                var user_id: Id = 12345;
+                var user_name: Name = "Alice";
+                var user_age: Age = 25;
+                var user_score: Score = 95.5;
+                var is_user_active: IsActive = true;
 
                 print("Type aliases:");
-                print("User ID: {userId}");
-                print("User Name: {userName}");
-                print("User Age: {userAge}");
-                print("User Score: {userScore}");
-                print("Is Active: {isUserActive}");
+                print("User ID: {user_id}");
+                print("User Name: {user_name}");
+                print("User Age: {user_age}");
+                print("User Score: {user_score}");
+                print("Is Active: {is_user_active}");
 
                 // ==========================================
                 // 12. TYPE SYSTEM - UNION TYPES
@@ -438,12 +438,12 @@ iter (x in 0..4) {
                 // Option type usage
                 type IntOption = Some | None;
 
-                var someValue = Some { kind: "Some", value: 42 };
-                var noneValue = None { kind: "None" };
+                var some_value = Some { kind: "Some", value: 42 };
+                var none_value = None { kind: "None" };
 
                 print("Option types:");
-                print("Some value: {someValue}");
-                print("None value: {noneValue}");
+                print("Some value: {some_value}");
+                print("None value: {none_value}");
 
                 // ==========================================
                 // 14. ERROR HANDLING - WORKING
@@ -459,7 +459,7 @@ iter (x in 0..4) {
                 }
 
                 // Function that propagates errors
-                fn safeDivide(x: int, y: int): int?DivisionByZero {
+                fn safe_divide(x: int, y: int): int?DivisionByZero {
                     var result = divide(x, y)?; // Error propagation
                     return ok(result);
                 }
@@ -467,16 +467,16 @@ iter (x in 0..4) {
                 print("Testing error handling:");
 
                 // Test successful division
-                var successResult = divide(10, 2);
-                print("divide(10, 2) = {successResult}");
+                var success_result = divide(10, 2);
+                print("divide(10, 2) = {success_result}");
 
                 // Test division by zero (should return error)
-                var errorResult = divide(10, 0);
-                print("divide(10, 0) = {errorResult}");
+                var error_result = divide(10, 0);
+                print("divide(10, 0) = {error_result}");
 
                 // Test error propagation
-                var propagatedResult = safeDivide(15, 3);
-                print("safeDivide(15, 3) = {propagatedResult}");
+                var propagated_result = safe_divide(15, 3);
+                print("safeDivide(15, 3) = {propagated_result}");
 
                 print("Error handling working with ? operator and error propagation");
 

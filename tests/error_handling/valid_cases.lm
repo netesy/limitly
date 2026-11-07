@@ -1,19 +1,19 @@
 // Test cases that should compile successfully without errors
 
 // Basic fallible function
-fn safeDivide(a: int, b: int): int?DivisionByZero {
+fn safe_divide(a: int, b: int): int?DivisionByZero {
     return ok(a / b);
 }
 
 // Function that properly propagates compatible errors
-fn chainedDivision(x: int, y: int, z: int): int?DivisionByZero {
-    var step1 = safeDivide(x, y)?;  // OK: Compatible error types
-    var step2 = safeDivide(step1, z)?;  // OK: Compatible error types
+fn chained_division(x: int, y: int, z: int): int?DivisionByZero {
+    var step1 = safe_divide(x, y)?;  // OK: Compatible error types
+    var step2 = safe_divide(step1, z)?;  // OK: Compatible error types
     return ok(step2);
 }
 
 // Function with generic error type
-fn maybeError(flag: bool): int? {
+fn maybe_error(flag: bool): int? {
     if (flag) {
         return err(DivisionByZero);
     }
@@ -21,13 +21,13 @@ fn maybeError(flag: bool): int? {
 }
 
 // Function that narrows from generic to specific
-fn narrowError(flag: bool): int?DivisionByZero {
-    var result = maybeError(flag)?;  // OK: Generic can be narrowed to specific
+fn narrow_error(flag: bool): int?DivisionByZero {
+    var result = maybe_error(flag)?;  // OK: Generic can be narrowed to specific
     return ok(result);
 }
 
 // Function with multiple error types
-fn multiError(x: int): int?DivisionByZero, IndexOutOfBounds {
+fn multi_error(x: int): int?DivisionByZero, IndexOutOfBounds {
     if (x < 0) {
         return err(DivisionByZero);  // OK: DivisionByZero is in signature
     }
@@ -38,20 +38,20 @@ fn multiError(x: int): int?DivisionByZero, IndexOutOfBounds {
 }
 
 // Proper variable assignments
-fn validAssignments(): nil {
+fn valid_assignments(): nil {
     var _success: int?DivisionByZero = ok(42);
     var _error: int?DivisionByZero = err(DivisionByZero);
     var _generic: int? = ok(100);
 }
 
 // Function calls with correct argument types
-fn correctCalls(): nil {
-    var _result1 = safeDivide(10, 2);  // OK: int, int arguments
-    var _result2 = chainedDivision(20, 4, 2);  // OK: int, int, int arguments
+fn correct_calls(): nil {
+    var _result1 = safe_divide(10, 2);  // OK: int, int arguments
+    var _result2 = chained_division(20, 4, 2);  // OK: int, int, int arguments
 }
 
 // Non-fallible function that doesn't use error propagation
-fn nonFallibleCorrect(x: int, y: int): int {
+fn non_fallible_correct(x: int, y: int): int {
     return x + y;  // OK: No error propagation
 }
 
@@ -59,10 +59,10 @@ fn main(): nil {
     print("Valid error handling cases test");
 
     // All these should work without errors
-    var _r1 = chainedDivision(100, 10, 2);
-    var _r2 = narrowError(false);
-    var _r3 = multiError(50);
-    var _r4 = nonFallibleCorrect(5, 3);
+    var _r1 = chained_division(100, 10, 2);
+    var _r2 = narrow_error(false);
+    var _r3 = multi_error(50);
+    var _r4 = non_fallible_correct(5, 3);
 
     print("All valid cases compiled successfully!");
 }

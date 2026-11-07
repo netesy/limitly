@@ -7,7 +7,7 @@ enum Result {
     Error(str)
 }
 
-fn describeResult(r: Result): str {
+fn describe_result(r: Result): str {
     match (r) {
         Result.Success(msg) => { return "Success: " + msg; },
         Result.Error(e) => { return "Error: " + e; }
@@ -21,7 +21,7 @@ enum Message {
     Write(str)
 }
 
-fn processMessage(msg: Message): str {
+fn process_message(msg: Message): str {
     match (msg) {
         Message.Quit => { return "Quitting application..."; },
         Message.Move(x, y) => { return "Moving to position ({x}, {y})"; },
@@ -37,7 +37,7 @@ enum Shape {
     Square(Color)
 }
 
-fn describeShape(s: Shape): str {
+fn describe_shape(s: Shape): str {
     match (s) {
         Shape.Circle(color) => {
             match (color) {
@@ -60,15 +60,15 @@ fn test() {
     print("--- Test 1: Enum with associated values ---");
     var r1 = Result.Success("Operation completed");
     var r2 = Result.Error("Something went wrong");
-    print(describeResult(r1));
-    print(describeResult(r2));
-    assert(describeResult(r1) == "Success: Operation completed", "describeResult(Success) failed");
-    assert(describeResult(r2) == "Error: Something went wrong", "describeResult(Error) failed");
+    print(describe_result(r1));
+    print(describe_result(r2));
+    assert(describe_result(r1) == "Success: Operation completed", "describeResult(Success) failed");
+    assert(describe_result(r2) == "Error: Something went wrong", "describeResult(Error) failed");
 
     print("\n--- Test 2: Enum with tuple payload ---");
-    var m1 = processMessage(Message.Quit);
-    var m2 = processMessage(Message.Move(10, 20));
-    var m3 = processMessage(Message.Write("Hello"));
+    var m1 = process_message(Message.Quit);
+    var m2 = process_message(Message.Move(10, 20));
+    var m3 = process_message(Message.Write("Hello"));
     print(m1);
     print(m2);
     print(m3);
@@ -77,8 +77,8 @@ fn test() {
     assert(m3 == "Writing message: Hello", "Write failed");
 
     print("\n--- Test 3: Nested enum dispatch ---");
-    var s1 = describeShape(Shape.Circle(Color.Red));
-    var s2 = describeShape(Shape.Square(Color.Red));
+    var s1 = describe_shape(Shape.Circle(Color.Red));
+    var s2 = describe_shape(Shape.Square(Color.Red));
     print(s1);
     print(s2);
     assert(s1 == "Red circle", "Circle(Red) failed");

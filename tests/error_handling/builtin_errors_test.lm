@@ -11,23 +11,23 @@ print("Division result:", result1);
 
 // Test 2: List index out of bounds
 print("Test 2: List index out of bounds");
-var myList = [1, 2, 3];
-var result2 = myList[5];  // Should return IndexOutOfBounds error
+var my_list = [1, 2, 3];
+var result2 = my_list[5];  // Should return IndexOutOfBounds error
 assert(result2.isErr(), "List index out of bounds should return error");
 assert(result2.unwrapErr() == IndexOutOfBounds, "Should be IndexOutOfBounds error");
 print("List access result:", result2);
 
 // Test 3: Dictionary key not found
 print("Test 3: Dictionary key not found");
-var myDict = {"a": 1, "b": 2};
-var result3 = myDict["c"];  // Should return IndexOutOfBounds error
+var my_dict = {"a": 1, "b": 2};
+var result3 = my_dict["c"];  // Should return IndexOutOfBounds error
 assert(result3.isErr(), "Dictionary key not found should return error");
 assert(result3.unwrapErr() == IndexOutOfBounds, "Should be IndexOutOfBounds error");
 print("Dict access result:", result3);
 
 // Test 4: Invalid list index type
 print("Test 4: Invalid list index type");
-var result4 = myList["invalid"];  // Should return TypeConversion error
+var result4 = my_list["invalid"];  // Should return TypeConversion error
 assert(result4.isErr(), "Invalid list index type should return error");
 assert(result4.unwrapErr() == TypeConversion, "Should be TypeConversion error");
 print("Invalid index result:", result4);

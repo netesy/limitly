@@ -19,8 +19,8 @@ var invalid3: SimpleUnion = 42.5;  // ERROR: float not in union
 type NumberUnion = int | float;
 type StringUnion = str | bool;
 
-var numUnion: NumberUnion = 42;
-var strUnion: StringUnion = numUnion;  // ERROR: NumberUnion not compatible with StringUnion
+var num_union: NumberUnion = 42;
+var str_union: StringUnion = num_union;  // ERROR: NumberUnion not compatible with StringUnion
 
 // Test 5: Invalid nested union assignment
 type InnerUnion = int | str;

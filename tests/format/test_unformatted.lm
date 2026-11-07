@@ -13,7 +13,7 @@ fn greet(name : str = "World"): str{
     return "Hello, " + name + " ! ";
 }
 
-fn processData(data :[int], multiplier : int = 2):[int]{
+fn process_data(data :[int], multiplier : int = 2):[int]{
     var result :[int]=[];
     iter(item in data){
         result.append(item * multiplier);
@@ -62,7 +62,7 @@ print("Result :{result}");
 var greeting : str = greet();
 print(greeting);
 
-var processed :[int]= processData(numbers, 3);
+var processed :[int]= process_data(numbers, 3);
 print("Processed :{processed}");
 
 match(x){

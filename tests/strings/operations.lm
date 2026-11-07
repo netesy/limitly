@@ -16,32 +16,32 @@ assert(concat == "Hello World", "String concatenation should work");
 
 // String comparison
 print("String comparisons:");
-var eqResult = str1 == str2;
-var neResult = str1 != str2;
+var eq_result = str1 == str2;
+var ne_result = str1 != str2;
 
-print("{str1} == {str2}: {eqResult}");
-print("{str1} != {str2}: {neResult}");
+print("{str1} == {str2}: {eq_result}");
+print("{str1} != {str2}: {ne_result}");
 
-assert(not eqResult, "'Hello' should not equal 'World'");
-assert(neResult, "'Hello' should not equal 'World' (not equal)");
+assert(not eq_result, "'Hello' should not equal 'World'");
+assert(ne_result, "'Hello' should not equal 'World' (not equal)");
 
 // String with numbers
-var numStr:str = "42";
+var num_str:str = "42";
 var num:int = 42;
-var strNumEq = numStr == num;
+var str_num_eq = num_str == num;
 
-print("String vs number: {numStr} == {num}: {strNumEq}");
-assert(not strNumEq, "String '42' should not equal number 42");
+print("String vs number: {num_str} == {num}: {str_num_eq}");
+assert(not str_num_eq, "String '42' should not equal number 42");
 
 // Empty strings
 var empty = "";
-var emptyStr = "";
-var emptyEq = empty == emptyStr;
+var empty_str = "";
+var empty_eq = empty == empty_str;
 
 print("Empty string: '{empty}'");
-print("Empty length check: {emptyEq}");
+print("Empty length check: {empty_eq}");
 assert(empty == "", "Empty string should be empty");
-assert(emptyEq, "Two empty strings should be equal");
+assert(empty_eq, "Two empty strings should be equal");
 
 // Special characters
 var special = "Line 1\nLine 2\tTabbed";
@@ -54,10 +54,10 @@ print("Quoted: {quoted}");
 assert(quoted == "He said \"Hello\"", "Quoted strings should work");
 
 // String indexing
-var testStr = "Lymar";
-assert(testStr[0] == "L", "First character should be 'L'");
-assert(testStr[4] == "r", "Last character should be 'r'");
+var test_str = "Lymar";
+assert(test_str[0] == "L", "First character should be 'L'");
+assert(test_str[4] == "r", "Last character should be 'r'");
 
-print("String 'Lymar' first char: {testStr[0]}, last char: {testStr[4]}");
+print("String 'Lymar' first char: {test_str[0]}, last char: {test_str[4]}");
 
 print("=== String Operations Tests Complete ===");

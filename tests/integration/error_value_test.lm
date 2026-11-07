@@ -21,11 +21,11 @@ var dict1 = {"key": "value", "num": 123};
 print("Dict: {dict1}");
 
 // Test function calls (basic functionality)
-fn testFunc(a, b) {
+fn test_func(a, b) {
     return a + b;
 }
 
-var sum = testFunc(5, 7);
+var sum = test_func(5, 7);
 print("Function result: {sum}");
 
 print("=== Error Value Infrastructure Ready ===");

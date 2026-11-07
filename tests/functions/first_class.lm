@@ -14,11 +14,11 @@ fn multiply(a: int, b: int): int {
 }
 
 // Store functions in variables
-var addFunc = add;
-var multFunc = multiply;
+var add_func = add;
+var mult_func = multiply;
 
-var result1 = addFunc(3, 4);
-var result2 = multFunc(3, 4);
+var result1 = add_func(3, 4);
+var result2 = mult_func(3, 4);
 print("addFunc(3, 4) = {result1}");
 print("multFunc(3, 4) = {result2}");
 
@@ -27,31 +27,31 @@ assert(result2 == 12, "Function stored in variable should work correctly");
 
 // Test 2: Functions as parameters
 print("\n --- Test 2: Functions as Parameters --- ");
-fn applyOperation(x: int, y: int, operation: fn(int, int): int): int {
+fn apply_operation(x: int, y: int, operation: fn(int, int): int): int {
     return operation(x, y);
 }
 
-var opResult1 = applyOperation(6, 7, add);
-var opResult2 = applyOperation(6, 7, multiply);
-print("applyOperation(6, 7, add) = {opResult1}");
-print("applyOperation(6, 7, multiply) = {opResult2}");
+var op_result1 = apply_operation(6, 7, add);
+var op_result2 = apply_operation(6, 7, multiply);
+print("applyOperation(6, 7, add) = {op_result1}");
+print("applyOperation(6, 7, multiply) = {op_result2}");
 
-assert(opResult1 == 13, "Function passed as parameter should work correctly");
-assert(opResult2 == 42, "Function passed as parameter should work correctly");
+assert(op_result1 == 13, "Function passed as parameter should work correctly");
+assert(op_result2 == 42, "Function passed as parameter should work correctly");
 
 // Test 3: Functions returning functions
 print("\n --- Test 3: Functions Returning Functions --- ");
-fn createAdder(increment: int): fn(int): int {
+fn create_adder(increment: int): fn(int): int {
     return fn(value: int): int {
         return value + increment;
     };
 }
 
-var addFive = createAdder(5);
-var addTen = createAdder(10);
+var add_five = create_adder(5);
+var add_ten = create_adder(10);
 
-var add5_result = addFive(3);
-var add10_result = addTen(7);
+var add5_result = add_five(3);
+var add10_result = add_ten(7);
 print("addFive(3) = {add5_result}");
 print("addTen(7) = {add10_result}");
 
@@ -92,11 +92,11 @@ fn square(x: int): int {
     return x * x;
 }
 
-var squareThenIncrement = compose(increment, square);
-var incrementThenSquare = compose(square, increment);
+var square_then_increment = compose(increment, square);
+var increment_then_square = compose(square, increment);
 
-var comp1 = squareThenIncrement(4);
-var comp2 = incrementThenSquare(4);
+var comp1 = square_then_increment(4);
+var comp2 = increment_then_square(4);
 print("squareThenIncrement(4) = {comp1}");
 print("incrementThenSquare(4) = {comp2}");
 
@@ -105,14 +105,14 @@ assert(comp2 == 25, "Function composition should work: (4+1)^2 = 25");
 
 // Test 6: Function arrays simulation
 print("\n --- Test 6: Function Collections --- ");
-fn createFunctionSet(): (fn(int): int, fn(int): int, fn(int): int) {
+fn create_function_set(): (fn(int): int, fn(int): int, fn(int): int) {
     var f1 = fn(x: int): int { return x + 1;};
     var f2 = fn(x: int): int { return x * 2;};
     var f3 = fn(x: int): int { return x * x;};
     return (f1, f2, f3);
 }
 
-var (func1, func2, func3) = createFunctionSet();
+var (func1, func2, func3) = create_function_set();
 var f1_result = func1(5);
 var f2_result = func2(5);
 var f3_result = func3(5);
@@ -126,8 +126,8 @@ assert(f3_result == 25, "Function from tuple should work: 5*5 = 25");
 
 // Test 7: Conditional function selection
 print("\n --- Test 7: Conditional Function Selection --- ");
-fn selectOperation(useAdd: bool): fn(int, int): int {
-    if (useAdd) {
+fn select_operation(use_add: bool): fn(int, int): int {
+    if (use_add) {
         return fn(a: int, b: int): int {
             return a + b;
         };
@@ -138,11 +138,11 @@ fn selectOperation(useAdd: bool): fn(int, int): int {
     }
 }
 
-var addOp = selectOperation(true);
-var multOp = selectOperation(false);
+var add_op = select_operation(true);
+var mult_op = select_operation(false);
 
-var sel1 = addOp(3, 4);
-var sel2 = multOp(3, 4);
+var sel1 = add_op(3, 4);
+var sel2 = mult_op(3, 4);
 print("addOp(3, 4) = {sel1}");
 print("multOp(3, 4) = {sel2}");
 
@@ -151,15 +151,15 @@ assert(sel2 == 12, "Conditional function selection should return multiply functi
 
 // Test 8: Function factory with parameters
 print("\n --- Test 8: Function Factory --- ");
-fn createProcessor(prefix: str, multiplier: int): fn(int): str {
+fn create_processor(prefix: str, multiplier: int): fn(int): str {
     return fn(value: int): str {
         var result = value * multiplier;
         return "{prefix}: {result}";
     };
 }
 
-var processor1 = createProcessor("Result", 2);
-var processor2 = createProcessor("Value", 5);
+var processor1 = create_processor("Result", 2);
+var processor2 = create_processor("Value", 5);
 
 var proc1_result = processor1(10);
 var proc2_result = processor2(3);

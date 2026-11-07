@@ -8,20 +8,20 @@ print("\n--- Test 1: Basic Union Types ---");
 type NumberOrString = int | str;
 type BoolOrFloat = bool | float;
 
-var numStr1: NumberOrString = 42;
-var numStr2: NumberOrString = "hello";
-var boolFloat1: BoolOrFloat = true;
-var boolFloat2: BoolOrFloat = 3.14;
+var num_str1: NumberOrString = 42;
+var num_str2: NumberOrString = "hello";
+var bool_float1: BoolOrFloat = true;
+var bool_float2: BoolOrFloat = 3.14;
 
-print("NumberOrString (int): {numStr1}");
-print("NumberOrString (str): {numStr2}");
-print("BoolOrFloat (bool): {boolFloat1}");
-print("BoolOrFloat (float): {boolFloat2}");
+print("NumberOrString (int): {num_str1}");
+print("NumberOrString (str): {num_str2}");
+print("BoolOrFloat (bool): {bool_float1}");
+print("BoolOrFloat (float): {bool_float2}");
 
-assert(numStr1 == 42, "Union type should accept int value");
-assert(numStr2 == "hello", "Union type should accept str value");
-assert(boolFloat1, "Union type should accept bool value");
-assert(boolFloat2 == 3.14, "Union type should accept float value");
+assert(num_str1 == 42, "Union type should accept int value");
+assert(num_str2 == "hello", "Union type should accept str value");
+assert(bool_float1, "Union type should accept bool value");
+assert(bool_float2 == 3.14, "Union type should accept float value");
 
 // Test 2: Multi-variant union types
 print("\n--- Test 2: Multi-variant Union Types ---");
@@ -90,20 +90,20 @@ print("\n--- Test 5: Union Type Compatibility ---");
 type IntOrStr = int | str;
 type StrOrBool = str | bool;
 
-var intStr: IntOrStr = 100;
-var strBool: StrOrBool = "shared";
+var int_str: IntOrStr = 100;
+var str_bool: StrOrBool = "shared";
 
-print("IntOrStr: {intStr}");
-print("StrOrBool: {strBool}");
+print("IntOrStr: {int_str}");
+print("StrOrBool: {str_bool}");
 
-assert(intStr == 100, "Union compatibility should work");
-assert(strBool == "shared", "Union compatibility should work");
+assert(int_str == 100, "Union compatibility should work");
+assert(str_bool == "shared", "Union compatibility should work");
 
 // Test 6: Union types in functions
 print("\n--- Test 6: Union Types in Functions ---");
 type Result = int | str;
 
-fn processValue(input: int): Result {
+fn process_value(input: int): Result {
     if (input > 0) {
         return input * 2;
     } else {
@@ -111,8 +111,8 @@ fn processValue(input: int): Result {
     }
 }
 
-var result1: Result = processValue(5);
-var result2: Result = processValue(-1);
+var result1: Result = process_value(5);
+var result2: Result = process_value(-1);
 
 print("Process result 1: {result1}");
 print("Process result 2: {result2}");

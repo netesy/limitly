@@ -64,18 +64,18 @@ if (a > 10) {
 }
 
 // Boolean conditions
-var isActive = true;
-var isValid = false;
+var is_active = true;
+var is_valid = false;
 
-assert(isActive, "isActive should be true");
-assert(not isValid, "isValid should be false");
+assert(is_active, "isActive should be true");
+assert(not is_valid, "isValid should be false");
 
-if (isActive and ! isValid) {
+if (is_active and ! is_valid) {
     print("Active but not valid");
-    assert(isActive and ! isValid, "Should be active but not valid");
+    assert(is_active and ! is_valid, "Should be active but not valid");
 }
 
-if (isActive or isValid) {
+if (is_active or is_valid) {
     print("At least one is true");
-    assert(isActive or isValid, "At least one should be true");
+    assert(is_active or is_valid, "At least one should be true");
 }

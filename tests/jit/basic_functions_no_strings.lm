@@ -5,11 +5,11 @@ print("=== Basic Function Tests ===");
 
 // Test 1: Simple function declaration and call
 print("\n--- Test 1: Simple Functions ---");
-fn sayHello() {
+fn say_hello() {
     print("Hello from function!");
 }
 
-sayHello();
+say_hello();
 
 // Test 2: Function with parameters
 print("\n--- Test 2: Functions with Parameters ---");
@@ -43,9 +43,9 @@ fn calculate(x: int, y: int): int {
     return result;
 }
 
-var calcResult = calculate(3, 4);
+var calc_result = calculate(3, 4);
 print("calculate(3, 4) =");
-print(calcResult);
+print(calc_result);
 
 // Test 5: Recursive function
 print("\n--- Test 5: Recursion ---");
@@ -71,22 +71,22 @@ fn multiply(a: int, b: int): int {
     return a * b;
 }
 
-fn isEven(n: int): bool {
+fn is_even(n: int): bool {
     return (n % 2) == 0;
 }
 
-var subResult = subtract(10, 3);
-var multResult = multiply(6, 7);
-var evenCheck = isEven(8);
-var oddCheck = isEven(9);
+var sub_result = subtract(10, 3);
+var mult_result = multiply(6, 7);
+var even_check = is_even(8);
+var odd_check = is_even(9);
 
 print("subtract(10, 3) =");
-print(subResult);
+print(sub_result);
 print("multiply(6, 7) =");
-print(multResult);
+print(mult_result);
 print("isEven(8) =");
-print(evenCheck);
+print(even_check);
 print("isEven(9) =");
-print(oddCheck);
+print(odd_check);
 
 print("\n=== Basic Function Tests Complete ===");

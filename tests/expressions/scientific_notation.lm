@@ -16,26 +16,26 @@ assert(large == 4.56e+15, "Large scientific notation should parse correctly");
 assert(negative == 7.89e-5, "Negative scientific notation should parse correctly");
 
 // Test with capital E
-var capitalE: f64 = 2.5E+8;
-var capitalENeg: f64 = 3.14E-3;
+var capital_e: f64 = 2.5E+8;
+var capital_e_neg: f64 = 3.14E-3;
 
 print("Capital E notation:");
-print("Capital E positive:", capitalE);
-print("Capital E negative:", capitalENeg);
+print("Capital E positive:", capital_e);
+print("Capital E negative:", capital_e_neg);
 
-assert(capitalE == 2.5e+8, "Capital E positive should work");
-assert(capitalENeg == 3.14e-3, "Capital E negative should work");
+assert(capital_e == 2.5e+8, "Capital E positive should work");
+assert(capital_e_neg == 3.14e-3, "Capital E negative should work");
 
 // Test integer scientific notation (should be treated as float)
-var intScientific: f64 = 5e10;
-var intScientificNeg: f64 = 2e-6;
+var int_scientific: f64 = 5e10;
+var int_scientific_neg: f64 = 2e-6;
 
 print("Integer scientific notation:");
-print("Int scientific:", intScientific);
-print("Int scientific negative:", intScientificNeg);
+print("Int scientific:", int_scientific);
+print("Int scientific negative:", int_scientific_neg);
 
-assert(intScientific == 5e10, "Integer scientific notation should work");
-assert(intScientificNeg == 2e-6, "Integer scientific notation negative should work");
+assert(int_scientific == 5e10, "Integer scientific notation should work");
+assert(int_scientific_neg == 2e-6, "Integer scientific notation negative should work");
 
 // Test edge cases
 var zero: f64 = 0e0;

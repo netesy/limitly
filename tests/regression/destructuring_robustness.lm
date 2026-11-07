@@ -5,9 +5,9 @@ print("a: {a}, b: {b}");
 var (x, y) = [100, 200];
 print("x: {x}, y: {y}");
 
-fn getTuple(): (int, int, int) {
+fn get_tuple(): (int, int, int) {
     return (1, 2, 3);
 }
 
-var (f, g, h) = getTuple();
+var (f, g, h) = get_tuple();
 print("f: {f}, g: {g}, h: {h}");

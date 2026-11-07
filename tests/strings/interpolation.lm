@@ -11,21 +11,21 @@ assert(pi == 3.14159, "Variable pi should be 3.14159");
 
 // Basic interpolation
 var greeting1 = "Hello, {name}!";
-var ageStr = "Age: {age}";
-var piStr = "Pi: {pi}";
+var age_str = "Age: {age}";
+var pi_str = "Pi: {pi}";
 
 print(greeting1);
-print(ageStr);
-print(piStr);
+print(age_str);
+print(pi_str);
 
 assert(greeting1 == "Hello, World!", "Basic interpolation should work");
-assert(ageStr == "Age: 25", "Integer interpolation should work");
-assert(piStr == "Pi: 3.14159", "Float interpolation should work");
+assert(age_str == "Age: 25", "Integer interpolation should work");
+assert(pi_str == "Pi: 3.14159", "Float interpolation should work");
 
 // Expression interpolation
-var nextYear = "Next year: {age + 1}";
-print(nextYear);
-assert(nextYear == "Next year: 26", "Expression interpolation should work");
+var next_year = "Next year: {age + 1}";
+print(next_year);
+assert(next_year == "Next year: 26", "Expression interpolation should work");
 
 var area = "Area of circle: {pi * 2 * 2}";
 print(area);
@@ -54,14 +54,14 @@ assert(start2 == "25 is the age", "Start interpolation should work");
 // Complex expressions
 var x = 10;
 var y = 5;
-var mathStr = "Math: {x} + {y} = {x + y}";
-var compStr = "Comparison: {x} > {y} is {x > y}";
+var math_str = "Math: {x} + {y} = {x + y}";
+var comp_str = "Comparison: {x} > {y} is {x > y}";
 
-print(mathStr);
-print(compStr);
+print(math_str);
+print(comp_str);
 
-assert(mathStr == "Math: 10 + 5 = 15", "Complex math interpolation should work");
-assert(compStr == "Comparison: 10 > 5 is true", "Comparison interpolation should work");
+assert(math_str == "Math: 10 + 5 = 15", "Complex math interpolation should work");
+assert(comp_str == "Comparison: 10 > 5 is true", "Comparison interpolation should work");
 
 // Nested expressions
 var nested = "Complex: {(x + y) * 2 - 1}";

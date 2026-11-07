@@ -2,7 +2,7 @@
 // Test suite covering robust linter rules
 
 
-fn bad_conventions(BadParam: int, x: any): int {
+fn bad_conventions(bad_param: int, x: any): int {
     if (true) {
         // empty block
     }

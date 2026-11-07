@@ -24,19 +24,19 @@ var float1 = 0.0;
 var float2 = 3.14159;
 var float3 = -2.71828;
 var float4 = 1.23e-14;
-var emptyStr = "";
+var empty_str = "";
 
 assert(float1 == 0.0, "Float literal 0.0 should be 0.0");
 assert(float2 == 3.14159, "Float literal 3.14159 should be 3.14159");
 assert(float3 == -2.71828, "Float literal -2.71828 should be -2.71828");
 assert(float4 == 1.23e-14, "Float literal 1.23e-14 should be 1.23e-14");
-assert(emptyStr == "", "Empty string should be empty");
+assert(empty_str == "", "Empty string should be empty");
 
 print(float1);
 print(float2);
 print(float3);
 print(float4);
-print(emptyStr);
+print(empty_str);
 
 // String literals
 print("Strings:");
@@ -65,11 +65,11 @@ print(bool2);
 
 // Nil literal
 print("Nil:");
-var nilValue = nil;
+var nil_value = nil;
 
-assert(nilValue == nil, "Nil literal should be nil");
+assert(nil_value == nil, "Nil literal should be nil");
 
-print(nilValue);
+print(nil_value);
 
 fn test_same_scale() {
     var a: d2 = 10.25;

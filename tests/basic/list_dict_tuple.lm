@@ -6,12 +6,12 @@ assert(fruits[0] == "Apple", "First fruit should be Apple");
 assert(fruits[1] == "Banana", "Second fruit should be Banana");
 assert(fruits[2] == "Cherrys", "Third fruit should be Cherrys");
 
-var fruitCount = 0;
+var fruit_count = 0;
 iter (fruit in fruits) {
     print(fruit);
-    fruitCount += 1;
+    fruit_count += 1;
 }
-assert(fruitCount == 3, "Loop should iterate 3 times");
+assert(fruit_count == 3, "Loop should iterate 3 times");
 
 // Tuple access by index (tuples are not iterable; use index access instead)
 var fruites = ("Apples", "Bananas", "Cherries");
@@ -31,12 +31,12 @@ assert(my_dict["bi"] == 12, "Key 'bi' should map to 12");
 assert(my_dict["ce"] == 78, "Key 'ce' should map to 78");
 assert(my_dict["de"] == 28, "Key 'de' should map to 28");
 
-var dictCount = 0;
+var dict_count = 0;
 iter (key, value in my_dict) {
     print("{key}: {value}");
-    dictCount += 1;
+    dict_count += 1;
 }
-assert(dictCount == 4, "Dictionary loop should iterate 4 times");
+assert(dict_count == 4, "Dictionary loop should iterate 4 times");
 
 print("=== List, Dict, Tuple Tests Complete ===");
 

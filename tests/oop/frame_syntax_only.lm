@@ -35,7 +35,7 @@ frame Animal : Movable, Drawable {
 }
 
 frame BankAccount {
-    pub accountNumber: str;
+    pub account_number: str;
     prot balance: int;
 
     pub fn deposit(amount: int) {

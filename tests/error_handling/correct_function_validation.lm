@@ -9,12 +9,12 @@ fn divide(a: int, b: int): int?DivisionByZero {
 }
 
 // 2. Function that correctly propagates errors
-fn safeDivision(x: int, y: int): int?DivisionByZero {
+fn safe_division(x: int, y: int): int?DivisionByZero {
     return divide(x, y)?;
 }
 
 // 3. Function with multiple error types
-fn multipleErrors(x: int): int?ErrorA, ErrorB {
+fn multiple_errors(x: int): int?ErrorA, ErrorB {
     if (x < 0) {
         return err(ErrorA);
     }
@@ -25,14 +25,14 @@ fn multipleErrors(x: int): int?ErrorA, ErrorB {
 }
 
 // 4. Function that calls multiple fallible functions
-fn callMultiple(a: int, b: int): int?DivisionByZero, ErrorA, ErrorB {
+fn call_multiple(a: int, b: int): int?DivisionByZero, ErrorA, ErrorB {
     var result1 = divide(a, b)?;
-    var result2 = multipleErrors(result1)?;
+    var result2 = multiple_errors(result1)?;
     return result2;
 }
 
 // 5. Function with generic error type
-fn genericError(x: int): int? {
+fn generic_error(x: int): int? {
     if (x < 0) {
         return err(GenericError);
     }
@@ -41,4 +41,4 @@ fn genericError(x: int): int? {
 
 print("Testing correct function signature error type validation");
 print("All functions should compile without errors");
-print("Result: {safeDivision(10, 2)}");
+print("Result: {safe_division(10, 2)}");

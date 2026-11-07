@@ -13,12 +13,12 @@ type SuperAdminId = AdminId;
 var base: BaseId = 1000;
 var user: UserId = 2000;
 var admin: AdminId = 3000;
-var superAdmin: SuperAdminId = 4000;
+var super_admin: SuperAdminId = 4000;
 
 print("Base ID: {base}");
 print("User ID: {user}");
 print("Admin ID: {admin}");
-print("Super Admin ID: {superAdmin}");
+print("Super Admin ID: {super_admin}");
 
 // Test 2: Union type combinations
 print("\n--- Test 2: Union Type Combinations ---");
@@ -42,15 +42,15 @@ print("\n--- Test 3: Function Parameter Compatibility ---");
 type InputType = int | str;
 type OutputType = str;
 
-fn formatInput(input: InputType): OutputType {
+fn format_input(input: InputType): OutputType {
     return "Formatted: {input}";
 }
 
 var input1: InputType = 123;
 var input2: InputType = "hello";
 
-var output1: OutputType = formatInput(input1);
-var output2: OutputType = formatInput(input2);
+var output1: OutputType = format_input(input1);
+var output2: OutputType = format_input(input2);
 
 print("Format output 1: {output1}");
 print("Format output 2: {output2}");
@@ -70,13 +70,13 @@ print("Node 2: {node2}");
 print("\n--- Test 5: Type Inference with Unions ---");
 type FlexibleType = int | str | bool;
 
-fn inferType(value: FlexibleType): str {
+fn infer_type(value: FlexibleType): str {
     return "Type inferred for: {value}";
 }
 
-var infer1 = inferType(42);
-var infer2 = inferType("test");
-var infer3 = inferType(true);
+var infer1 = infer_type(42);
+var infer2 = infer_type("test");
+var infer3 = infer_type(true);
 
 print("Infer 1: {infer1}");
 print("Infer 2: {infer2}");
@@ -86,7 +86,7 @@ print("Infer 3: {infer3}");
 print("\n--- Test 6: Union Return Types ---");
 type ProcessResult = int | str | bool;
 
-fn processData(mode: int): ProcessResult {
+fn process_data(mode: int): ProcessResult {
     if (mode == 1) {
         return 42;
     } else if (mode == 2) {
@@ -96,9 +96,9 @@ fn processData(mode: int): ProcessResult {
     }
 }
 
-var proc1: ProcessResult = processData(1);
-var proc2: ProcessResult = processData(2);
-var proc3: ProcessResult = processData(3);
+var proc1: ProcessResult = process_data(1);
+var proc2: ProcessResult = process_data(2);
+var proc3: ProcessResult = process_data(3);
 
 print("Process 1: {proc1}");
 print("Process 2: {proc2}");
@@ -159,13 +159,13 @@ type IntToStringDict = {int: str};
 type StringToIntDict = {str: int};
 type StringToFloatDict = {str: float};
 
-var ageMap: {str: int} = {"Alice": 25, "Bob": 30, "Charlie": 35};
-var priceMap: {int: float} = {1: 9.99, 2: 19.99, 3: 29.99};
-var nameMap: {int: str} = {1: "First", 2: "Second", 3: "Third"};
+var age_map: {str: int} = {"Alice": 25, "Bob": 30, "Charlie": 35};
+var price_map: {int: float} = {1: 9.99, 2: 19.99, 3: 29.99};
+var name_map: {int: str} = {1: "First", 2: "Second", 3: "Third"};
 
-print("Age map: {ageMap}");
-print("Price map: {priceMap}");
-print("Name map: {nameMap}");
+print("Age map: {age_map}");
+print("Price map: {price_map}");
+print("Name map: {name_map}");
 
 // Test 11: Nested Collections
 print("\n--- Test 11: Nested Collections ---");
@@ -173,13 +173,13 @@ type ListOfIntLists = [[int]];
 type DictOfStringToIntList = {str: [int]};
 
 var matrix: [[int]] = [[1, 2], [3, 4], [5, 6]];
-var studentGrades: {str: [float]} = {
+var student_grades: {str: [float]} = {
     "Alice": [95.5, 87.2, 92.8],
     "Bob": [88.1, 91.5, 89.7]
 };
 
 print("Matrix: {matrix}");
-print("Student grades: {studentGrades}");
+print("Student grades: {student_grades}");
 
 // Test 12: Structural Types
 print("\n--- Test 12: Structural Types ---");

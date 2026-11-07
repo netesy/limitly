@@ -1,7 +1,7 @@
 // Test error type inference for functions using ? operator
 
 // Helper function that can fail
-fn mayFail(x: int): int?TestError {
+fn may_fail(x: int): int?TestError {
     if (x < 0) {
         return err(TestError);
     }
@@ -9,54 +9,54 @@ fn mayFail(x: int): int?TestError {
 }
 
 // 1. Function that should infer error types from ? usage
-fn shouldInferError(x: int): int?TestError {
-    return mayFail(x)?;
+fn should_infer_error(x: int): int?TestError {
+    return may_fail(x)?;
 }
 
 // 2. Function that uses ? but doesn't declare error types (should cause compile error)
-fn missingErrorDeclaration(x: int): int {
-    return mayFail(x)?; // Should cause error: function uses ? but doesn't declare error types
+fn missing_error_declaration(x: int): int {
+    return may_fail(x)?; // Should cause error: function uses ? but doesn't declare error types
 }
 
 // 3. Function that declares error types but body can't produce them (should cause error)
-fn declaredButNotProduced(x: int): int?UnusedError {
+fn declared_but_not_produced(x: int): int?UnusedError {
     return x * 2; // Should cause error: declares UnusedError but can't produce it
 }
 
 // 4. Function that produces error types not declared (should cause error)
-fn producedButNotDeclared(x: int): int?TestError {
+fn produced_but_not_declared(x: int): int?TestError {
     if (x == 0) {
         return err(AnotherError); // Should cause error: produces AnotherError but only declares TestError
     }
-    return mayFail(x)?;
+    return may_fail(x)?;
 }
 
 // 5. Function with correct error type inference and declaration
-fn correctErrorHandling(x: int): int?TestError {
+fn correct_error_handling(x: int): int?TestError {
     if (x < 0) {
         return err(TestError);
     }
-    return mayFail(x)?;
+    return may_fail(x)?;
 }
 
 // 6. Function that calls multiple fallible functions with different error types
-fn multipleErrorSources(x: int, y: str): int?TestError, ParseError {
+fn multiple_error_sources(x: int, y: str): int?TestError, ParseError {
     var parsed = parseInt(y)?; // Can produce ParseError
-    var result = mayFail(x)?;  // Can produce TestError
+    var result = may_fail(x)?;  // Can produce TestError
     return result + parsed;
 }
 
 print("Testing error type inference");
 
 // Test correct function
-var result1 = correctErrorHandling(5)?else err => {
+var result1 = correct_error_handling(5)?else err => {
     print("Error: {err}");
     return -1;
 };
 print("Result 1: {result1}");
 
 // Test multiple error sources
-var result2 = multipleErrorSources(3, "42")?else err => {
+var result2 = multiple_error_sources(3, "42")?else err => {
     print("Error: {err}");
     return -1;
 };

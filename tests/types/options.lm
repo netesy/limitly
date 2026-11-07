@@ -19,18 +19,18 @@ type MaybeString = str |nil;
 
 // Using a placeholder for nil (since nil isn't fully implemented)
 type nilType = str;
-var noneValue:nilType = "None";
+var none_value:nilType = "None";
 
-var maybeInt1: int = 42;
-var maybeString1: str = "hello";
+var maybe_int1: int = 42;
+var maybe_string1: str = "hello";
 
-print("Maybe int (value): {maybeInt1}");
-print("Maybe string (value): {maybeString1}");
-print("None representation: {noneValue}");
+print("Maybe int (value): {maybe_int1}");
+print("Maybe string (value): {maybe_string1}");
+print("None representation: {none_value}");
 
 // Test 3: Optional parameter simulation
 print("\n--- Test 3: Optional Parameter Simulation ---");
-fn greetOptional(name: str?) {
+fn greet_optional(name: str?) {
     if (name) {
         print("Hello, {name}!");
     } else {
@@ -38,14 +38,14 @@ fn greetOptional(name: str?) {
     }
 }
 
-greetOptional("Alice");
+greet_optional("Alice");
 // Note: null handling would require proper Option type implementation
 
 // Test 4: Option-like return types
 print("\n--- Test 4: Option-like Return Types ---");
 type FindResult = int | str;  // int for found index, str for "not found"
 
-fn findInArray(target: int): FindResult {
+fn find_in_array(target: int): FindResult {
     // Simulate array search
     if (target > 0) {
         return target;  // Return the "index"
@@ -54,17 +54,17 @@ fn findInArray(target: int): FindResult {
     }
 }
 
-var found: FindResult = findInArray(5);
-var notFound: FindResult = findInArray(-1);
+var found: FindResult = find_in_array(5);
+var not_found: FindResult = find_in_array(-1);
 
 print("Search result (found): {found}");
-print("Search result (not found): {notFound}");
+print("Search result (not found): {not_found}");
 
 // Test 5: Chained optional operations simulation
 print("\n--- Test 5: Chained Optional Operations ---");
 type ChainResult = str | int;
 
-fn processOptional(input: int): ChainResult {
+fn process_optional(input: int): ChainResult {
     if (input > 10) {
         return input * 2;
     } else {
@@ -72,14 +72,14 @@ fn processOptional(input: int): ChainResult {
     }
 }
 
-fn chainOptional(input: int): ChainResult {
-    var first: ChainResult = processOptional(input);
+fn chain_optional(input: int): ChainResult {
+    var first: ChainResult = process_optional(input);
     // In a full Option implementation, self would chain properly
     return first;
 }
 
-var chain1: ChainResult = chainOptional(15);
-var chain2: ChainResult = chainOptional(5);
+var chain1: ChainResult = chain_optional(15);
+var chain2: ChainResult = chain_optional(5);
 
 print("Chain result 1: {chain1}");
 print("Chain result 2: {chain2}");
@@ -88,7 +88,7 @@ print("Chain result 2: {chain2}");
 print("\n--- Test 6: Error Handling Compatibility ---");
 type SafeResult = int | str;  // int for success, str for error
 
-fn safeDivide(a: int, b: int): SafeResult {
+fn safe_divide(a: int, b: int): SafeResult {
     if (b != 0) {
         return a / b;
     } else {
@@ -96,8 +96,8 @@ fn safeDivide(a: int, b: int): SafeResult {
     }
 }
 
-var safe1: SafeResult = safeDivide(10, 2);
-var safe2: SafeResult = safeDivide(10, 0);
+var safe1: SafeResult = safe_divide(10, 2);
+var safe2: SafeResult = safe_divide(10, 0);
 
 print("Safe divide (success): {safe1}");
 print("Safe divide (error): {safe2}");

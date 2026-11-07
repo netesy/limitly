@@ -42,8 +42,8 @@ sm2.tag = "alias";
 assert(sm2.tag == "alias");
 
 // 3. Composes with a type-only constructor: the value argument folds inside out.
-staged fn nullable(T: type): type {
-    return T | nil;
+staged fn nullable(t: type): type {
+    return t | nil;
 }
 
 var maybe: nullable(pick(1, int, str)) = "text";

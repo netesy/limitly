@@ -7,21 +7,21 @@ fn divide(a: int, b: int): int?DivisionByZero {
     return ok(a / b);
 }
 
-fn processResult(result: int?DivisionByZero): str {
+fn process_result(result: int?DivisionByZero): str {
     match (result) {
         val x => "Success: {x}",
         err e => "Error: {e.message}"
     }
 }
 
-fn processResultSpecific(result: int?DivisionByZero): str {
+fn process_result_specific(result: int?DivisionByZero): str {
     match (result) {
         val x => "Success: {x}",
         DivisionByZero(msg) => "Division error: {msg}"
     }
 }
 
-fn processMultipleErrors(result: int?DivisionByZero, IndexOutOfBounds): str {
+fn process_multiple_errors(result: int?DivisionByZero, IndexOutOfBounds): str {
     match (result) {
         val x => "Success: {x}",
         DivisionByZero(msg) => "Division error: {msg}",
@@ -29,24 +29,24 @@ fn processMultipleErrors(result: int?DivisionByZero, IndexOutOfBounds): str {
     }
 }
 
-fn testGenericErrorPattern() {
+fn test_generic_error_pattern() {
     var result1 = divide(10, 2);
     var result2 = divide(10, 0);
 
-    print(processResult(result1)); // Should print: Success: 5
-    print(processResult(result2)); // Should print: Error: Cannot divide by zero
+    print(process_result(result1)); // Should print: Success: 5
+    print(process_result(result2)); // Should print: Error: Cannot divide by zero
 }
 
-fn testSpecificErrorPattern() {
+fn test_specific_error_pattern() {
     var result1 = divide(10, 2);
     var result2 = divide(10, 0);
 
-    print(processResultSpecific(result1)); // Should print: Success: 5
-    print(processResultSpecific(result2)); // Should print: Division error: Cannot divide by zero
+    print(process_result_specific(result1)); // Should print: Success: 5
+    print(process_result_specific(result2)); // Should print: Division error: Cannot divide by zero
 }
 
-fn testNestedErrorPatterns() {
-    fn processNested(outer: int?DivisionByZero): str {
+fn test_nested_error_patterns() {
+    fn process_nested(outer: int?DivisionByZero): str {
         match (outer) {
             val x => {
                 var inner = divide(x, 2);
@@ -62,12 +62,12 @@ fn testNestedErrorPatterns() {
     var result1 = divide(10, 2);
     var result2 = divide(10, 0);
 
-    print(processNested(result1)); // Should print: Nested success: 2
-    print(processNested(result2)); // Should print: Outer error: Cannot divide by zero
+    print(process_nested(result1)); // Should print: Nested success: 2
+    print(process_nested(result2)); // Should print: Outer error: Cannot divide by zero
 }
 
-fn testErrorPatternWithGuards() {
-    fn processWithGuard(result: int?DivisionByZero): str {
+fn test_error_pattern_with_guards() {
+    fn process_with_guard(result: int?DivisionByZero): str {
         match (result) {
             val x where x > 5 => "Large success: {x}",
             val x => "Small success: {x}",
@@ -79,13 +79,13 @@ fn testErrorPatternWithGuards() {
     var result2 = divide(6, 2);   // 3
     var result3 = divide(10, 0);  // Error
 
-    print(processWithGuard(result1)); // Should print: Large success: 10
-    print(processWithGuard(result2)); // Should print: Small success: 3
-    print(processWithGuard(result3)); // Should print: Error: Cannot divide by zero
+    print(process_with_guard(result1)); // Should print: Large success: 10
+    print(process_with_guard(result2)); // Should print: Small success: 3
+    print(process_with_guard(result3)); // Should print: Error: Cannot divide by zero
 }
 
 // Test exhaustive matching validation
-fn testExhaustiveMatching() {
+fn test_exhaustive_matching() {
     // This should compile fine - exhaustive
     fn exhaustive(result: int?DivisionByZero): str {
         match (result) {
@@ -117,11 +117,11 @@ fn testExhaustiveMatching() {
 fn main() {
     print("Testing error pattern matching...");
 
-    testGenericErrorPattern();
-    testSpecificErrorPattern();
-    testNestedErrorPatterns();
-    testErrorPatternWithGuards();
-    testExhaustiveMatching();
+    test_generic_error_pattern();
+    test_specific_error_pattern();
+    test_nested_error_patterns();
+    test_error_pattern_with_guards();
+    test_exhaustive_matching();
 
     print("Error pattern matching tests completed!");
 }

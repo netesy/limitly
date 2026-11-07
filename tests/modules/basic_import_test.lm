@@ -17,12 +17,12 @@ var result = basic.add(5, 3);
 print("5 + 3 = {result}");
 
 print("Test 1.5: Call function that returns module variable ");
-var moduleVarResult = basic.getModuleVar();
-print("Module variable via function: " + moduleVarResult);
+var module_var_result = basic.getModuleVar();
+print("Module variable via function: " + module_var_result);
 
 assert(basic.moduleVar == "Hello from basic module", "Module variable should be accessible");
 assert(basic.number == 42, "Module number should be accessible");
 assert(result == 8, "Module function should work: 5 + 3 = 8");
-assert(moduleVarResult == "Hello from basic module", "Module function should return correct variable");
+assert(module_var_result == "Hello from basic module", "Module function should return correct variable");
 
 print("=== Basic Import Test Complete ===");

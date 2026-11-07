@@ -48,13 +48,13 @@ assert(precedence == 16, "10 + 3 * 2 should equal 16 (multiplication first)");
 // Float arithmetic
 var x = 3.14;
 var y = 2.0;
-var floatSum = x + y;
-var floatDiv = x / y;
+var float_sum = x + y;
+var float_div = x / y;
 
-print("Float arithmetic: {x} + {y} = {floatSum}");
-print("Float division: {x} / {y} = {floatDiv}");
+print("Float arithmetic: {x} + {y} = {float_sum}");
+print("Float division: {x} / {y} = {float_div}");
 
-assert(floatSum > 5.13 and floatSum < 5.15, "3.14 + 2.0 should equal approximately 5.14");
-assert(floatDiv > 1.56 and floatDiv < 1.58, "3.14 / 2.0 should equal approximately 1.57");
+assert(float_sum > 5.13 and float_sum < 5.15, "3.14 + 2.0 should equal approximately 5.14");
+assert(float_div > 1.56 and float_div < 1.58, "3.14 / 2.0 should equal approximately 1.57");
 
 print("=== Arithmetic Expression Tests Complete ===");
