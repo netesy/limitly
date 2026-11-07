@@ -41,15 +41,15 @@ pub fn _open_lib(): int {
         }
 
         var candidates: [str] = [
-            "bin/liblymar_ssl.dll",
-            "bin/liblymar_ssl.so",
-            "bin/liblymar_ssl.dylib",
-            "./bin/liblymar_ssl.dll",
-            "./bin/liblymar_ssl.so",
-            "./bin/liblymar_ssl.dylib",
-            "liblymar_ssl.dll",
-            "liblymar_ssl.so",
-            "liblymar_ssl.dylib"
+        "bin/liblymar_ssl.dll",
+        "bin/liblymar_ssl.so",
+        "bin/liblymar_ssl.dylib",
+        "./bin/liblymar_ssl.dll",
+        "./bin/liblymar_ssl.so",
+        "./bin/liblymar_ssl.dylib",
+        "liblymar_ssl.dll",
+        "liblymar_ssl.so",
+        "liblymar_ssl.dylib"
         ];
 
         iter (c in candidates) {

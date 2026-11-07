@@ -77,7 +77,7 @@ assert(not char_eq("abc", "abd"), "char_eq multi char");
 
 // Test basename logic
 // "/usr/local/bin" -> "bin"
-// "/file.txt" -> "file.txt"  
+// "/file.txt" -> "file.txt"
 // "/" -> "/"
 // "" -> ""
 fn test_basename_hello(): str {

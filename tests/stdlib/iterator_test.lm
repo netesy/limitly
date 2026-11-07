@@ -12,7 +12,7 @@ fn main(): int {
     var filtered = iterator.filter(iterator.iterator([1, 2, 3]), even);
     if (filtered.next() != 2) { return 3; }
     var chunks = iterator.chunk(iterator.iterator([1, 2, 3]), 2);
-    var first = chunks.next();
+    var _first = chunks.next();
     var cycled = iterator.cycle([5]);
     if (cycled.next() != 5) { return 4; }
     return 0;

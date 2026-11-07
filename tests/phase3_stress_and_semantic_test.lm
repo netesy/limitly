@@ -1,5 +1,4 @@
 // Phase 3 Stress Testing and Shared Semantic Validation
-import std.gg as gg;
 import std.app as app;
 import std.ui as ui;
 import std.ui.context as ui_context;

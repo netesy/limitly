@@ -3,14 +3,14 @@ import std.io as io;
 fn main(): int {
     // Basic print test
     io.print("Testing IO print...");
-    
+
     // File exists test
     var exists = io.exists("Makefile");
     assert(exists, "io.exists fail for Makefile");
-    
+
     var non_existent = io.exists("non_existent_file_xyz.txt");
     assert(!non_existent, "io.exists fail for non-existent file");
-    
+
     // File open/read/write/close test
     var f_res = io.open("test_io_temp.txt", "w");
     match (f_res) {
@@ -24,7 +24,7 @@ fn main(): int {
             nil;
         }
     }
-    
+
     var f_read_res = io.open("test_io_temp.txt", "r");
     match (f_read_res) {
         val f => {
@@ -47,10 +47,10 @@ fn main(): int {
             nil;
         }
     }
-    
+
     io.delete("test_io_temp.txt");
     assert(!io.exists("test_io_temp.txt"), "File should be deleted");
-    
+
     print("IO tests passed!");
     return 0;
 }

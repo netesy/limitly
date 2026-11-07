@@ -279,89 +279,89 @@ frame SceneManager: gtraits.Updatable {
             if (t > 1.0) t = 1.0;
 
             if (self.transition_mode == 1) { // FadeOut
-                self.transition_alpha = t;
-                if (t >= 1.0) {
-                    // Switch scenes at full black
-                    self._perform_switch(self.pending_scene_name);
-                    self.transition_mode = 2; // FadeIn
-                    self.transition_timer = 0.0;
-                }
-            } elif (self.transition_mode == 2) { // FadeIn
-                self.transition_alpha = 1.0 - t;
-                if (t >= 1.0) {
-                    self.is_transitioning = false;
-                    self.transition_mode = TRANSITION_NONE;
-                    self.transition_alpha = 0.0;
-                    self.pending_scene_name = "";
-                }
+            self.transition_alpha = t;
+            if (t >= 1.0) {
+                // Switch scenes at full black
+                self._perform_switch(self.pending_scene_name);
+                self.transition_mode = 2; // FadeIn
+                self.transition_timer = 0.0;
+            }
+        } elif (self.transition_mode == 2) { // FadeIn
+        self.transition_alpha = 1.0 - t;
+        if (t >= 1.0) {
+            self.is_transitioning = false;
+            self.transition_mode = TRANSITION_NONE;
+            self.transition_alpha = 0.0;
+            self.pending_scene_name = "";
+        }
+    }
+}
+
+// Update active scene
+var cur = self.current();
+if (cur != nil) {
+    var cur_s = cur as Scene;
+    cur_s.update(dt);
+}
+}
+
+pub fn fixed_update(dt: float): nil {
+    var cur = self.current();
+    if (cur != nil) {
+        var cur_s = cur as Scene;
+        cur_s.fixed_update(dt);
+    }
+}
+
+pub fn draw(): nil {
+    // Draw visible scenes in stack order (bottom to top)
+    var i = 0;
+    while (i < len(self.stack)) {
+        var sc = self.stack[i];
+        if (sc.is_visible) {
+            sc.draw();
+        }
+        i = i + 1;
+    }
+
+    // Draw transition overlay if active
+    if (self.is_transitioning and self.transition_alpha > 0.0) {
+        // Draw fullscreen quad overlay
+        gg.draw_rect_primitive(
+            0.0, 0.0, 100000.0, 100000.0,
+            self.transition_color.r,
+            self.transition_color.g,
+            self.transition_color.b,
+            self.transition_alpha
+        );
+    }
+}
+
+pub fn draw_gui(gui: any): nil {
+    var i = 0;
+    while (i < len(self.stack)) {
+        var sc = self.stack[i];
+        if (sc.is_visible) {
+            sc.draw_gui(gui);
+        }
+        i = i + 1;
+    }
+}
+
+pub fn on_event(event_type: int, p1: any, p2: any): bool {
+    // Events route from top of stack down until handled
+    var i = len(self.stack) - 1;
+    while (i >= 0) {
+        var sc = self.stack[i];
+        if (sc.is_active and not sc.is_paused) {
+            if (sc.on_event(event_type, p1, p2)) {
+                return true;
             }
         }
-
-        // Update active scene
-        var cur = self.current();
-        if (cur != nil) {
-            var cur_s = cur as Scene;
-            cur_s.update(dt);
-        }
+        i = i - 1;
     }
-
-    pub fn fixed_update(dt: float): nil {
-        var cur = self.current();
-        if (cur != nil) {
-            var cur_s = cur as Scene;
-            cur_s.fixed_update(dt);
-        }
-    }
-
-    pub fn draw(): nil {
-        // Draw visible scenes in stack order (bottom to top)
-        var i = 0;
-        while (i < len(self.stack)) {
-            var sc = self.stack[i];
-            if (sc.is_visible) {
-                sc.draw();
-            }
-            i = i + 1;
-        }
-
-        // Draw transition overlay if active
-        if (self.is_transitioning and self.transition_alpha > 0.0) {
-            // Draw fullscreen quad overlay
-            gg.draw_rect_primitive(
-                0.0, 0.0, 100000.0, 100000.0,
-                self.transition_color.r,
-                self.transition_color.g,
-                self.transition_color.b,
-                self.transition_alpha
-            );
-        }
-    }
-
-    pub fn draw_gui(gui: any): nil {
-        var i = 0;
-        while (i < len(self.stack)) {
-            var sc = self.stack[i];
-            if (sc.is_visible) {
-                sc.draw_gui(gui);
-            }
-            i = i + 1;
-        }
-    }
-
-    pub fn on_event(event_type: int, p1: any, p2: any): bool {
-        // Events route from top of stack down until handled
-        var i = len(self.stack) - 1;
-        while (i >= 0) {
-            var sc = self.stack[i];
-            if (sc.is_active and not sc.is_paused) {
-                if (sc.on_event(event_type, p1, p2)) {
-                    return true;
-                }
-            }
-            i = i - 1;
-        }
-        return false;
-    }
+    return false;
+}
 }
 
 pub fn SceneManager(): SceneManager {

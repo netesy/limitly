@@ -7,46 +7,46 @@ import std.color as color;
 
 fn build_view(): ui.Widget {
     val header = ui.row([
-        ui.text("VISUALIZATIONS & ANALYTICS TEST").font_size(16.0).bold().color(color.rgb(255, 255, 255)),
-        ui.badge("TAB 4 / 4").background(color.rgb(99, 102, 241)),
-        ui.spacer(1.0),
-        ui.indicator("online", "Metrics Pipeline Active")
+    ui.text("VISUALIZATIONS & ANALYTICS TEST").font_size(16.0).bold().color(color.rgb(255, 255, 255)),
+    ui.badge("TAB 4 / 4").background(color.rgb(99, 102, 241)),
+    ui.spacer(1.0),
+    ui.indicator("online", "Metrics Pipeline Active")
     ]).spacing(12.0).height(28.0);
 
     val bar = ui.bar_chart("HTTP Requests / Day (k)", [42.0, 58.0, 75.0, 68.0, 92.0, 84.0, 110.0], ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"])
-        .width(420.0)
-        .height(180.0);
+    .width(420.0)
+    .height(180.0);
 
     val line = ui.line_chart("P99 Response Latency (ms)", [18.0, 16.0, 22.0, 34.0, 26.0, 20.0, 17.0, 15.0])
-        .width(420.0)
-        .height(180.0);
+    .width(420.0)
+    .height(180.0);
 
     val pie = ui.pie_chart("Resource Allocation Breakdown", [65.0, 25.0, 10.0])
-        .width(420.0)
-        .height(170.0);
+    .width(420.0)
+    .height(170.0);
 
     val histo = ui.plot_histogram("Latency Distribution Histogram", [0.15, 0.35, 0.70, 0.95, 0.85, 0.50, 0.25, 0.10])
-        .width(420.0)
-        .height(170.0);
+    .width(420.0)
+    .height(170.0);
 
     val top_charts = ui.row([bar, line]).spacing(16.0);
     val bottom_charts = ui.row([pie, histo]).spacing(16.0);
 
     val summary_card = ui.card("System Performance Metrics Overview", ui.column([
-        ui.text("All telemetry signals are operating within healthy SLA bounds (99.98% availability across regions).").font_size(12.0).color(color.rgb(200, 205, 220)),
-        ui.row([
-            ui.indicator("online", "Telemetry Collector (US-East)"),
-            ui.indicator("online", "Time-Series Database"),
-            ui.indicator("online", "Alerting Gateway"),
-            ui.indicator("online", "Grafana Bridge")
-        ]).spacing(20.0)
+    ui.text("All telemetry signals are operating within healthy SLA bounds (99.98% availability across regions).").font_size(12.0).color(color.rgb(200, 205, 220)),
+    ui.row([
+    ui.indicator("online", "Telemetry Collector (US-East)"),
+    ui.indicator("online", "Time-Series Database"),
+    ui.indicator("online", "Alerting Gateway"),
+    ui.indicator("online", "Grafana Bridge")
+    ]).spacing(20.0)
     ]).spacing(8.0)).width(856.0);
 
     return ui.column([
-        header,
-        top_charts,
-        bottom_charts,
-        summary_card
+    header,
+    top_charts,
+    bottom_charts,
+    summary_card
     ]).spacing(14.0).padding(14.0);
 }
 

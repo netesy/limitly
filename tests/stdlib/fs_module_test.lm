@@ -9,25 +9,25 @@ fn test_fs_operations(): int {
     var p = path.Path("test_fs_temp_dir") as path.Path;
 
     fs_obj.create_dir(p);
-    assert(fs_obj.exists(p) == true, "exists true failed");
+    assert(fs_obj.exists(p), "exists true failed");
 
     var p_new = path.Path("test_fs_temp_dir_renamed") as path.Path;
     fs_obj.rename(p, p_new);
-    assert(fs_obj.exists(p) == false, "rename old exists failed");
-    assert(fs_obj.exists(p_new) == true, "rename new exists failed");
+    assert(not fs_obj.exists(p), "rename old exists failed");
+    assert(fs_obj.exists(p_new), "rename new exists failed");
 
     fs_obj.remove(p_new);
-    assert(fs_obj.exists(p_new) == false, "remove failed");
+    assert(not fs_obj.exists(p_new), "remove failed");
     return 1;
 }
 
 fn test_permissions(): int {
     print("Testing Permissions...");
     var perm = fs.Permissions(true) as fs.Permissions;
-    assert(perm.is_readonly() == true, "is_readonly true failed");
+    assert(perm.is_readonly(), "is_readonly true failed");
 
     var perm2 = fs.Permissions(false) as fs.Permissions;
-    assert(perm2.is_readonly() == false, "is_readonly false failed");
+    assert(not perm2.is_readonly(), "is_readonly false failed");
     return 1;
 }
 

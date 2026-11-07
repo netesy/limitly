@@ -184,23 +184,23 @@ pub fn connect(host: str, port: int, config: TLSConfig = nil): TLSSocket? {
                 var raw_sock = ffi.foreign_call(
                     fn_conn,
                     [
-                        ffi.cstring_as_ptr(cs_host), port,
-                        ffi.cstring_as_ptr(cs_sni),
-                        verify_int,
-                        ffi.cstring_as_ptr(cs_ca),
-                        ffi.cstring_as_ptr(cs_cert),
-                        ffi.cstring_as_ptr(cs_key),
-                        cfg.timeout_ms
+                    ffi.cstring_as_ptr(cs_host), port,
+                    ffi.cstring_as_ptr(cs_sni),
+                    verify_int,
+                    ffi.cstring_as_ptr(cs_ca),
+                    ffi.cstring_as_ptr(cs_cert),
+                    ffi.cstring_as_ptr(cs_key),
+                    cfg.timeout_ms
                     ],
                     ffi.TYPE_PTR,
                     [
-                        ffi.TYPE_PTR, ffi.TYPE_I32,
-                        ffi.TYPE_PTR,
-                        ffi.TYPE_I32,
-                        ffi.TYPE_PTR,
-                        ffi.TYPE_PTR,
-                        ffi.TYPE_PTR,
-                        ffi.TYPE_I32
+                    ffi.TYPE_PTR, ffi.TYPE_I32,
+                    ffi.TYPE_PTR,
+                    ffi.TYPE_I32,
+                    ffi.TYPE_PTR,
+                    ffi.TYPE_PTR,
+                    ffi.TYPE_PTR,
+                    ffi.TYPE_I32
                     ]
                 );
 

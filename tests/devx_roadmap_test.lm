@@ -12,7 +12,7 @@ fn test_string_builder(): nil {
     b.append_line(" World");
     b.append_char(33); // '!'
 
-    var result = b.to_string();
+    var _result = b.to_string();
     assert(b.length() > 0, "length positive");
     print("StringBuilder test passed.\n");
     b.clear();
@@ -75,8 +75,8 @@ fn test_deque_and_sorted_map(): nil {
 
     assert((sm.get(10) as str) == "Ten", "sm.get(10) Ten");
     assert((sm.get(5) as str) == "Five", "sm.get(5) Five");
-    assert(sm.contains(20) == true, "sm.contains(20) true");
-    assert(sm.contains(99) == false, "sm.contains(99) false");
+    assert(sm.contains(20), "sm.contains(20) true");
+    assert(not sm.contains(99), "sm.contains(99) false");
     print("SortedMap test passed.\n");
 }
 

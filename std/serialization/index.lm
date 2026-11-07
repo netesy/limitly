@@ -53,7 +53,7 @@ pub fn json_decode(value: str): str?Error {
         return err(Error(code="DecodeError", message="not a JSON string: too short"));
     }
     if (_builtin_substring(value, 0, 1) != "\""
-        or _builtin_substring(value, length - 1, length) != "\"") {
+    or _builtin_substring(value, length - 1, length) != "\"") {
         return err(Error(code="DecodeError", message="not a JSON string: missing quotes"));
     }
 

@@ -210,8 +210,8 @@ frame Router {
         self.current_route = -1;
         self.not_found_fn  = fn(p: RouterParams): ui.Widget {
             return ui.column([
-                ui.text("404 — Page Not Found").font_size(24.0),
-                ui.text("The requested path was not found.").opacity(0.6)
+            ui.text("404 — Page Not Found").font_size(24.0),
+            ui.text("The requested path was not found.").opacity(0.6)
             ]).padding(40.0);
         };
         self.middlewares = [];

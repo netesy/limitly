@@ -5,7 +5,7 @@ fn main() {
         print("Failed to create file resource");
         return;
     }
-    
+
     // 0 = OP_OPEN
     resource_call(f, 0, ["test.txt", "w"]);
     // 3 = OP_WRITE

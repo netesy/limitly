@@ -145,8 +145,8 @@ fn main(): int {
     var map_iter_str = "Map" + "Iterator";
     var filter_iter_str = "Filter" + "Iterator";
 
-    assert(_builtin_string_contains(content, map_iter_str) == false, "Unexpected map iterator allocation");
-    assert(_builtin_string_contains(content, filter_iter_str) == false, "Unexpected filter iterator allocation");
+    assert(not _builtin_string_contains(content, map_iter_str), "Unexpected map iterator allocation");
+    assert(not _builtin_string_contains(content, filter_iter_str), "Unexpected filter iterator allocation");
 
     print("Stream Fusion Test Passed.");
     return 0;

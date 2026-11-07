@@ -57,8 +57,8 @@ print("Booleans:");
 var bool1 = true;
 var bool2 = false;
 
-assert(bool1 == true, "Boolean literal true should be true");
-assert(bool2 == false, "Boolean literal false should be false");
+assert(bool1, "Boolean literal true should be true");
+assert(not bool2, "Boolean literal false should be false");
 
 print(bool1);
 print(bool2);
@@ -82,7 +82,7 @@ fn test_same_scale() {
     var f = d + e;
     assert(f == 2.0000, "d4 + d4 should be 2.0000");
 
-    var g = a * b; 
+    var _g = a * b;
 }
 
 fn test_mixed_scale() {
@@ -126,9 +126,9 @@ fn test_arithmetic() {
 }
 
 
-    print("Running decimal tests...");
-    test_same_scale();
-    test_mixed_scale();
-    test_comparison();
-    test_arithmetic();
-    print("Decimal tests passed!");
+print("Running decimal tests...");
+test_same_scale();
+test_mixed_scale();
+test_comparison();
+test_arithmetic();
+print("Decimal tests passed!");

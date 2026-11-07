@@ -19,38 +19,38 @@
 /// @example
 /// var payload = "Hello, high performance Lymar compression!";
 /// var compressed = compress_hex(payload, 6)? else {
-///     print("Compression failed");
-///     return;
-/// };
-/// print("Compressed hex: {compressed}");
-pub fn compress_hex(data: str, level: int = 6): str? {
-    if (len(data) == 0) {
-        return ok("");
-    }
-    return ok("789c...");
-}
-
-/// Dynamic buffer decompressor frame.
-///
-/// > [!TIP]
-/// > Prefer reusing a single instance across batch worker tasks to minimize JIT setup.
-///
-/// > [!WARNING]
-/// > Decompressing corrupted payloads will return a fallible err(ZlibError).
-frame Decompressor {
-    /// Maximum allowed uncompressed byte size (default 10MB).
-    pub max_bytes: int;
-
-    /// Initializes a decompressor with a safe buffer memory ceiling.
-    pub init(limit: int = 10485760) {
-        self.max_bytes = limit;
+    ///     print("Compression failed");
+    ///     return;
+    /// };
+    /// print("Compressed hex: {compressed}");
+    pub fn compress_hex(data: str, level: int = 6): str? {
+        if (len(data) == 0) {
+            return ok("");
+        }
+        return ok("789c...");
     }
 
-    /// Decompresses a hex-encoded deflate payload into plain text.
+    /// Dynamic buffer decompressor frame.
     ///
-    /// @param hex_data The hex-encoded deflate string.
-    /// @return The uncompressed string payload.
-    pub fn decompress(hex_data: str): str? {
-        return ok("uncompressed");
+    /// > [!TIP]
+    /// > Prefer reusing a single instance across batch worker tasks to minimize JIT setup.
+    ///
+    /// > [!WARNING]
+    /// > Decompressing corrupted payloads will return a fallible err(ZlibError).
+    frame Decompressor {
+        /// Maximum allowed uncompressed byte size (default 10MB).
+        pub max_bytes: int;
+
+        /// Initializes a decompressor with a safe buffer memory ceiling.
+        pub init(limit: int = 10485760) {
+            self.max_bytes = limit;
+        }
+
+        /// Decompresses a hex-encoded deflate payload into plain text.
+        ///
+        /// @param hex_data The hex-encoded deflate string.
+        /// @return The uncompressed string payload.
+        pub fn decompress(hex_data: str): str? {
+            return ok("uncompressed");
+        }
     }
-}

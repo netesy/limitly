@@ -15,7 +15,7 @@ frame Calculator {
 frame Point {
     pub x: int;
     pub y: int;
-    
+
     init(px: int, py: int) {
         x = px;
         y = py;
@@ -24,7 +24,7 @@ frame Point {
 
 frame Resource {
     pub id: int;
-    
+
     deinit() {
         print("Cleanup");
     }
@@ -37,7 +37,7 @@ frame Animal : Movable, Drawable {
 frame BankAccount {
     pub accountNumber: str;
     prot balance: int;
-    
+
     pub fn deposit(amount: int) {
         balance = balance + amount;
     }

@@ -27,7 +27,15 @@ public:
         std::vector<std::string> target_paths;
     };
 
+    struct FixOptions {
+        bool dry_run = false;
+        bool verbose = false;
+        bool no_color = false;
+        std::vector<std::string> target_paths;
+    };
+
     static int run(int argc, char** argv);
+    static int runFix(int argc, char** argv);
     static std::vector<LintDiagnostic> lintFile(const std::string& filepath, const Options& opts);
     static std::vector<LintDiagnostic> lintSource(const std::string& filename, const std::string& source, const Options& opts);
 };

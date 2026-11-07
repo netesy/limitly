@@ -6,7 +6,7 @@ fn main(): int {
     print("E: {math.E}");
     print("TAU: {math.TAU}");
     print("PHI: {math.PHI}");
-    
+
     print("\n=== Testing Basic Operations ===");
     var abs_val = math.abs(-5.5);
     print("abs(-5.5): {abs_val}");
@@ -20,7 +20,7 @@ fn main(): int {
     print("sign(-10.0): {sign_val}");
     var lerp_val = math.lerp(0.0, 10.0, 0.5);
     print("lerp(0.0, 10.0, 0.5): {lerp_val}");
-    
+
     print("\n=== Testing Rounding ===");
     var floor_val = math.floor(3.7);
     print("floor(3.7): {floor_val}");
@@ -32,7 +32,7 @@ fn main(): int {
     print("trunc(3.9): {trunc_val}");
     var fract_val = math.fract(3.75);
     print("fract(3.75): {fract_val}");
-    
+
     print("\n=== Testing Powers and Logs ===");
     var sqrt_val = math.sqrt(16.0);
     print("sqrt(16.0): {sqrt_val}");
@@ -44,7 +44,7 @@ fn main(): int {
     print("exp(1.0): {exp_val}");
     var log_val = math.log(math.E);
     print("log(math.E): {log_val}");
-    
+
     print("\n=== Testing Trigonometry ===");
     var sin_val = math.sin(0.0);
     print("sin(0.0): {sin_val}");
@@ -52,7 +52,7 @@ fn main(): int {
     print("cos(0.0): {cos_val}");
     var tan_val = math.tan(0.0);
     print("tan(0.0): {tan_val}");
-    
+
     print("\n=== Testing Integer Utilities ===");
     var gcd_val = math.gcd(48, 18);
     print("gcd(48, 18): {gcd_val}");
@@ -62,7 +62,7 @@ fn main(): int {
     print("factorial(5): {fact_val}");
     var comb_val = math.combinations(5, 2);
     print("combinations(5, 2): {comb_val}");
-    
+
     print("\n=== Testing Floating-point Helpers ===");
     var is_nan_val = math.is_nan(math.NAN);
     print("is_nan(math.NAN): {is_nan_val}");

@@ -139,9 +139,9 @@ frame Rect {
 
     pub fn intersects(other: Rect): bool {
         return not (self.x + self.w < other.x or
-                    other.x + other.w < self.x or
-                    self.y + self.h < other.y or
-                    other.y + other.h < self.y);
+        other.x + other.w < self.x or
+        self.y + self.h < other.y or
+        other.y + other.h < self.y);
     }
 
     pub fn intersection(other: Rect): Rect {

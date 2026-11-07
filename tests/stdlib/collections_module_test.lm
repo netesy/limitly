@@ -118,13 +118,13 @@ fn test_sets(): int {
     print("Testing Sets...");
     var hs_val = collections.HashSet() as hashset_col.HashSet;
     hs_val.add("item1");
-    assert(hs_val.contains("item1") == true, "HashSet contains incorrect");
+    assert(hs_val.contains("item1"), "HashSet contains incorrect");
     hs_val.remove("item1");
-    assert(hs_val.contains("item1") == false, "HashSet contains after remove incorrect");
+    assert(not hs_val.contains("item1"), "HashSet contains after remove incorrect");
 
     var bs_val = collections.BTreeSet() as btreeset_col.BTreeSetWrapper;
     bs_val.add("bitem");
-    assert(bs_val.contains("bitem") == true, "BTreeSet contains incorrect");
+    assert(bs_val.contains("bitem"), "BTreeSet contains incorrect");
     return 1;
 }
 
@@ -168,14 +168,14 @@ fn test_bitset(): int {
     assert(bs_val.get_size() == 128, "BitSet size should be 128");
 
     bs_val.set(10);
-    assert(bs_val.get(10) == true, "BitSet get(10) incorrect");
-    assert(bs_val.get(11) == false, "BitSet get(11) incorrect");
+    assert(bs_val.get(10), "BitSet get(10) incorrect");
+    assert(not bs_val.get(11), "BitSet get(11) incorrect");
 
     bs_val.unset(10);
-    assert(bs_val.get(10) == false, "BitSet get(10) after unset incorrect");
+    assert(not bs_val.get(10), "BitSet get(10) after unset incorrect");
 
     bs_val.toggle(15);
-    assert(bs_val.get(15) == true, "BitSet get(15) after toggle incorrect");
+    assert(bs_val.get(15), "BitSet get(15) after toggle incorrect");
     return 1;
 }
 
@@ -185,9 +185,9 @@ fn test_bloom_filter(): int {
     bf_val.add("hello");
     bf_val.add("world");
 
-    assert(bf_val.contains("hello") == true, "BloomFilter should contain 'hello'");
-    assert(bf_val.contains("world") == true, "BloomFilter should contain 'world'");
-    assert(bf_val.contains("not_added") == false, "BloomFilter should not contain 'not_added'");
+    assert(bf_val.contains("hello"), "BloomFilter should contain 'hello'");
+    assert(bf_val.contains("world"), "BloomFilter should contain 'world'");
+    assert(not bf_val.contains("not_added"), "BloomFilter should not contain 'not_added'");
     return 1;
 }
 

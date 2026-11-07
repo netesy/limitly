@@ -8,7 +8,7 @@ parallel(cores=Auto, timeout=2s, grace=10ms, on_error=Partial) {
 
 var output = channel();
 concurrent(ch=output, mode=batch, cores=2, timeout=500ms,
-           grace=20ms, on_error=Continue, on_timeout=Partial) {
+grace=20ms, on_error=Continue, on_timeout=Partial) {
     task(i in 1..2) {
         output.send(i);
     }

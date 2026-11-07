@@ -165,7 +165,7 @@ pub fn app_init(config: WindowConfig): int {
     if (global_app_state.is_initialized != 0) {
         return 0;
     }
-    
+
     gg.setup();
     global_app_state.window_config = config;
     global_app_state.width = config.width;
@@ -173,7 +173,7 @@ pub fn app_init(config: WindowConfig): int {
     global_app_state.framebuffer_width = config.width;
     global_app_state.framebuffer_height = config.height;
     global_app_state.window_id = 1;
-    
+
     global_app_state.is_initialized = 1;
     global_app_state.is_running = 0;
     global_app_state.frame_count = 0;
@@ -183,7 +183,7 @@ pub fn app_init(config: WindowConfig): int {
     global_app_state.event_queue_head = 0;
     ui_context.ui_init();
     ui_context.set_viewport_size(config.width as float, config.height as float);
-    
+
     return 1;
 }
 
@@ -202,11 +202,11 @@ pub fn app_shutdown(): nil {
     if (global_app_state.is_initialized == 0) {
         return;
     }
-    
+
     if (global_app_state.is_running != 0) {
         global_app_state.is_running = 0;
     }
-    
+
     global_app_state.event_queue = [] as [Event];
     global_app_state.is_initialized = 0;
     global_app_state.window_id = 0;
@@ -245,14 +245,14 @@ pub fn app_run(): nil {
     if (global_app_state.is_initialized == 0) {
         return;
     }
-    
+
     if (global_app_state.is_running != 0) {
         return;
     }
-    
+
     show_window();
     global_app_state.is_running = 1;
-    
+
     // Main event loop
     while (global_app_state.is_running != 0) {
         run_frame_step();
@@ -303,32 +303,32 @@ pub fn process_events(): nil {
         var ev = q[q_idx];
         match (ev.event_type) {
             EventType.Quit => {
-            global_app_state.is_running = 0;
+                global_app_state.is_running = 0;
             },
             EventType.Resize => {
-            global_app_state.width = ev.x;
-            global_app_state.height = ev.y;
-            global_app_state.framebuffer_width = ev.x;
-            global_app_state.framebuffer_height = ev.y;
-            ui_context.set_viewport_size(ev.x as float, ev.y as float);
+                global_app_state.width = ev.x;
+                global_app_state.height = ev.y;
+                global_app_state.framebuffer_width = ev.x;
+                global_app_state.framebuffer_height = ev.y;
+                ui_context.set_viewport_size(ev.x as float, ev.y as float);
             },
             EventType.MouseDown => {
-            ui_context.dispatch_pointer_down(ev.x as float, ev.y as float);
+                ui_context.dispatch_pointer_down(ev.x as float, ev.y as float);
             },
             EventType.MouseUp => {
-            ui_context.dispatch_pointer_up(ev.x as float, ev.y as float);
+                ui_context.dispatch_pointer_up(ev.x as float, ev.y as float);
             },
             EventType.MouseMove => {
-            ui_context.dispatch_pointer_move(ev.x as float, ev.y as float);
+                ui_context.dispatch_pointer_move(ev.x as float, ev.y as float);
             },
             EventType.KeyDown => {
-            ui_context.dispatch_key_down(ev.key_code);
+                ui_context.dispatch_key_down(ev.key_code);
             },
             EventType.Char => {
-            ui_context.dispatch_char_input(ev.key_code);
+                ui_context.dispatch_char_input(ev.key_code);
             },
             EventType.MouseWheel => {
-            ui_context.dispatch_mouse_wheel(ev.y as float);
+                ui_context.dispatch_mouse_wheel(ev.y as float);
             },
             _ => {}
         }

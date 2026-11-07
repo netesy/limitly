@@ -3,7 +3,7 @@
 
 frame Foo {
     pub value: int = 0;
-    
+
     pub fn inc() {
         self.value = self.value + 1;
     }

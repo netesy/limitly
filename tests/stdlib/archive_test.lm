@@ -1,6 +1,5 @@
 // Archive test
 import std.archive as archive;
-import std.io as io;
 
 print("=== Archive Tests ===");
 

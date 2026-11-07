@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>formatter.lm - Lymar API Reference</title>
+<style>
+:root {
+  --bg-primary: #0a0e17;
+  --bg-secondary: #111827;
+  --bg-tertiary: #1f2937;
+  --accent: #38bdf8;
+  --accent-hover: #7dd3fc;
+  --text-main: #f1f5f9;
+  --text-muted: #94a3b8;
+  --border-color: #334155;
+}
+* { box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif;
+  margin: 0; padding: 0; background: var(--bg-primary); color: var(--text-main); display: flex;
+}
+nav {
+  width: 300px; height: 100vh; overflow-y: auto; background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color); padding: 24px 20px; position: fixed;
+}
+nav h2 { font-size: 1.15rem; color: var(--accent); margin-top: 0; margin-bottom: 16px; font-weight: 700; }
+#search-input {
+  width: 100%; padding: 8px 12px; background: var(--bg-tertiary); border: 1px solid var(--border-color);
+  border-radius: 6px; color: #fff; font-size: 0.85rem; margin-bottom: 16px;
+}
+#search-input:focus { outline: none; border-color: var(--accent); }
+.nav-link { display: block; color: var(--text-muted); text-decoration: none; padding: 6px 8px; font-size: 0.9rem; border-radius: 4px; }
+.nav-link:hover { color: #fff; background: var(--bg-tertiary); }
+main { margin-left: 300px; padding: 40px 48px; max-width: 950px; flex: 1; }
+h1 { color: #fff; font-size: 2.2rem; margin-top: 0; padding-bottom: 16px; border-bottom: 1px solid var(--border-color); }
+h2 { color: var(--accent); font-size: 1.4rem; margin-top: 36px; margin-bottom: 14px; }
+h3 { color: #fff; font-size: 1.25rem; margin-top: 28px; margin-bottom: 12px; display: flex; align-items: center; gap: 10px; }
+h4 { color: var(--accent); font-size: 1rem; margin-top: 20px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+.badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
+.badge-pub { background: #064e3b; color: #6ee7b7; border: 1px solid #059669; }
+.badge-private { background: #334155; color: #cbd5e1; }
+.badge-type { background: #1e1b4b; color: #c7d2fe; border: 1px solid #4338ca; }
+.code-sig { background: #090d16; border: 1px solid var(--border-color); padding: 14px 18px; border-radius: 8px; overflow-x: auto; font-family: 'Consolas', 'Fira Code', monospace; font-size: 0.95rem; color: #e2e8f0; }
+.summary { color: #cbd5e1; line-height: 1.65; margin: 14px 0; font-size: 1rem; }
+/* Callout styling */
+.callout { margin: 16px 0; padding: 14px 18px; border-radius: 8px; border-left: 4px solid; font-size: 0.92rem; }
+.callout-header { font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+.callout-tip { border-color: #10b981; background: rgba(16, 185, 129, 0.08); color: #d1fae5; }
+.callout-tip .callout-header { color: #34d399; }
+.callout-warning { border-color: #f59e0b; background: rgba(245, 158, 11, 0.08); color: #fef3c7; }
+.callout-warning .callout-header { color: #fbbf24; }
+.callout-note { border-color: #0284c7; background: rgba(2, 132, 199, 0.08); color: #e0f2fe; }
+.callout-note .callout-header { color: #38bdf8; }
+.callout-deprecated { border-color: #e11d48; background: rgba(225, 29, 72, 0.08); color: #ffe4e6; }
+.callout-deprecated .callout-header { color: #fb7185; }
+/* Example card */
+.example-card { margin: 20px 0; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: #080c14; }
+.example-header { background: #162032; padding: 8px 16px; font-size: 0.82rem; font-weight: 700; color: #94a3b8; border-bottom: 1px solid var(--border-color); }
+.example-card pre { margin: 0; padding: 14px 18px; overflow-x: auto; font-family: monospace; font-size: 0.92rem; color: #e2e8f0; }
+/* Tables */
+table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 0.92rem; }
+th { background: #162032; color: #94a3b8; text-align: left; padding: 10px 14px; font-weight: 600; border-bottom: 1px solid var(--border-color); }
+td { padding: 10px 14px; border-bottom: 1px solid #1e293b; color: #cbd5e1; }
+ul { padding-left: 20px; color: #cbd5e1; line-height: 1.6; }
+hr { border: 0; border-top: 1px solid var(--border-color); margin: 36px 0; }
+</style>
+<script>
+function filterNav() {
+  var q = document.getElementById('search-input').value.toLowerCase();
+  var links = document.querySelectorAll('.nav-link');
+  links.forEach(function(l) {
+    l.style.display = l.textContent.toLowerCase().includes(q) ? 'block' : 'none';
+  });
+}
+</script>
+</head>
+<body>
+<nav>
+<h2>formatter.lm</h2>
+<input type="text" id="search-input" placeholder="Filter symbols..." oninput="filterNav()">
+<div id="nav-list">
+<a class="nav-link" href="#format_int">format_int <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#format_float">format_float <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#format_bool">format_bool <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#pad_left">pad_left <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#pad_right">pad_right <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#center">center <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#truncate">truncate <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#title_case">title_case <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#snake_case">snake_case <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#camel_case">camel_case <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#kebab_case">kebab_case <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#pascal_case">pascal_case <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+</div>
+</nav>
+<main>
+<h1>formatter.lm API Reference</h1>
+<h2>Module Overview</h2>
+<div class="summary"><p>Standard Library Format Formatter Submodule
+
+String alignment, case conversions, and primitive value representations.</p></div>
+<div id="format_int">
+<h3>format_int <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn format_int(value: int): str</code></pre>
+<div class="summary"><p>Formats an integer value as a string representation.</p></div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>value</code></td><td>Integer number to convert.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">String representation of the integer.</p>
+<div class="example-card">
+<div class="example-header"><span>✨</span> Example: Idiomatic Usage</div>
+<pre><code>var txt = format_int(42);</code></pre>
+</div>
+</div><hr>
+<div id="format_float">
+<h3>format_float <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn format_float(value: float): str</code></pre>
+<div class="summary"><p>Formats a floating-point value as a string representation.</p></div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>value</code></td><td>Floating-point number to convert.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">String representation of the float.</p>
+<div class="example-card">
+<div class="example-header"><span>✨</span> Example: Idiomatic Usage</div>
+<pre><code>var txt = format_float(3.14159);</code></pre>
+</div>
+</div><hr>
+<div id="format_bool">
+<h3>format_bool <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn format_bool(value: bool): str</code></pre>
+<div class="summary"><p>Formats a boolean value as `"true"` or `"false"`.</p></div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>value</code></td><td>Boolean to convert.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Literal `"true"` or `"false"`.</p>
+<div class="example-card">
+<div class="example-header"><span>✨</span> Example: Idiomatic Usage</div>
+<pre><code>var txt = format_bool(true);</code></pre>
+</div>
+</div><hr>
+<div id="pad_left">
+<h3>pad_left <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn pad_left(value: str, length_val: int, fill_char: str): str</code></pre>
+<div class="summary"><p>Pads the beginning of a string with a fill character until reaching the desired target length.</p></div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>value</code></td><td>Source text.</td></tr>
+<tr><td><code>length_val</code></td><td>Desired minimum length.</td></tr>
+<tr><td><code>fill_char</code></td><td>Character string used for padding.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Padded string or original if already long enough.</p>
+<div class="example-card">
+<div class="example-header"><span>✨</span> Example: Idiomatic Usage</div>
+<pre><code>var padded = pad_left("42", 5, "0"); // "00042"</code></pre>
+</div>
+</div><hr>
+<div id="pad_right">
+<h3>pad_right <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn pad_right(value: str, length_val: int, fill_char: str): str</code></pre>
+<div class="summary"><p>Pads the end of a string with a fill character until reaching the desired target length.</p></div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>value</code></td><td>Source text.</td></tr>
+<tr><td><code>length_val</code></td><td>Desired minimum length.</td></tr>
+<tr><td><code>fill_char</code></td><td>Character string used for padding.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Padded string or original if already long enough.</p>
+<div class="example-card">
+<div class="example-header"><span>✨</span> Example: Idiomatic Usage</div>
+<pre><code>var padded = pad_right("hello", 8, "."); // "hello..."</code></pre>
+</div>
+</div><hr>
+<div id="center">
+<h3>center <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn center(value: str, length_val: int, fill_char: str): str</code></pre>
+<div class="summary"><p>Centers text by evenly distributing padding characters on both sides.</p></div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>value</code></td><td>Text to center.</td></tr>
+<tr><td><code>length_val</code></td><td>Total target width.</td></tr>
+<tr><td><code>fill_char</code></td><td>Character string used for padding.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Centered text string.</p>
+<div class="example-card">
+<div class="example-header"><span>✨</span> Example: Idiomatic Usage</div>
+<pre><code>var centered = center("title", 11, "="); // "===title==="</code></pre>
+</div>
+</div><hr>
+<div id="truncate">
+<h3>truncate <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn truncate(value: str, length_val: int, ellipsis: bool): str</code></pre>
+<div class="summary"><p>Truncates a string to maximum length, optionally appending an ellipsis (`"..."`).</p></div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>value</code></td><td>Source text.</td></tr>
+<tr><td><code>length_val</code></td><td>Maximum character length allowed.</td></tr>
+<tr><td><code>ellipsis</code></td><td>If true and length > 3, replaces trailing characters with `"..."`.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Truncated string.</p>
+<div class="example-card">
+<div class="example-header"><span>✨</span> Example: Idiomatic Usage</div>
+<pre><code>var short_text = truncate("long descriptive title", 10, true);</code></pre>
+</div>
+</div><hr>
+<div id="title_case">
+<h3>title_case <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn title_case(value: str): str</code></pre>
+<div class="summary"><p>Converts text into Title Case capitalization.</p></div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>value</code></td><td>Input text string.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Title-cased string.</p>
+<div class="example-card">
+<div class="example-header"><span>✨</span> Example: Idiomatic Usage</div>
+<pre><code>var res = title_case("hello world"); // "Hello World"</code></pre>
+</div>
+</div><hr>
+<div id="snake_case">
+<h3>snake_case <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn snake_case(value: str): str</code></pre>
+<div class="summary"><p>Converts text into snake_case by lowercasing and replacing whitespace with underscores.</p></div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>value</code></td><td>Input text string.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Lowercase snake_case identifier string.</p>
+<div class="example-card">
+<div class="example-header"><span>✨</span> Example: Idiomatic Usage</div>
+<pre><code>var id = snake_case("User First Name"); // "user_first_name"</code></pre>
+</div>
+</div><hr>
+<div id="camel_case">
+<h3>camel_case <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn camel_case(value: str): str</code></pre>
+<div class="summary"><p>Converts text into camelCase identifier format.</p></div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>value</code></td><td>Input text string.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">camelCase identifier string.</p>
+<div class="example-card">
+<div class="example-header"><span>✨</span> Example: Idiomatic Usage</div>
+<pre><code>var id = camel_case("user first name"); // "userFirstName"</code></pre>
+</div>
+</div><hr>
+<div id="kebab_case">
+<h3>kebab_case <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn kebab_case(value: str): str</code></pre>
+<div class="summary"><p>Converts text into kebab-case identifier format using hyphens.</p></div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>value</code></td><td>Input text string.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">kebab-case string.</p>
+<div class="example-card">
+<div class="example-header"><span>✨</span> Example: Idiomatic Usage</div>
+<pre><code>var id = kebab_case("user profile pic"); // "user-profile-pic"</code></pre>
+</div>
+</div><hr>
+<div id="pascal_case">
+<h3>pascal_case <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn pascal_case(value: str): str</code></pre>
+<div class="summary"><p>Converts text into PascalCase identifier format.</p></div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>value</code></td><td>Input text string.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">PascalCase string.</p>
+<div class="example-card">
+<div class="example-header"><span>✨</span> Example: Idiomatic Usage</div>
+<pre><code>var id = pascal_case("user account state"); // "UserAccountState"</code></pre>
+</div>
+</div><hr>
+</main>
+</body>
+</html>

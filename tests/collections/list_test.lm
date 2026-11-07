@@ -17,7 +17,7 @@ fn main(): int {
     l.push_back(20);
     l.push_back(30);
     l.pop_front();
-    
+
     var it = l.iterator();
     assert(it.next() == 20, "First element from iterator should be 20");
     assert(it.next() == 30, "Second element from iterator should be 30");

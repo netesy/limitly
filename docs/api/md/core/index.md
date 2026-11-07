@@ -1,0 +1,39 @@
+# API Documentation: `index.lm`
+
+## Overview
+
+std.core: the shared vocabulary every other module builds on - Error, the
+staged Option(T) template, and the marker traits.
+
+Fallible results use the language's own types, not library wrappers: a
+function that can fail declares `T?` (generic error) or `T?Error` and returns
+`ok(value)` / `err(Error(code=..., message=...))`. Callers unwrap with `?`,
+`? else { ... }` or `match (v) { val x => ..., err e => ... }`.
+
+The Result / Ok / Err frames are gone: they were a parallel, weaker copy of
+the native fallible machinery (no real propagation, `any`-typed payloads).
+The specialised OptionInt / OptionStr / ResultInt / ResultStr frames and the
+ok_int / err_int / ok_str / err_str / ok_bool helpers are gone. Migration map:
+
+  ResultInt            ->  int?Error        ok_int(v)   ->  ok(v)
+  ResultStr            ->  str?Error        err_int(m)  ->  err(Error(code="...", message=m))
+  Result / Ok / Err    ->  T?Error + ok/err/?            (native fallibles)
+  OptionInt            ->  int?             ok_str(v)   ->  ok(v)
+  OptionStr            ->  str?             ok_bool(v)  ->  plain bool
+  Some(v)              ->  Option(true, v)  under an `Option(T)` type annotation
+  None()               ->  Option(false, nil)            (same annotation)
+
+Option itself stays - as the staged template `Option(T: type)` - because its
+combinators (map / filter / unwrap_or chaining) cannot be written over a bare
+`T | nil` without per-type wrappers. Plain absence still prefers `T?`.
+
+  r.is_ok() / r.is_err()  ->  match (r) { val v => ..., err e => ... }
+  r.unwrap()              ->  r?
+  r.unwrap_or(d)          ->  r? else { return d; }
+
+The `return` inside the fallback block is required. `r? else { d }` with a bare
+trailing expression compiles and runs, but the block's value is discarded and
+the binding silently becomes nil - so a fallback written that way yields nil
+where an int was expected. Read a fallible without a control transfer with
+`match` instead.
+

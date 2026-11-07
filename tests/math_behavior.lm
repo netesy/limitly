@@ -1,4 +1,3 @@
-import std.math as math;
 
 fn main() {
     var a = 1.0;

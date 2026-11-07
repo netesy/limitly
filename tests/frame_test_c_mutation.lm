@@ -15,11 +15,11 @@ frame Foo {
 
 fn main(): int {
     var f = Foo();
-    
+
     f.inc() ;
     print(f.value);
     assert(f.value == 1, "Method should mutate the original object");
-    
+
     print("Test C - Member Mutation: PASSED");
     return 0;
 }

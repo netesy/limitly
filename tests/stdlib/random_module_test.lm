@@ -12,7 +12,7 @@ fn test_random_frame(): int {
     assert(f >= 0.0 and f <= 1.0, "next_float failed");
 
     var b = rng.next_bool();
-    assert(b == true or b == false, "next_bool failed");
+    assert(b or not b, "next_bool failed");
 
     var ri = rng.range_int(1, 10);
     assert(ri >= 1 and ri < 10, "range_int failed");
@@ -46,7 +46,7 @@ fn test_random_helpers(): int {
     assert(rf >= 0.0 and rf <= 5.0, "random_float helper failed");
 
     var rb = r.random_bool();
-    assert(rb == true or rb == false, "random_bool helper failed");
+    assert(rb or not rb, "random_bool helper failed");
     return 1;
 }
 

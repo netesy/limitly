@@ -20,8 +20,8 @@ fn test_identity(): int {
     var machine = os.arch();
     assert(os.is_linux() == (platform == "linux"), "is_linux disagrees with platform");
     assert(os.is_macos() == (platform == "darwin"), "is_macos disagrees with platform");
-    assert((os.is_windows() and os.is_linux()) == false, "windows and linux are both true");
-    assert((os.is_linux() and os.is_macos()) == false, "linux and macos are both true");
+    assert(not (os.is_windows() and os.is_linux()), "windows and linux are both true");
+    assert(not (os.is_linux() and os.is_macos()), "linux and macos are both true");
     assert(os.is_wasm() == (platform == "wasi" or machine == "wasm32"), "is_wasm disagrees with the detected target");
     assert(os.is_64bit() == (machine == "x86_64" or machine == "aarch64" or machine == "riscv64"), "is_64bit disagrees with arch");
 
@@ -52,9 +52,9 @@ fn test_directories(): int {
     assert(len(program) > 0, "exe_path is empty");
 
     // chdir is observable through cwd, and reversible.
-    assert(os.chdir(home) == true, "chdir to home failed");
+    assert(os.chdir(home), "chdir to home failed");
     assert(os.cwd() == home, "cwd did not follow chdir");
-    assert(os.chdir(before) == true, "chdir back failed");
+    assert(os.chdir(before), "chdir back failed");
     assert(os.cwd() == before, "cwd did not restore");
     return 1;
 }
@@ -62,19 +62,19 @@ fn test_directories(): int {
 fn test_environment(): int {
     print("Testing OS Environment...");
 
-    assert(os.setenv("LYMAR_OS_TEST", "os_value") == true, "setenv failed");
+    assert(os.setenv("LYMAR_OS_TEST", "os_value"), "setenv failed");
     // `?` unwraps the optional; comparing an optional with == does not.
     var present = os.getenv("LYMAR_OS_TEST")? else {
         return 0;
     };
     assert(present == "os_value", "getenv returned the wrong value");
 
-    assert(os.unsetenv("LYMAR_OS_TEST") == true, "unsetenv failed");
+    assert(os.unsetenv("LYMAR_OS_TEST"), "unsetenv failed");
     assert(os.getenv("LYMAR_OS_TEST") == nil, "unsetenv left the variable set");
     assert(os.getenv("LYMAR_OS_TEST_ABSENT") == nil, "unknown variable is not nil");
 
     // getenv_or returns a plain str, so it needs no unwrapping.
-    assert(os.setenv("LYMAR_OS_TEST", "os_value") == true, "setenv for getenv_or failed");
+    assert(os.setenv("LYMAR_OS_TEST", "os_value"), "setenv for getenv_or failed");
     assert(os.getenv_or("LYMAR_OS_TEST", "wrong") == "os_value", "getenv_or returned the wrong value");
     assert(os.getenv_or("LYMAR_OS_TEST_ABSENT", "fallback") == "fallback", "getenv_or ignored its fallback");
     os.unsetenv("LYMAR_OS_TEST");

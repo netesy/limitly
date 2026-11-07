@@ -5,8 +5,8 @@ import std.regex as r;
 fn test_regex_frame(): int {
     print("Testing Regex Frame...");
     var regex = r.Regex("cat", 0);
-    assert(regex.matches("the cat sat") == true, "matches true failed");
-    assert(regex.matches("the dog sat") == false, "matches false failed");
+    assert(regex.matches("the cat sat"), "matches true failed");
+    assert(not regex.matches("the dog sat"), "matches false failed");
 
     var first = regex.find_first_match("the cat sat");
     assert(first == "cat", "find_first_match failed");
@@ -26,7 +26,7 @@ fn test_regex_frame(): int {
     assert(parts[0] == "the ", "split 0 failed");
     assert(parts[1] == " sat", "split 1 failed");
 
-    assert(regex.is_valid() == true, "is_valid failed");
+    assert(regex.is_valid(), "is_valid failed");
     assert(regex.to_string() == "/cat/", "to_string failed");
     return 1;
 }
@@ -41,7 +41,7 @@ fn test_regex_patterns(): int {
 
 fn test_regex_helpers(): int {
     print("Testing Regex Helpers...");
-    assert(r.is_match("cat", "the cat sat") == true, "is_match helper failed");
+    assert(r.is_match("cat", "the cat sat"), "is_match helper failed");
     assert(r.replace("cat", "the cat sat", "dog") == "the dog sat", "replace helper failed");
     return 1;
 }

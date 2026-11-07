@@ -24,8 +24,8 @@ unsafe {
     var workload_start = clock();
     for (var i = 0; i < 50; i = i + 1) {
         total_w = total_w + (ffi.foreign_call(measure,
-            [handle, 16.0, ffi.cstring_as_ptr(text)], ffi.TYPE_F32,
-            [ffi.TYPE_PTR, ffi.TYPE_F32, ffi.TYPE_PTR]) as float);
+        [handle, 16.0, ffi.cstring_as_ptr(text)], ffi.TYPE_F32,
+        [ffi.TYPE_PTR, ffi.TYPE_F32, ffi.TYPE_PTR]) as float);
     }
     var workload_ms = (clock() - workload_start) * 1000.0;
     ffi.cstring_free(text);

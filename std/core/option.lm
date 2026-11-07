@@ -22,70 +22,70 @@
 /// @example
 /// var opt: Option(int) = Option(true, 42);
 /// if (opt.is_some()) {
-///     print("Value is: {opt.unwrap()}");
-/// }
-staged frame Option(T: type) {
-    pub var present: bool;
-    pub var value: T | nil;
+    ///     print("Value is: {opt.unwrap()}");
+    /// }
+    staged frame Option(T: type) {
+        pub var present: bool;
+        pub var value: T | nil;
 
-    /// Initializes a new Option instance.
-    pub init(p: bool, v: T | nil) {
-        self.present = p;
-        self.value = v;
-    }
+        /// Initializes a new Option instance.
+        pub init(p: bool, v: T | nil) {
+            self.present = p;
+            self.value = v;
+        }
 
-    /// Checks if the option contains a value.
-    ///
-    /// @return Returns true if a value is present, false otherwise.
-    pub fn is_some(): bool {
-        return self.present;
-    }
+        /// Checks if the option contains a value.
+        ///
+        /// @return Returns true if a value is present, false otherwise.
+        pub fn is_some(): bool {
+            return self.present;
+        }
 
-    /// Checks if the option is empty.
-    ///
-    /// @return Returns true if no value is present, false otherwise.
-    pub fn is_none(): bool {
-        return not self.present;
-    }
+        /// Checks if the option is empty.
+        ///
+        /// @return Returns true if no value is present, false otherwise.
+        pub fn is_none(): bool {
+            return not self.present;
+        }
 
-    /// Unwraps and returns the contained value.
-    ///
-    /// @warning Throws or fails if called on an empty Option.
-    /// @return The contained value of type T.
-    pub fn unwrap(): T {
-        return self.value as T;
-    }
-
-    /// Unwraps the contained value, or returns the provided default value.
-    ///
-    /// @param default_value Fallback value to return if empty.
-    /// @return The contained value or default_value.
-    pub fn unwrap_or(default_value: T): T {
-        if (self.present) {
+        /// Unwraps and returns the contained value.
+        ///
+        /// @warning Throws or fails if called on an empty Option.
+        /// @return The contained value of type T.
+        pub fn unwrap(): T {
             return self.value as T;
         }
-        return default_value;
-    }
 
-    /// Transforms the contained value using function f if present.
-    ///
-    /// @param f Transformation function.
-    /// @return New Option containing the transformed value.
-    pub fn map(f: fn(T): T): Option(T) {
-        if (self.present) {
-            return Option(true, f(self.value as T));
+        /// Unwraps the contained value, or returns the provided default value.
+        ///
+        /// @param default_value Fallback value to return if empty.
+        /// @return The contained value or default_value.
+        pub fn unwrap_or(default_value: T): T {
+            if (self.present) {
+                return self.value as T;
+            }
+            return default_value;
         }
-        return self;
-    }
 
-    /// Retains the value only if the predicate matches.
-    ///
-    /// @param predicate Filter predicate.
-    /// @return Matching Option or empty Option.
-    pub fn filter(predicate: fn(T): bool): Option(T) {
-        if (self.present and predicate(self.value as T)) {
+        /// Transforms the contained value using function f if present.
+        ///
+        /// @param f Transformation function.
+        /// @return New Option containing the transformed value.
+        pub fn map(f: fn(T): T): Option(T) {
+            if (self.present) {
+                return Option(true, f(self.value as T));
+            }
             return self;
         }
-        return Option(false, nil);
+
+        /// Retains the value only if the predicate matches.
+        ///
+        /// @param predicate Filter predicate.
+        /// @return Matching Option or empty Option.
+        pub fn filter(predicate: fn(T): bool): Option(T) {
+            if (self.present and predicate(self.value as T)) {
+                return self;
+            }
+            return Option(false, nil);
+        }
     }
-}

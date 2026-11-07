@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>palette.lm - Lymar API Reference</title>
+<style>
+:root {
+  --bg-primary: #0a0e17;
+  --bg-secondary: #111827;
+  --bg-tertiary: #1f2937;
+  --accent: #38bdf8;
+  --accent-hover: #7dd3fc;
+  --text-main: #f1f5f9;
+  --text-muted: #94a3b8;
+  --border-color: #334155;
+}
+* { box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif;
+  margin: 0; padding: 0; background: var(--bg-primary); color: var(--text-main); display: flex;
+}
+nav {
+  width: 300px; height: 100vh; overflow-y: auto; background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color); padding: 24px 20px; position: fixed;
+}
+nav h2 { font-size: 1.15rem; color: var(--accent); margin-top: 0; margin-bottom: 16px; font-weight: 700; }
+#search-input {
+  width: 100%; padding: 8px 12px; background: var(--bg-tertiary); border: 1px solid var(--border-color);
+  border-radius: 6px; color: #fff; font-size: 0.85rem; margin-bottom: 16px;
+}
+#search-input:focus { outline: none; border-color: var(--accent); }
+.nav-link { display: block; color: var(--text-muted); text-decoration: none; padding: 6px 8px; font-size: 0.9rem; border-radius: 4px; }
+.nav-link:hover { color: #fff; background: var(--bg-tertiary); }
+main { margin-left: 300px; padding: 40px 48px; max-width: 950px; flex: 1; }
+h1 { color: #fff; font-size: 2.2rem; margin-top: 0; padding-bottom: 16px; border-bottom: 1px solid var(--border-color); }
+h2 { color: var(--accent); font-size: 1.4rem; margin-top: 36px; margin-bottom: 14px; }
+h3 { color: #fff; font-size: 1.25rem; margin-top: 28px; margin-bottom: 12px; display: flex; align-items: center; gap: 10px; }
+h4 { color: var(--accent); font-size: 1rem; margin-top: 20px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+.badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
+.badge-pub { background: #064e3b; color: #6ee7b7; border: 1px solid #059669; }
+.badge-private { background: #334155; color: #cbd5e1; }
+.badge-type { background: #1e1b4b; color: #c7d2fe; border: 1px solid #4338ca; }
+.code-sig { background: #090d16; border: 1px solid var(--border-color); padding: 14px 18px; border-radius: 8px; overflow-x: auto; font-family: 'Consolas', 'Fira Code', monospace; font-size: 0.95rem; color: #e2e8f0; }
+.summary { color: #cbd5e1; line-height: 1.65; margin: 14px 0; font-size: 1rem; }
+/* Callout styling */
+.callout { margin: 16px 0; padding: 14px 18px; border-radius: 8px; border-left: 4px solid; font-size: 0.92rem; }
+.callout-header { font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+.callout-tip { border-color: #10b981; background: rgba(16, 185, 129, 0.08); color: #d1fae5; }
+.callout-tip .callout-header { color: #34d399; }
+.callout-warning { border-color: #f59e0b; background: rgba(245, 158, 11, 0.08); color: #fef3c7; }
+.callout-warning .callout-header { color: #fbbf24; }
+.callout-note { border-color: #0284c7; background: rgba(2, 132, 199, 0.08); color: #e0f2fe; }
+.callout-note .callout-header { color: #38bdf8; }
+.callout-deprecated { border-color: #e11d48; background: rgba(225, 29, 72, 0.08); color: #ffe4e6; }
+.callout-deprecated .callout-header { color: #fb7185; }
+/* Example card */
+.example-card { margin: 20px 0; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: #080c14; }
+.example-header { background: #162032; padding: 8px 16px; font-size: 0.82rem; font-weight: 700; color: #94a3b8; border-bottom: 1px solid var(--border-color); }
+.example-card pre { margin: 0; padding: 14px 18px; overflow-x: auto; font-family: monospace; font-size: 0.92rem; color: #e2e8f0; }
+/* Tables */
+table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 0.92rem; }
+th { background: #162032; color: #94a3b8; text-align: left; padding: 10px 14px; font-weight: 600; border-bottom: 1px solid var(--border-color); }
+td { padding: 10px 14px; border-bottom: 1px solid #1e293b; color: #cbd5e1; }
+ul { padding-left: 20px; color: #cbd5e1; line-height: 1.6; }
+hr { border: 0; border-top: 1px solid var(--border-color); margin: 36px 0; }
+</style>
+<script>
+function filterNav() {
+  var q = document.getElementById('search-input').value.toLowerCase();
+  var links = document.querySelectorAll('.nav-link');
+  links.forEach(function(l) {
+    l.style.display = l.textContent.toLowerCase().includes(q) ? 'block' : 'none';
+  });
+}
+</script>
+</head>
+<body>
+<nav>
+<h2>palette.lm</h2>
+<input type="text" id="search-input" placeholder="Filter symbols..." oninput="filterNav()">
+<div id="nav-list">
+<a class="nav-link" href="#Shades">Shades <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#_shade_from_hex">_shade_from_hex <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#slate">slate <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#gray">gray <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#zinc">zinc <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#neutral">neutral <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#stone">stone <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#red">red <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#orange">orange <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#amber">amber <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#yellow">yellow <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#lime">lime <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#green">green <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#emerald">emerald <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#teal">teal <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#cyan">cyan <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#sky">sky <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#blue">blue <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#indigo">indigo <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#violet">violet <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#purple">purple <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#fuchsia">fuchsia <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#pink">pink <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#rose">rose <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#crimson">crimson <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#cool_gray">cool_gray <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#warm_gray">warm_gray <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#shade">shade <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#palette">palette <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#tw">tw <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+</div>
+</nav>
+<main>
+<h1>palette.lm API Reference</h1>
+<h2>Module Overview</h2>
+<div class="summary"><p>std/color/palette.lm
+Modern UI Color Palette System for Lymar
+Provides 11-step shade scales (50 to 950) for modern UI styling and palettes.</p></div>
+<div id="Shades">
+<h3>Shades <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame Shades</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>var pub c50: Color</code> <em>(field)</em></li>
+<li><code>var pub c100: Color</code> <em>(field)</em></li>
+<li><code>var pub c200: Color</code> <em>(field)</em></li>
+<li><code>var pub c300: Color</code> <em>(field)</em></li>
+<li><code>var pub c400: Color</code> <em>(field)</em></li>
+<li><code>var pub c500: Color</code> <em>(field)</em></li>
+<li><code>var pub c600: Color</code> <em>(field)</em></li>
+<li><code>var pub c700: Color</code> <em>(field)</em></li>
+<li><code>var pub c800: Color</code> <em>(field)</em></li>
+<li><code>var pub c900: Color</code> <em>(field)</em></li>
+<li><code>var pub c950: Color</code> <em>(field)</em></li>
+<li><code>pub init(h50: int, h100: int, h200: int, h300: int, h400: int, h500: int, h600: int, h700: int, h800: int, h900: int, h950: int)</code> <em>(constructor)</em></li>
+<li><code>pub fn shade(): Color</code> <em>(method)</em></li>
+<li><code>pub fn get(): Color</code> <em>(method)</em></li>
+</ul>
+</div><hr>
+<div id="_shade_from_hex">
+<h3>_shade_from_hex <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _shade_from_hex(level: int, h50: int, h100: int, h200: int, h300: int, h400: int, h500: int, h600: int, h700: int, h800: int, h900: int, h950: int): Color</code></pre>
+</div><hr>
+<div id="slate">
+<h3>slate <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn slate(level: int = ...): Color</code></pre>
+</div><hr>
+<div id="gray">
+<h3>gray <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn gray(level: int = ...): Color</code></pre>
+</div><hr>
+<div id="zinc">
+<h3>zinc <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn zinc(level: int = ...): Color</code></pre>
+</div><hr>
+<div id="neutral">
+<h3>neutral <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn neutral(level: int = ...): Color</code></pre>
+</div><hr>
+<div id="stone">
+<h3>stone <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn stone(level: int = ...): Color</code></pre>
+</div><hr>
+<div id="red">
+<h3>red <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn red(level: int = ...): Color</code></pre>
+</div><hr>
+<div id="orange">
+<h3>orange <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn orange(level: int = ...): Color</code></pre>
+</div><hr>
+<div id="amber">
+<h3>amber <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn amber(level: int = ...): Color</code></pre>
+</div><hr>
+<div id="yellow">
+<h3>yellow <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn yellow(level: int = ...): Color</code></pre>
+</div><hr>
+<div id="lime">
+<h3>lime <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn lime(level: int = ...): Color</code></pre>
+</div><hr>
+<div id="green">
+<h3>green <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn green(level: int = ...): Color</code></pre>
+</div><hr>
+<div id="emerald">
+<h3>emerald <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn emerald(level: int = ...): Color</code></pre>
+</div><hr>
+<div id="teal">
+<h3>teal <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn teal(level: int = ...): Color</code></pre>
+</div><hr>
+<div id="cyan">
+<h3>cyan <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn cyan(level: int = ...): Color</code></pre>
+</div><hr>
+<div id="sky">
+<h3>sky <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn sky(level: int = ...): Color</code></pre>
+</div><hr>
+<div id="blue">
+<h3>blue <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn blue(level: int = ...): Color</code></pre>
+</div><hr>
+<div id="indigo">
+<h3>indigo <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn indigo(level: int = ...): Color</code></pre>
+</div><hr>
+<div id="violet">
+<h3>violet <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn violet(level: int = ...): Color</code></pre>
+</div><hr>
+<div id="purple">
+<h3>purple <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn purple(level: int = ...): Color</code></pre>
+</div><hr>
+<div id="fuchsia">
+<h3>fuchsia <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn fuchsia(level: int = ...): Color</code></pre>
+</div><hr>
+<div id="pink">
+<h3>pink <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn pink(level: int = ...): Color</code></pre>
+</div><hr>
+<div id="rose">
+<h3>rose <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn rose(level: int = ...): Color</code></pre>
+</div><hr>
+<div id="crimson">
+<h3>crimson <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn crimson(level: int = ...): Color</code></pre>
+</div><hr>
+<div id="cool_gray">
+<h3>cool_gray <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn cool_gray(level: int = ...): Color</code></pre>
+</div><hr>
+<div id="warm_gray">
+<h3>warm_gray <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn warm_gray(level: int = ...): Color</code></pre>
+</div><hr>
+<div id="shade">
+<h3>shade <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn shade(name: str, level: int = ...): Color</code></pre>
+</div><hr>
+<div id="palette">
+<h3>palette <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn palette(name: str, level: int = ...): Color</code></pre>
+</div><hr>
+<div id="tw">
+<h3>tw <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn tw(name: str, level: int = ...): Color</code></pre>
+</div><hr>
+</main>
+</body>
+</html>

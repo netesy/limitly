@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>index.lm - Lymar API Reference</title>
+<style>
+:root {
+  --bg-primary: #0a0e17;
+  --bg-secondary: #111827;
+  --bg-tertiary: #1f2937;
+  --accent: #38bdf8;
+  --accent-hover: #7dd3fc;
+  --text-main: #f1f5f9;
+  --text-muted: #94a3b8;
+  --border-color: #334155;
+}
+* { box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif;
+  margin: 0; padding: 0; background: var(--bg-primary); color: var(--text-main); display: flex;
+}
+nav {
+  width: 300px; height: 100vh; overflow-y: auto; background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color); padding: 24px 20px; position: fixed;
+}
+nav h2 { font-size: 1.15rem; color: var(--accent); margin-top: 0; margin-bottom: 16px; font-weight: 700; }
+#search-input {
+  width: 100%; padding: 8px 12px; background: var(--bg-tertiary); border: 1px solid var(--border-color);
+  border-radius: 6px; color: #fff; font-size: 0.85rem; margin-bottom: 16px;
+}
+#search-input:focus { outline: none; border-color: var(--accent); }
+.nav-link { display: block; color: var(--text-muted); text-decoration: none; padding: 6px 8px; font-size: 0.9rem; border-radius: 4px; }
+.nav-link:hover { color: #fff; background: var(--bg-tertiary); }
+main { margin-left: 300px; padding: 40px 48px; max-width: 950px; flex: 1; }
+h1 { color: #fff; font-size: 2.2rem; margin-top: 0; padding-bottom: 16px; border-bottom: 1px solid var(--border-color); }
+h2 { color: var(--accent); font-size: 1.4rem; margin-top: 36px; margin-bottom: 14px; }
+h3 { color: #fff; font-size: 1.25rem; margin-top: 28px; margin-bottom: 12px; display: flex; align-items: center; gap: 10px; }
+h4 { color: var(--accent); font-size: 1rem; margin-top: 20px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+.badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
+.badge-pub { background: #064e3b; color: #6ee7b7; border: 1px solid #059669; }
+.badge-private { background: #334155; color: #cbd5e1; }
+.badge-type { background: #1e1b4b; color: #c7d2fe; border: 1px solid #4338ca; }
+.code-sig { background: #090d16; border: 1px solid var(--border-color); padding: 14px 18px; border-radius: 8px; overflow-x: auto; font-family: 'Consolas', 'Fira Code', monospace; font-size: 0.95rem; color: #e2e8f0; }
+.summary { color: #cbd5e1; line-height: 1.65; margin: 14px 0; font-size: 1rem; }
+/* Callout styling */
+.callout { margin: 16px 0; padding: 14px 18px; border-radius: 8px; border-left: 4px solid; font-size: 0.92rem; }
+.callout-header { font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+.callout-tip { border-color: #10b981; background: rgba(16, 185, 129, 0.08); color: #d1fae5; }
+.callout-tip .callout-header { color: #34d399; }
+.callout-warning { border-color: #f59e0b; background: rgba(245, 158, 11, 0.08); color: #fef3c7; }
+.callout-warning .callout-header { color: #fbbf24; }
+.callout-note { border-color: #0284c7; background: rgba(2, 132, 199, 0.08); color: #e0f2fe; }
+.callout-note .callout-header { color: #38bdf8; }
+.callout-deprecated { border-color: #e11d48; background: rgba(225, 29, 72, 0.08); color: #ffe4e6; }
+.callout-deprecated .callout-header { color: #fb7185; }
+/* Example card */
+.example-card { margin: 20px 0; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: #080c14; }
+.example-header { background: #162032; padding: 8px 16px; font-size: 0.82rem; font-weight: 700; color: #94a3b8; border-bottom: 1px solid var(--border-color); }
+.example-card pre { margin: 0; padding: 14px 18px; overflow-x: auto; font-family: monospace; font-size: 0.92rem; color: #e2e8f0; }
+/* Tables */
+table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 0.92rem; }
+th { background: #162032; color: #94a3b8; text-align: left; padding: 10px 14px; font-weight: 600; border-bottom: 1px solid var(--border-color); }
+td { padding: 10px 14px; border-bottom: 1px solid #1e293b; color: #cbd5e1; }
+ul { padding-left: 20px; color: #cbd5e1; line-height: 1.6; }
+hr { border: 0; border-top: 1px solid var(--border-color); margin: 36px 0; }
+</style>
+<script>
+function filterNav() {
+  var q = document.getElementById('search-input').value.toLowerCase();
+  var links = document.querySelectorAll('.nav-link');
+  links.forEach(function(l) {
+    l.style.display = l.textContent.toLowerCase().includes(q) ? 'block' : 'none';
+  });
+}
+</script>
+</head>
+<body>
+<nav>
+<h2>index.lm</h2>
+<input type="text" id="search-input" placeholder="Filter symbols..." oninput="filterNav()">
+<div id="nav-list">
+<a class="nav-link" href="#Pixel">Pixel <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#rgb">rgb <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#rgba">rgba <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#color_rgb">color_rgb <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#color_rgba">color_rgba <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#color_rgb8">color_rgb8 <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#Info">Info <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#_open_lib">_open_lib <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#Image">Image <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#load">load <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#load_forced">load_forced <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#query">query <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#create">create <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#get_pixel">get_pixel <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#set_pixel">set_pixel <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#free_image">free_image <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#free">free <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#destroy">destroy <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#clone">clone <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#resize">resize <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#crop">crop <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#flip_vertical">flip_vertical <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#flip_horizontal">flip_horizontal <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#rotate_90">rotate_90 <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#fill">fill <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#fill_rect">fill_rect <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#draw_line">draw_line <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#flip_v">flip_v <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#flip_h">flip_h <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#blit">blit <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#blend_blit">blend_blit <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#save_png">save_png <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#save_jpg">save_jpg <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#save_bmp">save_bmp <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#save_tga">save_tga <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#save">save <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#PngFacade">PngFacade <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#JpgFacade">JpgFacade <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#BmpFacade">BmpFacade <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#TgaFacade">TgaFacade <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#detect_system_font">detect_system_font <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+</div>
+</nav>
+<main>
+<h1>index.lm API Reference</h1>
+<h2>Module Overview</h2>
+<div class="summary"><p>std/image/index.lm
+
+Core image types, fluent manipulation, shared lifecycle, and pixel access.
+Sub-modules (png, jpg, bmp, tga, hdr) import this module.</p></div>
+<div id="Pixel">
+<h3>Pixel <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame Pixel</code></pre>
+<div class="summary"><p>── Pixel value frame ─────────────────────────────────────────────────────</p></div>
+<h4>Members</h4>
+<ul>
+<li><code>var pub r: int</code> <em>(field)</em></li>
+<li><code>var pub g: int</code> <em>(field)</em></li>
+<li><code>var pub b: int</code> <em>(field)</em></li>
+<li><code>var pub a: int</code> <em>(field)</em></li>
+<li><code>pub init()</code> <em>(constructor)</em></li>
+<li><code>pub fn with_alpha(new_a: int): Pixel</code> <em>(method)</em></li>
+</ul>
+</div><hr>
+<div id="rgb">
+<h3>rgb <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn rgb(r: int, g: int, b: int): Pixel</code></pre>
+<div class="summary"><p>── Semantic Color Constructors & Palettes (Fluent style matching std.ui) ──</p></div>
+</div><hr>
+<div id="rgba">
+<h3>rgba <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn rgba(r: int, g: int, b: int, a: int): Pixel</code></pre>
+</div><hr>
+<div id="color_rgb">
+<h3>color_rgb <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn color_rgb(r: float, g: float, b: float): Pixel</code></pre>
+</div><hr>
+<div id="color_rgba">
+<h3>color_rgba <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn color_rgba(r: float, g: float, b: float, a: float): Pixel</code></pre>
+</div><hr>
+<div id="color_rgb8">
+<h3>color_rgb8 <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn color_rgb8(r: int, g: int, b: int): Pixel</code></pre>
+</div><hr>
+<div id="Info">
+<h3>Info <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame Info</code></pre>
+<div class="summary"><p>── Image metadata frame ──────────────────────────────────────────────────</p></div>
+<h4>Members</h4>
+<ul>
+<li><code>var pub width: int</code> <em>(field)</em></li>
+<li><code>var pub height: int</code> <em>(field)</em></li>
+<li><code>var pub channels: int</code> <em>(field)</em></li>
+<li><code>pub init()</code> <em>(constructor)</em></li>
+</ul>
+</div><hr>
+<div id="_open_lib">
+<h3>_open_lib <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn _open_lib(): int</code></pre>
+</div><hr>
+<div id="Image">
+<h3>Image <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame Image</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>var pub width: int</code> <em>(field)</em></li>
+<li><code>var pub height: int</code> <em>(field)</em></li>
+<li><code>var pub channels: int</code> <em>(field)</em></li>
+<li><code>var pub pixels: int</code> <em>(field)</em></li>
+<li><code>var pub is_hdr: bool</code> <em>(field)</em></li>
+<li><code>var pub _lib: int</code> <em>(field)</em></li>
+<li><code>pub init()</code> <em>(constructor)</em></li>
+<li><code>pub fn pixel_offset(x: int, y: int): int</code> <em>(method)</em></li>
+<li><code>pub fn byte_size(): int</code> <em>(method)</em></li>
+<li><code>pub fn is_valid(): bool</code> <em>(method)</em></li>
+<li><code>pub fn get(x: int, y: int): Pixel</code> <em>(method)</em></li>
+<li><code>pub fn set(x: int, y: int, px: Pixel): Image</code> <em>(method)</em></li>
+<li><code>pub fn set_rgba(x: int, y: int, r: int, g: int, b: int): Image</code> <em>(method)</em></li>
+<li><code>pub fn fill(color: Pixel): Image</code> <em>(method)</em></li>
+<li><code>pub fn fill_rgb(r: int, g: int, b: int): Image</code> <em>(method)</em></li>
+<li><code>pub fn fill_rgba(r: int, g: int, b: int, a: int): Image</code> <em>(method)</em></li>
+<li><code>pub fn clear(color: Pixel): Image</code> <em>(method)</em></li>
+<li><code>pub fn fill_rect(x: int, y: int, w: int, h: int, color: Pixel): Image</code> <em>(method)</em></li>
+<li><code>pub fn rect(x: int, y: int, w: int, h: int, color: Pixel): Image</code> <em>(method)</em></li>
+<li><code>pub fn line(x0: int, y0: int, x1: int, y1: int, color: Pixel): Image</code> <em>(method)</em></li>
+<li><code>pub fn blit(src: Image, dst_x: int, dst_y: int): Image</code> <em>(method)</em></li>
+<li><code>pub fn blend_blit(src: Image, dst_x: int, dst_y: int): Image</code> <em>(method)</em></li>
+<li><code>pub fn flip_v(): Image</code> <em>(method)</em></li>
+<li><code>pub fn flip_h(): Image</code> <em>(method)</em></li>
+<li><code>pub fn flip_vertical(): Image</code> <em>(method)</em></li>
+<li><code>pub fn flip_horizontal(): Image</code> <em>(method)</em></li>
+<li><code>pub fn clone(): Image?</code> <em>(method)</em></li>
+<li><code>pub fn resize(new_w: int, new_h: int): Image?</code> <em>(method)</em></li>
+<li><code>pub fn crop(x: int, y: int, w: int, h: int): Image?</code> <em>(method)</em></li>
+<li><code>pub fn rotate_90(): Image?</code> <em>(method)</em></li>
+<li><code>pub fn save(path: str): bool?</code> <em>(method)</em></li>
+<li><code>pub fn save_png(path: str): bool?</code> <em>(method)</em></li>
+<li><code>pub fn save_jpg(path: str): bool?</code> <em>(method)</em></li>
+<li><code>pub fn save_bmp(path: str): bool?</code> <em>(method)</em></li>
+<li><code>pub fn save_tga(path: str): bool?</code> <em>(method)</em></li>
+<li><code>pub fn release(): nil</code> <em>(method)</em></li>
+<li><code>pub fn free(): nil</code> <em>(method)</em></li>
+</ul>
+</div><hr>
+<div id="load">
+<h3>load <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn load(path: str): Image?</code></pre>
+</div><hr>
+<div id="load_forced">
+<h3>load_forced <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn load_forced(path: str, channels: int): Image?</code></pre>
+</div><hr>
+<div id="query">
+<h3>query <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn query(path: str): Info?</code></pre>
+</div><hr>
+<div id="create">
+<h3>create <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn create(w: int, h: int, channels: int = ...): Image?</code></pre>
+</div><hr>
+<div id="get_pixel">
+<h3>get_pixel <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn get_pixel(img: Image, x: int, y: int): Pixel</code></pre>
+</div><hr>
+<div id="set_pixel">
+<h3>set_pixel <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn set_pixel(img: Image, x: int, y: int, r: int, g: int, b: int, a: int = ...): nil</code></pre>
+</div><hr>
+<div id="free_image">
+<h3>free_image <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn free_image(img: Image): nil</code></pre>
+</div><hr>
+<div id="free">
+<h3>free <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn free(img: Image): nil</code></pre>
+</div><hr>
+<div id="destroy">
+<h3>destroy <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn destroy(img: Image): nil</code></pre>
+</div><hr>
+<div id="clone">
+<h3>clone <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn clone(img: Image): Image?</code></pre>
+</div><hr>
+<div id="resize">
+<h3>resize <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn resize(img: Image, new_width: int, new_height: int): Image?</code></pre>
+</div><hr>
+<div id="crop">
+<h3>crop <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn crop(img: Image, x: int, y: int, width: int, height: int): Image?</code></pre>
+</div><hr>
+<div id="flip_vertical">
+<h3>flip_vertical <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn flip_vertical(img: Image): nil</code></pre>
+</div><hr>
+<div id="flip_horizontal">
+<h3>flip_horizontal <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn flip_horizontal(img: Image): nil</code></pre>
+</div><hr>
+<div id="rotate_90">
+<h3>rotate_90 <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn rotate_90(img: Image): Image?</code></pre>
+</div><hr>
+<div id="fill">
+<h3>fill <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn fill(img: Image, r: int, g: int, b: int, a: int = ...): nil</code></pre>
+</div><hr>
+<div id="fill_rect">
+<h3>fill_rect <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn fill_rect(img: Image, x: int, y: int, w: int, h: int, color: Pixel): nil</code></pre>
+</div><hr>
+<div id="draw_line">
+<h3>draw_line <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn draw_line(img: Image, x0: int, y0: int, x1: int, y1: int, color: Pixel): nil</code></pre>
+</div><hr>
+<div id="flip_v">
+<h3>flip_v <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn flip_v(img: Image): nil</code></pre>
+</div><hr>
+<div id="flip_h">
+<h3>flip_h <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn flip_h(img: Image): nil</code></pre>
+</div><hr>
+<div id="blit">
+<h3>blit <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn blit(dst: Image, src: Image, dst_x: int, dst_y: int): nil</code></pre>
+</div><hr>
+<div id="blend_blit">
+<h3>blend_blit <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn blend_blit(dst: Image, src: Image, dst_x: int, dst_y: int): nil</code></pre>
+</div><hr>
+<div id="save_png">
+<h3>save_png <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn save_png(img: Image, path: str): bool?</code></pre>
+</div><hr>
+<div id="save_jpg">
+<h3>save_jpg <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn save_jpg(img: Image, path: str, quality: int = ...): bool?</code></pre>
+</div><hr>
+<div id="save_bmp">
+<h3>save_bmp <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn save_bmp(img: Image, path: str): bool?</code></pre>
+</div><hr>
+<div id="save_tga">
+<h3>save_tga <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn save_tga(img: Image, path: str, rle: bool = ...): bool?</code></pre>
+</div><hr>
+<div id="save">
+<h3>save <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn save(img: Image, path: str, quality: int = ...): bool?</code></pre>
+<div class="summary"><p>Unified save with format auto-detection by file extension</p></div>
+</div><hr>
+<div id="PngFacade">
+<h3>PngFacade <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame PngFacade</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>pub init()</code> <em>(constructor)</em></li>
+<li><code>pub fn save(img: Image, path: str): bool?</code> <em>(method)</em></li>
+<li><code>pub fn load(path: str): Image?</code> <em>(method)</em></li>
+<li><code>pub fn load_as(path: str, channels: int): Image?</code> <em>(method)</em></li>
+</ul>
+</div><hr>
+<div id="JpgFacade">
+<h3>JpgFacade <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame JpgFacade</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>pub init()</code> <em>(constructor)</em></li>
+<li><code>pub fn save(img: Image, path: str): bool?</code> <em>(method)</em></li>
+<li><code>pub fn load(path: str): Image?</code> <em>(method)</em></li>
+<li><code>pub fn load_as(path: str, channels: int): Image?</code> <em>(method)</em></li>
+</ul>
+</div><hr>
+<div id="BmpFacade">
+<h3>BmpFacade <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame BmpFacade</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>pub init()</code> <em>(constructor)</em></li>
+<li><code>pub fn save(img: Image, path: str): bool?</code> <em>(method)</em></li>
+<li><code>pub fn load(path: str): Image?</code> <em>(method)</em></li>
+<li><code>pub fn load_as(path: str, channels: int): Image?</code> <em>(method)</em></li>
+</ul>
+</div><hr>
+<div id="TgaFacade">
+<h3>TgaFacade <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame TgaFacade</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>pub init()</code> <em>(constructor)</em></li>
+<li><code>pub fn save(img: Image, path: str): bool?</code> <em>(method)</em></li>
+<li><code>pub fn save_rle(img: Image, path: str): bool?</code> <em>(method)</em></li>
+<li><code>pub fn load(path: str): Image?</code> <em>(method)</em></li>
+<li><code>pub fn load_as(path: str, channels: int): Image?</code> <em>(method)</em></li>
+</ul>
+</div><hr>
+<div id="detect_system_font">
+<h3>detect_system_font <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn detect_system_font(preferred_name: str = ...): str</code></pre>
+</div><hr>
+</main>
+</body>
+</html>

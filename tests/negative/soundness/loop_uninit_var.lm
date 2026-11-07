@@ -4,7 +4,7 @@
 var x: int;
 
 while (x < 10) {  // ERROR: x not initialized
-    x = x + 1;
+x = x + 1;
 }
 
 print(x);

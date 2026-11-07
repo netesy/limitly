@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>process.lm - Lymar API Reference</title>
+<style>
+:root {
+  --bg-primary: #0a0e17;
+  --bg-secondary: #111827;
+  --bg-tertiary: #1f2937;
+  --accent: #38bdf8;
+  --accent-hover: #7dd3fc;
+  --text-main: #f1f5f9;
+  --text-muted: #94a3b8;
+  --border-color: #334155;
+}
+* { box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif;
+  margin: 0; padding: 0; background: var(--bg-primary); color: var(--text-main); display: flex;
+}
+nav {
+  width: 300px; height: 100vh; overflow-y: auto; background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color); padding: 24px 20px; position: fixed;
+}
+nav h2 { font-size: 1.15rem; color: var(--accent); margin-top: 0; margin-bottom: 16px; font-weight: 700; }
+#search-input {
+  width: 100%; padding: 8px 12px; background: var(--bg-tertiary); border: 1px solid var(--border-color);
+  border-radius: 6px; color: #fff; font-size: 0.85rem; margin-bottom: 16px;
+}
+#search-input:focus { outline: none; border-color: var(--accent); }
+.nav-link { display: block; color: var(--text-muted); text-decoration: none; padding: 6px 8px; font-size: 0.9rem; border-radius: 4px; }
+.nav-link:hover { color: #fff; background: var(--bg-tertiary); }
+main { margin-left: 300px; padding: 40px 48px; max-width: 950px; flex: 1; }
+h1 { color: #fff; font-size: 2.2rem; margin-top: 0; padding-bottom: 16px; border-bottom: 1px solid var(--border-color); }
+h2 { color: var(--accent); font-size: 1.4rem; margin-top: 36px; margin-bottom: 14px; }
+h3 { color: #fff; font-size: 1.25rem; margin-top: 28px; margin-bottom: 12px; display: flex; align-items: center; gap: 10px; }
+h4 { color: var(--accent); font-size: 1rem; margin-top: 20px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+.badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
+.badge-pub { background: #064e3b; color: #6ee7b7; border: 1px solid #059669; }
+.badge-private { background: #334155; color: #cbd5e1; }
+.badge-type { background: #1e1b4b; color: #c7d2fe; border: 1px solid #4338ca; }
+.code-sig { background: #090d16; border: 1px solid var(--border-color); padding: 14px 18px; border-radius: 8px; overflow-x: auto; font-family: 'Consolas', 'Fira Code', monospace; font-size: 0.95rem; color: #e2e8f0; }
+.summary { color: #cbd5e1; line-height: 1.65; margin: 14px 0; font-size: 1rem; }
+/* Callout styling */
+.callout { margin: 16px 0; padding: 14px 18px; border-radius: 8px; border-left: 4px solid; font-size: 0.92rem; }
+.callout-header { font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+.callout-tip { border-color: #10b981; background: rgba(16, 185, 129, 0.08); color: #d1fae5; }
+.callout-tip .callout-header { color: #34d399; }
+.callout-warning { border-color: #f59e0b; background: rgba(245, 158, 11, 0.08); color: #fef3c7; }
+.callout-warning .callout-header { color: #fbbf24; }
+.callout-note { border-color: #0284c7; background: rgba(2, 132, 199, 0.08); color: #e0f2fe; }
+.callout-note .callout-header { color: #38bdf8; }
+.callout-deprecated { border-color: #e11d48; background: rgba(225, 29, 72, 0.08); color: #ffe4e6; }
+.callout-deprecated .callout-header { color: #fb7185; }
+/* Example card */
+.example-card { margin: 20px 0; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: #080c14; }
+.example-header { background: #162032; padding: 8px 16px; font-size: 0.82rem; font-weight: 700; color: #94a3b8; border-bottom: 1px solid var(--border-color); }
+.example-card pre { margin: 0; padding: 14px 18px; overflow-x: auto; font-family: monospace; font-size: 0.92rem; color: #e2e8f0; }
+/* Tables */
+table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 0.92rem; }
+th { background: #162032; color: #94a3b8; text-align: left; padding: 10px 14px; font-weight: 600; border-bottom: 1px solid var(--border-color); }
+td { padding: 10px 14px; border-bottom: 1px solid #1e293b; color: #cbd5e1; }
+ul { padding-left: 20px; color: #cbd5e1; line-height: 1.6; }
+hr { border: 0; border-top: 1px solid var(--border-color); margin: 36px 0; }
+</style>
+<script>
+function filterNav() {
+  var q = document.getElementById('search-input').value.toLowerCase();
+  var links = document.querySelectorAll('.nav-link');
+  links.forEach(function(l) {
+    l.style.display = l.textContent.toLowerCase().includes(q) ? 'block' : 'none';
+  });
+}
+</script>
+</head>
+<body>
+<nav>
+<h2>process.lm</h2>
+<input type="text" id="search-input" placeholder="Filter symbols..." oninput="filterNav()">
+<div id="nav-list">
+<a class="nav-link" href="#exit">exit <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#id">id <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#pid">pid <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#args">args <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#command">command <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#memory">memory <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#peak_memory">peak_memory <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#current_rss">current_rss <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#peak_rss">peak_rss <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#is_space_at">is_space_at <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#to_argv">to_argv <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#run">run <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#exec">exec <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+</div>
+</nav>
+<main>
+<h1>process.lm API Reference</h1>
+<h2>Module Overview</h2>
+<div class="summary"><p>std/process/process.lm
+Process identity, arguments, memory inspection, and subprocess execution.</p></div>
+<div id="exit">
+<h3>exit <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn exit(code: int): nil</code></pre>
+<div class="summary"><p>Terminates the process immediately with the given exit code.</p></div>
+<div class="callout callout-warning">
+<div class="callout-header"><span>⚠️</span> Warning</div>
+<div class="callout-content"><p>Flushes standard streams and terminates without executing frame destructors.</p></div>
+</div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>code</code></td><td>Operating system exit code.</td></tr>
+</tbody>
+</table>
+</div><hr>
+<div id="id">
+<h3>id <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn id(): int</code></pre>
+<div class="summary"><p>Returns the operating system Process ID (PID).</p></div>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Process ID integer (0 when unavailable).</p>
+</div><hr>
+<div id="pid">
+<h3>pid <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn pid(): int</code></pre>
+<div class="summary"><p>Alias for `id()`.</p></div>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Process ID integer.</p>
+</div><hr>
+<div id="args">
+<h3>args <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn args(): list</code></pre>
+<div class="summary"><p>Returns the command line arguments passed to the program, excluding the binary name.</p></div>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">List of argument strings.</p>
+</div><hr>
+<div id="command">
+<h3>command <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn command(): str</code></pre>
+<div class="summary"><p>Returns the program name as invoked (argv[0]).</p></div>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Executable invocation name.</p>
+</div><hr>
+<div id="memory">
+<h3>memory <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn memory(): int</code></pre>
+<div class="summary"><p>Returns the current resident set size (RSS) in kilobytes.</p></div>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Memory usage in KB.</p>
+</div><hr>
+<div id="peak_memory">
+<h3>peak_memory <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn peak_memory(): int</code></pre>
+<div class="summary"><p>Returns the peak resident set size (RSS) in kilobytes since launch.</p></div>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Peak memory usage in KB.</p>
+</div><hr>
+<div id="current_rss">
+<h3>current_rss <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn current_rss(): int</code></pre>
+<div class="summary"><p>Alias for `memory()`.</p></div>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Resident set size in KB.</p>
+</div><hr>
+<div id="peak_rss">
+<h3>peak_rss <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn peak_rss(): int</code></pre>
+<div class="summary"><p>Alias for `peak_memory()`.</p></div>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Peak resident set size in KB.</p>
+</div><hr>
+<div id="is_space_at">
+<h3>is_space_at <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn is_space_at(text: str, index: int): bool</code></pre>
+</div><hr>
+<div id="to_argv">
+<h3>to_argv <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn to_argv(command_line: str): list</code></pre>
+</div><hr>
+<div id="run">
+<h3>run <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn run(command_line: str): int</code></pre>
+<div class="summary"><p>Spawns a shell or process command string and waits for its exit code.</p></div>
+<h4>Contracts & Preconditions</h4>
+<ul>
+<li><code>requires len(command_line) > 0</code></li>
+</ul>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>command_line</code></td><td>Raw command string to execute.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Exit code (0 for success, non-zero for error, -1 if spawn failed).</p>
+</div><hr>
+<div id="exec">
+<h3>exec <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn exec(program: str, arguments: list): int</code></pre>
+<div class="summary"><p>Executes a program binary directly with discrete arguments and waits for its exit code.</p></div>
+<h4>Contracts & Preconditions</h4>
+<ul>
+<li><code>requires len(program) > 0</code></li>
+</ul>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>program</code></td><td>Executable binary name or path.</td></tr>
+<tr><td><code>arguments</code></td><td>Vector of arguments.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Exit code.</p>
+</div><hr>
+</main>
+</body>
+</html>

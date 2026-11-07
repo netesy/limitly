@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>index.lm - Lymar API Reference</title>
+<style>
+:root {
+  --bg-primary: #0a0e17;
+  --bg-secondary: #111827;
+  --bg-tertiary: #1f2937;
+  --accent: #38bdf8;
+  --accent-hover: #7dd3fc;
+  --text-main: #f1f5f9;
+  --text-muted: #94a3b8;
+  --border-color: #334155;
+}
+* { box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif;
+  margin: 0; padding: 0; background: var(--bg-primary); color: var(--text-main); display: flex;
+}
+nav {
+  width: 300px; height: 100vh; overflow-y: auto; background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color); padding: 24px 20px; position: fixed;
+}
+nav h2 { font-size: 1.15rem; color: var(--accent); margin-top: 0; margin-bottom: 16px; font-weight: 700; }
+#search-input {
+  width: 100%; padding: 8px 12px; background: var(--bg-tertiary); border: 1px solid var(--border-color);
+  border-radius: 6px; color: #fff; font-size: 0.85rem; margin-bottom: 16px;
+}
+#search-input:focus { outline: none; border-color: var(--accent); }
+.nav-link { display: block; color: var(--text-muted); text-decoration: none; padding: 6px 8px; font-size: 0.9rem; border-radius: 4px; }
+.nav-link:hover { color: #fff; background: var(--bg-tertiary); }
+main { margin-left: 300px; padding: 40px 48px; max-width: 950px; flex: 1; }
+h1 { color: #fff; font-size: 2.2rem; margin-top: 0; padding-bottom: 16px; border-bottom: 1px solid var(--border-color); }
+h2 { color: var(--accent); font-size: 1.4rem; margin-top: 36px; margin-bottom: 14px; }
+h3 { color: #fff; font-size: 1.25rem; margin-top: 28px; margin-bottom: 12px; display: flex; align-items: center; gap: 10px; }
+h4 { color: var(--accent); font-size: 1rem; margin-top: 20px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+.badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
+.badge-pub { background: #064e3b; color: #6ee7b7; border: 1px solid #059669; }
+.badge-private { background: #334155; color: #cbd5e1; }
+.badge-type { background: #1e1b4b; color: #c7d2fe; border: 1px solid #4338ca; }
+.code-sig { background: #090d16; border: 1px solid var(--border-color); padding: 14px 18px; border-radius: 8px; overflow-x: auto; font-family: 'Consolas', 'Fira Code', monospace; font-size: 0.95rem; color: #e2e8f0; }
+.summary { color: #cbd5e1; line-height: 1.65; margin: 14px 0; font-size: 1rem; }
+/* Callout styling */
+.callout { margin: 16px 0; padding: 14px 18px; border-radius: 8px; border-left: 4px solid; font-size: 0.92rem; }
+.callout-header { font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+.callout-tip { border-color: #10b981; background: rgba(16, 185, 129, 0.08); color: #d1fae5; }
+.callout-tip .callout-header { color: #34d399; }
+.callout-warning { border-color: #f59e0b; background: rgba(245, 158, 11, 0.08); color: #fef3c7; }
+.callout-warning .callout-header { color: #fbbf24; }
+.callout-note { border-color: #0284c7; background: rgba(2, 132, 199, 0.08); color: #e0f2fe; }
+.callout-note .callout-header { color: #38bdf8; }
+.callout-deprecated { border-color: #e11d48; background: rgba(225, 29, 72, 0.08); color: #ffe4e6; }
+.callout-deprecated .callout-header { color: #fb7185; }
+/* Example card */
+.example-card { margin: 20px 0; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: #080c14; }
+.example-header { background: #162032; padding: 8px 16px; font-size: 0.82rem; font-weight: 700; color: #94a3b8; border-bottom: 1px solid var(--border-color); }
+.example-card pre { margin: 0; padding: 14px 18px; overflow-x: auto; font-family: monospace; font-size: 0.92rem; color: #e2e8f0; }
+/* Tables */
+table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 0.92rem; }
+th { background: #162032; color: #94a3b8; text-align: left; padding: 10px 14px; font-weight: 600; border-bottom: 1px solid var(--border-color); }
+td { padding: 10px 14px; border-bottom: 1px solid #1e293b; color: #cbd5e1; }
+ul { padding-left: 20px; color: #cbd5e1; line-height: 1.6; }
+hr { border: 0; border-top: 1px solid var(--border-color); margin: 36px 0; }
+</style>
+<script>
+function filterNav() {
+  var q = document.getElementById('search-input').value.toLowerCase();
+  var links = document.querySelectorAll('.nav-link');
+  links.forEach(function(l) {
+    l.style.display = l.textContent.toLowerCase().includes(q) ? 'block' : 'none';
+  });
+}
+</script>
+</head>
+<body>
+<nav>
+<h2>index.lm</h2>
+<input type="text" id="search-input" placeholder="Filter symbols..." oninput="filterNav()">
+<div id="nav-list">
+<a class="nav-link" href="#Path">Path <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#from_string">from_string <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#join">join <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#normalize">normalize <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#is_relative">is_relative <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#starts_with">starts_with <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#ends_with">ends_with <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#last_index_of">last_index_of <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#is_separator">is_separator <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#ends_with_separator">ends_with_separator <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#starts_with_separator">starts_with_separator <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#last_separator_index">last_separator_index <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#is_root_text">is_root_text <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#has_drive_prefix">has_drive_prefix <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#is_absolute_text">is_absolute_text <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#separator">separator <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#list_separator">list_separator <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#absolute">absolute <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+</div>
+</nav>
+<main>
+<h1>index.lm API Reference</h1>
+<h2>Module Overview</h2>
+<div class="summary"><p>std/path/index.lm
+Path module - Cross-platform path manipulation.
+
+The separator that gets written is the platform one (std.os.path_separator);
+both "/" and "\" are always accepted when reading, so a POSIX path can be
+manipulated on Windows and vice versa.</p></div>
+<div id="Path">
+<h3>Path <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame Path</code></pre>
+<div class="summary"><p>Represents a filesystem path, providing methods for component decomposition,
+joining, normalization, and filesystem inspection.</p></div>
+<div class="callout callout-tip">
+<div class="callout-header"><span>💡</span> Idiomatic Usage & Best Practice</div>
+<div class="callout-content"><p>All join operations normalize redundant separators automatically.</p></div>
+</div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>value</code></td><td>The raw string path backing this Path instance.</td></tr>
+</tbody>
+</table>
+<div class="example-card">
+<div class="example-header"><span>✨</span> Example: Idiomatic Usage</div>
+<pre><code>var p = Path("/usr/local/bin");
+print("Basename: {p.basename()}"); // "bin"</code></pre>
+</div>
+<h4>Members</h4>
+<ul>
+<li><code>var pub value: str</code> <em>(field)</em></li>
+<li><code>pub init(value: str)</code> <em>(constructor)</em></li>
+<li><code>pub fn from_string(path: str): Path</code> <em>(method)</em></li>
+<li><code>pub fn join(other: str): Path</code> <em>(method)</em></li>
+<li><code>pub fn join_multiple(parts: list): Path</code> <em>(method)</em></li>
+<li><code>pub fn parent(): Path?</code> <em>(method)</em></li>
+<li><code>pub fn basename(): str</code> <em>(method)</em></li>
+<li><code>pub fn stem(): str</code> <em>(method)</em></li>
+<li><code>pub fn extension(): str</code> <em>(method)</em></li>
+<li><code>pub fn normalize(): Path</code> <em>(method)</em></li>
+<li><code>pub fn resolve(): Path</code> <em>(method)</em></li>
+<li><code>pub fn is_absolute(): bool</code> <em>(method)</em></li>
+<li><code>pub fn is_relative(): bool</code> <em>(method)</em></li>
+<li><code>pub fn exists(): bool</code> <em>(method)</em></li>
+<li><code>pub fn with_extension(extension: str): Path</code> <em>(method)</em></li>
+<li><code>pub fn with_basename(basename: str): Path</code> <em>(method)</em></li>
+<li><code>pub fn equals(other: Path): bool</code> <em>(method)</em></li>
+<li><code>pub fn starts_with(prefix: Path): bool</code> <em>(method)</em></li>
+<li><code>pub fn ends_with(suffix: Path): bool</code> <em>(method)</em></li>
+<li><code>pub fn to_string(): str</code> <em>(method)</em></li>
+<li><code>pub fn display(): str</code> <em>(method)</em></li>
+</ul>
+</div><hr>
+<div id="from_string">
+<h3>from_string <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn from_string(v: str): Path</code></pre>
+<div class="summary"><p>Creates a new Path instance from a raw string.</p></div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>v</code></td><td>Raw path string.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">New Path instance.</p>
+</div><hr>
+<div id="join">
+<h3>join <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn join(paths: list): Path</code></pre>
+<div class="summary"><p>Joins an array of path strings using platform separator logic.</p></div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>paths</code></td><td>Array of path segments.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Joined Path instance.</p>
+</div><hr>
+<div id="normalize">
+<h3>normalize <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn normalize(path_str: str): Path</code></pre>
+<div class="summary"><p>Normalizes a path string, resolving `.` and `..` segments.</p></div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>path_str</code></td><td>Raw path string.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Normalized Path instance.</p>
+</div><hr>
+<div id="is_relative">
+<h3>is_relative <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn is_relative(path_str: str): bool</code></pre>
+<div class="summary"><p>Checks whether a path string represents a relative path.</p></div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>path_str</code></td><td>Path string to inspect.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">True if relative, false if absolute.</p>
+</div><hr>
+<div id="starts_with">
+<h3>starts_with <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn starts_with(s: str, prefix: str): bool</code></pre>
+<div class="summary"><p>Helper functions for string operations since primitive strings don't have methods</p></div>
+</div><hr>
+<div id="ends_with">
+<h3>ends_with <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn ends_with(s: str, suffix: str): bool</code></pre>
+</div><hr>
+<div id="last_index_of">
+<h3>last_index_of <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn last_index_of(s: str, pattern: str): int</code></pre>
+</div><hr>
+<div id="is_separator">
+<h3>is_separator <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn is_separator(c: str): bool</code></pre>
+<div class="summary"><p>Separator helpers. Parsing accepts both separators on every platform; writing
+always uses the platform separator. Indexing a string yields its character
+code, so characters are extracted with substring() to stay in the str type.</p></div>
+</div><hr>
+<div id="ends_with_separator">
+<h3>ends_with_separator <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn ends_with_separator(s: str): bool</code></pre>
+</div><hr>
+<div id="starts_with_separator">
+<h3>starts_with_separator <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn starts_with_separator(s: str): bool</code></pre>
+</div><hr>
+<div id="last_separator_index">
+<h3>last_separator_index <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn last_separator_index(s: str): int</code></pre>
+<div class="summary"><p>Index of the final separator in s, counting either separator, or -1.</p></div>
+</div><hr>
+<div id="is_root_text">
+<h3>is_root_text <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn is_root_text(s: str): bool</code></pre>
+<div class="summary"><p>A path that is nothing but separators is a root ("/", "\\", "//").</p></div>
+</div><hr>
+<div id="has_drive_prefix">
+<h3>has_drive_prefix <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn has_drive_prefix(s: str): bool</code></pre>
+<div class="summary"><p>Windows drive prefix, e.g. the "C:" of "C:/Users".</p></div>
+</div><hr>
+<div id="is_absolute_text">
+<h3>is_absolute_text <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn is_absolute_text(s: str): bool</code></pre>
+</div><hr>
+<div id="separator">
+<h3>separator <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn separator(): str</code></pre>
+<div class="summary"><p>The platform separator used for writing paths (`\` on Windows, `/` on POSIX).</p></div>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Host platform path separator string.</p>
+</div><hr>
+<div id="list_separator">
+<h3>list_separator <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn list_separator(): str</code></pre>
+<div class="summary"><p>The separator between entries of a search-path environment variable (`:` on POSIX, `;` on Windows).</p></div>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Search list separator string.</p>
+</div><hr>
+<div id="absolute">
+<h3>absolute <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn absolute(parts: list): Path</code></pre>
+<div class="summary"><p>Resolves an array of subpaths relative to the process's current working directory.</p></div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>parts</code></td><td>Subpath components to join with the current directory.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Absolute Path instance.</p>
+</div><hr>
+</main>
+</body>
+</html>

@@ -55,7 +55,7 @@ frame Path {
     pub fn join(other: str): Path {
         if (self.value == "") return Path(other);
         if (other == "") return Path(self.value);
-        
+
         // Handle path separators: emit the platform separator, but never
         // duplicate one that is already present on either side.
         var separator = os.path_separator();
@@ -88,10 +88,10 @@ frame Path {
             var fallback: Path? = nil;
             return fallback;
         }
-        
+
         var last_sep = last_separator_index(self.value);
         if (last_sep == -1) return Path("");
-        
+
         var parent_path = substring(self.value, 0, last_sep);
         if (parent_path != "") {
             return Path(parent_path);
@@ -105,10 +105,10 @@ frame Path {
     /// @return Basename string.
     pub fn basename(): str {
         if (len(self.value) == 0 or is_root_text(self.value)) return self.value;
-        
+
         var last_sep = last_separator_index(self.value);
         if (last_sep == -1) return self.value;
-        
+
         if (last_sep + 1 < len(self.value)) {
             return substring(self.value, last_sep + 1, len(self.value));
         } else {
@@ -123,7 +123,7 @@ frame Path {
         var base = self.basename();
         var last_dot = last_index_of(base, ".");
         if (last_dot == -1 or last_dot == 0) return base;
-        
+
         return substring(base, 0, last_dot);
     }
 
@@ -134,7 +134,7 @@ frame Path {
         var base = self.basename();
         var last_dot = last_index_of(base, ".");
         if (last_dot == -1 or last_dot == 0 or last_dot == len(base) - 1) return "";
-        
+
         return substring(base, last_dot + 1, len(base));
     }
 
@@ -306,8 +306,8 @@ frame Path {
 ///
 /// @param v Raw path string.
 /// @return New Path instance.
-pub fn from_string(v: str): Path { 
-    return Path.from_string(v); 
+pub fn from_string(v: str): Path {
+    return Path.from_string(v);
 }
 
 /// Joins an array of path strings using platform separator logic.
@@ -317,7 +317,7 @@ pub fn from_string(v: str): Path {
 pub fn join(paths: [str]): Path {
     if (len(paths) == 0) return Path("");
     if (len(paths) == 1) return Path.from_string(paths[0]);
-    
+
     var result = Path.from_string(paths[0]);
     var i: int = 1;
     while (i < len(paths)) {

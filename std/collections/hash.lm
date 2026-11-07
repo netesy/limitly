@@ -3,27 +3,27 @@
 
 frame NativeHashMap {
     pub data: {any: any};
-    
+
     pub init() {
         self.data = {} as {any: any};
     }
-    
+
     pub fn put(key: any, value: any) {
         self.data[key] = value;
     }
-    
+
     pub fn get(key: any): any {
         return self.data[key];
     }
-    
+
     pub fn has(key: any): bool {
         return self.data[key] != nil;
     }
-    
+
     pub fn remove(key: any) {
         self.data[key] = nil;
     }
-    
+
     pub fn len(): int {
         return len(self.data);
     }
@@ -35,7 +35,7 @@ frame NativeHashMap {
     pub fn length(): int {
         return len(self.data);
     }
-    
+
     pub fn keys(): [any] {
         var res = [];
         return res;
@@ -44,23 +44,23 @@ frame NativeHashMap {
 
 frame NativeHashSet {
     pub data: {any: any};
-    
+
     pub init() {
         self.data = {} as {any: any};
     }
-    
+
     pub fn add(item: any) {
         self.data[item] = true;
     }
-    
+
     pub fn contains(item: any): bool {
         return self.data[item] != nil;
     }
-    
+
     pub fn remove(item: any) {
         self.data[item] = nil;
     }
-    
+
     pub fn len(): int {
         return len(self.data);
     }

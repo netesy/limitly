@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>rasterizer.lm - Lymar API Reference</title>
+<style>
+:root {
+  --bg-primary: #0a0e17;
+  --bg-secondary: #111827;
+  --bg-tertiary: #1f2937;
+  --accent: #38bdf8;
+  --accent-hover: #7dd3fc;
+  --text-main: #f1f5f9;
+  --text-muted: #94a3b8;
+  --border-color: #334155;
+}
+* { box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif;
+  margin: 0; padding: 0; background: var(--bg-primary); color: var(--text-main); display: flex;
+}
+nav {
+  width: 300px; height: 100vh; overflow-y: auto; background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color); padding: 24px 20px; position: fixed;
+}
+nav h2 { font-size: 1.15rem; color: var(--accent); margin-top: 0; margin-bottom: 16px; font-weight: 700; }
+#search-input {
+  width: 100%; padding: 8px 12px; background: var(--bg-tertiary); border: 1px solid var(--border-color);
+  border-radius: 6px; color: #fff; font-size: 0.85rem; margin-bottom: 16px;
+}
+#search-input:focus { outline: none; border-color: var(--accent); }
+.nav-link { display: block; color: var(--text-muted); text-decoration: none; padding: 6px 8px; font-size: 0.9rem; border-radius: 4px; }
+.nav-link:hover { color: #fff; background: var(--bg-tertiary); }
+main { margin-left: 300px; padding: 40px 48px; max-width: 950px; flex: 1; }
+h1 { color: #fff; font-size: 2.2rem; margin-top: 0; padding-bottom: 16px; border-bottom: 1px solid var(--border-color); }
+h2 { color: var(--accent); font-size: 1.4rem; margin-top: 36px; margin-bottom: 14px; }
+h3 { color: #fff; font-size: 1.25rem; margin-top: 28px; margin-bottom: 12px; display: flex; align-items: center; gap: 10px; }
+h4 { color: var(--accent); font-size: 1rem; margin-top: 20px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+.badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
+.badge-pub { background: #064e3b; color: #6ee7b7; border: 1px solid #059669; }
+.badge-private { background: #334155; color: #cbd5e1; }
+.badge-type { background: #1e1b4b; color: #c7d2fe; border: 1px solid #4338ca; }
+.code-sig { background: #090d16; border: 1px solid var(--border-color); padding: 14px 18px; border-radius: 8px; overflow-x: auto; font-family: 'Consolas', 'Fira Code', monospace; font-size: 0.95rem; color: #e2e8f0; }
+.summary { color: #cbd5e1; line-height: 1.65; margin: 14px 0; font-size: 1rem; }
+/* Callout styling */
+.callout { margin: 16px 0; padding: 14px 18px; border-radius: 8px; border-left: 4px solid; font-size: 0.92rem; }
+.callout-header { font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+.callout-tip { border-color: #10b981; background: rgba(16, 185, 129, 0.08); color: #d1fae5; }
+.callout-tip .callout-header { color: #34d399; }
+.callout-warning { border-color: #f59e0b; background: rgba(245, 158, 11, 0.08); color: #fef3c7; }
+.callout-warning .callout-header { color: #fbbf24; }
+.callout-note { border-color: #0284c7; background: rgba(2, 132, 199, 0.08); color: #e0f2fe; }
+.callout-note .callout-header { color: #38bdf8; }
+.callout-deprecated { border-color: #e11d48; background: rgba(225, 29, 72, 0.08); color: #ffe4e6; }
+.callout-deprecated .callout-header { color: #fb7185; }
+/* Example card */
+.example-card { margin: 20px 0; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: #080c14; }
+.example-header { background: #162032; padding: 8px 16px; font-size: 0.82rem; font-weight: 700; color: #94a3b8; border-bottom: 1px solid var(--border-color); }
+.example-card pre { margin: 0; padding: 14px 18px; overflow-x: auto; font-family: monospace; font-size: 0.92rem; color: #e2e8f0; }
+/* Tables */
+table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 0.92rem; }
+th { background: #162032; color: #94a3b8; text-align: left; padding: 10px 14px; font-weight: 600; border-bottom: 1px solid var(--border-color); }
+td { padding: 10px 14px; border-bottom: 1px solid #1e293b; color: #cbd5e1; }
+ul { padding-left: 20px; color: #cbd5e1; line-height: 1.6; }
+hr { border: 0; border-top: 1px solid var(--border-color); margin: 36px 0; }
+</style>
+<script>
+function filterNav() {
+  var q = document.getElementById('search-input').value.toLowerCase();
+  var links = document.querySelectorAll('.nav-link');
+  links.forEach(function(l) {
+    l.style.display = l.textContent.toLowerCase().includes(q) ? 'block' : 'none';
+  });
+}
+</script>
+</head>
+<body>
+<nav>
+<h2>rasterizer.lm</h2>
+<input type="text" id="search-input" placeholder="Filter symbols..." oninput="filterNav()">
+<div id="nav-list">
+<a class="nav-link" href="#GlyphBitmap">GlyphBitmap <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#Intersection">Intersection <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#rasterize_glyph">rasterize_glyph <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#rasterize_glyph_subpixel">rasterize_glyph_subpixel <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#sqrt_approx">sqrt_approx <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#dist_to_segment_squared">dist_to_segment_squared <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#point_inside_outline">point_inside_outline <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#rasterize_glyph_sdf">rasterize_glyph_sdf <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+</div>
+</nav>
+<main>
+<h1>rasterizer.lm API Reference</h1>
+<h2>Module Overview</h2>
+<div class="summary"><p>std/font/rasterizer.lm
+Subpixel supersampled scanline rasterizer for font glyphs.
+Produces 8-bit alpha coverage bitmaps (0..255) using standard non-zero winding rule.</p></div>
+<div id="GlyphBitmap">
+<h3>GlyphBitmap <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame GlyphBitmap</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>var pub width: int</code> <em>(field)</em></li>
+<li><code>var pub height: int</code> <em>(field)</em></li>
+<li><code>var pub x_offset: int</code> <em>(field)</em></li>
+<li><code>var pub y_offset: int</code> <em>(field)</em></li>
+<li><code>var pub pixels: list</code> <em>(field)</em></li>
+<li><code>pub init()</code> <em>(constructor)</em></li>
+</ul>
+</div><hr>
+<div id="Intersection">
+<h3>Intersection <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame Intersection</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>var pub x: float</code> <em>(field)</em></li>
+<li><code>var pub direction: int</code> <em>(field)</em></li>
+<li><code>pub init()</code> <em>(constructor)</em></li>
+</ul>
+</div><hr>
+<div id="rasterize_glyph">
+<h3>rasterize_glyph <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn rasterize_glyph(outline: g.GlyphOutline, scale: float): GlyphBitmap</code></pre>
+</div><hr>
+<div id="rasterize_glyph_subpixel">
+<h3>rasterize_glyph_subpixel <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn rasterize_glyph_subpixel(outline: g.GlyphOutline, scale: float, oversample_x: int = ..., oversample_y: int = ..., shift_x: float = ..., shift_y: float = ...): GlyphBitmap</code></pre>
+</div><hr>
+<div id="sqrt_approx">
+<h3>sqrt_approx <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn sqrt_approx(x: float): float</code></pre>
+<div class="summary"><p>Helper: Square root using Newton-Raphson approximation</p></div>
+</div><hr>
+<div id="dist_to_segment_squared">
+<h3>dist_to_segment_squared <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn dist_to_segment_squared(px: float, py: float, x1: float, y1: float, x2: float, y2: float): float</code></pre>
+<div class="summary"><p>Helper: Calculate squared distance from point to line segment</p></div>
+</div><hr>
+<div id="point_inside_outline">
+<h3>point_inside_outline <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn point_inside_outline(px: float, py: float, segments: list): bool</code></pre>
+<div class="summary"><p>Helper: Check if point is inside glyph using winding rule</p></div>
+</div><hr>
+<div id="rasterize_glyph_sdf">
+<h3>rasterize_glyph_sdf <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn rasterize_glyph_sdf(outline: g.GlyphOutline, scale: float, padding: int = ..., onedge_value: float = ..., pixel_dist_scale: float = ...): GlyphBitmap</code></pre>
+</div><hr>
+</main>
+</body>
+</html>

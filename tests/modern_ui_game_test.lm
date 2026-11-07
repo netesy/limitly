@@ -9,7 +9,6 @@
 // 6. ColorRole native pattern matching
 // 7. Clean domain imports from std.color and std.math
 
-import std.ui as ui;
 import std.ui.components as comp;
 import std.ui.staged as staged_ui;
 import std.ui.event as event;
@@ -18,7 +17,6 @@ import std.game.components as gcomp;
 import std.game.types as gtypes;
 import std.color as color;
 import std.color.palette as palette;
-import std.math as math;
 
 fn test_embedded_ui_components() {
     print("=== Testing Embedded UI Components ===");
@@ -35,7 +33,7 @@ fn test_embedded_ui_components() {
     var lbl = comp.Label("Dashboard").color(color.white).font_size(20.0).bold();
     assert(lbl.text == "Dashboard", "Label text mismatch");
     assert(lbl.font_size_val == 20.0, "Label font size mismatch");
-    assert(lbl.is_bold == true, "Label bold flag mismatch");
+    assert(lbl.is_bold, "Label bold flag mismatch");
 
     // Slider component with embedded LayoutMetrics, VisualStyle, and Changeable
     var sld = comp.Slider(50.0, 0.0, 100.0);
@@ -46,12 +44,12 @@ fn test_embedded_ui_components() {
     // Checkbox component with embedded LayoutMetrics, VisualStyle, Clickable, Changeable
     var chk = comp.Checkbox("Remember me", false);
     chk.toggle();
-    assert(chk.is_checked == true, "Checkbox toggle mismatch");
+    assert(chk.is_checked, "Checkbox toggle mismatch");
 
     // TextInput component with embedded Focusable
     var txt = comp.TextInput("hello world");
     txt.focus();
-    assert(txt.is_focused == true, "TextInput focus mismatch");
+    assert(txt.is_focused, "TextInput focus mismatch");
 
     // ProgressBar component
     var pb = comp.ProgressBar(40.0, 100.0);
@@ -62,7 +60,7 @@ fn test_embedded_ui_components() {
     assert(sp.flex_val == 2.0, "Spacer flex mismatch");
 
     var col = comp.column([btn, lbl, sp]);
-    assert(col.is_vertical() == true, "Column is_vertical mismatch");
+    assert(col.is_vertical(), "Column is_vertical mismatch");
     assert(len(col.children) == 3, "Column children count mismatch");
 
     print("[PASS] Embedded UI Components");
@@ -111,7 +109,7 @@ fn test_nominal_event_and_fallible_dispatch() {
         assert(false, "fire_action unexpectedly failed");
         event.EventResult.Ignored
     };
-    assert(executed.get() == true, "fire_action did not invoke callback");
+    assert(executed.get(), "fire_action did not invoke callback");
     assert(act_res == event.EventResult.Handled, "fire_action result mismatch");
 
     // Nil action returns Ignored without crashing or throwing
@@ -124,11 +122,11 @@ fn test_nominal_event_and_fallible_dispatch() {
     // Invalid target produces fallible error
     var invalid_evt = event.make_click_event("", 0.0, 0.0);
     var errored = false;
-    var res2 = event.dispatch_event(invalid_evt)? else {
+    var _res2 = event.dispatch_event(invalid_evt)? else {
         errored = true;
         event.EventResult.Ignored
     };
-    assert(errored == true, "Empty target should produce fallible error");
+    assert(errored, "Empty target should produce fallible error");
     print("[PASS] Nominal Enums & Fallible Event Dispatch");
 }
 
@@ -139,11 +137,11 @@ fn test_game_embedded_geometry() {
     // Promoted field from Rect
     assert(ws.w == 200.0, "Promoted width mismatch");
     // Promoted method from Rect
-    assert(ws.contains(50.0, 50.0) == true, "Point inside Rect should match");
-    assert(ws.contains(300.0, 50.0) == false, "Point outside Rect should not match");
+    assert(ws.contains(50.0, 50.0), "Point inside Rect should match");
+    assert(not ws.contains(300.0, 50.0), "Point outside Rect should not match");
 
     ws.update_hover(50.0, 50.0);
-    assert(ws.is_hot == true, "Widget should be hot when hovered");
+    assert(ws.is_hot, "Widget should be hot when hovered");
 
     // Transform2D with embedded Vec2
     var tf = gcomp.Transform2D(10.0, 20.0, 0.0);

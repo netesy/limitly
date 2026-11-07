@@ -4,9 +4,9 @@ fn main(): int {
     var parser = cli.ArgParser("limapp");
     parser.parse(["limapp", "-v", "--flag", "file.txt", "out.bin"]);
 
-    assert(parser.has_flag("-v") == true, "has_flag -v failed");
-    assert(parser.has_flag("--flag") == true, "has_flag --flag failed");
-    assert(parser.has_flag("-x") == false, "has_flag -x should be false");
+    assert(parser.has_flag("-v"), "has_flag -v failed");
+    assert(parser.has_flag("--flag"), "has_flag --flag failed");
+    assert(not parser.has_flag("-x"), "has_flag -x should be false");
 
     var args = parser.get_args();
     assert(len(args) == 2, "positional args count should be 2");

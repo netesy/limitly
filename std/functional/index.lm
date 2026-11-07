@@ -254,12 +254,12 @@ fn xor(pred1: fn(int): bool, pred2: fn(int): bool): fn(int): bool {
 // Memoization utilities
 fn memoize_int(fn_ref: fn(int): int): fn(int): int {
     var cache: {int: int} = {};
-    
+
     return fn(x: int): int {
         if (cache[x] != nil) {
             return cache[x];
         }
-        
+
         var result = fn_ref(x);
         cache[x] = result;
         return result;
@@ -268,12 +268,12 @@ fn memoize_int(fn_ref: fn(int): int): fn(int): int {
 
 fn memoize_str(fn_ref: fn(str): str): fn(str): str {
     var cache: {str: str} = {};
-    
+
     return fn(x: str): str {
         if (cache[x] != nil) {
             return cache[x];
         }
-        
+
         var result = fn_ref(x);
         cache[x] = result;
         return result;
@@ -282,12 +282,12 @@ fn memoize_str(fn_ref: fn(str): str): fn(str): str {
 
 fn memoize_bool(fn_ref: fn(int): bool): fn(int): bool {
     var cache: {int: bool} = {};
-    
+
     return fn(x: int): bool {
         if (cache[x] != nil) {
             return cache[x];
         }
-        
+
         var result = fn_ref(x);
         cache[x] = result;
         return result;

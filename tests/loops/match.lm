@@ -173,11 +173,11 @@ print("Message 3: {msg3}");
 // Test 10: Guard clauses
 print("\n--- Test 10: Guard Clauses ---");
 fn getGuard(ans: int): str {
-match(ans) {
-    x where x > 10 => { return "greater than 10"; },
-    x where x < 10 => { return "less than 10"; },
-    x => { return "exactly 10"; }
-}
+    match(ans) {
+        x where x > 10 => { return "greater than 10"; },
+        x where x < 10 => { return "less than 10"; },
+        x => { return "exactly 10"; }
+    }
 }
 var result10 =  getGuard(10);
 assert(result10 == "exactly 10", "Guard clause test for 10 failed");

@@ -21,46 +21,46 @@ var return_code = 0;
 
 // Test 6: Missing delimiter - closing brace
 // frame Test {
-//     pub fn method() {
-//     // Missing closing brace
+    //     pub fn method() {
+        //     // Missing closing brace
 
-// Test 7: Type mismatch
-// var x: int = "hello";  // Should report type mismatch with specific reason
+        // Test 7: Type mismatch
+        // var x: int = "hello";  // Should report type mismatch with specific reason
 
-// Test 8: Missing semicolon
-// var y = 10
-// var z = 20
+        // Test 8: Missing semicolon
+        // var y = 10
+        // var z = 20
 
-// Test 9: Missing colon in type annotation
-// frame Test {
-//     pub field int  // Missing colon
-// }
+        // Test 9: Missing colon in type annotation
+        // frame Test {
+            //     pub field int  // Missing colon
+            // }
 
-// Test 10: Reserved keyword as parameter name
-// fn test(var: int) {}  // Should report: `var` cannot be used as a parameter name
+            // Test 10: Reserved keyword as parameter name
+            // fn test(var: int) {}  // Should report: `var` cannot be used as a parameter name
 
-// Test 11: Built-in type as field name
-// frame Test {
-//     pub int: int;  // Should report: `int` cannot be used as a field name
-// }
+            // Test 11: Built-in type as field name
+            // frame Test {
+                //     pub int: int;  // Should report: `int` cannot be used as a field name
+                // }
 
-// Test 12: Missing closing parenthesis
-// fn test() {
-//     print("hello"  // Missing closing paren
+                // Test 12: Missing closing parenthesis
+                // fn test() {
+                    //     print("hello"  // Missing closing paren
 
-// Test 13: Missing closing bracket
-// var arr = [1, 2, 3;  // Missing closing bracket
+                    // Test 13: Missing closing bracket
+                    // var arr = [1, 2, 3;  // Missing closing bracket
 
-// Test 14: Valid code to ensure parser recovers
-fn valid_function(x: int): int {
-    return x + 1;
-}
+                    // Test 14: Valid code to ensure parser recovers
+                    fn valid_function(x: int): int {
+                        return x + 1;
+                    }
 
-frame ValidFrame {
-    pub field: int;
-}
+                    frame ValidFrame {
+                        pub field: int;
+                    }
 
-// Test that valid identifiers work correctly
-var my_int = 100;
-var my_bool = false;
-var my_str = "hello";
+                    // Test that valid identifiers work correctly
+                    var my_int = 100;
+                    var my_bool = false;
+                    var my_str = "hello";

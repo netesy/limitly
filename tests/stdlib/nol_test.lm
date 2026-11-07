@@ -7,20 +7,20 @@ fn main(): int {
     var cb = "}";
 
     var nol_doc = "# Lymar project manifest\n" +
-        "## Multi-line\n" +
-        "   header comment ##\n" +
-        "[package]\n" +
-        "name: \"my_project\"\n" +
-        "version: \"0.1.0\"\n" +
-        "edition: 2026\n" +
-        "active: true\n" +
-        "\n" +
-        "[dependencies]\n" +
-        "http: " + ob + " version: \"1.0.0\", path: \"../http\" " + cb + "\n" +
-        "crypto: \"0.2.0\"\n" +
-        "\n" +
-        "[native]\n" +
-        "sources: [\"src/native.c\", \"src/helper.c\"]\n";
+    "## Multi-line\n" +
+    "   header comment ##\n" +
+    "[package]\n" +
+    "name: \"my_project\"\n" +
+    "version: \"0.1.0\"\n" +
+    "edition: 2026\n" +
+    "active: true\n" +
+    "\n" +
+    "[dependencies]\n" +
+    "http: " + ob + " version: \"1.0.0\", path: \"../http\" " + cb + "\n" +
+    "crypto: \"0.2.0\"\n" +
+    "\n" +
+    "[native]\n" +
+    "sources: [\"src/native.c\", \"src/helper.c\"]\n";
 
     var doc = nol.parse(nol_doc)? else {
         assert(false, "Failed to parse NOL document");
@@ -44,7 +44,7 @@ fn main(): int {
 
     var active_val = doc.get("package.active") as nol.Value;
     assert(active_val.is_bool(), "active should be bool");
-    assert(active_val.as_bool() == true, "active should be true");
+    assert(active_val.as_bool(), "active should be true");
 
     var http_ver = doc.get("dependencies.http.version") as nol.Value;
     assert(http_ver != nil, "http.version should not be nil");

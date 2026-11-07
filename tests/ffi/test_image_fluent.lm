@@ -56,10 +56,10 @@ fn test_fluent_chaining(): int {
 
     // Chain drawing operations fluently on 150x150 canvas
     img.fill(image.dark_gray)
-       .fill_rect(20, 20, 50, 50, image.red)
-       .fill_rect(80, 20, 50, 50, image.blue)
-       .line(0, 0, 149, 149, image.white)
-       .set(0, 0, image.yellow);
+    .fill_rect(20, 20, 50, 50, image.red)
+    .fill_rect(80, 20, 50, 50, image.blue)
+    .line(0, 0, 149, 149, image.white)
+    .set(0, 0, image.yellow);
 
     var p_bg = img.get(75, 120);
     assert(p_bg.r == image.dark_gray.r, "background pixel mismatch");
@@ -88,7 +88,7 @@ fn test_fluent_transforms(): int {
     var img = img_opt? else { return 0; };
 
     img.fill(image.black)
-       .set(0, 0, image.red);
+    .set(0, 0, image.red);
 
     // In-place flip chain
     img.flip_h().flip_v();
@@ -128,16 +128,16 @@ fn test_unified_save_autodetect(): int {
     img.fill(image.indigo);
 
     var s1 = img.save("tests/ffi/fluent_out.png")? else { return 0; };
-    assert(s1 == true, "save png failed");
+    assert(s1, "save png failed");
 
     var s2 = img.save("tests/ffi/fluent_out.jpg", 80)? else { return 0; };
-    assert(s2 == true, "save jpg failed");
+    assert(s2, "save jpg failed");
 
     var s3 = img.save("tests/ffi/fluent_out.bmp")? else { return 0; };
-    assert(s3 == true, "save bmp failed");
+    assert(s3, "save bmp failed");
 
     var s4 = img.save("tests/ffi/fluent_out.tga")? else { return 0; };
-    assert(s4 == true, "save tga failed");
+    assert(s4, "save tga failed");
 
     // Verify loading the saved files
     var l1 = image.load("tests/ffi/fluent_out.png")? else { return 0; };
@@ -163,32 +163,32 @@ fn test_format_facades(): int {
 
     // Using format submodules via top-level image namespace
     var ok1 = image.png.save(img, "tests/ffi/facade_out.png")? else { return 0; };
-    assert(ok1 == true, "image.png.save failed");
+    assert(ok1, "image.png.save failed");
 
     var ok2 = image.jpg.save(img, "tests/ffi/facade_out.jpg", 85)? else { return 0; };
-    assert(ok2 == true, "image.jpg.save failed");
+    assert(ok2, "image.jpg.save failed");
 
     var ok3 = image.bmp.save(img, "tests/ffi/facade_out.bmp")? else { return 0; };
-    assert(ok3 == true, "image.bmp.save failed");
+    assert(ok3, "image.bmp.save failed");
 
     var ok4 = image.tga.save(img, "tests/ffi/facade_out.tga")? else { return 0; };
-    assert(ok4 == true, "image.tga.save failed");
+    assert(ok4, "image.tga.save failed");
 
     var ok5 = image.tga.save_rle(img, "tests/ffi/facade_out_rle.tga")? else { return 0; };
-    assert(ok5 == true, "image.tga.save_rle failed");
+    assert(ok5, "image.tga.save_rle failed");
 
     // Using directly imported format submodules
     var ok6 = png.save(img, "tests/ffi/direct_out.png")? else { return 0; };
-    assert(ok6 == true, "png.save failed");
+    assert(ok6, "png.save failed");
 
     var ok7 = jpg.save(img, "tests/ffi/direct_out.jpg", 90)? else { return 0; };
-    assert(ok7 == true, "jpg.save failed");
+    assert(ok7, "jpg.save failed");
 
     var ok8 = bmp.save(img, "tests/ffi/direct_out.bmp")? else { return 0; };
-    assert(ok8 == true, "bmp.save failed");
+    assert(ok8, "bmp.save failed");
 
     var ok9 = tga.save(img, "tests/ffi/direct_out.tga")? else { return 0; };
-    assert(ok9 == true, "tga.save failed");
+    assert(ok9, "tga.save failed");
 
     img.free();
 

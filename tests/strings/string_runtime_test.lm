@@ -8,7 +8,7 @@ var str2 = "World";
 var empty = "";
 
 print("str1 = {str1}");
-print("str2 = {str2}");  
+print("str2 = {str2}");
 print("empty = '{empty}'");
 
 // Test 2: String concatenation with automatic coercion

@@ -10,7 +10,7 @@ var z = true;
 
 print("Basic values:");
 print("x = {x}");
-print("y = {y}"); 
+print("y = {y}");
 print("z = {z}");
 
 // Test list and dict operations (these work and help verify the VM is functioning)

@@ -170,54 +170,54 @@ frame Parser {
     /// Parses a JSON braced object token { "key": val, ... }.
     pub fn parse_object(): value.Value {
         self.idx = self.idx + 1; // skip {
-        var keys: [str] = [];
-        var vals: [any] = [];
-        self.skip_whitespace();
-        var next_ch = _builtin_substring(self.text, self.idx, self.idx + 1);
-        if (next_ch == "}") {
-            self.idx = self.idx + 1;
+            var keys: [str] = [];
+            var vals: [any] = [];
+            self.skip_whitespace();
+            var next_ch = _builtin_substring(self.text, self.idx, self.idx + 1);
+            if (next_ch == "}") {
+                self.idx = self.idx + 1;
+                return value.make_object(keys, vals);
+            }
+
+            var keep_going = true;
+            while (keep_going) {
+                self.skip_whitespace();
+                var key_ch = _builtin_substring(self.text, self.idx, self.idx + 1);
+                var key = "";
+                if (key_ch == "\"") {
+                    var key_val = self.parse_string();
+                    key = key_val.str_val;
+                }
+                self.skip_whitespace();
+                // Skip colon
+                var colon_ch = _builtin_substring(self.text, self.idx, self.idx + 1);
+                if (colon_ch == ":") {
+                    self.idx = self.idx + 1;
+                }
+                var item_val = self.parse_value();
+                keys.append(key);
+                vals.append(item_val);
+                self.skip_whitespace();
+                var ch = _builtin_substring(self.text, self.idx, self.idx + 1);
+                if (ch == ",") {
+                    self.idx = self.idx + 1;
+                    self.skip_whitespace();
+                } elif (ch == "}") {
+                    self.idx = self.idx + 1;
+                    keep_going = false;
+                } else {
+                    keep_going = false;
+                }
+            }
             return value.make_object(keys, vals);
         }
-
-        var keep_going = true;
-        while (keep_going) {
-            self.skip_whitespace();
-            var key_ch = _builtin_substring(self.text, self.idx, self.idx + 1);
-            var key = "";
-            if (key_ch == "\"") {
-                var key_val = self.parse_string();
-                key = key_val.str_val;
-            }
-            self.skip_whitespace();
-            // Skip colon
-            var colon_ch = _builtin_substring(self.text, self.idx, self.idx + 1);
-            if (colon_ch == ":") {
-                self.idx = self.idx + 1;
-            }
-            var item_val = self.parse_value();
-            keys.append(key);
-            vals.append(item_val);
-            self.skip_whitespace();
-            var ch = _builtin_substring(self.text, self.idx, self.idx + 1);
-            if (ch == ",") {
-                self.idx = self.idx + 1;
-                self.skip_whitespace();
-            } elif (ch == "}") {
-                self.idx = self.idx + 1;
-                keep_going = false;
-            } else {
-                keep_going = false;
-            }
-        }
-        return value.make_object(keys, vals);
     }
-}
 
-/// Parses raw JSON text into an immutable `Value` AST node.
-///
-/// @param text Raw JSON text.
-/// @return Parsed `value.Value` root node.
-pub fn parse(text: str): value.Value {
-    var p = Parser(idx=0, text=text);
-    return p.parse_value();
-}
+    /// Parses raw JSON text into an immutable `Value` AST node.
+    ///
+    /// @param text Raw JSON text.
+    /// @return Parsed `value.Value` root node.
+    pub fn parse(text: str): value.Value {
+        var p = Parser(idx=0, text=text);
+        return p.parse_value();
+    }

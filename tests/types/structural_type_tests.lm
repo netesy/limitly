@@ -12,10 +12,10 @@ type Address = { street: str, city: str, zipCode: int };
 
 // Test 2: Complex structural types
 print("\n--- Test 2: Complex Structural Types ---");
-type Employee = { 
-    id: int, 
-    name: str, 
-    email: str, 
+type Employee = {
+    id: int,
+    name: str,
+    email: str,
     active: bool,
     salary: float
 };
@@ -43,12 +43,12 @@ print("\n--- Test 5: Various Field Counts ---");
 type Simple = { value: int };
 type Pair = { first: str, second: str };
 type Triple = { x: int, y: int, z: int };
-type Complex = { 
-    a: int, 
-    b: str, 
-    c: bool, 
-    d: float, 
-    e: str 
+type Complex = {
+    a: int,
+    b: str,
+    c: bool,
+    d: float,
+    e: str
 };
 
 print("Structural type declarations completed!");

@@ -13,11 +13,11 @@ frame Foo {
 
 fn main(): int {
     var f = Foo();
-    
+
     assert(f != nil, "Frame object should not be nil");
     assert(f.a == 123, "Field a should be initialized to 123");
     assert(f.b == "hello", "Field b should be initialized to 'hello'");
-    
+
     print("Test A - Frame Initialization: PASSED");
     return 0;
 }

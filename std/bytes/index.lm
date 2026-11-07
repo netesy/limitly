@@ -20,7 +20,7 @@
 /// @param initial Optional starting list of byte values.
 frame ByteBuffer {
     pub var data: [int];
-    
+
     pub init(initial: [int]? = nil) {
         if (initial != nil) {
             self.data = initial as [int];
@@ -28,14 +28,14 @@ frame ByteBuffer {
             self.data = [] as [int];
         }
     }
-    
+
     /// Appends a single byte (0-255) to the buffer.
     ///
     /// @param byte Byte value to append (automatically masked to 8 bits).
     pub fn append(byte: int) {
         self.data.append(byte % 256);
     }
-    
+
     /// Appends all bytes from an array to the buffer.
     ///
     /// @param bytes Array of byte integers to append.
@@ -46,7 +46,7 @@ frame ByteBuffer {
             i = i + 1;
         }
     }
-    
+
     /// Retrieves the byte value at the specified index.
     ///
     /// @pre idx >= 0 and idx < len(self.data)
@@ -56,14 +56,14 @@ frame ByteBuffer {
         contract(idx >= 0 and idx < len(self.data), "Index out of bounds");
         return self.data[idx];
     }
-    
+
     /// Returns the total number of bytes currently stored in the buffer.
     ///
     /// @return Number of bytes as an integer.
-    pub fn len(): int { 
-        return len(self.data); 
+    pub fn len(): int {
+        return len(self.data);
     }
-    
+
     /// Formats all bytes in the buffer into a lowercase hexadecimal string.
     ///
     /// @return Hexadecimal string representation.
@@ -85,10 +85,10 @@ frame ByteBuffer {
 /// @return 4-element byte array [MSB, ..., LSB].
 pub fn encode_i32_be(value: int): [int] {
     return [
-        (value >> 24) & 0xFF,
-        (value >> 16) & 0xFF,
-        (value >> 8) & 0xFF,
-        value & 0xFF
+    (value >> 24) & 0xFF,
+    (value >> 16) & 0xFF,
+    (value >> 8) & 0xFF,
+    value & 0xFF
     ];
 }
 
@@ -98,10 +98,10 @@ pub fn encode_i32_be(value: int): [int] {
 /// @return 4-element byte array [LSB, ..., MSB].
 pub fn encode_i32_le(value: int): [int] {
     return [
-        value & 0xFF,
-        (value >> 8) & 0xFF,
-        (value >> 16) & 0xFF,
-        (value >> 24) & 0xFF
+    value & 0xFF,
+    (value >> 8) & 0xFF,
+    (value >> 16) & 0xFF,
+    (value >> 24) & 0xFF
     ];
 }
 

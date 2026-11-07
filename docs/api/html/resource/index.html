@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>index.lm - Lymar API Reference</title>
+<style>
+:root {
+  --bg-primary: #0a0e17;
+  --bg-secondary: #111827;
+  --bg-tertiary: #1f2937;
+  --accent: #38bdf8;
+  --accent-hover: #7dd3fc;
+  --text-main: #f1f5f9;
+  --text-muted: #94a3b8;
+  --border-color: #334155;
+}
+* { box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif;
+  margin: 0; padding: 0; background: var(--bg-primary); color: var(--text-main); display: flex;
+}
+nav {
+  width: 300px; height: 100vh; overflow-y: auto; background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color); padding: 24px 20px; position: fixed;
+}
+nav h2 { font-size: 1.15rem; color: var(--accent); margin-top: 0; margin-bottom: 16px; font-weight: 700; }
+#search-input {
+  width: 100%; padding: 8px 12px; background: var(--bg-tertiary); border: 1px solid var(--border-color);
+  border-radius: 6px; color: #fff; font-size: 0.85rem; margin-bottom: 16px;
+}
+#search-input:focus { outline: none; border-color: var(--accent); }
+.nav-link { display: block; color: var(--text-muted); text-decoration: none; padding: 6px 8px; font-size: 0.9rem; border-radius: 4px; }
+.nav-link:hover { color: #fff; background: var(--bg-tertiary); }
+main { margin-left: 300px; padding: 40px 48px; max-width: 950px; flex: 1; }
+h1 { color: #fff; font-size: 2.2rem; margin-top: 0; padding-bottom: 16px; border-bottom: 1px solid var(--border-color); }
+h2 { color: var(--accent); font-size: 1.4rem; margin-top: 36px; margin-bottom: 14px; }
+h3 { color: #fff; font-size: 1.25rem; margin-top: 28px; margin-bottom: 12px; display: flex; align-items: center; gap: 10px; }
+h4 { color: var(--accent); font-size: 1rem; margin-top: 20px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+.badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
+.badge-pub { background: #064e3b; color: #6ee7b7; border: 1px solid #059669; }
+.badge-private { background: #334155; color: #cbd5e1; }
+.badge-type { background: #1e1b4b; color: #c7d2fe; border: 1px solid #4338ca; }
+.code-sig { background: #090d16; border: 1px solid var(--border-color); padding: 14px 18px; border-radius: 8px; overflow-x: auto; font-family: 'Consolas', 'Fira Code', monospace; font-size: 0.95rem; color: #e2e8f0; }
+.summary { color: #cbd5e1; line-height: 1.65; margin: 14px 0; font-size: 1rem; }
+/* Callout styling */
+.callout { margin: 16px 0; padding: 14px 18px; border-radius: 8px; border-left: 4px solid; font-size: 0.92rem; }
+.callout-header { font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+.callout-tip { border-color: #10b981; background: rgba(16, 185, 129, 0.08); color: #d1fae5; }
+.callout-tip .callout-header { color: #34d399; }
+.callout-warning { border-color: #f59e0b; background: rgba(245, 158, 11, 0.08); color: #fef3c7; }
+.callout-warning .callout-header { color: #fbbf24; }
+.callout-note { border-color: #0284c7; background: rgba(2, 132, 199, 0.08); color: #e0f2fe; }
+.callout-note .callout-header { color: #38bdf8; }
+.callout-deprecated { border-color: #e11d48; background: rgba(225, 29, 72, 0.08); color: #ffe4e6; }
+.callout-deprecated .callout-header { color: #fb7185; }
+/* Example card */
+.example-card { margin: 20px 0; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: #080c14; }
+.example-header { background: #162032; padding: 8px 16px; font-size: 0.82rem; font-weight: 700; color: #94a3b8; border-bottom: 1px solid var(--border-color); }
+.example-card pre { margin: 0; padding: 14px 18px; overflow-x: auto; font-family: monospace; font-size: 0.92rem; color: #e2e8f0; }
+/* Tables */
+table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 0.92rem; }
+th { background: #162032; color: #94a3b8; text-align: left; padding: 10px 14px; font-weight: 600; border-bottom: 1px solid var(--border-color); }
+td { padding: 10px 14px; border-bottom: 1px solid #1e293b; color: #cbd5e1; }
+ul { padding-left: 20px; color: #cbd5e1; line-height: 1.6; }
+hr { border: 0; border-top: 1px solid var(--border-color); margin: 36px 0; }
+</style>
+<script>
+function filterNav() {
+  var q = document.getElementById('search-input').value.toLowerCase();
+  var links = document.querySelectorAll('.nav-link');
+  links.forEach(function(l) {
+    l.style.display = l.textContent.toLowerCase().includes(q) ? 'block' : 'none';
+  });
+}
+</script>
+</head>
+<body>
+<nav>
+<h2>index.lm</h2>
+<input type="text" id="search-input" placeholder="Filter symbols..." oninput="filterNav()">
+<div id="nav-list">
+<a class="nav-link" href="#Resource">Resource <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#Memory">Memory <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#Reader">Reader <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#Writer">Writer <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#Pollable">Pollable <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#Poller">Poller <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#Connector">Connector <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#Binder">Binder <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#Listener">Listener <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#Accepter">Accepter <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#create_hash_engine">create_hash_engine <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#create_dns_resolver">create_dns_resolver <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#open_file">open_file <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#create_fs_resource">create_fs_resource <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#create_socket">create_socket <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#create_udp_socket">create_udp_socket <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#create_websocket">create_websocket <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#create_entropy">create_entropy <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#create_os_resource">create_os_resource <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#create_process_resource">create_process_resource <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#create_memory">create_memory <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#create">create <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#adopt_socket">adopt_socket <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_call">_call <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+</div>
+</nav>
+<main>
+<h1>index.lm API Reference</h1>
+<h2>Module Overview</h2>
+<div class="summary"><p>std/resource/index.lm
+Public entrypoint and facade for std.resource. Resource management and operating system handles.</p></div>
+<div id="Resource">
+<h3>Resource <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame Resource</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>var pub handle: int</code> <em>(field)</em></li>
+<li><code>var pub kind: int</code> <em>(field)</em></li>
+<li><code>var pub is_open_val: bool</code> <em>(field)</em></li>
+<li><code>pub init(h: int, k: int)</code> <em>(constructor)</em></li>
+<li><code>pub fn close(): nil?</code> <em>(method)</em></li>
+<li><code>pub fn is_open(): bool</code> <em>(method)</em></li>
+<li><code>pub fn _handle(): int</code> <em>(method)</em></li>
+</ul>
+</div><hr>
+<div id="Memory">
+<h3>Memory <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame Memory</code></pre>
+<div class="summary"><p>Byte-buffer resource backed by the RT_MEMORY resource, exposing memory measurement.</p></div>
+<h4>Members</h4>
+<ul>
+<li><code>var pub resource: Resource</code> <em>(field)</em></li>
+<li><code>pub init(r: Resource)</code> <em>(constructor)</em></li>
+<li><code>pub fn resize(size: int): bool</code> <em>(method)</em></li>
+<li><code>pub fn size(): int</code> <em>(method)</em></li>
+<li><code>pub fn capacity(): int</code> <em>(method)</em></li>
+<li><code>pub fn write(data: str): bool</code> <em>(method)</em></li>
+<li><code>pub fn read(): str</code> <em>(method)</em></li>
+<li><code>pub fn is_open(): bool</code> <em>(method)</em></li>
+<li><code>pub fn release(): bool</code> <em>(method)</em></li>
+<li><code>pub fn close(): nil?</code> <em>(method)</em></li>
+</ul>
+</div><hr>
+<div id="Reader">
+<h3>Reader <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame Reader</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>var pub resource: Resource</code> <em>(field)</em></li>
+<li><code>pub init(r: Resource)</code> <em>(constructor)</em></li>
+<li><code>pub fn read(args: list): any</code> <em>(method)</em></li>
+<li><code>pub fn read_bytes(): list</code> <em>(method)</em></li>
+</ul>
+</div><hr>
+<div id="Writer">
+<h3>Writer <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame Writer</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>var pub resource: Resource</code> <em>(field)</em></li>
+<li><code>pub init(r: Resource)</code> <em>(constructor)</em></li>
+<li><code>pub fn write(args: list): any</code> <em>(method)</em></li>
+</ul>
+</div><hr>
+<div id="Pollable">
+<h3>Pollable <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame Pollable</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>var pub resource: Resource</code> <em>(field)</em></li>
+<li><code>pub init(r: Resource)</code> <em>(constructor)</em></li>
+<li><code>pub fn poll(): bool</code> <em>(method)</em></li>
+</ul>
+</div><hr>
+<div id="Poller">
+<h3>Poller <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame Poller</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>var pub resource: Resource</code> <em>(field)</em></li>
+<li><code>pub init(r: Resource)</code> <em>(constructor)</em></li>
+<li><code>pub fn poll(): bool</code> <em>(method)</em></li>
+</ul>
+</div><hr>
+<div id="Connector">
+<h3>Connector <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame Connector</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>var pub resource: Resource</code> <em>(field)</em></li>
+<li><code>pub init(r: Resource)</code> <em>(constructor)</em></li>
+<li><code>pub fn connect(args: list): bool</code> <em>(method)</em></li>
+</ul>
+</div><hr>
+<div id="Binder">
+<h3>Binder <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame Binder</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>var pub resource: Resource</code> <em>(field)</em></li>
+<li><code>pub init(r: Resource)</code> <em>(constructor)</em></li>
+<li><code>pub fn bind(args: list): bool</code> <em>(method)</em></li>
+</ul>
+</div><hr>
+<div id="Listener">
+<h3>Listener <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame Listener</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>var pub resource: Resource</code> <em>(field)</em></li>
+<li><code>pub init(r: Resource)</code> <em>(constructor)</em></li>
+<li><code>pub fn listen(args: list): bool</code> <em>(method)</em></li>
+</ul>
+</div><hr>
+<div id="Accepter">
+<h3>Accepter <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame Accepter</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>var pub resource: Resource</code> <em>(field)</em></li>
+<li><code>pub init(r: Resource)</code> <em>(constructor)</em></li>
+<li><code>pub fn accept(): int</code> <em>(method)</em></li>
+</ul>
+</div><hr>
+<div id="create_hash_engine">
+<h3>create_hash_engine <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn create_hash_engine(): Resource?</code></pre>
+</div><hr>
+<div id="create_dns_resolver">
+<h3>create_dns_resolver <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn create_dns_resolver(): Resource?</code></pre>
+</div><hr>
+<div id="open_file">
+<h3>open_file <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn open_file(path: str, mode: str): Resource?</code></pre>
+</div><hr>
+<div id="create_fs_resource">
+<h3>create_fs_resource <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn create_fs_resource(): Resource?</code></pre>
+</div><hr>
+<div id="create_socket">
+<h3>create_socket <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn create_socket(): Resource?</code></pre>
+</div><hr>
+<div id="create_udp_socket">
+<h3>create_udp_socket <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn create_udp_socket(): Resource?</code></pre>
+</div><hr>
+<div id="create_websocket">
+<h3>create_websocket <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn create_websocket(): Resource?</code></pre>
+</div><hr>
+<div id="create_entropy">
+<h3>create_entropy <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn create_entropy(): Resource?</code></pre>
+</div><hr>
+<div id="create_os_resource">
+<h3>create_os_resource <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn create_os_resource(): Resource?</code></pre>
+</div><hr>
+<div id="create_process_resource">
+<h3>create_process_resource <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn create_process_resource(): Resource?</code></pre>
+</div><hr>
+<div id="create_memory">
+<h3>create_memory <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn create_memory(size: int): Memory?</code></pre>
+<div class="summary"><p>Create a byte-buffer memory resource with memory measurement support.
+`size` is the initial number of bytes to allocate (0 for an empty buffer).</p></div>
+</div><hr>
+<div id="create">
+<h3>create <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn create(type_id: int, args: list): Resource?</code></pre>
+</div><hr>
+<div id="adopt_socket">
+<h3>adopt_socket <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn adopt_socket(fd: int): Resource</code></pre>
+</div><hr>
+<div id="_call">
+<h3>_call <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn _call(h: int, op: int, args: list): any</code></pre>
+</div><hr>
+</main>
+</body>
+</html>

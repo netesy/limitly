@@ -48,37 +48,37 @@ fn main(): int {
     sort.counting_sort(ints);
     sort.radix_sort(ints, true);
 
-    var idx = search.linear_search(values, 3);
-    var bidx = search.binary_search(values, 3);
-    var lb = search.lower_bound(values, 3);
-    var ub = search.upper_bound(values, 3);
-    var er = search.equal_range(values, 3);
-    var ip = search.interpolation_search([1, 2, 3, 4, 5], 4);
+    var _idx = search.linear_search(values, 3);
+    var _bidx = search.binary_search(values, 3);
+    var _lb = search.lower_bound(values, 3);
+    var _ub = search.upper_bound(values, 3);
+    var _er = search.equal_range(values, 3);
+    var _ip = search.interpolation_search([1, 2, 3, 4, 5], 4);
 
     var mapped = algorithm.map(values, double_value);
-    var filtered = algorithm.filter(values, is_even);
-    var reduced = algorithm.reduce(values, add_values, 0);
-    var folded = algorithm.fold(values, 0, add_values);
+    var _filtered = algorithm.filter(values, is_even);
+    var _reduced = algorithm.reduce(values, add_values, 0);
+    var _folded = algorithm.fold(values, 0, add_values);
     var zipped = algorithm.zip(values, mapped);
-    var unzipped = algorithm.unzip(zipped);
-    var boundary = algorithm.partition(values, is_even);
+    var _unzipped = algorithm.unzip(zipped);
+    var _boundary = algorithm.partition(values, is_even);
     algorithm.reverse(values);
     algorithm.rotate(values, 2);
     var unique_values = algorithm.unique([1, 1, 2, 3, 3]);
-    var c = algorithm.count(unique_values, 2);
-    var found = algorithm.find(unique_values, 3);
-    var found_if = algorithm.find_if(unique_values, is_even);
-    var any_even = algorithm.any_match(unique_values, is_even);
-    var all_even = algorithm.all(unique_values, is_even);
-    var none_even = algorithm.none([1, 3, 5], is_even);
-    var removed = algorithm.remove_if(unique_values, is_even);
-    var transformed = algorithm.transform(unique_values, double_value);
+    var _c = algorithm.count(unique_values, 2);
+    var _found = algorithm.find(unique_values, 3);
+    var _found_if = algorithm.find_if(unique_values, is_even);
+    var _any_even = algorithm.any_match(unique_values, is_even);
+    var _all_even = algorithm.all(unique_values, is_even);
+    var _none_even = algorithm.none([1, 3, 5], is_even);
+    var _removed = algorithm.remove_if(unique_values, is_even);
+    var _transformed = algorithm.transform(unique_values, double_value);
 
     var it = iterator.iterator(unique_values);
     var mapped_it = iterator.map(it, double_value);
-    var collected = iterator.collect(mapped_it);
+    var _collected = iterator.collect(mapped_it);
     var r = range.inclusive(1, 3).iterator();
-    var first = r.next();
+    var _first = r.next();
 
     var vector: collections.Vector(int) = collections.Vector();
     vector.push(1);

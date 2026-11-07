@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>dns.lm - Lymar API Reference</title>
+<style>
+:root {
+  --bg-primary: #0a0e17;
+  --bg-secondary: #111827;
+  --bg-tertiary: #1f2937;
+  --accent: #38bdf8;
+  --accent-hover: #7dd3fc;
+  --text-main: #f1f5f9;
+  --text-muted: #94a3b8;
+  --border-color: #334155;
+}
+* { box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif;
+  margin: 0; padding: 0; background: var(--bg-primary); color: var(--text-main); display: flex;
+}
+nav {
+  width: 300px; height: 100vh; overflow-y: auto; background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color); padding: 24px 20px; position: fixed;
+}
+nav h2 { font-size: 1.15rem; color: var(--accent); margin-top: 0; margin-bottom: 16px; font-weight: 700; }
+#search-input {
+  width: 100%; padding: 8px 12px; background: var(--bg-tertiary); border: 1px solid var(--border-color);
+  border-radius: 6px; color: #fff; font-size: 0.85rem; margin-bottom: 16px;
+}
+#search-input:focus { outline: none; border-color: var(--accent); }
+.nav-link { display: block; color: var(--text-muted); text-decoration: none; padding: 6px 8px; font-size: 0.9rem; border-radius: 4px; }
+.nav-link:hover { color: #fff; background: var(--bg-tertiary); }
+main { margin-left: 300px; padding: 40px 48px; max-width: 950px; flex: 1; }
+h1 { color: #fff; font-size: 2.2rem; margin-top: 0; padding-bottom: 16px; border-bottom: 1px solid var(--border-color); }
+h2 { color: var(--accent); font-size: 1.4rem; margin-top: 36px; margin-bottom: 14px; }
+h3 { color: #fff; font-size: 1.25rem; margin-top: 28px; margin-bottom: 12px; display: flex; align-items: center; gap: 10px; }
+h4 { color: var(--accent); font-size: 1rem; margin-top: 20px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+.badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
+.badge-pub { background: #064e3b; color: #6ee7b7; border: 1px solid #059669; }
+.badge-private { background: #334155; color: #cbd5e1; }
+.badge-type { background: #1e1b4b; color: #c7d2fe; border: 1px solid #4338ca; }
+.code-sig { background: #090d16; border: 1px solid var(--border-color); padding: 14px 18px; border-radius: 8px; overflow-x: auto; font-family: 'Consolas', 'Fira Code', monospace; font-size: 0.95rem; color: #e2e8f0; }
+.summary { color: #cbd5e1; line-height: 1.65; margin: 14px 0; font-size: 1rem; }
+/* Callout styling */
+.callout { margin: 16px 0; padding: 14px 18px; border-radius: 8px; border-left: 4px solid; font-size: 0.92rem; }
+.callout-header { font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+.callout-tip { border-color: #10b981; background: rgba(16, 185, 129, 0.08); color: #d1fae5; }
+.callout-tip .callout-header { color: #34d399; }
+.callout-warning { border-color: #f59e0b; background: rgba(245, 158, 11, 0.08); color: #fef3c7; }
+.callout-warning .callout-header { color: #fbbf24; }
+.callout-note { border-color: #0284c7; background: rgba(2, 132, 199, 0.08); color: #e0f2fe; }
+.callout-note .callout-header { color: #38bdf8; }
+.callout-deprecated { border-color: #e11d48; background: rgba(225, 29, 72, 0.08); color: #ffe4e6; }
+.callout-deprecated .callout-header { color: #fb7185; }
+/* Example card */
+.example-card { margin: 20px 0; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: #080c14; }
+.example-header { background: #162032; padding: 8px 16px; font-size: 0.82rem; font-weight: 700; color: #94a3b8; border-bottom: 1px solid var(--border-color); }
+.example-card pre { margin: 0; padding: 14px 18px; overflow-x: auto; font-family: monospace; font-size: 0.92rem; color: #e2e8f0; }
+/* Tables */
+table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 0.92rem; }
+th { background: #162032; color: #94a3b8; text-align: left; padding: 10px 14px; font-weight: 600; border-bottom: 1px solid var(--border-color); }
+td { padding: 10px 14px; border-bottom: 1px solid #1e293b; color: #cbd5e1; }
+ul { padding-left: 20px; color: #cbd5e1; line-height: 1.6; }
+hr { border: 0; border-top: 1px solid var(--border-color); margin: 36px 0; }
+</style>
+<script>
+function filterNav() {
+  var q = document.getElementById('search-input').value.toLowerCase();
+  var links = document.querySelectorAll('.nav-link');
+  links.forEach(function(l) {
+    l.style.display = l.textContent.toLowerCase().includes(q) ? 'block' : 'none';
+  });
+}
+</script>
+</head>
+<body>
+<nav>
+<h2>dns.lm</h2>
+<input type="text" id="search-input" placeholder="Filter symbols..." oninput="filterNav()">
+<div id="nav-list">
+<a class="nav-link" href="#DNSError">DNSError <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#DNSRecord">DNSRecord <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#Resolver">Resolver <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#DNS">DNS <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#resolve">resolve <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#resolve_all">resolve_all <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#lookup">lookup <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#resolve_or_passthrough">resolve_or_passthrough <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#reverse_lookup">reverse_lookup <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#is_ip">is_ip <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#is_ipv4">is_ipv4 <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#parse_ipv4">parse_ipv4 <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#format_ipv4">format_ipv4 <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#is_ipv6">is_ipv6 <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#is_loopback">is_loopback <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#is_private">is_private <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#is_multicast">is_multicast <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#split_string">split_string <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#is_digit">is_digit <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#is_hex_digit">is_hex_digit <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+</div>
+</nav>
+<main>
+<h1>dns.lm API Reference</h1>
+<h2>Module Overview</h2>
+<div class="summary"><p>std/net/dns.lm
+DNS resolution and IP address validation module.</p></div>
+<div id="DNSError">
+<h3>DNSError <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame DNSError</code></pre>
+<div class="summary"><p>Represents an error encountered during DNS resolution or IP parsing.</p></div>
+<h4>Members</h4>
+<ul>
+<li><code>var pub code: str</code> <em>(field)</em></li>
+<li><code>var pub message: str</code> <em>(field)</em></li>
+<li><code>pub init(code: str, message: str)</code> <em>(constructor)</em></li>
+</ul>
+</div><hr>
+<div id="DNSRecord">
+<h3>DNSRecord <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame DNSRecord</code></pre>
+<div class="summary"><p>Represents a single DNS resource record returned from resolution queries.</p></div>
+<div class="callout callout-tip">
+<div class="callout-header"><span>💡</span> Idiomatic Usage & Best Practice</div>
+<div class="callout-content"><p>Use standard record types ("A", "AAAA", "CNAME", "TXT") for consistent protocol handling.</p></div>
+</div>
+<div class="callout callout-note">
+<div class="callout-header"><span>ℹ️</span> Note</div>
+<div class="callout-content"><p>Instances are immutable value containers representing point-in-time DNS state.</p></div>
+</div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>name</code></td><td>The domain name or fully-qualified domain name (FQDN).</td></tr>
+<tr><td><code>record_type</code></td><td>The DNS record type identifier (e.g. "A", "AAAA", "TXT"). Default is "A".</td></tr>
+<tr><td><code>value</code></td><td>The resolved IP address or text payload. Default is empty string.</td></tr>
+<tr><td><code>ttl</code></td><td>Time-to-live in seconds for caching policies. Default is 300.</td></tr>
+</tbody>
+</table>
+<div class="example-card">
+<div class="example-header"><span>✨</span> Example: Idiomatic Usage</div>
+<pre><code>var rec = DNSRecord("example.com", "A", "93.184.216.34", 300);
+print("Record: {rec.name} -> {rec.value} (TTL: {rec.ttl}s)");</code></pre>
+</div>
+<h4>Members</h4>
+<ul>
+<li><code>var pub name: str</code> <em>(field)</em></li>
+<li><code>var pub record_type: str</code> <em>(field)</em></li>
+<li><code>var pub value: str</code> <em>(field)</em></li>
+<li><code>var pub ttl: int</code> <em>(field)</em></li>
+<li><code>pub init(name: str)</code> <em>(constructor)</em></li>
+</ul>
+</div><hr>
+<div id="Resolver">
+<h3>Resolver <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame Resolver</code></pre>
+<div class="summary"><p>In-memory caching DNS resolver with configurable query timeouts.</p></div>
+<div class="callout callout-tip">
+<div class="callout-header"><span>💡</span> Idiomatic Usage & Best Practice</div>
+<div class="callout-content"><p>Reusing a single `Resolver` instance across worker tasks avoids redundant round-trips to upstream DNS nameservers by utilizing its internal cache.</p></div>
+</div>
+<div class="callout callout-warning">
+<div class="callout-header"><span>⚠️</span> Warning</div>
+<div class="callout-content"><p>Clear cache periodically with `clear_cache()` in long-running processes to honor TTL expirations and dynamic IP updates.</p></div>
+</div>
+<div class="callout callout-note">
+<div class="callout-header"><span>ℹ️</span> Note</div>
+<div class="callout-content"><p>Thread-safe within cooperative async event loops; allocates cached strings on lookup.</p></div>
+</div>
+<div class="example-card">
+<div class="example-header"><span>✨</span> Example: Idiomatic Usage</div>
+<pre><code>var resolver = Resolver(timeout=3000);
+var ip = resolver.resolve("example.com")? else {
+    print("Resolution failed: {err}");
+    return;
+};
+print("Resolved IP: {ip}");</code></pre>
+</div>
+<h4>Members</h4>
+<ul>
+<li><code>var pub cache: dict</code> <em>(field)</em></li>
+<li><code>var pub timeout_ms: int</code> <em>(field)</em></li>
+<li><code>pub init()</code> <em>(constructor)</em></li>
+<li><code>pub fn resolve(host: str): str</code> <em>(method)</em></li>
+<li><code>pub fn resolve_all(host: str): list</code> <em>(method)</em></li>
+<li><code>pub fn resolve_or_passthrough(host: str): str</code> <em>(method)</em></li>
+<li><code>pub fn reverse_lookup(ip: str): str</code> <em>(method)</em></li>
+<li><code>pub fn clear_cache(): nil</code> <em>(method)</em></li>
+</ul>
+</div><hr>
+<div id="DNS">
+<h3>DNS <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame DNS</code></pre>
+<div class="summary"><p>Static namespace wrapper providing convenient DNS resolution and IP address validation.</p></div>
+<div class="callout callout-tip">
+<div class="callout-header"><span>💡</span> Idiomatic Usage & Best Practice</div>
+<div class="callout-content"><p>Call static methods directly via `dns.resolve(host)` or `DNS.resolve(host)`.</p></div>
+</div>
+<div class="callout callout-note">
+<div class="callout-header"><span>ℹ️</span> Note</div>
+<div class="callout-content"><p>Relies on the underlying system socket resolver mechanisms.</p></div>
+</div>
+<div class="example-card">
+<div class="example-header"><span>✨</span> Example: Idiomatic Usage</div>
+<pre><code>import std.net.dns as dns;
+if (dns.is_ipv4("192.168.1.1")) {
+    print("Valid IPv4 gateway");
+}</code></pre>
+</div>
+<h4>Members</h4>
+<ul>
+<li><code>pub init()</code> <em>(constructor)</em></li>
+<li><code>pub fn resolve(host: str): str</code> <em>(method)</em></li>
+<li><code>pub fn resolve_all(host: str): list</code> <em>(method)</em></li>
+<li><code>pub fn lookup(host: str): str</code> <em>(method)</em></li>
+<li><code>pub fn is_ip(address: str): bool</code> <em>(method)</em></li>
+<li><code>pub fn is_ipv4(address: str): bool</code> <em>(method)</em></li>
+<li><code>pub fn is_ipv6(address: str): bool</code> <em>(method)</em></li>
+<li><code>pub fn is_loopback(address: str): bool</code> <em>(method)</em></li>
+<li><code>pub fn is_private(address: str): bool</code> <em>(method)</em></li>
+<li><code>pub fn is_multicast(address: str): bool</code> <em>(method)</em></li>
+<li><code>pub fn parse_ipv4(address: str): list?</code> <em>(method)</em></li>
+<li><code>pub fn format_ipv4(octets: list): str</code> <em>(method)</em></li>
+<li><code>pub fn resolve_or_passthrough(host: str): str</code> <em>(method)</em></li>
+<li><code>pub fn reverse_lookup(ip: str): str</code> <em>(method)</em></li>
+</ul>
+</div><hr>
+<div id="resolve">
+<h3>resolve <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn resolve(host: str): str?</code></pre>
+<div class="summary"><p>Resolves a hostname into an IPv4 or IPv6 address using the system DNS resolver.</p></div>
+<div class="callout callout-tip">
+<div class="callout-header"><span>💡</span> Idiomatic Usage & Best Practice</div>
+<div class="callout-content"><p>For applications handling mixed IP/hostname inputs, prefer `resolve_or_passthrough` to eliminate redundant resolution overhead.</p></div>
+</div>
+<div class="callout callout-warning">
+<div class="callout-header"><span>⚠️</span> Warning</div>
+<div class="callout-content"><p>This is a blocking network call bounded by socket resolver timeouts.</p></div>
+</div>
+<div class="callout callout-note">
+<div class="callout-header"><span>ℹ️</span> Note</div>
+<div class="callout-content"><p>Resolves through standard OS name resolution services (`getaddrinfo`).</p></div>
+</div>
+<h4>Contracts & Preconditions</h4>
+<ul>
+<li><code>requires len(host) > 0</code></li>
+</ul>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>host</code></td><td>The domain name or FQDN to query.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Returns ok(ip_str) on success, or err(DNSError) on DNS failure.</p>
+<div class="example-card">
+<div class="example-header"><span>✨</span> Example: Idiomatic Usage</div>
+<pre><code>var ip = resolve("localhost")? else {
+    print("Could not resolve: {err}");
+    return;
+};
+print("Resolved localhost: {ip}");</code></pre>
+</div>
+</div><hr>
+<div id="resolve_all">
+<h3>resolve_all <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn resolve_all(host: str): list?</code></pre>
+<div class="summary"><p>Resolves a hostname and returns all available IP addresses as a list.</p></div>
+<div class="callout callout-tip">
+<div class="callout-header"><span>💡</span> Idiomatic Usage & Best Practice</div>
+<div class="callout-content"><p>Useful for client-side load balancing, round-robin dispatch, and failover topologies.</p></div>
+</div>
+<h4>Contracts & Preconditions</h4>
+<ul>
+<li><code>requires len(host) > 0</code></li>
+</ul>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>host</code></td><td>The domain name or FQDN to query.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Returns ok([ip_str]) on success, or err(DNSError) on DNS failure.</p>
+<div class="example-card">
+<div class="example-header"><span>✨</span> Example: Idiomatic Usage</div>
+<pre><code>var ips = resolve_all("localhost")? else {
+    print("Resolution error: {err}");
+    return;
+};
+print("Found {len(ips)} IP addresses");</code></pre>
+</div>
+</div><hr>
+<div id="lookup">
+<h3>lookup <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn lookup(host: str): str?</code></pre>
+<div class="summary"><p>Convenience lookup function; alias for `resolve(host)`.</p></div>
+<div class="callout callout-tip">
+<div class="callout-header"><span>💡</span> Idiomatic Usage & Best Practice</div>
+<div class="callout-content"><p>Standard idiom for simple single-IP DNS resolution.</p></div>
+</div>
+<h4>Contracts & Preconditions</h4>
+<ul>
+<li><code>requires len(host) > 0</code></li>
+</ul>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>host</code></td><td>The domain name or FQDN to query.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Returns ok(ip_str) on success, or err(DNSError) on DNS failure.</p>
+</div><hr>
+<div id="resolve_or_passthrough">
+<h3>resolve_or_passthrough <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn resolve_or_passthrough(host: str): str?</code></pre>
+<div class="summary"><p>Returns the host as-is if already an IP address, or resolves it via DNS.</p></div>
+<div class="callout callout-tip">
+<div class="callout-header"><span>💡</span> Idiomatic Usage & Best Practice</div>
+<div class="callout-content"><p>Optimal for HTTP clients and socket connection logic that accept both raw IP addresses (e.g. "127.0.0.1") and hostnames (e.g. "api.service.com").</p></div>
+</div>
+<h4>Contracts & Preconditions</h4>
+<ul>
+<li><code>requires len(host) > 0</code></li>
+</ul>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>host</code></td><td>The candidate hostname or IP address.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Returns ok(ip_str) on success, or err(DNSError) on failure.</p>
+<div class="example-card">
+<div class="example-header"><span>✨</span> Example: Idiomatic Usage</div>
+<pre><code>var ip1 = resolve_or_passthrough("192.168.1.100")?; // No DNS query
+var ip2 = resolve_or_passthrough("localhost")?;     // Resolves to 127.0.0.1</code></pre>
+</div>
+</div><hr>
+<div id="reverse_lookup">
+<h3>reverse_lookup <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn reverse_lookup(ip: str): str?</code></pre>
+<div class="summary"><p>Performs a reverse DNS lookup to find the canonical hostname corresponding to an IP.</p></div>
+<div class="callout callout-warning">
+<div class="callout-header"><span>⚠️</span> Warning</div>
+<div class="callout-content"><p>If no reverse PTR mapping exists, this may return the IP address itself.</p></div>
+</div>
+<h4>Contracts & Preconditions</h4>
+<ul>
+<li><code>requires len(ip) > 0</code></li>
+</ul>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>ip</code></td><td>A valid IPv4 or IPv6 address string.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Returns ok(hostname) on success, or err(DNSError) if the IP syntax is invalid.</p>
+<div class="example-card">
+<div class="example-header"><span>✨</span> Example: Idiomatic Usage</div>
+<pre><code>var host = reverse_lookup("127.0.0.1")?;
+print("Host: {host}"); // "localhost"</code></pre>
+</div>
+</div><hr>
+<div id="is_ip">
+<h3>is_ip <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn is_ip(address: str): bool</code></pre>
+<div class="summary"><p>Checks whether the provided string is a valid IPv4 or IPv6 address.</p></div>
+<div class="callout callout-tip">
+<div class="callout-header"><span>💡</span> Idiomatic Usage & Best Practice</div>
+<div class="callout-content"><p>Fast local syntactic validation that incurs zero network or DNS overhead.</p></div>
+</div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>address</code></td><td>The candidate IP address string to check.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Returns true if the address is a valid IPv4 or IPv6 format, false otherwise.</p>
+<div class="example-card">
+<div class="example-header"><span>✨</span> Example: Idiomatic Usage</div>
+<pre><code>print("Is IP: {is_ip(\"10.0.0.1\")}"); // true
+print("Is IP: {is_ip(\"example.com\")}"); // false</code></pre>
+</div>
+</div><hr>
+<div id="is_ipv4">
+<h3>is_ipv4 <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn is_ipv4(address: str): bool</code></pre>
+<div class="summary"><p>Validates whether a string strictly conforms to IPv4 dotted-quad notation.</p></div>
+<div class="callout callout-note">
+<div class="callout-header"><span>ℹ️</span> Note</div>
+<div class="callout-content"><p>Rejects leading zeroes (e.g. "01"), out-of-range octets (> 255), and negative numbers.</p></div>
+</div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>address</code></td><td>The candidate string to inspect.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Returns true if strictly valid IPv4, false otherwise.</p>
+<div class="example-card">
+<div class="example-header"><span>✨</span> Example: Idiomatic Usage</div>
+<pre><code>print("Valid: {is_ipv4(\"172.16.254.1\")}"); // true
+print("Valid: {is_ipv4(\"256.0.0.1\")}");     // false</code></pre>
+</div>
+</div><hr>
+<div id="parse_ipv4">
+<h3>parse_ipv4 <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn parse_ipv4(address: str): list?</code></pre>
+<div class="summary"><p>Parses an IPv4 dotted string into a list of 4 integer octets [0-255].</p></div>
+<div class="callout callout-tip">
+<div class="callout-header"><span>💡</span> Idiomatic Usage & Best Practice</div>
+<div class="callout-content"><p>Useful for binary subnet mask arithmetic, CIDR matching, and network telemetry.</p></div>
+</div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>address</code></td><td>The candidate IPv4 string to parse.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Returns ok([o0, o1, o2, o3]) on success, or nil if invalid IPv4 syntax.</p>
+<div class="example-card">
+<div class="example-header"><span>✨</span> Example: Idiomatic Usage</div>
+<pre><code>var octets = parse_ipv4("192.168.1.1");
+if (octets != nil) {
+    var o = octets as [int];
+    print("First octet: {o[0]}"); // 192
+}</code></pre>
+</div>
+</div><hr>
+<div id="format_ipv4">
+<h3>format_ipv4 <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn format_ipv4(octets: list): str</code></pre>
+<div class="summary"><p>Formats a list of 4 integer octets into a canonical IPv4 dotted-quad string.</p></div>
+<h4>Contracts & Preconditions</h4>
+<ul>
+<li><code>requires len(octets) == 4</code></li>
+</ul>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>octets</code></td><td>An array containing exactly 4 integer octets (0-255).</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Formatted dotted-decimal IPv4 string, or empty string on length mismatch.</p>
+<div class="example-card">
+<div class="example-header"><span>✨</span> Example: Idiomatic Usage</div>
+<pre><code>var ip_str = format_ipv4([127, 0, 0, 1]);
+print("Formatted IP: {ip_str}"); // "127.0.0.1"</code></pre>
+</div>
+</div><hr>
+<div id="is_ipv6">
+<h3>is_ipv6 <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn is_ipv6(address: str): bool</code></pre>
+<div class="summary"><p>Validates whether a string conforms to IPv6 hexadecimal notation.</p></div>
+<div class="callout callout-note">
+<div class="callout-header"><span>ℹ️</span> Note</div>
+<div class="callout-content"><p>Recognizes standard 8-group notation and `::` zero-compaction (RFC 4291).</p></div>
+</div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>address</code></td><td>The candidate string to inspect.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Returns true if valid IPv6 format, false otherwise.</p>
+<div class="example-card">
+<div class="example-header"><span>✨</span> Example: Idiomatic Usage</div>
+<pre><code>print("Valid IPv6: {is_ipv6(\"2001:db8::1\")}"); // true
+print("Valid IPv6: {is_ipv6(\"::1\")}");          // true</code></pre>
+</div>
+</div><hr>
+<div id="is_loopback">
+<h3>is_loopback <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn is_loopback(address: str): bool</code></pre>
+<div class="summary"><p>Checks whether an IP address belongs to the loopback interface range.</p></div>
+<div class="callout callout-tip">
+<div class="callout-header"><span>💡</span> Idiomatic Usage & Best Practice</div>
+<div class="callout-content"><p>Correctly handles IPv4 127.0.0.0/8 subnet and IPv6 ::1 loopback representation.</p></div>
+</div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>address</code></td><td>The IPv4 or IPv6 address to verify.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Returns true if loopback, false otherwise.</p>
+<div class="example-card">
+<div class="example-header"><span>✨</span> Example: Idiomatic Usage</div>
+<pre><code>print("Loopback: {is_loopback(\"127.0.0.1\")}"); // true
+print("Loopback: {is_loopback(\"::1\")}");       // true</code></pre>
+</div>
+</div><hr>
+<div id="is_private">
+<h3>is_private <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn is_private(address: str): bool</code></pre>
+<div class="summary"><p>Checks whether an IP address belongs to private or link-local network ranges.</p></div>
+<div class="callout callout-tip">
+<div class="callout-header"><span>💡</span> Idiomatic Usage & Best Practice</div>
+<div class="callout-content"><p>Evaluates RFC 1918 private subnets (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16), RFC 3927 link-local (169.254.0.0/16), loopback, and IPv6 ULA (fc00::/7) / link-local (fe80::/10).</p></div>
+</div>
+<div class="callout callout-warning">
+<div class="callout-header"><span>⚠️</span> Warning</div>
+<div class="callout-content"><p>Useful for SSRF protection and validating that user-supplied URLs do not target internal networks.</p></div>
+</div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>address</code></td><td>The IP address string to inspect.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Returns true if private or link-local, false if publicly routable.</p>
+<div class="example-card">
+<div class="example-header"><span>✨</span> Example: Idiomatic Usage</div>
+<pre><code>if (is_private("192.168.1.1")) {
+    print("Internal network address");
+}</code></pre>
+</div>
+</div><hr>
+<div id="is_multicast">
+<h3>is_multicast <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn is_multicast(address: str): bool</code></pre>
+<div class="summary"><p>Checks whether an address is within the Class D (IPv4) or IPv6 multicast range.</p></div>
+<div class="callout callout-tip">
+<div class="callout-header"><span>💡</span> Idiomatic Usage & Best Practice</div>
+<div class="callout-content"><p>Detects IPv4 224.0.0.0 to 239.255.255.255 and IPv6 ff00::/8.</p></div>
+</div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>address</code></td><td>The IP address string to check.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Returns true if multicast, false otherwise.</p>
+<div class="example-card">
+<div class="example-header"><span>✨</span> Example: Idiomatic Usage</div>
+<pre><code>print("Multicast: {is_multicast(\"224.0.0.1\")}"); // true</code></pre>
+</div>
+</div><hr>
+<div id="split_string">
+<h3>split_string <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn split_string(s: str, delimiter: str): list</code></pre>
+</div><hr>
+<div id="is_digit">
+<h3>is_digit <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn is_digit(ch: str): bool</code></pre>
+</div><hr>
+<div id="is_hex_digit">
+<h3>is_hex_digit <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn is_hex_digit(ch: str): bool</code></pre>
+</div><hr>
+</main>
+</body>
+</html>

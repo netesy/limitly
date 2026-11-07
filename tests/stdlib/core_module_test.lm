@@ -100,45 +100,45 @@ fn test_option(): int {
     // Option(T) is a template, not a frame: the type position requests the
     // instantiation and the constructor is steered to the generated frame.
     var opt_some: opt.Option(str) = opt.Option(true, "hello");
-    assert(opt_some.is_some() == true, "opt_some should be some");
-    assert(opt_some.is_none() == false, "opt_some should not be none");
+    assert(opt_some.is_some(), "opt_some should be some");
+    assert(not opt_some.is_none(), "opt_some should not be none");
     assert(opt_some.unwrap() == "hello", "opt_some unwrap failed");
     assert(opt_some.unwrap_or("fallback") == "hello", "opt_some unwrap_or failed");
 
     var opt_none: opt.Option(str) = opt.Option(false, nil);
-    assert(opt_none.is_some() == false, "opt_none should not be some");
-    assert(opt_none.is_none() == true, "opt_none should be none");
+    assert(not opt_none.is_some(), "opt_none should not be some");
+    assert(opt_none.is_none(), "opt_none should be none");
     assert(opt_none.unwrap_or("fallback") == "fallback", "opt_none unwrap_or fallback failed");
 
     // Test Option.map -- typed: fn(T): T, so a str Option maps to a str Option.
     var opt_for_map: opt.Option(str) = opt.Option(true, "hi");
     var opt_mapped = opt_for_map.map(shout);
-    assert(opt_mapped.is_some() == true, "opt_mapped should be some");
+    assert(opt_mapped.is_some(), "opt_mapped should be some");
     assert(opt_mapped.unwrap() == "hi", "opt_mapped value should be hi");
 
     var opt_none_mapped = opt_none.map(shout);
-    assert(opt_none_mapped.is_none() == true, "mapped opt_none should be none");
+    assert(opt_none_mapped.is_none(), "mapped opt_none should be none");
 
     // Test Option.filter on the int instantiation
     var opt_int_some: opt.Option(int) = opt.Option(true, 10);
     var opt_filtered_true = opt_int_some.filter(is_positive_int);
-    assert(opt_filtered_true.is_some() == true, "opt_filtered_true should be some");
+    assert(opt_filtered_true.is_some(), "opt_filtered_true should be some");
     assert(opt_filtered_true.unwrap() == 10, "opt_filtered_true value incorrect");
 
     var opt_int_neg: opt.Option(int) = opt.Option(true, -5);
     var opt_filtered_false = opt_int_neg.filter(is_positive_int);
-    assert(opt_filtered_false.is_none() == true, "opt_filtered_false should be none");
+    assert(opt_filtered_false.is_none(), "opt_filtered_false should be none");
 
     // Index alias: core.Option(int) and opt.Option(int) are the SAME frame --
     // nominal identity is keyed on the template, not the import spelling.
     var idx_some: core.Option(int) = core.Option(true, 42);
-    assert(idx_some.is_some() == true, "idx_some should be some");
+    assert(idx_some.is_some(), "idx_some should be some");
     assert(idx_some.unwrap() == 42, "idx_some value incorrect");
     var cross: opt.Option(int) = idx_some;
     assert(cross.unwrap_or(0) == 42, "alias instantiations must interoperate");
 
     var idx_none: core.Option(int) = core.Option(false, nil);
-    assert(idx_none.is_none() == true, "idx_none should be none");
+    assert(idx_none.is_none(), "idx_none should be none");
 
     print("Option staged template tests passed!");
     return 1;
@@ -200,9 +200,9 @@ fn test_traits(): int {
 
     // Test Disposable Trait
     var disp = DummyDisposable();
-    assert(disp.disposed == false, "should not be disposed initially");
+    assert(not disp.disposed, "should not be disposed initially");
     disp.dispose();
-    assert(disp.disposed == true, "should be disposed after calling dispose()");
+    assert(disp.disposed, "should be disposed after calling dispose()");
 
     // Test Cloneable Trait
     var clone_src = DummyCloneable("cloned_data");

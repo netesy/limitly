@@ -23,8 +23,8 @@ fn test_tally(): int {
     t.check_int(1, 2, "deliberate mismatch");
     assert(t.count_failed() == 1, "failure was not recorded");
     assert(t.total() == 5, "total is wrong");
-    assert(t.all_passed() == false, "all_passed is true despite a failure");
-    assert(t.report() == false, "report should report failure");
+    assert(not t.all_passed(), "all_passed is true despite a failure");
+    assert(not t.report(), "report should report failure");
     return 1;
 }
 
@@ -40,8 +40,8 @@ fn test_reset(): int {
 
     t.check(true, "one check");
     assert(t.count_passed() == 1, "tally after reset failed");
-    assert(t.all_passed() == true, "all_passed should be true");
-    assert(t.report() == true, "report should report success");
+    assert(t.all_passed(), "all_passed should be true");
+    assert(t.report(), "report should report success");
     return 1;
 }
 
@@ -63,9 +63,9 @@ fn test_instances_are_independent(): int {
 fn test_verify_helper(): int {
     print("Testing Verify Helper...");
     var passed = testing.verify(true, "verify returns its condition");
-    assert(passed == true, "verify returned false for a true condition");
+    assert(passed, "verify returned false for a true condition");
     var failed = testing.verify(false, "verify reports a false condition");
-    assert(failed == false, "verify returned true for a false condition");
+    assert(not failed, "verify returned true for a false condition");
     return 1;
 }
 
@@ -93,8 +93,8 @@ fn checked_fail(): bool {
 fn test_run_test(): int {
     print("Testing Run Test...");
     // The FAIL line below is expected output: run_test reports, it does not abort.
-    assert(testing.run_test("passing case", checked_ok) == true, "run_test lost a pass");
-    assert(testing.run_test("failing case", checked_fail) == false, "run_test hid a failure");
+    assert(testing.run_test("passing case", checked_ok), "run_test lost a pass");
+    assert(not testing.run_test("failing case", checked_fail), "run_test hid a failure");
     return 1;
 }
 

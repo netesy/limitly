@@ -827,7 +827,7 @@ int DocGenerator::run(int argc, char** argv) {
     }
 
     bool is_dir_output = !opts.output_path.empty() &&
-        (fs::is_directory(opts.output_path) || (files.size() > 1 && opts.output_path.back() == '/'));
+        (fs::is_directory(opts.output_path) || (files.size() > 1 && (opts.output_path.back() == '/' || opts.output_path.back() == '\\')) || (!opts.output_path.ends_with(".html") && !opts.output_path.ends_with(".md")));
 
     if (is_dir_output && !fs::exists(opts.output_path)) {
         fs::create_directories(opts.output_path);
@@ -848,9 +848,23 @@ int DocGenerator::run(int argc, char** argv) {
         if (opts.stdout_only) {
             std::cout << content << "\n";
         } else if (is_dir_output) {
-            std::string stem = fs::path(file).stem().string();
+            fs::path rel_path = fs::path(file).filename();
+            for (const auto& target : opts.target_files) {
+                if (fs::is_directory(target)) {
+                    std::error_code ec;
+                    auto r = fs::relative(file, target, ec);
+                    if (!ec && !r.empty() && r.string().find("..") == std::string::npos) {
+                        rel_path = r;
+                        break;
+                    }
+                }
+            }
             std::string ext = (opts.format == Format::HTML) ? ".html" : ".md";
-            fs::path out_file = fs::path(opts.output_path) / (stem + ext);
+            fs::path out_file = fs::path(opts.output_path) / rel_path;
+            out_file.replace_extension(ext);
+            if (out_file.has_parent_path() && !fs::exists(out_file.parent_path())) {
+                fs::create_directories(out_file.parent_path());
+            }
             std::ofstream out(out_file);
             out << content;
             std::cout << "Generated documentation: " << out_file.generic_string() << "\n";

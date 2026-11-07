@@ -63,31 +63,31 @@ fn unknownErrorType(): int?UnknownError {
 
 // Test 10: Type mismatch in error union assignment
 fn typeMismatch(): nil {
-    var x: int?DivisionByZero = "hello";  // Should fail - string not compatible with int?DivisionByZero
+    var _x: int?DivisionByZero = "hello";  // Should fail - string not compatible with int?DivisionByZero
 }
 
 // Test 11: Correct error union assignment
 fn correctAssignment(): nil {
-    var x: int?DivisionByZero = 42;  // Should work
-    var y: int?DivisionByZero = err();  // Should work
+    var _x: int?DivisionByZero = 42;  // Should work
+    var _y: int?DivisionByZero = err();  // Should work
 }
 
 // Test 12: Function call with wrong argument types
 // fn wrongArguments(): nil {
-//     divide("hello", "world");  // Should fail - string arguments not compatible with int parameters
-// }
+    //     divide("hello", "world");  // Should fail - string arguments not compatible with int parameters
+    // }
 
-// Main function to test the error handling
+    // Main function to test the error handling
 
-print("Testing basic compile-time error checking");
-    
-// These should work
-var result1 = safeDivide(10, 2);
-var result2 = propagateGeneric(false);
+    print("Testing basic compile-time error checking");
 
-assert(result1.isOk(), "safeDivide(10, 2) should succeed");
-assert(result1.unwrap() == 5, "safeDivide(10, 2) should return 5");
-assert(result2.isOk(), "propagateGeneric(false) should succeed");
-assert(result2.unwrap() == 42, "propagateGeneric(false) should return 42");
+    // These should work
+    var result1 = safeDivide(10, 2);
+    var result2 = propagateGeneric(false);
 
-print("Basic error checking test completed");
+    assert(result1.isOk(), "safeDivide(10, 2) should succeed");
+    assert(result1.unwrap() == 5, "safeDivide(10, 2) should return 5");
+    assert(result2.isOk(), "propagateGeneric(false) should succeed");
+    assert(result2.unwrap() == 42, "propagateGeneric(false) should return 42");
+
+    print("Basic error checking test completed");

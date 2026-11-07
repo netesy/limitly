@@ -13,28 +13,28 @@ pub import std.mime.types show Type, Params;
 /// ```lymar
 /// var m = mime.parse("application/json; charset=utf-8");
 /// if (m.is_valid and m.is_application()) {
-///     print("Valid application payload\n");
-/// }
-/// ```
-pub fn parse(mime_str: str): types.Type {
-    contract(len(mime_str) >= 0, "mime_str must be a valid string");
-    return types.parse(mime_str);
-}
+    ///     print("Valid application payload\n");
+    /// }
+    /// ```
+    pub fn parse(mime_str: str): types.Type {
+        contract(len(mime_str) >= 0, "mime_str must be a valid string");
+        return types.parse(mime_str);
+    }
 
-/// Resolves a file extension to its standardized MIME type.
-///
-/// @param ext File extension with or without leading dot (e.g. `"html"` or `".json"`).
-/// @return Matching MIME type string, or `"application/octet-stream"` if unrecognized.
-pub fn extension_to_mime(ext: str): str {
-    contract(len(ext) > 0, "ext cannot be empty");
-    return types.extension_to_mime(ext);
-}
+    /// Resolves a file extension to its standardized MIME type.
+    ///
+    /// @param ext File extension with or without leading dot (e.g. `"html"` or `".json"`).
+    /// @return Matching MIME type string, or `"application/octet-stream"` if unrecognized.
+    pub fn extension_to_mime(ext: str): str {
+        contract(len(ext) > 0, "ext cannot be empty");
+        return types.extension_to_mime(ext);
+    }
 
-/// Resolves a MIME type string to its canonical file extension (including leading dot).
-///
-/// @param mime_str MIME type string (e.g. `"text/html"`).
-/// @return Canonical file extension with leading dot (e.g. `".html"`), or empty string if unrecognized.
-pub fn mime_to_extension(mime_str: str): str {
-    contract(len(mime_str) > 0, "mime_str cannot be empty");
-    return types.mime_to_extension(mime_str);
-}
+    /// Resolves a MIME type string to its canonical file extension (including leading dot).
+    ///
+    /// @param mime_str MIME type string (e.g. `"text/html"`).
+    /// @return Canonical file extension with leading dot (e.g. `".html"`), or empty string if unrecognized.
+    pub fn mime_to_extension(mime_str: str): str {
+        contract(len(mime_str) > 0, "mime_str cannot be empty");
+        return types.mime_to_extension(mime_str);
+    }

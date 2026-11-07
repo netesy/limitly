@@ -24,9 +24,9 @@ enum Color {
 }
 
 var colors: [Color] = [
-    Color.Red,
-    Color.Blue,
-    Color.Green
+Color.Red,
+Color.Blue,
+Color.Green
 ];
 
 var color_dict: {str: Color} = {

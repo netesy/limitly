@@ -44,7 +44,7 @@ staged fn g(a: int): int {
     return a + 1;
 }
 staged fn f(a: int): int {
-    var mid = g(100);
+    var _mid = g(100);
     return a + 0;
 }
 assert(f(5) == 5);
@@ -55,7 +55,7 @@ staged fn h(v: d4): d4 {
     return v * 2;
 }
 staged fn k(v: d4): d4 {
-    var twice = h(100);
+    var _twice = h(100);
     return v;
 }
 val fs1 = k(1.5);

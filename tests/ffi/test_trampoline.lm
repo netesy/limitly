@@ -43,8 +43,8 @@ fn main() {
         print("--- Test 1: cb_add ---");
 
         var handle_add: int = ffi.callback_create("cb_add",
-                                                    [ffi.TYPE_I64, ffi.TYPE_I64],
-                                                    ffi.TYPE_I64);
+        [ffi.TYPE_I64, ffi.TYPE_I64],
+        ffi.TYPE_I64);
         assert(handle_add >= 0, "callback_create should return non-negative handle");
 
         // Obtain the native code pointer (returned as int/ptr).
@@ -65,8 +65,8 @@ fn main() {
         print("--- Test 2: cb_multiply ---");
 
         var handle_mul: int = ffi.callback_create("cb_multiply",
-                                                    [ffi.TYPE_F64, ffi.TYPE_F64],
-                                                    ffi.TYPE_F64);
+        [ffi.TYPE_F64, ffi.TYPE_F64],
+        ffi.TYPE_F64);
         assert(handle_mul >= 0, "callback_create should return non-negative handle");
 
         var fn_mul: int = ffi.callback_ptr(handle_mul);

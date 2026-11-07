@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>index.lm - Lymar API Reference</title>
+<style>
+:root {
+  --bg-primary: #0a0e17;
+  --bg-secondary: #111827;
+  --bg-tertiary: #1f2937;
+  --accent: #38bdf8;
+  --accent-hover: #7dd3fc;
+  --text-main: #f1f5f9;
+  --text-muted: #94a3b8;
+  --border-color: #334155;
+}
+* { box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif;
+  margin: 0; padding: 0; background: var(--bg-primary); color: var(--text-main); display: flex;
+}
+nav {
+  width: 300px; height: 100vh; overflow-y: auto; background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color); padding: 24px 20px; position: fixed;
+}
+nav h2 { font-size: 1.15rem; color: var(--accent); margin-top: 0; margin-bottom: 16px; font-weight: 700; }
+#search-input {
+  width: 100%; padding: 8px 12px; background: var(--bg-tertiary); border: 1px solid var(--border-color);
+  border-radius: 6px; color: #fff; font-size: 0.85rem; margin-bottom: 16px;
+}
+#search-input:focus { outline: none; border-color: var(--accent); }
+.nav-link { display: block; color: var(--text-muted); text-decoration: none; padding: 6px 8px; font-size: 0.9rem; border-radius: 4px; }
+.nav-link:hover { color: #fff; background: var(--bg-tertiary); }
+main { margin-left: 300px; padding: 40px 48px; max-width: 950px; flex: 1; }
+h1 { color: #fff; font-size: 2.2rem; margin-top: 0; padding-bottom: 16px; border-bottom: 1px solid var(--border-color); }
+h2 { color: var(--accent); font-size: 1.4rem; margin-top: 36px; margin-bottom: 14px; }
+h3 { color: #fff; font-size: 1.25rem; margin-top: 28px; margin-bottom: 12px; display: flex; align-items: center; gap: 10px; }
+h4 { color: var(--accent); font-size: 1rem; margin-top: 20px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+.badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
+.badge-pub { background: #064e3b; color: #6ee7b7; border: 1px solid #059669; }
+.badge-private { background: #334155; color: #cbd5e1; }
+.badge-type { background: #1e1b4b; color: #c7d2fe; border: 1px solid #4338ca; }
+.code-sig { background: #090d16; border: 1px solid var(--border-color); padding: 14px 18px; border-radius: 8px; overflow-x: auto; font-family: 'Consolas', 'Fira Code', monospace; font-size: 0.95rem; color: #e2e8f0; }
+.summary { color: #cbd5e1; line-height: 1.65; margin: 14px 0; font-size: 1rem; }
+/* Callout styling */
+.callout { margin: 16px 0; padding: 14px 18px; border-radius: 8px; border-left: 4px solid; font-size: 0.92rem; }
+.callout-header { font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+.callout-tip { border-color: #10b981; background: rgba(16, 185, 129, 0.08); color: #d1fae5; }
+.callout-tip .callout-header { color: #34d399; }
+.callout-warning { border-color: #f59e0b; background: rgba(245, 158, 11, 0.08); color: #fef3c7; }
+.callout-warning .callout-header { color: #fbbf24; }
+.callout-note { border-color: #0284c7; background: rgba(2, 132, 199, 0.08); color: #e0f2fe; }
+.callout-note .callout-header { color: #38bdf8; }
+.callout-deprecated { border-color: #e11d48; background: rgba(225, 29, 72, 0.08); color: #ffe4e6; }
+.callout-deprecated .callout-header { color: #fb7185; }
+/* Example card */
+.example-card { margin: 20px 0; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: #080c14; }
+.example-header { background: #162032; padding: 8px 16px; font-size: 0.82rem; font-weight: 700; color: #94a3b8; border-bottom: 1px solid var(--border-color); }
+.example-card pre { margin: 0; padding: 14px 18px; overflow-x: auto; font-family: monospace; font-size: 0.92rem; color: #e2e8f0; }
+/* Tables */
+table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 0.92rem; }
+th { background: #162032; color: #94a3b8; text-align: left; padding: 10px 14px; font-weight: 600; border-bottom: 1px solid var(--border-color); }
+td { padding: 10px 14px; border-bottom: 1px solid #1e293b; color: #cbd5e1; }
+ul { padding-left: 20px; color: #cbd5e1; line-height: 1.6; }
+hr { border: 0; border-top: 1px solid var(--border-color); margin: 36px 0; }
+</style>
+<script>
+function filterNav() {
+  var q = document.getElementById('search-input').value.toLowerCase();
+  var links = document.querySelectorAll('.nav-link');
+  links.forEach(function(l) {
+    l.style.display = l.textContent.toLowerCase().includes(q) ? 'block' : 'none';
+  });
+}
+</script>
+</head>
+<body>
+<nav>
+<h2>index.lm</h2>
+<input type="text" id="search-input" placeholder="Filter symbols..." oninput="filterNav()">
+<div id="nav-list">
+<a class="nav-link" href="#Function1">Function1 <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#Predicate">Predicate <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#compose_int">compose_int <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#compose_str">compose_str <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#pipe_int">pipe_int <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#pipe_str">pipe_str <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#curry_add">curry_add <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#curry_multiply">curry_multiply <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#curry_string_append">curry_string_append <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#curry_string_prepend">curry_string_prepend <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#partial_apply_binary">partial_apply_binary <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#partial_apply_ternary">partial_apply_ternary <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#compose_three_int">compose_three_int <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#compose_three_str">compose_three_str <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#pipe_three_int">pipe_three_int <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#always_true">always_true <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#always_false">always_false <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#equals">equals <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#not_equals">not_equals <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#greater_than">greater_than <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#less_than">less_than <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#greater_than_or_equal">greater_than_or_equal <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#less_than_or_equal">less_than_or_equal <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#is_even">is_even <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#is_odd">is_odd <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#is_positive">is_positive <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#is_negative">is_negative <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#is_zero">is_zero <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#not_fn">not_fn <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#and_fn">and_fn <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#or_fn">or_fn <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#xor">xor <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#memoize_int">memoize_int <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#memoize_str">memoize_str <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#memoize_bool">memoize_bool <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#identity">identity <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#identity_str">identity_str <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#constant">constant <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#constant_str">constant_str <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#flip">flip <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#apply_n_times">apply_n_times <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#apply_until">apply_until <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#apply_while">apply_while <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#add_n">add_n <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#multiply_n">multiply_n <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#power_n">power_n <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#wrap_with">wrap_with <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#prepend">prepend <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#append">append <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#repeat">repeat <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+</div>
+</nav>
+<main>
+<h1>index.lm API Reference</h1>
+<h2>Module Overview</h2>
+<div class="summary"><p>std/functional/index.lm
+Public entrypoint and facade for std.functional. Functional programming combinators and higher-order helpers.</p></div>
+<div id="Function1">
+<h3>Function1 <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame Function1</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>var fn_ref: function</code> <em>(field)</em></li>
+<li><code>pub init(fn_ref: function)</code> <em>(constructor)</em></li>
+<li><code>pub fn call(value: T): T</code> <em>(method)</em></li>
+<li><code>pub fn compose(other: Function1): Function1</code> <em>(method)</em></li>
+<li><code>pub fn and_then(other: Function1): Function1</code> <em>(method)</em></li>
+<li><code>pub fn memoize(): Function1</code> <em>(method)</em></li>
+<li><code>pub fn repeat(n: int): Function1</code> <em>(method)</em></li>
+</ul>
+</div><hr>
+<div id="Predicate">
+<h3>Predicate <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame Predicate</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>var fn_ref: function</code> <em>(field)</em></li>
+<li><code>pub init(fn_ref: function)</code> <em>(constructor)</em></li>
+<li><code>pub fn call(value: T): bool</code> <em>(method)</em></li>
+<li><code>pub fn negate(): Predicate</code> <em>(method)</em></li>
+<li><code>pub fn and_fn(other: Predicate): Predicate</code> <em>(method)</em></li>
+<li><code>pub fn or_fn(other: Predicate): Predicate</code> <em>(method)</em></li>
+</ul>
+</div><hr>
+<div id="compose_int">
+<h3>compose_int <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn compose_int(f: function, g: function): function</code></pre>
+<div class="summary"><p>Higher-order functions</p></div>
+</div><hr>
+<div id="compose_str">
+<h3>compose_str <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn compose_str(f: function, g: function): function</code></pre>
+</div><hr>
+<div id="pipe_int">
+<h3>pipe_int <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn pipe_int(f: function, g: function): function</code></pre>
+</div><hr>
+<div id="pipe_str">
+<h3>pipe_str <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn pipe_str(f: function, g: function): function</code></pre>
+</div><hr>
+<div id="curry_add">
+<h3>curry_add <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn curry_add(a: int): function</code></pre>
+<div class="summary"><p>Currying functions</p></div>
+</div><hr>
+<div id="curry_multiply">
+<h3>curry_multiply <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn curry_multiply(a: int): function</code></pre>
+</div><hr>
+<div id="curry_string_append">
+<h3>curry_string_append <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn curry_string_append(prefix: str): function</code></pre>
+</div><hr>
+<div id="curry_string_prepend">
+<h3>curry_string_prepend <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn curry_string_prepend(suffix: str): function</code></pre>
+</div><hr>
+<div id="partial_apply_binary">
+<h3>partial_apply_binary <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn partial_apply_binary(fn_ref: function, first_arg: int): function</code></pre>
+<div class="summary"><p>Partial application</p></div>
+</div><hr>
+<div id="partial_apply_ternary">
+<h3>partial_apply_ternary <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn partial_apply_ternary(fn_ref: function, first_arg: int): function</code></pre>
+</div><hr>
+<div id="compose_three_int">
+<h3>compose_three_int <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn compose_three_int(f: function, g: function, h: function): function</code></pre>
+<div class="summary"><p>Function composition utilities</p></div>
+</div><hr>
+<div id="compose_three_str">
+<h3>compose_three_str <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn compose_three_str(f: function, g: function, h: function): function</code></pre>
+</div><hr>
+<div id="pipe_three_int">
+<h3>pipe_three_int <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn pipe_three_int(f: function, g: function, h: function): function</code></pre>
+</div><hr>
+<div id="always_true">
+<h3>always_true <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn always_true(x: int): bool</code></pre>
+<div class="summary"><p>Predicate functions</p></div>
+</div><hr>
+<div id="always_false">
+<h3>always_false <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn always_false(x: int): bool</code></pre>
+</div><hr>
+<div id="equals">
+<h3>equals <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn equals(value: int): function</code></pre>
+</div><hr>
+<div id="not_equals">
+<h3>not_equals <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn not_equals(value: int): function</code></pre>
+</div><hr>
+<div id="greater_than">
+<h3>greater_than <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn greater_than(value: int): function</code></pre>
+</div><hr>
+<div id="less_than">
+<h3>less_than <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn less_than(value: int): function</code></pre>
+</div><hr>
+<div id="greater_than_or_equal">
+<h3>greater_than_or_equal <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn greater_than_or_equal(value: int): function</code></pre>
+</div><hr>
+<div id="less_than_or_equal">
+<h3>less_than_or_equal <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn less_than_or_equal(value: int): function</code></pre>
+</div><hr>
+<div id="is_even">
+<h3>is_even <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn is_even(x: int): bool</code></pre>
+</div><hr>
+<div id="is_odd">
+<h3>is_odd <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn is_odd(x: int): bool</code></pre>
+</div><hr>
+<div id="is_positive">
+<h3>is_positive <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn is_positive(x: int): bool</code></pre>
+</div><hr>
+<div id="is_negative">
+<h3>is_negative <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn is_negative(x: int): bool</code></pre>
+</div><hr>
+<div id="is_zero">
+<h3>is_zero <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn is_zero(x: int): bool</code></pre>
+</div><hr>
+<div id="not_fn">
+<h3>not_fn <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn not_fn(predicate: function): function</code></pre>
+<div class="summary"><p>Predicate combinators</p></div>
+</div><hr>
+<div id="and_fn">
+<h3>and_fn <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn and_fn(pred1: function, pred2: function): function</code></pre>
+</div><hr>
+<div id="or_fn">
+<h3>or_fn <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn or_fn(pred1: function, pred2: function): function</code></pre>
+</div><hr>
+<div id="xor">
+<h3>xor <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn xor(pred1: function, pred2: function): function</code></pre>
+</div><hr>
+<div id="memoize_int">
+<h3>memoize_int <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn memoize_int(fn_ref: function): function</code></pre>
+<div class="summary"><p>Memoization utilities</p></div>
+</div><hr>
+<div id="memoize_str">
+<h3>memoize_str <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn memoize_str(fn_ref: function): function</code></pre>
+</div><hr>
+<div id="memoize_bool">
+<h3>memoize_bool <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn memoize_bool(fn_ref: function): function</code></pre>
+</div><hr>
+<div id="identity">
+<h3>identity <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn identity(x: int): int</code></pre>
+<div class="summary"><p>Function utilities</p></div>
+</div><hr>
+<div id="identity_str">
+<h3>identity_str <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn identity_str(x: str): str</code></pre>
+</div><hr>
+<div id="constant">
+<h3>constant <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn constant(value: int): function</code></pre>
+</div><hr>
+<div id="constant_str">
+<h3>constant_str <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn constant_str(value: str): function</code></pre>
+</div><hr>
+<div id="flip">
+<h3>flip <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn flip(fn_ref: function): function</code></pre>
+</div><hr>
+<div id="apply_n_times">
+<h3>apply_n_times <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn apply_n_times(fn_ref: function, n: int, initial: int): int</code></pre>
+<div class="summary"><p>Function application utilities</p></div>
+</div><hr>
+<div id="apply_until">
+<h3>apply_until <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn apply_until(fn_ref: function, predicate: function, initial: int): int</code></pre>
+</div><hr>
+<div id="apply_while">
+<h3>apply_while <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn apply_while(fn_ref: function, predicate: function, initial: int): int</code></pre>
+</div><hr>
+<div id="add_n">
+<h3>add_n <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn add_n(n: int): function</code></pre>
+<div class="summary"><p>Function building utilities</p></div>
+</div><hr>
+<div id="multiply_n">
+<h3>multiply_n <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn multiply_n(n: int): function</code></pre>
+</div><hr>
+<div id="power_n">
+<h3>power_n <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn power_n(n: int): function</code></pre>
+</div><hr>
+<div id="wrap_with">
+<h3>wrap_with <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn wrap_with(wrapper: str): function</code></pre>
+<div class="summary"><p>String function utilities</p></div>
+</div><hr>
+<div id="prepend">
+<h3>prepend <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn prepend(prefix: str): function</code></pre>
+</div><hr>
+<div id="append">
+<h3>append <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn append(suffix: str): function</code></pre>
+</div><hr>
+<div id="repeat">
+<h3>repeat <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn repeat(times: int): function</code></pre>
+</div><hr>
+</main>
+</body>
+</html>

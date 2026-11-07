@@ -17,7 +17,7 @@ print("Test 2.3: Call complex aliased function");
 // print("Circle area (radius 3) = " + area);
 
 print("Test 2.4: Call recursive function through alias");
-var fact = math.factorial(5); 
+var fact = math.factorial(5);
 print("5! = {fact}");
 assert(fact == 120, "Module alias should provide access to recursive functions: 5! = 120");
 

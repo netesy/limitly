@@ -32,7 +32,7 @@ fn processMultipleErrors(result: int?DivisionByZero, IndexOutOfBounds): str {
 fn testGenericErrorPattern() {
     var result1 = divide(10, 2);
     var result2 = divide(10, 0);
-    
+
     print(processResult(result1)); // Should print: Success: 5
     print(processResult(result2)); // Should print: Error: Cannot divide by zero
 }
@@ -40,7 +40,7 @@ fn testGenericErrorPattern() {
 fn testSpecificErrorPattern() {
     var result1 = divide(10, 2);
     var result2 = divide(10, 0);
-    
+
     print(processResultSpecific(result1)); // Should print: Success: 5
     print(processResultSpecific(result2)); // Should print: Division error: Cannot divide by zero
 }
@@ -58,10 +58,10 @@ fn testNestedErrorPatterns() {
             err e => "Outer error: {e.message}"
         }
     }
-    
+
     var result1 = divide(10, 2);
     var result2 = divide(10, 0);
-    
+
     print(processNested(result1)); // Should print: Nested success: 2
     print(processNested(result2)); // Should print: Outer error: Cannot divide by zero
 }
@@ -74,11 +74,11 @@ fn testErrorPatternWithGuards() {
             err e => "Error: {e.message}"
         }
     }
-    
+
     var result1 = divide(20, 2);  // 10
     var result2 = divide(6, 2);   // 3
     var result3 = divide(10, 0);  // Error
-    
+
     print(processWithGuard(result1)); // Should print: Large success: 10
     print(processWithGuard(result2)); // Should print: Small success: 3
     print(processWithGuard(result3)); // Should print: Error: Cannot divide by zero
@@ -93,7 +93,7 @@ fn testExhaustiveMatching() {
             err e => "Error: {e.message}"
         }
     }
-    
+
     // This should cause a compile error - not exhaustive (missing error case)
     /*
     fn notExhaustive1(result: int?DivisionByZero): str {
@@ -102,7 +102,7 @@ fn testExhaustiveMatching() {
         }
     }
     */
-    
+
     // This should cause a compile error - not exhaustive (missing success case)
     /*
     fn notExhaustive2(result: int?DivisionByZero): str {
@@ -116,12 +116,12 @@ fn testExhaustiveMatching() {
 // Main test function
 fn main() {
     print("Testing error pattern matching...");
-    
+
     testGenericErrorPattern();
     testSpecificErrorPattern();
     testNestedErrorPatterns();
     testErrorPatternWithGuards();
     testExhaustiveMatching();
-    
+
     print("Error pattern matching tests completed!");
 }

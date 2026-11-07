@@ -432,7 +432,7 @@ fn _emit_container(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSn
         // First compute total height to draw background properly
         var cy = oy;
         var total_h = w.padding_top + w.padding_bottom;
-        
+
         // Background added first if container has known height or bounds
         var bg_h = ctx.avail_h;
         if (w.height_val > 0.0) { bg_h = w.height_val; }

@@ -33,7 +33,7 @@ fn test_generic_hashmap(): nil {
 
     assert(hm.size() == 2, "hashmap size 2");
     assert((hm.get("key1") as str) == "updated value", "updated key1 value match");
-    assert(hm.contains_key("key2") == true, "contains key2");
+    assert(hm.contains_key("key2"), "contains key2");
     print("Generic HashMap test passed.\n");
 }
 

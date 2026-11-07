@@ -16,12 +16,12 @@ fn main(): int {
 
     // 3. Create Retained Mode Textarea Widget
     var editor_widget = ui.textarea(initial_code, "Type code here...")
-        .width(500.0)
-        .height(250.0)
-        .background(color.rgb(20, 22, 28))
-        .foreground(color.white)
-        .corner_radius(6.0)
-        .padding(10.0);
+    .width(500.0)
+    .height(250.0)
+    .background(color.rgb(20, 22, 28))
+    .foreground(color.white)
+    .corner_radius(6.0)
+    .padding(10.0);
 
     // Get reference to EditorController from text_editor_state
     var controller = editor_widget.text_editor_state as text_ctrl.EditorController;
@@ -58,16 +58,16 @@ fn main(): int {
     var status_text = "Lines: " + (controller.get_line_count() as str) + " | Cursor: (" + (controller.get_cursor_line() as str) + ", " + (controller.get_cursor_col() as str) + ")";
 
     var editor_view = ui.column([
-        ui.text("Lymar Retained Text Editor").bold().font_size(18.0).color(color.rgb(100, 180, 255)),
-        ui.row([
-            ui.button("Undo", nil).background(color.rgb(40, 45, 60)),
-            ui.spacer(0.1),
-            ui.button("Redo", nil).background(color.rgb(40, 45, 60)),
-            ui.spacer(0.1),
-            ui.button("Clear", nil).background(color.rgb(80, 30, 35))
-        ]).spacing(8.0),
-        editor_widget,
-        ui.text(status_text).font_size(12.0).color(color.rgb(150, 160, 180))
+    ui.text("Lymar Retained Text Editor").bold().font_size(18.0).color(color.rgb(100, 180, 255)),
+    ui.row([
+    ui.button("Undo", nil).background(color.rgb(40, 45, 60)),
+    ui.spacer(0.1),
+    ui.button("Redo", nil).background(color.rgb(40, 45, 60)),
+    ui.spacer(0.1),
+    ui.button("Clear", nil).background(color.rgb(80, 30, 35))
+    ]).spacing(8.0),
+    editor_widget,
+    ui.text(status_text).font_size(12.0).color(color.rgb(150, 160, 180))
     ]).spacing(12.0).padding(16.0).background(color.rgb(14, 16, 22));
 
     // Set root layout and update frame pass

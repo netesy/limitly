@@ -3,7 +3,6 @@
 //   gcc -shared -fPIC -o scratch/libbind_fixture.dll tests/native/bind_fixture.c
 //   lymar run tests/native/bind_test.lm --bind-header tests/native/bind_fixture.h --bind-lib scratch/libbind_fixture.dll
 
-import std.ffi as ffi;
 import bind_fixture;
 
 fn main() {

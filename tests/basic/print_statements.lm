@@ -20,7 +20,7 @@ var boolResult = 10 > 5;
 var concatResult = "Result: " + "Success";
 
 assert(sumResult == 5, "2 + 3 should equal 5");
-assert(boolResult == true, "10 > 5 should be true");
+assert(boolResult, "10 > 5 should be true");
 assert(concatResult == "Result: Success", "String concatenation should work");
 
 print(sumResult);
@@ -39,8 +39,8 @@ var nilValue = nil;
 var zero = 0;
 var emptyStr = "";
 
-assert(boolTrue == true, "Boolean true should be true");
-assert(boolFalse == false, "Boolean false should be false");
+assert(boolTrue, "Boolean true should be true");
+assert(not boolFalse, "Boolean false should be false");
 assert(nilValue == nil, "Nil value should be nil");
 assert(zero == 0, "Zero should be 0");
 assert(emptyStr == "", "Empty string should be empty");
@@ -60,7 +60,7 @@ var logicResult = a > b;
 assert(a == 5, "Variable a should be 5");
 assert(b == 3, "Variable b should be 3");
 assert(mathResult == 8, "5 + 3 should equal 8");
-assert(logicResult == true, "5 > 3 should be true");
+assert(logicResult, "5 > 3 should be true");
 
 print("Math: {a} + {b} = {mathResult}");
 print("Logic: {a} > {b} is {logicResult}");
@@ -71,7 +71,7 @@ var loopCount = 0;
 for (var i = 1; i <= 3; i += 1) {
     loopCount += 1;
     print("Number: {i}");
-   // assert(i >= 1 and i <= 3, "Loop variable i should be between 1 and 3");
+    // assert(i >= 1 and i <= 3, "Loop variable i should be between 1 and 3");
 }
 assert(loopCount == 3, "Loop should execute 3 times");
 

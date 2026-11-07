@@ -5,35 +5,35 @@ import std.game.types as types;
 import std.game.input as input_mod;
 
 pub import std.game.types show
-    Vec2, vec2,
-    Rect, rect,
-    ColorRole, StyleVar,
-    GUITheme, default_theme, dark_theme, light_theme, cyberpunk_theme, retro_theme;
+Vec2, vec2,
+Rect, rect,
+ColorRole, StyleVar,
+GUITheme, default_theme, dark_theme, light_theme, cyberpunk_theme, retro_theme;
 
 pub import std.game.math show
-    Circle, circle,
-    Ray2D, ray2d,
-    Contact2D, RayHit2D,
-    test_aabb_aabb, test_circle_circle, test_circle_aabb,
-    raycast_aabb, raycast_circle;
+Circle, circle,
+Ray2D, ray2d,
+Contact2D, RayHit2D,
+test_aabb_aabb, test_circle_circle, test_circle_aabb,
+raycast_aabb, raycast_circle;
 
 pub import std.game.camera show
-    Camera2D, Camera;
+Camera2D, Camera;
 
 pub import std.game.sprite show
-    Texture2D, texture2d,
-    Sprite, sprite,
-    SpriteSheet, AnimationClip, AnimatedSprite;
+Texture2D, texture2d,
+Sprite, sprite,
+SpriteSheet, AnimationClip, AnimatedSprite;
 
 pub fn Texture(id: int = -1, width: int = 0, height: int = 0): Texture2D {
     return Texture2D(id=id, width=width, height=height);
 }
 
 pub import std.game.particles show
-    Particle, ParticleEmitter2D, ParticleEmitter;
+Particle, ParticleEmitter2D, ParticleEmitter;
 
 pub import std.game.input show
-    InputManager;
+InputManager;
 
 pub const KEY_SPACE: int         = input_mod.KEY_SPACE;
 pub const KEY_ENTER: int         = input_mod.KEY_ENTER;

@@ -2,4 +2,4 @@
 // Re-exports canonical Color definitions from std.color.
 
 pub import std.color show Color, rgb, rgba, hex, color_rgb, color_rgba, lerp,
-    white, black, transparent, red, green, blue, indigo, yellow, cyan, gray, dark_gray;
+white, black, transparent, red, green, blue, indigo, yellow, cyan, gray, dark_gray;

@@ -3,25 +3,25 @@ import std.validation as v;
 
 fn test_validation() {
     print("Testing Validation...");
-    assert(v.is_email("admin@lymar.dev") == true, "valid email");
-    assert(v.is_email("not-an-email") == false, "invalid email");
+    assert(v.is_email("admin@lymar.dev"), "valid email");
+    assert(not v.is_email("not-an-email"), "invalid email");
 
-    assert(v.is_phone("+1 (555) 123-4567") == true, "valid phone");
-    assert(v.is_phone("invalid_phone_abc") == false, "invalid phone");
+    assert(v.is_phone("+1 (555) 123-4567"), "valid phone");
+    assert(not v.is_phone("invalid_phone_abc"), "invalid phone");
 
-    assert(v.is_url("https://lymar.org/docs") == true, "valid url");
-    assert(v.is_url("ftp://not-http") == false, "ftp url");
+    assert(v.is_url("https://lymar.org/docs"), "valid url");
+    assert(not v.is_url("ftp://not-http"), "ftp url");
 
-    assert(v.is_domain("github.com") == true, "valid domain");
-    assert(v.is_domain("not a domain") == false, "invalid domain");
+    assert(v.is_domain("github.com"), "valid domain");
+    assert(not v.is_domain("not a domain"), "invalid domain");
 
-    assert(v.is_number("-123.456") == true, "valid number");
-    assert(v.is_number("12a34") == false, "invalid number");
+    assert(v.is_number("-123.456"), "valid number");
+    assert(not v.is_number("12a34"), "invalid number");
 
     var validator = v.Validate();
-    assert(validator.is_uuid("123e4567-e89b-12d3-a456-426614174000") == true, "valid uuid");
-    assert(validator.is_ipv4("127.0.0.1") == true, "valid ipv4");
-    assert(validator.is_ipv4("256.0.0.1") == false, "invalid ipv4 octet");
+    assert(validator.is_uuid("123e4567-e89b-12d3-a456-426614174000"), "valid uuid");
+    assert(validator.is_ipv4("127.0.0.1"), "valid ipv4");
+    assert(not validator.is_ipv4("256.0.0.1"), "invalid ipv4 octet");
 }
 
 print("=== Running Validation Test Suite ===");

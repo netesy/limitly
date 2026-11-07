@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>index.lm - Lymar API Reference</title>
+<style>
+:root {
+  --bg-primary: #0a0e17;
+  --bg-secondary: #111827;
+  --bg-tertiary: #1f2937;
+  --accent: #38bdf8;
+  --accent-hover: #7dd3fc;
+  --text-main: #f1f5f9;
+  --text-muted: #94a3b8;
+  --border-color: #334155;
+}
+* { box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif;
+  margin: 0; padding: 0; background: var(--bg-primary); color: var(--text-main); display: flex;
+}
+nav {
+  width: 300px; height: 100vh; overflow-y: auto; background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color); padding: 24px 20px; position: fixed;
+}
+nav h2 { font-size: 1.15rem; color: var(--accent); margin-top: 0; margin-bottom: 16px; font-weight: 700; }
+#search-input {
+  width: 100%; padding: 8px 12px; background: var(--bg-tertiary); border: 1px solid var(--border-color);
+  border-radius: 6px; color: #fff; font-size: 0.85rem; margin-bottom: 16px;
+}
+#search-input:focus { outline: none; border-color: var(--accent); }
+.nav-link { display: block; color: var(--text-muted); text-decoration: none; padding: 6px 8px; font-size: 0.9rem; border-radius: 4px; }
+.nav-link:hover { color: #fff; background: var(--bg-tertiary); }
+main { margin-left: 300px; padding: 40px 48px; max-width: 950px; flex: 1; }
+h1 { color: #fff; font-size: 2.2rem; margin-top: 0; padding-bottom: 16px; border-bottom: 1px solid var(--border-color); }
+h2 { color: var(--accent); font-size: 1.4rem; margin-top: 36px; margin-bottom: 14px; }
+h3 { color: #fff; font-size: 1.25rem; margin-top: 28px; margin-bottom: 12px; display: flex; align-items: center; gap: 10px; }
+h4 { color: var(--accent); font-size: 1rem; margin-top: 20px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+.badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
+.badge-pub { background: #064e3b; color: #6ee7b7; border: 1px solid #059669; }
+.badge-private { background: #334155; color: #cbd5e1; }
+.badge-type { background: #1e1b4b; color: #c7d2fe; border: 1px solid #4338ca; }
+.code-sig { background: #090d16; border: 1px solid var(--border-color); padding: 14px 18px; border-radius: 8px; overflow-x: auto; font-family: 'Consolas', 'Fira Code', monospace; font-size: 0.95rem; color: #e2e8f0; }
+.summary { color: #cbd5e1; line-height: 1.65; margin: 14px 0; font-size: 1rem; }
+/* Callout styling */
+.callout { margin: 16px 0; padding: 14px 18px; border-radius: 8px; border-left: 4px solid; font-size: 0.92rem; }
+.callout-header { font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+.callout-tip { border-color: #10b981; background: rgba(16, 185, 129, 0.08); color: #d1fae5; }
+.callout-tip .callout-header { color: #34d399; }
+.callout-warning { border-color: #f59e0b; background: rgba(245, 158, 11, 0.08); color: #fef3c7; }
+.callout-warning .callout-header { color: #fbbf24; }
+.callout-note { border-color: #0284c7; background: rgba(2, 132, 199, 0.08); color: #e0f2fe; }
+.callout-note .callout-header { color: #38bdf8; }
+.callout-deprecated { border-color: #e11d48; background: rgba(225, 29, 72, 0.08); color: #ffe4e6; }
+.callout-deprecated .callout-header { color: #fb7185; }
+/* Example card */
+.example-card { margin: 20px 0; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: #080c14; }
+.example-header { background: #162032; padding: 8px 16px; font-size: 0.82rem; font-weight: 700; color: #94a3b8; border-bottom: 1px solid var(--border-color); }
+.example-card pre { margin: 0; padding: 14px 18px; overflow-x: auto; font-family: monospace; font-size: 0.92rem; color: #e2e8f0; }
+/* Tables */
+table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 0.92rem; }
+th { background: #162032; color: #94a3b8; text-align: left; padding: 10px 14px; font-weight: 600; border-bottom: 1px solid var(--border-color); }
+td { padding: 10px 14px; border-bottom: 1px solid #1e293b; color: #cbd5e1; }
+ul { padding-left: 20px; color: #cbd5e1; line-height: 1.6; }
+hr { border: 0; border-top: 1px solid var(--border-color); margin: 36px 0; }
+</style>
+<script>
+function filterNav() {
+  var q = document.getElementById('search-input').value.toLowerCase();
+  var links = document.querySelectorAll('.nav-link');
+  links.forEach(function(l) {
+    l.style.display = l.textContent.toLowerCase().includes(q) ? 'block' : 'none';
+  });
+}
+</script>
+</head>
+<body>
+<nav>
+<h2>index.lm</h2>
+<input type="text" id="search-input" placeholder="Filter symbols..." oninput="filterNav()">
+<div id="nav-list">
+<a class="nav-link" href="#c_char">c_char <span style="font-size: 0.75rem; opacity: 0.6;">(Type Alias)</span></a>
+<a class="nav-link" href="#c_short">c_short <span style="font-size: 0.75rem; opacity: 0.6;">(Type Alias)</span></a>
+<a class="nav-link" href="#c_int">c_int <span style="font-size: 0.75rem; opacity: 0.6;">(Type Alias)</span></a>
+<a class="nav-link" href="#c_long">c_long <span style="font-size: 0.75rem; opacity: 0.6;">(Type Alias)</span></a>
+<a class="nav-link" href="#c_longlong">c_longlong <span style="font-size: 0.75rem; opacity: 0.6;">(Type Alias)</span></a>
+<a class="nav-link" href="#c_uchar">c_uchar <span style="font-size: 0.75rem; opacity: 0.6;">(Type Alias)</span></a>
+<a class="nav-link" href="#c_ushort">c_ushort <span style="font-size: 0.75rem; opacity: 0.6;">(Type Alias)</span></a>
+<a class="nav-link" href="#c_uint">c_uint <span style="font-size: 0.75rem; opacity: 0.6;">(Type Alias)</span></a>
+<a class="nav-link" href="#c_ulong">c_ulong <span style="font-size: 0.75rem; opacity: 0.6;">(Type Alias)</span></a>
+<a class="nav-link" href="#c_ulonglong">c_ulonglong <span style="font-size: 0.75rem; opacity: 0.6;">(Type Alias)</span></a>
+<a class="nav-link" href="#c_size_t">c_size_t <span style="font-size: 0.75rem; opacity: 0.6;">(Type Alias)</span></a>
+<a class="nav-link" href="#c_ssize_t">c_ssize_t <span style="font-size: 0.75rem; opacity: 0.6;">(Type Alias)</span></a>
+<a class="nav-link" href="#c_ptrdiff_t">c_ptrdiff_t <span style="font-size: 0.75rem; opacity: 0.6;">(Type Alias)</span></a>
+<a class="nav-link" href="#c_float">c_float <span style="font-size: 0.75rem; opacity: 0.6;">(Type Alias)</span></a>
+<a class="nav-link" href="#c_double">c_double <span style="font-size: 0.75rem; opacity: 0.6;">(Type Alias)</span></a>
+<a class="nav-link" href="#pubptr">pubptr <span style="font-size: 0.75rem; opacity: 0.6;">(Type Alias)</span></a>
+<a class="nav-link" href="#fnptr">fnptr <span style="font-size: 0.75rem; opacity: 0.6;">(Type Alias)</span></a>
+<a class="nav-link" href="#c_bool">c_bool <span style="font-size: 0.75rem; opacity: 0.6;">(Type Alias)</span></a>
+<a class="nav-link" href="#c_void">c_void <span style="font-size: 0.75rem; opacity: 0.6;">(Type Alias)</span></a>
+<a class="nav-link" href="#alloc">alloc <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#free">free <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#realloc">realloc <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#memcpy">memcpy <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#memset">memset <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#memcmp">memcmp <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#ptr_add">ptr_add <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_ffi_alloc">_ffi_alloc <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_ffi_free">_ffi_free <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_ffi_load_i8">_ffi_load_i8 <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_ffi_load_u8">_ffi_load_u8 <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_ffi_store_i8">_ffi_store_i8 <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_ffi_ptr_add">_ffi_ptr_add <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#ptr_sub">ptr_sub <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#ptr_diff">ptr_diff <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#ptr_align">ptr_align <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#ptr_is_aligned">ptr_is_aligned <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#load_i8">load_i8 <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#load_u8">load_u8 <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#load_i16">load_i16 <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#load_u16">load_u16 <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#load_i32">load_i32 <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#load_u32">load_u32 <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#load_i64">load_i64 <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#load_u64">load_u64 <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#load_f32">load_f32 <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#load_f64">load_f64 <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#load_ptr">load_ptr <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#store_i8">store_i8 <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#store_u8">store_u8 <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#store_i16">store_i16 <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#store_u16">store_u16 <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#store_i32">store_i32 <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#store_u32">store_u32 <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#store_i64">store_i64 <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#store_u64">store_u64 <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#store_f32">store_f32 <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#store_f64">store_f64 <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#store_ptr">store_ptr <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#library_load">library_load <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#library_unload">library_unload <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#library_get_symbol">library_get_symbol <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#foreign_call">foreign_call <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#call_i64_0">call_i64_0 <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#call_i64_1">call_i64_1 <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#call_i64_2">call_i64_2 <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#call_f64_2">call_f64_2 <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#call_void_1">call_void_1 <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#CString">CString <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#string_to_cstring">string_to_cstring <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#cstring_to_string">cstring_to_string <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#cstring_to_string_bounded">cstring_to_string_bounded <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#cstring_free">cstring_free <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#cstring_as_ptr">cstring_as_ptr <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#cstring_from_ptr">cstring_from_ptr <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#ForeignFunction">ForeignFunction <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#declare">declare <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#Library">Library <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#load">load <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#load_first">load_first <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#callback_create">callback_create <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#callback_ptr">callback_ptr <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#callback_destroy">callback_destroy <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_ffi_callback_create">_ffi_callback_create <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_ffi_callback_ptr">_ffi_callback_ptr <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_ffi_callback_destroy">_ffi_callback_destroy <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#Callback">Callback <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#create_callback">create_callback <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+</div>
+</nav>
+<main>
+<h1>index.lm API Reference</h1>
+<h2>Module Overview</h2>
+<div class="summary"><p>Foreign Function Interface (FFI) Module
+Standard C ABI Interoperability, Type Mapping, and Unmanaged Memory Operations</p></div>
+<div id="c_char">
+<h3>c_char <span class="badge badge-pub">Type Alias</span></h3>
+<pre class="code-sig"><code>type c_char = int</code></pre>
+<div class="summary"><p>Primitive C integer types</p></div>
+</div><hr>
+<div id="c_short">
+<h3>c_short <span class="badge badge-pub">Type Alias</span></h3>
+<pre class="code-sig"><code>type c_short = int</code></pre>
+</div><hr>
+<div id="c_int">
+<h3>c_int <span class="badge badge-pub">Type Alias</span></h3>
+<pre class="code-sig"><code>type c_int = int</code></pre>
+</div><hr>
+<div id="c_long">
+<h3>c_long <span class="badge badge-pub">Type Alias</span></h3>
+<pre class="code-sig"><code>type c_long = int</code></pre>
+</div><hr>
+<div id="c_longlong">
+<h3>c_longlong <span class="badge badge-pub">Type Alias</span></h3>
+<pre class="code-sig"><code>type c_longlong = int</code></pre>
+</div><hr>
+<div id="c_uchar">
+<h3>c_uchar <span class="badge badge-pub">Type Alias</span></h3>
+<pre class="code-sig"><code>type c_uchar = int</code></pre>
+</div><hr>
+<div id="c_ushort">
+<h3>c_ushort <span class="badge badge-pub">Type Alias</span></h3>
+<pre class="code-sig"><code>type c_ushort = int</code></pre>
+</div><hr>
+<div id="c_uint">
+<h3>c_uint <span class="badge badge-pub">Type Alias</span></h3>
+<pre class="code-sig"><code>type c_uint = int</code></pre>
+</div><hr>
+<div id="c_ulong">
+<h3>c_ulong <span class="badge badge-pub">Type Alias</span></h3>
+<pre class="code-sig"><code>type c_ulong = int</code></pre>
+</div><hr>
+<div id="c_ulonglong">
+<h3>c_ulonglong <span class="badge badge-pub">Type Alias</span></h3>
+<pre class="code-sig"><code>type c_ulonglong = int</code></pre>
+</div><hr>
+<div id="c_size_t">
+<h3>c_size_t <span class="badge badge-pub">Type Alias</span></h3>
+<pre class="code-sig"><code>type c_size_t = int</code></pre>
+</div><hr>
+<div id="c_ssize_t">
+<h3>c_ssize_t <span class="badge badge-pub">Type Alias</span></h3>
+<pre class="code-sig"><code>type c_ssize_t = int</code></pre>
+</div><hr>
+<div id="c_ptrdiff_t">
+<h3>c_ptrdiff_t <span class="badge badge-pub">Type Alias</span></h3>
+<pre class="code-sig"><code>type c_ptrdiff_t = int</code></pre>
+</div><hr>
+<div id="c_float">
+<h3>c_float <span class="badge badge-pub">Type Alias</span></h3>
+<pre class="code-sig"><code>type c_float = float</code></pre>
+</div><hr>
+<div id="c_double">
+<h3>c_double <span class="badge badge-pub">Type Alias</span></h3>
+<pre class="code-sig"><code>type c_double = float</code></pre>
+</div><hr>
+<div id="pubptr">
+<h3>pubptr <span class="badge badge-pub">Type Alias</span></h3>
+<pre class="code-sig"><code>type pubptr = int</code></pre>
+<div class="summary"><p>Opaque pointer types</p></div>
+</div><hr>
+<div id="fnptr">
+<h3>fnptr <span class="badge badge-pub">Type Alias</span></h3>
+<pre class="code-sig"><code>type fnptr = int</code></pre>
+</div><hr>
+<div id="c_bool">
+<h3>c_bool <span class="badge badge-pub">Type Alias</span></h3>
+<pre class="code-sig"><code>type c_bool = int</code></pre>
+</div><hr>
+<div id="c_void">
+<h3>c_void <span class="badge badge-pub">Type Alias</span></h3>
+<pre class="code-sig"><code>type c_void = int</code></pre>
+</div><hr>
+<div id="alloc">
+<h3>alloc <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn alloc(size: int): pubptr</code></pre>
+<div class="summary"><p>Memory Allocation Intrinsics</p></div>
+</div><hr>
+<div id="free">
+<h3>free <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn free(ptr: pubptr): nil</code></pre>
+</div><hr>
+<div id="realloc">
+<h3>realloc <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn realloc(ptr: pubptr, new_size: int): pubptr</code></pre>
+</div><hr>
+<div id="memcpy">
+<h3>memcpy <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn memcpy(dest: pubptr, src: pubptr, size: int): nil</code></pre>
+<div class="summary"><p>Memory Manipulation</p></div>
+</div><hr>
+<div id="memset">
+<h3>memset <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn memset(ptr: pubptr, value: int, size: int): nil</code></pre>
+</div><hr>
+<div id="memcmp">
+<h3>memcmp <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn memcmp(ptr1: pubptr, ptr2: pubptr, size: int): int</code></pre>
+</div><hr>
+<div id="ptr_add">
+<h3>ptr_add <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn ptr_add(ptr: pubptr, offset: int): pubptr</code></pre>
+<div class="summary"><p>Pointer Arithmetic</p></div>
+</div><hr>
+<div id="_ffi_alloc">
+<h3>_ffi_alloc <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _ffi_alloc(size: int): pubptr</code></pre>
+</div><hr>
+<div id="_ffi_free">
+<h3>_ffi_free <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _ffi_free(ptr: pubptr): nil</code></pre>
+</div><hr>
+<div id="_ffi_load_i8">
+<h3>_ffi_load_i8 <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _ffi_load_i8(ptr: pubptr): int</code></pre>
+</div><hr>
+<div id="_ffi_load_u8">
+<h3>_ffi_load_u8 <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _ffi_load_u8(ptr: pubptr): int</code></pre>
+</div><hr>
+<div id="_ffi_store_i8">
+<h3>_ffi_store_i8 <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _ffi_store_i8(ptr: pubptr, value: int): nil</code></pre>
+</div><hr>
+<div id="_ffi_ptr_add">
+<h3>_ffi_ptr_add <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _ffi_ptr_add(ptr: pubptr, offset: int): pubptr</code></pre>
+</div><hr>
+<div id="ptr_sub">
+<h3>ptr_sub <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn ptr_sub(ptr: pubptr, offset: int): pubptr</code></pre>
+</div><hr>
+<div id="ptr_diff">
+<h3>ptr_diff <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn ptr_diff(ptr1: pubptr, ptr2: pubptr): int</code></pre>
+</div><hr>
+<div id="ptr_align">
+<h3>ptr_align <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn ptr_align(ptr: pubptr, alignment: int): pubptr</code></pre>
+</div><hr>
+<div id="ptr_is_aligned">
+<h3>ptr_is_aligned <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn ptr_is_aligned(ptr: pubptr, alignment: int): bool</code></pre>
+</div><hr>
+<div id="load_i8">
+<h3>load_i8 <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn load_i8(ptr: pubptr): int</code></pre>
+<div class="summary"><p>Raw Memory Loading</p></div>
+</div><hr>
+<div id="load_u8">
+<h3>load_u8 <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn load_u8(ptr: pubptr): int</code></pre>
+</div><hr>
+<div id="load_i16">
+<h3>load_i16 <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn load_i16(ptr: pubptr): int</code></pre>
+</div><hr>
+<div id="load_u16">
+<h3>load_u16 <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn load_u16(ptr: pubptr): int</code></pre>
+</div><hr>
+<div id="load_i32">
+<h3>load_i32 <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn load_i32(ptr: pubptr): int</code></pre>
+</div><hr>
+<div id="load_u32">
+<h3>load_u32 <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn load_u32(ptr: pubptr): int</code></pre>
+</div><hr>
+<div id="load_i64">
+<h3>load_i64 <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn load_i64(ptr: pubptr): int</code></pre>
+</div><hr>
+<div id="load_u64">
+<h3>load_u64 <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn load_u64(ptr: pubptr): int</code></pre>
+</div><hr>
+<div id="load_f32">
+<h3>load_f32 <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn load_f32(ptr: pubptr): float</code></pre>
+</div><hr>
+<div id="load_f64">
+<h3>load_f64 <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn load_f64(ptr: pubptr): float</code></pre>
+</div><hr>
+<div id="load_ptr">
+<h3>load_ptr <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn load_ptr(ptr: pubptr): pubptr</code></pre>
+</div><hr>
+<div id="store_i8">
+<h3>store_i8 <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn store_i8(ptr: pubptr, value: int): nil</code></pre>
+<div class="summary"><p>Raw Memory Storing</p></div>
+</div><hr>
+<div id="store_u8">
+<h3>store_u8 <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn store_u8(ptr: pubptr, value: int): nil</code></pre>
+</div><hr>
+<div id="store_i16">
+<h3>store_i16 <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn store_i16(ptr: pubptr, value: int): nil</code></pre>
+</div><hr>
+<div id="store_u16">
+<h3>store_u16 <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn store_u16(ptr: pubptr, value: int): nil</code></pre>
+</div><hr>
+<div id="store_i32">
+<h3>store_i32 <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn store_i32(ptr: pubptr, value: int): nil</code></pre>
+</div><hr>
+<div id="store_u32">
+<h3>store_u32 <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn store_u32(ptr: pubptr, value: int): nil</code></pre>
+</div><hr>
+<div id="store_i64">
+<h3>store_i64 <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn store_i64(ptr: pubptr, value: int): nil</code></pre>
+</div><hr>
+<div id="store_u64">
+<h3>store_u64 <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn store_u64(ptr: pubptr, value: int): nil</code></pre>
+</div><hr>
+<div id="store_f32">
+<h3>store_f32 <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn store_f32(ptr: pubptr, value: float): nil</code></pre>
+</div><hr>
+<div id="store_f64">
+<h3>store_f64 <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn store_f64(ptr: pubptr, value: float): nil</code></pre>
+</div><hr>
+<div id="store_ptr">
+<h3>store_ptr <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn store_ptr(ptr: pubptr, value: pubptr): nil</code></pre>
+</div><hr>
+<div id="library_load">
+<h3>library_load <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn library_load(path: str): pubptr</code></pre>
+<div class="summary"><p>Dynamic Linking Operations</p></div>
+</div><hr>
+<div id="library_unload">
+<h3>library_unload <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn library_unload(handle: pubptr): nil</code></pre>
+</div><hr>
+<div id="library_get_symbol">
+<h3>library_get_symbol <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn library_get_symbol(handle: pubptr, symbol: str): fnptr</code></pre>
+</div><hr>
+<div id="foreign_call">
+<h3>foreign_call <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn foreign_call(func_ptr: fnptr, args: list, return_type: int = ..., param_types: list = ...)</code></pre>
+<div class="summary"><p>Foreign Calls</p></div>
+</div><hr>
+<div id="call_i64_0">
+<h3>call_i64_0 <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn call_i64_0(func_ptr: fnptr): int</code></pre>
+<div class="summary"><p>Typed calls are the supported safe-wrapper building blocks. Unlike
+`foreign_call`, their complete ABI signature is visible in LIR and can be
+implemented identically by every backend.</p></div>
+</div><hr>
+<div id="call_i64_1">
+<h3>call_i64_1 <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn call_i64_1(func_ptr: fnptr, arg1: int): int</code></pre>
+</div><hr>
+<div id="call_i64_2">
+<h3>call_i64_2 <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn call_i64_2(func_ptr: fnptr, arg1: int, arg2: int): int</code></pre>
+</div><hr>
+<div id="call_f64_2">
+<h3>call_f64_2 <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn call_f64_2(func_ptr: fnptr, arg1: f64, arg2: f64): f64</code></pre>
+</div><hr>
+<div id="call_void_1">
+<h3>call_void_1 <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn call_void_1(func_ptr: fnptr, arg1: pubptr): nil</code></pre>
+</div><hr>
+<div id="CString">
+<h3>CString <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame CString</code></pre>
+<div class="summary"><p>CString wrapper</p></div>
+<h4>Members</h4>
+<ul>
+<li><code>var pub ptr: pubptr</code> <em>(field)</em></li>
+<li><code>var pub length: int</code> <em>(field)</em></li>
+<li><code>var pub is_owned: int</code> <em>(field)</em></li>
+</ul>
+</div><hr>
+<div id="string_to_cstring">
+<h3>string_to_cstring <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn string_to_cstring(s: str): CString</code></pre>
+</div><hr>
+<div id="cstring_to_string">
+<h3>cstring_to_string <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn cstring_to_string(p: pubptr): str</code></pre>
+</div><hr>
+<div id="cstring_to_string_bounded">
+<h3>cstring_to_string_bounded <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn cstring_to_string_bounded(p: pubptr, max_length: int): str?</code></pre>
+<div class="summary"><p>Convert a foreign C string without scanning beyond caller-owned memory.
+Returns nil when no terminator occurs within max_length bytes.</p></div>
+</div><hr>
+<div id="cstring_free">
+<h3>cstring_free <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn cstring_free(cs: CString): nil</code></pre>
+</div><hr>
+<div id="cstring_as_ptr">
+<h3>cstring_as_ptr <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn cstring_as_ptr(cs: CString): pubptr</code></pre>
+</div><hr>
+<div id="cstring_from_ptr">
+<h3>cstring_from_ptr <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn cstring_from_ptr(p: pubptr, take_ownership: int): CString</code></pre>
+</div><hr>
+<div id="ForeignFunction">
+<h3>ForeignFunction <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame ForeignFunction</code></pre>
+<div class="summary"><p>High-Level Foreign Function Descriptor & Call Wrapper</p></div>
+<h4>Members</h4>
+<ul>
+<li><code>var pub name: str</code> <em>(field)</em></li>
+<li><code>var pub func_ptr: fnptr</code> <em>(field)</em></li>
+<li><code>var pub param_types: list</code> <em>(field)</em></li>
+<li><code>var pub return_type: int</code> <em>(field)</em></li>
+<li><code>pub fn call(): any</code> <em>(method)</em></li>
+<li><code>pub fn call_list(call_args: list): any</code> <em>(method)</em></li>
+</ul>
+</div><hr>
+<div id="declare">
+<h3>declare <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn declare(name: str, func_ptr: fnptr, param_types: list, return_type: int): ForeignFunction</code></pre>
+</div><hr>
+<div id="Library">
+<h3>Library <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame Library</code></pre>
+<div class="summary"><p>High-level Library Abstraction</p></div>
+<h4>Members</h4>
+<ul>
+<li><code>var pub handle: pubptr</code> <em>(field)</em></li>
+<li><code>var pub path: str</code> <em>(field)</em></li>
+<li><code>var pub is_loaded: bool</code> <em>(field)</em></li>
+<li><code>pub fn symbol(symbol_name: str): fnptr</code> <em>(method)</em></li>
+<li><code>pub fn func(name: str, return_type: int, param_types: list): ForeignFunction</code> <em>(method)</em></li>
+<li><code>pub fn close(): nil</code> <em>(method)</em></li>
+</ul>
+</div><hr>
+<div id="load">
+<h3>load <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn load(path: str): Library</code></pre>
+</div><hr>
+<div id="load_first">
+<h3>load_first <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn load_first(candidates: list): Library</code></pre>
+<div class="summary"><p>Load the first available library from a list of candidate paths.</p></div>
+</div><hr>
+<div id="callback_create">
+<h3>callback_create <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn callback_create(func_name: str, arg_types: list, ret_type: int): int</code></pre>
+</div><hr>
+<div id="callback_ptr">
+<h3>callback_ptr <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn callback_ptr(handle: int): fnptr</code></pre>
+</div><hr>
+<div id="callback_destroy">
+<h3>callback_destroy <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn callback_destroy(handle: int): nil</code></pre>
+</div><hr>
+<div id="_ffi_callback_create">
+<h3>_ffi_callback_create <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _ffi_callback_create(func_name: str, arg_types: list, ret_type: int): int</code></pre>
+</div><hr>
+<div id="_ffi_callback_ptr">
+<h3>_ffi_callback_ptr <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _ffi_callback_ptr(handle: int): fnptr</code></pre>
+</div><hr>
+<div id="_ffi_callback_destroy">
+<h3>_ffi_callback_destroy <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _ffi_callback_destroy(handle: int): nil</code></pre>
+</div><hr>
+<div id="Callback">
+<h3>Callback <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame Callback</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>var pub handle: int</code> <em>(field)</em></li>
+<li><code>var pub pointer: fnptr</code> <em>(field)</em></li>
+<li><code>var pub is_open: bool</code> <em>(field)</em></li>
+<li><code>pub fn close(): nil</code> <em>(method)</em></li>
+</ul>
+</div><hr>
+<div id="create_callback">
+<h3>create_callback <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn create_callback(func_name: str, arg_types: list, ret_type: int): Callback?</code></pre>
+</div><hr>
+</main>
+</body>
+</html>

@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>sprite.lm - Lymar API Reference</title>
+<style>
+:root {
+  --bg-primary: #0a0e17;
+  --bg-secondary: #111827;
+  --bg-tertiary: #1f2937;
+  --accent: #38bdf8;
+  --accent-hover: #7dd3fc;
+  --text-main: #f1f5f9;
+  --text-muted: #94a3b8;
+  --border-color: #334155;
+}
+* { box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif;
+  margin: 0; padding: 0; background: var(--bg-primary); color: var(--text-main); display: flex;
+}
+nav {
+  width: 300px; height: 100vh; overflow-y: auto; background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color); padding: 24px 20px; position: fixed;
+}
+nav h2 { font-size: 1.15rem; color: var(--accent); margin-top: 0; margin-bottom: 16px; font-weight: 700; }
+#search-input {
+  width: 100%; padding: 8px 12px; background: var(--bg-tertiary); border: 1px solid var(--border-color);
+  border-radius: 6px; color: #fff; font-size: 0.85rem; margin-bottom: 16px;
+}
+#search-input:focus { outline: none; border-color: var(--accent); }
+.nav-link { display: block; color: var(--text-muted); text-decoration: none; padding: 6px 8px; font-size: 0.9rem; border-radius: 4px; }
+.nav-link:hover { color: #fff; background: var(--bg-tertiary); }
+main { margin-left: 300px; padding: 40px 48px; max-width: 950px; flex: 1; }
+h1 { color: #fff; font-size: 2.2rem; margin-top: 0; padding-bottom: 16px; border-bottom: 1px solid var(--border-color); }
+h2 { color: var(--accent); font-size: 1.4rem; margin-top: 36px; margin-bottom: 14px; }
+h3 { color: #fff; font-size: 1.25rem; margin-top: 28px; margin-bottom: 12px; display: flex; align-items: center; gap: 10px; }
+h4 { color: var(--accent); font-size: 1rem; margin-top: 20px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+.badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
+.badge-pub { background: #064e3b; color: #6ee7b7; border: 1px solid #059669; }
+.badge-private { background: #334155; color: #cbd5e1; }
+.badge-type { background: #1e1b4b; color: #c7d2fe; border: 1px solid #4338ca; }
+.code-sig { background: #090d16; border: 1px solid var(--border-color); padding: 14px 18px; border-radius: 8px; overflow-x: auto; font-family: 'Consolas', 'Fira Code', monospace; font-size: 0.95rem; color: #e2e8f0; }
+.summary { color: #cbd5e1; line-height: 1.65; margin: 14px 0; font-size: 1rem; }
+/* Callout styling */
+.callout { margin: 16px 0; padding: 14px 18px; border-radius: 8px; border-left: 4px solid; font-size: 0.92rem; }
+.callout-header { font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+.callout-tip { border-color: #10b981; background: rgba(16, 185, 129, 0.08); color: #d1fae5; }
+.callout-tip .callout-header { color: #34d399; }
+.callout-warning { border-color: #f59e0b; background: rgba(245, 158, 11, 0.08); color: #fef3c7; }
+.callout-warning .callout-header { color: #fbbf24; }
+.callout-note { border-color: #0284c7; background: rgba(2, 132, 199, 0.08); color: #e0f2fe; }
+.callout-note .callout-header { color: #38bdf8; }
+.callout-deprecated { border-color: #e11d48; background: rgba(225, 29, 72, 0.08); color: #ffe4e6; }
+.callout-deprecated .callout-header { color: #fb7185; }
+/* Example card */
+.example-card { margin: 20px 0; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: #080c14; }
+.example-header { background: #162032; padding: 8px 16px; font-size: 0.82rem; font-weight: 700; color: #94a3b8; border-bottom: 1px solid var(--border-color); }
+.example-card pre { margin: 0; padding: 14px 18px; overflow-x: auto; font-family: monospace; font-size: 0.92rem; color: #e2e8f0; }
+/* Tables */
+table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 0.92rem; }
+th { background: #162032; color: #94a3b8; text-align: left; padding: 10px 14px; font-weight: 600; border-bottom: 1px solid var(--border-color); }
+td { padding: 10px 14px; border-bottom: 1px solid #1e293b; color: #cbd5e1; }
+ul { padding-left: 20px; color: #cbd5e1; line-height: 1.6; }
+hr { border: 0; border-top: 1px solid var(--border-color); margin: 36px 0; }
+</style>
+<script>
+function filterNav() {
+  var q = document.getElementById('search-input').value.toLowerCase();
+  var links = document.querySelectorAll('.nav-link');
+  links.forEach(function(l) {
+    l.style.display = l.textContent.toLowerCase().includes(q) ? 'block' : 'none';
+  });
+}
+</script>
+</head>
+<body>
+<nav>
+<h2>sprite.lm</h2>
+<input type="text" id="search-input" placeholder="Filter symbols..." oninput="filterNav()">
+<div id="nav-list">
+<a class="nav-link" href="#Texture2D">Texture2D <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#texture2d">texture2d <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#Sprite">Sprite <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#sprite">sprite <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#SpriteSheet">SpriteSheet <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#AnimationClip">AnimationClip <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#AnimatedSprite">AnimatedSprite <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+</div>
+</nav>
+<main>
+<h1>sprite.lm API Reference</h1>
+<h2>Module Overview</h2>
+<div class="summary"><p>std/game/sprite.lm
+2D Sprites, SpriteSheets, Frame Animations, and Textured Quad Rendering</p></div>
+<div id="Texture2D">
+<h3>Texture2D <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame Texture2D</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>var pub id: int</code> <em>(field)</em></li>
+<li><code>var pub width: int</code> <em>(field)</em></li>
+<li><code>var pub height: int</code> <em>(field)</em></li>
+<li><code>pub init()</code> <em>(constructor)</em></li>
+</ul>
+</div><hr>
+<div id="texture2d">
+<h3>texture2d <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn texture2d(id: int, w: int, h: int): Texture2D</code></pre>
+</div><hr>
+<div id="Sprite">
+<h3>Sprite <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame Sprite: gtraits.Drawable</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>var pub texture: Texture2D</code> <em>(field)</em></li>
+<li><code>var pub position: types.Vec2</code> <em>(field)</em></li>
+<li><code>var pub src_rect: types.Rect</code> <em>(field)</em></li>
+<li><code>var pub origin: types.Vec2</code> <em>(field)</em></li>
+<li><code>var pub scale: types.Vec2</code> <em>(field)</em></li>
+<li><code>var pub rotation: float</code> <em>(field)</em></li>
+<li><code>var pub tint: color.Color</code> <em>(field)</em></li>
+<li><code>var pub flip_x: bool</code> <em>(field)</em></li>
+<li><code>var pub flip_y: bool</code> <em>(field)</em></li>
+<li><code>pub init()</code> <em>(constructor)</em></li>
+<li><code>pub fn draw(): nil</code> <em>(method)</em></li>
+</ul>
+</div><hr>
+<div id="sprite">
+<h3>sprite <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn sprite(texture: any = ..., position: any = ...): Sprite</code></pre>
+</div><hr>
+<div id="SpriteSheet">
+<h3>SpriteSheet <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame SpriteSheet</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>var pub texture: Texture2D</code> <em>(field)</em></li>
+<li><code>var pub cell_width: int</code> <em>(field)</em></li>
+<li><code>var pub cell_height: int</code> <em>(field)</em></li>
+<li><code>var pub columns: int</code> <em>(field)</em></li>
+<li><code>var pub rows: int</code> <em>(field)</em></li>
+<li><code>pub init()</code> <em>(constructor)</em></li>
+<li><code>pub fn get_frame(col: int, row: int): types.Rect</code> <em>(method)</em></li>
+<li><code>pub fn get_frame_index(index: int): types.Rect</code> <em>(method)</em></li>
+</ul>
+</div><hr>
+<div id="AnimationClip">
+<h3>AnimationClip <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame AnimationClip</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>var pub name: str</code> <em>(field)</em></li>
+<li><code>var pub frames: list</code> <em>(field)</em></li>
+<li><code>var pub fps: float</code> <em>(field)</em></li>
+<li><code>var pub loop: bool</code> <em>(field)</em></li>
+<li><code>pub init()</code> <em>(constructor)</em></li>
+</ul>
+</div><hr>
+<div id="AnimatedSprite">
+<h3>AnimatedSprite <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame AnimatedSprite: gtraits.Updatable, gtraits.Drawable</code></pre>
+<div class="summary"><p>AnimatedSprite composes Sprite via `embed`: the sprite fields (texture,
+position, origin, scale, rotation, tint, flip_x, flip_y) are promoted from
+Sprite rather than duplicated, and `src_rect` comes along for free. Sprite's
+`draw` is promoted too but immediately shadowed by the own `draw` below
+(name-based dedupe), so animation-aware painting wins.</p></div>
+<h4>Members</h4>
+<ul>
+<li><code>var pub clips: dict</code> <em>(field)</em></li>
+<li><code>var pub current_clip: str</code> <em>(field)</em></li>
+<li><code>var pub frame_index: int</code> <em>(field)</em></li>
+<li><code>var pub frame_timer: float</code> <em>(field)</em></li>
+<li><code>var pub is_playing: bool</code> <em>(field)</em></li>
+<li><code>pub init()</code> <em>(constructor)</em></li>
+<li><code>pub fn add_clip(clip: AnimationClip): nil</code> <em>(method)</em></li>
+<li><code>pub fn play(clip_name: str): nil</code> <em>(method)</em></li>
+<li><code>pub fn pause(): nil</code> <em>(method)</em></li>
+<li><code>pub fn resume(): nil</code> <em>(method)</em></li>
+<li><code>pub fn stop(): nil</code> <em>(method)</em></li>
+<li><code>pub fn update(dt: float): nil</code> <em>(method)</em></li>
+<li><code>pub fn draw(): nil</code> <em>(method)</em></li>
+</ul>
+</div><hr>
+</main>
+</body>
+</html>

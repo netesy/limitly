@@ -7,15 +7,15 @@ frame Set {
     // Basic operations
     pub fn add(value: int): Set {
         if (self.contains(value)) return self;
-        
+
         var new_elements = [] as [int];
         var i: int = 0;
-        
+
         while (i < len(self.elements)) {
             new_elements[i] = self.elements[i];
             i = i + 1;
         }
-        
+
         new_elements[len(self.elements)] = value;
         return Set(elements=new_elements);
     }
@@ -23,12 +23,12 @@ frame Set {
     pub fn remove(value: int): Set {
         var index = self.find_index(value);
         if (index == nil) return self;
-        
+
         var idx = index as int;
         var new_elements = [] as [int];
         var i: int = 0;
         var j: int = 0;
-        
+
         while (i < len(self.elements)) {
             if (i != idx) {
                 new_elements[j] = self.elements[i];
@@ -36,7 +36,7 @@ frame Set {
             }
             i = i + 1;
         }
-        
+
         return Set(elements=new_elements);
     }
 
@@ -64,12 +64,12 @@ frame Set {
     pub fn union(other: Set): Set {
         var combined = Set(elements=self.elements);
         var i: int = 0;
-        
+
         while (i < len(other.elements)) {
             combined = combined.add(other.elements[i]);
             i = i + 1;
         }
-        
+
         return combined;
     }
 
@@ -77,7 +77,7 @@ frame Set {
         var result = [] as [int];
         var i: int = 0;
         var j: int = 0;
-        
+
         while (i < len(self.elements)) {
             if (other.contains(self.elements[i])) {
                 result[j] = self.elements[i];
@@ -85,7 +85,7 @@ frame Set {
             }
             i = i + 1;
         }
-        
+
         return Set(elements=result);
     }
 
@@ -93,7 +93,7 @@ frame Set {
         var result = [] as [int];
         var i: int = 0;
         var j: int = 0;
-        
+
         while (i < len(self.elements)) {
             if (not other.contains(self.elements[i])) {
                 result[j] = self.elements[i];
@@ -101,7 +101,7 @@ frame Set {
             }
             i = i + 1;
         }
-        
+
         return Set(elements=result);
     }
 
@@ -134,7 +134,7 @@ frame Set {
         var seen = {} as {int: bool};
         var i: int = 0;
         var j: int = 0;
-        
+
         while (i < len(self.elements)) {
             var mapped_value = f(self.elements[i]);
             if (seen[mapped_value] == nil) {
@@ -144,7 +144,7 @@ frame Set {
             }
             i = i + 1;
         }
-        
+
         return Set(elements=result);
     }
 
@@ -152,7 +152,7 @@ frame Set {
         var result = [] as [int];
         var i: int = 0;
         var j: int = 0;
-        
+
         while (i < len(self.elements)) {
             if (predicate(self.elements[i])) {
                 result[j] = self.elements[i];
@@ -160,7 +160,7 @@ frame Set {
             }
             i = i + 1;
         }
-        
+
         return Set(elements=result);
     }
 
@@ -229,13 +229,13 @@ frame Set {
     pub fn to_string(): str {
         var result = "{";
         var i: int = 0;
-        
+
         while (i < len(self.elements)) {
             if (i > 0) result = result + ", ";
             result = result + "{self.elements[i]}";
             i = i + 1;
         }
-        
+
         result = result + "}";
         return result;
     }

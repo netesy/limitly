@@ -20,14 +20,14 @@ fn mean(items: [any]): float {
 fn median(items: [any]): float {
     var n = len(items);
     if (n == 0) return 0.0;
-    
+
     // Create copy for sorting
     var copy = [];
     for (var i = 0; i < n; i = i + 1) {
         copy.append(items[i]);
     }
     sort.sort(copy);
-    
+
     if (n % 2 == 1) {
         return copy[n / 2] as float;
     } else {

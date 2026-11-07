@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>context.lm - Lymar API Reference</title>
+<style>
+:root {
+  --bg-primary: #0a0e17;
+  --bg-secondary: #111827;
+  --bg-tertiary: #1f2937;
+  --accent: #38bdf8;
+  --accent-hover: #7dd3fc;
+  --text-main: #f1f5f9;
+  --text-muted: #94a3b8;
+  --border-color: #334155;
+}
+* { box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif;
+  margin: 0; padding: 0; background: var(--bg-primary); color: var(--text-main); display: flex;
+}
+nav {
+  width: 300px; height: 100vh; overflow-y: auto; background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color); padding: 24px 20px; position: fixed;
+}
+nav h2 { font-size: 1.15rem; color: var(--accent); margin-top: 0; margin-bottom: 16px; font-weight: 700; }
+#search-input {
+  width: 100%; padding: 8px 12px; background: var(--bg-tertiary); border: 1px solid var(--border-color);
+  border-radius: 6px; color: #fff; font-size: 0.85rem; margin-bottom: 16px;
+}
+#search-input:focus { outline: none; border-color: var(--accent); }
+.nav-link { display: block; color: var(--text-muted); text-decoration: none; padding: 6px 8px; font-size: 0.9rem; border-radius: 4px; }
+.nav-link:hover { color: #fff; background: var(--bg-tertiary); }
+main { margin-left: 300px; padding: 40px 48px; max-width: 950px; flex: 1; }
+h1 { color: #fff; font-size: 2.2rem; margin-top: 0; padding-bottom: 16px; border-bottom: 1px solid var(--border-color); }
+h2 { color: var(--accent); font-size: 1.4rem; margin-top: 36px; margin-bottom: 14px; }
+h3 { color: #fff; font-size: 1.25rem; margin-top: 28px; margin-bottom: 12px; display: flex; align-items: center; gap: 10px; }
+h4 { color: var(--accent); font-size: 1rem; margin-top: 20px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+.badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
+.badge-pub { background: #064e3b; color: #6ee7b7; border: 1px solid #059669; }
+.badge-private { background: #334155; color: #cbd5e1; }
+.badge-type { background: #1e1b4b; color: #c7d2fe; border: 1px solid #4338ca; }
+.code-sig { background: #090d16; border: 1px solid var(--border-color); padding: 14px 18px; border-radius: 8px; overflow-x: auto; font-family: 'Consolas', 'Fira Code', monospace; font-size: 0.95rem; color: #e2e8f0; }
+.summary { color: #cbd5e1; line-height: 1.65; margin: 14px 0; font-size: 1rem; }
+/* Callout styling */
+.callout { margin: 16px 0; padding: 14px 18px; border-radius: 8px; border-left: 4px solid; font-size: 0.92rem; }
+.callout-header { font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+.callout-tip { border-color: #10b981; background: rgba(16, 185, 129, 0.08); color: #d1fae5; }
+.callout-tip .callout-header { color: #34d399; }
+.callout-warning { border-color: #f59e0b; background: rgba(245, 158, 11, 0.08); color: #fef3c7; }
+.callout-warning .callout-header { color: #fbbf24; }
+.callout-note { border-color: #0284c7; background: rgba(2, 132, 199, 0.08); color: #e0f2fe; }
+.callout-note .callout-header { color: #38bdf8; }
+.callout-deprecated { border-color: #e11d48; background: rgba(225, 29, 72, 0.08); color: #ffe4e6; }
+.callout-deprecated .callout-header { color: #fb7185; }
+/* Example card */
+.example-card { margin: 20px 0; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: #080c14; }
+.example-header { background: #162032; padding: 8px 16px; font-size: 0.82rem; font-weight: 700; color: #94a3b8; border-bottom: 1px solid var(--border-color); }
+.example-card pre { margin: 0; padding: 14px 18px; overflow-x: auto; font-family: monospace; font-size: 0.92rem; color: #e2e8f0; }
+/* Tables */
+table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 0.92rem; }
+th { background: #162032; color: #94a3b8; text-align: left; padding: 10px 14px; font-weight: 600; border-bottom: 1px solid var(--border-color); }
+td { padding: 10px 14px; border-bottom: 1px solid #1e293b; color: #cbd5e1; }
+ul { padding-left: 20px; color: #cbd5e1; line-height: 1.6; }
+hr { border: 0; border-top: 1px solid var(--border-color); margin: 36px 0; }
+</style>
+<script>
+function filterNav() {
+  var q = document.getElementById('search-input').value.toLowerCase();
+  var links = document.querySelectorAll('.nav-link');
+  links.forEach(function(l) {
+    l.style.display = l.textContent.toLowerCase().includes(q) ? 'block' : 'none';
+  });
+}
+</script>
+</head>
+<body>
+<nav>
+<h2>context.lm</h2>
+<input type="text" id="search-input" placeholder="Filter symbols..." oninput="filterNav()">
+<div id="nav-list">
+<a class="nav-link" href="#UIContextState">UIContextState <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#push_overlay">push_overlay <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#clear_overlays">clear_overlays <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#ui_init">ui_init <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_signal_dirty_cb">_signal_dirty_cb <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#mark_element_dirty">mark_element_dirty <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#set_viewport_size">set_viewport_size <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#get_viewport_width">get_viewport_width <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#get_viewport_height">get_viewport_height <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#set_root">set_root <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#update_blueprint">update_blueprint <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#set_root_any">set_root_any <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#codepoint_to_utf8">codepoint_to_utf8 <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#utf8_pop_back">utf8_pop_back <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#get_char_width">get_char_width <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#measure_widget_height">measure_widget_height <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#measure_widget_width">measure_widget_width <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#hit_test_and_click_blueprint">hit_test_and_click_blueprint <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#hit_test_and_click_widget">hit_test_and_click_widget <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#blur_focus_recursive">blur_focus_recursive <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#dispatch_pointer_down">dispatch_pointer_down <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#dispatch_pointer_click">dispatch_pointer_click <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#dispatch_pointer_move">dispatch_pointer_move <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#render_blueprint_node">render_blueprint_node <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#draw_widget_focus_ring">draw_widget_focus_ring <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#render_widget_node">render_widget_node <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#update_animations_recursive">update_animations_recursive <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#render_from_layout_boxes">render_from_layout_boxes <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#frame_update">frame_update <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#reset_pressed_recursive">reset_pressed_recursive <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#update_hover_state_recursive">update_hover_state_recursive <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#dispatch_pointer_up">dispatch_pointer_up <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#send_char_to_widget">send_char_to_widget <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#dispatch_char_input">dispatch_char_input <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#send_key_down_to_widget">send_key_down_to_widget <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#dispatch_key_down">dispatch_key_down <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#send_wheel_to_widget">send_wheel_to_widget <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#dispatch_mouse_wheel">dispatch_mouse_wheel <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+</div>
+</nav>
+<main>
+<h1>context.lm API Reference</h1>
+<h2>Module Overview</h2>
+<div class="summary"><p>UI Context Module
+Retained UI Pipeline implementation with Dynamic Layout, Flexbox Spacers, Hit Testing, and Callback Dispatch</p></div>
+<div id="UIContextState">
+<h3>UIContextState <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame UIContextState</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>var pub is_initialized: int</code> <em>(field)</em></li>
+<li><code>var pub next_element_id: int</code> <em>(field)</em></li>
+<li><code>var pub root_element: int</code> <em>(field)</em></li>
+<li><code>var pub dirty: int</code> <em>(field)</em></li>
+<li><code>var pub current_blueprint: ui_types.Blueprint</code> <em>(field)</em></li>
+<li><code>var pub current_widget: ui.Widget</code> <em>(field)</em></li>
+<li><code>var pub focus_manager: focus.Manager</code> <em>(field)</em></li>
+<li><code>var pub modifiers: int</code> <em>(field)</em></li>
+<li><code>var pub get_clipboard_cb: function?</code> <em>(field)</em></li>
+<li><code>var pub set_clipboard_cb: function?</code> <em>(field)</em></li>
+<li><code>var pub has_widget: int</code> <em>(field)</em></li>
+<li><code>var pub viewport_w: float</code> <em>(field)</em></li>
+<li><code>var pub viewport_h: float</code> <em>(field)</em></li>
+<li><code>var pub captured_widget: ui.Widget</code> <em>(field)</em></li>
+<li><code>var pub has_captured: int</code> <em>(field)</em></li>
+<li><code>var pub captured_bounds_x: float</code> <em>(field)</em></li>
+<li><code>var pub captured_bounds_y: float</code> <em>(field)</em></li>
+<li><code>var pub captured_bounds_w: float</code> <em>(field)</em></li>
+<li><code>var pub captured_bounds_h: float</code> <em>(field)</em></li>
+<li><code>var pub last_pointer_x: float</code> <em>(field)</em></li>
+<li><code>var pub last_pointer_y: float</code> <em>(field)</em></li>
+<li><code>var pub is_pointer_down: int</code> <em>(field)</em></li>
+<li><code>var pub active_overlays: list</code> <em>(field)</em></li>
+<li><code>var pub cached_draw_list: any</code> <em>(field)</em></li>
+</ul>
+</div><hr>
+<div id="push_overlay">
+<h3>push_overlay <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn push_overlay(w: ui.Widget): nil</code></pre>
+</div><hr>
+<div id="clear_overlays">
+<h3>clear_overlays <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn clear_overlays(): nil</code></pre>
+</div><hr>
+<div id="ui_init">
+<h3>ui_init <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn ui_init(): int</code></pre>
+</div><hr>
+<div id="_signal_dirty_cb">
+<h3>_signal_dirty_cb <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _signal_dirty_cb(): nil</code></pre>
+</div><hr>
+<div id="mark_element_dirty">
+<h3>mark_element_dirty <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn mark_element_dirty(element_id: int): nil</code></pre>
+</div><hr>
+<div id="set_viewport_size">
+<h3>set_viewport_size <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn set_viewport_size(w: float, h: float): nil</code></pre>
+</div><hr>
+<div id="get_viewport_width">
+<h3>get_viewport_width <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn get_viewport_width(): float</code></pre>
+</div><hr>
+<div id="get_viewport_height">
+<h3>get_viewport_height <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn get_viewport_height(): float</code></pre>
+</div><hr>
+<div id="set_root">
+<h3>set_root <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn set_root(w: ui.Widget): nil</code></pre>
+</div><hr>
+<div id="update_blueprint">
+<h3>update_blueprint <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn update_blueprint(bp: ui_types.Blueprint): nil</code></pre>
+</div><hr>
+<div id="set_root_any">
+<h3>set_root_any <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn set_root_any(root): nil</code></pre>
+</div><hr>
+<div id="codepoint_to_utf8">
+<h3>codepoint_to_utf8 <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn codepoint_to_utf8(cp: int): str</code></pre>
+</div><hr>
+<div id="utf8_pop_back">
+<h3>utf8_pop_back <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn utf8_pop_back(s: str): str</code></pre>
+</div><hr>
+<div id="get_char_width">
+<h3>get_char_width <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn get_char_width(font_size: float): float</code></pre>
+</div><hr>
+<div id="measure_widget_height">
+<h3>measure_widget_height <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn measure_widget_height(w: ui.Widget): float</code></pre>
+</div><hr>
+<div id="measure_widget_width">
+<h3>measure_widget_width <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn measure_widget_width(w: ui.Widget, available_w: float): float</code></pre>
+</div><hr>
+<div id="hit_test_and_click_blueprint">
+<h3>hit_test_and_click_blueprint <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn hit_test_and_click_blueprint(bp: ui_types.Blueprint, px: float, py: float, x: float, y: float, available_w: float, available_h: float): ui_types.Blueprint</code></pre>
+</div><hr>
+<div id="hit_test_and_click_widget">
+<h3>hit_test_and_click_widget <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn hit_test_and_click_widget(w: ui.Widget, px: float, py: float, x: float, y: float, available_w: float, available_h: float): nil</code></pre>
+</div><hr>
+<div id="blur_focus_recursive">
+<h3>blur_focus_recursive <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn blur_focus_recursive(w: ui.Widget): nil</code></pre>
+</div><hr>
+<div id="dispatch_pointer_down">
+<h3>dispatch_pointer_down <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn dispatch_pointer_down(px: float, py: float): nil</code></pre>
+</div><hr>
+<div id="dispatch_pointer_click">
+<h3>dispatch_pointer_click <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn dispatch_pointer_click(px: float, py: float): nil</code></pre>
+</div><hr>
+<div id="dispatch_pointer_move">
+<h3>dispatch_pointer_move <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn dispatch_pointer_move(px: float, py: float): nil</code></pre>
+</div><hr>
+<div id="render_blueprint_node">
+<h3>render_blueprint_node <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn render_blueprint_node(bp: ui_types.Blueprint, x: float, y: float, available_w: float, available_h: float, cvs: canvas.Canvas): nil</code></pre>
+</div><hr>
+<div id="draw_widget_focus_ring">
+<h3>draw_widget_focus_ring <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn draw_widget_focus_ring(w: ui.Widget, x: float, y: float, width: float, height: float, cvs: canvas.Canvas): nil</code></pre>
+<div class="summary"><p>Helper to draw focus ring if widget is focused</p></div>
+</div><hr>
+<div id="render_widget_node">
+<h3>render_widget_node <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn render_widget_node(w: ui.Widget, x: float, y: float, available_w: float, available_h: float, cvs: canvas.Canvas): nil</code></pre>
+</div><hr>
+<div id="update_animations_recursive">
+<h3>update_animations_recursive <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn update_animations_recursive(w: ui.Widget, dt: float): nil</code></pre>
+</div><hr>
+<div id="render_from_layout_boxes">
+<h3>render_from_layout_boxes <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn render_from_layout_boxes(boxes: list, cvs: canvas.Canvas): nil</code></pre>
+<div class="summary"><p>Render using pre-computed layout boxes for better performance
+This is called when layout.lm's LayoutBox system is integrated</p></div>
+</div><hr>
+<div id="frame_update">
+<h3>frame_update <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn frame_update(delta_time: float): nil</code></pre>
+</div><hr>
+<div id="reset_pressed_recursive">
+<h3>reset_pressed_recursive <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn reset_pressed_recursive(w: ui.Widget): nil</code></pre>
+</div><hr>
+<div id="update_hover_state_recursive">
+<h3>update_hover_state_recursive <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn update_hover_state_recursive(w: ui.Widget, px: float, py: float, x: float, y: float, available_w: float, available_h: float, mark_dirty: int): nil</code></pre>
+<div class="summary"><p>Update hover states for interactive widgets</p></div>
+</div><hr>
+<div id="dispatch_pointer_up">
+<h3>dispatch_pointer_up <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn dispatch_pointer_up(px: float, py: float): nil</code></pre>
+</div><hr>
+<div id="send_char_to_widget">
+<h3>send_char_to_widget <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn send_char_to_widget(w: ui.Widget, cp: int): int</code></pre>
+</div><hr>
+<div id="dispatch_char_input">
+<h3>dispatch_char_input <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn dispatch_char_input(cp: int): nil</code></pre>
+</div><hr>
+<div id="send_key_down_to_widget">
+<h3>send_key_down_to_widget <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn send_key_down_to_widget(w: ui.Widget, key_code: int, mods: int): int</code></pre>
+</div><hr>
+<div id="dispatch_key_down">
+<h3>dispatch_key_down <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn dispatch_key_down(key_code: int, mods: int = ...): nil</code></pre>
+</div><hr>
+<div id="send_wheel_to_widget">
+<h3>send_wheel_to_widget <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn send_wheel_to_widget(w: ui.Widget, px: float, py: float, delta: float, x: float, y: float, available_w: float, available_h: float): int</code></pre>
+</div><hr>
+<div id="dispatch_mouse_wheel">
+<h3>dispatch_mouse_wheel <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn dispatch_mouse_wheel(delta: float): nil</code></pre>
+</div><hr>
+</main>
+</body>
+</html>

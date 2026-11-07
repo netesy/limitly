@@ -14,102 +14,102 @@ import std.color as color;
 // Snippet 1: Simple label + button
 fn snippet_1_simple(): ui.Widget {
     return ui.column([
-        ui.text("Welcome to Lymar!").color(color.white),
-        ui.button("Get Started").background(color.blue).foreground(color.white)
+    ui.text("Welcome to Lymar!").color(color.white),
+    ui.button("Get Started").background(color.blue).foreground(color.white)
     ]).spacing(12.0).padding(16.0);
 }
 
 // Snippet 2: Styled login form
 fn snippet_2_login(): ui.Widget {
     var input_style = ui.style()
-        .background(color.dark_gray)
-        .padding(10.0)
-        .corner_radius(4.0)
-        .font_size(14.0);
+    .background(color.dark_gray)
+    .padding(10.0)
+    .corner_radius(4.0)
+    .font_size(14.0);
 
     return ui.column([
-        ui.text("Sign In").font_size(20.0).bold().color(color.white),
-        ui.text("Username").color(color.light_gray),
-        ui.input("user@example.com").style(input_style),
-        ui.text("Password").color(color.light_gray),
-        ui.input("********").style(input_style),
-        ui.button("Login")
-            .background(color.indigo)
-            .foreground(color.white)
-            .padding_xy(16.0, 10.0)
-            .corner_radius(6.0)
+    ui.text("Sign In").font_size(20.0).bold().color(color.white),
+    ui.text("Username").color(color.light_gray),
+    ui.input("user@example.com").style(input_style),
+    ui.text("Password").color(color.light_gray),
+    ui.input("********").style(input_style),
+    ui.button("Login")
+    .background(color.indigo)
+    .foreground(color.white)
+    .padding_xy(16.0, 10.0)
+    .corner_radius(6.0)
     ]).spacing(8.0).padding(16.0);
 }
 
 // Snippet 3: Counter
 fn snippet_3_counter(): ui.Widget {
     return ui.column([
-        ui.text("Counter Application").font_size(18.0).bold(),
-        ui.text("Count: 42").color(color.light_gray),
-        ui.row([
-            ui.button("Decrement").background(color.red).padding(8.0),
-            ui.spacer(),
-            ui.button("Increment").background(color.green).padding(8.0)
-        ]).spacing(10.0)
+    ui.text("Counter Application").font_size(18.0).bold(),
+    ui.text("Count: 42").color(color.light_gray),
+    ui.row([
+    ui.button("Decrement").background(color.red).padding(8.0),
+    ui.spacer(),
+    ui.button("Increment").background(color.green).padding(8.0)
+    ]).spacing(10.0)
     ]).spacing(12.0).padding(16.0);
 }
 
 // Snippet 4: Toolbar / card layout
 fn snippet_4_card(): ui.Widget {
     var card_style = ui.style()
-        .background(color.dark_gray)
-        .padding(16.0)
-        .corner_radius(8.0)
-        .spacing(10.0);
+    .background(color.dark_gray)
+    .padding(16.0)
+    .corner_radius(8.0)
+    .spacing(10.0);
 
     var toolbar = ui.row([
-        ui.button("New").padding(6.0),
-        ui.button("Open").padding(6.0),
-        ui.button("Save").padding(6.0),
-        ui.spacer(),
-        ui.button("Settings").padding(6.0)
+    ui.button("New").padding(6.0),
+    ui.button("Open").padding(6.0),
+    ui.button("Save").padding(6.0),
+    ui.spacer(),
+    ui.button("Settings").padding(6.0)
     ]).spacing(8.0);
 
     return ui.column([
-        toolbar,
-        ui.column([
-            ui.text("Project Dashboard").font_size(18.0).bold(),
-            ui.text("All systems operational.").color(color.green)
-        ]).style(card_style)
+    toolbar,
+    ui.column([
+    ui.text("Project Dashboard").font_size(18.0).bold(),
+    ui.text("All systems operational.").color(color.green)
+    ]).style(card_style)
     ]).spacing(12.0).padding(16.0);
 }
 
 // Snippet 5: Settings form
 fn snippet_5_settings(): ui.Widget {
     return ui.column([
-        ui.text("Settings").font_size(20.0).bold(),
-        ui.row([
-            ui.text("Enable Notifications"),
-            ui.spacer(),
-            ui.checkbox(true)
-        ]),
-        ui.row([
-            ui.text("Dark Theme"),
-            ui.spacer(),
-            ui.checkbox(true)
-        ]),
-        ui.row([
-            ui.text("Volume"),
-            ui.spacer(),
-            ui.slider(75.0, 0.0, 100.0)
-        ]),
-        ui.button("Save Changes").background(color.blue).padding(10.0)
+    ui.text("Settings").font_size(20.0).bold(),
+    ui.row([
+    ui.text("Enable Notifications"),
+    ui.spacer(),
+    ui.checkbox(true)
+    ]),
+    ui.row([
+    ui.text("Dark Theme"),
+    ui.spacer(),
+    ui.checkbox(true)
+    ]),
+    ui.row([
+    ui.text("Volume"),
+    ui.spacer(),
+    ui.slider(75.0, 0.0, 100.0)
+    ]),
+    ui.button("Save Changes").background(color.blue).padding(10.0)
     ]).spacing(10.0).padding(16.0);
 }
 
 fn build_all_forms_gallery(): ui.Widget {
     return ui.column([
-        ui.text("Lymar UI Form Gallery").font_size(22.0).bold().color(color.white),
-        snippet_1_simple(),
-        snippet_2_login(),
-        snippet_3_counter(),
-        snippet_4_card(),
-        snippet_5_settings()
+    ui.text("Lymar UI Form Gallery").font_size(22.0).bold().color(color.white),
+    snippet_1_simple(),
+    snippet_2_login(),
+    snippet_3_counter(),
+    snippet_4_card(),
+    snippet_5_settings()
     ]).spacing(12.0).padding(12.0);
 }
 

@@ -26,7 +26,7 @@ print("Tiny Float:", tinyFloat);
 assert(smallFloat == 2.2250738585072014e-308, "Small float should be 2.2250738585072014e-308");
 assert(tinyFloat == 1e-100, "Tiny float should be 1e-100");
 
-// Test negative large values  
+// Test negative large values
 var posLarge: i64 = 123456789;   // Positive integer
 var negLarge: i64 = -123456789;  // Simple negative integer
 var negFloat: f64 = -1.7976931348623157e+308;
@@ -62,8 +62,8 @@ print("maxI64 > posLarge:", comp1);
 print("negLarge < posLarge:", comp2);
 print("largeFloat > 0.0:", comp3);
 
-assert(comp1 == true, "maxI64 should be greater than posLarge");
-assert(comp2 == true, "negLarge should be less than posLarge");
-assert(comp3 == true, "largeFloat should be greater than 0.0");
+assert(comp1, "maxI64 should be greater than posLarge");
+assert(comp2, "negLarge should be less than posLarge");
+assert(comp3, "largeFloat should be greater than 0.0");
 
 print("=== Large Literal Tests Complete ===");

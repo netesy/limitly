@@ -7,7 +7,6 @@
 
 import std.app as app;
 import std.ui as ui;
-import std.ui.context as ui_context;
 
 fn on_scrolled_btn_click() {
     print("Scrolled button clicked");
@@ -30,12 +29,12 @@ fn run_scroll_tab_tests() {
     var spacer3 = ui.spacer().height(100.0);
 
     var scroll_content = ui.column([
-        btn1,
-        spacer1,
-        inp1,
-        spacer2,
-        btn_scrolled,
-        spacer3
+    btn1,
+    spacer1,
+    inp1,
+    spacer2,
+    btn_scrolled,
+    spacer3
     ]);
 
     var scr_a = ui.scroll(scroll_content).height(180.0);
@@ -44,9 +43,9 @@ fn run_scroll_tab_tests() {
     var chk_b = ui.checkbox(true);
     var sld_b = ui.slider(75.0, 0.0, 100.0);
     var tab_b_content = ui.column([
-        ui.text("Tab B Settings"),
-        chk_b,
-        sld_b
+    ui.text("Tab B Settings"),
+    chk_b,
+    sld_b
     ]).spacing(10.0);
 
     var tv = ui.tabs(["Dashboard", "Settings"], [scr_a, tab_b_content], 0);

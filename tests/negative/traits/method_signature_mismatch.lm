@@ -7,8 +7,8 @@ trait Drawable {
 
 frame Shape: Drawable {
     pub fn draw() {  // Missing scale parameter
-        print("Drawing");
-    }
+    print("Drawing");
+}
 }
 
 var shape = Shape {};

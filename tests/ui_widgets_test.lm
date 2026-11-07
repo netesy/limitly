@@ -98,22 +98,22 @@ fn test_ui_context_rendering_and_dispatch(): nil {
     ctx.set_viewport_size(800.0, 600.0);
 
     var root = ui.column([
-        ui.alert("System Normal", "success"),
-        ui.row([
-            ui.toggle(false),
-            ui.stepper(10, 1, 0, 100),
-            ui.progress(0.5)
-        ]),
-        ui.accordion("Settings", ui.column([
-            ui.color_picker("Theme", color.blue),
-            ui.file_input("Config File")
-        ]), true),
-        ui.bar_chart("Revenue", [30.0, 60.0, 90.0]),
-        ui.pie_chart("Share", [40.0, 60.0]),
-        ui.table(["Service", "Status"], [
-            [ui.text("Auth"), ui.indicator("online", "OK")],
-            [ui.text("DB"), ui.indicator("online", "OK")]
-        ])
+    ui.alert("System Normal", "success"),
+    ui.row([
+    ui.toggle(false),
+    ui.stepper(10, 1, 0, 100),
+    ui.progress(0.5)
+    ]),
+    ui.accordion("Settings", ui.column([
+    ui.color_picker("Theme", color.blue),
+    ui.file_input("Config File")
+    ]), true),
+    ui.bar_chart("Revenue", [30.0, 60.0, 90.0]),
+    ui.pie_chart("Share", [40.0, 60.0]),
+    ui.table(["Service", "Status"], [
+    [ui.text("Auth"), ui.indicator("online", "OK")],
+    [ui.text("DB"), ui.indicator("online", "OK")]
+    ])
     ]).spacing(8.0).padding(10.0);
 
     ctx.set_root(root);

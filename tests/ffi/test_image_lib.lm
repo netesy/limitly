@@ -15,7 +15,6 @@ import std.image.png   as png;
 import std.image.jpg   as jpg;
 import std.image.bmp   as bmp;
 import std.image.tga   as tga;
-import std.image.hdr   as hdr;
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -270,13 +269,13 @@ fn test_edge_guards(): nil {
     print("--- Test 9: edge guards ---");
 
     var bad_w_ok: bool = false;
-    var res1 = image.create(-1, 150, 4)? else {
+    var _res1 = image.create(-1, 150, 4)? else {
         bad_w_ok = true;
     };
     check(bad_w_ok, "create(-1,150,4) correctly returns err");
 
     var bad_c_ok: bool = false;
-    var res2 = image.create(150, 150, 0)? else {
+    var _res2 = image.create(150, 150, 0)? else {
         bad_c_ok = true;
     };
     check(bad_c_ok, "create(150,150,0) correctly returns err");

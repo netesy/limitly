@@ -7,7 +7,7 @@ trait Drawable {
 
 frame Square: Drawable {
     pub side: int;
-    
+
     pub init(s: int) {
         self.side = s;
     }

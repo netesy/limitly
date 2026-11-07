@@ -20,9 +20,9 @@ fn test_button_callback() {
 
 fn test_fluent_text_styling(): int {
     var t = ui.text("Hello Lymar")
-        .color(color.red)
-        .font_size(24.0)
-        .bold();
+    .color(color.red)
+    .font_size(24.0)
+    .bold();
 
     assert(t.kind == ui.KIND_TEXT, "text kind mismatch");
     assert(t.text_val == "Hello Lymar", "text content mismatch");
@@ -35,11 +35,11 @@ fn test_fluent_text_styling(): int {
 
 fn test_fluent_button_styling(): int {
     var btn = ui.button("Save", test_button_callback)
-        .background(color.indigo)
-        .foreground(color.white)
-        .padding(14.0)
-        .corner_radius(8.0)
-        .size(160.0, 44.0);
+    .background(color.indigo)
+    .foreground(color.white)
+    .padding(14.0)
+    .corner_radius(8.0)
+    .size(160.0, 44.0);
 
     assert(btn.kind == ui.KIND_BUTTON, "button kind mismatch");
     assert(btn.text_val == "Save", "button label mismatch");
@@ -56,8 +56,8 @@ fn test_layout_modifiers(): int {
     var item1 = ui.text("Item 1");
     var item2 = ui.text("Item 2");
     var col = ui.column([item1, item2])
-        .spacing(12.0)
-        .padding_xy(16.0, 20.0);
+    .spacing(12.0)
+    .padding_xy(16.0, 20.0);
 
     assert(col.kind == ui.KIND_CONTAINER, "column kind mismatch");
     assert(col.is_vertical == 1, "column vertical axis mismatch");
@@ -77,11 +77,11 @@ fn test_layout_modifiers(): int {
 fn test_style_reuse_and_precedence(): int {
     // Define a reusable style
     var base_style = ui.style()
-        .background(color.blue)
-        .foreground(color.white)
-        .padding(10.0)
-        .corner_radius(6.0)
-        .font_size(16.0);
+    .background(color.blue)
+    .foreground(color.white)
+    .padding(10.0)
+    .corner_radius(6.0)
+    .font_size(16.0);
 
     // Apply reusable style to two different widgets
     var btn1 = ui.button("B1").style(base_style);
@@ -108,12 +108,12 @@ fn test_style_reuse_and_precedence(): int {
 fn test_state_styling(): int {
     var pressed_style = ui.style().background(color.dark_gray).foreground(color.yellow);
     var btn = ui.button("Stateful")
-        .background(color.blue)
-        .pressed(pressed_style);
+    .background(color.blue)
+    .pressed(pressed_style);
 
     var ps = btn.pressed_style_val as ui.Style;
-    assert(ps.has_bg == true, "pressed style missing bg");
-    assert(ps.has_fg == true, "pressed style missing fg");
+    assert(ps.has_bg, "pressed style missing bg");
+    assert(ps.has_fg, "pressed style missing fg");
     print("[PASS] 5. State-specific styling (LVGL-inspired)");
     return 1;
 }
@@ -123,8 +123,8 @@ fn test_retained_lifecycle_and_callback(): int {
     assert(app.init(cfg) == 1, "app init failed");
 
     var btn = ui.button("Click Counter", test_button_callback)
-        .background(color.rgb(40, 100, 200))
-        .size(200.0, 40.0);
+    .background(color.rgb(40, 100, 200))
+    .size(200.0, 40.0);
 
     var root = ui.column([btn]).padding(20.0);
     app.ui(root);
@@ -162,12 +162,12 @@ fn test_retained_lifecycle_and_callback(): int {
 
 fn test_style_merge(): int {
     var s1 = ui.style()
-        .background(color.red)
-        .padding(10.0);
+    .background(color.red)
+    .padding(10.0);
 
     var s2 = ui.style()
-        .foreground(color.blue)
-        .corner_radius(6.0);
+    .foreground(color.blue)
+    .corner_radius(6.0);
 
     var merged = s1.merge(s2);
 

@@ -11,7 +11,7 @@ fn test_same_scale() {
     var f = d + e;
     assert(f == 2.0000, "d4 + d4 should be 2.0000");
 
-    var g = a * b; // 10.25 * 5.75 = 58.9375. Since result is d2, it should be 58.93 if truncation or trap if strict.
+    var _g = a * b; // 10.25 * 5.75 = 58.9375. Since result is d2, it should be 58.93 if truncation or trap if strict.
     // Wait, the spec says same scale arithmetic d2 * d2 -> d2.
     // Manual calculation: 1025 * 575 = 589375. Scaled back by 10^2: 5893.75.
     // My implementation: res128 /= 10^scale. 589375 / 100 = 5893.

@@ -5,7 +5,7 @@ frame Calculator {
     fn private_helper(): int {
         return 42;
     }
-    
+
     pub fn public_method(): int {
         return private_helper();
     }

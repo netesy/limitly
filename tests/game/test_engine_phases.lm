@@ -23,7 +23,7 @@ fn test_phase1_timing_and_app() {
     assert(cfg.fixed_dt > 0.01 and cfg.fixed_dt < 0.02, "Default fixed_dt should be ~0.0166");
 
     var app = game.Game(cfg);
-    assert(app.is_running == false, "Game should not be running before setup");
+    assert(not app.is_running, "Game should not be running before setup");
     assert(app.dt() > 0.0, "Delta time should have initial non-zero fallback");
     assert(app.time_scale == 1.0, "Time scale should default to 1.0");
 
@@ -84,8 +84,8 @@ fn test_phase2_geometry_and_collisions() {
     var r2 = game.Rect(50.0, 50.0, 100.0, 100.0);
     var r3 = game.Rect(200.0, 200.0, 50.0, 50.0);
 
-    assert(r1.intersects(r2) == true, "r1 and r2 should intersect");
-    assert(r1.intersects(r3) == false, "r1 and r3 should not intersect");
+    assert(r1.intersects(r2), "r1 and r2 should intersect");
+    assert(not r1.intersects(r3), "r1 and r3 should not intersect");
 
     var inter = r1.intersection(r2);
     assert(inter.x == 50.0 and inter.y == 50.0, "Intersection top-left mismatch");
@@ -96,7 +96,7 @@ fn test_phase2_geometry_and_collisions() {
 
     // AABB vs AABB Collision Manifold
     var contact_aabb = game.test_aabb_aabb(r1, r2);
-    assert(contact_aabb.collided == true, "AABB contact should be true");
+    assert(contact_aabb.collided, "AABB contact should be true");
     assert(contact_aabb.penetration > 0.0, "AABB penetration should be positive");
 
     // Circle vs Circle
@@ -104,31 +104,31 @@ fn test_phase2_geometry_and_collisions() {
     var c2 = game.Circle(center=game.Vec2(15.0, 0.0), radius=10.0);
     var c3 = game.Circle(center=game.Vec2(50.0, 50.0), radius=5.0);
 
-    assert(c1.intersects_circle(c2) == true, "c1 and c2 should overlap");
-    assert(c1.intersects_circle(c3) == false, "c1 and c3 should not overlap");
+    assert(c1.intersects_circle(c2), "c1 and c2 should overlap");
+    assert(not c1.intersects_circle(c3), "c1 and c3 should not overlap");
 
     var contact_cc = game.test_circle_circle(c1, c2);
-    assert(contact_cc.collided == true, "Circle contact should be true");
+    assert(contact_cc.collided, "Circle contact should be true");
     assert(math.abs(contact_cc.penetration - 5.0) < 0.0001, "Circle penetration should be 5.0");
     assert(contact_cc.normal.x == 1.0 and contact_cc.normal.y == 0.0, "Circle collision normal mismatch");
 
     // Circle vs AABB
     var c_box = game.Circle(center=game.Vec2(95.0, 50.0), radius=10.0);
     var contact_ca = game.test_circle_aabb(c_box, r1);
-    assert(contact_ca.collided == true, "Circle vs AABB should collide");
+    assert(contact_ca.collided, "Circle vs AABB should collide");
     assert(contact_ca.penetration > 0.0, "Circle vs AABB penetration should be > 0");
 
     // Raycasting AABB
     var ray_box = game.Ray2D(origin=game.Vec2(-50.0, 50.0), direction=game.Vec2(1.0, 0.0));
     var hit_box = game.raycast_aabb(ray_box, r1);
-    assert(hit_box.hit == true, "Ray should hit box");
+    assert(hit_box.hit, "Ray should hit box");
     assert(math.abs(hit_box.distance - 50.0) < 0.001, "Ray hit distance should be 50.0");
     assert(hit_box.normal.x == -1.0, "Ray hit normal should point left");
 
     // Raycasting Circle
     var ray_c = game.Ray2D(origin=game.Vec2(0.0, -50.0), direction=game.Vec2(0.0, 1.0));
     var hit_c = game.raycast_circle(ray_c, c1);
-    assert(hit_c.hit == true, "Ray should hit circle");
+    assert(hit_c.hit, "Ray should hit circle");
     assert(math.abs(hit_c.distance - 40.0) < 0.001, "Ray hit distance should be 40.0");
 
     print("[OK] Phase 2B Geometry & Collisions passed");
@@ -165,10 +165,10 @@ fn test_phase3_camera_and_input() {
 
     // Simulate key down
     input.on_key_down(game.KEY_SPACE);
-    assert(input.is_key_down(game.KEY_SPACE) == true, "Space should be down");
-    assert(input.is_key_pressed(game.KEY_SPACE) == true, "Space should be pressed this frame");
-    assert(input.is_action_down("jump") == true, "Jump action should be down");
-    assert(input.is_action_pressed("jump") == true, "Jump action should be pressed");
+    assert(input.is_key_down(game.KEY_SPACE), "Space should be down");
+    assert(input.is_key_pressed(game.KEY_SPACE), "Space should be pressed this frame");
+    assert(input.is_action_down("jump"), "Jump action should be down");
+    assert(input.is_action_pressed("jump"), "Jump action should be pressed");
 
     // Test axis
     input.on_key_down(game.KEY_D);
@@ -176,8 +176,8 @@ fn test_phase3_camera_and_input() {
 
     // Mouse buttons
     input.on_mouse_down(game.MOUSE_LEFT, 250.0, 150.0);
-    assert(input.is_mouse_down(game.MOUSE_LEFT) == true, "Mouse left should be down");
-    assert(input.is_mouse_pressed(game.MOUSE_LEFT) == true, "Mouse left should be pressed");
+    assert(input.is_mouse_down(game.MOUSE_LEFT), "Mouse left should be down");
+    assert(input.is_mouse_pressed(game.MOUSE_LEFT), "Mouse left should be pressed");
     assert(input.mouse_x == 250.0 and input.mouse_y == 150.0, "Mouse position mismatch");
 
     print("[OK] Phase 3 Camera & Input passed");
@@ -203,7 +203,7 @@ fn test_phase4_sprites_and_particles() {
     anim.add_clip(run_clip);
     anim.play("run");
 
-    assert(anim.is_playing == true, "Animation should be playing");
+    assert(anim.is_playing, "Animation should be playing");
     assert(anim.frame_index == 0, "Initial frame index should be 0");
 
     // Update by 0.12s (1 frame duration is 0.1s at 10 FPS)

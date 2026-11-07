@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>state.lm - Lymar API Reference</title>
+<style>
+:root {
+  --bg-primary: #0a0e17;
+  --bg-secondary: #111827;
+  --bg-tertiary: #1f2937;
+  --accent: #38bdf8;
+  --accent-hover: #7dd3fc;
+  --text-main: #f1f5f9;
+  --text-muted: #94a3b8;
+  --border-color: #334155;
+}
+* { box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif;
+  margin: 0; padding: 0; background: var(--bg-primary); color: var(--text-main); display: flex;
+}
+nav {
+  width: 300px; height: 100vh; overflow-y: auto; background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color); padding: 24px 20px; position: fixed;
+}
+nav h2 { font-size: 1.15rem; color: var(--accent); margin-top: 0; margin-bottom: 16px; font-weight: 700; }
+#search-input {
+  width: 100%; padding: 8px 12px; background: var(--bg-tertiary); border: 1px solid var(--border-color);
+  border-radius: 6px; color: #fff; font-size: 0.85rem; margin-bottom: 16px;
+}
+#search-input:focus { outline: none; border-color: var(--accent); }
+.nav-link { display: block; color: var(--text-muted); text-decoration: none; padding: 6px 8px; font-size: 0.9rem; border-radius: 4px; }
+.nav-link:hover { color: #fff; background: var(--bg-tertiary); }
+main { margin-left: 300px; padding: 40px 48px; max-width: 950px; flex: 1; }
+h1 { color: #fff; font-size: 2.2rem; margin-top: 0; padding-bottom: 16px; border-bottom: 1px solid var(--border-color); }
+h2 { color: var(--accent); font-size: 1.4rem; margin-top: 36px; margin-bottom: 14px; }
+h3 { color: #fff; font-size: 1.25rem; margin-top: 28px; margin-bottom: 12px; display: flex; align-items: center; gap: 10px; }
+h4 { color: var(--accent); font-size: 1rem; margin-top: 20px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+.badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
+.badge-pub { background: #064e3b; color: #6ee7b7; border: 1px solid #059669; }
+.badge-private { background: #334155; color: #cbd5e1; }
+.badge-type { background: #1e1b4b; color: #c7d2fe; border: 1px solid #4338ca; }
+.code-sig { background: #090d16; border: 1px solid var(--border-color); padding: 14px 18px; border-radius: 8px; overflow-x: auto; font-family: 'Consolas', 'Fira Code', monospace; font-size: 0.95rem; color: #e2e8f0; }
+.summary { color: #cbd5e1; line-height: 1.65; margin: 14px 0; font-size: 1rem; }
+/* Callout styling */
+.callout { margin: 16px 0; padding: 14px 18px; border-radius: 8px; border-left: 4px solid; font-size: 0.92rem; }
+.callout-header { font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+.callout-tip { border-color: #10b981; background: rgba(16, 185, 129, 0.08); color: #d1fae5; }
+.callout-tip .callout-header { color: #34d399; }
+.callout-warning { border-color: #f59e0b; background: rgba(245, 158, 11, 0.08); color: #fef3c7; }
+.callout-warning .callout-header { color: #fbbf24; }
+.callout-note { border-color: #0284c7; background: rgba(2, 132, 199, 0.08); color: #e0f2fe; }
+.callout-note .callout-header { color: #38bdf8; }
+.callout-deprecated { border-color: #e11d48; background: rgba(225, 29, 72, 0.08); color: #ffe4e6; }
+.callout-deprecated .callout-header { color: #fb7185; }
+/* Example card */
+.example-card { margin: 20px 0; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: #080c14; }
+.example-header { background: #162032; padding: 8px 16px; font-size: 0.82rem; font-weight: 700; color: #94a3b8; border-bottom: 1px solid var(--border-color); }
+.example-card pre { margin: 0; padding: 14px 18px; overflow-x: auto; font-family: monospace; font-size: 0.92rem; color: #e2e8f0; }
+/* Tables */
+table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 0.92rem; }
+th { background: #162032; color: #94a3b8; text-align: left; padding: 10px 14px; font-weight: 600; border-bottom: 1px solid var(--border-color); }
+td { padding: 10px 14px; border-bottom: 1px solid #1e293b; color: #cbd5e1; }
+ul { padding-left: 20px; color: #cbd5e1; line-height: 1.6; }
+hr { border: 0; border-top: 1px solid var(--border-color); margin: 36px 0; }
+</style>
+<script>
+function filterNav() {
+  var q = document.getElementById('search-input').value.toLowerCase();
+  var links = document.querySelectorAll('.nav-link');
+  links.forEach(function(l) {
+    l.style.display = l.textContent.toLowerCase().includes(q) ? 'block' : 'none';
+  });
+}
+</script>
+</head>
+<body>
+<nav>
+<h2>state.lm</h2>
+<input type="text" id="search-input" placeholder="Filter symbols..." oninput="filterNav()">
+<div id="nav-list">
+<a class="nav-link" href="#register_dirty_notifier">register_dirty_notifier <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#Reactive">Reactive <span style="font-size: 0.75rem; opacity: 0.6;">(Trait)</span></a>
+<a class="nav-link" href="#Signal">Signal <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#ComputedSignal">ComputedSignal <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#Effect">Effect <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#signal">signal <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#signal_bool">signal_bool <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#signal_int">signal_int <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#signal_float">signal_float <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#signal_str">signal_str <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#computed">computed <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#effect">effect <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#effect_with_cleanup">effect_with_cleanup <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#dispose_all_effects">dispose_all_effects <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#batch_begin">batch_begin <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#batch_end">batch_end <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#mark_element_dirty_signal">mark_element_dirty_signal <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#batch_updates">batch_updates <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#bind_text">bind_text <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#bind_bool">bind_bool <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#bind_float">bind_float <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#bind_int">bind_int <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#bind_two_way_text">bind_two_way_text <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#bind_two_way_bool">bind_two_way_bool <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#bind_two_way_float">bind_two_way_float <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+</div>
+</nav>
+<main>
+<h1>state.lm API Reference</h1>
+<h2>Module Overview</h2>
+<div class="summary"><p>── State Management with Batch Updates ──────────────────────────────────────
+Dirty notification callback — set by context.lm at startup via register_dirty_notifier()</p></div>
+<div id="register_dirty_notifier">
+<h3>register_dirty_notifier <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn register_dirty_notifier(cb: function): nil</code></pre>
+</div><hr>
+<div id="Reactive">
+<h3>Reactive <span class="badge badge-pub">Trait</span></h3>
+<pre class="code-sig"><code>trait Reactive</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>fn get(): any</code> <em>(method requirement)</em></li>
+<li><code>fn subscribe(callback: function): nil</code> <em>(method requirement)</em></li>
+</ul>
+</div><hr>
+<div id="Signal">
+<h3>Signal <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame Signal: Reactive</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>var pub value: any</code> <em>(field)</em></li>
+<li><code>pub init(init_val: any)</code> <em>(constructor)</em></li>
+<li><code>pub fn subscriber_count(): int</code> <em>(method)</em></li>
+<li><code>pub fn get(): any</code> <em>(method)</em></li>
+<li><code>pub fn set(new_val: any): nil</code> <em>(method)</em></li>
+</ul>
+</div><hr>
+<div id="ComputedSignal">
+<h3>ComputedSignal <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame ComputedSignal: Reactive</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>var pub compute_fn: function</code> <em>(field)</em></li>
+<li><code>var pub value: any</code> <em>(field)</em></li>
+<li><code>var pub is_dirty: int</code> <em>(field)</em></li>
+<li><code>pub init(compute: function, deps: list)</code> <em>(constructor)</em></li>
+<li><code>pub fn get(): any</code> <em>(method)</em></li>
+<li><code>pub fn dep_count(): int</code> <em>(method)</em></li>
+<li><code>pub fn poke(): nil</code> <em>(method)</em></li>
+<li><code>fn _computed_dep_changed(new_val: any): nil</code> <em>(method)</em></li>
+</ul>
+</div><hr>
+<div id="Effect">
+<h3>Effect <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame Effect</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>var pub effect_fn: function</code> <em>(field)</em></li>
+<li><code>var pub cleanup_fn: function</code> <em>(field)</em></li>
+<li><code>var pub is_active: int</code> <em>(field)</em></li>
+<li><code>pub init(user_effect: function, deps: list)</code> <em>(constructor)</em></li>
+<li><code>pub fn dispose(): nil</code> <em>(method)</em></li>
+<li><code>pub fn dep_count(): int</code> <em>(method)</em></li>
+<li><code>fn _effect_dep_changed(new_val: any): nil</code> <em>(method)</em></li>
+</ul>
+</div><hr>
+<div id="signal">
+<h3>signal <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn signal(init_val): Signal</code></pre>
+</div><hr>
+<div id="signal_bool">
+<h3>signal_bool <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn signal_bool(init_val: bool): Signal</code></pre>
+</div><hr>
+<div id="signal_int">
+<h3>signal_int <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn signal_int(init_val: int): Signal</code></pre>
+</div><hr>
+<div id="signal_float">
+<h3>signal_float <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn signal_float(init_val: float): Signal</code></pre>
+</div><hr>
+<div id="signal_str">
+<h3>signal_str <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn signal_str(init_val: str): Signal</code></pre>
+</div><hr>
+<div id="computed">
+<h3>computed <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn computed(compute_fn: function, deps: list): ComputedSignal</code></pre>
+<div class="summary"><p>Computed signal (derived state)</p></div>
+</div><hr>
+<div id="effect">
+<h3>effect <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn effect(effect_fn: function, deps: list): Effect</code></pre>
+<div class="summary"><p>Effect (side effect that runs when dependencies change)</p></div>
+</div><hr>
+<div id="effect_with_cleanup">
+<h3>effect_with_cleanup <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn effect_with_cleanup(effect_fn: function, cleanup_fn: function, deps: list): Effect</code></pre>
+<div class="summary"><p>Effect with cleanup</p></div>
+</div><hr>
+<div id="dispose_all_effects">
+<h3>dispose_all_effects <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn dispose_all_effects(): nil</code></pre>
+<div class="summary"><p>Dispose all active effects</p></div>
+</div><hr>
+<div id="batch_begin">
+<h3>batch_begin <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn batch_begin(): nil</code></pre>
+<div class="summary"><p>Batch state updates (debounces dirty marking)</p></div>
+</div><hr>
+<div id="batch_end">
+<h3>batch_end <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn batch_end(): nil</code></pre>
+</div><hr>
+<div id="mark_element_dirty_signal">
+<h3>mark_element_dirty_signal <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn mark_element_dirty_signal(): nil</code></pre>
+<div class="summary"><p>Notify the UI context that something changed</p></div>
+</div><hr>
+<div id="batch_updates">
+<h3>batch_updates <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn batch_updates(updates: function): nil</code></pre>
+<div class="summary"><p>Batch update pattern</p></div>
+</div><hr>
+<div id="bind_text">
+<h3>bind_text <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn bind_text(sig: Signal, widget_mutator: function): nil</code></pre>
+<div class="summary"><p>── Widget Signal Binding Helpers ───────────────────────────────────────────
+Bind a signal's value to a widget's text property</p></div>
+</div><hr>
+<div id="bind_bool">
+<h3>bind_bool <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn bind_bool(sig: Signal, widget_mutator: function): nil</code></pre>
+<div class="summary"><p>Bind a signal's value to a widget's boolean property (e.g., is_checked, is_enabled)</p></div>
+</div><hr>
+<div id="bind_float">
+<h3>bind_float <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn bind_float(sig: Signal, widget_mutator: function): nil</code></pre>
+<div class="summary"><p>Bind a signal's value to a widget's float property (e.g., slider_val, opacity_val)</p></div>
+</div><hr>
+<div id="bind_int">
+<h3>bind_int <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn bind_int(sig: Signal, widget_mutator: function): nil</code></pre>
+<div class="summary"><p>Bind a signal's value to a widget's int property</p></div>
+</div><hr>
+<div id="bind_two_way_text">
+<h3>bind_two_way_text <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn bind_two_way_text(sig: Signal, get_widget_fn: function, set_widget_fn: function): function</code></pre>
+<div class="summary"><p>Two-way binding: signal to widget and widget to signal
+Returns a cleanup function to unsubscribe</p></div>
+</div><hr>
+<div id="bind_two_way_bool">
+<h3>bind_two_way_bool <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn bind_two_way_bool(sig: Signal, get_widget_fn: function, set_widget_fn: function): function</code></pre>
+<div class="summary"><p>Two-way binding for boolean (checkbox, toggle)</p></div>
+</div><hr>
+<div id="bind_two_way_float">
+<h3>bind_two_way_float <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn bind_two_way_float(sig: Signal, get_widget_fn: function, set_widget_fn: function): function</code></pre>
+<div class="summary"><p>Two-way binding for float (slider)</p></div>
+</div><hr>
+</main>
+</body>
+</html>

@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>server.lm - Lymar API Reference</title>
+<style>
+:root {
+  --bg-primary: #0a0e17;
+  --bg-secondary: #111827;
+  --bg-tertiary: #1f2937;
+  --accent: #38bdf8;
+  --accent-hover: #7dd3fc;
+  --text-main: #f1f5f9;
+  --text-muted: #94a3b8;
+  --border-color: #334155;
+}
+* { box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif;
+  margin: 0; padding: 0; background: var(--bg-primary); color: var(--text-main); display: flex;
+}
+nav {
+  width: 300px; height: 100vh; overflow-y: auto; background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color); padding: 24px 20px; position: fixed;
+}
+nav h2 { font-size: 1.15rem; color: var(--accent); margin-top: 0; margin-bottom: 16px; font-weight: 700; }
+#search-input {
+  width: 100%; padding: 8px 12px; background: var(--bg-tertiary); border: 1px solid var(--border-color);
+  border-radius: 6px; color: #fff; font-size: 0.85rem; margin-bottom: 16px;
+}
+#search-input:focus { outline: none; border-color: var(--accent); }
+.nav-link { display: block; color: var(--text-muted); text-decoration: none; padding: 6px 8px; font-size: 0.9rem; border-radius: 4px; }
+.nav-link:hover { color: #fff; background: var(--bg-tertiary); }
+main { margin-left: 300px; padding: 40px 48px; max-width: 950px; flex: 1; }
+h1 { color: #fff; font-size: 2.2rem; margin-top: 0; padding-bottom: 16px; border-bottom: 1px solid var(--border-color); }
+h2 { color: var(--accent); font-size: 1.4rem; margin-top: 36px; margin-bottom: 14px; }
+h3 { color: #fff; font-size: 1.25rem; margin-top: 28px; margin-bottom: 12px; display: flex; align-items: center; gap: 10px; }
+h4 { color: var(--accent); font-size: 1rem; margin-top: 20px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+.badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
+.badge-pub { background: #064e3b; color: #6ee7b7; border: 1px solid #059669; }
+.badge-private { background: #334155; color: #cbd5e1; }
+.badge-type { background: #1e1b4b; color: #c7d2fe; border: 1px solid #4338ca; }
+.code-sig { background: #090d16; border: 1px solid var(--border-color); padding: 14px 18px; border-radius: 8px; overflow-x: auto; font-family: 'Consolas', 'Fira Code', monospace; font-size: 0.95rem; color: #e2e8f0; }
+.summary { color: #cbd5e1; line-height: 1.65; margin: 14px 0; font-size: 1rem; }
+/* Callout styling */
+.callout { margin: 16px 0; padding: 14px 18px; border-radius: 8px; border-left: 4px solid; font-size: 0.92rem; }
+.callout-header { font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+.callout-tip { border-color: #10b981; background: rgba(16, 185, 129, 0.08); color: #d1fae5; }
+.callout-tip .callout-header { color: #34d399; }
+.callout-warning { border-color: #f59e0b; background: rgba(245, 158, 11, 0.08); color: #fef3c7; }
+.callout-warning .callout-header { color: #fbbf24; }
+.callout-note { border-color: #0284c7; background: rgba(2, 132, 199, 0.08); color: #e0f2fe; }
+.callout-note .callout-header { color: #38bdf8; }
+.callout-deprecated { border-color: #e11d48; background: rgba(225, 29, 72, 0.08); color: #ffe4e6; }
+.callout-deprecated .callout-header { color: #fb7185; }
+/* Example card */
+.example-card { margin: 20px 0; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: #080c14; }
+.example-header { background: #162032; padding: 8px 16px; font-size: 0.82rem; font-weight: 700; color: #94a3b8; border-bottom: 1px solid var(--border-color); }
+.example-card pre { margin: 0; padding: 14px 18px; overflow-x: auto; font-family: monospace; font-size: 0.92rem; color: #e2e8f0; }
+/* Tables */
+table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 0.92rem; }
+th { background: #162032; color: #94a3b8; text-align: left; padding: 10px 14px; font-weight: 600; border-bottom: 1px solid var(--border-color); }
+td { padding: 10px 14px; border-bottom: 1px solid #1e293b; color: #cbd5e1; }
+ul { padding-left: 20px; color: #cbd5e1; line-height: 1.6; }
+hr { border: 0; border-top: 1px solid var(--border-color); margin: 36px 0; }
+</style>
+<script>
+function filterNav() {
+  var q = document.getElementById('search-input').value.toLowerCase();
+  var links = document.querySelectorAll('.nav-link');
+  links.forEach(function(l) {
+    l.style.display = l.textContent.toLowerCase().includes(q) ? 'block' : 'none';
+  });
+}
+</script>
+</head>
+<body>
+<nav>
+<h2>server.lm</h2>
+<input type="text" id="search-input" placeholder="Filter symbols..." oninput="filterNav()">
+<div id="nav-list">
+<a class="nav-link" href="#Connection">Connection <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#Server">Server <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#Room">Room <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#__room_keys">__room_keys <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+</div>
+</nav>
+<main>
+<h1>server.lm API Reference</h1>
+<h2>Module Overview</h2>
+<div class="summary"><p>Provides WebSocket server utilities built on the raw WebSocket client module.
+
+Operations that can fail return `T?Error` and carry a diagnostic code; the
+ones that cannot (`join`, `leave`, `broadcast` on a room) just return a count.</p></div>
+<div id="Connection">
+<h3>Connection <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame Connection</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>var pub resource: res.Resource?</code> <em>(field)</em></li>
+<li><code>var pub writer: res.Writer?</code> <em>(field)</em></li>
+<li><code>var pub reader: res.Reader?</code> <em>(field)</em></li>
+<li><code>var pub poller: res.Poller?</code> <em>(field)</em></li>
+<li><code>var pub remote_addr: str</code> <em>(field)</em></li>
+<li><code>var pub connected: bool</code> <em>(field)</em></li>
+<li><code>var pub id: str</code> <em>(field)</em></li>
+<li><code>pub init(handle: int)</code> <em>(constructor)</em></li>
+<li><code>pub fn send(message: str): int</code> <em>(method)</em></li>
+<li><code>pub fn recv(): str</code> <em>(method)</em></li>
+<li><code>pub fn has_message(): bool</code> <em>(method)</em></li>
+<li><code>pub fn send_ping(): bool</code> <em>(method)</em></li>
+<li><code>pub fn send_pong(): bool</code> <em>(method)</em></li>
+<li><code>pub fn close(): nil</code> <em>(method)</em></li>
+</ul>
+</div><hr>
+<div id="Server">
+<h3>Server <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame Server</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>var host: str</code> <em>(field)</em></li>
+<li><code>var port: int</code> <em>(field)</em></li>
+<li><code>var running: bool</code> <em>(field)</em></li>
+<li><code>var on_connect: str</code> <em>(field)</em></li>
+<li><code>var on_message: str</code> <em>(field)</em></li>
+<li><code>var on_disconnect: str</code> <em>(field)</em></li>
+<li><code>var pub resource: res.Resource?</code> <em>(field)</em></li>
+<li><code>var pub binder: res.Binder?</code> <em>(field)</em></li>
+<li><code>var pub listener: res.Listener?</code> <em>(field)</em></li>
+<li><code>pub init()</code> <em>(constructor)</em></li>
+<li><code>pub fn set_host(host: str): Server</code> <em>(method)</em></li>
+<li><code>pub fn set_port(port: int): Server</code> <em>(method)</em></li>
+<li><code>pub fn on_connection(handler: str): Server</code> <em>(method)</em></li>
+<li><code>pub fn on_message_handler(handler: str): Server</code> <em>(method)</em></li>
+<li><code>pub fn on_disconnection(handler: str): Server</code> <em>(method)</em></li>
+<li><code>pub fn start(): int</code> <em>(method)</em></li>
+<li><code>pub fn accept(): str</code> <em>(method)</em></li>
+<li><code>pub fn broadcast(handles: list, message: str): int</code> <em>(method)</em></li>
+<li><code>pub fn stop(): nil</code> <em>(method)</em></li>
+<li><code>pub fn select_subprotocol(requested: str, supported: list): str</code> <em>(method)</em></li>
+<li><code>pub fn is_running(): bool</code> <em>(method)</em></li>
+</ul>
+</div><hr>
+<div id="Room">
+<h3>Room <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame Room</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>var name: str</code> <em>(field)</em></li>
+<li><code>var connections: dict</code> <em>(field)</em></li>
+<li><code>pub init(name: str)</code> <em>(constructor)</em></li>
+<li><code>pub fn join(id: str, conn: Connection): int</code> <em>(method)</em></li>
+<li><code>pub fn leave(id: str): int</code> <em>(method)</em></li>
+<li><code>pub fn member_count(): int</code> <em>(method)</em></li>
+<li><code>pub fn broadcast(message: str): int</code> <em>(method)</em></li>
+</ul>
+</div><hr>
+<div id="__room_keys">
+<h3>__room_keys <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn __room_keys(connections: dict): list</code></pre>
+<div class="summary"><p>Keys of a connection table. `iter` inside a frame method aborts the compiler,
+so the loop lives in this free function and the methods walk the resulting
+list with a while loop. Dictionaries are walked with the two-variable form,
+`iter (key, value in dict)`.</p></div>
+</div><hr>
+</main>
+</body>
+</html>

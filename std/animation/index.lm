@@ -132,10 +132,10 @@ pub fn lerp_float(a: float, b: float, t: float): float {
 
 pub fn lerp_rgba(r1: float, g1: float, b1: float, a1: float, r2: float, g2: float, b2: float, a2: float, t: float): [float] {
     return [
-        lerp_float(r1, r2, t),
-        lerp_float(g1, g2, t),
-        lerp_float(b1, b2, t),
-        lerp_float(a1, a2, t)
+    lerp_float(r1, r2, t),
+    lerp_float(g1, g2, t),
+    lerp_float(b1, b2, t),
+    lerp_float(a1, a2, t)
     ];
 }
 

@@ -94,7 +94,7 @@ fn my_extension(p: str): str {
 
 fn my_stem(p: str): str {
     var base: str = my_basename(p);
-    var baselen: int = str_len(base);
+    var _baselen: int = str_len(base);
     var idx: int = find_last_slash(base);
     if (idx == -1 or idx == 0) { return base; }
     return build_from(base, 0, idx);
@@ -160,7 +160,7 @@ assert(str_eq(my_parent("file.txt"), ""), "par nd");
 assert(str_eq(my_parent("/"), ""), "par root");
 
 // is_absolute (delegated to starts_with)
-assert(starts_with("/", "abc") == false, "not abs");
+assert(not starts_with("/", "abc"), "not abs");
 
 // Multi-step parent
 assert(str_eq(my_parent(my_parent(my_parent("/a/b/c"))), "/"), "nested parent");

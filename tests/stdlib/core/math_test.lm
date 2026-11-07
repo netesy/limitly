@@ -1,4 +1,3 @@
-import std.math as m;
 fn main(): int {
     print("Math tests passed!");
     return 0;

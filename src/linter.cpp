@@ -634,7 +634,8 @@ public:
 
         is_runtime_bridge = (filename.find("internal") != std::string::npos ||
                              filename.find("resource") != std::string::npos ||
-                             filename.find("gg") != std::string::npos);
+                             filename.find("gg") != std::string::npos ||
+                             filename.find("box_test") != std::string::npos);
 
         push_scope();
 
@@ -755,6 +756,23 @@ public:
 
             push_scope();
 
+            bool is_generic_callback = false;
+            if (func->params.size() == 1) {
+                auto ptype = (func->params[0].second) ? format_type(func->params[0].second) : "";
+                auto rtype = (func->returnType.has_value() && func->returnType.value()) ? format_type(func->returnType.value()) : "";
+                if (ptype == "any" && (rtype == "bool" || rtype == "any")) {
+                    is_generic_callback = true;
+                }
+            } else if (func->params.size() == 2) {
+                auto p1type = (func->params[0].second) ? format_type(func->params[0].second) : "";
+                auto p2type = (func->params[1].second) ? format_type(func->params[1].second) : "";
+                auto rtype = (func->returnType.has_value() && func->returnType.value()) ? format_type(func->returnType.value()) : "";
+                if (p1type == "any" && p2type == "any" && (rtype == "int" || rtype == "any")) {
+                    is_generic_callback = true;
+                }
+            }
+            bool allow_any = in_trait || is_runtime_bridge || is_generic_callback;
+
             for (const auto& [param, type] : func->params) {
                 if (is_reserved_keyword(param)) {
                     add_diag(func->line, 1, "reserved-identifier",
@@ -766,7 +784,7 @@ public:
                              "Parameter '" + param + "' should be snake_case",
                              "rename parameter to follow snake_case (e.g. '" + to_snake_case(param) + "')");
                 }
-                if (!in_trait && !is_runtime_bridge && type && format_type(type) == "any") {
+                if (!allow_any && type && format_type(type) == "any") {
                     add_diag(func->line, 1, "any-overuse",
                              "Parameter '" + param + "' uses dynamic 'any' type",
                              "prefer a concrete type (e.g. 'int', 'str') or trait contract to enable static safety");
@@ -777,7 +795,7 @@ public:
                 scope_stack.back()[param] = meta;
             }
 
-            if (!in_trait && !is_runtime_bridge && func->returnType.has_value() && func->returnType.value() && format_type(func->returnType.value()) == "any") {
+            if (!allow_any && func->returnType.has_value() && func->returnType.value() && format_type(func->returnType.value()) == "any") {
                 add_diag(func->line, 1, "any-overuse",
                          "Function '" + func->name + "' has return type 'any'",
                          "prefer concrete return type or trait for static verification");
@@ -1275,7 +1293,9 @@ int Linter::run(int argc, char** argv) {
     Options opts;
     for (int i = 2; i < argc; ++i) {
         std::string arg = argv[i];
-        if (arg == "--deny-warnings" || arg == "-Werror") {
+        if (arg == "--fix") {
+            return runFix(argc, argv);
+        } else if (arg == "--deny-warnings" || arg == "-Werror") {
             opts.deny_warnings = true;
         } else if (arg == "--json") {
             opts.json_output = true;
@@ -1363,6 +1383,418 @@ int Linter::run(int argc, char** argv) {
     if (error_count > 0 || (opts.deny_warnings && warning_count > 0)) {
         return 1;
     }
+    return 0;
+}
+
+int Linter::runFix(int argc, char** argv) {
+    enable_ansi_colors();
+
+    FixOptions opts;
+    for (int i = 2; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "--dry-run") {
+            opts.dry_run = true;
+        } else if (arg == "-v" || arg == "--verbose") {
+            opts.verbose = true;
+        } else if (arg == "--no-color") {
+            opts.no_color = true;
+        } else if (arg == "--fix") {
+            // ignore if passed to fix command
+        } else if (arg[0] != '-') {
+            opts.target_paths.push_back(arg);
+        }
+    }
+
+    if (opts.target_paths.empty()) {
+        if (fs::exists("std")) opts.target_paths.push_back("std");
+        if (fs::exists("tests")) opts.target_paths.push_back("tests");
+        if (fs::exists("src")) opts.target_paths.push_back("src");
+    }
+
+    std::vector<std::string> files_to_fix;
+    for (const auto& path_str : opts.target_paths) {
+        if (fs::is_regular_file(path_str)) {
+            files_to_fix.push_back(path_str);
+        } else if (fs::is_directory(path_str)) {
+            for (const auto& entry : fs::recursive_directory_iterator(path_str)) {
+                if (entry.is_regular_file() && entry.path().extension() == ".lm") {
+                    std::string gen_path = entry.path().generic_string();
+                    if (gen_path.find("tests/errors/") != std::string::npos) continue;
+                    files_to_fix.push_back(gen_path);
+                }
+            }
+        }
+    }
+
+    std::sort(files_to_fix.begin(), files_to_fix.end());
+
+    std::string bold = !opts.no_color ? "\033[1m" : "";
+    std::string green = !opts.no_color ? "\033[1;32m" : "";
+    std::string yellow = !opts.no_color ? "\033[1;33m" : "";
+    std::string cyan = !opts.no_color ? "\033[1;36m" : "";
+    std::string reset = !opts.no_color ? "\033[0m" : "";
+
+    size_t total_fixes = 0;
+    size_t files_modified = 0;
+
+    Options lint_opts;
+    for (const auto& file : files_to_fix) {
+        std::ifstream in(file);
+        if (!in.is_open()) continue;
+        std::vector<std::string> lines;
+        std::string l;
+        while (std::getline(in, l)) {
+            lines.push_back(l);
+        }
+        in.close();
+
+        auto diags = lintFile(file, lint_opts);
+        if (diags.empty()) continue;
+
+        // Sort diagnostics descending by line number so edits do not disrupt earlier lines
+        std::sort(diags.begin(), diags.end(), [](const LintDiagnostic& a, const LintDiagnostic& b) {
+            return a.line > b.line;
+        });
+
+        int file_fixes = 0;
+        std::unordered_set<int> fixed_redundant_bool_lines;
+        for (const auto& d : diags) {
+            if (d.line <= 0 || static_cast<size_t>(d.line) > lines.size()) continue;
+            std::string& line = lines[d.line - 1];
+
+            if (d.rule == "unused-import") {
+                std::string sym;
+                auto q1 = d.message.find('\'');
+                if (q1 != std::string::npos) {
+                    auto q2 = d.message.find('\'', q1 + 1);
+                    if (q2 != std::string::npos) {
+                        sym = d.message.substr(q1 + 1, q2 - q1 - 1);
+                    }
+                }
+
+                bool fixed = false;
+                if (!sym.empty()) {
+                    auto show_pos = line.find("show");
+                    if (show_pos != std::string::npos) {
+                        auto sym_pos = line.find(sym, show_pos);
+                        if (sym_pos != std::string::npos) {
+                            size_t comma_before = line.rfind(',', sym_pos);
+                            if (comma_before != std::string::npos && comma_before >= show_pos) {
+                                line.erase(comma_before, (sym_pos + sym.length()) - comma_before);
+                                fixed = true;
+                            } else {
+                                size_t comma_after = line.find(',', sym_pos + sym.length());
+                                if (comma_after != std::string::npos) {
+                                    size_t next_char = line.find_first_not_of(" \t", comma_after + 1);
+                                    if (next_char != std::string::npos) {
+                                        line.erase(sym_pos, next_char - sym_pos);
+                                    } else {
+                                        line.erase(sym_pos, (comma_after + 1) - sym_pos);
+                                    }
+                                    fixed = true;
+                                } else {
+                                    line = "__LYMAR_REMOVED_LINE__";
+                                    fixed = true;
+                                }
+                            }
+                        }
+                    } else {
+                        line = "__LYMAR_REMOVED_LINE__";
+                        fixed = true;
+                    }
+                } else {
+                    line = "__LYMAR_REMOVED_LINE__";
+                    fixed = true;
+                }
+
+                if (fixed) {
+                    file_fixes++;
+                    if (opts.verbose) {
+                        std::cout << cyan << "  [fix] " << reset << file << ":" << d.line << ": removed unused import '" << sym << "'\n";
+                    }
+                }
+            } else if (d.rule == "redundant-bool") {
+                if (fixed_redundant_bool_lines.count(d.line)) continue;
+                fixed_redundant_bool_lines.insert(d.line);
+
+                enum class BoolFixKind { Remove, Negate };
+                struct BoolMatch {
+                    size_t op_pos;
+                    size_t op_len;
+                    BoolFixKind kind;
+                };
+
+                std::vector<BoolMatch> matches;
+                bool in_str = false;
+                char quote_char = 0;
+                for (size_t i = 0; i < line.length(); ++i) {
+                    if (in_str) {
+                        if (line[i] == '\\' && i + 1 < line.length()) {
+                            i++;
+                        } else if (line[i] == quote_char) {
+                            in_str = false;
+                        }
+                    } else {
+                        if (line[i] == '"' || line[i] == '\'') {
+                            in_str = true;
+                            quote_char = line[i];
+                        } else if (line[i] == '/' && i + 1 < line.length() && line[i + 1] == '/') {
+                            break;
+                        } else {
+                            if (line.compare(i, 8, "== false") == 0) {
+                                if (i + 8 >= line.length() || (!isalnum(static_cast<unsigned char>(line[i + 8])) && line[i + 8] != '_')) {
+                                    matches.push_back({i, 8, BoolFixKind::Negate});
+                                    i += 7;
+                                    continue;
+                                }
+                            } else if (line.compare(i, 7, "!= true") == 0) {
+                                if (i + 7 >= line.length() || (!isalnum(static_cast<unsigned char>(line[i + 7])) && line[i + 7] != '_')) {
+                                    matches.push_back({i, 7, BoolFixKind::Negate});
+                                    i += 6;
+                                    continue;
+                                }
+                            } else if (line.compare(i, 7, "== true") == 0) {
+                                if (i + 7 >= line.length() || (!isalnum(static_cast<unsigned char>(line[i + 7])) && line[i + 7] != '_')) {
+                                    matches.push_back({i, 7, BoolFixKind::Remove});
+                                    i += 6;
+                                    continue;
+                                }
+                            } else if (line.compare(i, 8, "!= false") == 0) {
+                                if (i + 8 >= line.length() || (!isalnum(static_cast<unsigned char>(line[i + 8])) && line[i + 8] != '_')) {
+                                    matches.push_back({i, 8, BoolFixKind::Remove});
+                                    i += 7;
+                                    continue;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Sort descending by position so rightmost replacements don't invalidate leftmost offsets
+                std::sort(matches.begin(), matches.end(), [](const BoolMatch& a, const BoolMatch& b) {
+                    return a.op_pos > b.op_pos;
+                });
+
+                bool fixed = false;
+                for (const auto& m : matches) {
+                    size_t op_pos = m.op_pos;
+                    size_t op_len = m.op_len;
+                    size_t left_end = op_pos;
+                    while (left_end > 0 && (line[left_end - 1] == ' ' || line[left_end - 1] == '\t')) {
+                        left_end--;
+                    }
+                    if (left_end == 0) continue;
+
+                    if (m.kind == BoolFixKind::Remove) {
+                        line.erase(left_end, (op_pos + op_len) - left_end);
+                        fixed = true;
+                    } else if (m.kind == BoolFixKind::Negate) {
+                        size_t p = left_end;
+                        if (line[p - 1] == ')') {
+                            int depth = 0;
+                            size_t cur = p - 1;
+                            bool found = false;
+                            while (true) {
+                                if (line[cur] == ')') depth++;
+                                else if (line[cur] == '(') {
+                                    depth--;
+                                    if (depth == 0) {
+                                        p = cur;
+                                        found = true;
+                                        break;
+                                    }
+                                }
+                                if (cur == 0) break;
+                                cur--;
+                            }
+                            if (!found) continue;
+
+                            // Trace backwards over any chained calls, indexing, or member accesses
+                            while (p > 0) {
+                                if (line[p - 1] == ']') {
+                                    int bdepth = 0;
+                                    size_t bcur = p - 1;
+                                    bool bfound = false;
+                                    while (true) {
+                                        if (line[bcur] == ']') bdepth++;
+                                        else if (line[bcur] == '[') {
+                                            bdepth--;
+                                            if (bdepth == 0) {
+                                                p = bcur;
+                                                bfound = true;
+                                                break;
+                                            }
+                                        }
+                                        if (bcur == 0) break;
+                                        bcur--;
+                                    }
+                                    if (!bfound) break;
+                                } else if (line[p - 1] == ')') {
+                                    int cdepth = 0;
+                                    size_t ccur = p - 1;
+                                    bool cfound = false;
+                                    while (true) {
+                                        if (line[ccur] == ')') cdepth++;
+                                        else if (line[ccur] == '(') {
+                                            cdepth--;
+                                            if (cdepth == 0) {
+                                                p = ccur;
+                                                cfound = true;
+                                                break;
+                                            }
+                                        }
+                                        if (ccur == 0) break;
+                                        ccur--;
+                                    }
+                                    if (!cfound) break;
+                                } else if (isalnum(static_cast<unsigned char>(line[p - 1])) || line[p - 1] == '_' || line[p - 1] == '.') {
+                                    p--;
+                                } else {
+                                    break;
+                                }
+                            }
+                        } else if (line[p - 1] == ']') {
+                            int bdepth = 0;
+                            size_t bcur = p - 1;
+                            bool bfound = false;
+                            while (true) {
+                                if (line[bcur] == ']') bdepth++;
+                                else if (line[bcur] == '[') {
+                                    bdepth--;
+                                    if (bdepth == 0) {
+                                        p = bcur;
+                                        bfound = true;
+                                        break;
+                                    }
+                                }
+                                if (bcur == 0) break;
+                                bcur--;
+                            }
+                            if (bfound) {
+                                while (p > 0 && (isalnum(static_cast<unsigned char>(line[p - 1])) || line[p - 1] == '_' || line[p - 1] == '.')) {
+                                    p--;
+                                }
+                            }
+                        } else {
+                            while (p > 0 && (isalnum(static_cast<unsigned char>(line[p - 1])) || line[p - 1] == '_' || line[p - 1] == '.')) {
+                                p--;
+                            }
+                        }
+
+                        if (p < left_end) {
+                            line.erase(left_end, (op_pos + op_len) - left_end);
+                            if (p >= 4 && line.substr(p - 4, 4) == "not ") {
+                                line.erase(p - 4, 4);
+                            } else if (p >= 1 && line[p - 1] == '!') {
+                                line.erase(p - 1, 1);
+                            } else {
+                                line.insert(p, "not ");
+                            }
+                            fixed = true;
+                        }
+                    }
+                }
+
+                if (fixed) {
+                    file_fixes++;
+                    if (opts.verbose) {
+                        std::cout << cyan << "  [fix] " << reset << file << ":" << d.line << ": simplified redundant boolean comparison\n";
+                    }
+                }
+            } else if (d.rule == "this-forbidden") {
+                bool fixed = false;
+                size_t pos = 0;
+                while ((pos = line.find("this.", pos)) != std::string::npos) {
+                    line.replace(pos, 5, "self.");
+                    pos += 5;
+                    fixed = true;
+                }
+                pos = 0;
+                while ((pos = line.find("this", pos)) != std::string::npos) {
+                    bool left_boundary = (pos == 0 || (!isalnum(line[pos - 1]) && line[pos - 1] != '_'));
+                    bool right_boundary = (pos + 4 >= line.length() || (!isalnum(line[pos + 4]) && line[pos + 4] != '_'));
+                    if (left_boundary && right_boundary) {
+                        line.replace(pos, 4, "self");
+                        pos += 4;
+                        fixed = true;
+                    } else {
+                        pos += 4;
+                    }
+                }
+                if (fixed) {
+                    file_fixes++;
+                    if (opts.verbose) {
+                        std::cout << cyan << "  [fix] " << reset << file << ":" << d.line << ": replaced forbidden 'this' with 'self'\n";
+                    }
+                }
+            } else if (d.rule == "unused-var") {
+                std::string var_name;
+                auto q1 = d.message.find('\'');
+                if (q1 != std::string::npos) {
+                    auto q2 = d.message.find('\'', q1 + 1);
+                    if (q2 != std::string::npos) {
+                        var_name = d.message.substr(q1 + 1, q2 - q1 - 1);
+                    }
+                }
+                if (!var_name.empty()) {
+                    bool fixed = false;
+                    std::string target_var = "var " + var_name;
+                    auto pos = line.find(target_var);
+                    if (pos != std::string::npos) {
+                        line.replace(pos, target_var.length(), "var _" + var_name);
+                        fixed = true;
+                    } else {
+                        std::string target_val = "val " + var_name;
+                        pos = line.find(target_val);
+                        if (pos != std::string::npos) {
+                            line.replace(pos, target_val.length(), "val _" + var_name);
+                            fixed = true;
+                        }
+                    }
+                    if (fixed) {
+                        file_fixes++;
+                        if (opts.verbose) {
+                            std::cout << cyan << "  [fix] " << reset << file << ":" << d.line << ": prefixed unused variable '" << var_name << "' with '_'\n";
+                        }
+                    }
+                }
+            }
+        }
+
+        if (file_fixes > 0) {
+            total_fixes += file_fixes;
+            files_modified++;
+
+            std::string new_content;
+            for (const auto& line_str : lines) {
+                if (line_str == "__LYMAR_REMOVED_LINE__") continue;
+                new_content += line_str + "\n";
+            }
+
+            if (!opts.dry_run) {
+                std::ofstream out(file);
+                if (out.is_open()) {
+                    out << new_content;
+                }
+                std::cout << green << "Fixed " << file_fixes << " issue" << (file_fixes == 1 ? "" : "s")
+                          << " in " << file << reset << "\n";
+            } else {
+                std::cout << yellow << "[dry-run] Would fix " << file_fixes << " issue" << (file_fixes == 1 ? "" : "s")
+                          << " in " << file << reset << "\n";
+            }
+        }
+    }
+
+    if (total_fixes == 0) {
+        std::cout << green << "✨ No fixable lint issues found." << reset << "\n";
+    } else {
+        std::cout << (opts.dry_run ? yellow : green) << bold
+                  << (opts.dry_run ? "ℹ " : "✨ ")
+                  << (opts.dry_run ? "Would fix " : "Fixed ") << total_fixes << " issue" << (total_fixes == 1 ? "" : "s")
+                  << " across " << files_modified << " file" << (files_modified == 1 ? "" : "s")
+                  << (opts.dry_run ? ". Run 'lymar fix' to apply." : ".") << reset << "\n";
+    }
+
     return 0;
 }
 

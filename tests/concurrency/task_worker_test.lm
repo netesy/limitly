@@ -80,7 +80,7 @@ concurrent(ch=mixed_results, cores=3) {
         print("Task processing number: {i}");
         mixed_results.send("Task result: {i * 10}");
     }
-    
+
     // Worker for processing strings
     worker(text) {
         print("Worker processing text: {text}");

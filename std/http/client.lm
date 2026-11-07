@@ -227,7 +227,7 @@ frame Client {
         var full_request = req.method + " " + path_str;
         if (parsed.query != "") full_request = full_request + "?" + parsed.query;
         full_request = full_request + " HTTP/1.1\r\n";
-        
+
         // Host header
         full_request = full_request + "Host: " + parsed.host;
         if (parsed.port > 0 and parsed.port != 80 and parsed.port != 443) {

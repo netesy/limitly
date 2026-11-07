@@ -159,13 +159,14 @@ void printUsage(const char* programName) {
     std::cout << "\n  Tooling:\n";
     std::cout << "    " << programName << " test [options] [filter] Run project tests (parallel, filtered)\n";
     std::cout << "    " << programName << " lint [options] [files]  Run linter & static analysis\n";
+    std::cout << "    " << programName << " fix [options] [files]   Automatically fix linter issues (alias: lint --fix)\n";
+    std::cout << "    " << programName << " fmt [options] [files]   Format source files (alias: format)\n";
     std::cout << "    " << programName << " doc [options] [files]   Generate documentation from docstrings\n";
     std::cout << "    " << programName << " bench [options] [files] Run performance benchmarks\n";
     std::cout << "    " << programName << " profile [options] <file> Profile runtime execution and hotspots\n";
     std::cout << "    " << programName << " up [--check] [--version TAG] [--prefix DIR] Update compiler from GitHub releases\n";
     std::cout << "    " << programName << " -lsp                 Start LSP server\n";
     std::cout << "    " << programName << " -dap [--port PORT]   Start DAP server\n";
-    std::cout << "    " << programName << " -format <file>       Format a source file\n";
     std::cout << "\n  Debugging:\n";
     std::cout << "    " << programName << " -ast <source_file>      Print the AST\n";
     std::cout << "    " << programName << " -cst <source_file>      Print the CST\n";
@@ -212,15 +213,6 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
-    if (command == "-format" && argc >= 3) {
-        std::ifstream file(argv[2]);
-        if (!file.is_open()) return 1;
-        std::stringstream buffer;
-        buffer << file.rdbuf();
-        std::cout << LM::Formatter::format(buffer.str()) << std::endl;
-        return 0;
-    }
-
     if (command == "-ast" && argc >= 3) { options.print_ast = true; return LM::Compiler::executeFile(argv[2], options); }
     if (command == "-cst" && argc >= 3) { options.print_cst = true; return LM::Compiler::executeFile(argv[2], options); }
     if (command == "-tokens" && argc >= 3) { options.print_tokens = true; return LM::Compiler::executeFile(argv[2], options); }
@@ -230,6 +222,7 @@ int main(int argc, char* argv[]) {
 #endif
 
     if (command == "test") return Lyra::handle_test(argc, argv);
+    if (command == "fix" || command == "-fix") return LM::Linter::runFix(argc, argv);
     if (command == "lint" || command == "-lint") return LM::Linter::run(argc, argv);
     if (command == "doc" || command == "-doc") return LM::DocGenerator::run(argc, argv);
     if (command == "bench" || command == "-bench") return LM::BenchmarkRunner::run(argc, argv);
@@ -280,7 +273,7 @@ int main(int argc, char* argv[]) {
     if (command == "env") return Lyra::handle_env();
     if (command == "toolchain") return Lyra::handle_toolchain(argc, argv);
     if (command == "watch") return Lyra::handle_watch(argc, argv);
-    if (command == "fmt") return Lyra::handle_fmt(argc, argv);
+    if (command == "fmt" || command == "format" || command == "-format") return Lyra::handle_fmt(argc, argv);
 
     } catch (const std::exception& error) {
         std::cerr << "Package command failed: " << error.what() << '\n';

@@ -303,11 +303,11 @@ pub fn get_num_fonts(reader: r.ByteReader): int {
     var scalar_type = reader.read_u32();
 
     if (scalar_type == 0x74746366) { // 'ttcf'
-        reader.skip(4); // version
-        return reader.read_u32();
-    }
+    reader.skip(4); // version
+    return reader.read_u32();
+}
 
-    return 1; // Single font file
+return 1; // Single font file
 }
 
 pub fn get_font_offset(reader: r.ByteReader, font_index: int): int {
@@ -315,20 +315,20 @@ pub fn get_font_offset(reader: r.ByteReader, font_index: int): int {
     var scalar_type = reader.read_u32();
 
     if (scalar_type == 0x74746366) { // 'ttcf'
-        reader.skip(4); // version
-        var num_fonts = reader.read_u32();
-        if (font_index < 0 or font_index >= num_fonts) {
-            return -1;
-        }
-        reader.skip(font_index * 4);
-        return reader.read_u32();
+    reader.skip(4); // version
+    var num_fonts = reader.read_u32();
+    if (font_index < 0 or font_index >= num_fonts) {
+        return -1;
     }
+    reader.skip(font_index * 4);
+    return reader.read_u32();
+}
 
-    if (font_index == 0) {
-        return 0;
-    }
+if (font_index == 0) {
+    return 0;
+}
 
-    return -1;
+return -1;
 }
 
 pub fn parse_tables(reader: r.ByteReader): Info? {
@@ -338,221 +338,221 @@ pub fn parse_tables(reader: r.ByteReader): Info? {
     // Check for TrueType Collection ('ttcf')
     var font_offset = 0;
     if (scalar_type == 0x74746366) { // 'ttcf'
-        reader.skip(4); // version
-        var num_fonts = reader.read_u32();
-        if (num_fonts > 0) {
-            font_offset = reader.read_u32();
-            reader.seek(font_offset);
-            scalar_type = reader.read_u32();
+    reader.skip(4); // version
+    var num_fonts = reader.read_u32();
+    if (num_fonts > 0) {
+        font_offset = reader.read_u32();
+        reader.seek(font_offset);
+        scalar_type = reader.read_u32();
+    }
+}
+
+var num_tables = reader.read_u16();
+reader.skip(6); // searchRange, entrySelector, rangeShift
+
+var tables: [TableRecord] = [];
+for (var i = 0; i < num_tables; i = i + 1) {
+    var tag = reader.read_tag();
+    reader.skip(4); // checkSum
+    var offset = reader.read_u32();
+    var length = reader.read_u32();
+    tables.append(TableRecord(tag, offset, length));
+}
+
+var find_table_offset = fn(t_tag: int): int {
+    for (var i = 0; i < len(tables); i = i + 1) {
+        if (tables[i].tag == t_tag) {
+            return tables[i].offset;
         }
     }
+    return -1;
+};
 
-    var num_tables = reader.read_u16();
+var info = Info();
+
+// 1. Parse 'head' table
+var head_offset = find_table_offset(TAG_HEAD);
+if (head_offset < 0) { return err(); }
+reader.seek(head_offset + 18);
+info.units_per_em = reader.read_u16();
+reader.seek(head_offset + 50);
+info.index_to_loc_format = reader.read_i16();
+
+// 2. Parse 'maxp' table
+var maxp_offset = find_table_offset(TAG_MAXP);
+if (maxp_offset < 0) { return err(); }
+reader.seek(maxp_offset + 4);
+info.num_glyphs = reader.read_u16();
+
+// 3. Parse 'hhea' table
+var hhea_offset = find_table_offset(TAG_HHEA);
+if (hhea_offset < 0) { return err(); }
+reader.seek(hhea_offset + 4);
+info.ascent = reader.read_i16();
+info.descent = reader.read_i16();
+info.line_gap = reader.read_i16();
+reader.seek(hhea_offset + 34);
+info.num_h_metrics = reader.read_u16();
+
+// 4. Save offsets for 'hmtx', 'loca', 'glyf'
+var hmtx_offset = find_table_offset(TAG_HMTX);
+if (hmtx_offset < 0) { return err(); }
+info.hmtx_offset = hmtx_offset;
+
+var loca_offset = find_table_offset(TAG_LOCA);
+if (loca_offset < 0) { return err(); }
+info.loca_offset = loca_offset;
+
+var glyf_offset = find_table_offset(TAG_GLYF);
+if (glyf_offset < 0) { return err(); }
+info.glyf_offset = glyf_offset;
+
+// Build glyph metrics cache for fast lookup (like stb_truetype)
+info.build_glyph_metrics_cache(reader);
+
+// 5. Parse 'cmap' table
+var cmap_offset = find_table_offset(TAG_CMAP);
+if (cmap_offset < 0) { return err(); }
+
+reader.seek(cmap_offset + 2);
+var num_subtables = reader.read_u16();
+var format4_offset = 0;
+var format12_offset = 0;
+
+for (var i = 0; i < num_subtables; i = i + 1) {
+    var platform_id = reader.read_u16();
+    var encoding_id = reader.read_u16();
+    var sub_offset = cmap_offset + reader.read_u32();
+
+    var current_pos = reader.tell();
+    reader.seek(sub_offset);
+    var format = reader.read_u16();
+    reader.seek(current_pos);
+
+    if (format == 4 and format4_offset == 0) {
+        if (platform_id == 0 or (platform_id == 3 and (encoding_id == 1 or encoding_id == 0))) {
+            format4_offset = sub_offset;
+        }
+    } elif (format == 12 and format12_offset == 0) {
+        if (platform_id == 0 or (platform_id == 3 and encoding_id == 10)) {
+            format12_offset = sub_offset;
+        }
+    }
+}
+
+// Parse format 4 if found
+if (format4_offset > 0) {
+    reader.seek(format4_offset);
+    reader.skip(6); // format, length, language
+    var seg_count_x2 = reader.read_u16();
+    var seg_count = seg_count_x2 / 2;
     reader.skip(6); // searchRange, entrySelector, rangeShift
 
-    var tables: [TableRecord] = [];
-    for (var i = 0; i < num_tables; i = i + 1) {
-        var tag = reader.read_tag();
-        reader.skip(4); // checkSum
-        var offset = reader.read_u32();
-        var length = reader.read_u32();
-        tables.append(TableRecord(tag, offset, length));
+    var end_codes: [int] = [];
+    for (var i = 0; i < seg_count; i = i + 1) {
+        end_codes.append(reader.read_u16());
+    }
+    reader.skip(2); // reservedPad
+
+    var start_codes: [int] = [];
+    for (var i = 0; i < seg_count; i = i + 1) {
+        start_codes.append(reader.read_u16());
     }
 
-    var find_table_offset = fn(t_tag: int): int {
-        for (var i = 0; i < len(tables); i = i + 1) {
-            if (tables[i].tag == t_tag) {
-                return tables[i].offset;
-            }
-        }
-        return -1;
-    };
-
-    var info = Info();
-
-    // 1. Parse 'head' table
-    var head_offset = find_table_offset(TAG_HEAD);
-    if (head_offset < 0) { return err(); }
-    reader.seek(head_offset + 18);
-    info.units_per_em = reader.read_u16();
-    reader.seek(head_offset + 50);
-    info.index_to_loc_format = reader.read_i16();
-
-    // 2. Parse 'maxp' table
-    var maxp_offset = find_table_offset(TAG_MAXP);
-    if (maxp_offset < 0) { return err(); }
-    reader.seek(maxp_offset + 4);
-    info.num_glyphs = reader.read_u16();
-
-    // 3. Parse 'hhea' table
-    var hhea_offset = find_table_offset(TAG_HHEA);
-    if (hhea_offset < 0) { return err(); }
-    reader.seek(hhea_offset + 4);
-    info.ascent = reader.read_i16();
-    info.descent = reader.read_i16();
-    info.line_gap = reader.read_i16();
-    reader.seek(hhea_offset + 34);
-    info.num_h_metrics = reader.read_u16();
-
-    // 4. Save offsets for 'hmtx', 'loca', 'glyf'
-    var hmtx_offset = find_table_offset(TAG_HMTX);
-    if (hmtx_offset < 0) { return err(); }
-    info.hmtx_offset = hmtx_offset;
-
-    var loca_offset = find_table_offset(TAG_LOCA);
-    if (loca_offset < 0) { return err(); }
-    info.loca_offset = loca_offset;
-
-    var glyf_offset = find_table_offset(TAG_GLYF);
-    if (glyf_offset < 0) { return err(); }
-    info.glyf_offset = glyf_offset;
-
-    // Build glyph metrics cache for fast lookup (like stb_truetype)
-    info.build_glyph_metrics_cache(reader);
-
-    // 5. Parse 'cmap' table
-    var cmap_offset = find_table_offset(TAG_CMAP);
-    if (cmap_offset < 0) { return err(); }
-
-    reader.seek(cmap_offset + 2);
-    var num_subtables = reader.read_u16();
-    var format4_offset = 0;
-    var format12_offset = 0;
-
-    for (var i = 0; i < num_subtables; i = i + 1) {
-        var platform_id = reader.read_u16();
-        var encoding_id = reader.read_u16();
-        var sub_offset = cmap_offset + reader.read_u32();
-
-        var current_pos = reader.tell();
-        reader.seek(sub_offset);
-        var format = reader.read_u16();
-        reader.seek(current_pos);
-
-        if (format == 4 and format4_offset == 0) {
-            if (platform_id == 0 or (platform_id == 3 and (encoding_id == 1 or encoding_id == 0))) {
-                format4_offset = sub_offset;
-            }
-        } elif (format == 12 and format12_offset == 0) {
-            if (platform_id == 0 or (platform_id == 3 and encoding_id == 10)) {
-                format12_offset = sub_offset;
-            }
-        }
+    var id_deltas: [int] = [];
+    for (var i = 0; i < seg_count; i = i + 1) {
+        id_deltas.append(reader.read_i16());
     }
 
-    // Parse format 4 if found
-    if (format4_offset > 0) {
-        reader.seek(format4_offset);
-        reader.skip(6); // format, length, language
-        var seg_count_x2 = reader.read_u16();
-        var seg_count = seg_count_x2 / 2;
-        reader.skip(6); // searchRange, entrySelector, rangeShift
-
-        var end_codes: [int] = [];
-        for (var i = 0; i < seg_count; i = i + 1) {
-            end_codes.append(reader.read_u16());
-        }
-        reader.skip(2); // reservedPad
-
-        var start_codes: [int] = [];
-        for (var i = 0; i < seg_count; i = i + 1) {
-            start_codes.append(reader.read_u16());
-        }
-
-        var id_deltas: [int] = [];
-        for (var i = 0; i < seg_count; i = i + 1) {
-            id_deltas.append(reader.read_i16());
-        }
-
-        var id_range_offsets_base = reader.tell();
-        var id_range_offsets: [int] = [];
-        for (var i = 0; i < seg_count; i = i + 1) {
-            id_range_offsets.append(reader.read_u16());
-        }
-
-        var cmap4 = CmapFormat4();
-        cmap4.seg_count = seg_count;
-        cmap4.end_codes = end_codes;
-        cmap4.start_codes = start_codes;
-        cmap4.id_deltas = id_deltas;
-        cmap4.id_range_offsets = id_range_offsets;
-        cmap4.id_range_offsets_base = id_range_offsets_base;
-        cmap4.is_valid = true;
-        info.cmap_format4 = cmap4;
+    var id_range_offsets_base = reader.tell();
+    var id_range_offsets: [int] = [];
+    for (var i = 0; i < seg_count; i = i + 1) {
+        id_range_offsets.append(reader.read_u16());
     }
 
-    // Parse format 12 if found
-    if (format12_offset > 0) {
-        reader.seek(format12_offset + 12);
-        var num_groups = reader.read_u32();
-        var groups: [CmapGroup] = [];
-        for (var i = 0; i < num_groups; i = i + 1) {
-            var s_char = reader.read_u32();
-            var e_char = reader.read_u32();
-            var s_glyph = reader.read_u32();
-            groups.append(CmapGroup(s_char, e_char, s_glyph));
-        }
-        var cmap12 = CmapFormat12();
-        cmap12.groups = groups;
-        cmap12.is_valid = true;
-        info.cmap_format12 = cmap12;
+    var cmap4 = CmapFormat4();
+    cmap4.seg_count = seg_count;
+    cmap4.end_codes = end_codes;
+    cmap4.start_codes = start_codes;
+    cmap4.id_deltas = id_deltas;
+    cmap4.id_range_offsets = id_range_offsets;
+    cmap4.id_range_offsets_base = id_range_offsets_base;
+    cmap4.is_valid = true;
+    info.cmap_format4 = cmap4;
+}
+
+// Parse format 12 if found
+if (format12_offset > 0) {
+    reader.seek(format12_offset + 12);
+    var num_groups = reader.read_u32();
+    var groups: [CmapGroup] = [];
+    for (var i = 0; i < num_groups; i = i + 1) {
+        var s_char = reader.read_u32();
+        var e_char = reader.read_u32();
+        var s_glyph = reader.read_u32();
+        groups.append(CmapGroup(s_char, e_char, s_glyph));
     }
+    var cmap12 = CmapFormat12();
+    cmap12.groups = groups;
+    cmap12.is_valid = true;
+    info.cmap_format12 = cmap12;
+}
 
-    // 6. Parse OS/2 table (typographic metrics)
-    var os2_offset = find_table_offset(TAG_OS2);
-    if (os2_offset >= 0) {
-        reader.seek(os2_offset + 68);
-        info.typo_ascent = reader.read_i16();
-        info.typo_descent = reader.read_i16();
-        info.typo_line_gap = reader.read_i16();
-        info.has_os2 = true;
-    }
+// 6. Parse OS/2 table (typographic metrics)
+var os2_offset = find_table_offset(TAG_OS2);
+if (os2_offset >= 0) {
+    reader.seek(os2_offset + 68);
+    info.typo_ascent = reader.read_i16();
+    info.typo_descent = reader.read_i16();
+    info.typo_line_gap = reader.read_i16();
+    info.has_os2 = true;
+}
 
-    // 7. Parse kern table (kerning pairs)
-    var kern_offset = find_table_offset(TAG_KERN);
-    if (kern_offset >= 0) {
-        reader.seek(kern_offset);
-        var version = reader.read_u16();
-        var num_kern_tables = reader.read_u16();
+// 7. Parse kern table (kerning pairs)
+var kern_offset = find_table_offset(TAG_KERN);
+if (kern_offset >= 0) {
+    reader.seek(kern_offset);
+    var version = reader.read_u16();
+    var num_kern_tables = reader.read_u16();
 
-        // Look for horizontal format 0 table
-        if (num_kern_tables > 0) {
-            var kern_found = false;
-            var k = 0;
-            while (k < num_kern_tables and !kern_found) {
-                var subtable_start = reader.tell();
-                var subtable_length = reader.read_u32();
-                var coverage = reader.read_u16();
-                var format = (coverage >> 8) & 0xFF;
-                var horizontal = (coverage & 1) != 0;
+    // Look for horizontal format 0 table
+    if (num_kern_tables > 0) {
+        var kern_found = false;
+        var k = 0;
+        while (k < num_kern_tables and !kern_found) {
+            var subtable_start = reader.tell();
+            var subtable_length = reader.read_u32();
+            var coverage = reader.read_u16();
+            var format = (coverage >> 8) & 0xFF;
+            var horizontal = (coverage & 1) != 0;
 
-                // We only support format 0 horizontal kerning
-                if (format == 0 and horizontal) {
-                    var num_pairs = reader.read_u16();
-                    // Skip searchRange, entrySelector, rangeShift (6 bytes)
-                    reader.skip(6);
+            // We only support format 0 horizontal kerning
+            if (format == 0 and horizontal) {
+                var num_pairs = reader.read_u16();
+                // Skip searchRange, entrySelector, rangeShift (6 bytes)
+                reader.skip(6);
 
-                    var kerning_pairs: [KerningEntry] = [];
-                    for (var p = 0; p < num_pairs; p = p + 1) {
-                        var left = reader.read_u16();
-                        var right = reader.read_u16();
-                        var value = reader.read_i16();
-                        kerning_pairs.append(KerningEntry(left, right, value));
-                    }
-
-                    info.kerning_pairs = kerning_pairs;
-                    info.has_kern = true;
-                    info.kern_offset = kern_offset;
-                    kern_found = true;
+                var kerning_pairs: [KerningEntry] = [];
+                for (var p = 0; p < num_pairs; p = p + 1) {
+                    var left = reader.read_u16();
+                    var right = reader.read_u16();
+                    var value = reader.read_i16();
+                    kerning_pairs.append(KerningEntry(left, right, value));
                 }
 
-                // Skip to next subtable
-                reader.seek(subtable_start + subtable_length);
-                k = k + 1;
+                info.kerning_pairs = kerning_pairs;
+                info.has_kern = true;
+                info.kern_offset = kern_offset;
+                kern_found = true;
             }
+
+            // Skip to next subtable
+            reader.seek(subtable_start + subtable_length);
+            k = k + 1;
         }
     }
+}
 
-    info.is_valid = true;
-    return ok(info);
+info.is_valid = true;
+return ok(info);
 }

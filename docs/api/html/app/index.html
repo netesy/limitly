@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>index.lm - Lymar API Reference</title>
+<style>
+:root {
+  --bg-primary: #0a0e17;
+  --bg-secondary: #111827;
+  --bg-tertiary: #1f2937;
+  --accent: #38bdf8;
+  --accent-hover: #7dd3fc;
+  --text-main: #f1f5f9;
+  --text-muted: #94a3b8;
+  --border-color: #334155;
+}
+* { box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif;
+  margin: 0; padding: 0; background: var(--bg-primary); color: var(--text-main); display: flex;
+}
+nav {
+  width: 300px; height: 100vh; overflow-y: auto; background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color); padding: 24px 20px; position: fixed;
+}
+nav h2 { font-size: 1.15rem; color: var(--accent); margin-top: 0; margin-bottom: 16px; font-weight: 700; }
+#search-input {
+  width: 100%; padding: 8px 12px; background: var(--bg-tertiary); border: 1px solid var(--border-color);
+  border-radius: 6px; color: #fff; font-size: 0.85rem; margin-bottom: 16px;
+}
+#search-input:focus { outline: none; border-color: var(--accent); }
+.nav-link { display: block; color: var(--text-muted); text-decoration: none; padding: 6px 8px; font-size: 0.9rem; border-radius: 4px; }
+.nav-link:hover { color: #fff; background: var(--bg-tertiary); }
+main { margin-left: 300px; padding: 40px 48px; max-width: 950px; flex: 1; }
+h1 { color: #fff; font-size: 2.2rem; margin-top: 0; padding-bottom: 16px; border-bottom: 1px solid var(--border-color); }
+h2 { color: var(--accent); font-size: 1.4rem; margin-top: 36px; margin-bottom: 14px; }
+h3 { color: #fff; font-size: 1.25rem; margin-top: 28px; margin-bottom: 12px; display: flex; align-items: center; gap: 10px; }
+h4 { color: var(--accent); font-size: 1rem; margin-top: 20px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+.badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
+.badge-pub { background: #064e3b; color: #6ee7b7; border: 1px solid #059669; }
+.badge-private { background: #334155; color: #cbd5e1; }
+.badge-type { background: #1e1b4b; color: #c7d2fe; border: 1px solid #4338ca; }
+.code-sig { background: #090d16; border: 1px solid var(--border-color); padding: 14px 18px; border-radius: 8px; overflow-x: auto; font-family: 'Consolas', 'Fira Code', monospace; font-size: 0.95rem; color: #e2e8f0; }
+.summary { color: #cbd5e1; line-height: 1.65; margin: 14px 0; font-size: 1rem; }
+/* Callout styling */
+.callout { margin: 16px 0; padding: 14px 18px; border-radius: 8px; border-left: 4px solid; font-size: 0.92rem; }
+.callout-header { font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+.callout-tip { border-color: #10b981; background: rgba(16, 185, 129, 0.08); color: #d1fae5; }
+.callout-tip .callout-header { color: #34d399; }
+.callout-warning { border-color: #f59e0b; background: rgba(245, 158, 11, 0.08); color: #fef3c7; }
+.callout-warning .callout-header { color: #fbbf24; }
+.callout-note { border-color: #0284c7; background: rgba(2, 132, 199, 0.08); color: #e0f2fe; }
+.callout-note .callout-header { color: #38bdf8; }
+.callout-deprecated { border-color: #e11d48; background: rgba(225, 29, 72, 0.08); color: #ffe4e6; }
+.callout-deprecated .callout-header { color: #fb7185; }
+/* Example card */
+.example-card { margin: 20px 0; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: #080c14; }
+.example-header { background: #162032; padding: 8px 16px; font-size: 0.82rem; font-weight: 700; color: #94a3b8; border-bottom: 1px solid var(--border-color); }
+.example-card pre { margin: 0; padding: 14px 18px; overflow-x: auto; font-family: monospace; font-size: 0.92rem; color: #e2e8f0; }
+/* Tables */
+table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 0.92rem; }
+th { background: #162032; color: #94a3b8; text-align: left; padding: 10px 14px; font-weight: 600; border-bottom: 1px solid var(--border-color); }
+td { padding: 10px 14px; border-bottom: 1px solid #1e293b; color: #cbd5e1; }
+ul { padding-left: 20px; color: #cbd5e1; line-height: 1.6; }
+hr { border: 0; border-top: 1px solid var(--border-color); margin: 36px 0; }
+</style>
+<script>
+function filterNav() {
+  var q = document.getElementById('search-input').value.toLowerCase();
+  var links = document.querySelectorAll('.nav-link');
+  links.forEach(function(l) {
+    l.style.display = l.textContent.toLowerCase().includes(q) ? 'block' : 'none';
+  });
+}
+</script>
+</head>
+<body>
+<nav>
+<h2>index.lm</h2>
+<input type="text" id="search-input" placeholder="Filter symbols..." oninput="filterNav()">
+<div id="nav-list">
+<a class="nav-link" href="#event_type_from_int">event_type_from_int <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#Event">Event <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#KeyEvent">KeyEvent <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#MouseEvent">MouseEvent <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#ResizeEvent">ResizeEvent <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#WindowConfig">WindowConfig <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#default_window_config">default_window_config <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#State">State <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#make_default_event">make_default_event <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#app_init">app_init <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#init">init <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#app_shutdown">app_shutdown <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#shutdown">shutdown <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#app_is_valid">app_is_valid <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#app_is_running">app_is_running <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#ui">ui <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#set_ui">set_ui <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#run_frame_step">run_frame_step <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#app_run">app_run <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#run">run <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#app_quit">app_quit <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#quit">quit <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#process_events">process_events <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#push_mouse_click">push_mouse_click <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#push_quit_event">push_quit_event <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#push_event">push_event <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#poll_event">poll_event <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#has_pending_events">has_pending_events <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#present_frame">present_frame <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#set_window_size">set_window_size <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#get_window_width">get_window_width <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#get_window_height">get_window_height <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#get_framebuffer_width">get_framebuffer_width <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#get_framebuffer_height">get_framebuffer_height <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#get_dpi_scale">get_dpi_scale <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#get_frame_count">get_frame_count <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#get_delta_time">get_delta_time <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#set_window_title">set_window_title <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#set_fullscreen">set_fullscreen <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#set_swap_interval">set_swap_interval <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#show_window">show_window <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#hide_window">hide_window <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#focus_window">focus_window <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#request_attention">request_attention <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#get_current_time">get_current_time <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#sleep_ms">sleep_ms <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#get_clipboard_string">get_clipboard_string <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#set_clipboard_string">set_clipboard_string <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#get_mouse_position">get_mouse_position <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#set_mouse_position">set_mouse_position <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#get_mouse_button_state">get_mouse_button_state <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#get_key_state">get_key_state <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#get_modifier_state">get_modifier_state <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#create_app_data_directory">create_app_data_directory <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#get_executable_path">get_executable_path <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#get_home_directory">get_home_directory <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+</div>
+</nav>
+<main>
+<h1>index.lm API Reference</h1>
+<h2>Module Overview</h2>
+<div class="summary"><p>Application Module
+Portable window application lifecycle, event loop, and timing driver</p></div>
+<div id="event_type_from_int">
+<h3>event_type_from_int <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn event_type_from_int(code: int): EventType</code></pre>
+</div><hr>
+<div id="Event">
+<h3>Event <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame Event</code></pre>
+<div class="summary"><p>Event frame</p></div>
+<h4>Members</h4>
+<ul>
+<li><code>var pub event_type: EventType</code> <em>(field)</em></li>
+<li><code>var pub timestamp: int</code> <em>(field)</em></li>
+<li><code>var pub window_id: int</code> <em>(field)</em></li>
+<li><code>var pub x: int</code> <em>(field)</em></li>
+<li><code>var pub y: int</code> <em>(field)</em></li>
+<li><code>var pub key_code: int</code> <em>(field)</em></li>
+<li><code>var pub xdest: int</code> <em>(field)</em></li>
+<li><code>var pub ydest: int</code> <em>(field)</em></li>
+<li><code>pub init()</code> <em>(constructor)</em></li>
+</ul>
+</div><hr>
+<div id="KeyEvent">
+<h3>KeyEvent <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame KeyEvent</code></pre>
+<div class="summary"><p>Key event frame</p></div>
+<h4>Members</h4>
+<ul>
+<li><code>var pub modifiers: int</code> <em>(field)</em></li>
+<li><code>var pub repeat: int</code> <em>(field)</em></li>
+</ul>
+</div><hr>
+<div id="MouseEvent">
+<h3>MouseEvent <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame MouseEvent</code></pre>
+<div class="summary"><p>Mouse event frame</p></div>
+<h4>Members</h4>
+<ul>
+<li><code>var pub button: int</code> <em>(field)</em></li>
+<li><code>var pub modifiers: int</code> <em>(field)</em></li>
+</ul>
+</div><hr>
+<div id="ResizeEvent">
+<h3>ResizeEvent <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame ResizeEvent</code></pre>
+<div class="summary"><p>Resize event frame</p></div>
+<h4>Members</h4>
+<ul>
+<li><code>var pub width: int</code> <em>(field)</em></li>
+<li><code>var pub height: int</code> <em>(field)</em></li>
+<li><code>var pub framebuffer_width: int</code> <em>(field)</em></li>
+<li><code>var pub framebuffer_height: int</code> <em>(field)</em></li>
+</ul>
+</div><hr>
+<div id="WindowConfig">
+<h3>WindowConfig <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame WindowConfig</code></pre>
+<div class="summary"><p>Window configuration</p></div>
+<h4>Members</h4>
+<ul>
+<li><code>var pub width: int</code> <em>(field)</em></li>
+<li><code>var pub height: int</code> <em>(field)</em></li>
+<li><code>var pub title: str</code> <em>(field)</em></li>
+<li><code>var pub resizable: int</code> <em>(field)</em></li>
+<li><code>var pub fullscreen: int</code> <em>(field)</em></li>
+<li><code>var pub high_dpi: int</code> <em>(field)</em></li>
+<li><code>var pub sample_count: int</code> <em>(field)</em></li>
+<li><code>var pub swap_interval: int</code> <em>(field)</em></li>
+</ul>
+</div><hr>
+<div id="default_window_config">
+<h3>default_window_config <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn default_window_config(): WindowConfig</code></pre>
+<div class="summary"><p>Default window configuration</p></div>
+</div><hr>
+<div id="State">
+<h3>State <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame State</code></pre>
+<div class="summary"><p>Application state</p></div>
+<h4>Members</h4>
+<ul>
+<li><code>var pub is_initialized: int</code> <em>(field)</em></li>
+<li><code>var pub is_running: int</code> <em>(field)</em></li>
+<li><code>var pub window_config: WindowConfig</code> <em>(field)</em></li>
+<li><code>var pub window_id: int</code> <em>(field)</em></li>
+<li><code>var pub width: int</code> <em>(field)</em></li>
+<li><code>var pub height: int</code> <em>(field)</em></li>
+<li><code>var pub framebuffer_width: int</code> <em>(field)</em></li>
+<li><code>var pub framebuffer_height: int</code> <em>(field)</em></li>
+<li><code>var pub dpi_scale: float</code> <em>(field)</em></li>
+<li><code>var pub event_queue: list</code> <em>(field)</em></li>
+<li><code>var pub event_queue_head: int</code> <em>(field)</em></li>
+<li><code>var pub frame_count: int</code> <em>(field)</em></li>
+<li><code>var pub last_frame_time: int</code> <em>(field)</em></li>
+<li><code>var pub delta_time: float</code> <em>(field)</em></li>
+</ul>
+</div><hr>
+<div id="make_default_event">
+<h3>make_default_event <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn make_default_event(): Event</code></pre>
+</div><hr>
+<div id="app_init">
+<h3>app_init <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn app_init(config: WindowConfig): int</code></pre>
+<div class="summary"><p>Initialize application with window configuration</p></div>
+</div><hr>
+<div id="init">
+<h3>init <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn init(config: any = ...): int</code></pre>
+</div><hr>
+<div id="app_shutdown">
+<h3>app_shutdown <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn app_shutdown(): nil</code></pre>
+<div class="summary"><p>Shutdown application and release resources</p></div>
+</div><hr>
+<div id="shutdown">
+<h3>shutdown <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn shutdown(): nil</code></pre>
+</div><hr>
+<div id="app_is_valid">
+<h3>app_is_valid <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn app_is_valid(): int</code></pre>
+</div><hr>
+<div id="app_is_running">
+<h3>app_is_running <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn app_is_running(): int</code></pre>
+</div><hr>
+<div id="ui">
+<h3>ui <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn ui(root: ui_types.Widget): nil</code></pre>
+</div><hr>
+<div id="set_ui">
+<h3>set_ui <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn set_ui(root): nil</code></pre>
+</div><hr>
+<div id="run_frame_step">
+<h3>run_frame_step <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn run_frame_step(): nil</code></pre>
+</div><hr>
+<div id="app_run">
+<h3>app_run <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn app_run(): nil</code></pre>
+</div><hr>
+<div id="run">
+<h3>run <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn run(root: any = ...): nil</code></pre>
+</div><hr>
+<div id="app_quit">
+<h3>app_quit <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn app_quit(): nil</code></pre>
+</div><hr>
+<div id="quit">
+<h3>quit <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn quit(): nil</code></pre>
+</div><hr>
+<div id="process_events">
+<h3>process_events <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn process_events(): nil</code></pre>
+</div><hr>
+<div id="push_mouse_click">
+<h3>push_mouse_click <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn push_mouse_click(x: int, y: int): nil</code></pre>
+</div><hr>
+<div id="push_quit_event">
+<h3>push_quit_event <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn push_quit_event(): nil</code></pre>
+</div><hr>
+<div id="push_event">
+<h3>push_event <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn push_event(event: Event): nil</code></pre>
+</div><hr>
+<div id="poll_event">
+<h3>poll_event <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn poll_event(): Event</code></pre>
+</div><hr>
+<div id="has_pending_events">
+<h3>has_pending_events <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn has_pending_events(): int</code></pre>
+</div><hr>
+<div id="present_frame">
+<h3>present_frame <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn present_frame(): nil</code></pre>
+</div><hr>
+<div id="set_window_size">
+<h3>set_window_size <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn set_window_size(width: int, height: int): nil</code></pre>
+</div><hr>
+<div id="get_window_width">
+<h3>get_window_width <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn get_window_width(): int</code></pre>
+</div><hr>
+<div id="get_window_height">
+<h3>get_window_height <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn get_window_height(): int</code></pre>
+</div><hr>
+<div id="get_framebuffer_width">
+<h3>get_framebuffer_width <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn get_framebuffer_width(): int</code></pre>
+</div><hr>
+<div id="get_framebuffer_height">
+<h3>get_framebuffer_height <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn get_framebuffer_height(): int</code></pre>
+</div><hr>
+<div id="get_dpi_scale">
+<h3>get_dpi_scale <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn get_dpi_scale(): float</code></pre>
+</div><hr>
+<div id="get_frame_count">
+<h3>get_frame_count <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn get_frame_count(): int</code></pre>
+</div><hr>
+<div id="get_delta_time">
+<h3>get_delta_time <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn get_delta_time(): float</code></pre>
+</div><hr>
+<div id="set_window_title">
+<h3>set_window_title <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn set_window_title(title: str): nil</code></pre>
+</div><hr>
+<div id="set_fullscreen">
+<h3>set_fullscreen <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn set_fullscreen(fullscreen: int): nil</code></pre>
+</div><hr>
+<div id="set_swap_interval">
+<h3>set_swap_interval <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn set_swap_interval(interval: int): nil</code></pre>
+</div><hr>
+<div id="show_window">
+<h3>show_window <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn show_window(): nil</code></pre>
+</div><hr>
+<div id="hide_window">
+<h3>hide_window <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn hide_window(): nil</code></pre>
+</div><hr>
+<div id="focus_window">
+<h3>focus_window <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn focus_window(): nil</code></pre>
+</div><hr>
+<div id="request_attention">
+<h3>request_attention <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn request_attention(): nil</code></pre>
+</div><hr>
+<div id="get_current_time">
+<h3>get_current_time <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn get_current_time(): int</code></pre>
+</div><hr>
+<div id="sleep_ms">
+<h3>sleep_ms <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn sleep_ms(milliseconds: int): nil</code></pre>
+</div><hr>
+<div id="get_clipboard_string">
+<h3>get_clipboard_string <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn get_clipboard_string(): str</code></pre>
+</div><hr>
+<div id="set_clipboard_string">
+<h3>set_clipboard_string <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn set_clipboard_string(text: str): nil</code></pre>
+</div><hr>
+<div id="get_mouse_position">
+<h3>get_mouse_position <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn get_mouse_position(): tuple</code></pre>
+</div><hr>
+<div id="set_mouse_position">
+<h3>set_mouse_position <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn set_mouse_position(x: int, y: int): nil</code></pre>
+</div><hr>
+<div id="get_mouse_button_state">
+<h3>get_mouse_button_state <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn get_mouse_button_state(button: int): int</code></pre>
+</div><hr>
+<div id="get_key_state">
+<h3>get_key_state <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn get_key_state(key: int): int</code></pre>
+</div><hr>
+<div id="get_modifier_state">
+<h3>get_modifier_state <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn get_modifier_state(): int</code></pre>
+</div><hr>
+<div id="create_app_data_directory">
+<h3>create_app_data_directory <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn create_app_data_directory(): str</code></pre>
+</div><hr>
+<div id="get_executable_path">
+<h3>get_executable_path <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn get_executable_path(): str</code></pre>
+<div class="summary"><p>These two are answered by std.os: they are facts about the machine and the
+location of the program, not about the application loop.</p></div>
+</div><hr>
+<div id="get_home_directory">
+<h3>get_home_directory <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn get_home_directory(): str</code></pre>
+</div><hr>
+</main>
+</body>
+</html>

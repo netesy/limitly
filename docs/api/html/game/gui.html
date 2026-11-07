@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>gui.lm - Lymar API Reference</title>
+<style>
+:root {
+  --bg-primary: #0a0e17;
+  --bg-secondary: #111827;
+  --bg-tertiary: #1f2937;
+  --accent: #38bdf8;
+  --accent-hover: #7dd3fc;
+  --text-main: #f1f5f9;
+  --text-muted: #94a3b8;
+  --border-color: #334155;
+}
+* { box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif;
+  margin: 0; padding: 0; background: var(--bg-primary); color: var(--text-main); display: flex;
+}
+nav {
+  width: 300px; height: 100vh; overflow-y: auto; background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color); padding: 24px 20px; position: fixed;
+}
+nav h2 { font-size: 1.15rem; color: var(--accent); margin-top: 0; margin-bottom: 16px; font-weight: 700; }
+#search-input {
+  width: 100%; padding: 8px 12px; background: var(--bg-tertiary); border: 1px solid var(--border-color);
+  border-radius: 6px; color: #fff; font-size: 0.85rem; margin-bottom: 16px;
+}
+#search-input:focus { outline: none; border-color: var(--accent); }
+.nav-link { display: block; color: var(--text-muted); text-decoration: none; padding: 6px 8px; font-size: 0.9rem; border-radius: 4px; }
+.nav-link:hover { color: #fff; background: var(--bg-tertiary); }
+main { margin-left: 300px; padding: 40px 48px; max-width: 950px; flex: 1; }
+h1 { color: #fff; font-size: 2.2rem; margin-top: 0; padding-bottom: 16px; border-bottom: 1px solid var(--border-color); }
+h2 { color: var(--accent); font-size: 1.4rem; margin-top: 36px; margin-bottom: 14px; }
+h3 { color: #fff; font-size: 1.25rem; margin-top: 28px; margin-bottom: 12px; display: flex; align-items: center; gap: 10px; }
+h4 { color: var(--accent); font-size: 1rem; margin-top: 20px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+.badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
+.badge-pub { background: #064e3b; color: #6ee7b7; border: 1px solid #059669; }
+.badge-private { background: #334155; color: #cbd5e1; }
+.badge-type { background: #1e1b4b; color: #c7d2fe; border: 1px solid #4338ca; }
+.code-sig { background: #090d16; border: 1px solid var(--border-color); padding: 14px 18px; border-radius: 8px; overflow-x: auto; font-family: 'Consolas', 'Fira Code', monospace; font-size: 0.95rem; color: #e2e8f0; }
+.summary { color: #cbd5e1; line-height: 1.65; margin: 14px 0; font-size: 1rem; }
+/* Callout styling */
+.callout { margin: 16px 0; padding: 14px 18px; border-radius: 8px; border-left: 4px solid; font-size: 0.92rem; }
+.callout-header { font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+.callout-tip { border-color: #10b981; background: rgba(16, 185, 129, 0.08); color: #d1fae5; }
+.callout-tip .callout-header { color: #34d399; }
+.callout-warning { border-color: #f59e0b; background: rgba(245, 158, 11, 0.08); color: #fef3c7; }
+.callout-warning .callout-header { color: #fbbf24; }
+.callout-note { border-color: #0284c7; background: rgba(2, 132, 199, 0.08); color: #e0f2fe; }
+.callout-note .callout-header { color: #38bdf8; }
+.callout-deprecated { border-color: #e11d48; background: rgba(225, 29, 72, 0.08); color: #ffe4e6; }
+.callout-deprecated .callout-header { color: #fb7185; }
+/* Example card */
+.example-card { margin: 20px 0; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: #080c14; }
+.example-header { background: #162032; padding: 8px 16px; font-size: 0.82rem; font-weight: 700; color: #94a3b8; border-bottom: 1px solid var(--border-color); }
+.example-card pre { margin: 0; padding: 14px 18px; overflow-x: auto; font-family: monospace; font-size: 0.92rem; color: #e2e8f0; }
+/* Tables */
+table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 0.92rem; }
+th { background: #162032; color: #94a3b8; text-align: left; padding: 10px 14px; font-weight: 600; border-bottom: 1px solid var(--border-color); }
+td { padding: 10px 14px; border-bottom: 1px solid #1e293b; color: #cbd5e1; }
+ul { padding-left: 20px; color: #cbd5e1; line-height: 1.6; }
+hr { border: 0; border-top: 1px solid var(--border-color); margin: 36px 0; }
+</style>
+<script>
+function filterNav() {
+  var q = document.getElementById('search-input').value.toLowerCase();
+  var links = document.querySelectorAll('.nav-link');
+  links.forEach(function(l) {
+    l.style.display = l.textContent.toLowerCase().includes(q) ? 'block' : 'none';
+  });
+}
+</script>
+</head>
+<body>
+<nav>
+<h2>gui.lm</h2>
+<input type="text" id="search-input" placeholder="Filter symbols..." oninput="filterNav()">
+<div id="nav-list">
+<a class="nav-link" href="#WindowState">WindowState <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#GUI">GUI <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+</div>
+</nav>
+<main>
+<h1>gui.lm API Reference</h1>
+<h2>Module Overview</h2>
+<div class="summary"><p>std/game/gui.lm
+High-performance, zero-DOM Immediate-Mode GUI (IMGUI) engine for game developers.
+Features comprehensive widget library, moddable style stack, and customizable themes.</p></div>
+<div id="WindowState">
+<h3>WindowState <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame WindowState</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>var pub collapsed: bool</code> <em>(field)</em></li>
+<li><code>var pub is_dragging: bool</code> <em>(field)</em></li>
+<li><code>var pub drag_off_x: float</code> <em>(field)</em></li>
+<li><code>var pub drag_off_y: float</code> <em>(field)</em></li>
+<li><code>pub init()</code> <em>(constructor)</em></li>
+</ul>
+</div><hr>
+<div id="GUI">
+<h3>GUI <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame GUI</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>var pub theme: types.GUITheme</code> <em>(field)</em></li>
+<li><code>var pub mouse_x: float</code> <em>(field)</em></li>
+<li><code>var pub mouse_y: float</code> <em>(field)</em></li>
+<li><code>var pub mouse_down: bool</code> <em>(field)</em></li>
+<li><code>var pub mouse_pressed: bool</code> <em>(field)</em></li>
+<li><code>var pub mouse_released: bool</code> <em>(field)</em></li>
+<li><code>var pub mouse_wheel: float</code> <em>(field)</em></li>
+<li><code>var pub prev_mouse_down: bool</code> <em>(field)</em></li>
+<li><code>var pub dt: float</code> <em>(field)</em></li>
+<li><code>var pub keys_down: list</code> <em>(field)</em></li>
+<li><code>var pub keys_pressed: list</code> <em>(field)</em></li>
+<li><code>var pub typed_chars: list</code> <em>(field)</em></li>
+<li><code>var pub active_modifiers: int</code> <em>(field)</em></li>
+<li><code>var pub get_clipboard_cb: function?</code> <em>(field)</em></li>
+<li><code>var pub set_clipboard_cb: function?</code> <em>(field)</em></li>
+<li><code>var pub hot_id: str</code> <em>(field)</em></li>
+<li><code>var pub active_id: str</code> <em>(field)</em></li>
+<li><code>var pub id_prefix: str</code> <em>(field)</em></li>
+<li><code>var pub prev_item_hovered: bool</code> <em>(field)</em></li>
+<li><code>var pub prev_item_rect: types.Rect</code> <em>(field)</em></li>
+<li><code>var pub cursor_x: float</code> <em>(field)</em></li>
+<li><code>var pub cursor_y: float</code> <em>(field)</em></li>
+<li><code>var pub start_x: float</code> <em>(field)</em></li>
+<li><code>var pub start_y: float</code> <em>(field)</em></li>
+<li><code>var pub line_h: float</code> <em>(field)</em></li>
+<li><code>var pub same_line_flag: bool</code> <em>(field)</em></li>
+<li><code>var pub prev_item_w: float</code> <em>(field)</em></li>
+<li><code>var pub indent_x: float</code> <em>(field)</em></li>
+<li><code>var pub columns_count: int</code> <em>(field)</em></li>
+<li><code>var pub columns_idx: int</code> <em>(field)</em></li>
+<li><code>var pub columns_start_x: float</code> <em>(field)</em></li>
+<li><code>var pub columns_width: float</code> <em>(field)</em></li>
+<li><code>var pub scroll_y: float</code> <em>(field)</em></li>
+<li><code>var pub active_popup_id: str</code> <em>(field)</em></li>
+<li><code>var pub popup_x: float</code> <em>(field)</em></li>
+<li><code>var pub popup_y: float</code> <em>(field)</em></li>
+<li><code>var pub popup_w: float</code> <em>(field)</em></li>
+<li><code>var pub popup_h: float</code> <em>(field)</em></li>
+<li><code>var pub cur_tab_bar_id: str</code> <em>(field)</em></li>
+<li><code>var pub combo_open_id: str</code> <em>(field)</em></li>
+<li><code>var pub editor_controllers: dict</code> <em>(field)</em></li>
+<li><code>var pub scroll_offsets: dict</code> <em>(field)</em></li>
+<li><code>var pub focus_manager: focus.Manager</code> <em>(field)</em></li>
+<li><code>var pub next_shadow: any</code> <em>(field)</em></li>
+<li><code>var pub has_next_shadow: bool</code> <em>(field)</em></li>
+<li><code>var pub shadow_stack: list</code> <em>(field)</em></li>
+<li><code>var pub next_opacity: float</code> <em>(field)</em></li>
+<li><code>var pub has_next_opacity: bool</code> <em>(field)</em></li>
+<li><code>var pub next_disabled: bool</code> <em>(field)</em></li>
+<li><code>var pub has_next_disabled: bool</code> <em>(field)</em></li>
+<li><code>var pub in_window: bool</code> <em>(field)</em></li>
+<li><code>var pub cur_window_title: str</code> <em>(field)</em></li>
+<li><code>var pub cur_window_x: float</code> <em>(field)</em></li>
+<li><code>var pub cur_window_y: float</code> <em>(field)</em></li>
+<li><code>var pub cur_window_w: float</code> <em>(field)</em></li>
+<li><code>var pub cur_window_h: float</code> <em>(field)</em></li>
+<li><code>var pub windows: dict</code> <em>(field)</em></li>
+<li><code>var pub headers: dict</code> <em>(field)</em></li>
+<li><code>var pub anim_store: anim.IMGUIAnimationStore</code> <em>(field)</em></li>
+<li><code>var pub style_color_indices: list</code> <em>(field)</em></li>
+<li><code>var pub style_color_stack: list</code> <em>(field)</em></li>
+<li><code>var pub style_var_indices: list</code> <em>(field)</em></li>
+<li><code>var pub style_var_stack: list</code> <em>(field)</em></li>
+<li><code>pub init()</code> <em>(constructor)</em></li>
+<li><code>pub fn begin(mx: float, my: float, is_down: bool): nil</code> <em>(method)</em></li>
+<li><code>pub fn is_occluded(x: float, y: float, w: float, h: float): bool</code> <em>(method)</em></li>
+<li><code>pub fn end(): nil</code> <em>(method)</em></li>
+<li><code>pub fn set_theme(new_theme: types.GUITheme): nil</code> <em>(method)</em></li>
+<li><code>pub fn push_style_color(idx: int, c: color.Color): nil</code> <em>(method)</em></li>
+<li><code>pub fn push_color_role(role: types.ColorRole, c: color.Color): nil</code> <em>(method)</em></li>
+<li><code>pub fn pop_style_color(): nil</code> <em>(method)</em></li>
+<li><code>pub fn push_style_var(idx: int, value: float): nil</code> <em>(method)</em></li>
+<li><code>pub fn pop_style_var(): nil</code> <em>(method)</em></li>
+<li><code>pub fn set_next_shadow(s: any): nil</code> <em>(method)</em></li>
+<li><code>pub fn shadow(s: any): GUI</code> <em>(method)</em></li>
+<li><code>pub fn opacity(o: float): GUI</code> <em>(method)</em></li>
+<li><code>pub fn disabled(): GUI</code> <em>(method)</em></li>
+<li><code>pub fn push_shadow(s: any): nil</code> <em>(method)</em></li>
+<li><code>pub fn pop_shadow(): nil</code> <em>(method)</em></li>
+<li><code>pub fn get_active_shadow(): any</code> <em>(method)</em></li>
+<li><code>pub fn get_style_color(idx: int): color.Color</code> <em>(method)</em></li>
+<li><code>pub fn get_style_var(idx: int, default_value: float): float</code> <em>(method)</em></li>
+<li><code>pub fn get_color_role(role: types.ColorRole): color.Color</code> <em>(method)</em></li>
+<li><code>pub fn get_var_type(v: types.StyleVar, default_value: float): float</code> <em>(method)</em></li>
+<li><code>pub fn make_id(label: str): str</code> <em>(method)</em></li>
+<li><code>pub fn push_id(prefix: str): nil</code> <em>(method)</em></li>
+<li><code>pub fn pop_id(): nil</code> <em>(method)</em></li>
+<li><code>pub fn set_cursor(x: float, y: float): nil</code> <em>(method)</em></li>
+<li><code>pub fn same_line(): nil</code> <em>(method)</em></li>
+<li><code>pub fn spacing(): nil</code> <em>(method)</em></li>
+<li><code>pub fn indent(): nil</code> <em>(method)</em></li>
+<li><code>pub fn unindent(): nil</code> <em>(method)</em></li>
+<li><code>fn advance(item_w: float, item_h: float): nil</code> <em>(method)</em></li>
+<li><code>pub fn columns(count: int): nil</code> <em>(method)</em></li>
+<li><code>pub fn next_column(): nil</code> <em>(method)</em></li>
+<li><code>pub fn draw_rect(x: float, y: float, w: float, h: float, col: color.Color): nil</code> <em>(method)</em></li>
+<li><code>pub fn label(text: str): nil</code> <em>(method)</em></li>
+<li><code>pub fn button(text: str): bool</code> <em>(method)</em></li>
+<li><code>pub fn button_colored(text: str, bg_color: color.Color): bool</code> <em>(method)</em></li>
+<li><code>pub fn checkbox(label: str, checked: bool): bool</code> <em>(method)</em></li>
+<li><code>pub fn radio_button(label: str, active: bool): bool</code> <em>(method)</em></li>
+<li><code>pub fn toggle(label: str, enabled: bool): bool</code> <em>(method)</em></li>
+<li><code>pub fn slider(label: str, value: float, min_val: float, max_val: float): float</code> <em>(method)</em></li>
+<li><code>pub fn slider_int(label: str, value: int): int</code> <em>(method)</em></li>
+<li><code>pub fn stepper_int(label: str, value: int): int</code> <em>(method)</em></li>
+<li><code>pub fn stepper_float(label: str, value: float): float</code> <em>(method)</em></li>
+<li><code>pub fn is_key_down(k: int): bool</code> <em>(method)</em></li>
+<li><code>pub fn is_key_pressed(k: int): bool</code> <em>(method)</em></li>
+<li><code>pub fn get_typed_chars(): list</code> <em>(method)</em></li>
+<li><code>pub fn get_editor_controller(label: str): any</code> <em>(method)</em></li>
+<li><code>pub fn set_multiline_selection(label: str, line: int, col: int, end_line: int, end_col: int): nil</code> <em>(method)</em></li>
+<li><code>pub fn set_multiline_text(label: str, new_text: str): nil</code> <em>(method)</em></li>
+<li><code>pub fn get_multiline_cursor(label: str): tuple</code> <em>(method)</em></li>
+<li><code>pub fn input_text_multiline(label: str, text: str, width: float, height: float): str</code> <em>(method)</em></li>
+<li><code>pub fn input_text(label: str, text: str): str</code> <em>(method)</em></li>
+<li><code>pub fn combo_box(label: str, items: list, selected_idx: int): int</code> <em>(method)</em></li>
+<li><code>pub fn color_button(id: str, col: color.Color): bool</code> <em>(method)</em></li>
+<li><code>pub fn color_picker(label: str, col: color.Color): color.Color</code> <em>(method)</em></li>
+<li><code>pub fn plot_lines(label: str, values: list): nil</code> <em>(method)</em></li>
+<li><code>pub fn plot_histogram(label: str, values: list): nil</code> <em>(method)</em></li>
+<li><code>pub fn progress_bar(fraction: float): nil</code> <em>(method)</em></li>
+<li><code>pub fn separator(): nil</code> <em>(method)</em></li>
+<li><code>pub fn header(title: str): bool</code> <em>(method)</em></li>
+<li><code>pub fn begin_tab_bar(id: str): bool</code> <em>(method)</em></li>
+<li><code>pub fn tab_item(label: str, is_active: bool): bool</code> <em>(method)</em></li>
+<li><code>pub fn end_tab_bar(): nil</code> <em>(method)</em></li>
+<li><code>pub fn tree_node(label: str): bool</code> <em>(method)</em></li>
+<li><code>pub fn tree_pop(): nil</code> <em>(method)</em></li>
+<li><code>pub fn tooltip(text: str): nil</code> <em>(method)</em></li>
+<li><code>pub fn open_popup(id: str): nil</code> <em>(method)</em></li>
+<li><code>pub fn close_popup(id: str): nil</code> <em>(method)</em></li>
+<li><code>pub fn is_popup_open(id: str): bool</code> <em>(method)</em></li>
+<li><code>pub fn begin_popup(id: str, x: float, y: float, w: float, h: float): bool</code> <em>(method)</em></li>
+<li><code>pub fn end_popup(): nil</code> <em>(method)</em></li>
+<li><code>pub fn table(headers: list, rows_count: int): bool</code> <em>(method)</em></li>
+<li><code>pub fn begin_scroll_area(w: float, h: float, content_h: float): bool</code> <em>(method)</em></li>
+<li><code>pub fn end_scroll_area(): nil</code> <em>(method)</em></li>
+<li><code>pub fn set_window_rect(title: str, x: float, y: float, w: float, h: float): nil</code> <em>(method)</em></li>
+<li><code>pub fn begin_window(title: str, default_x: float, default_y: float, default_w: float, default_h: float): bool</code> <em>(method)</em></li>
+<li><code>pub fn end_window(): nil</code> <em>(method)</em></li>
+<li><code>pub fn show_debug_hud(fps: float, dt: float): nil</code> <em>(method)</em></li>
+</ul>
+</div><hr>
+</main>
+</body>
+</html>

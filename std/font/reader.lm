@@ -119,8 +119,8 @@ frame ByteReader {
     pub fn peek_u32(offset: int): int {
         if (offset < 0 or offset + 3 >= self.size) { return 0; }
         return ((self.data[offset] & 0xFF) << 24) |
-               ((self.data[offset + 1] & 0xFF) << 16) |
-               ((self.data[offset + 2] & 0xFF) << 8) |
-               (self.data[offset + 3] & 0xFF);
+        ((self.data[offset + 1] & 0xFF) << 16) |
+        ((self.data[offset + 2] & 0xFF) << 8) |
+        (self.data[offset + 3] & 0xFF);
     }
 }

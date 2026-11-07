@@ -1,4 +1,3 @@
-import tests.modules.mixin_lib show Timestampable, Identifiable;
 
 frame Article {
     mixin Timestampable;

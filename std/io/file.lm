@@ -33,115 +33,115 @@ pub type IOError = FileNotFound | PermissionDenied | DiskFull | NetworkError | U
 /// @example
 /// import std.io.file as file;
 /// var f = file.open("test.txt", "w")? else {
-///     return;
-/// };
-/// f.write("Lymar I/O");
-/// f.close();
-frame File : Disposable {
-    embed res.Reader;
-    embed res.Writer;
+    ///     return;
+    /// };
+    /// f.write("Lymar I/O");
+    /// f.close();
+    frame File : Disposable {
+        embed res.Reader;
+        embed res.Writer;
 
-    pub var path: str;
-    pub var resource: res.Resource;
+        pub var path: str;
+        pub var resource: res.Resource;
 
-    pub init(p: str, r: res.Resource) {
-        self.path = p;
-        self.resource = r;
-    }
-
-    pub deinit() {
-        self.dispose();
-    }
-
-    /// Disposes resources held by the file handle.
-    pub fn dispose(): nil {
-        if (self.resource.is_open_val) {
-            self.close();
+        pub init(p: str, r: res.Resource) {
+            self.path = p;
+            self.resource = r;
         }
-        return nil;
-    }
 
-    /// Reads content from the file stream.
-    ///
-    /// @param args Optional read arguments (e.g. byte limits).
-    /// @return String content or fallible IOError.
-    pub fn read(args: [any] = [] as [any]): any {
-        if (len(args) == 0) {
-            var res_data = rt.call(self.resource.handle, res.OP_READ, []);
-            if (res_data == nil) return err(UnknownError(message="fail"));
-            return ok(res_data as str);
+        pub deinit() {
+            self.dispose();
         }
-        return rt.call(self.resource.handle, res.OP_READ, args);
-    }
 
-    /// Reads raw bytes from the file stream.
-    ///
-    /// @return List of byte integers or fallible IOError.
-    pub fn read_bytes(): [int]?IOError {
-        var res_data = rt.call(self.resource.handle, res.OP_READ_BYTES, []);
-        if (res_data == nil or len(res_data as [int]) == 0) return err(UnknownError(message="empty"));
-        return ok(res_data as [int]);
-    }
-
-    /// Writes data to the file stream.
-    ///
-    /// @pre arg != nil
-    /// @param arg The data string or argument list to write.
-    /// @return Fallible ok(nil) or err(UnknownError).
-    pub fn write(arg: any): any {
-        contract(arg != nil, "Write payload must not be nil");
-        var args_list: [any] = [];
-        if (arg as [any] != nil) {
-            args_list = arg as [any];
-        } else {
-            args_list.append(arg);
-        }
-        var success = rt.call(self.resource.handle, res.OP_WRITE, args_list);
-        if (success == nil) return err(UnknownError(message="fail"));
-        return ok(nil);
-    }
-
-    /// Closes the underlying operating system file resource.
-    ///
-    /// @return Fallible ok(nil) or err(IOError).
-    pub fn close(): nil?IOError {
-        if (self.resource.is_open_val) {
-            rt.destroy(self.resource.handle);
-            self.resource.is_open_val = false;
-        }
-        return ok(nil);
-    }
-
-    /// Checks if the file stream is currently open.
-    ///
-    /// @return True if file handle is open.
-    pub fn is_open(): bool {
-        return self.resource.is_open();
-    }
-}
-
-/// Opens a file at the given path with specified mode ("r", "w", "a", etc.).
-///
-/// @pre len(path) > 0 and len(mode) > 0
-/// @param path The relative or absolute filesystem path.
-/// @param mode File access mode ('r', 'w', 'a', etc.).
-/// @return Fallible File handle or IOError variant.
-///
-/// @example
-/// var file = open("data.txt", "r")? else {
-///     print("Failed to open data.txt");
-///     return;
-/// };
-pub fn open(path: str, mode: str): File?IOError {
-    contract(len(path) > 0, "File path must not be empty");
-    contract(len(mode) > 0, "File mode must not be empty");
-    match (res.open_file(path=path, mode=mode)) {
-        val r => return ok(File(path, r)),
-        err e => {
-            if (mode == "w" or mode == "a") {
-                return err(PermissionDenied(path=path, operation=mode));
+        /// Disposes resources held by the file handle.
+        pub fn dispose(): nil {
+            if (self.resource.is_open_val) {
+                self.close();
             }
-            return err(FileNotFound(path=path));
+            return nil;
+        }
+
+        /// Reads content from the file stream.
+        ///
+        /// @param args Optional read arguments (e.g. byte limits).
+        /// @return String content or fallible IOError.
+        pub fn read(args: [any] = [] as [any]): any {
+            if (len(args) == 0) {
+                var res_data = rt.call(self.resource.handle, res.OP_READ, []);
+                if (res_data == nil) return err(UnknownError(message="fail"));
+                return ok(res_data as str);
+            }
+            return rt.call(self.resource.handle, res.OP_READ, args);
+        }
+
+        /// Reads raw bytes from the file stream.
+        ///
+        /// @return List of byte integers or fallible IOError.
+        pub fn read_bytes(): [int]?IOError {
+            var res_data = rt.call(self.resource.handle, res.OP_READ_BYTES, []);
+            if (res_data == nil or len(res_data as [int]) == 0) return err(UnknownError(message="empty"));
+            return ok(res_data as [int]);
+        }
+
+        /// Writes data to the file stream.
+        ///
+        /// @pre arg != nil
+        /// @param arg The data string or argument list to write.
+        /// @return Fallible ok(nil) or err(UnknownError).
+        pub fn write(arg: any): any {
+            contract(arg != nil, "Write payload must not be nil");
+            var args_list: [any] = [];
+            if (arg as [any] != nil) {
+                args_list = arg as [any];
+            } else {
+                args_list.append(arg);
+            }
+            var success = rt.call(self.resource.handle, res.OP_WRITE, args_list);
+            if (success == nil) return err(UnknownError(message="fail"));
+            return ok(nil);
+        }
+
+        /// Closes the underlying operating system file resource.
+        ///
+        /// @return Fallible ok(nil) or err(IOError).
+        pub fn close(): nil?IOError {
+            if (self.resource.is_open_val) {
+                rt.destroy(self.resource.handle);
+                self.resource.is_open_val = false;
+            }
+            return ok(nil);
+        }
+
+        /// Checks if the file stream is currently open.
+        ///
+        /// @return True if file handle is open.
+        pub fn is_open(): bool {
+            return self.resource.is_open();
         }
     }
-}
+
+    /// Opens a file at the given path with specified mode ("r", "w", "a", etc.).
+    ///
+    /// @pre len(path) > 0 and len(mode) > 0
+    /// @param path The relative or absolute filesystem path.
+    /// @param mode File access mode ('r', 'w', 'a', etc.).
+    /// @return Fallible File handle or IOError variant.
+    ///
+    /// @example
+    /// var file = open("data.txt", "r")? else {
+        ///     print("Failed to open data.txt");
+        ///     return;
+        /// };
+        pub fn open(path: str, mode: str): File?IOError {
+            contract(len(path) > 0, "File path must not be empty");
+            contract(len(mode) > 0, "File mode must not be empty");
+            match (res.open_file(path=path, mode=mode)) {
+                val r => return ok(File(path, r)),
+                err e => {
+                    if (mode == "w" or mode == "a") {
+                        return err(PermissionDenied(path=path, operation=mode));
+                    }
+                    return err(FileNotFound(path=path));
+                }
+            }
+        }

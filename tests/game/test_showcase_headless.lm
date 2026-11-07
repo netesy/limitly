@@ -1,7 +1,6 @@
 // tests/game/test_showcase_headless.lm
 import std.game as game;
 import std.game.types as types;
-import std.gg as gg;
 
 fn test_game_showcase_run() {
     var cfg = game.Config(

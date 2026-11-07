@@ -37,8 +37,8 @@ pub fn icon(glyph: str, size: float = 24.0, color_val: color.Color = color.white
 pub fn icon_button(glyph: str, label: str = "", on_click: any = nil, size: float = 20.0): ui_types.Widget {
     if (len(label) > 0) {
         var row = ui_types.row([
-            icon(glyph, size),
-            ui_types.text(label)
+        icon(glyph, size),
+        ui_types.text(label)
         ]);
         row.spacing_val = 8.0;
         var btn = ui_types.button("").on_click(on_click);

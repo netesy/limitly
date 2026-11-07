@@ -10,7 +10,7 @@ var isActive = true;
 assert(x == 42, "Variable x should be 42");
 assert(y == 3.14, "Variable y should be 3.14");
 assert(name == "Lymar", "Variable name should be 'Lymar'");
-assert(isActive == true, "Variable isActive should be true");
+assert(isActive, "Variable isActive should be true");
 
 print("Integer: {x}");
 print("Float: {y}");
@@ -26,7 +26,7 @@ isActive = false;
 assert(x == 100, "Reassigned x should be 100");
 assert(y == 2.71, "Reassigned y should be 2.71");
 assert(name == "Language", "Reassigned name should be 'Language'");
-assert(isActive == false, "Reassigned isActive should be false");
+assert(not isActive, "Reassigned isActive should be false");
 
 print("After reassignment:");
 print("Integer: {x}");

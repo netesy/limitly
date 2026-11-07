@@ -83,15 +83,15 @@ print("Final worker count: {worker_count}");
 // var simple_channel = channel();
 
 // concurrent {
-//     worker(item) {
-//         simple_channel.send("Simple worker: {item}");  // Channel communication only
-//     }
-// }
+    //     worker(item) {
+        //         simple_channel.send("Simple worker: {item}");  // Channel communication only
+        //     }
+        // }
 
-// simple_channel.send("test");
+        // simple_channel.send("test");
 
-// iter (result in simple_channel) {
-//     print("Simple result: {result}");
-// }
+        // iter (result in simple_channel) {
+            //     print("Simple result: {result}");
+            // }
 
-print("Smoke test finished successfully");
+            print("Smoke test finished successfully");

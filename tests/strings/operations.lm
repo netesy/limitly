@@ -9,7 +9,7 @@ assert(str1 == "Hello", "str1 should be 'Hello'");
 assert(str2 == "World", "str2 should be 'World'");
 assert(space == " ", "space should be a single space");
 
-// String concatenation 
+// String concatenation
 var concat = str1 + space + str2;
 print("Concatenation: {str1} + {space} + {str2} = {concat}");
 assert(concat == "Hello World", "String concatenation should work");
@@ -22,8 +22,8 @@ var neResult = str1 != str2;
 print("{str1} == {str2}: {eqResult}");
 print("{str1} != {str2}: {neResult}");
 
-assert(eqResult == false, "'Hello' should not equal 'World'");
-assert(neResult == true, "'Hello' should not equal 'World' (not equal)");
+assert(not eqResult, "'Hello' should not equal 'World'");
+assert(neResult, "'Hello' should not equal 'World' (not equal)");
 
 // String with numbers
 var numStr:str = "42";
@@ -31,7 +31,7 @@ var num:int = 42;
 var strNumEq = numStr == num;
 
 print("String vs number: {numStr} == {num}: {strNumEq}");
-assert(strNumEq == false, "String '42' should not equal number 42");
+assert(not strNumEq, "String '42' should not equal number 42");
 
 // Empty strings
 var empty = "";
@@ -41,7 +41,7 @@ var emptyEq = empty == emptyStr;
 print("Empty string: '{empty}'");
 print("Empty length check: {emptyEq}");
 assert(empty == "", "Empty string should be empty");
-assert(emptyEq == true, "Two empty strings should be equal");
+assert(emptyEq, "Two empty strings should be equal");
 
 // Special characters
 var special = "Line 1\nLine 2\tTabbed";

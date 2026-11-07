@@ -16,7 +16,7 @@ print("PASS: Completed 100 function calls without memory issues");
 // Test 2: Nested function calls
 print("Test 2: Nested function calls");
 var nested_result = math_module.multiply(
-    math_module.add(5, 3), 
+    math_module.add(5, 3),
     math_module.subtract(10, 2)
 );
 print("Nested result: {nested_result}"); // Should be (5+3) * (10-2) = 8 * 8 = 64

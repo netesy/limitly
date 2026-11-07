@@ -1,9 +1,6 @@
 // tests/game/test_responsive_resize.lm
 import std.game as game;
-import std.game.types as types;
-import std.gg as gg;
 import std.ui as ui;
-import std.app as app;
 
 fn test_game_resize() {
     var cfg = game.Config(

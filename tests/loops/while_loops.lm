@@ -99,6 +99,6 @@ while (flag) {
     print("Boolean iteration: {boolCount}");
 }
 assert(boolCount == 4, "Boolean while should iterate 4 times");
-assert(flag == false, "Flag should be false at end");
+assert(not flag, "Flag should be false at end");
 
 print("=== While Loop Tests Complete ===");

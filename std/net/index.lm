@@ -9,41 +9,41 @@
 // @example
 // import std.net as net;
 // var ip = net.resolve("example.com")? else {
-//     print("DNS lookup failed");
-//     return;
-// };
-// print("Resolved: {ip}");
+    //     print("DNS lookup failed");
+    //     return;
+    // };
+    // print("Resolved: {ip}");
 
-pub import std.net.tcp as tcp;
-pub import std.net.udp as udp;
-pub import std.net.dns as dns;
-pub import std.net.tls as tls;
+    pub import std.net.tcp as tcp;
+    pub import std.net.udp as udp;
+    pub import std.net.dns as dns;
+    pub import std.net.tls as tls;
 
-// Re-export key frames and functions at the net namespace level
-// TCP
-pub import std.net.tcp show Socket, Server;
+    // Re-export key frames and functions at the net namespace level
+    // TCP
+    pub import std.net.tcp show Socket, Server;
 
-// UDP
-pub import std.net.udp show UDP;
+    // UDP
+    pub import std.net.udp show UDP;
 
-// DNS
-pub import std.net.dns show DNS, Resolver, DNSRecord, resolve, lookup, reverse_lookup, is_ipv4, is_ipv6, is_ip;
+    // DNS
+    pub import std.net.dns show DNS, Resolver, DNSRecord, resolve, lookup, reverse_lookup, is_ipv4, is_ipv6, is_ip;
 
-// TLS
-pub import std.net.tls show TLSConfig, TLSSocket;
+    // TLS
+    pub import std.net.tls show TLSConfig, TLSSocket;
 
-/// Establishes an encrypted TLS client connection to the specified host and port.
-///
-/// @tip Always specify a hostname rather than a raw IP to ensure SNI certificate validation succeeds.
-/// @warning Connecting with disabled verification exposes connections to man-in-the-middle attacks.
-///
-/// @pre len(host) > 0 and port > 0 and port <= 65535
-/// @param host Target server domain name or IP address.
-/// @param port Target TCP port number (1-65535).
-/// @param cfg Optional custom TLSConfig instance.
-/// @return Connected TLSSocket, or err(Error).
-pub fn connect_tls(host: str, port: int, cfg: tls.TLSConfig = nil): tls.TLSSocket? {
-    contract(len(host) > 0, "TLS target host must not be empty");
-    contract(port > 0 and port <= 65535, "Port must be in valid range 1-65535");
-    return tls.connect(host, port, cfg);
-}
+    /// Establishes an encrypted TLS client connection to the specified host and port.
+    ///
+    /// @tip Always specify a hostname rather than a raw IP to ensure SNI certificate validation succeeds.
+    /// @warning Connecting with disabled verification exposes connections to man-in-the-middle attacks.
+    ///
+    /// @pre len(host) > 0 and port > 0 and port <= 65535
+    /// @param host Target server domain name or IP address.
+    /// @param port Target TCP port number (1-65535).
+    /// @param cfg Optional custom TLSConfig instance.
+    /// @return Connected TLSSocket, or err(Error).
+    pub fn connect_tls(host: str, port: int, cfg: tls.TLSConfig = nil): tls.TLSSocket? {
+        contract(len(host) > 0, "TLS target host must not be empty");
+        contract(port > 0 and port <= 65535, "Port must be in valid range 1-65535");
+        return tls.connect(host, port, cfg);
+    }

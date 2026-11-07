@@ -189,210 +189,210 @@ fn service_row(name: str, status: str, version: str, region: str, is_healthy: in
     if (is_healthy == 0) {
         status_bg = color.rgb(75, 55, 20);
         status_fg = color.rgb(255, 210, 80);
-        }
-
-        return ui.row([
-        ui.text(name)
-        .font_size(13.0)
-        .bold()
-        .color(color.white)
-        .width(180.0),
-        ui.badge(status).background(status_bg).foreground(status_fg),
-        ui.spacer(),
-        ui.badge(version).background(color.rgb(35, 45, 65)).foreground(color.rgb(130, 180, 255)),
-        ui.spacer(),
-        ui.badge(region).background(color.rgb(35, 38, 48)).foreground(color.gray),
-        ui.spacer(),
-        ui.button("Restart", on_sync)
-        .background(color.rgb(45, 48, 60))
-        .foreground(color.light_gray)
-        .padding_xy(10.0, 4.0)
-        .corner_radius(4.0)
-        ]).spacing(8.0);
     }
 
-    // TAB 1: Microservices Catalog Page
-    fn build_microservices_page(): ui.Widget {
-        var card_style = ui.style()
-        .background(color.rgb(24, 26, 34))
-        .padding(14.0)
-        .corner_radius(8.0)
-        .spacing(10.0);
+    return ui.row([
+    ui.text(name)
+    .font_size(13.0)
+    .bold()
+    .color(color.white)
+    .width(180.0),
+    ui.badge(status).background(status_bg).foreground(status_fg),
+    ui.spacer(),
+    ui.badge(version).background(color.rgb(35, 45, 65)).foreground(color.rgb(130, 180, 255)),
+    ui.spacer(),
+    ui.badge(region).background(color.rgb(35, 38, 48)).foreground(color.gray),
+    ui.spacer(),
+    ui.button("Restart", on_sync)
+    .background(color.rgb(45, 48, 60))
+    .foreground(color.light_gray)
+    .padding_xy(10.0, 4.0)
+    .corner_radius(4.0)
+    ]).spacing(8.0);
+}
 
-        var filter_bar = ui.row([
-        ui.text("Filter: ").color(color.light_gray),
-        ui.input("payments", "Search microservice...", on_search_changed).width(200.0),
-        ui.spacer(),
-        ui.badge("4 SERVICES MONITORED").background(color.rgb(35, 50, 70)).foreground(color.rgb(140, 200, 255))
-        ]).spacing(8.0);
+// TAB 1: Microservices Catalog Page
+fn build_microservices_page(): ui.Widget {
+    var card_style = ui.style()
+    .background(color.rgb(24, 26, 34))
+    .padding(14.0)
+    .corner_radius(8.0)
+    .spacing(10.0);
 
-        var list = ui.column([
-        service_row("payments - api - v2", "ONLINE", "v2.4.0", "us - east - 1", 1),
-        service_row("auth0 - gateway", "ONLINE", "v1.9.3", "eu - west - 1", 1),
-        service_row("kafka - event - mesh", "DEGRADED", "v3.1.0", "ap - northeast", 0),
-        service_row("prom - telemetry", "ONLINE", "v2.8.2", "global", 1)
-        ]).spacing(10.0);
+    var filter_bar = ui.row([
+    ui.text("Filter: ").color(color.light_gray),
+    ui.input("payments", "Search microservice...", on_search_changed).width(200.0),
+    ui.spacer(),
+    ui.badge("4 SERVICES MONITORED").background(color.rgb(35, 50, 70)).foreground(color.rgb(140, 200, 255))
+    ]).spacing(8.0);
 
-        return ui.column([
-        filter_bar,
-        list
-        ]).style(card_style);
-    }
+    var list = ui.column([
+    service_row("payments - api - v2", "ONLINE", "v2.4.0", "us - east - 1", 1),
+    service_row("auth0 - gateway", "ONLINE", "v1.9.3", "eu - west - 1", 1),
+    service_row("kafka - event - mesh", "DEGRADED", "v3.1.0", "ap - northeast", 0),
+    service_row("prom - telemetry", "ONLINE", "v2.8.2", "global", 1)
+    ]).spacing(10.0);
 
-    // TAB 2: Live Telemetry Page (Scissor Clipped Scroll View)
-    fn build_telemetry_page(): ui.Widget {
-        var card_style = ui.style()
-        .background(color.rgb(22, 24, 30))
-        .padding(12.0)
-        .corner_radius(8.0)
-        .spacing(6.0);
+    return ui.column([
+    filter_bar,
+    list
+    ]).style(card_style);
+}
 
-        var top_bar = ui.row([
-        ui.text("Real - Time Cluster Telemetry Feed")
-        .font_size(13.0)
-        .bold()
-        .color(color.light_gray),
-        ui.spacer(),
-        ui.badge("SCISSOR CLIPPED").background(color.rgb(30, 60, 90)).foreground(color.rgb(120, 200, 255)),
-        ui.badge("LIVE STREAM").background(color.rgb(25, 75, 45)).foreground(color.rgb(90, 240, 140))
-        ]).spacing(8.0);
+// TAB 2: Live Telemetry Page (Scissor Clipped Scroll View)
+fn build_telemetry_page(): ui.Widget {
+    var card_style = ui.style()
+    .background(color.rgb(22, 24, 30))
+    .padding(12.0)
+    .corner_radius(8.0)
+    .spacing(6.0);
 
-        var logs = [
-        ui.text("[13: 50: 02] [INFO] Deployment b72ef1 verified on 12 edge nodes - HTTP / 3 enabled").color(color.rgb(140, 210, 160)),
-        ui.text("[13: 50: 18] [SEC] Autonomous TLS certificate renewal confirmed (0 ms downtime)").color(color.rgb(160, 190, 240)),
-        ui.text("[13: 50: 31] [METR] Prometheus metrics exporter heartbeat ACK received on: 9090").color(color.gray),
-        ui.text("[13: 50: 44] [POD] Pod worker - node - us - east - 8 auto - healed after healthcheck timeout").color(color.rgb(255, 200, 100)),
-        ui.text("[13: 51: 02] [NET] BGP anycast route converged across 34 points of presence").color(color.rgb(140, 210, 160)),
-        ui.text("[13: 51: 15] [AUTH] mTLS mutual authentication handshake success (auth0 - gateway)").color(color.rgb(160, 190, 240)),
-        ui.text("[13: 51: 28] [DB] Read replica replication lag < 4ms across cross - region VPC").color(color.gray),
-        ui.text("[13: 51: 40] [CDN] Edge cache hit ratio reached 98.6 % on static assets bucket").color(color.rgb(140, 210, 160)),
-        ui.text("[13: 51: 55] [SYS] Kernel eBPF packet filter rules updated without packet drop").color(color.rgb(160, 190, 240)),
-        ui.text("[13: 52: 10] [ALERT] Spike in queries absorbed by horizontal autoscale pool").color(color.rgb(255, 140, 120)),
-        ui.text("[13: 52: 25] [SYNC] Distributed consensus quorum acknowledged in epoch #4912").color(color.rgb(160, 190, 240)),
-        ui.text("[13: 52: 40] [MESH] Envoy proxy sidecar memory stabilized at 18.4 MB").color(color.gray),
-        ui.text("[13: 52: 55] [HEAL] Node pool cordon lifted automatically on us - east - prod - 1").color(color.rgb(140, 210, 160)),
-        ui.text("[13: 53: 10] [RATE] Token bucket rate limiter allowed 42, 900 req / sec sustained").color(color.rgb(160, 190, 240)),
-        ui.text("[13: 53: 25] [DONE] Telemetry buffer flushed cleanly to persistent storage").color(color.rgb(140, 210, 160))
-        ];
+    var top_bar = ui.row([
+    ui.text("Real - Time Cluster Telemetry Feed")
+    .font_size(13.0)
+    .bold()
+    .color(color.light_gray),
+    ui.spacer(),
+    ui.badge("SCISSOR CLIPPED").background(color.rgb(30, 60, 90)).foreground(color.rgb(120, 200, 255)),
+    ui.badge("LIVE STREAM").background(color.rgb(25, 75, 45)).foreground(color.rgb(90, 240, 140))
+    ]).spacing(8.0);
 
-        // Scissor clipped scroll container (190px high)
-        var log_scroll = ui.scroll(ui.column(logs).spacing(6.0)).height(190.0);
+    var logs = [
+    ui.text("[13: 50: 02] [INFO] Deployment b72ef1 verified on 12 edge nodes - HTTP / 3 enabled").color(color.rgb(140, 210, 160)),
+    ui.text("[13: 50: 18] [SEC] Autonomous TLS certificate renewal confirmed (0 ms downtime)").color(color.rgb(160, 190, 240)),
+    ui.text("[13: 50: 31] [METR] Prometheus metrics exporter heartbeat ACK received on: 9090").color(color.gray),
+    ui.text("[13: 50: 44] [POD] Pod worker - node - us - east - 8 auto - healed after healthcheck timeout").color(color.rgb(255, 200, 100)),
+    ui.text("[13: 51: 02] [NET] BGP anycast route converged across 34 points of presence").color(color.rgb(140, 210, 160)),
+    ui.text("[13: 51: 15] [AUTH] mTLS mutual authentication handshake success (auth0 - gateway)").color(color.rgb(160, 190, 240)),
+    ui.text("[13: 51: 28] [DB] Read replica replication lag < 4ms across cross - region VPC").color(color.gray),
+    ui.text("[13: 51: 40] [CDN] Edge cache hit ratio reached 98.6 % on static assets bucket").color(color.rgb(140, 210, 160)),
+    ui.text("[13: 51: 55] [SYS] Kernel eBPF packet filter rules updated without packet drop").color(color.rgb(160, 190, 240)),
+    ui.text("[13: 52: 10] [ALERT] Spike in queries absorbed by horizontal autoscale pool").color(color.rgb(255, 140, 120)),
+    ui.text("[13: 52: 25] [SYNC] Distributed consensus quorum acknowledged in epoch #4912").color(color.rgb(160, 190, 240)),
+    ui.text("[13: 52: 40] [MESH] Envoy proxy sidecar memory stabilized at 18.4 MB").color(color.gray),
+    ui.text("[13: 52: 55] [HEAL] Node pool cordon lifted automatically on us - east - prod - 1").color(color.rgb(140, 210, 160)),
+    ui.text("[13: 53: 10] [RATE] Token bucket rate limiter allowed 42, 900 req / sec sustained").color(color.rgb(160, 190, 240)),
+    ui.text("[13: 53: 25] [DONE] Telemetry buffer flushed cleanly to persistent storage").color(color.rgb(140, 210, 160))
+    ];
 
-        return ui.column([
-        top_bar,
-        log_scroll
-        ]).style(card_style);
-    }
+    // Scissor clipped scroll container (190px high)
+    var log_scroll = ui.scroll(ui.column(logs).spacing(6.0)).height(190.0);
 
-    // TAB 3: Settings & Tools Page (Select, Checkboxes, Slider, Open Window)
-    fn build_settings_page(): ui.Widget {
-        var card_style = ui.style()
-        .background(color.rgb(24, 26, 34))
-        .padding(14.0)
-        .corner_radius(8.0)
-        .spacing(12.0);
+    return ui.column([
+    top_bar,
+    log_scroll
+    ]).style(card_style);
+}
 
-        var region_row = ui.row([
-        ui.text("Target Region / Environment: ").color(color.white).width(200.0),
-        ui.select([
-        "US - East (N. Virginia)",
-        "EU - Central (Frankfurt)",
-        "AP - East (Tokyo)",
-        "Global Multi - Cloud"
-        ], 0, on_region_changed).width(220.0),
-        ui.spacer(),
-        ui.badge("ACTIVE ENV").background(color.indigo).foreground(color.white)
-        ]).spacing(10.0);
+// TAB 3: Settings & Tools Page (Select, Checkboxes, Slider, Open Window)
+fn build_settings_page(): ui.Widget {
+    var card_style = ui.style()
+    .background(color.rgb(24, 26, 34))
+    .padding(14.0)
+    .corner_radius(8.0)
+    .spacing(12.0);
 
-        var toggle_row = ui.row([
-        ui.text("Autonomous Scale: ").color(color.light_gray),
-        ui.checkbox(true, on_autoscale_toggled),
-        ui.spacer(),
-        ui.text("Zero - Downtime Rolling: ").color(color.light_gray),
-        ui.checkbox(true, on_rolling_toggled),
-        ui.spacer(),
-        ui.text("Replicas (1..20): ").color(color.light_gray),
-        ui.slider(8.0, 1.0, 20.0, on_replica_slider).width(120.0)
-        ]).spacing(8.0);
+    var region_row = ui.row([
+    ui.text("Target Region / Environment: ").color(color.white).width(200.0),
+    ui.select([
+    "US - East (N. Virginia)",
+    "EU - Central (Frankfurt)",
+    "AP - East (Tokyo)",
+    "Global Multi - Cloud"
+    ], 0, on_region_changed).width(220.0),
+    ui.spacer(),
+    ui.badge("ACTIVE ENV").background(color.indigo).foreground(color.white)
+    ]).spacing(10.0);
 
-        var diagnostics_row = ui.row([
-        ui.column([
-        ui.text("System Diagnostics & Telemetry")
-        .font_size(13.0)
-        .bold()
-        .color(color.white),
-        ui.text("Collects real - time engine telemetry, scissor clipping state, and event loop metrics.")
-        .font_size(11.0)
-        .color(color.gray)
-        ]),
-        ui.spacer(),
-        ui.button("Run Diagnostics", on_sync)
-        .background(color.indigo)
-        .foreground(color.white)
-        .padding_xy(16.0, 8.0)
-        .corner_radius(6.0)
-        ]).spacing(12.0);
+    var toggle_row = ui.row([
+    ui.text("Autonomous Scale: ").color(color.light_gray),
+    ui.checkbox(true, on_autoscale_toggled),
+    ui.spacer(),
+    ui.text("Zero - Downtime Rolling: ").color(color.light_gray),
+    ui.checkbox(true, on_rolling_toggled),
+    ui.spacer(),
+    ui.text("Replicas (1..20): ").color(color.light_gray),
+    ui.slider(8.0, 1.0, 20.0, on_replica_slider).width(120.0)
+    ]).spacing(8.0);
 
-        return ui.column([
-        region_row,
-        toggle_row,
-        diagnostics_row
-        ]).style(card_style);
-    }
+    var diagnostics_row = ui.row([
+    ui.column([
+    ui.text("System Diagnostics & Telemetry")
+    .font_size(13.0)
+    .bold()
+    .color(color.white),
+    ui.text("Collects real - time engine telemetry, scissor clipping state, and event loop metrics.")
+    .font_size(11.0)
+    .color(color.gray)
+    ]),
+    ui.spacer(),
+    ui.button("Run Diagnostics", on_sync)
+    .background(color.indigo)
+    .foreground(color.white)
+    .padding_xy(16.0, 8.0)
+    .corner_radius(6.0)
+    ]).spacing(12.0);
 
-    // Footer Component
-    fn build_footer(): ui.Widget {
-        return ui.row([
-        ui.text("Lymar Engine v1.0 - Software Framebuffer - Scissor Clipped Retained Canvas")
-        .font_size(11.0)
-        .color(color.gray),
-        ui.spacer(),
-        ui.text("Memory: 14.2 MB | Ready")
-        .font_size(11.0)
-        .color(color.gray)
-        ]);
-    }
+    return ui.column([
+    region_row,
+    toggle_row,
+    diagnostics_row
+    ]).style(card_style);
+}
 
-    // App Root View
-    fn build_app_view(): ui.Widget {
-        var titles = ["Overview", "Microservices", "Live Telemetry", "Settings & Tools"];
-        var pages = [
-        build_overview_page(),
-        build_microservices_page(),
-        build_telemetry_page(),
-        build_settings_page()
-        ];
+// Footer Component
+fn build_footer(): ui.Widget {
+    return ui.row([
+    ui.text("Lymar Engine v1.0 - Software Framebuffer - Scissor Clipped Retained Canvas")
+    .font_size(11.0)
+    .color(color.gray),
+    ui.spacer(),
+    ui.text("Memory: 14.2 MB | Ready")
+    .font_size(11.0)
+    .color(color.gray)
+    ]);
+}
 
-        var tab_container = ui.tabs(titles, pages, 0, on_tab_switch);
+// App Root View
+fn build_app_view(): ui.Widget {
+    var titles = ["Overview", "Microservices", "Live Telemetry", "Settings & Tools"];
+    var pages = [
+    build_overview_page(),
+    build_microservices_page(),
+    build_telemetry_page(),
+    build_settings_page()
+    ];
 
-        var page = ui.column([
-        build_header(),
-        tab_container,
-        build_footer()
-        ])
-        .spacing(12.0)
-        .padding(14.0);
-        // Root overflow is explicit in v1: applications wrap oversized content in
-        // Scroll rather than relying on an implicit root scrolling policy.
-        return ui.scroll(page);
-    }
+    var tab_container = ui.tabs(titles, pages, 0, on_tab_switch);
 
-    fn main() {
-        print(" === Launching Lymar Studio - Modern Cloud Console Showcase === ");
+    var page = ui.column([
+    build_header(),
+    tab_container,
+    build_footer()
+    ])
+    .spacing(12.0)
+    .padding(14.0);
+    // Root overflow is explicit in v1: applications wrap oversized content in
+    // Scroll rather than relying on an implicit root scrolling policy.
+    return ui.scroll(page);
+}
 
-        var cfg = app.default_window_config();
-        cfg.title = "Lymar Studio - Cloud Infrastructure Console";
-        cfg.width = 820;
-        cfg.height = 620;
+fn main() {
+    print(" === Launching Lymar Studio - Modern Cloud Console Showcase === ");
 
-        assert(app.init(cfg) == 1, "app init failed");
+    var cfg = app.default_window_config();
+    cfg.title = "Lymar Studio - Cloud Infrastructure Console";
+    cfg.width = 820;
+    cfg.height = 620;
 
-        var root = build_app_view();
-        app.ui(root);
+    assert(app.init(cfg) == 1, "app init failed");
 
-        print("Running application main loop...");
-        app.run();
+    var root = build_app_view();
+    app.ui(root);
 
-        app.shutdown();
-        print("Lymar Studio shutdown successfully.");
-    }
+    print("Running application main loop...");
+    app.run();
+
+    app.shutdown();
+    print("Lymar Studio shutdown successfully.");
+}

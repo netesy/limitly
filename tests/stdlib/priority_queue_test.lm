@@ -18,7 +18,7 @@ fn main(): int {
     p.push(5);
     p.push(20);
     p.push(1);
-    
+
     assert(p.length() == 4, "PriorityQueue length should be 4");
     assert(p.peek() == 1, "Peek should return 1 (min)");
     assert(p.pop() == 1, "Pop should return 1");
@@ -26,14 +26,14 @@ fn main(): int {
     assert(p.pop() == 10, "Pop should return 10");
     assert(p.pop() == 20, "Pop should return 20");
     assert(p.pop() == nil, "Pop on empty PQ should return nil");
-    
+
     // Custom comparator (Max-heap)
     var pmax: pq.PriorityQueue(int) = pq.PriorityQueue(cmp_max);
     pmax.push(10);
     pmax.push(5);
     pmax.push(20);
     assert(pmax.peek() == 20, "Max-heap peek should be 20");
-    
+
     print("PriorityQueue tests passed!");
     return 0;
 }

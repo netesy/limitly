@@ -9,15 +9,15 @@
 /// @example
 /// ```lymar
 /// frame UserKey : Hashable {
-///     pub id: int;
-///     pub fn hash(): int {
-///         return self.id;
-///     }
-/// }
-/// ```
-trait Hashable {
-    /// Computes a hash code representation for the object.
-    ///
-    /// @return 64-bit integer hash code.
-    fn hash(): int;
-}
+    ///     pub id: int;
+    ///     pub fn hash(): int {
+        ///         return self.id;
+        ///     }
+        /// }
+        /// ```
+        trait Hashable {
+            /// Computes a hash code representation for the object.
+            ///
+            /// @return 64-bit integer hash code.
+            fn hash(): int;
+        }

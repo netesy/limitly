@@ -24,8 +24,8 @@ fn test_showcase_headless() {
     var bdg = ui.badge("HEALTHY").background(color.green).foreground(color.white);
 
     var root = ui.column([
-        ui.row([bdg, sel]),
-        tv
+    ui.row([bdg, sel]),
+    tv
     ]);
 
     app.ui(root);

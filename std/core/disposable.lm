@@ -7,16 +7,16 @@
 /// @example
 /// ```lymar
 /// frame FileStream : Disposable {
-///     pub handle: int;
-///     pub fn dispose(): nil {
-///         if (self.handle != 0) {
-///             // close handle
-///             self.handle = 0;
-///         }
-///     }
-/// }
-/// ```
-trait Disposable {
-    /// Deterministically releases underlying resources held by the object.
-    fn dispose(): nil;
-}
+    ///     pub handle: int;
+    ///     pub fn dispose(): nil {
+        ///         if (self.handle != 0) {
+            ///             // close handle
+            ///             self.handle = 0;
+            ///         }
+            ///     }
+            /// }
+            /// ```
+            trait Disposable {
+                /// Deterministically releases underlying resources held by the object.
+                fn dispose(): nil;
+            }

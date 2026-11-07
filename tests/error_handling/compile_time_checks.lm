@@ -86,13 +86,13 @@ fn unknownErrorType(): int?UnknownError {
 
 // Test 13: Type mismatch in error union assignment
 fn typeMismatch(): nil {
-    var x: int?DivisionByZero = "hello";  // Should fail - string not compatible with int?DivisionByZero
+    var _x: int?DivisionByZero = "hello";  // Should fail - string not compatible with int?DivisionByZero
 }
 
 // Test 14: Correct error union assignment
 fn correctAssignment(): nil {
-    var x: int?DivisionByZero = ok(42);  // Should work
-    var y: int?DivisionByZero = err(DivisionByZero);  // Should work
+    var _x: int?DivisionByZero = ok(42);  // Should work
+    var _y: int?DivisionByZero = err(DivisionByZero);  // Should work
 }
 
 // Test 15: Function call with wrong argument types
@@ -103,12 +103,12 @@ fn wrongArguments(): nil {
 // Main function to test the error handling
 fn main(): nil {
     print("Testing compile-time error checking");
-    
+
     // These should work
-    var result1 = safeDivide(10, 2);
-    var result2 = properlyHandled(10, 0);
-    var result3 = handleMultiple(50);
-    
+    var _result1 = safeDivide(10, 2);
+    var _result2 = properlyHandled(10, 0);
+    var _result3 = handleMultiple(50);
+
     // Test proper error handling
     match (divide(10, 0)) {
         val result => print("Result: ", result);

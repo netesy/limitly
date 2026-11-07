@@ -3,7 +3,7 @@
 frame ManagedFrame {
     pub data: {str: any};
     pub value: int;
-    
+
     pub init(d: {str: any}, v: int) {
         self.data = d;
         self.value = v;
@@ -14,12 +14,12 @@ frame ManagedFrame {
 frame DeinitFrame {
     pub name: str;
     pub flag: bool;
-    
+
     pub init(n: str, f: bool) {
         self.name = n;
         self.flag = f;
     }
-    
+
     pub deinit() {
         print("DeinitFrame.deinit called for: {self.name}");
     }
@@ -33,10 +33,10 @@ fn create_nested_structure(v: int): ManagedFrame {
     var d = {} as {str: any};
     d["num"] = v;
     d["sub"] = {} as {str: any};
-    
+
     var sub_dict = d["sub"] as {str: any};
     sub_dict["hello"] = "world";
-    
+
     var frame_inst = ManagedFrame(d, 42);
     return frame_inst;
 }
@@ -44,11 +44,11 @@ fn create_nested_structure(v: int): ManagedFrame {
 fn test_early_return(cond: bool): {str: any} {
     var dict = {} as {str: any};
     dict["key"] = "test";
-    
-    if (cond == true) {
+
+    if (cond) {
         return dict; // Escapes, survives
     }
-    
+
     // Fallthrough: dict goes out of scope and gets reclaimed
     return {} as {str: any};
 }
@@ -56,13 +56,13 @@ fn test_early_return(cond: bool): {str: any} {
 fn test_nested_regions() {
     var outer_dict = {} as {str: any};
     outer_dict["level"] = "outer";
-    
+
     {
         var inner_dict = {} as {str: any};
         inner_dict["level"] = "inner";
         outer_dict["inner_ref"] = inner_dict; // Transfers ownership to outer_dict, escapes inner block exit
     }
-    
+
     var retrieved_inner = outer_dict["inner_ref"] as {str: any};
     assert(retrieved_inner["level"] == "inner", "Nested region escape failed");
 }
@@ -73,9 +73,9 @@ fn main() {
     // 1. Primitives (Verify basic types work with copy semantics)
     var a = 42;
     var b = true;
-    var c = 3.14;
+    var _c = 3.14;
     assert(a == 42, "Primitive integer mismatch");
-    assert(b == true, "Primitive boolean mismatch");
+    assert(b, "Primitive boolean mismatch");
 
     // 2. Local Strings
     var s = create_local_string();
@@ -90,7 +90,7 @@ fn main() {
     // 4. Frames and Deinitializers
     {
         var df = DeinitFrame("TempObject", true);
-        assert(df.flag == true, "Frame field access failed");
+        assert(df.flag, "Frame field access failed");
         // df deinitializer is implicitly called at block scope exit
     }
 
@@ -103,7 +103,7 @@ fn main() {
     // 6. Early and Conditional Returns
     var r1 = test_early_return(true);
     assert(r1["key"] == "test", "Early return escape failed");
-    
+
     var r2 = test_early_return(false);
     assert(r2["key"] == nil, "Fallthrough deallocation failure");
 
@@ -120,7 +120,7 @@ fn main() {
         var temp_frame = create_nested_structure(i);
         var temp_data = temp_frame.data;
         assert(temp_data["num"] == i, "Stress loop validation failed");
-        
+
         i = i + 1;
     }
     print("Stress loop completed successfully!");

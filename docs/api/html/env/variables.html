@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>variables.lm - Lymar API Reference</title>
+<style>
+:root {
+  --bg-primary: #0a0e17;
+  --bg-secondary: #111827;
+  --bg-tertiary: #1f2937;
+  --accent: #38bdf8;
+  --accent-hover: #7dd3fc;
+  --text-main: #f1f5f9;
+  --text-muted: #94a3b8;
+  --border-color: #334155;
+}
+* { box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif;
+  margin: 0; padding: 0; background: var(--bg-primary); color: var(--text-main); display: flex;
+}
+nav {
+  width: 300px; height: 100vh; overflow-y: auto; background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color); padding: 24px 20px; position: fixed;
+}
+nav h2 { font-size: 1.15rem; color: var(--accent); margin-top: 0; margin-bottom: 16px; font-weight: 700; }
+#search-input {
+  width: 100%; padding: 8px 12px; background: var(--bg-tertiary); border: 1px solid var(--border-color);
+  border-radius: 6px; color: #fff; font-size: 0.85rem; margin-bottom: 16px;
+}
+#search-input:focus { outline: none; border-color: var(--accent); }
+.nav-link { display: block; color: var(--text-muted); text-decoration: none; padding: 6px 8px; font-size: 0.9rem; border-radius: 4px; }
+.nav-link:hover { color: #fff; background: var(--bg-tertiary); }
+main { margin-left: 300px; padding: 40px 48px; max-width: 950px; flex: 1; }
+h1 { color: #fff; font-size: 2.2rem; margin-top: 0; padding-bottom: 16px; border-bottom: 1px solid var(--border-color); }
+h2 { color: var(--accent); font-size: 1.4rem; margin-top: 36px; margin-bottom: 14px; }
+h3 { color: #fff; font-size: 1.25rem; margin-top: 28px; margin-bottom: 12px; display: flex; align-items: center; gap: 10px; }
+h4 { color: var(--accent); font-size: 1rem; margin-top: 20px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+.badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
+.badge-pub { background: #064e3b; color: #6ee7b7; border: 1px solid #059669; }
+.badge-private { background: #334155; color: #cbd5e1; }
+.badge-type { background: #1e1b4b; color: #c7d2fe; border: 1px solid #4338ca; }
+.code-sig { background: #090d16; border: 1px solid var(--border-color); padding: 14px 18px; border-radius: 8px; overflow-x: auto; font-family: 'Consolas', 'Fira Code', monospace; font-size: 0.95rem; color: #e2e8f0; }
+.summary { color: #cbd5e1; line-height: 1.65; margin: 14px 0; font-size: 1rem; }
+/* Callout styling */
+.callout { margin: 16px 0; padding: 14px 18px; border-radius: 8px; border-left: 4px solid; font-size: 0.92rem; }
+.callout-header { font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+.callout-tip { border-color: #10b981; background: rgba(16, 185, 129, 0.08); color: #d1fae5; }
+.callout-tip .callout-header { color: #34d399; }
+.callout-warning { border-color: #f59e0b; background: rgba(245, 158, 11, 0.08); color: #fef3c7; }
+.callout-warning .callout-header { color: #fbbf24; }
+.callout-note { border-color: #0284c7; background: rgba(2, 132, 199, 0.08); color: #e0f2fe; }
+.callout-note .callout-header { color: #38bdf8; }
+.callout-deprecated { border-color: #e11d48; background: rgba(225, 29, 72, 0.08); color: #ffe4e6; }
+.callout-deprecated .callout-header { color: #fb7185; }
+/* Example card */
+.example-card { margin: 20px 0; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: #080c14; }
+.example-header { background: #162032; padding: 8px 16px; font-size: 0.82rem; font-weight: 700; color: #94a3b8; border-bottom: 1px solid var(--border-color); }
+.example-card pre { margin: 0; padding: 14px 18px; overflow-x: auto; font-family: monospace; font-size: 0.92rem; color: #e2e8f0; }
+/* Tables */
+table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 0.92rem; }
+th { background: #162032; color: #94a3b8; text-align: left; padding: 10px 14px; font-weight: 600; border-bottom: 1px solid var(--border-color); }
+td { padding: 10px 14px; border-bottom: 1px solid #1e293b; color: #cbd5e1; }
+ul { padding-left: 20px; color: #cbd5e1; line-height: 1.6; }
+hr { border: 0; border-top: 1px solid var(--border-color); margin: 36px 0; }
+</style>
+<script>
+function filterNav() {
+  var q = document.getElementById('search-input').value.toLowerCase();
+  var links = document.querySelectorAll('.nav-link');
+  links.forEach(function(l) {
+    l.style.display = l.textContent.toLowerCase().includes(q) ? 'block' : 'none';
+  });
+}
+</script>
+</head>
+<body>
+<nav>
+<h2>variables.lm</h2>
+<input type="text" id="search-input" placeholder="Filter symbols..." oninput="filterNav()">
+<div id="nav-list">
+<a class="nav-link" href="#get">get <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#get_or">get_or <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#has">has <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#contains">contains <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#get_int">get_int <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#get_bool">get_bool <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#set">set <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#unset">unset <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#vars">vars <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#to_dict">to_dict <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#keys">keys <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#values">values <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#parse_env">parse_env <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#load_dotenv">load_dotenv <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#load_file">load_file <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#find_char">find_char <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#Env">Env <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+</div>
+</nav>
+<main>
+<h1>variables.lm API Reference</h1>
+<h2>Module Overview</h2>
+<div class="summary"><p>std/env/variables.lm
+Process environment variables, parsing, and .env file configuration.</p></div>
+<div id="get">
+<h3>get <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn get(key: str): str?</code></pre>
+<div class="summary"><p>Retrieves the string value of an environment variable, returning nil if unset.</p></div>
+<h4>Contracts & Preconditions</h4>
+<ul>
+<li><code>requires len(key) > 0</code></li>
+</ul>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>key</code></td><td>Environment variable name.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Fallible string value or nil.</p>
+</div><hr>
+<div id="get_or">
+<h3>get_or <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn get_or(key: str, fallback: str): str</code></pre>
+<div class="summary"><p>Retrieves an environment variable or returns a fallback string if absent.</p></div>
+<h4>Contracts & Preconditions</h4>
+<ul>
+<li><code>requires len(key) > 0</code></li>
+</ul>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>key</code></td><td>Environment variable name.</td></tr>
+<tr><td><code>fallback</code></td><td>Default string value.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Variable value or fallback.</p>
+</div><hr>
+<div id="has">
+<h3>has <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn has(key: str): bool</code></pre>
+<div class="summary"><p>Checks whether an environment variable exists.</p></div>
+<h4>Contracts & Preconditions</h4>
+<ul>
+<li><code>requires len(key) > 0</code></li>
+</ul>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>key</code></td><td>Environment variable name.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">True if key is defined in the environment.</p>
+</div><hr>
+<div id="contains">
+<h3>contains <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn contains(key: str): bool</code></pre>
+<div class="summary"><p>Alias for `has()`.</p></div>
+<h4>Contracts & Preconditions</h4>
+<ul>
+<li><code>requires len(key) > 0</code></li>
+</ul>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>key</code></td><td>Environment variable name.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">True if key is defined.</p>
+</div><hr>
+<div id="get_int">
+<h3>get_int <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn get_int(key: str, fallback: int = ...): int</code></pre>
+<div class="summary"><p>Parses an environment variable as an integer, falling back to a default if absent or invalid.</p></div>
+<h4>Contracts & Preconditions</h4>
+<ul>
+<li><code>requires len(key) > 0</code></li>
+</ul>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>key</code></td><td>Environment variable name.</td></tr>
+<tr><td><code>fallback</code></td><td>Default integer value.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Parsed integer or fallback.</p>
+</div><hr>
+<div id="get_bool">
+<h3>get_bool <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn get_bool(key: str, fallback: bool = ...): bool</code></pre>
+<div class="summary"><p>Parses a boolean environment variable ("1", "true", "yes", "on" vs "0", "false", "no", "off").</p></div>
+<h4>Contracts & Preconditions</h4>
+<ul>
+<li><code>requires len(key) > 0</code></li>
+</ul>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>key</code></td><td>Environment variable name.</td></tr>
+<tr><td><code>fallback</code></td><td>Default boolean value.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Parsed boolean or fallback.</p>
+</div><hr>
+<div id="set">
+<h3>set <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn set(key: str, value: str): bool</code></pre>
+<div class="summary"><p>Sets or updates an environment variable for the process.</p></div>
+<h4>Contracts & Preconditions</h4>
+<ul>
+<li><code>requires len(key) > 0</code></li>
+</ul>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>key</code></td><td>Environment variable name.</td></tr>
+<tr><td><code>value</code></td><td>Target value string.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">True if successfully set.</p>
+</div><hr>
+<div id="unset">
+<h3>unset <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn unset(key: str): bool</code></pre>
+<div class="summary"><p>Deletes an environment variable from the process environment.</p></div>
+<h4>Contracts & Preconditions</h4>
+<ul>
+<li><code>requires len(key) > 0</code></li>
+</ul>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>key</code></td><td>Environment variable name.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">True if successfully removed.</p>
+</div><hr>
+<div id="vars">
+<h3>vars <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn vars(): list</code></pre>
+<div class="summary"><p>Returns all environment variables formatted as a list of "KEY=VALUE" strings.</p></div>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">List of raw environment entries.</p>
+</div><hr>
+<div id="to_dict">
+<h3>to_dict <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn to_dict(): dict</code></pre>
+<div class="summary"><p>Parses all environment variables into a dictionary mapping {KEY: VALUE}.</p></div>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Dictionary of environment variables.</p>
+</div><hr>
+<div id="keys">
+<h3>keys <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn keys(): list</code></pre>
+<div class="summary"><p>Returns a list of all environment variable names.</p></div>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">List of variable key strings.</p>
+</div><hr>
+<div id="values">
+<h3>values <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn values(): list</code></pre>
+<div class="summary"><p>Returns a list of all environment variable values.</p></div>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">List of variable value strings.</p>
+</div><hr>
+<div id="parse_env">
+<h3>parse_env <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn parse_env(content: str): dict</code></pre>
+<div class="summary"><p>Parses a `.env` file content string into a key-value dictionary.</p></div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>content</code></td><td>Raw .env text content.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Dictionary of parsed configuration variables.</p>
+</div><hr>
+<div id="load_dotenv">
+<h3>load_dotenv <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn load_dotenv(content: str): int</code></pre>
+<div class="summary"><p>Parses `.env` content and injects variables into the current process environment.</p></div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>content</code></td><td>Raw .env file content.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Number of variables successfully set.</p>
+</div><hr>
+<div id="load_file">
+<h3>load_file <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn load_file(path: str): int</code></pre>
+<div class="summary"><p>Reads a `.env` file from disk and loads its variables into the process environment.</p></div>
+<h4>Contracts & Preconditions</h4>
+<ul>
+<li><code>requires len(path) > 0</code></li>
+</ul>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>path</code></td><td>Filesystem path to the .env file.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Number of variables loaded, or 0 if unreadable.</p>
+</div><hr>
+<div id="find_char">
+<h3>find_char <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn find_char(s: str, needle: str): int</code></pre>
+</div><hr>
+<div id="Env">
+<h3>Env <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame Env</code></pre>
+<div class="summary"><p>Object-oriented interface to environment variable management.</p></div>
+<h4>Members</h4>
+<ul>
+<li><code>pub init()</code> <em>(constructor)</em></li>
+<li><code>pub fn get(key: str): str?</code> <em>(method)</em></li>
+<li><code>pub fn get_or(key: str, fallback: str): str</code> <em>(method)</em></li>
+<li><code>pub fn get_int(key: str): int</code> <em>(method)</em></li>
+<li><code>pub fn get_bool(key: str): bool</code> <em>(method)</em></li>
+<li><code>pub fn has(key: str): bool</code> <em>(method)</em></li>
+<li><code>pub fn contains(key: str): bool</code> <em>(method)</em></li>
+<li><code>pub fn set(key: str, value: str): bool</code> <em>(method)</em></li>
+<li><code>pub fn unset(key: str): bool</code> <em>(method)</em></li>
+<li><code>pub fn vars(): list</code> <em>(method)</em></li>
+<li><code>pub fn to_dict(): dict</code> <em>(method)</em></li>
+<li><code>pub fn keys(): list</code> <em>(method)</em></li>
+<li><code>pub fn values(): list</code> <em>(method)</em></li>
+<li><code>pub fn parse_env(content: str): dict</code> <em>(method)</em></li>
+<li><code>pub fn load_dotenv(content: str): int</code> <em>(method)</em></li>
+<li><code>pub fn load_file(path: str): int</code> <em>(method)</em></li>
+<li><code>pub fn path(fallback: str): str</code> <em>(method)</em></li>
+</ul>
+</div><hr>
+</main>
+</body>
+</html>

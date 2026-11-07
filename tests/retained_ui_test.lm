@@ -14,9 +14,9 @@ fn main() {
 
     // Construct retained UI tree using modern fluent std.ui API
     var btn = ui.button("Click Me")
-        .background(color.rgb(60, 120, 210));
+    .background(color.rgb(60, 120, 210));
     var lbl = ui.text("Hello Retained UI")
-        .color(color.white);
+    .color(color.white);
     var root = ui.column([btn, lbl]);
 
     app.ui(root);

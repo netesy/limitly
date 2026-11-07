@@ -2,14 +2,14 @@
 // Capturing already moved variable
 
 fn consume(x: [int]) {
-    var transferred = x;
+    var _transferred = x;
 }
 
 fn test() {
     var data = [1, 2, 3];
     consume(data);
-    
-    var f = fn() {
+
+    var _f = fn() {
         var x = data;  // ERROR: data already moved
     };
 }

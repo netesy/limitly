@@ -23,13 +23,13 @@ pub fn menu(items: [str], on_select: any = nil): ui_types.Widget {
     var i = 0;
     while (i < len(items)) {
         var item = ui_types.button(items[i])
-            .background(color.rgb(28, 30, 40))
-            .width(160.0)
-            .height(28.0);
+        .background(color.rgb(28, 30, 40))
+        .width(160.0)
+        .height(28.0);
         item_widgets.append(item);
         i = i + 1;
     }
-    
+
     var w = ui_types.column(item_widgets);
     w.background_color = color.rgb(24, 26, 34);
     w.foreground_color = color.white;
@@ -40,7 +40,7 @@ pub fn menu(items: [str], on_select: any = nil): ui_types.Widget {
     w.spacing_val = 2.0;
     w.corner_radius_val = 4.0;
     w.on_change_action = on_select;
-    
+
     return w;
 }
 
@@ -55,17 +55,17 @@ pub fn menu_items(items: [MenuItem]): ui_types.Widget {
             label = mi.icon + " " + mi.label;
         }
         var btn = ui_types.button(label)
-            .background(color.rgb(28, 30, 40))
-            .width(180.0)
-            .height(32.0)
-            .on_click(mi.action);
+        .background(color.rgb(28, 30, 40))
+        .width(180.0)
+        .height(32.0)
+        .on_click(mi.action);
         if (not mi.enabled) {
             btn = btn.disabled();
         }
         item_widgets.append(btn);
         i = i + 1;
     }
-    
+
     var w = ui_types.column(item_widgets);
     w.background_color = color.rgb(20, 22, 28);
     w.foreground_color = color.white;
@@ -76,7 +76,7 @@ pub fn menu_items(items: [MenuItem]): ui_types.Widget {
     w.spacing_val = 2.0;
     w.corner_radius_val = 6.0;
     w.shadow_val = ui_types.shadow(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
-    
+
     return w;
 }
 
@@ -90,7 +90,7 @@ pub fn context_menu(x: float, y: float, items: [str], on_select: any = nil): ui_
 pub fn dropdown_menu(button_label: str, items: [str], on_select: any = nil): ui_types.Widget {
     var btn = ui_types.button(button_label);
     var dropdown = menu(items, on_select);
-    
+
     var container = ui_types.column([btn, dropdown]);
     container.spacing_val = 0.0;
     return container;

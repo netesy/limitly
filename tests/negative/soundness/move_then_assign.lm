@@ -2,7 +2,7 @@
 // Assigning to moved variable
 
 fn consume(x: [int]) {
-    var transferred = x;
+    var _transferred = x;
 }
 
 var data = [1, 2, 3];

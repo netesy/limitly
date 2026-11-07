@@ -12,7 +12,7 @@ frame HdrImage {
     pub var _lib:     int;
 
     pub init(w: int = 0, h: int = 0, c: int = 3,
-             p: int = 0, lib: int = 0) {
+    p: int = 0, lib: int = 0) {
         self.width    = w;
         self.height   = h;
         self.channels = c;

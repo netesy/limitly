@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>components.lm - Lymar API Reference</title>
+<style>
+:root {
+  --bg-primary: #0a0e17;
+  --bg-secondary: #111827;
+  --bg-tertiary: #1f2937;
+  --accent: #38bdf8;
+  --accent-hover: #7dd3fc;
+  --text-main: #f1f5f9;
+  --text-muted: #94a3b8;
+  --border-color: #334155;
+}
+* { box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif;
+  margin: 0; padding: 0; background: var(--bg-primary); color: var(--text-main); display: flex;
+}
+nav {
+  width: 300px; height: 100vh; overflow-y: auto; background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color); padding: 24px 20px; position: fixed;
+}
+nav h2 { font-size: 1.15rem; color: var(--accent); margin-top: 0; margin-bottom: 16px; font-weight: 700; }
+#search-input {
+  width: 100%; padding: 8px 12px; background: var(--bg-tertiary); border: 1px solid var(--border-color);
+  border-radius: 6px; color: #fff; font-size: 0.85rem; margin-bottom: 16px;
+}
+#search-input:focus { outline: none; border-color: var(--accent); }
+.nav-link { display: block; color: var(--text-muted); text-decoration: none; padding: 6px 8px; font-size: 0.9rem; border-radius: 4px; }
+.nav-link:hover { color: #fff; background: var(--bg-tertiary); }
+main { margin-left: 300px; padding: 40px 48px; max-width: 950px; flex: 1; }
+h1 { color: #fff; font-size: 2.2rem; margin-top: 0; padding-bottom: 16px; border-bottom: 1px solid var(--border-color); }
+h2 { color: var(--accent); font-size: 1.4rem; margin-top: 36px; margin-bottom: 14px; }
+h3 { color: #fff; font-size: 1.25rem; margin-top: 28px; margin-bottom: 12px; display: flex; align-items: center; gap: 10px; }
+h4 { color: var(--accent); font-size: 1rem; margin-top: 20px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+.badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
+.badge-pub { background: #064e3b; color: #6ee7b7; border: 1px solid #059669; }
+.badge-private { background: #334155; color: #cbd5e1; }
+.badge-type { background: #1e1b4b; color: #c7d2fe; border: 1px solid #4338ca; }
+.code-sig { background: #090d16; border: 1px solid var(--border-color); padding: 14px 18px; border-radius: 8px; overflow-x: auto; font-family: 'Consolas', 'Fira Code', monospace; font-size: 0.95rem; color: #e2e8f0; }
+.summary { color: #cbd5e1; line-height: 1.65; margin: 14px 0; font-size: 1rem; }
+/* Callout styling */
+.callout { margin: 16px 0; padding: 14px 18px; border-radius: 8px; border-left: 4px solid; font-size: 0.92rem; }
+.callout-header { font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+.callout-tip { border-color: #10b981; background: rgba(16, 185, 129, 0.08); color: #d1fae5; }
+.callout-tip .callout-header { color: #34d399; }
+.callout-warning { border-color: #f59e0b; background: rgba(245, 158, 11, 0.08); color: #fef3c7; }
+.callout-warning .callout-header { color: #fbbf24; }
+.callout-note { border-color: #0284c7; background: rgba(2, 132, 199, 0.08); color: #e0f2fe; }
+.callout-note .callout-header { color: #38bdf8; }
+.callout-deprecated { border-color: #e11d48; background: rgba(225, 29, 72, 0.08); color: #ffe4e6; }
+.callout-deprecated .callout-header { color: #fb7185; }
+/* Example card */
+.example-card { margin: 20px 0; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: #080c14; }
+.example-header { background: #162032; padding: 8px 16px; font-size: 0.82rem; font-weight: 700; color: #94a3b8; border-bottom: 1px solid var(--border-color); }
+.example-card pre { margin: 0; padding: 14px 18px; overflow-x: auto; font-family: monospace; font-size: 0.92rem; color: #e2e8f0; }
+/* Tables */
+table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 0.92rem; }
+th { background: #162032; color: #94a3b8; text-align: left; padding: 10px 14px; font-weight: 600; border-bottom: 1px solid var(--border-color); }
+td { padding: 10px 14px; border-bottom: 1px solid #1e293b; color: #cbd5e1; }
+ul { padding-left: 20px; color: #cbd5e1; line-height: 1.6; }
+hr { border: 0; border-top: 1px solid var(--border-color); margin: 36px 0; }
+</style>
+<script>
+function filterNav() {
+  var q = document.getElementById('search-input').value.toLowerCase();
+  var links = document.querySelectorAll('.nav-link');
+  links.forEach(function(l) {
+    l.style.display = l.textContent.toLowerCase().includes(q) ? 'block' : 'none';
+  });
+}
+</script>
+</head>
+<body>
+<nav>
+<h2>components.lm</h2>
+<input type="text" id="search-input" placeholder="Filter symbols..." oninput="filterNav()">
+<div id="nav-list">
+<a class="nav-link" href="#Fluent">Fluent <span style="font-size: 0.75rem; opacity: 0.6;">(Trait)</span></a>
+<a class="nav-link" href="#LayoutMetrics">LayoutMetrics <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#LayoutBox">LayoutBox <span style="font-size: 0.75rem; opacity: 0.6;">(Type Alias)</span></a>
+<a class="nav-link" href="#VisualStyle">VisualStyle <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#Clickable">Clickable <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#Changeable">Changeable <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#Focusable">Focusable <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#Button">Button <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#Label">Label <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#Slider">Slider <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#Checkbox">Checkbox <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#TextInput">TextInput <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#ProgressBar">ProgressBar <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#Container">Container <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#Spacer">Spacer <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#column">column <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#row">row <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+</div>
+</nav>
+<main>
+<h1>components.lm API Reference</h1>
+<h2>Module Overview</h2>
+<div class="summary"><p>std/ui/components.lm
+Zero-Cost Component Embedding Architecture for Lymar Retained UI.
+
+Replaces monolithic 60-field God objects with fine-grained, composable
+component frames utilizing Lymar's `embed` mechanism.
+Flattened fields have zero pointer overhead; promoted methods provide
+fluent builder ergonomics without wrapper allocations.
+
+Interaction slots are typed optional functions -- `(fn(): nil)?` -- never
+raw `any`, and every invocation routes through a fallible `EventResult?`
+pipeline so call sites carry no nil-check ladders.</p></div>
+<div id="Fluent">
+<h3>Fluent <span class="badge badge-pub">Trait</span></h3>
+<pre class="code-sig"><code>trait Fluent</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>fn kind_name(): str</code> <em>(method requirement)</em></li>
+</ul>
+</div><hr>
+<div id="LayoutMetrics">
+<h3>LayoutMetrics <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame LayoutMetrics</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>var pub width_val: float</code> <em>(field)</em></li>
+<li><code>var pub height_val: float</code> <em>(field)</em></li>
+<li><code>var pub pad_l: float</code> <em>(field)</em></li>
+<li><code>var pub pad_t: float</code> <em>(field)</em></li>
+<li><code>var pub pad_r: float</code> <em>(field)</em></li>
+<li><code>var pub pad_b: float</code> <em>(field)</em></li>
+<li><code>var pub spacing_val: float</code> <em>(field)</em></li>
+<li><code>var pub flex_val: float</code> <em>(field)</em></li>
+<li><code>pub init()</code> <em>(constructor)</em></li>
+<li><code>pub fn set_dimensions(w: float, h: float): nil</code> <em>(method)</em></li>
+<li><code>pub fn set_padding(p: float): nil</code> <em>(method)</em></li>
+</ul>
+</div><hr>
+<div id="LayoutBox">
+<h3>LayoutBox <span class="badge badge-pub">Type Alias</span></h3>
+<pre class="code-sig"><code>type LayoutBox = LayoutMetrics</code></pre>
+</div><hr>
+<div id="VisualStyle">
+<h3>VisualStyle <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame VisualStyle</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>var pub bg: Color</code> <em>(field)</em></li>
+<li><code>var pub fg: Color</code> <em>(field)</em></li>
+<li><code>var pub radius: float</code> <em>(field)</em></li>
+<li><code>var pub opacity_val: float</code> <em>(field)</em></li>
+<li><code>pub init()</code> <em>(constructor)</em></li>
+<li><code>pub fn set_colors(background: Color, foreground: Color): nil</code> <em>(method)</em></li>
+<li><code>pub fn set_radius(r: float): nil</code> <em>(method)</em></li>
+</ul>
+</div><hr>
+<div id="Clickable">
+<h3>Clickable <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame Clickable</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>var pub is_pressed: bool</code> <em>(field)</em></li>
+<li><code>var pub is_hovered: bool</code> <em>(field)</em></li>
+<li><code>var pub on_click_action: function?</code> <em>(field)</em></li>
+<li><code>var pub click_count: int</code> <em>(field)</em></li>
+<li><code>pub init()</code> <em>(constructor)</em></li>
+<li><code>pub fn set_on_click(action: function): nil</code> <em>(method)</em></li>
+<li><code>pub fn click(): EventResult?</code> <em>(method)</em></li>
+<li><code>pub fn trigger_click(): nil</code> <em>(method)</em></li>
+</ul>
+</div><hr>
+<div id="Changeable">
+<h3>Changeable <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame Changeable</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>var pub on_change_action: function?</code> <em>(field)</em></li>
+<li><code>var pub change_count: int</code> <em>(field)</em></li>
+<li><code>pub init()</code> <em>(constructor)</em></li>
+<li><code>pub fn set_on_change(action: function): nil</code> <em>(method)</em></li>
+<li><code>pub fn notify_change(): EventResult?</code> <em>(method)</em></li>
+</ul>
+</div><hr>
+<div id="Focusable">
+<h3>Focusable <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame Focusable</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>var pub is_focused: bool</code> <em>(field)</em></li>
+<li><code>var pub cursor_pos: int</code> <em>(field)</em></li>
+<li><code>pub init()</code> <em>(constructor)</em></li>
+<li><code>pub fn focus(): nil</code> <em>(method)</em></li>
+<li><code>pub fn blur(): nil</code> <em>(method)</em></li>
+</ul>
+</div><hr>
+<div id="Button">
+<h3>Button <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame Button: Fluent</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>var pub label: str</code> <em>(field)</em></li>
+<li><code>pub init(text: str)</code> <em>(constructor)</em></li>
+<li><code>pub fn kind_name(): str</code> <em>(method)</em></li>
+<li><code>pub fn background(c: Color): Button</code> <em>(method)</em></li>
+<li><code>pub fn foreground(c: Color): Button</code> <em>(method)</em></li>
+<li><code>pub fn padding(p: float): Button</code> <em>(method)</em></li>
+<li><code>pub fn corner_radius(r: float): Button</code> <em>(method)</em></li>
+<li><code>pub fn width(w: float): Button</code> <em>(method)</em></li>
+<li><code>pub fn height(h: float): Button</code> <em>(method)</em></li>
+</ul>
+</div><hr>
+<div id="Label">
+<h3>Label <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame Label: Fluent</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>var pub text: str</code> <em>(field)</em></li>
+<li><code>var pub font_size_val: float</code> <em>(field)</em></li>
+<li><code>var pub is_bold: bool</code> <em>(field)</em></li>
+<li><code>pub init(txt: str)</code> <em>(constructor)</em></li>
+<li><code>pub fn kind_name(): str</code> <em>(method)</em></li>
+<li><code>pub fn color(c: Color): Label</code> <em>(method)</em></li>
+<li><code>pub fn font_size(sz: float): Label</code> <em>(method)</em></li>
+<li><code>pub fn bold(): Label</code> <em>(method)</em></li>
+</ul>
+</div><hr>
+<div id="Slider">
+<h3>Slider <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame Slider: Fluent</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>var pub value: float</code> <em>(field)</em></li>
+<li><code>var pub min_val: float</code> <em>(field)</em></li>
+<li><code>var pub max_val: float</code> <em>(field)</em></li>
+<li><code>pub init()</code> <em>(constructor)</em></li>
+<li><code>pub fn kind_name(): str</code> <em>(method)</em></li>
+<li><code>pub fn set_range(min_v: float, max_v: float): Slider</code> <em>(method)</em></li>
+<li><code>pub fn on_change(action: function): Slider</code> <em>(method)</em></li>
+<li><code>pub fn set_value(v: float): Slider</code> <em>(method)</em></li>
+<li><code>pub fn value_of(v: float): Slider</code> <em>(method)</em></li>
+<li><code>pub fn ratio(): float</code> <em>(method)</em></li>
+</ul>
+</div><hr>
+<div id="Checkbox">
+<h3>Checkbox <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame Checkbox: Fluent</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>var pub label: str</code> <em>(field)</em></li>
+<li><code>var pub is_checked: bool</code> <em>(field)</em></li>
+<li><code>pub init(text: str)</code> <em>(constructor)</em></li>
+<li><code>pub fn kind_name(): str</code> <em>(method)</em></li>
+<li><code>pub fn on_change(action: function): Checkbox</code> <em>(method)</em></li>
+<li><code>pub fn toggle(): EventResult?</code> <em>(method)</em></li>
+</ul>
+</div><hr>
+<div id="TextInput">
+<h3>TextInput <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame TextInput: Fluent</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>var pub text: str</code> <em>(field)</em></li>
+<li><code>var pub placeholder: str</code> <em>(field)</em></li>
+<li><code>pub init()</code> <em>(constructor)</em></li>
+<li><code>pub fn kind_name(): str</code> <em>(method)</em></li>
+<li><code>pub fn on_change(action: function): TextInput</code> <em>(method)</em></li>
+<li><code>pub fn set_text(next: str): TextInput</code> <em>(method)</em></li>
+<li><code>pub fn display_text(): str</code> <em>(method)</em></li>
+</ul>
+</div><hr>
+<div id="ProgressBar">
+<h3>ProgressBar <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame ProgressBar: Fluent</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>var pub value: float</code> <em>(field)</em></li>
+<li><code>var pub max_val: float</code> <em>(field)</em></li>
+<li><code>pub init()</code> <em>(constructor)</em></li>
+<li><code>pub fn kind_name(): str</code> <em>(method)</em></li>
+<li><code>pub fn set_progress(v: float): ProgressBar</code> <em>(method)</em></li>
+<li><code>pub fn ratio(): float</code> <em>(method)</em></li>
+</ul>
+</div><hr>
+<div id="Container">
+<h3>Container <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame Container: Fluent</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>var pub children: list</code> <em>(field)</em></li>
+<li><code>var pub flow: Flow</code> <em>(field)</em></li>
+<li><code>pub init()</code> <em>(constructor)</em></li>
+<li><code>pub fn kind_name(): str</code> <em>(method)</em></li>
+<li><code>pub fn add(c: Fluent): Container</code> <em>(method)</em></li>
+<li><code>pub fn layout(f: Flow): Container</code> <em>(method)</em></li>
+<li><code>pub fn is_vertical(): bool</code> <em>(method)</em></li>
+<li><code>pub fn background(c: Color): Container</code> <em>(method)</em></li>
+<li><code>pub fn padding(p: float): Container</code> <em>(method)</em></li>
+<li><code>pub fn spacing(s: float): Container</code> <em>(method)</em></li>
+</ul>
+</div><hr>
+<div id="Spacer">
+<h3>Spacer <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame Spacer: Fluent</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>pub init()</code> <em>(constructor)</em></li>
+<li><code>pub fn kind_name(): str</code> <em>(method)</em></li>
+<li><code>pub fn flex(f: float): Spacer</code> <em>(method)</em></li>
+</ul>
+</div><hr>
+<div id="column">
+<h3>column <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn column(children: list = ...): Container</code></pre>
+</div><hr>
+<div id="row">
+<h3>row <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn row(children: list = ...): Container</code></pre>
+</div><hr>
+</main>
+</body>
+</html>

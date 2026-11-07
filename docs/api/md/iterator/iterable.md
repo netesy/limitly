@@ -1,0 +1,10 @@
+# API Documentation: `iterable.lm`
+
+## Overview
+
+Standard Library Iterable Trait
+
+Re-exported from std.traits: the previous local declaration required
+`to_iterator()` while std.traits required `iterator()`, so neither contract
+could be satisfied by a single frame.
+

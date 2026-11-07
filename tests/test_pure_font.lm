@@ -16,28 +16,28 @@ fn main(): int {
     var fnt = font.load_system_font()? else {
         print("Failed to load system font");
         return 1;
-        };
-        assert(fnt.is_valid, "Font must be valid");
+    };
+    assert(fnt.is_valid, "Font must be valid");
 
-        print("Step 3: Measuring text dimensions...");
-        var w = fnt.text_width("Hello Lymar Font ! ", 24.0);
-        var h = fnt.text_height("Hello Lymar Font ! ", 24.0);
-        print("Text size: width = {w}, height = {h}");
-        assert(w > 50.0, "Expected width > 50");
-        assert(h > 15.0, "Expected height > 15");
+    print("Step 3: Measuring text dimensions...");
+    var w = fnt.text_width("Hello Lymar Font ! ", 24.0);
+    var h = fnt.text_height("Hello Lymar Font ! ", 24.0);
+    print("Text size: width = {w}, height = {h}");
+    assert(w > 50.0, "Expected width > 50");
+    assert(h > 15.0, "Expected height > 15");
 
-        print("Step 4: Rendering text to Image...");
-        var img_opt = fnt.render("Lymar Typography Engine", 22.0, image.white);
-        assert(img_opt != nil, "Rendering text failed");
-        var img = img_opt?;
-        assert(img.is_valid(), "Rendered image must be valid");
-        print("Rendered image dimensions: {img.width}x{img.height}");
-        assert(img.width > 0 and img.height > 0, "Dimensions must be positive");
-        img.save_png("test_pure_font_render.png");
+    print("Step 4: Rendering text to Image...");
+    var img_opt = fnt.render("Lymar Typography Engine", 22.0, image.white);
+    assert(img_opt != nil, "Rendering text failed");
+    var img = img_opt?;
+    assert(img.is_valid(), "Rendered image must be valid");
+    print("Rendered image dimensions: {img.width}x{img.height}");
+    assert(img.width > 0 and img.height > 0, "Dimensions must be positive");
+    img.save_png("test_pure_font_render.png");
 
-        img.free();
-        fnt.free();
+    img.free();
+    fnt.free();
 
-        print(" === std.font Tests Passed Successfully ! === ");
-        return 0;
-    }
+    print(" === std.font Tests Passed Successfully ! === ");
+    return 0;
+}

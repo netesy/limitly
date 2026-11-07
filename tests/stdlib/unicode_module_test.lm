@@ -17,25 +17,25 @@ fn test_rune(): int {
 
 fn test_categories(): int {
     print("Testing Categories...");
-    assert(u.is_upper("A") == true, "is_upper A failed");
-    assert(u.is_upper("a") == false, "is_upper a failed");
+    assert(u.is_upper("A"), "is_upper A failed");
+    assert(not u.is_upper("a"), "is_upper a failed");
 
-    assert(u.is_lower("a") == true, "is_lower a failed");
-    assert(u.is_lower("A") == false, "is_lower A failed");
+    assert(u.is_lower("a"), "is_lower a failed");
+    assert(not u.is_lower("A"), "is_lower A failed");
 
-    assert(u.is_digit("5") == true, "is_digit 5 failed");
-    assert(u.is_digit("a") == false, "is_digit a failed");
+    assert(u.is_digit("5"), "is_digit 5 failed");
+    assert(not u.is_digit("a"), "is_digit a failed");
 
-    assert(u.is_alpha("a") == true, "is_alpha a failed");
-    assert(u.is_alpha("5") == false, "is_alpha 5 failed");
+    assert(u.is_alpha("a"), "is_alpha a failed");
+    assert(not u.is_alpha("5"), "is_alpha 5 failed");
 
-    assert(u.is_alphanumeric("a") == true, "is_alphanumeric a failed");
-    assert(u.is_alphanumeric("5") == true, "is_alphanumeric 5 failed");
-    assert(u.is_alphanumeric("!") == false, "is_alphanumeric ! failed");
+    assert(u.is_alphanumeric("a"), "is_alphanumeric a failed");
+    assert(u.is_alphanumeric("5"), "is_alphanumeric 5 failed");
+    assert(not u.is_alphanumeric("!"), "is_alphanumeric ! failed");
 
-    assert(u.is_whitespace(" ") == true, "is_whitespace space failed");
-    assert(u.is_whitespace("\n") == true, "is_whitespace newline failed");
-    assert(u.is_whitespace("a") == false, "is_whitespace a failed");
+    assert(u.is_whitespace(" "), "is_whitespace space failed");
+    assert(u.is_whitespace("\n"), "is_whitespace newline failed");
+    assert(not u.is_whitespace("a"), "is_whitespace a failed");
     return 1;
 }
 

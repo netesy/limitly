@@ -4,7 +4,7 @@
 var error_result = err(DivisionByZero);
 print("Error result:", error_result);
 
-// Test success construction  
+// Test success construction
 var success_result = ok(42);
 print("Success result:", success_result);
 
@@ -33,11 +33,11 @@ fn test_error_propagation() {
     // Valid usage
     var result = divide(10, 2)?;
     print("Division result:", result);
-    
+
     // Error propagation
     // var error_result = divide(10, 0)?;  // Will propagate DivisionByZero
     // print("This should not print due to error propagation");
-    
+
     // Compile-time error: Unhandled error type 'Overflow'
     // var unhandled = parse_number("123")?;
 }
@@ -56,27 +56,27 @@ fn test_error_handling() {
         print("Caught error:", error);
         return -1;
     };
-    
+
     // Type checking in error handler
     //  var parsed = parse_number("123")? else error {
-    //      // Compile-time error: Type mismatch in error handling
-    //      // if (error == "DivisionByZero") { ... }
-        
-    //     //  // Valid type checking
-    //     //  if (error == "InvalidNumber") {
-    //     //      print("Invalid number format");
-    //     //  } else if (error == "Overflow") {
-    //     //      print("Number too large");
-    //     //  }
-    //     //  return -1;
-    //  };
-    
-    // print("Result after error handling:", result);
-}
+        //      // Compile-time error: Type mismatch in error handling
+        //      // if (error == "DivisionByZero") { ... }
+
+        //     //  // Valid type checking
+        //     //  if (error == "InvalidNumber") {
+            //     //      print("Invalid number format");
+            //     //  } else if (error == "Overflow") {
+                //     //      print("Number too large");
+                //     //  }
+                //     //  return -1;
+                //  };
+
+                // print("Result after error handling:", result);
+            }
 
 
-test_error_propagation();
-test_error_handling();
+            test_error_propagation();
+            test_error_handling();
 
-var safe_result = safe_divide(20, 0);
-print("Safe division result again :", safe_result);
+            var safe_result = safe_divide(20, 0);
+            print("Safe division result again :", safe_result);

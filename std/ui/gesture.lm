@@ -63,7 +63,7 @@ pub fn update_gesture_on_pointer_down(gesture_key: str, x: float, y: float, curr
     if (gesture_states[gesture_key] != nil) {
         state = gesture_states[gesture_key];
     }
-    
+
     // Check for double tap
     var time_since_last = current_time - state.last_tap_time;
     if (time_since_last < 0.3) {
@@ -71,12 +71,12 @@ pub fn update_gesture_on_pointer_down(gesture_key: str, x: float, y: float, curr
     } else {
         state.tap_count = 1;
     }
-    
+
     state.pointer_down_time = current_time;
     state.pointer_down_x = x;
     state.pointer_down_y = y;
     state.is_long_press_active = 0;
-    
+
     gesture_states[gesture_key] = state;
 }
 
@@ -86,7 +86,7 @@ pub fn update_gesture_on_pointer_move(gesture_key: str, x: float, y: float): flo
         var state = gesture_states[gesture_key];
         var dx = x - state.pointer_down_x;
         var dy = y - state.pointer_down_y;
-        
+
         // Return distance moved (can be used to detect swipe threshold)
         var distance = (dx * dx + dy * dy) as float;
         return distance;
@@ -99,12 +99,12 @@ pub fn update_gesture_on_pointer_up(gesture_key: str, current_time: float): int 
     if (gesture_states[gesture_key] != nil) {
         var state = gesture_states[gesture_key];
         var hold_time = current_time - state.pointer_down_time;
-        
+
         // Long press detected (held for 500ms)
         if (hold_time >= 0.5) {
             state.is_long_press_active = 1;
         }
-        
+
         state.last_tap_time = current_time;
         gesture_states[gesture_key] = state;
         return state.tap_count;

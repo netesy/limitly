@@ -62,7 +62,7 @@ print("=== All Tests Completed Successfully ===");
 
 // Note: Error conditions that cause runtime errors:
 // - math_module.nonexistent_function(5, 10) -> "Property 'nonexistent_function' not found"
-// - math_module.nonexistent_variable -> "Property 'nonexistent_variable' not found"  
+// - math_module.nonexistent_variable -> "Property 'nonexistent_variable' not found"
 // - math_module.add(5) -> "Function add expects 2 to 2 arguments, got 1"
 // - math_module.add(5, 10, 15) -> "Function add expects 2 to 2 arguments, got 3"
 // - Functions without return statements return 'nil'

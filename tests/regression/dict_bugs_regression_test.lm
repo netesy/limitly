@@ -28,7 +28,7 @@ fn main() {
     // Test 1: Empty Dictionary
     var dict1 = {};
     assert(dict1 != nil, "Test 1 failed: Empty dictionary should not be Nil");
-    
+
     // Test 2: Explicit Cast
     var dict2 = {} as {str: any};
     assert(dict2 != nil, "Test 2 failed: Cast empty dictionary should not be Nil");
@@ -42,7 +42,7 @@ fn main() {
     dict3["boolean"] = true;
     assert(dict3["string"] == "hello", "Test 3 failed: String value mismatch");
     assert(dict3["number"] == 42, "Test 3 failed: Number value mismatch");
-    assert(dict3["boolean"] == true, "Test 3 failed: Boolean value mismatch");
+    assert(dict3["boolean"], "Test 3 failed: Boolean value mismatch");
 
     // Test 4: Frame-Backed Dictionary & Test 5: Multiple Frame Fields
     var frame_inst = TestFrame({} as {str: any}, 100, 200, 300);
@@ -68,10 +68,10 @@ fn main() {
     var outer_dict = {} as {str: any};
     outer_dict["inner"] = {} as {str: any};
     frame_inst.data["nested"] = outer_dict;
-    
+
     var fetched_outer = frame_inst.data["nested"] as {str: any};
     fetched_outer["inner"]["key"] = "nested_value";
-    
+
     var retrieved_inner = fetched_outer["inner"] as {str: any};
     assert(retrieved_inner["key"] == "nested_value", "Test 8 failed: Nested dictionary mutation did not persist");
 

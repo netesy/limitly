@@ -45,7 +45,7 @@ print("Precedence: {a} + {b} * 2 = {precedence}");
 
 assert(precedence == 16, "10 + 3 * 2 should equal 16 (multiplication first)");
 
-// Float arithmetic 
+// Float arithmetic
 var x = 3.14;
 var y = 2.0;
 var floatSum = x + y;

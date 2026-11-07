@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>index.lm - Lymar API Reference</title>
+<style>
+:root {
+  --bg-primary: #0a0e17;
+  --bg-secondary: #111827;
+  --bg-tertiary: #1f2937;
+  --accent: #38bdf8;
+  --accent-hover: #7dd3fc;
+  --text-main: #f1f5f9;
+  --text-muted: #94a3b8;
+  --border-color: #334155;
+}
+* { box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif;
+  margin: 0; padding: 0; background: var(--bg-primary); color: var(--text-main); display: flex;
+}
+nav {
+  width: 300px; height: 100vh; overflow-y: auto; background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color); padding: 24px 20px; position: fixed;
+}
+nav h2 { font-size: 1.15rem; color: var(--accent); margin-top: 0; margin-bottom: 16px; font-weight: 700; }
+#search-input {
+  width: 100%; padding: 8px 12px; background: var(--bg-tertiary); border: 1px solid var(--border-color);
+  border-radius: 6px; color: #fff; font-size: 0.85rem; margin-bottom: 16px;
+}
+#search-input:focus { outline: none; border-color: var(--accent); }
+.nav-link { display: block; color: var(--text-muted); text-decoration: none; padding: 6px 8px; font-size: 0.9rem; border-radius: 4px; }
+.nav-link:hover { color: #fff; background: var(--bg-tertiary); }
+main { margin-left: 300px; padding: 40px 48px; max-width: 950px; flex: 1; }
+h1 { color: #fff; font-size: 2.2rem; margin-top: 0; padding-bottom: 16px; border-bottom: 1px solid var(--border-color); }
+h2 { color: var(--accent); font-size: 1.4rem; margin-top: 36px; margin-bottom: 14px; }
+h3 { color: #fff; font-size: 1.25rem; margin-top: 28px; margin-bottom: 12px; display: flex; align-items: center; gap: 10px; }
+h4 { color: var(--accent); font-size: 1rem; margin-top: 20px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+.badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
+.badge-pub { background: #064e3b; color: #6ee7b7; border: 1px solid #059669; }
+.badge-private { background: #334155; color: #cbd5e1; }
+.badge-type { background: #1e1b4b; color: #c7d2fe; border: 1px solid #4338ca; }
+.code-sig { background: #090d16; border: 1px solid var(--border-color); padding: 14px 18px; border-radius: 8px; overflow-x: auto; font-family: 'Consolas', 'Fira Code', monospace; font-size: 0.95rem; color: #e2e8f0; }
+.summary { color: #cbd5e1; line-height: 1.65; margin: 14px 0; font-size: 1rem; }
+/* Callout styling */
+.callout { margin: 16px 0; padding: 14px 18px; border-radius: 8px; border-left: 4px solid; font-size: 0.92rem; }
+.callout-header { font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+.callout-tip { border-color: #10b981; background: rgba(16, 185, 129, 0.08); color: #d1fae5; }
+.callout-tip .callout-header { color: #34d399; }
+.callout-warning { border-color: #f59e0b; background: rgba(245, 158, 11, 0.08); color: #fef3c7; }
+.callout-warning .callout-header { color: #fbbf24; }
+.callout-note { border-color: #0284c7; background: rgba(2, 132, 199, 0.08); color: #e0f2fe; }
+.callout-note .callout-header { color: #38bdf8; }
+.callout-deprecated { border-color: #e11d48; background: rgba(225, 29, 72, 0.08); color: #ffe4e6; }
+.callout-deprecated .callout-header { color: #fb7185; }
+/* Example card */
+.example-card { margin: 20px 0; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: #080c14; }
+.example-header { background: #162032; padding: 8px 16px; font-size: 0.82rem; font-weight: 700; color: #94a3b8; border-bottom: 1px solid var(--border-color); }
+.example-card pre { margin: 0; padding: 14px 18px; overflow-x: auto; font-family: monospace; font-size: 0.92rem; color: #e2e8f0; }
+/* Tables */
+table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 0.92rem; }
+th { background: #162032; color: #94a3b8; text-align: left; padding: 10px 14px; font-weight: 600; border-bottom: 1px solid var(--border-color); }
+td { padding: 10px 14px; border-bottom: 1px solid #1e293b; color: #cbd5e1; }
+ul { padding-left: 20px; color: #cbd5e1; line-height: 1.6; }
+hr { border: 0; border-top: 1px solid var(--border-color); margin: 36px 0; }
+</style>
+<script>
+function filterNav() {
+  var q = document.getElementById('search-input').value.toLowerCase();
+  var links = document.querySelectorAll('.nav-link');
+  links.forEach(function(l) {
+    l.style.display = l.textContent.toLowerCase().includes(q) ? 'block' : 'none';
+  });
+}
+</script>
+</head>
+<body>
+<nav>
+<h2>index.lm</h2>
+<input type="text" id="search-input" placeholder="Filter symbols..." oninput="filterNav()">
+<div id="nav-list">
+<a class="nav-link" href="#is_nan">is_nan <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#is_inf">is_inf <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#is_finite">is_finite <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#nearly_equal">nearly_equal <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#abs">abs <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#abs_int">abs_int <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#gcd">gcd <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#lcm">lcm <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#factorial">factorial <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#permutations">permutations <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#combinations">combinations <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#min">min <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#max">max <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#clamp">clamp <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#sign">sign <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#lerp">lerp <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#floor">floor <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#ceil">ceil <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#round">round <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#trunc">trunc <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#fract">fract <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#pow">pow <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#sqrt">sqrt <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#cbrt">cbrt <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#hypot">hypot <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#log">log <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#log2">log2 <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#log10">log10 <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#exp">exp <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#exp2">exp2 <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#sin">sin <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#cos">cos <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#tan">tan <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#asin">asin <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#acos">acos <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#atan">atan <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#atan2">atan2 <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#sinh">sinh <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#cosh">cosh <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#tanh">tanh <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#sum">sum <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#mean">mean <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#median">median <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#variance">variance <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#stddev">stddev <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#random_int">random_int <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#random_float">random_float <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#random_bool">random_bool <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#random_bytes">random_bytes <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#random_string">random_string <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+</div>
+</nav>
+<main>
+<h1>index.lm API Reference</h1>
+<h2>Module Overview</h2>
+<div class="summary"><p>std/math/index.lm
+Public entrypoint and facade for std.math. Mathematical constants, arithmetic functions, trigonometry, and statistics.</p></div>
+<div id="is_nan">
+<h3>is_nan <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn is_nan(x: float): bool</code></pre>
+<div class="summary"><p>Checks whether a floating-point value is Not-a-Number (NaN).</p></div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>x</code></td><td>Candidate float.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">True if value is NaN.</p>
+</div><hr>
+<div id="is_inf">
+<h3>is_inf <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn is_inf(x: float): bool</code></pre>
+<div class="summary"><p>Checks whether a floating-point value is positive or negative infinity.</p></div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>x</code></td><td>Candidate float.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">True if value is infinite.</p>
+</div><hr>
+<div id="is_finite">
+<h3>is_finite <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn is_finite(x: float): bool</code></pre>
+<div class="summary"><p>Checks whether a floating-point value is finite (neither NaN nor infinite).</p></div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>x</code></td><td>Candidate float.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">True if value is finite.</p>
+</div><hr>
+<div id="nearly_equal">
+<h3>nearly_equal <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn nearly_equal(a: float, b: float, epsilon: float = ...): bool</code></pre>
+<div class="summary"><p>Checks whether two floating-point values are approximately equal within an epsilon tolerance.</p></div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>a</code></td><td>First operand.</td></tr>
+<tr><td><code>b</code></td><td>Second operand.</td></tr>
+<tr><td><code>epsilon</code></td><td>Maximum allowable difference tolerance.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">True if |a - b| <= epsilon.</p>
+</div><hr>
+<div id="abs">
+<h3>abs <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn abs(x: float): float</code></pre>
+<div class="summary"><p>Returns the absolute value of a 64-bit float.</p></div>
+</div><hr>
+<div id="abs_int">
+<h3>abs_int <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn abs_int(x: int): int</code></pre>
+<div class="summary"><p>Returns the absolute value of a 64-bit integer.</p></div>
+</div><hr>
+<div id="gcd">
+<h3>gcd <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn gcd(a: int, b: int): int</code></pre>
+<div class="summary"><p>Computes the Greatest Common Divisor (GCD) of two integers.</p></div>
+</div><hr>
+<div id="lcm">
+<h3>lcm <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn lcm(a: int, b: int): int</code></pre>
+<div class="summary"><p>Computes the Least Common Multiple (LCM) of two integers.</p></div>
+</div><hr>
+<div id="factorial">
+<h3>factorial <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn factorial(n: int): int</code></pre>
+<div class="summary"><p>Computes the factorial of a non-negative integer (n!).</p></div>
+</div><hr>
+<div id="permutations">
+<h3>permutations <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn permutations(n: int, k: int): int</code></pre>
+<div class="summary"><p>Computes the number of k-permutations of n items: P(n, k).</p></div>
+</div><hr>
+<div id="combinations">
+<h3>combinations <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn combinations(n: int, k: int): int</code></pre>
+<div class="summary"><p>Computes the number of k-combinations of n items: C(n, k).</p></div>
+</div><hr>
+<div id="min">
+<h3>min <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn min(a: float, b: float): float</code></pre>
+<div class="summary"><p>Returns the minimum of two floating-point numbers.</p></div>
+</div><hr>
+<div id="max">
+<h3>max <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn max(a: float, b: float): float</code></pre>
+<div class="summary"><p>Returns the maximum of two floating-point numbers.</p></div>
+</div><hr>
+<div id="clamp">
+<h3>clamp <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn clamp(value: float, low: float, high: float): float</code></pre>
+<div class="summary"><p>Clamps a value within an inclusive [low, high] interval.</p></div>
+</div><hr>
+<div id="sign">
+<h3>sign <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn sign(x: float): float</code></pre>
+<div class="summary"><p>Returns the sign of a floating-point number (-1.0, 0.0, or 1.0).</p></div>
+</div><hr>
+<div id="lerp">
+<h3>lerp <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn lerp(a: float, b: float, t: float): float</code></pre>
+<div class="summary"><p>Performs linear interpolation between two endpoints: `a + (b - a) * t`.</p></div>
+</div><hr>
+<div id="floor">
+<h3>floor <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn floor(x: float): int</code></pre>
+<div class="summary"><p>Rounds a float down to the nearest integer.</p></div>
+</div><hr>
+<div id="ceil">
+<h3>ceil <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn ceil(x: float): int</code></pre>
+<div class="summary"><p>Rounds a float up to the nearest integer.</p></div>
+</div><hr>
+<div id="round">
+<h3>round <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn round(x: float): int</code></pre>
+<div class="summary"><p>Rounds a float to the nearest integer, half away from zero.</p></div>
+</div><hr>
+<div id="trunc">
+<h3>trunc <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn trunc(x: float): int</code></pre>
+<div class="summary"><p>Truncates a float towards zero.</p></div>
+</div><hr>
+<div id="fract">
+<h3>fract <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn fract(x: float): float</code></pre>
+<div class="summary"><p>Returns the fractional component of a float.</p></div>
+</div><hr>
+<div id="pow">
+<h3>pow <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn pow(base: float, exponent: float): float</code></pre>
+<div class="summary"><p>Computes base raised to the power of exponent (`base^exponent`).</p></div>
+</div><hr>
+<div id="sqrt">
+<h3>sqrt <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn sqrt(x: float): float</code></pre>
+<div class="summary"><p>Computes the square root of a non-negative float.</p></div>
+</div><hr>
+<div id="cbrt">
+<h3>cbrt <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn cbrt(x: float): float</code></pre>
+<div class="summary"><p>Computes the cube root of a float.</p></div>
+</div><hr>
+<div id="hypot">
+<h3>hypot <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn hypot(x: float, y: float): float</code></pre>
+<div class="summary"><p>Computes the hypotenuse length sqrt(x^2 + y^2).</p></div>
+</div><hr>
+<div id="log">
+<h3>log <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn log(x: float): float</code></pre>
+<div class="summary"><p>Computes the natural logarithm (base e) of a positive float.</p></div>
+</div><hr>
+<div id="log2">
+<h3>log2 <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn log2(x: float): float</code></pre>
+<div class="summary"><p>Computes the binary logarithm (base 2) of a positive float.</p></div>
+</div><hr>
+<div id="log10">
+<h3>log10 <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn log10(x: float): float</code></pre>
+<div class="summary"><p>Computes the common logarithm (base 10) of a positive float.</p></div>
+</div><hr>
+<div id="exp">
+<h3>exp <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn exp(x: float): float</code></pre>
+<div class="summary"><p>Computes the exponential function e^x.</p></div>
+</div><hr>
+<div id="exp2">
+<h3>exp2 <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn exp2(x: float): float</code></pre>
+<div class="summary"><p>Computes 2^x.</p></div>
+</div><hr>
+<div id="sin">
+<h3>sin <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn sin(x: float): float</code></pre>
+<div class="summary"><p>Computes the sine of an angle in radians.</p></div>
+</div><hr>
+<div id="cos">
+<h3>cos <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn cos(x: float): float</code></pre>
+<div class="summary"><p>Computes the cosine of an angle in radians.</p></div>
+</div><hr>
+<div id="tan">
+<h3>tan <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn tan(x: float): float</code></pre>
+<div class="summary"><p>Computes the tangent of an angle in radians.</p></div>
+</div><hr>
+<div id="asin">
+<h3>asin <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn asin(x: float): float</code></pre>
+<div class="summary"><p>Computes the arcsine in radians.</p></div>
+</div><hr>
+<div id="acos">
+<h3>acos <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn acos(x: float): float</code></pre>
+<div class="summary"><p>Computes the arccosine in radians.</p></div>
+</div><hr>
+<div id="atan">
+<h3>atan <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn atan(x: float): float</code></pre>
+<div class="summary"><p>Computes the arctangent in radians.</p></div>
+</div><hr>
+<div id="atan2">
+<h3>atan2 <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn atan2(y: float, x: float): float</code></pre>
+<div class="summary"><p>Computes the four-quadrant angle atan2(y, x).</p></div>
+</div><hr>
+<div id="sinh">
+<h3>sinh <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn sinh(x: float): float</code></pre>
+<div class="summary"><p>Computes the hyperbolic sine.</p></div>
+</div><hr>
+<div id="cosh">
+<h3>cosh <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn cosh(x: float): float</code></pre>
+<div class="summary"><p>Computes the hyperbolic cosine.</p></div>
+</div><hr>
+<div id="tanh">
+<h3>tanh <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn tanh(x: float): float</code></pre>
+<div class="summary"><p>Computes the hyperbolic tangent.</p></div>
+</div><hr>
+<div id="sum">
+<h3>sum <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn sum(items: list): float</code></pre>
+<div class="summary"><p>Computes the sum of all numerical values in a collection.</p></div>
+</div><hr>
+<div id="mean">
+<h3>mean <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn mean(items: list): float</code></pre>
+<div class="summary"><p>Computes the arithmetic mean of a collection.</p></div>
+</div><hr>
+<div id="median">
+<h3>median <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn median(items: list): float</code></pre>
+<div class="summary"><p>Computes the statistical median of a collection.</p></div>
+</div><hr>
+<div id="variance">
+<h3>variance <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn variance(items: list): float</code></pre>
+<div class="summary"><p>Computes the population variance of a collection.</p></div>
+</div><hr>
+<div id="stddev">
+<h3>stddev <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn stddev(items: list): float</code></pre>
+<div class="summary"><p>Computes the population standard deviation of a collection.</p></div>
+</div><hr>
+<div id="random_int">
+<h3>random_int <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn random_int(min: int, max: int): int</code></pre>
+<div class="summary"><p>Generates a random integer in range [min, max) using the default PRNG.</p></div>
+</div><hr>
+<div id="random_float">
+<h3>random_float <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn random_float(min: float, max: float): float</code></pre>
+<div class="summary"><p>Generates a random float in range [min, max] using the default PRNG.</p></div>
+</div><hr>
+<div id="random_bool">
+<h3>random_bool <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn random_bool(): bool</code></pre>
+<div class="summary"><p>Generates a random boolean flag using the default PRNG.</p></div>
+</div><hr>
+<div id="random_bytes">
+<h3>random_bytes <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn random_bytes(count: int): list</code></pre>
+<div class="summary"><p>Generates a list of random byte integers using the default PRNG.</p></div>
+</div><hr>
+<div id="random_string">
+<h3>random_string <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn random_string(len_val: int): str</code></pre>
+<div class="summary"><p>Generates a random alphanumeric string of length `len_val` using the default PRNG.</p></div>
+</div><hr>
+</main>
+</body>
+</html>

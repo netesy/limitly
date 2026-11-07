@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>url.lm - Lymar API Reference</title>
+<style>
+:root {
+  --bg-primary: #0a0e17;
+  --bg-secondary: #111827;
+  --bg-tertiary: #1f2937;
+  --accent: #38bdf8;
+  --accent-hover: #7dd3fc;
+  --text-main: #f1f5f9;
+  --text-muted: #94a3b8;
+  --border-color: #334155;
+}
+* { box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif;
+  margin: 0; padding: 0; background: var(--bg-primary); color: var(--text-main); display: flex;
+}
+nav {
+  width: 300px; height: 100vh; overflow-y: auto; background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color); padding: 24px 20px; position: fixed;
+}
+nav h2 { font-size: 1.15rem; color: var(--accent); margin-top: 0; margin-bottom: 16px; font-weight: 700; }
+#search-input {
+  width: 100%; padding: 8px 12px; background: var(--bg-tertiary); border: 1px solid var(--border-color);
+  border-radius: 6px; color: #fff; font-size: 0.85rem; margin-bottom: 16px;
+}
+#search-input:focus { outline: none; border-color: var(--accent); }
+.nav-link { display: block; color: var(--text-muted); text-decoration: none; padding: 6px 8px; font-size: 0.9rem; border-radius: 4px; }
+.nav-link:hover { color: #fff; background: var(--bg-tertiary); }
+main { margin-left: 300px; padding: 40px 48px; max-width: 950px; flex: 1; }
+h1 { color: #fff; font-size: 2.2rem; margin-top: 0; padding-bottom: 16px; border-bottom: 1px solid var(--border-color); }
+h2 { color: var(--accent); font-size: 1.4rem; margin-top: 36px; margin-bottom: 14px; }
+h3 { color: #fff; font-size: 1.25rem; margin-top: 28px; margin-bottom: 12px; display: flex; align-items: center; gap: 10px; }
+h4 { color: var(--accent); font-size: 1rem; margin-top: 20px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+.badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
+.badge-pub { background: #064e3b; color: #6ee7b7; border: 1px solid #059669; }
+.badge-private { background: #334155; color: #cbd5e1; }
+.badge-type { background: #1e1b4b; color: #c7d2fe; border: 1px solid #4338ca; }
+.code-sig { background: #090d16; border: 1px solid var(--border-color); padding: 14px 18px; border-radius: 8px; overflow-x: auto; font-family: 'Consolas', 'Fira Code', monospace; font-size: 0.95rem; color: #e2e8f0; }
+.summary { color: #cbd5e1; line-height: 1.65; margin: 14px 0; font-size: 1rem; }
+/* Callout styling */
+.callout { margin: 16px 0; padding: 14px 18px; border-radius: 8px; border-left: 4px solid; font-size: 0.92rem; }
+.callout-header { font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+.callout-tip { border-color: #10b981; background: rgba(16, 185, 129, 0.08); color: #d1fae5; }
+.callout-tip .callout-header { color: #34d399; }
+.callout-warning { border-color: #f59e0b; background: rgba(245, 158, 11, 0.08); color: #fef3c7; }
+.callout-warning .callout-header { color: #fbbf24; }
+.callout-note { border-color: #0284c7; background: rgba(2, 132, 199, 0.08); color: #e0f2fe; }
+.callout-note .callout-header { color: #38bdf8; }
+.callout-deprecated { border-color: #e11d48; background: rgba(225, 29, 72, 0.08); color: #ffe4e6; }
+.callout-deprecated .callout-header { color: #fb7185; }
+/* Example card */
+.example-card { margin: 20px 0; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: #080c14; }
+.example-header { background: #162032; padding: 8px 16px; font-size: 0.82rem; font-weight: 700; color: #94a3b8; border-bottom: 1px solid var(--border-color); }
+.example-card pre { margin: 0; padding: 14px 18px; overflow-x: auto; font-family: monospace; font-size: 0.92rem; color: #e2e8f0; }
+/* Tables */
+table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 0.92rem; }
+th { background: #162032; color: #94a3b8; text-align: left; padding: 10px 14px; font-weight: 600; border-bottom: 1px solid var(--border-color); }
+td { padding: 10px 14px; border-bottom: 1px solid #1e293b; color: #cbd5e1; }
+ul { padding-left: 20px; color: #cbd5e1; line-height: 1.6; }
+hr { border: 0; border-top: 1px solid var(--border-color); margin: 36px 0; }
+</style>
+<script>
+function filterNav() {
+  var q = document.getElementById('search-input').value.toLowerCase();
+  var links = document.querySelectorAll('.nav-link');
+  links.forEach(function(l) {
+    l.style.display = l.textContent.toLowerCase().includes(q) ? 'block' : 'none';
+  });
+}
+</script>
+</head>
+<body>
+<nav>
+<h2>url.lm</h2>
+<input type="text" id="search-input" placeholder="Filter symbols..." oninput="filterNav()">
+<div id="nav-list">
+<a class="nav-link" href="#URL">URL <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#build">build <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#to_lower">to_lower <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#normalize_path">normalize_path <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#find_last">find_last <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#index_of">index_of <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#split_str">split_str <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#substring">substring <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+</div>
+</nav>
+<main>
+<h1>url.lm API Reference</h1>
+<h2>Module Overview</h2>
+<div class="summary"><p>std/url/url.lm
+RFC 3986 Uniform Resource Identifier (URI) / URL parser and resolver.</p></div>
+<div id="URL">
+<h3>URL <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame URL</code></pre>
+<div class="summary"><p>Represents a parsed Uniform Resource Locator (URL) conforming to RFC 3986.
+Decomposes URLs into scheme, user credentials, host, port, path, query, and fragment.
+Supports IPv6 bracketed hosts, default port inference, query parsing, and relative path resolution.</p></div>
+<div class="callout callout-tip">
+<div class="callout-header"><span>💡</span> Idiomatic Usage & Best Practice</div>
+<div class="callout-content"><p>Use `url.resolve("...")` to resolve relative hyperlinks against a base document URL.</p></div>
+</div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>url_str</code></td><td>Optional candidate URL string to parse immediately upon instantiation.</td></tr>
+</tbody>
+</table>
+<div class="example-card">
+<div class="example-header"><span>✨</span> Example: Idiomatic Usage</div>
+<pre><code>import std.url as url;
+var u = url.URL("https://user:pass@example.com:8080/api/v1?page=1#section");
+print("Host: {u.host}, Port: {u.port}, Path: {u.path}");</code></pre>
+</div>
+<h4>Members</h4>
+<ul>
+<li><code>var pub fragment: str</code> <em>(field)</em></li>
+<li><code>var pub host: str</code> <em>(field)</em></li>
+<li><code>var pub is_valid: bool</code> <em>(field)</em></li>
+<li><code>var pub password: str</code> <em>(field)</em></li>
+<li><code>var pub path: str</code> <em>(field)</em></li>
+<li><code>var pub port: int</code> <em>(field)</em></li>
+<li><code>var pub query: str</code> <em>(field)</em></li>
+<li><code>var pub scheme: str</code> <em>(field)</em></li>
+<li><code>var pub username: str</code> <em>(field)</em></li>
+<li><code>pub init(url_str: str)</code> <em>(constructor)</em></li>
+<li><code>pub fn parse(url_str: str)</code> <em>(method)</em></li>
+<li><code>pub fn to_string(): str</code> <em>(method)</em></li>
+<li><code>pub fn query_params(): query.QueryParams</code> <em>(method)</em></li>
+<li><code>pub fn origin(): str</code> <em>(method)</em></li>
+<li><code>pub fn resolve(relative: str): URL</code> <em>(method)</em></li>
+</ul>
+</div><hr>
+<div id="build">
+<h3>build <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn build(scheme: str, host: str, port: int, path: str, query: str, fragment: str): URL</code></pre>
+<div class="summary"><p>Constructs a URL object directly from discrete components.</p></div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>scheme</code></td><td>URL scheme (e.g. "https", "http").</td></tr>
+<tr><td><code>host</code></td><td>Hostname or IP.</td></tr>
+<tr><td><code>port</code></td><td>Integer port (-1 for default).</td></tr>
+<tr><td><code>path</code></td><td>Resource path.</td></tr>
+<tr><td><code>query</code></td><td>Query string without leading '?'.</td></tr>
+<tr><td><code>fragment</code></td><td>Fragment without leading '#'.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Configured URL instance.</p>
+</div><hr>
+<div id="to_lower">
+<h3>to_lower <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn to_lower(s: str): str</code></pre>
+</div><hr>
+<div id="normalize_path">
+<h3>normalize_path <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn normalize_path(path_val: str): str</code></pre>
+</div><hr>
+<div id="find_last">
+<h3>find_last <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn find_last(s: str, ch: str): int</code></pre>
+</div><hr>
+<div id="index_of">
+<h3>index_of <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn index_of(s: str, pattern: str): int</code></pre>
+</div><hr>
+<div id="split_str">
+<h3>split_str <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn split_str(s: str, delimiter: str): list</code></pre>
+</div><hr>
+<div id="substring">
+<h3>substring <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn substring(s: str, start: int, end_idx: int): str</code></pre>
+</div><hr>
+</main>
+</body>
+</html>

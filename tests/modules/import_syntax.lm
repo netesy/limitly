@@ -1,9 +1,9 @@
 //import tests.modules.my_module as m hide greet;
 import tests.functions.basic as math hide greet;
 
-//print(m.message); 
+//print(m.message);
 
-//m.ask(); 
+//m.ask();
 //m.greet(); //self should not show when hidden
 //math.greet();
 print("adding 4 and 8 is: {math.add(4,8)}");

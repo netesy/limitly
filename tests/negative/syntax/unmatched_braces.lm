@@ -4,6 +4,6 @@
 fn broken() {
     if (true) {
         print("Missing closing brace");
-    // Missing }
+        // Missing }
 
-print("End");
+        print("End");

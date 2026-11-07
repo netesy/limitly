@@ -49,35 +49,35 @@ fn test_parsing(): int {
 
     // Test invalid inputs
     var failed = false;
-    var e1 = semver.parse("")? else { failed = true; };
+    var _e1 = semver.parse("")? else { failed = true; };
     assert(failed, "Empty string should fail");
 
     failed = false;
-    var e2 = semver.parse("1.2")? else { failed = true; };
+    var _e2 = semver.parse("1.2")? else { failed = true; };
     assert(failed, "Missing patch version should fail");
 
     failed = false;
-    var e3 = semver.parse("1.2.3.4")? else { failed = true; };
+    var _e3 = semver.parse("1.2.3.4")? else { failed = true; };
     assert(failed, "Four parts should fail");
 
     failed = false;
-    var e4 = semver.parse("01.2.3")? else { failed = true; };
+    var _e4 = semver.parse("01.2.3")? else { failed = true; };
     assert(failed, "Leading zeroes in core version should fail");
 
     failed = false;
-    var e5 = semver.parse("1.2.3-alpha.01")? else { failed = true; };
+    var _e5 = semver.parse("1.2.3-alpha.01")? else { failed = true; };
     assert(failed, "Leading zeroes in numeric pre-release should fail");
 
     failed = false;
-    var e6 = semver.parse("1.2.3-alpha..1")? else { failed = true; };
+    var _e6 = semver.parse("1.2.3-alpha..1")? else { failed = true; };
     assert(failed, "Empty pre-release identifiers should fail");
 
     failed = false;
-    var e7 = semver.parse("1.2.3+build..12")? else { failed = true; };
+    var _e7 = semver.parse("1.2.3+build..12")? else { failed = true; };
     assert(failed, "Empty build identifiers should fail");
 
     failed = false;
-    var e8 = semver.parse("1.2.3-alpha_1")? else { failed = true; };
+    var _e8 = semver.parse("1.2.3-alpha_1")? else { failed = true; };
     assert(failed, "Invalid characters in pre-release should fail");
 
     print("Parsing tests passed!");

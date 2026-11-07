@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>types.lm - Lymar API Reference</title>
+<style>
+:root {
+  --bg-primary: #0a0e17;
+  --bg-secondary: #111827;
+  --bg-tertiary: #1f2937;
+  --accent: #38bdf8;
+  --accent-hover: #7dd3fc;
+  --text-main: #f1f5f9;
+  --text-muted: #94a3b8;
+  --border-color: #334155;
+}
+* { box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif;
+  margin: 0; padding: 0; background: var(--bg-primary); color: var(--text-main); display: flex;
+}
+nav {
+  width: 300px; height: 100vh; overflow-y: auto; background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color); padding: 24px 20px; position: fixed;
+}
+nav h2 { font-size: 1.15rem; color: var(--accent); margin-top: 0; margin-bottom: 16px; font-weight: 700; }
+#search-input {
+  width: 100%; padding: 8px 12px; background: var(--bg-tertiary); border: 1px solid var(--border-color);
+  border-radius: 6px; color: #fff; font-size: 0.85rem; margin-bottom: 16px;
+}
+#search-input:focus { outline: none; border-color: var(--accent); }
+.nav-link { display: block; color: var(--text-muted); text-decoration: none; padding: 6px 8px; font-size: 0.9rem; border-radius: 4px; }
+.nav-link:hover { color: #fff; background: var(--bg-tertiary); }
+main { margin-left: 300px; padding: 40px 48px; max-width: 950px; flex: 1; }
+h1 { color: #fff; font-size: 2.2rem; margin-top: 0; padding-bottom: 16px; border-bottom: 1px solid var(--border-color); }
+h2 { color: var(--accent); font-size: 1.4rem; margin-top: 36px; margin-bottom: 14px; }
+h3 { color: #fff; font-size: 1.25rem; margin-top: 28px; margin-bottom: 12px; display: flex; align-items: center; gap: 10px; }
+h4 { color: var(--accent); font-size: 1rem; margin-top: 20px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+.badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
+.badge-pub { background: #064e3b; color: #6ee7b7; border: 1px solid #059669; }
+.badge-private { background: #334155; color: #cbd5e1; }
+.badge-type { background: #1e1b4b; color: #c7d2fe; border: 1px solid #4338ca; }
+.code-sig { background: #090d16; border: 1px solid var(--border-color); padding: 14px 18px; border-radius: 8px; overflow-x: auto; font-family: 'Consolas', 'Fira Code', monospace; font-size: 0.95rem; color: #e2e8f0; }
+.summary { color: #cbd5e1; line-height: 1.65; margin: 14px 0; font-size: 1rem; }
+/* Callout styling */
+.callout { margin: 16px 0; padding: 14px 18px; border-radius: 8px; border-left: 4px solid; font-size: 0.92rem; }
+.callout-header { font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+.callout-tip { border-color: #10b981; background: rgba(16, 185, 129, 0.08); color: #d1fae5; }
+.callout-tip .callout-header { color: #34d399; }
+.callout-warning { border-color: #f59e0b; background: rgba(245, 158, 11, 0.08); color: #fef3c7; }
+.callout-warning .callout-header { color: #fbbf24; }
+.callout-note { border-color: #0284c7; background: rgba(2, 132, 199, 0.08); color: #e0f2fe; }
+.callout-note .callout-header { color: #38bdf8; }
+.callout-deprecated { border-color: #e11d48; background: rgba(225, 29, 72, 0.08); color: #ffe4e6; }
+.callout-deprecated .callout-header { color: #fb7185; }
+/* Example card */
+.example-card { margin: 20px 0; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: #080c14; }
+.example-header { background: #162032; padding: 8px 16px; font-size: 0.82rem; font-weight: 700; color: #94a3b8; border-bottom: 1px solid var(--border-color); }
+.example-card pre { margin: 0; padding: 14px 18px; overflow-x: auto; font-family: monospace; font-size: 0.92rem; color: #e2e8f0; }
+/* Tables */
+table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 0.92rem; }
+th { background: #162032; color: #94a3b8; text-align: left; padding: 10px 14px; font-weight: 600; border-bottom: 1px solid var(--border-color); }
+td { padding: 10px 14px; border-bottom: 1px solid #1e293b; color: #cbd5e1; }
+ul { padding-left: 20px; color: #cbd5e1; line-height: 1.6; }
+hr { border: 0; border-top: 1px solid var(--border-color); margin: 36px 0; }
+</style>
+<script>
+function filterNav() {
+  var q = document.getElementById('search-input').value.toLowerCase();
+  var links = document.querySelectorAll('.nav-link');
+  links.forEach(function(l) {
+    l.style.display = l.textContent.toLowerCase().includes(q) ? 'block' : 'none';
+  });
+}
+</script>
+</head>
+<body>
+<nav>
+<h2>types.lm</h2>
+<input type="text" id="search-input" placeholder="Filter symbols..." oninput="filterNav()">
+<div id="nav-list">
+<a class="nav-link" href="#Vec2">Vec2 <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#vec2">vec2 <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#Rect">Rect <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#rect">rect <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#color_role_from_index">color_role_from_index <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#style_var_from_index">style_var_from_index <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#GUITheme">GUITheme <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#default_theme">default_theme <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#dark_theme">dark_theme <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#light_theme">light_theme <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#cyberpunk_theme">cyberpunk_theme <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#retro_theme">retro_theme <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+</div>
+</nav>
+<main>
+<h1>types.lm API Reference</h1>
+<h2>Module Overview</h2>
+<div class="summary"><p>std/game/types.lm
+Fundamental math primitives, color definitions, and themes for std.game IMGUI</p></div>
+<div id="Vec2">
+<h3>Vec2 <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame Vec2</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>var pub x: float</code> <em>(field)</em></li>
+<li><code>var pub y: float</code> <em>(field)</em></li>
+<li><code>pub init()</code> <em>(constructor)</em></li>
+<li><code>pub fn add(other: Vec2): Vec2</code> <em>(method)</em></li>
+<li><code>pub fn sub(other: Vec2): Vec2</code> <em>(method)</em></li>
+<li><code>pub fn scale(s: float): Vec2</code> <em>(method)</em></li>
+<li><code>pub fn mul(other: Vec2): Vec2</code> <em>(method)</em></li>
+<li><code>pub fn div(s: float): Vec2</code> <em>(method)</em></li>
+<li><code>pub fn dot(other: Vec2): float</code> <em>(method)</em></li>
+<li><code>pub fn cross(other: Vec2): float</code> <em>(method)</em></li>
+<li><code>pub fn mag_sq(): float</code> <em>(method)</em></li>
+<li><code>pub fn mag(): float</code> <em>(method)</em></li>
+<li><code>pub fn length(): float</code> <em>(method)</em></li>
+<li><code>pub fn length_sq(): float</code> <em>(method)</em></li>
+<li><code>pub fn normalize(): Vec2</code> <em>(method)</em></li>
+<li><code>pub fn dist_sq(other: Vec2): float</code> <em>(method)</em></li>
+<li><code>pub fn dist(other: Vec2): float</code> <em>(method)</em></li>
+<li><code>pub fn lerp(target: Vec2, t: float): Vec2</code> <em>(method)</em></li>
+<li><code>pub fn angle(): float</code> <em>(method)</em></li>
+<li><code>pub fn rotate(radians: float): Vec2</code> <em>(method)</em></li>
+<li><code>pub fn perpendicular(): Vec2</code> <em>(method)</em></li>
+<li><code>pub fn reflect(normal: Vec2): Vec2</code> <em>(method)</em></li>
+<li><code>pub fn clamp_length(max_len: float): Vec2</code> <em>(method)</em></li>
+</ul>
+</div><hr>
+<div id="vec2">
+<h3>vec2 <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn vec2(x: float, y: float): Vec2</code></pre>
+</div><hr>
+<div id="Rect">
+<h3>Rect <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame Rect</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>var pub x: float</code> <em>(field)</em></li>
+<li><code>var pub y: float</code> <em>(field)</em></li>
+<li><code>var pub w: float</code> <em>(field)</em></li>
+<li><code>var pub h: float</code> <em>(field)</em></li>
+<li><code>pub init()</code> <em>(constructor)</em></li>
+<li><code>pub fn contains(px: float, py: float): bool</code> <em>(method)</em></li>
+<li><code>pub fn contains_vec(p: Vec2): bool</code> <em>(method)</em></li>
+<li><code>pub fn intersects(other: Rect): bool</code> <em>(method)</em></li>
+<li><code>pub fn intersection(other: Rect): Rect</code> <em>(method)</em></li>
+<li><code>pub fn union_rect(other: Rect): Rect</code> <em>(method)</em></li>
+<li><code>pub fn center(): Vec2</code> <em>(method)</em></li>
+<li><code>pub fn expand(amount: float): Rect</code> <em>(method)</em></li>
+<li><code>pub fn clamp_point(p: Vec2): Vec2</code> <em>(method)</em></li>
+</ul>
+</div><hr>
+<div id="rect">
+<h3>rect <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn rect(x: float, y: float, w: float, h: float): Rect</code></pre>
+</div><hr>
+<div id="color_role_from_index">
+<h3>color_role_from_index <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn color_role_from_index(idx: int): ColorRole</code></pre>
+</div><hr>
+<div id="style_var_from_index">
+<h3>style_var_from_index <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn style_var_from_index(idx: int): StyleVar</code></pre>
+</div><hr>
+<div id="GUITheme">
+<h3>GUITheme <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame GUITheme</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>var pub bg_window: color.Color</code> <em>(field)</em></li>
+<li><code>var pub bg_window_title: color.Color</code> <em>(field)</em></li>
+<li><code>var pub bg_panel: color.Color</code> <em>(field)</em></li>
+<li><code>var pub text: color.Color</code> <em>(field)</em></li>
+<li><code>var pub text_muted: color.Color</code> <em>(field)</em></li>
+<li><code>var pub accent: color.Color</code> <em>(field)</em></li>
+<li><code>var pub btn_normal: color.Color</code> <em>(field)</em></li>
+<li><code>var pub btn_hover: color.Color</code> <em>(field)</em></li>
+<li><code>var pub btn_active: color.Color</code> <em>(field)</em></li>
+<li><code>var pub slider_track: color.Color</code> <em>(field)</em></li>
+<li><code>var pub slider_thumb: color.Color</code> <em>(field)</em></li>
+<li><code>var pub slider_thumb_hover: color.Color</code> <em>(field)</em></li>
+<li><code>var pub checkbox_border: color.Color</code> <em>(field)</em></li>
+<li><code>var pub checkbox_check: color.Color</code> <em>(field)</em></li>
+<li><code>var pub separator: color.Color</code> <em>(field)</em></li>
+<li><code>var pub frame_bg: color.Color</code> <em>(field)</em></li>
+<li><code>var pub frame_bg_hover: color.Color</code> <em>(field)</em></li>
+<li><code>var pub frame_bg_active: color.Color</code> <em>(field)</em></li>
+<li><code>var pub tab_normal: color.Color</code> <em>(field)</em></li>
+<li><code>var pub tab_active: color.Color</code> <em>(field)</em></li>
+<li><code>var pub plot_lines: color.Color</code> <em>(field)</em></li>
+<li><code>var pub plot_histogram: color.Color</code> <em>(field)</em></li>
+<li><code>var pub padding: float</code> <em>(field)</em></li>
+<li><code>var pub spacing: float</code> <em>(field)</em></li>
+<li><code>var pub item_height: float</code> <em>(field)</em></li>
+<li><code>var pub rounding: float</code> <em>(field)</em></li>
+<li><code>var pub font_scale: int</code> <em>(field)</em></li>
+<li><code>var pub hover_duration: float</code> <em>(field)</em></li>
+<li><code>var pub press_duration: float</code> <em>(field)</em></li>
+<li><code>var pub enter_duration: float</code> <em>(field)</em></li>
+<li><code>var pub exit_duration: float</code> <em>(field)</em></li>
+<li><code>var pub button_shadow: Shadow?</code> <em>(field)</em></li>
+<li><code>var pub window_shadow: Shadow?</code> <em>(field)</em></li>
+<li><code>var pub popup_shadow: Shadow?</code> <em>(field)</em></li>
+<li><code>pub init()</code> <em>(constructor)</em></li>
+</ul>
+</div><hr>
+<div id="default_theme">
+<h3>default_theme <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn default_theme(): GUITheme</code></pre>
+</div><hr>
+<div id="dark_theme">
+<h3>dark_theme <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn dark_theme(): GUITheme</code></pre>
+</div><hr>
+<div id="light_theme">
+<h3>light_theme <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn light_theme(): GUITheme</code></pre>
+</div><hr>
+<div id="cyberpunk_theme">
+<h3>cyberpunk_theme <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn cyberpunk_theme(): GUITheme</code></pre>
+</div><hr>
+<div id="retro_theme">
+<h3>retro_theme <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn retro_theme(): GUITheme</code></pre>
+</div><hr>
+</main>
+</body>
+</html>

@@ -42,30 +42,30 @@ fn get_number_from_string(s: str): int? {
 // Test function to demonstrate the unified system
 fn test_unified_system() {
     print("Testing unified Type? error system");
-    
+
     // Test successful operations
     var result1 = divide(10, 2);
     print("divide(10, 2) result:", result1);
-    
+
     // Test error case
     var result2 = divide(10, 0);
     print("divide(10, 0) result:", result2);
-    
+
     // Test chained operations
     var result3 = calculate(20, 4, 2);
     print("calculate(20, 4, 2) result:", result3);
-    
+
     // Test error propagation
     var result4 = calculate(20, 0, 2);
     print("calculate(20, 0, 2) result:", result4);
-    
+
     // Test ? else construct
     var safe_result1 = safe_calculate(10, 2);
     print("safe_calculate(10, 2) result:", safe_result1);
-    
+
     var safe_result2 = safe_calculate(10, 0);
     print("safe_calculate(10, 0) result:", safe_result2);
-    
+
     // Test string parsing
     var parsed1 = get_number_from_string("123");
     print("get_number_from_string('123') result:", parsed1);
@@ -73,4 +73,4 @@ fn test_unified_system() {
 
 // Main function
 
-    test_unified_system();
+test_unified_system();

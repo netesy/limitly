@@ -115,11 +115,11 @@ fn main(): int {
         user_code_section = substring(user_code_section, 0, subsequent_fn_pos + 7);
     }
 
-    assert(_builtin_string_contains(user_code_section, "TraitCallMethod") == false, "TraitCallMethod found on devirtualized path in main()");
+    assert(not _builtin_string_contains(user_code_section, "TraitCallMethod"), "TraitCallMethod found on devirtualized path in main()");
 
     // Assert 2: Direct frame call symbols are present
-    assert(_builtin_string_contains(content, "ListWrapper.init") == true, "ListWrapper.init call symbol missing");
-    assert(_builtin_string_contains(content, "ListWrapper.next") == true, "ListWrapper.next call symbol missing");
+    assert(_builtin_string_contains(content, "ListWrapper.init"), "ListWrapper.init call symbol missing");
+    assert(_builtin_string_contains(content, "ListWrapper.next"), "ListWrapper.next call symbol missing");
 
     // Assert 3: No instructions follow an explicit Return opcode in the same linear block
     var lines: [str] = [];
@@ -142,10 +142,10 @@ fn main(): int {
         var line = lines[j];
 
         var is_block_boundary = _builtin_string_contains(line, "fn ") or
-                                _builtin_string_contains(line, "===") or
-                                _builtin_string_contains(line, "bb_") or
-                                _builtin_string_contains(line, "label_") or
-                                (_builtin_string_contains(line, "L") and _builtin_string_contains(line, ":"));
+        _builtin_string_contains(line, "===") or
+        _builtin_string_contains(line, "bb_") or
+        _builtin_string_contains(line, "label_") or
+        (_builtin_string_contains(line, "L") and _builtin_string_contains(line, ":"));
 
         if (is_block_boundary) {
             seen_return = false;
@@ -153,9 +153,9 @@ fn main(): int {
             seen_return = true;
         } else if (seen_return) {
             var is_instruction = _builtin_string_contains(line, "=") or
-                                 _builtin_string_contains(line, "Region") or
-                                 _builtin_string_contains(line, "Call") or
-                                 _builtin_string_contains(line, "Jump");
+            _builtin_string_contains(line, "Region") or
+            _builtin_string_contains(line, "Call") or
+            _builtin_string_contains(line, "Jump");
             if (is_instruction) {
                 assert(false, "Unreachable instruction following Return opcode: " + line);
             }

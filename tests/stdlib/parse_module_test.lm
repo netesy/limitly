@@ -19,7 +19,7 @@ fn test_parse_frame(): int {
         err e => assert(false, "parse_int negative err failed")
     }
 
-    assert(p.parse_bool("true") == true, "parse_bool failed");
+    assert(p.parse_bool("true"), "parse_bool failed");
     return 1;
 }
 
@@ -31,7 +31,7 @@ fn test_parse_helpers(): int {
         err e => assert(false, "parse_int helper err failed")
     }
 
-    assert(parse.parse_bool("0") == false, "parse_bool helper failed");
+    assert(not parse.parse_bool("0"), "parse_bool helper failed");
 
     var rdt = parse.parse_datetime("1970-01-12 13:46:40");
     match (rdt) {

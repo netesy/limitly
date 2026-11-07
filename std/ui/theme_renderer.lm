@@ -21,7 +21,7 @@ pub fn apply_theme_color(p: paint.Paint, color_token: ui_types.Color): paint.Pai
 pub fn draw_focus_ring(cvs: canvas.Canvas, x: float, y: float, w: float, h: float, thickness: float = 2.0): nil {
     var ring_p = paint.Paint();
     ring_p.color_val = color.rgba(100, 180, 255, 1.0); // Use theme focus_ring color
-    
+
     // Top border
     cvs.draw_rect(rect.Rect(x=x - thickness, y=y - thickness, w=w + (2.0 * thickness), h=thickness), ring_p);
     // Bottom border
@@ -36,7 +36,7 @@ pub fn draw_focus_ring(cvs: canvas.Canvas, x: float, y: float, w: float, h: floa
 pub fn draw_rounded_rect(cvs: canvas.Canvas, r: rect.Rect, radius: float, bg_color: ui_types.Color): nil {
     var p = paint.Paint();
     apply_theme_color(p, bg_color);
-    
+
     // Simple approximation: draw rect with corner rectangles trimmed
     // Full implementation would require canvas.draw_rounded_rect
     cvs.draw_rect(r, p);

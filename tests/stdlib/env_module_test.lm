@@ -10,14 +10,14 @@ fn test_env_frame(): int {
     print("Testing Env Frame...");
     var e = env.Env() as env.Env;
 
-    assert(e.set("LYMAR_TEST_VAR", "frame_value") == true, "set failed");
+    assert(e.set("LYMAR_TEST_VAR", "frame_value"), "set failed");
     // `?` unwraps the optional value; `== nil` tests for absence.
     var value = e.get("LYMAR_TEST_VAR")? else {
         return 0;
     };
     assert(value == "frame_value", "get returned the wrong value");
 
-    assert(e.unset("LYMAR_TEST_VAR") == true, "unset failed");
+    assert(e.unset("LYMAR_TEST_VAR"), "unset failed");
     assert(e.get("LYMAR_TEST_VAR") == nil, "unset left the variable visible");
 
     // path() reads the PATH environment variable, so it belongs here.
@@ -28,13 +28,13 @@ fn test_env_frame(): int {
 fn test_env_helpers(): int {
     print("Testing Env Helpers...");
 
-    assert(env.set("LYMAR_TEST_VAR", "helper_value") == true, "set helper failed");
+    assert(env.set("LYMAR_TEST_VAR", "helper_value"), "set helper failed");
     var value = env.get("LYMAR_TEST_VAR")? else {
         return 0;
     };
     assert(value == "helper_value", "get helper returned the wrong value");
 
-    assert(env.unset("LYMAR_TEST_VAR") == true, "unset helper failed");
+    assert(env.unset("LYMAR_TEST_VAR"), "unset helper failed");
     assert(env.get("LYMAR_TEST_VAR") == nil, "unset helper left the variable visible");
 
     var all = env.vars();
@@ -47,15 +47,15 @@ fn test_empty_value_behavior(): int {
     // Whether a variable set to "" stays present is platform-defined: POSIX
     // environments store the empty value, Win32 removes the variable. Only the
     // return codes are asserted here, so the test holds on both.
-    assert(env.set("LYMAR_TEST_EMPTY", "") == true, "empty set failed");
-    assert(env.unset("LYMAR_TEST_EMPTY") == true, "unset empty failed");
+    assert(env.set("LYMAR_TEST_EMPTY", ""), "empty set failed");
+    assert(env.unset("LYMAR_TEST_EMPTY"), "unset empty failed");
     assert(env.get("LYMAR_TEST_EMPTY") == nil, "variable survived unset");
     return 1;
 }
 
 fn test_optional_unwrapping(): int {
     print("Testing Optional Unwrapping...");
-    assert(env.set("LYMAR_TEST_OPT", "opt_value") == true, "set for unwrap failed");
+    assert(env.set("LYMAR_TEST_OPT", "opt_value"), "set for unwrap failed");
 
     // `?` unwraps the payload of a present optional.
     var via_propagator = env.get("LYMAR_TEST_OPT")? else {
@@ -80,7 +80,7 @@ fn test_optional_unwrapping(): int {
     var e = env.Env() as env.Env;
     assert(e.get_or("LYMAR_TEST_OPT", "wrong") == "opt_value", "Env.get_or returned the wrong value");
 
-    assert(env.unset("LYMAR_TEST_OPT") == true, "unset after unwrap failed");
+    assert(env.unset("LYMAR_TEST_OPT"), "unset after unwrap failed");
     return 1;
 }
 
@@ -107,8 +107,8 @@ fn test_env_advanced(): int {
     assert(not env.has("LYMAR_NONEXISTENT_VAR"), "has failed for absent var");
     assert(env.get_int("LYMAR_INT_VAR", 0) == 42, "get_int failed");
     assert(env.get_int("LYMAR_ABSENT_VAR", 99) == 99, "get_int fallback failed");
-    assert(env.get_bool("LYMAR_BOOL_VAR", false) == true, "get_bool failed");
-    assert(env.get_bool("LYMAR_ABSENT_VAR", true) == true, "get_bool fallback failed");
+    assert(env.get_bool("LYMAR_BOOL_VAR", false), "get_bool failed");
+    assert(env.get_bool("LYMAR_ABSENT_VAR", true), "get_bool fallback failed");
 
     var dict = env.to_dict();
     assert(dict["LYMAR_INT_VAR"] == "42", "to_dict failed");

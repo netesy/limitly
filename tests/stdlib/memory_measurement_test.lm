@@ -13,20 +13,20 @@ fn main(): int {
 
     // 2. Resize and re-measure.
     var grew = m.resize(256);
-    assert(grew == true, "resize should succeed");
+    assert(grew, "resize should succeed");
     assert(m.size() == 256, "measurement after resize should be 256 bytes");
 
     // 3. Round-trip bytes within a buffer sized to the content.
     var packed = m.resize(5);
-    assert(packed == true, "resize to content size should succeed");
+    assert(packed, "resize to content size should succeed");
     assert(m.size() == 5, "measurement should track the resize to 5 bytes");
     var wrote = m.write("hello");
-    assert(wrote == true, "write within capacity should succeed");
+    assert(wrote, "write within capacity should succeed");
     assert(m.read() == "hello", "read should return written bytes");
 
     // 4. Release the buffer; measurement drops to zero.
     var released = m.release();
-    assert(released == true, "release should succeed");
+    assert(released, "release should succeed");
     assert(m.size() == 0, "measurement after release should be 0 bytes");
 
     m.close();

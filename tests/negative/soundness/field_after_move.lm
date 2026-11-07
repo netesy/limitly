@@ -6,7 +6,7 @@ frame Data {
 }
 
 fn consume(d: Data) {
-    var transferred = d;
+    var _transferred = d;
 }
 
 var data = Data { value: 42 };

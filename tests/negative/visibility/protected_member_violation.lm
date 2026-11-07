@@ -2,7 +2,7 @@
 // Accessing protected member from outside
 
 frame Base {
-   prot value: int;
+    prot value: int;
 }
 
 var base = Base { value: 42 };

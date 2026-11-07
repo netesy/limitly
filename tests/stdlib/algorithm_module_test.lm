@@ -2,20 +2,16 @@
 
 import std.algorithm as algo;
 
-fn is_even(x: any): bool {
-    var val_int = x as int;
-    return val_int % 2 == 0;
+fn is_even(x: int): bool {
+    return x % 2 == 0;
 }
 
-fn add_ten(x: any): any {
-    var val_int = x as int;
-    return val_int + 10;
+fn add_ten(x: int): int {
+    return x + 10;
 }
 
-fn sum_reducer(acc: any, x: any): any {
-    var val_acc = acc as int;
-    var val_x = x as int;
-    return val_acc + val_x;
+fn sum_reducer(acc: int, x: int): int {
+    return acc + x;
 }
 
 fn test_search(): int {
@@ -27,14 +23,14 @@ fn test_search(): int {
 
     assert(algo.find_if(items, is_even) == 1, "find_if failed"); // index of 2
 
-    assert(algo.any_match(items, is_even) == true, "any_match true failed");
-    assert(algo.any_match([1, 3, 5], is_even) == false, "any_match false failed");
+    assert(algo.any_match(items, is_even), "any_match true failed");
+    assert(not algo.any_match([1, 3, 5], is_even), "any_match false failed");
 
-    assert(algo.none([1, 3, 5], is_even) == true, "none true failed");
-    assert(algo.none(items, is_even) == false, "none failed");
+    assert(algo.none([1, 3, 5], is_even), "none true failed");
+    assert(not algo.none(items, is_even), "none failed");
 
-    assert(algo.all([2, 4, 6], is_even) == true, "all true failed");
-    assert(algo.all(items, is_even) == false, "all false failed");
+    assert(algo.all([2, 4, 6], is_even), "all true failed");
+    assert(not algo.all(items, is_even), "all false failed");
 
     assert(algo.count([1, 2, 2, 3, 2], 2) == 3, "count failed");
     assert(algo.linear_search(items, 4) == 3, "linear_search failed");
@@ -76,11 +72,11 @@ fn test_partition(): int {
     // Elements before pivot_idx should satisfy is_even, elements after should not
     var i = 0;
     while (i < pivot_idx) {
-        assert(is_even(items[i]) == true, "partition left failed");
+        assert(is_even(items[i]), "partition left failed");
         i = i + 1;
     }
     while (i < len(items)) {
-        assert(is_even(items[i]) == false, "partition right failed");
+        assert(not is_even(items[i]), "partition right failed");
         i = i + 1;
     }
     return 1;

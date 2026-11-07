@@ -8,6 +8,6 @@ fn main() {
     var res = string.contains(replaced, "Language");
     print("Contains res:");
     print(res);
-    assert(res == true, "Contains failure");
+    assert(res, "Contains failure");
     print("Passed!");
 }

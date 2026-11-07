@@ -20,12 +20,12 @@ fn test_resize() {
     assert(ui_context.get_viewport_height() == 600.0, "initial viewport_h should be 600");
 
     var root = ui.column([
-        ui.row([
-            ui.text("Title").bold(),
-            ui.spacer(),
-            ui.button("Action", nil)
-        ]),
-        ui.spacer()
+    ui.row([
+    ui.text("Title").bold(),
+    ui.spacer(),
+    ui.button("Action", nil)
+    ]),
+    ui.spacer()
     ]);
     app.ui(root);
 

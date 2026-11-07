@@ -38,14 +38,14 @@ var j = 1;
 while (j <= 20) {
     var square_result = math_module.square(j);
     var add_result = math_module.add(j, 1);
-    
+
     if (square_result > 10) {
         operations += 1;
     }
     if (add_result > 5) {
         operations += 1;
     }
-    
+
     j += 1;
 }
 print("Operations completed: {operations}");

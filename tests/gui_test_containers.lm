@@ -7,10 +7,10 @@ import std.color as color;
 
 fn build_view(): ui.Widget {
     val header = ui.row([
-        ui.text("CONTAINERS & STRUCTURE TEST").font_size(16.0).bold().color(color.rgb(255, 255, 255)),
-        ui.badge("TAB 3 / 4").background(color.rgb(99, 102, 241)),
-        ui.spacer(1.0),
-        ui.indicator("online", "Topology Engine Synchronized")
+    ui.text("CONTAINERS & STRUCTURE TEST").font_size(16.0).bold().color(color.rgb(255, 255, 255)),
+    ui.badge("TAB 3 / 4").background(color.rgb(99, 102, 241)),
+    ui.spacer(1.0),
+    ui.indicator("online", "Topology Engine Synchronized")
     ]).spacing(12.0).height(28.0);
 
     val table_headers = ["Node ID", "Instance Type", "Region", "Memory", "Status"];
@@ -23,25 +23,25 @@ fn build_view(): ui.Widget {
     val tbl = ui.table(table_headers, table_rows);
 
     val tree = ui.tree_node("Project Limitless", [
-        ui.tree_node("src", [
-            ui.text("main.lm"),
-            ui.text("pipeline.lm"),
-            ui.tree_node("transforms", [
-                ui.text("SSARenamer.cpp"),
-                ui.text("ConstantFolder.cpp")
-            ], true)
-        ], true),
-        ui.tree_node("std", [
-            ui.text("ui.lm"),
-            ui.text("app.lm")
-        ], false)
+    ui.tree_node("src", [
+    ui.text("main.lm"),
+    ui.text("pipeline.lm"),
+    ui.tree_node("transforms", [
+    ui.text("SSARenamer.cpp"),
+    ui.text("ConstantFolder.cpp")
+    ], true)
+    ], true),
+    ui.tree_node("std", [
+    ui.text("ui.lm"),
+    ui.text("app.lm")
+    ], false)
     ], true);
 
     val time_events = [
-        ui.text("08:00 AM - Initialized cluster orchestrator"),
-        ui.text("10:30 AM - Scaled replica pool to 16 workers"),
-        ui.text("01:15 PM - Ingress TLS certificate renewed"),
-        ui.text("03:45 PM - Deployed application version 2.4.0")
+    ui.text("08:00 AM - Initialized cluster orchestrator"),
+    ui.text("10:30 AM - Scaled replica pool to 16 workers"),
+    ui.text("01:15 PM - Ingress TLS certificate renewed"),
+    ui.text("03:45 PM - Deployed application version 2.4.0")
     ];
     val tline = ui.timeline(time_events);
 
@@ -51,33 +51,33 @@ fn build_view(): ui.Widget {
     val acc2 = ui.accordion("Database Sharding & Read Replicas (Closed)", ui.text("Primary: PostgreSQL 16 (Multi-AZ) | Replicas: 3 read-pools active"), false);
 
     val left_col = ui.column([
-        ui.text("Infrastructure Node Instances:").font_size(12.0).color(color.rgb(160, 165, 185)),
-        tbl,
-        acc1,
-        acc2
+    ui.text("Infrastructure Node Instances:").font_size(12.0).color(color.rgb(160, 165, 185)),
+    tbl,
+    acc1,
+    acc2
     ]).spacing(8.0).width(480.0);
 
     val right_col = ui.column([
-        ui.row([
-            ui.column([
-                ui.text("Release Timeline:").font_size(12.0).color(color.rgb(160, 165, 185)),
-                tline
-            ]).spacing(4.0).width(200.0),
-            ui.column([
-                ui.text("Project File Tree:").font_size(12.0).color(color.rgb(160, 165, 185)),
-                tree
-            ]).spacing(4.0).width(160.0)
-        ]).spacing(10.0),
-        ui.text("Maintenance Calendar:").font_size(12.0).color(color.rgb(160, 165, 185)),
-        cal
+    ui.row([
+    ui.column([
+    ui.text("Release Timeline:").font_size(12.0).color(color.rgb(160, 165, 185)),
+    tline
+    ]).spacing(4.0).width(200.0),
+    ui.column([
+    ui.text("Project File Tree:").font_size(12.0).color(color.rgb(160, 165, 185)),
+    tree
+    ]).spacing(4.0).width(160.0)
+    ]).spacing(10.0),
+    ui.text("Maintenance Calendar:").font_size(12.0).color(color.rgb(160, 165, 185)),
+    cal
     ]).spacing(8.0).width(380.0);
 
     return ui.column([
-        header,
-        ui.row([
-            left_col,
-            right_col
-        ]).spacing(12.0)
+    header,
+    ui.row([
+    left_col,
+    right_col
+    ]).spacing(12.0)
     ]).spacing(12.0).padding(14.0);
 }
 

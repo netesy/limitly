@@ -27,7 +27,7 @@ assert(userId == 12345, "Type alias should work for uint");
 assert(userName == "Alice", "Type alias should work for str");
 assert(userAge == 25, "Type alias should work for int");
 assert(userScore == 95.5, "Type alias should work for float");
-assert(isUserActive == true, "Type alias should work for bool");
+assert(isUserActive, "Type alias should work for bool");
 
 // Test 2: All primitive type aliases
 print("\n--- Test 2: Primitive Type Aliases ---");
@@ -52,7 +52,7 @@ print("Float: {floatVal}");
 assert(intVal == 42, "Primitive type alias should work for int");
 assert(uintVal == 100, "Primitive type alias should work for uint");
 assert(strVal == "hello", "Primitive type alias should work for str");
-assert(boolVal == true, "Primitive type alias should work for bool");
+assert(boolVal, "Primitive type alias should work for bool");
 assert(floatVal == 3.14, "Primitive type alias should work for float");
 
 // Test 3: Type alias compatibility
@@ -122,7 +122,7 @@ type GlobalType = int;
     var localVar: str = "local";
     print("Global in local scope: {globalVar}");
     print("Local variable: {localVar}");
-    
+
     assert(globalVar == 999, "Global type alias should work in local scope");
     assert(localVar == "local", "Local variable should work correctly");
 }

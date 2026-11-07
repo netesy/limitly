@@ -8,24 +8,24 @@ pub fn dialog(title: str, content: ui_types.Widget, is_open: bool = true, width:
     if (not is_open) {
         return ui_types.empty();
     }
-    
+
     var close_btn = ui_types.button("✕")
-        .width(32.0)
-        .height(32.0)
-        .background(color.rgb(255, 100, 100))
-        .on_click(on_close);
-    
+    .width(32.0)
+    .height(32.0)
+    .background(color.rgb(255, 100, 100))
+    .on_click(on_close);
+
     var header = ui_types.row([
-        ui_types.text(title).font_size(18.0).bold(),
-        ui_types.spacer(1.0),
-        close_btn
+    ui_types.text(title).font_size(18.0).bold(),
+    ui_types.spacer(1.0),
+    close_btn
     ]);
     header.spacing_val = 8.0;
     header.padding_bottom = 12.0;
-    
+
     var dialog_content = ui_types.column([
-        header,
-        content
+    header,
+    content
     ]);
     dialog_content.background_color = color.rgb(24, 26, 34);
     dialog_content.foreground_color = color.white;
@@ -37,7 +37,7 @@ pub fn dialog(title: str, content: ui_types.Widget, is_open: bool = true, width:
     dialog_content.spacing_val = 12.0;
     dialog_content.width_val = width;
     dialog_content.height_val = height;
-    
+
     // Dynamic centering using active viewport
     var vw = viewport.global_viewport.width;
     if (vw <= 0.0) { vw = 800.0; }
@@ -48,21 +48,21 @@ pub fn dialog(title: str, content: ui_types.Widget, is_open: bool = true, width:
     var y = (vh - height) / 2.0;
     if (x < 0.0) { x = 0.0; }
     if (y < 0.0) { y = 0.0; }
-    
+
     return ui_types.overlay(dialog_content, x, y, width, height);
 }
 
 // Alert dialog (modal with message and OK button)
 pub fn alert(title: str, message: str, on_ok: any = nil): ui_types.Widget {
     var ok_btn = ui_types.button("OK").on_click(on_ok);
-    
+
     var content = ui_types.column([
-        ui_types.text(message),
-        ui_types.spacer(0.5),
-        ok_btn
+    ui_types.text(message),
+    ui_types.spacer(0.5),
+    ok_btn
     ]);
     content.spacing_val = 12.0;
-    
+
     return dialog(title, content, true, 320.0, 180.0, on_ok);
 }
 
@@ -73,22 +73,22 @@ pub fn alert_dialog(title: str, message: str, on_ok: any = nil): ui_types.Widget
 // Confirm dialog (modal with message and Yes/No buttons)
 pub fn confirm(title: str, message: str, on_yes: any = nil, on_no: any = nil): ui_types.Widget {
     var yes_btn = ui_types.button("Yes")
-        .background(color.rgb(80, 220, 130))
-        .on_click(on_yes);
+    .background(color.rgb(80, 220, 130))
+    .on_click(on_yes);
     var no_btn = ui_types.button("No")
-        .background(color.rgb(255, 100, 100))
-        .on_click(on_no);
-    
+    .background(color.rgb(255, 100, 100))
+    .on_click(on_no);
+
     var buttons = ui_types.row([yes_btn, no_btn]);
     buttons.spacing_val = 12.0;
-    
+
     var content = ui_types.column([
-        ui_types.text(message),
-        ui_types.spacer(0.5),
-        buttons
+    ui_types.text(message),
+    ui_types.spacer(0.5),
+    buttons
     ]);
     content.spacing_val = 12.0;
-    
+
     return dialog(title, content, true, 360.0, 200.0, on_no);
 }
 

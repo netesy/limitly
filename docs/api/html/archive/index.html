@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>index.lm - Lymar API Reference</title>
+<style>
+:root {
+  --bg-primary: #0a0e17;
+  --bg-secondary: #111827;
+  --bg-tertiary: #1f2937;
+  --accent: #38bdf8;
+  --accent-hover: #7dd3fc;
+  --text-main: #f1f5f9;
+  --text-muted: #94a3b8;
+  --border-color: #334155;
+}
+* { box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif;
+  margin: 0; padding: 0; background: var(--bg-primary); color: var(--text-main); display: flex;
+}
+nav {
+  width: 300px; height: 100vh; overflow-y: auto; background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color); padding: 24px 20px; position: fixed;
+}
+nav h2 { font-size: 1.15rem; color: var(--accent); margin-top: 0; margin-bottom: 16px; font-weight: 700; }
+#search-input {
+  width: 100%; padding: 8px 12px; background: var(--bg-tertiary); border: 1px solid var(--border-color);
+  border-radius: 6px; color: #fff; font-size: 0.85rem; margin-bottom: 16px;
+}
+#search-input:focus { outline: none; border-color: var(--accent); }
+.nav-link { display: block; color: var(--text-muted); text-decoration: none; padding: 6px 8px; font-size: 0.9rem; border-radius: 4px; }
+.nav-link:hover { color: #fff; background: var(--bg-tertiary); }
+main { margin-left: 300px; padding: 40px 48px; max-width: 950px; flex: 1; }
+h1 { color: #fff; font-size: 2.2rem; margin-top: 0; padding-bottom: 16px; border-bottom: 1px solid var(--border-color); }
+h2 { color: var(--accent); font-size: 1.4rem; margin-top: 36px; margin-bottom: 14px; }
+h3 { color: #fff; font-size: 1.25rem; margin-top: 28px; margin-bottom: 12px; display: flex; align-items: center; gap: 10px; }
+h4 { color: var(--accent); font-size: 1rem; margin-top: 20px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+.badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
+.badge-pub { background: #064e3b; color: #6ee7b7; border: 1px solid #059669; }
+.badge-private { background: #334155; color: #cbd5e1; }
+.badge-type { background: #1e1b4b; color: #c7d2fe; border: 1px solid #4338ca; }
+.code-sig { background: #090d16; border: 1px solid var(--border-color); padding: 14px 18px; border-radius: 8px; overflow-x: auto; font-family: 'Consolas', 'Fira Code', monospace; font-size: 0.95rem; color: #e2e8f0; }
+.summary { color: #cbd5e1; line-height: 1.65; margin: 14px 0; font-size: 1rem; }
+/* Callout styling */
+.callout { margin: 16px 0; padding: 14px 18px; border-radius: 8px; border-left: 4px solid; font-size: 0.92rem; }
+.callout-header { font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+.callout-tip { border-color: #10b981; background: rgba(16, 185, 129, 0.08); color: #d1fae5; }
+.callout-tip .callout-header { color: #34d399; }
+.callout-warning { border-color: #f59e0b; background: rgba(245, 158, 11, 0.08); color: #fef3c7; }
+.callout-warning .callout-header { color: #fbbf24; }
+.callout-note { border-color: #0284c7; background: rgba(2, 132, 199, 0.08); color: #e0f2fe; }
+.callout-note .callout-header { color: #38bdf8; }
+.callout-deprecated { border-color: #e11d48; background: rgba(225, 29, 72, 0.08); color: #ffe4e6; }
+.callout-deprecated .callout-header { color: #fb7185; }
+/* Example card */
+.example-card { margin: 20px 0; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: #080c14; }
+.example-header { background: #162032; padding: 8px 16px; font-size: 0.82rem; font-weight: 700; color: #94a3b8; border-bottom: 1px solid var(--border-color); }
+.example-card pre { margin: 0; padding: 14px 18px; overflow-x: auto; font-family: monospace; font-size: 0.92rem; color: #e2e8f0; }
+/* Tables */
+table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 0.92rem; }
+th { background: #162032; color: #94a3b8; text-align: left; padding: 10px 14px; font-weight: 600; border-bottom: 1px solid var(--border-color); }
+td { padding: 10px 14px; border-bottom: 1px solid #1e293b; color: #cbd5e1; }
+ul { padding-left: 20px; color: #cbd5e1; line-height: 1.6; }
+hr { border: 0; border-top: 1px solid var(--border-color); margin: 36px 0; }
+</style>
+<script>
+function filterNav() {
+  var q = document.getElementById('search-input').value.toLowerCase();
+  var links = document.querySelectorAll('.nav-link');
+  links.forEach(function(l) {
+    l.style.display = l.textContent.toLowerCase().includes(q) ? 'block' : 'none';
+  });
+}
+</script>
+</head>
+<body>
+<nav>
+<h2>index.lm</h2>
+<input type="text" id="search-input" placeholder="Filter symbols..." oninput="filterNav()">
+<div id="nav-list">
+<a class="nav-link" href="#compression_method_code">compression_method_code <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#Entry">Entry <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#Archive">Archive <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#open_tar">open_tar <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#read_tar_from_bytes">read_tar_from_bytes <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#open_zip">open_zip <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#read_zip_from_bytes">read_zip_from_bytes <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#create_tar">create_tar <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#create_zip">create_zip <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#extract_tar">extract_tar <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#extract_zip">extract_zip <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#write_ascii_into">write_ascii_into <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#format_octal">format_octal <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#append_u16_le">append_u16_le <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#append_u32_le">append_u32_le <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#ensure_dir">ensure_dir <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#ensure_parent_dir">ensure_parent_dir <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+</div>
+</nav>
+<main>
+<h1>index.lm API Reference</h1>
+<h2>Module Overview</h2>
+<div class="summary"><p>std/archive/index.lm
+
+Complete Archive management for TAR and ZIP formats.
+Supports reading, creating, listing, and extracting archive entries.</p></div>
+<div id="compression_method_code">
+<h3>compression_method_code <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn compression_method_code(m: CompressionMethod): int</code></pre>
+<div class="summary"><p>Converts a CompressionMethod enum variant into its numerical ZIP/TAR header code.</p></div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>m</code></td><td>The compression method enum variant.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Returns 0 for Stored, 8 for Deflated.</p>
+</div><hr>
+<div id="Entry">
+<h3>Entry <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame Entry</code></pre>
+<div class="summary"><p>Represents a single file or directory node stored inside an archive.</p></div>
+<div class="callout callout-tip">
+<div class="callout-header"><span>💡</span> Idiomatic Usage & Best Practice</div>
+<div class="callout-content"><p>Query `is_directory` before attempting to read text or binary content.</p></div>
+</div>
+<div class="callout callout-note">
+<div class="callout-header"><span>ℹ️</span> Note</div>
+<div class="callout-content"><p>Instances store the entry payload, uncompressed byte size, and compression method.</p></div>
+</div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>name</code></td><td>Relative path within the archive hierarchy (e.g. "docs/readme.txt").</td></tr>
+<tr><td><code>size</code></td><td>Uncompressed byte size. Inferred automatically if content is provided.</td></tr>
+<tr><td><code>is_dir</code></td><td>True if this entry represents a directory node.</td></tr>
+<tr><td><code>content</code></td><td>Raw text or binary data contained within the entry.</td></tr>
+<tr><td><code>method</code></td><td>Compression method applied (0 for Stored, 8 for Deflated).</td></tr>
+</tbody>
+</table>
+<div class="example-card">
+<div class="example-header"><span>✨</span> Example: Idiomatic Usage</div>
+<pre><code>var entry = Entry("hello.txt", content="Hello, World!");
+print("Size: {entry.size()} bytes");</code></pre>
+</div>
+<h4>Members</h4>
+<ul>
+<li><code>var pub filename: str</code> <em>(field)</em></li>
+<li><code>var pub uncompressed_size: int</code> <em>(field)</em></li>
+<li><code>var pub is_directory: bool</code> <em>(field)</em></li>
+<li><code>var pub data: str</code> <em>(field)</em></li>
+<li><code>var pub compression_method: int</code> <em>(field)</em></li>
+<li><code>pub init(name: str)</code> <em>(constructor)</em></li>
+<li><code>pub fn method(): CompressionMethod</code> <em>(method)</em></li>
+<li><code>pub fn text(): str</code> <em>(method)</em></li>
+<li><code>pub fn size(): int</code> <em>(method)</em></li>
+</ul>
+</div><hr>
+<div id="Archive">
+<h3>Archive <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame Archive</code></pre>
+<div class="summary"><p>Multi-entry archive container supporting TAR (USTAR) and ZIP serialization.</p></div>
+<div class="callout callout-tip">
+<div class="callout-header"><span>💡</span> Idiomatic Usage & Best Practice</div>
+<div class="callout-content"><p>Methods like `add_file` and `add_directory` return `self` for fluent chaining.</p></div>
+</div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>path</code></td><td>Optional default filesystem path associated with this archive.</td></tr>
+</tbody>
+</table>
+<div class="example-card">
+<div class="example-header"><span>✨</span> Example: Idiomatic Usage</div>
+<pre><code>var arch = Archive();
+arch.add_file("config.json", "{}");
+var zip_data = arch.to_zip_bytes();</code></pre>
+</div>
+<h4>Members</h4>
+<ul>
+<li><code>var pub entries: list</code> <em>(field)</em></li>
+<li><code>var pub archive_path: str</code> <em>(field)</em></li>
+<li><code>pub init()</code> <em>(constructor)</em></li>
+<li><code>pub fn add_entry(entry: Entry): nil</code> <em>(method)</em></li>
+<li><code>pub fn add_file(name: str, content: str): Archive</code> <em>(method)</em></li>
+<li><code>pub fn add_directory(name: str): Archive</code> <em>(method)</em></li>
+<li><code>pub fn get_entry(name: str): Entry?</code> <em>(method)</em></li>
+<li><code>pub fn read_text(name: str): str?</code> <em>(method)</em></li>
+<li><code>pub fn has_entry(name: str): bool</code> <em>(method)</em></li>
+<li><code>pub fn count(): int</code> <em>(method)</em></li>
+<li><code>pub fn list(): list</code> <em>(method)</em></li>
+<li><code>pub fn extract(target_dir: str): bool</code> <em>(method)</em></li>
+<li><code>pub fn extract_entry(name: str, target_dir: str): bool</code> <em>(method)</em></li>
+<li><code>pub fn to_tar_bytes(): list</code> <em>(method)</em></li>
+<li><code>pub fn write_tar(output_path: str): bool</code> <em>(method)</em></li>
+<li><code>pub fn to_zip_bytes(): list</code> <em>(method)</em></li>
+<li><code>pub fn write_zip(output_path: str): bool</code> <em>(method)</em></li>
+</ul>
+</div><hr>
+<div id="open_tar">
+<h3>open_tar <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn open_tar(path: str): Archive?</code></pre>
+<div class="summary"><p>Opens and parses a TAR archive from disk.</p></div>
+<h4>Contracts & Preconditions</h4>
+<ul>
+<li><code>requires len(path) > 0</code></li>
+</ul>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>path</code></td><td>Filesystem path to the TAR archive.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Returns ok(Archive) on success, or nil if file not found or invalid.</p>
+</div><hr>
+<div id="read_tar_from_bytes">
+<h3>read_tar_from_bytes <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn read_tar_from_bytes(path: str, bytes: list): Archive</code></pre>
+<div class="summary"><p>Parses a byte array containing USTAR TAR formatted data into an Archive.</p></div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>path</code></td><td>Label path to associate with the parsed Archive.</td></tr>
+<tr><td><code>bytes</code></td><td>In-memory byte array of TAR archive records.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Populated Archive instance.</p>
+</div><hr>
+<div id="open_zip">
+<h3>open_zip <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn open_zip(path: str): Archive?</code></pre>
+<div class="summary"><p>Opens and parses a ZIP archive from disk.</p></div>
+<h4>Contracts & Preconditions</h4>
+<ul>
+<li><code>requires len(path) > 0</code></li>
+</ul>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>path</code></td><td>Filesystem path to the ZIP archive.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Returns ok(Archive) on success, or nil if file not found or invalid.</p>
+</div><hr>
+<div id="read_zip_from_bytes">
+<h3>read_zip_from_bytes <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn read_zip_from_bytes(path: str, bytes: list): Archive</code></pre>
+<div class="summary"><p>Parses an in-memory byte array containing PKZip formatted data into an Archive.</p></div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>path</code></td><td>Label path to associate with the parsed Archive.</td></tr>
+<tr><td><code>bytes</code></td><td>In-memory byte array of ZIP records.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Populated Archive instance.</p>
+</div><hr>
+<div id="create_tar">
+<h3>create_tar <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn create_tar(path: str = ...): Archive</code></pre>
+<div class="summary"><p>Creates a new, empty TAR archive builder.</p></div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>path</code></td><td>Optional target path.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Fresh Archive container.</p>
+</div><hr>
+<div id="create_zip">
+<h3>create_zip <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn create_zip(path: str = ...): Archive</code></pre>
+<div class="summary"><p>Creates a new, empty ZIP archive builder.</p></div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>path</code></td><td>Optional target path.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Fresh Archive container.</p>
+</div><hr>
+<div id="extract_tar">
+<h3>extract_tar <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn extract_tar(archive_path: str, target_dir: str): bool</code></pre>
+<div class="summary"><p>Extracts an entire TAR archive on disk into the destination directory.</p></div>
+<h4>Contracts & Preconditions</h4>
+<ul>
+<li><code>requires len(archive_path) > 0 and len(target_dir) > 0</code></li>
+</ul>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>archive_path</code></td><td>Path to the source .tar file.</td></tr>
+<tr><td><code>target_dir</code></td><td>Destination directory to unpack files into.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Returns true if extracted successfully, false otherwise.</p>
+</div><hr>
+<div id="extract_zip">
+<h3>extract_zip <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn extract_zip(archive_path: str, target_dir: str): bool</code></pre>
+<div class="summary"><p>Extracts an entire ZIP archive on disk into the destination directory.</p></div>
+<h4>Contracts & Preconditions</h4>
+<ul>
+<li><code>requires len(archive_path) > 0 and len(target_dir) > 0</code></li>
+</ul>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>archive_path</code></td><td>Path to the source .zip file.</td></tr>
+<tr><td><code>target_dir</code></td><td>Destination directory to unpack files into.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Returns true if extracted successfully, false otherwise.</p>
+</div><hr>
+<div id="write_ascii_into">
+<h3>write_ascii_into <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn write_ascii_into(arr: list, start_idx: int, text: str)</code></pre>
+<div class="summary"><p>Helpers</p></div>
+</div><hr>
+<div id="format_octal">
+<h3>format_octal <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn format_octal(val_num: int, digits: int): str</code></pre>
+</div><hr>
+<div id="append_u16_le">
+<h3>append_u16_le <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn append_u16_le(arr: list, val_num: int)</code></pre>
+</div><hr>
+<div id="append_u32_le">
+<h3>append_u32_le <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn append_u32_le(arr: list, val_num: int)</code></pre>
+</div><hr>
+<div id="ensure_dir">
+<h3>ensure_dir <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn ensure_dir(path: str)</code></pre>
+</div><hr>
+<div id="ensure_parent_dir">
+<h3>ensure_parent_dir <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn ensure_parent_dir(file_path: str)</code></pre>
+</div><hr>
+</main>
+</body>
+</html>

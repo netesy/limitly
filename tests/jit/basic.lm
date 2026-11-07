@@ -33,29 +33,29 @@ print(1 != 2);
 // ~~~ Control Flow: If/Else ~~~
 print("~~~ Control Flow: If/Else ~~~");
 if (true) {
-  print("if(true) -> then");
+    print("if(true) -> then");
 } else {
-  print("if(true) -> else");
+    print("if(true) -> else");
 }
 
 if (false) {
-  print("if(false) -> then");
+    print("if(false) -> then");
 } else {
-  print("if(false) -> else");
+    print("if(false) -> else");
 }
 
 // ~~~ Control Flow: While Loop ~~~
 print("~~~ Control Flow: While Loop ~~~");
 var i = 0;
 while (i < 3) {
-  print(i);
-  i = i + 1;
+    print(i);
+    i = i + 1;
 }
 
 // ~~~ Control Flow: For Loop ~~~
 print("~~~ Control Flow: For Loop ~~~");
 for (var j = 0; j < 3; j = j + 1) {
-  print(j);
+    print(j);
 }
 
 // // ~~~ Variables ~~~

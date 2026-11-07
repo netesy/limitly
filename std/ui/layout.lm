@@ -88,21 +88,21 @@ fn measure_width(w: ui_types.Widget, available_w: float): float {
     }
     if (w.kind == ui_types.KIND_CONTAINER) {
         if (w.is_vertical == 0) { // Row
-            var total = w.padding_left + w.padding_right;
-            var i = 0;
-            while (i < len(w.children)) {
-                total = total + measure_width(w.children[i], available_w);
-                if (i < len(w.children) - 1) {
-                    total = total + w.spacing_val;
-                }
-                i = i + 1;
+        var total = w.padding_left + w.padding_right;
+        var i = 0;
+        while (i < len(w.children)) {
+            total = total + measure_width(w.children[i], available_w);
+            if (i < len(w.children) - 1) {
+                total = total + w.spacing_val;
             }
-            if (total > available_w) total = available_w;
-            return total;
+            i = i + 1;
         }
-        return available_w;
+        if (total > available_w) total = available_w;
+        return total;
     }
     return available_w;
+}
+return available_w;
 }
 
 // Compute full layout tree with positions and sizes
@@ -112,78 +112,78 @@ pub fn compute_layout(widget: ui_types.Widget, x: float, y: float, available_w: 
     box.y = y;
     box.width = available_w;
     box.height = available_h;
-    
+
     if (widget.kind == ui_types.KIND_CONTAINER) {
         var curr_x = x + widget.padding_left;
         var curr_y = y + widget.padding_top;
         var inner_w = available_w - widget.padding_left - widget.padding_right;
         var inner_h = available_h - widget.padding_top - widget.padding_bottom;
-        
+
         if (widget.is_vertical == 1) { // Column layout
-            var i = 0;
-            while (i < len(widget.children)) {
-                var child = widget.children[i];
-                var child_h = measure_height(child);
-                var child_w = inner_w;
-                if (child.width_val > 0.0) {
-                    child_w = child.width_val;
-                }
-                
-                var child_box = compute_layout(child, curr_x, curr_y, child_w, child_h);
-                box.children.append(child_box);
-                
-                curr_y = curr_y + child_h + widget.spacing_val;
-                i = i + 1;
+        var i = 0;
+        while (i < len(widget.children)) {
+            var child = widget.children[i];
+            var child_h = measure_height(child);
+            var child_w = inner_w;
+            if (child.width_val > 0.0) {
+                child_w = child.width_val;
             }
-        } elif (widget.is_vertical == 0) { // Row layout with flexbox
-            var fixed_w = 0.0;
-            var num_spacers = 0;
-            var total_flex = 0.0;
-            var i = 0;
-            while (i < len(widget.children)) {
-                var child = widget.children[i];
-                if (child.kind == ui_types.KIND_SPACER) {
-                    num_spacers = num_spacers + 1;
-                    total_flex = total_flex + child.flex_val;
-                } else {
-                    var cw = measure_width(child, inner_w);
-                    fixed_w = fixed_w + cw;
-                }
-                i = i + 1;
-            }
-            
-            var spacing_total = 0.0;
-            if (len(widget.children) > 1) {
-                var num_gaps: float = (len(widget.children) - 1) as float;
-                spacing_total = num_gaps * widget.spacing_val;
-            }
-            var remaining_w = inner_w - fixed_w - spacing_total;
-            var spacer_unit = 0.0;
-            if (num_spacers > 0 and remaining_w > 0.0 and total_flex > 0.0) {
-                spacer_unit = remaining_w / total_flex;
-            }
-            
-            i = 0;
-            while (i < len(widget.children)) {
-                var child = widget.children[i];
-                var child_h = measure_height(child);
-                var child_w = 0.0;
-                if (child.kind == ui_types.KIND_SPACER) {
-                    child_w = spacer_unit * child.flex_val;
-                } else {
-                    child_w = measure_width(child, inner_w);
-                }
-                
-                var child_box = compute_layout(child, curr_x, curr_y, child_w, child_h);
-                box.children.append(child_box);
-                
-                curr_x = curr_x + child_w + widget.spacing_val;
-                i = i + 1;
-            }
+
+            var child_box = compute_layout(child, curr_x, curr_y, child_w, child_h);
+            box.children.append(child_box);
+
+            curr_y = curr_y + child_h + widget.spacing_val;
+            i = i + 1;
         }
+    } elif (widget.is_vertical == 0) { // Row layout with flexbox
+    var fixed_w = 0.0;
+    var num_spacers = 0;
+    var total_flex = 0.0;
+    var i = 0;
+    while (i < len(widget.children)) {
+        var child = widget.children[i];
+        if (child.kind == ui_types.KIND_SPACER) {
+            num_spacers = num_spacers + 1;
+            total_flex = total_flex + child.flex_val;
+        } else {
+            var cw = measure_width(child, inner_w);
+            fixed_w = fixed_w + cw;
+        }
+        i = i + 1;
     }
-    
-    return box;
+
+    var spacing_total = 0.0;
+    if (len(widget.children) > 1) {
+        var num_gaps: float = (len(widget.children) - 1) as float;
+        spacing_total = num_gaps * widget.spacing_val;
+    }
+    var remaining_w = inner_w - fixed_w - spacing_total;
+    var spacer_unit = 0.0;
+    if (num_spacers > 0 and remaining_w > 0.0 and total_flex > 0.0) {
+        spacer_unit = remaining_w / total_flex;
+    }
+
+    i = 0;
+    while (i < len(widget.children)) {
+        var child = widget.children[i];
+        var child_h = measure_height(child);
+        var child_w = 0.0;
+        if (child.kind == ui_types.KIND_SPACER) {
+            child_w = spacer_unit * child.flex_val;
+        } else {
+            child_w = measure_width(child, inner_w);
+        }
+
+        var child_box = compute_layout(child, curr_x, curr_y, child_w, child_h);
+        box.children.append(child_box);
+
+        curr_x = curr_x + child_w + widget.spacing_val;
+        i = i + 1;
+    }
+}
+}
+
+return box;
 }
 
 // Flatten layout tree to list for efficient rendering and hit-testing

@@ -19,7 +19,7 @@ print("=== Valid Operations Complete ===");
 // Test 2: Missing function (would cause compile error)
 // var result = math_module.nonexistent_function(5, 10);
 
-// Test 3: Missing variable (would cause compile error)  
+// Test 3: Missing variable (would cause compile error)
 // var value = math_module.nonexistent_variable;
 
 // Test 4: Wrong parameter count (would cause compile error)

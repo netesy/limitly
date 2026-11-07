@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>index.lm - Lymar API Reference</title>
+<style>
+:root {
+  --bg-primary: #0a0e17;
+  --bg-secondary: #111827;
+  --bg-tertiary: #1f2937;
+  --accent: #38bdf8;
+  --accent-hover: #7dd3fc;
+  --text-main: #f1f5f9;
+  --text-muted: #94a3b8;
+  --border-color: #334155;
+}
+* { box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif;
+  margin: 0; padding: 0; background: var(--bg-primary); color: var(--text-main); display: flex;
+}
+nav {
+  width: 300px; height: 100vh; overflow-y: auto; background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color); padding: 24px 20px; position: fixed;
+}
+nav h2 { font-size: 1.15rem; color: var(--accent); margin-top: 0; margin-bottom: 16px; font-weight: 700; }
+#search-input {
+  width: 100%; padding: 8px 12px; background: var(--bg-tertiary); border: 1px solid var(--border-color);
+  border-radius: 6px; color: #fff; font-size: 0.85rem; margin-bottom: 16px;
+}
+#search-input:focus { outline: none; border-color: var(--accent); }
+.nav-link { display: block; color: var(--text-muted); text-decoration: none; padding: 6px 8px; font-size: 0.9rem; border-radius: 4px; }
+.nav-link:hover { color: #fff; background: var(--bg-tertiary); }
+main { margin-left: 300px; padding: 40px 48px; max-width: 950px; flex: 1; }
+h1 { color: #fff; font-size: 2.2rem; margin-top: 0; padding-bottom: 16px; border-bottom: 1px solid var(--border-color); }
+h2 { color: var(--accent); font-size: 1.4rem; margin-top: 36px; margin-bottom: 14px; }
+h3 { color: #fff; font-size: 1.25rem; margin-top: 28px; margin-bottom: 12px; display: flex; align-items: center; gap: 10px; }
+h4 { color: var(--accent); font-size: 1rem; margin-top: 20px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+.badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
+.badge-pub { background: #064e3b; color: #6ee7b7; border: 1px solid #059669; }
+.badge-private { background: #334155; color: #cbd5e1; }
+.badge-type { background: #1e1b4b; color: #c7d2fe; border: 1px solid #4338ca; }
+.code-sig { background: #090d16; border: 1px solid var(--border-color); padding: 14px 18px; border-radius: 8px; overflow-x: auto; font-family: 'Consolas', 'Fira Code', monospace; font-size: 0.95rem; color: #e2e8f0; }
+.summary { color: #cbd5e1; line-height: 1.65; margin: 14px 0; font-size: 1rem; }
+/* Callout styling */
+.callout { margin: 16px 0; padding: 14px 18px; border-radius: 8px; border-left: 4px solid; font-size: 0.92rem; }
+.callout-header { font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+.callout-tip { border-color: #10b981; background: rgba(16, 185, 129, 0.08); color: #d1fae5; }
+.callout-tip .callout-header { color: #34d399; }
+.callout-warning { border-color: #f59e0b; background: rgba(245, 158, 11, 0.08); color: #fef3c7; }
+.callout-warning .callout-header { color: #fbbf24; }
+.callout-note { border-color: #0284c7; background: rgba(2, 132, 199, 0.08); color: #e0f2fe; }
+.callout-note .callout-header { color: #38bdf8; }
+.callout-deprecated { border-color: #e11d48; background: rgba(225, 29, 72, 0.08); color: #ffe4e6; }
+.callout-deprecated .callout-header { color: #fb7185; }
+/* Example card */
+.example-card { margin: 20px 0; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: #080c14; }
+.example-header { background: #162032; padding: 8px 16px; font-size: 0.82rem; font-weight: 700; color: #94a3b8; border-bottom: 1px solid var(--border-color); }
+.example-card pre { margin: 0; padding: 14px 18px; overflow-x: auto; font-family: monospace; font-size: 0.92rem; color: #e2e8f0; }
+/* Tables */
+table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 0.92rem; }
+th { background: #162032; color: #94a3b8; text-align: left; padding: 10px 14px; font-weight: 600; border-bottom: 1px solid var(--border-color); }
+td { padding: 10px 14px; border-bottom: 1px solid #1e293b; color: #cbd5e1; }
+ul { padding-left: 20px; color: #cbd5e1; line-height: 1.6; }
+hr { border: 0; border-top: 1px solid var(--border-color); margin: 36px 0; }
+</style>
+<script>
+function filterNav() {
+  var q = document.getElementById('search-input').value.toLowerCase();
+  var links = document.querySelectorAll('.nav-link');
+  links.forEach(function(l) {
+    l.style.display = l.textContent.toLowerCase().includes(q) ? 'block' : 'none';
+  });
+}
+</script>
+</head>
+<body>
+<nav>
+<h2>index.lm</h2>
+<input type="text" id="search-input" placeholder="Filter symbols..." oninput="filterNav()">
+<div id="nav-list">
+<a class="nav-link" href="#ResourceTrait">ResourceTrait <span style="font-size: 0.75rem; opacity: 0.6;">(Trait)</span></a>
+<a class="nav-link" href="#Buffer">Buffer <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#Image">Image <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#Sampler">Sampler <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#Shader">Shader <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#Pipeline">Pipeline <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#Bindings">Bindings <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#PassAction">PassAction <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#Pass">Pass <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#GraphicsContext">GraphicsContext <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#setup">setup <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#shutdown">shutdown <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#is_valid">is_valid <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#spawn_window">spawn_window <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#push_clip">push_clip <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#pop_clip">pop_clip <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#poll_events">poll_events <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#rgba">rgba <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#make_pass_action">make_pass_action <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#make_buffer">make_buffer <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#make_buffer_data">make_buffer_data <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#make_image">make_image <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#make_sampler">make_sampler <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#make_shader">make_shader <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#make_pipeline">make_pipeline <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#make_bindings">make_bindings <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#begin_pass">begin_pass <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#set_window_size">set_window_size <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#draw_rect_primitive">draw_rect_primitive <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#draw_shadow_primitive">draw_shadow_primitive <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#draw_triangle_primitive">draw_triangle_primitive <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#draw_text">draw_text <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#measure_text">measure_text <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#get_line_height">get_line_height <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#end_pass">end_pass <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#apply_pipeline">apply_pipeline <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#apply_bindings">apply_bindings <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#draw">draw <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#commit">commit <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#readback_pixel">readback_pixel <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+</div>
+</nav>
+<main>
+<h1>index.lm API Reference</h1>
+<h2>Module Overview</h2>
+<div class="summary"><p>std.gg - Portable Sokol-GFX Style Low-Level Graphics Abstraction Module</p></div>
+<div id="ResourceTrait">
+<h3>ResourceTrait <span class="badge badge-pub">Trait</span></h3>
+<pre class="code-sig"><code>trait ResourceTrait</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>fn is_valid(): bool</code> <em>(method requirement)</em></li>
+</ul>
+</div><hr>
+<div id="Buffer">
+<h3>Buffer <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame Buffer: ResourceTrait</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>var pub size: int</code> <em>(field)</em></li>
+<li><code>var pub is_index: bool</code> <em>(field)</em></li>
+</ul>
+</div><hr>
+<div id="Image">
+<h3>Image <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame Image: ResourceTrait</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>var pub width: int</code> <em>(field)</em></li>
+<li><code>var pub height: int</code> <em>(field)</em></li>
+</ul>
+</div><hr>
+<div id="Sampler">
+<h3>Sampler <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame Sampler: ResourceTrait</code></pre>
+</div><hr>
+<div id="Shader">
+<h3>Shader <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame Shader: ResourceTrait</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>var pub vs_src: str</code> <em>(field)</em></li>
+<li><code>var pub fs_src: str</code> <em>(field)</em></li>
+</ul>
+</div><hr>
+<div id="Pipeline">
+<h3>Pipeline <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame Pipeline: ResourceTrait</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>var pub shader_id: int</code> <em>(field)</em></li>
+<li><code>var pub primitive_type: int</code> <em>(field)</em></li>
+</ul>
+</div><hr>
+<div id="Bindings">
+<h3>Bindings <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame Bindings</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>var pub vertex_buffer_id: int</code> <em>(field)</em></li>
+<li><code>var pub index_buffer_id: int</code> <em>(field)</em></li>
+<li><code>var pub image_id: int</code> <em>(field)</em></li>
+<li><code>var pub sampler_id: int</code> <em>(field)</em></li>
+</ul>
+</div><hr>
+<div id="PassAction">
+<h3>PassAction <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame PassAction</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>var pub r: float</code> <em>(field)</em></li>
+<li><code>var pub g: float</code> <em>(field)</em></li>
+<li><code>var pub b: float</code> <em>(field)</em></li>
+<li><code>var pub a: float</code> <em>(field)</em></li>
+<li><code>var pub clear: bool</code> <em>(field)</em></li>
+</ul>
+</div><hr>
+<div id="Pass">
+<h3>Pass <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame Pass</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>var pub width: int</code> <em>(field)</em></li>
+<li><code>var pub height: int</code> <em>(field)</em></li>
+<li><code>var pub action: PassAction</code> <em>(field)</em></li>
+</ul>
+</div><hr>
+<div id="GraphicsContext">
+<h3>GraphicsContext <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame GraphicsContext</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>var pub handle: int</code> <em>(field)</em></li>
+<li><code>var pub next_resource_id: int</code> <em>(field)</em></li>
+<li><code>pub init()</code> <em>(constructor)</em></li>
+</ul>
+</div><hr>
+<div id="setup">
+<h3>setup <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn setup(): bool</code></pre>
+</div><hr>
+<div id="shutdown">
+<h3>shutdown <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn shutdown(): nil</code></pre>
+</div><hr>
+<div id="is_valid">
+<h3>is_valid <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn is_valid(): bool</code></pre>
+</div><hr>
+<div id="spawn_window">
+<h3>spawn_window <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn spawn_window(width: int, height: int, title: str, resizable: int = ...): nil</code></pre>
+</div><hr>
+<div id="push_clip">
+<h3>push_clip <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn push_clip(x: float, y: float, w: float, h: float): nil</code></pre>
+</div><hr>
+<div id="pop_clip">
+<h3>pop_clip <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn pop_clip(): nil</code></pre>
+</div><hr>
+<div id="poll_events">
+<h3>poll_events <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn poll_events(): any</code></pre>
+</div><hr>
+<div id="rgba">
+<h3>rgba <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn rgba(r: int, g: int, b: int): int</code></pre>
+</div><hr>
+<div id="make_pass_action">
+<h3>make_pass_action <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn make_pass_action(r: float, g: float, b: float, a: float, clear: bool): PassAction</code></pre>
+</div><hr>
+<div id="make_buffer">
+<h3>make_buffer <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn make_buffer(size: int, is_index: bool): Buffer</code></pre>
+</div><hr>
+<div id="make_buffer_data">
+<h3>make_buffer_data <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn make_buffer_data(size: int, is_index: bool, data: any): Buffer</code></pre>
+</div><hr>
+<div id="make_image">
+<h3>make_image <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn make_image(width: int, height: int): Image</code></pre>
+</div><hr>
+<div id="make_sampler">
+<h3>make_sampler <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn make_sampler(): Sampler</code></pre>
+</div><hr>
+<div id="make_shader">
+<h3>make_shader <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn make_shader(vs: str, fs: str): Shader</code></pre>
+</div><hr>
+<div id="make_pipeline">
+<h3>make_pipeline <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn make_pipeline(shader_id: int, primitive_type: int): Pipeline</code></pre>
+</div><hr>
+<div id="make_bindings">
+<h3>make_bindings <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn make_bindings(vbuf_id: int, ibuf_id: int, img_id: int, sampler_id: int): Bindings</code></pre>
+</div><hr>
+<div id="begin_pass">
+<h3>begin_pass <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn begin_pass(w: int, h: int, r: float, g: float, b: float, a: float): nil</code></pre>
+</div><hr>
+<div id="set_window_size">
+<h3>set_window_size <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn set_window_size(width: int, height: int): nil</code></pre>
+</div><hr>
+<div id="draw_rect_primitive">
+<h3>draw_rect_primitive <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn draw_rect_primitive(x: float, y: float, w: float, h: float, r: float, g: float, b: float, a: float): nil</code></pre>
+</div><hr>
+<div id="draw_shadow_primitive">
+<h3>draw_shadow_primitive <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn draw_shadow_primitive(x: float, y: float, w: float, h: float, r: float, g: float, b: float, a: float, off_x: float, off_y: float, blur: float, spread: float): nil</code></pre>
+</div><hr>
+<div id="draw_triangle_primitive">
+<h3>draw_triangle_primitive <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn draw_triangle_primitive(x1: float, y1: float, x2: float, y2: float, x3: float, y3: float, r: float, g: float, b: float, a: float): nil</code></pre>
+</div><hr>
+<div id="draw_text">
+<h3>draw_text <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn draw_text(text_str: str, x: float, y: float, r: float, g: float, b: float, a: float, scale: int = ...): nil</code></pre>
+</div><hr>
+<div id="measure_text">
+<h3>measure_text <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn measure_text(text_str: str, scale: int = ...): float</code></pre>
+</div><hr>
+<div id="get_line_height">
+<h3>get_line_height <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn get_line_height(scale: int = ...): float</code></pre>
+</div><hr>
+<div id="end_pass">
+<h3>end_pass <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn end_pass(): nil</code></pre>
+</div><hr>
+<div id="apply_pipeline">
+<h3>apply_pipeline <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn apply_pipeline(pip_id: int): nil</code></pre>
+</div><hr>
+<div id="apply_bindings">
+<h3>apply_bindings <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn apply_bindings(v_id: int, i_id: int): nil</code></pre>
+</div><hr>
+<div id="draw">
+<h3>draw <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn draw(base: int, count: int, instances: int): nil</code></pre>
+</div><hr>
+<div id="commit">
+<h3>commit <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn commit(): nil</code></pre>
+</div><hr>
+<div id="readback_pixel">
+<h3>readback_pixel <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn readback_pixel(x: int, y: int): any</code></pre>
+</div><hr>
+</main>
+</body>
+</html>

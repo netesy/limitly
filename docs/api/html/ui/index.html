@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>index.lm - Lymar API Reference</title>
+<style>
+:root {
+  --bg-primary: #0a0e17;
+  --bg-secondary: #111827;
+  --bg-tertiary: #1f2937;
+  --accent: #38bdf8;
+  --accent-hover: #7dd3fc;
+  --text-main: #f1f5f9;
+  --text-muted: #94a3b8;
+  --border-color: #334155;
+}
+* { box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif;
+  margin: 0; padding: 0; background: var(--bg-primary); color: var(--text-main); display: flex;
+}
+nav {
+  width: 300px; height: 100vh; overflow-y: auto; background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color); padding: 24px 20px; position: fixed;
+}
+nav h2 { font-size: 1.15rem; color: var(--accent); margin-top: 0; margin-bottom: 16px; font-weight: 700; }
+#search-input {
+  width: 100%; padding: 8px 12px; background: var(--bg-tertiary); border: 1px solid var(--border-color);
+  border-radius: 6px; color: #fff; font-size: 0.85rem; margin-bottom: 16px;
+}
+#search-input:focus { outline: none; border-color: var(--accent); }
+.nav-link { display: block; color: var(--text-muted); text-decoration: none; padding: 6px 8px; font-size: 0.9rem; border-radius: 4px; }
+.nav-link:hover { color: #fff; background: var(--bg-tertiary); }
+main { margin-left: 300px; padding: 40px 48px; max-width: 950px; flex: 1; }
+h1 { color: #fff; font-size: 2.2rem; margin-top: 0; padding-bottom: 16px; border-bottom: 1px solid var(--border-color); }
+h2 { color: var(--accent); font-size: 1.4rem; margin-top: 36px; margin-bottom: 14px; }
+h3 { color: #fff; font-size: 1.25rem; margin-top: 28px; margin-bottom: 12px; display: flex; align-items: center; gap: 10px; }
+h4 { color: var(--accent); font-size: 1rem; margin-top: 20px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+.badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
+.badge-pub { background: #064e3b; color: #6ee7b7; border: 1px solid #059669; }
+.badge-private { background: #334155; color: #cbd5e1; }
+.badge-type { background: #1e1b4b; color: #c7d2fe; border: 1px solid #4338ca; }
+.code-sig { background: #090d16; border: 1px solid var(--border-color); padding: 14px 18px; border-radius: 8px; overflow-x: auto; font-family: 'Consolas', 'Fira Code', monospace; font-size: 0.95rem; color: #e2e8f0; }
+.summary { color: #cbd5e1; line-height: 1.65; margin: 14px 0; font-size: 1rem; }
+/* Callout styling */
+.callout { margin: 16px 0; padding: 14px 18px; border-radius: 8px; border-left: 4px solid; font-size: 0.92rem; }
+.callout-header { font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+.callout-tip { border-color: #10b981; background: rgba(16, 185, 129, 0.08); color: #d1fae5; }
+.callout-tip .callout-header { color: #34d399; }
+.callout-warning { border-color: #f59e0b; background: rgba(245, 158, 11, 0.08); color: #fef3c7; }
+.callout-warning .callout-header { color: #fbbf24; }
+.callout-note { border-color: #0284c7; background: rgba(2, 132, 199, 0.08); color: #e0f2fe; }
+.callout-note .callout-header { color: #38bdf8; }
+.callout-deprecated { border-color: #e11d48; background: rgba(225, 29, 72, 0.08); color: #ffe4e6; }
+.callout-deprecated .callout-header { color: #fb7185; }
+/* Example card */
+.example-card { margin: 20px 0; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: #080c14; }
+.example-header { background: #162032; padding: 8px 16px; font-size: 0.82rem; font-weight: 700; color: #94a3b8; border-bottom: 1px solid var(--border-color); }
+.example-card pre { margin: 0; padding: 14px 18px; overflow-x: auto; font-family: monospace; font-size: 0.92rem; color: #e2e8f0; }
+/* Tables */
+table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 0.92rem; }
+th { background: #162032; color: #94a3b8; text-align: left; padding: 10px 14px; font-weight: 600; border-bottom: 1px solid var(--border-color); }
+td { padding: 10px 14px; border-bottom: 1px solid #1e293b; color: #cbd5e1; }
+ul { padding-left: 20px; color: #cbd5e1; line-height: 1.6; }
+hr { border: 0; border-top: 1px solid var(--border-color); margin: 36px 0; }
+</style>
+<script>
+function filterNav() {
+  var q = document.getElementById('search-input').value.toLowerCase();
+  var links = document.querySelectorAll('.nav-link');
+  links.forEach(function(l) {
+    l.style.display = l.textContent.toLowerCase().includes(q) ? 'block' : 'none';
+  });
+}
+</script>
+</head>
+<body>
+<nav>
+<h2>index.lm</h2>
+<input type="text" id="search-input" placeholder="Filter symbols..." oninput="filterNav()">
+<div id="nav-list">
+<a class="nav-link" href="#style">style <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#shadow">shadow <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#signal">signal <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#signal_bool">signal_bool <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#signal_int">signal_int <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#signal_float">signal_float <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#signal_str">signal_str <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#computed">computed <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#effect">effect <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#effect_with_cleanup">effect_with_cleanup <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#batch_updates">batch_updates <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#dispose_all_effects">dispose_all_effects <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#compute_layout">compute_layout <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#compute_layout_enhanced">compute_layout_enhanced <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#flatten_layout">flatten_layout <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#hit_test_boxes">hit_test_boxes <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#compute_grid_layout">compute_grid_layout <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#responsive_layout">responsive_layout <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#responsive">responsive <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#breakpoint">breakpoint <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#grid_two_column">grid_two_column <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#grid_three_column">grid_three_column <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#grid_with_aspect">grid_with_aspect <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#grid_enhanced">grid_enhanced <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#make_router">make_router <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#make_router_with_base">make_router_with_base <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#router_link">router_link <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#tab_bar">tab_bar <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#breadcrumbs">breadcrumbs <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#accordion">accordion <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#alert">alert <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#badge">badge <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#bar_chart">bar_chart <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#bubble_chart">bubble_chart <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#button">button <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#calendar">calendar <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#card">card <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#checkbox">checkbox <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#color_picker">color_picker <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#column">column <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#dialog">dialog <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#alert_dialog">alert_dialog <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#confirm">confirm <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#confirm_dialog">confirm_dialog <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#modal_backdrop">modal_backdrop <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#diff">diff <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#dock">dock <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#doughnut_chart">doughnut_chart <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#empty">empty <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#file_input">file_input <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#filter">filter <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#form_field">form_field <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#grid">grid <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#image">image <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#indicator">indicator <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#input">input <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#join">join <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#line_chart">line_chart <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#link">link <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#list">list <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#mask">mask <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#overlay">overlay <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#pie_chart">pie_chart <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#plot_histogram">plot_histogram <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#plot_lines">plot_lines <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#polar_area_chart">polar_area_chart <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#progress">progress <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#radar_chart">radar_chart <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#range_slider">range_slider <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#row">row <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#scatter_chart">scatter_chart <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#scroll">scroll <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#select">select <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#multi_select">multi_select <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#slider">slider <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#spacer">spacer <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#stack">stack <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#stat">stat <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#stepper">stepper <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#steps">steps <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#table">table <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#tabs">tabs <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#text">text <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#text_area">text_area <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#textarea">textarea <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#timeline">timeline <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#toast">toast <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#toggle">toggle <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#tooltip">tooltip <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#tree_node">tree_node <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#build">build <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#replay">replay <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#dl_hit_test">dl_hit_test <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+</div>
+</nav>
+<main>
+<h1>index.lm API Reference</h1>
+<h2>Module Overview</h2>
+<div class="summary"><p>std.ui - Public Fluent & Composable UI Framework for Lymar
+Canonical entry point for Lymar Retained UI System</p></div>
+<div id="style">
+<h3>style <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn style(): Style</code></pre>
+<div class="summary"><p>── Styles & Layout Constants ─────────────────────────────────────────────────
+align_start/center/end and AXIS_* are re-exported via `pub import show` above
+(type-safe; the old `var` aliases were invisible in type position).</p></div>
+</div><hr>
+<div id="shadow">
+<h3>shadow <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn shadow(r: float = ..., g: float = ..., b: float = ..., a: float = ..., off_x: float = ..., off_y: float = ..., blur: float = ..., spread: float = ...): Shadow</code></pre>
+<div class="summary"><p>── Application & Window ──────────────────────────────────────────────────────</p></div>
+</div><hr>
+<div id="signal">
+<h3>signal <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn signal(init_val): Signal</code></pre>
+<div class="summary"><p>── State Management ───────────────────────────────────────────────────────────</p></div>
+</div><hr>
+<div id="signal_bool">
+<h3>signal_bool <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn signal_bool(init_val: bool): Signal</code></pre>
+</div><hr>
+<div id="signal_int">
+<h3>signal_int <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn signal_int(init_val: int): Signal</code></pre>
+</div><hr>
+<div id="signal_float">
+<h3>signal_float <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn signal_float(init_val: float): Signal</code></pre>
+</div><hr>
+<div id="signal_str">
+<h3>signal_str <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn signal_str(init_val: str): Signal</code></pre>
+</div><hr>
+<div id="computed">
+<h3>computed <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn computed(compute_fn: function, deps: list): ComputedSignal</code></pre>
+</div><hr>
+<div id="effect">
+<h3>effect <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn effect(effect_fn: function, deps: list): Effect</code></pre>
+</div><hr>
+<div id="effect_with_cleanup">
+<h3>effect_with_cleanup <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn effect_with_cleanup(effect_fn: function, cleanup_fn: function, deps: list): Effect</code></pre>
+</div><hr>
+<div id="batch_updates">
+<h3>batch_updates <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn batch_updates(updates: function): nil</code></pre>
+</div><hr>
+<div id="dispose_all_effects">
+<h3>dispose_all_effects <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn dispose_all_effects(): nil</code></pre>
+</div><hr>
+<div id="compute_layout">
+<h3>compute_layout <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn compute_layout(widget: Widget, x: float, y: float, available_w: float, available_h: float): LayoutBox</code></pre>
+<div class="summary"><p>── Layout Operations ─────────────────────────────────────────────────────────</p></div>
+</div><hr>
+<div id="compute_layout_enhanced">
+<h3>compute_layout_enhanced <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn compute_layout_enhanced(widget: Widget, x: float, y: float, available_w: float, available_h: float): LayoutBox</code></pre>
+</div><hr>
+<div id="flatten_layout">
+<h3>flatten_layout <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn flatten_layout(box: LayoutBox): list</code></pre>
+</div><hr>
+<div id="hit_test_boxes">
+<h3>hit_test_boxes <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn hit_test_boxes(boxes: list, px: float, py: float): LayoutBox</code></pre>
+</div><hr>
+<div id="compute_grid_layout">
+<h3>compute_grid_layout <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn compute_grid_layout(spec: GridSpec, children: list, x: float, y: float, available_w: float, available_h: float): list</code></pre>
+</div><hr>
+<div id="responsive_layout">
+<h3>responsive_layout <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn responsive_layout(breakpoints: list, viewport_w: float, default_widget: Widget): Widget</code></pre>
+</div><hr>
+<div id="responsive">
+<h3>responsive <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn responsive(mobile: Widget, tablet: Widget, desktop: Widget, viewport_w: float): Widget</code></pre>
+</div><hr>
+<div id="breakpoint">
+<h3>breakpoint <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn breakpoint(small: Widget, large: Widget, viewport_w: float, threshold: float = ...): Widget</code></pre>
+</div><hr>
+<div id="grid_two_column">
+<h3>grid_two_column <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn grid_two_column(left: Widget, right: Widget, gap: float = ...): Widget</code></pre>
+<div class="summary"><p>── Grid Layout ─────────────────────────────────────────────────────────────</p></div>
+</div><hr>
+<div id="grid_three_column">
+<h3>grid_three_column <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn grid_three_column(a: Widget, b: Widget, c: Widget, gap: float = ...): Widget</code></pre>
+</div><hr>
+<div id="grid_with_aspect">
+<h3>grid_with_aspect <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn grid_with_aspect(columns_count: int, children: list, aspect_ratio: float, spacing_val: float = ...): Widget</code></pre>
+</div><hr>
+<div id="grid_enhanced">
+<h3>grid_enhanced <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn grid_enhanced(spec: GridSpec, children: list): Widget</code></pre>
+</div><hr>
+<div id="make_router">
+<h3>make_router <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn make_router(): Router</code></pre>
+<div class="summary"><p>── Navigation & Routing ─────────────────────────────────────────────────────</p></div>
+</div><hr>
+<div id="make_router_with_base">
+<h3>make_router_with_base <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn make_router_with_base(base: str): Router</code></pre>
+</div><hr>
+<div id="router_link">
+<h3>router_link <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn router_link(label: str, path: str, router: Router): Widget</code></pre>
+</div><hr>
+<div id="tab_bar">
+<h3>tab_bar <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn tab_bar(routes: list, router: Router): Widget</code></pre>
+</div><hr>
+<div id="breadcrumbs">
+<h3>breadcrumbs <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn breadcrumbs(router: Router): Widget</code></pre>
+</div><hr>
+<div id="accordion">
+<h3>accordion <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn accordion(title: str, content: Widget, default_open: bool = ...): Widget</code></pre>
+<div class="summary"><p>── Semantic Widget Constructors ──────────────────────────────────────────────</p></div>
+</div><hr>
+<div id="alert">
+<h3>alert <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn alert(message: str, type_val: str = ...): Widget</code></pre>
+</div><hr>
+<div id="badge">
+<h3>badge <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn badge(label: str): Widget</code></pre>
+</div><hr>
+<div id="bar_chart">
+<h3>bar_chart <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn bar_chart(label: str, values: list, labels: list = ...): Widget</code></pre>
+</div><hr>
+<div id="bubble_chart">
+<h3>bubble_chart <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn bubble_chart(label: str, values: list): Widget</code></pre>
+</div><hr>
+<div id="button">
+<h3>button <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn button(label: str, on_click: any = ...): Widget</code></pre>
+</div><hr>
+<div id="calendar">
+<h3>calendar <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn calendar(selected_date: str = ...): Widget</code></pre>
+</div><hr>
+<div id="card">
+<h3>card <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn card(title: str, content: Widget): Widget</code></pre>
+</div><hr>
+<div id="checkbox">
+<h3>checkbox <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn checkbox(checked: bool = ..., on_change: any = ...): Widget</code></pre>
+</div><hr>
+<div id="color_picker">
+<h3>color_picker <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn color_picker(label: str, color: Color, on_change: any = ...): Widget</code></pre>
+</div><hr>
+<div id="column">
+<h3>column <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn column(children: list): Widget</code></pre>
+</div><hr>
+<div id="dialog">
+<h3>dialog <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn dialog(title: str, content: Widget, is_open: bool = ..., width: float = ..., height: float = ..., on_close: any = ...): Widget</code></pre>
+</div><hr>
+<div id="alert_dialog">
+<h3>alert_dialog <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn alert_dialog(title: str, message: str, on_ok: any = ...): Widget</code></pre>
+</div><hr>
+<div id="confirm">
+<h3>confirm <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn confirm(title: str, message: str, on_yes: any = ..., on_no: any = ...): Widget</code></pre>
+</div><hr>
+<div id="confirm_dialog">
+<h3>confirm_dialog <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn confirm_dialog(title: str, message: str, on_yes: any = ..., on_no: any = ...): Widget</code></pre>
+</div><hr>
+<div id="modal_backdrop">
+<h3>modal_backdrop <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn modal_backdrop(alpha: float = ...): Widget</code></pre>
+</div><hr>
+<div id="diff">
+<h3>diff <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn diff(old_text: str, new_text: str): Widget</code></pre>
+</div><hr>
+<div id="dock">
+<h3>dock <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn dock(items: list): Widget</code></pre>
+</div><hr>
+<div id="doughnut_chart">
+<h3>doughnut_chart <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn doughnut_chart(label: str, values: list, labels: list = ...): Widget</code></pre>
+</div><hr>
+<div id="empty">
+<h3>empty <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn empty(): Widget</code></pre>
+</div><hr>
+<div id="file_input">
+<h3>file_input <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn file_input(label: str = ..., on_select: any = ...): Widget</code></pre>
+</div><hr>
+<div id="filter">
+<h3>filter <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn filter(query: str = ..., placeholder: str = ..., on_change: any = ...): Widget</code></pre>
+</div><hr>
+<div id="form_field">
+<h3>form_field <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn form_field(label_text: str, control: Widget, help_text: str = ..., error_text: str = ...): Widget</code></pre>
+</div><hr>
+<div id="grid">
+<h3>grid <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn grid(columns_count: int, children: list, spacing_val: float = ...): Widget</code></pre>
+</div><hr>
+<div id="image">
+<h3>image <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn image(source: str = ...): Widget</code></pre>
+</div><hr>
+<div id="indicator">
+<h3>indicator <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn indicator(status: str = ..., label: str = ...): Widget</code></pre>
+</div><hr>
+<div id="input">
+<h3>input <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn input(value: str = ..., placeholder: str = ..., on_change: any = ...): Widget</code></pre>
+</div><hr>
+<div id="join">
+<h3>join <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn join(items: list): Widget</code></pre>
+</div><hr>
+<div id="line_chart">
+<h3>line_chart <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn line_chart(label: str, values: list): Widget</code></pre>
+</div><hr>
+<div id="link">
+<h3>link <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn link(text_val: str, url: str): Widget</code></pre>
+</div><hr>
+<div id="list">
+<h3>list <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn list(items: list): Widget</code></pre>
+</div><hr>
+<div id="mask">
+<h3>mask <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn mask(shape: str = ..., child: Widget = ...): Widget</code></pre>
+</div><hr>
+<div id="overlay">
+<h3>overlay <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn overlay(content: Widget, x: float = ..., y: float = ..., width_val: float = ..., height_val: float = ...): Widget</code></pre>
+</div><hr>
+<div id="pie_chart">
+<h3>pie_chart <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn pie_chart(label: str, values: list, labels: list = ...): Widget</code></pre>
+</div><hr>
+<div id="plot_histogram">
+<h3>plot_histogram <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn plot_histogram(label: str, values: list, min_val: float = ..., max_val: float = ...): Widget</code></pre>
+</div><hr>
+<div id="plot_lines">
+<h3>plot_lines <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn plot_lines(label: str, values: list, min_val: float = ..., max_val: float = ...): Widget</code></pre>
+</div><hr>
+<div id="polar_area_chart">
+<h3>polar_area_chart <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn polar_area_chart(label: str, values: list, labels: list = ...): Widget</code></pre>
+</div><hr>
+<div id="progress">
+<h3>progress <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn progress(fraction: float = ..., width_val: float = ...): Widget</code></pre>
+</div><hr>
+<div id="radar_chart">
+<h3>radar_chart <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn radar_chart(label: str, values: list, labels: list = ...): Widget</code></pre>
+</div><hr>
+<div id="range_slider">
+<h3>range_slider <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn range_slider(low: float = ..., high: float = ..., min_val: float = ..., max_val: float = ...): Widget</code></pre>
+</div><hr>
+<div id="row">
+<h3>row <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn row(children: list): Widget</code></pre>
+</div><hr>
+<div id="scatter_chart">
+<h3>scatter_chart <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn scatter_chart(label: str, values: list): Widget</code></pre>
+</div><hr>
+<div id="scroll">
+<h3>scroll <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn scroll(content: Widget): Widget</code></pre>
+</div><hr>
+<div id="select">
+<h3>select <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn select(options: list, selected_idx: int = ..., on_change: any = ...): Widget</code></pre>
+</div><hr>
+<div id="multi_select">
+<h3>multi_select <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn multi_select(options: list, selected_indices: list = ..., on_change: any = ...): Widget</code></pre>
+</div><hr>
+<div id="slider">
+<h3>slider <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn slider(value: float = ..., min_val: float = ..., max_val: float = ..., on_change: any = ...): Widget</code></pre>
+</div><hr>
+<div id="spacer">
+<h3>spacer <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn spacer(flex: float = ...): Widget</code></pre>
+</div><hr>
+<div id="stack">
+<h3>stack <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn stack(children: list): Widget</code></pre>
+</div><hr>
+<div id="stat">
+<h3>stat <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn stat(title: str, value: str, desc: str = ...): Widget</code></pre>
+</div><hr>
+<div id="stepper">
+<h3>stepper <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn stepper(value: int = ..., step: int = ..., min_val: int = ..., max_val: int = ..., on_change: any = ...): Widget</code></pre>
+</div><hr>
+<div id="steps">
+<h3>steps <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn steps(step_titles: list, active_step: int = ...): Widget</code></pre>
+</div><hr>
+<div id="table">
+<h3>table <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn table(headers: list, rows: list): Widget</code></pre>
+</div><hr>
+<div id="tabs">
+<h3>tabs <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn tabs(titles: list, pages: list, active: int = ..., on_change: any = ...): Widget</code></pre>
+</div><hr>
+<div id="text">
+<h3>text <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn text(content: str): Widget</code></pre>
+</div><hr>
+<div id="text_area">
+<h3>text_area <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn text_area(value: str = ..., placeholder: str = ..., on_change: any = ...): Widget</code></pre>
+</div><hr>
+<div id="textarea">
+<h3>textarea <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn textarea(content: str): Widget</code></pre>
+</div><hr>
+<div id="timeline">
+<h3>timeline <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn timeline(events: list): Widget</code></pre>
+</div><hr>
+<div id="toast">
+<h3>toast <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn toast(message: str, type_val: str = ...): Widget</code></pre>
+</div><hr>
+<div id="toggle">
+<h3>toggle <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn toggle(enabled: bool = ..., on_change: any = ...): Widget</code></pre>
+</div><hr>
+<div id="tooltip">
+<h3>tooltip <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn tooltip(label: str, content: Widget): Widget</code></pre>
+</div><hr>
+<div id="tree_node">
+<h3>tree_node <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn tree_node(label: str, children: list, default_open: bool = ...): Widget</code></pre>
+</div><hr>
+<div id="build">
+<h3>build <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn build(root: Widget, vw: float, vh: float, ts: any = ..., x: float = ..., y: float = ...): DrawList</code></pre>
+<div class="summary"><p>── Hybrid UI Execution Engine ────────────────────────────────────────────────</p></div>
+</div><hr>
+<div id="replay">
+<h3>replay <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn replay(dlist_obj: DrawList): nil</code></pre>
+</div><hr>
+<div id="dl_hit_test">
+<h3>dl_hit_test <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn dl_hit_test(dlist_obj: DrawList, px: float, py: float): HitZone</code></pre>
+</div><hr>
+</main>
+</body>
+</html>

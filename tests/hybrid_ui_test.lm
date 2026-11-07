@@ -18,10 +18,10 @@ fn main(): nil {
     var save_btn = ui.button("Save").size(100.0, 32.0).on_click(fn(): nil { print("[Hybrid] Save clicked"); });
     var cancel_btn = ui.button("Cancel").size(100.0, 32.0).on_click(fn(): nil { print("[Hybrid] Cancel clicked"); });
     var title = ui.text("Dashboard").font_size(24.0).color(color.white);
-    
+
     var root = ui.column([
-        title,
-        ui.row([save_btn, cancel_btn]).spacing(12.0)
+    title,
+    ui.row([save_btn, cancel_btn]).spacing(12.0)
     ]).padding(16.0);
 
     print("Widgets declared successfully");

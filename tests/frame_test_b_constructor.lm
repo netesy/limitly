@@ -11,9 +11,9 @@ frame Foo {
 
 fn main(): int {
     var f = Foo();
-    
+
     assert(f.a == 5, "Constructor should set a to 5");
-    
+
     print("Test B - Constructor Execution: PASSED");
     return 0;
 }

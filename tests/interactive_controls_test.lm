@@ -3,7 +3,6 @@
 
 import std.app as app;
 import std.ui as ui;
-import std.ui.context as ui_context;
 import std.color as color;
 
 fn test_click_action() {
@@ -36,26 +35,26 @@ fn run_tests() {
     tab_bar.height(36.0);
 
     var scr = ui.scroll(ui.column([
-        ui.text("Line 1"),
-        ui.text("Line 2"),
-        ui.text("Line 3"),
-        ui.text("Line 4"),
-        ui.text("Line 5"),
-        ui.text("Line 6"),
-        ui.text("Line 7"),
-        ui.text("Line 8"),
-        ui.text("Line 9"),
-        ui.text("Line 10")
+    ui.text("Line 1"),
+    ui.text("Line 2"),
+    ui.text("Line 3"),
+    ui.text("Line 4"),
+    ui.text("Line 5"),
+    ui.text("Line 6"),
+    ui.text("Line 7"),
+    ui.text("Line 8"),
+    ui.text("Line 9"),
+    ui.text("Line 10")
     ])).height(60.0);
 
 
     var root = ui.column([
-        tab_bar,
-        btn,
-        chk,
-        sld,
-        inp,
-        scr
+    tab_bar,
+    btn,
+    chk,
+    sld,
+    inp,
+    scr
     ]).spacing(10.0);
 
     app.ui(root);

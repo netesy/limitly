@@ -64,19 +64,19 @@ pub fn encrypt_gcm(key: str, iv: str, plaintext: str, aad: str = ""): GcmCipher?
                 var res = ffi.foreign_call(
                     fn_enc,
                     [
-                        ffi.cstring_as_ptr(cs_key),
-                        ffi.cstring_as_ptr(cs_iv),
-                        ffi.cstring_as_ptr(cs_pt), len(plaintext),
-                        ffi.cstring_as_ptr(cs_aad), len(aad),
-                        ct_buf,
-                        tag_buf
+                    ffi.cstring_as_ptr(cs_key),
+                    ffi.cstring_as_ptr(cs_iv),
+                    ffi.cstring_as_ptr(cs_pt), len(plaintext),
+                    ffi.cstring_as_ptr(cs_aad), len(aad),
+                    ct_buf,
+                    tag_buf
                     ],
                     ffi.TYPE_I32,
                     [
-                        ffi.TYPE_PTR, ffi.TYPE_PTR,
-                        ffi.TYPE_PTR, ffi.TYPE_I32,
-                        ffi.TYPE_PTR, ffi.TYPE_I32,
-                        ffi.TYPE_PTR, ffi.TYPE_PTR
+                    ffi.TYPE_PTR, ffi.TYPE_PTR,
+                    ffi.TYPE_PTR, ffi.TYPE_I32,
+                    ffi.TYPE_PTR, ffi.TYPE_I32,
+                    ffi.TYPE_PTR, ffi.TYPE_PTR
                     ]
                 );
 
@@ -131,18 +131,18 @@ pub fn decrypt_gcm(key: str, iv: str, ciphertext: str, tag: str, aad: str = ""):
                 var dec_len = ffi.foreign_call(
                     fn_dec,
                     [
-                        ffi.cstring_as_ptr(cs_key),
-                        ffi.cstring_as_ptr(cs_iv),
-                        ffi.cstring_as_ptr(cs_ct),
-                        ffi.cstring_as_ptr(cs_aad), len(aad),
-                        ffi.cstring_as_ptr(cs_tag),
-                        pt_buf
+                    ffi.cstring_as_ptr(cs_key),
+                    ffi.cstring_as_ptr(cs_iv),
+                    ffi.cstring_as_ptr(cs_ct),
+                    ffi.cstring_as_ptr(cs_aad), len(aad),
+                    ffi.cstring_as_ptr(cs_tag),
+                    pt_buf
                     ],
                     ffi.TYPE_I32,
                     [
-                        ffi.TYPE_PTR, ffi.TYPE_PTR,
-                        ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_I32,
-                        ffi.TYPE_PTR, ffi.TYPE_PTR
+                    ffi.TYPE_PTR, ffi.TYPE_PTR,
+                    ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_I32,
+                    ffi.TYPE_PTR, ffi.TYPE_PTR
                     ]
                 );
 
@@ -190,16 +190,16 @@ pub fn encrypt_cbc(key: str, iv: str, plaintext: str): str? {
                 var res = ffi.foreign_call(
                     fn_enc,
                     [
-                        ffi.cstring_as_ptr(cs_key),
-                        ffi.cstring_as_ptr(cs_iv),
-                        ffi.cstring_as_ptr(cs_pt), len(plaintext),
-                        ct_buf
+                    ffi.cstring_as_ptr(cs_key),
+                    ffi.cstring_as_ptr(cs_iv),
+                    ffi.cstring_as_ptr(cs_pt), len(plaintext),
+                    ct_buf
                     ],
                     ffi.TYPE_I32,
                     [
-                        ffi.TYPE_PTR, ffi.TYPE_PTR,
-                        ffi.TYPE_PTR, ffi.TYPE_I32,
-                        ffi.TYPE_PTR
+                    ffi.TYPE_PTR, ffi.TYPE_PTR,
+                    ffi.TYPE_PTR, ffi.TYPE_I32,
+                    ffi.TYPE_PTR
                     ]
                 );
 
@@ -245,15 +245,15 @@ pub fn decrypt_cbc(key: str, iv: str, ciphertext: str): str? {
                 var res = ffi.foreign_call(
                     fn_dec,
                     [
-                        ffi.cstring_as_ptr(cs_key),
-                        ffi.cstring_as_ptr(cs_iv),
-                        ffi.cstring_as_ptr(cs_ct),
-                        pt_buf
+                    ffi.cstring_as_ptr(cs_key),
+                    ffi.cstring_as_ptr(cs_iv),
+                    ffi.cstring_as_ptr(cs_ct),
+                    pt_buf
                     ],
                     ffi.TYPE_I32,
                     [
-                        ffi.TYPE_PTR, ffi.TYPE_PTR,
-                        ffi.TYPE_PTR, ffi.TYPE_PTR
+                    ffi.TYPE_PTR, ffi.TYPE_PTR,
+                    ffi.TYPE_PTR, ffi.TYPE_PTR
                     ]
                 );
 

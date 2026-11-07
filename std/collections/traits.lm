@@ -10,70 +10,70 @@
 /// ```lymar
 /// var list = List();
 /// if (list.is_empty()) {
-///     print("Empty collection");
-/// }
-/// ```
-trait Collection {
-    /// Returns the number of elements contained in the collection.
-    ///
-    /// @return Non-negative integer count.
-    fn len(): int;
+    ///     print("Empty collection");
+    /// }
+    /// ```
+    trait Collection {
+        /// Returns the number of elements contained in the collection.
+        ///
+        /// @return Non-negative integer count.
+        fn len(): int;
 
-    /// Checks if the collection contains zero elements.
-    ///
-    /// @return `true` if empty, `false` otherwise.
-    fn is_empty(): bool;
+        /// Checks if the collection contains zero elements.
+        ///
+        /// @return `true` if empty, `false` otherwise.
+        fn is_empty(): bool;
 
-    /// Removes all elements from the collection.
-    fn clear(): nil;
-}
+        /// Removes all elements from the collection.
+        fn clear(): nil;
+    }
 
-/// Interface for collections supporting zero-based indexed element access.
-///
-/// @note Implementations should safely validate index bounds.
-///
-/// @example
-/// ```lymar
-/// var list = List();
-/// list.append(10);
-/// var item = list.get(0);
-/// ```
-trait Indexable : Collection {
-    /// Retrieves the element stored at the specified index.
+    /// Interface for collections supporting zero-based indexed element access.
     ///
-    /// @param index Zero-based positional index.
-    /// @return Element at index or `nil` if out of bounds.
-    fn get(index: int): any;
+    /// @note Implementations should safely validate index bounds.
+    ///
+    /// @example
+    /// ```lymar
+    /// var list = List();
+    /// list.append(10);
+    /// var item = list.get(0);
+    /// ```
+    trait Indexable : Collection {
+        /// Retrieves the element stored at the specified index.
+        ///
+        /// @param index Zero-based positional index.
+        /// @return Element at index or `nil` if out of bounds.
+        fn get(index: int): any;
 
-    /// Sets or replaces the element at the specified index.
-    ///
-    /// @param index Zero-based target index.
-    /// @param item Value to store.
-    /// @return `true` if assignment succeeded, `false` if index is out of bounds.
-    fn set(index: int, item: any): bool;
-}
+        /// Sets or replaces the element at the specified index.
+        ///
+        /// @param index Zero-based target index.
+        /// @param item Value to store.
+        /// @return `true` if assignment succeeded, `false` if index is out of bounds.
+        fn set(index: int, item: any): bool;
+    }
 
-/// Interface for collections supporting in-place element insertion and removal.
-///
-/// @tip Combine with `Indexable` for full dynamic list semantics.
-///
-/// @example
-/// ```lymar
-/// var list = List();
-/// list.append("hello");
-/// list.remove(0);
-/// ```
-trait Mutable : Collection {
-    /// Appends a new element to the back of the collection.
+    /// Interface for collections supporting in-place element insertion and removal.
     ///
-    /// @param item Element value to append.
-    fn append(item: any): nil;
+    /// @tip Combine with `Indexable` for full dynamic list semantics.
+    ///
+    /// @example
+    /// ```lymar
+    /// var list = List();
+    /// list.append("hello");
+    /// list.remove(0);
+    /// ```
+    trait Mutable : Collection {
+        /// Appends a new element to the back of the collection.
+        ///
+        /// @param item Element value to append.
+        fn append(item: any): nil;
 
-    /// Removes and returns the element at the specified index.
-    ///
-    /// @param index Zero-based target position.
-    /// @return Removed element or `nil` if out of bounds.
-    fn remove(index: int): any;
-}
+        /// Removes and returns the element at the specified index.
+        ///
+        /// @param index Zero-based target position.
+        /// @return Removed element or `nil` if out of bounds.
+        fn remove(index: int): any;
+    }
 
 

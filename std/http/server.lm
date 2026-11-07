@@ -218,7 +218,7 @@ frame Server {
         var reader = res.Reader(r=client);
         var raw_bytes = reader.read_bytes();
         if (len(raw_bytes) == 0) return nil;
-        
+
         var raw = _builtin_string_from_bytes(raw_bytes);
         return ok(parse_server_request(raw));
     }
@@ -226,7 +226,7 @@ frame Server {
     pub fn send_response(client: res.Resource, resp: ServerResponse): bool {
         var writer = res.Writer(r=client);
         var raw = "HTTP/1.1 " + (resp.status as str) + " " + resp.status_text + "\r\n";
-        
+
         if (resp.headers["content-type"] == nil) {
             resp.headers["content-type"] = common.MIME_TEXT_PLAIN;
         }
@@ -241,7 +241,7 @@ frame Server {
             raw = raw + name + ": " + value + "\r\n";
         }
         raw = raw + "\r\n" + resp.body;
-        
+
         var bytes: [int] = [];
         var i = 0;
         while (i < len(raw)) {
@@ -253,7 +253,7 @@ frame Server {
 
     pub fn serve(handler: any): bool {
         if (not self.running) return false;
-        
+
         match (self.accept_client()) {
             val client => {
                 match (self.read_request(client)) {

@@ -7,27 +7,27 @@
 ///
 /// @example
 /// fn fail_example(): int? {
-///     return err(Error("E001", "Operation failed"));
-/// }
-frame Error {
-    pub code: str;
-    pub message: str;
+    ///     return err(Error("E001", "Operation failed"));
+    /// }
+    frame Error {
+        pub code: str;
+        pub message: str;
 
-    /// Initializes a new error frame with an error code and human-readable message.
-    ///
-    /// @pre len(code) > 0
-    /// @param code Identifier code describing the error category.
-    /// @param message Human-readable detail message explaining the failure.
-    pub init(code: str, message: str) {
-        contract(len(code) > 0, "Error code must not be empty");
-        self.code = code;
-        self.message = message;
-    }
+        /// Initializes a new error frame with an error code and human-readable message.
+        ///
+        /// @pre len(code) > 0
+        /// @param code Identifier code describing the error category.
+        /// @param message Human-readable detail message explaining the failure.
+        pub init(code: str, message: str) {
+            contract(len(code) > 0, "Error code must not be empty");
+            self.code = code;
+            self.message = message;
+        }
 
-    /// Formats the error into a standardized string: `[code] message`.
-    ///
-    /// @return String representation of the error.
-    pub fn to_string(): str {
-        return "[{self.code}] {self.message}";
+        /// Formats the error into a standardized string: `[code] message`.
+        ///
+        /// @return String representation of the error.
+        pub fn to_string(): str {
+            return "[{self.code}] {self.message}";
+        }
     }
-}

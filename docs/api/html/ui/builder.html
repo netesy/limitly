@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>builder.lm - Lymar API Reference</title>
+<style>
+:root {
+  --bg-primary: #0a0e17;
+  --bg-secondary: #111827;
+  --bg-tertiary: #1f2937;
+  --accent: #38bdf8;
+  --accent-hover: #7dd3fc;
+  --text-main: #f1f5f9;
+  --text-muted: #94a3b8;
+  --border-color: #334155;
+}
+* { box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif;
+  margin: 0; padding: 0; background: var(--bg-primary); color: var(--text-main); display: flex;
+}
+nav {
+  width: 300px; height: 100vh; overflow-y: auto; background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color); padding: 24px 20px; position: fixed;
+}
+nav h2 { font-size: 1.15rem; color: var(--accent); margin-top: 0; margin-bottom: 16px; font-weight: 700; }
+#search-input {
+  width: 100%; padding: 8px 12px; background: var(--bg-tertiary); border: 1px solid var(--border-color);
+  border-radius: 6px; color: #fff; font-size: 0.85rem; margin-bottom: 16px;
+}
+#search-input:focus { outline: none; border-color: var(--accent); }
+.nav-link { display: block; color: var(--text-muted); text-decoration: none; padding: 6px 8px; font-size: 0.9rem; border-radius: 4px; }
+.nav-link:hover { color: #fff; background: var(--bg-tertiary); }
+main { margin-left: 300px; padding: 40px 48px; max-width: 950px; flex: 1; }
+h1 { color: #fff; font-size: 2.2rem; margin-top: 0; padding-bottom: 16px; border-bottom: 1px solid var(--border-color); }
+h2 { color: var(--accent); font-size: 1.4rem; margin-top: 36px; margin-bottom: 14px; }
+h3 { color: #fff; font-size: 1.25rem; margin-top: 28px; margin-bottom: 12px; display: flex; align-items: center; gap: 10px; }
+h4 { color: var(--accent); font-size: 1rem; margin-top: 20px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+.badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
+.badge-pub { background: #064e3b; color: #6ee7b7; border: 1px solid #059669; }
+.badge-private { background: #334155; color: #cbd5e1; }
+.badge-type { background: #1e1b4b; color: #c7d2fe; border: 1px solid #4338ca; }
+.code-sig { background: #090d16; border: 1px solid var(--border-color); padding: 14px 18px; border-radius: 8px; overflow-x: auto; font-family: 'Consolas', 'Fira Code', monospace; font-size: 0.95rem; color: #e2e8f0; }
+.summary { color: #cbd5e1; line-height: 1.65; margin: 14px 0; font-size: 1rem; }
+/* Callout styling */
+.callout { margin: 16px 0; padding: 14px 18px; border-radius: 8px; border-left: 4px solid; font-size: 0.92rem; }
+.callout-header { font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+.callout-tip { border-color: #10b981; background: rgba(16, 185, 129, 0.08); color: #d1fae5; }
+.callout-tip .callout-header { color: #34d399; }
+.callout-warning { border-color: #f59e0b; background: rgba(245, 158, 11, 0.08); color: #fef3c7; }
+.callout-warning .callout-header { color: #fbbf24; }
+.callout-note { border-color: #0284c7; background: rgba(2, 132, 199, 0.08); color: #e0f2fe; }
+.callout-note .callout-header { color: #38bdf8; }
+.callout-deprecated { border-color: #e11d48; background: rgba(225, 29, 72, 0.08); color: #ffe4e6; }
+.callout-deprecated .callout-header { color: #fb7185; }
+/* Example card */
+.example-card { margin: 20px 0; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: #080c14; }
+.example-header { background: #162032; padding: 8px 16px; font-size: 0.82rem; font-weight: 700; color: #94a3b8; border-bottom: 1px solid var(--border-color); }
+.example-card pre { margin: 0; padding: 14px 18px; overflow-x: auto; font-family: monospace; font-size: 0.92rem; color: #e2e8f0; }
+/* Tables */
+table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 0.92rem; }
+th { background: #162032; color: #94a3b8; text-align: left; padding: 10px 14px; font-weight: 600; border-bottom: 1px solid var(--border-color); }
+td { padding: 10px 14px; border-bottom: 1px solid #1e293b; color: #cbd5e1; }
+ul { padding-left: 20px; color: #cbd5e1; line-height: 1.6; }
+hr { border: 0; border-top: 1px solid var(--border-color); margin: 36px 0; }
+</style>
+<script>
+function filterNav() {
+  var q = document.getElementById('search-input').value.toLowerCase();
+  var links = document.querySelectorAll('.nav-link');
+  links.forEach(function(l) {
+    l.style.display = l.textContent.toLowerCase().includes(q) ? 'block' : 'none';
+  });
+}
+</script>
+</head>
+<body>
+<nav>
+<h2>builder.lm</h2>
+<input type="text" id="search-input" placeholder="Filter symbols..." oninput="filterNav()">
+<div id="nav-list">
+<a class="nav-link" href="#ThemeSnap">ThemeSnap <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#default_theme_snap">default_theme_snap <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#snap_theme">snap_theme <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#LayoutCtx">LayoutCtx <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#_add_hit">_add_hit <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_draw_border">_draw_border <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_draw_shadow">_draw_shadow <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_draw_checkmark">_draw_checkmark <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_draw_chevron_down">_draw_chevron_down <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_draw_chevron_up">_draw_chevron_up <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_draw_chevron_right">_draw_chevron_right <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#build">build <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_emit">_emit <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_emit_text">_emit_text <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_emit_button">_emit_button <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_get_natural_width">_get_natural_width <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_emit_container">_emit_container <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_emit_slider">_emit_slider <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_emit_checkbox">_emit_checkbox <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_emit_input">_emit_input <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_emit_progress">_emit_progress <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_emit_toggle">_emit_toggle <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_emit_badge">_emit_badge <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_emit_card">_emit_card <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_emit_alert">_emit_alert <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_emit_scroll">_emit_scroll <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_emit_tabs">_emit_tabs <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_emit_select">_emit_select <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_emit_textarea">_emit_textarea <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_emit_multi_select">_emit_multi_select <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_emit_table">_emit_table <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_emit_accordion">_emit_accordion <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_emit_stat">_emit_stat <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_emit_indicator">_emit_indicator <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_emit_link">_emit_link <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_emit_stepper">_emit_stepper <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_emit_range_slider">_emit_range_slider <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_emit_color_picker">_emit_color_picker <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_emit_steps">_emit_steps <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_emit_timeline">_emit_timeline <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_emit_tree_node">_emit_tree_node <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_emit_form_field">_emit_form_field <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_emit_diff">_emit_diff <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_emit_file_input">_emit_file_input <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_emit_filter">_emit_filter <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_emit_calendar">_emit_calendar <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_emit_bar_chart">_emit_bar_chart <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_emit_line_chart">_emit_line_chart <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_emit_pie_chart">_emit_pie_chart <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_emit_histogram">_emit_histogram <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+</div>
+</nav>
+<main>
+<h1>builder.lm API Reference</h1>
+<h2>Module Overview</h2>
+<div class="summary"><p>std/ui/builder.lm
+Single-pass hybrid builder: walks Widget tree ONCE, emits DrawList + HitZones.
+
+Retained mode in syntax and developer ergonomics, but immediate mode in execution:
+  - Walks the composable Widget tree in a single linear pass
+  - Emits flat DrawCmds and HitZones directly into a DrawList
+  - The DrawList is cached and replayed by replay.lm each frame at zero cost
+  - Interactive events hit-test against the flat HitZone list in O(n) time</p></div>
+<div id="ThemeSnap">
+<h3>ThemeSnap <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame ThemeSnap</code></pre>
+<div class="summary"><p>── Theme snapshot ────────────────────────────────────────────────────────────
+Flat color values extracted once per build — avoids repeated field access</p></div>
+<h4>Members</h4>
+<ul>
+<li><code>var pub text_r: float</code> <em>(field)</em></li>
+<li><code>var pub text_g: float</code> <em>(field)</em></li>
+<li><code>var pub text_b: float</code> <em>(field)</em></li>
+<li><code>var pub text2_r: float</code> <em>(field)</em></li>
+<li><code>var pub text2_g: float</code> <em>(field)</em></li>
+<li><code>var pub text2_b: float</code> <em>(field)</em></li>
+<li><code>var pub bg_r: float</code> <em>(field)</em></li>
+<li><code>var pub bg_g: float</code> <em>(field)</em></li>
+<li><code>var pub bg_b: float</code> <em>(field)</em></li>
+<li><code>var pub surface_r: float</code> <em>(field)</em></li>
+<li><code>var pub surface_g: float</code> <em>(field)</em></li>
+<li><code>var pub surface_b: float</code> <em>(field)</em></li>
+<li><code>var pub accent_r: float</code> <em>(field)</em></li>
+<li><code>var pub accent_g: float</code> <em>(field)</em></li>
+<li><code>var pub accent_b: float</code> <em>(field)</em></li>
+<li><code>var pub border_r: float</code> <em>(field)</em></li>
+<li><code>var pub border_g: float</code> <em>(field)</em></li>
+<li><code>var pub border_b: float</code> <em>(field)</em></li>
+<li><code>var pub btn_r: float</code> <em>(field)</em></li>
+<li><code>var pub btn_g: float</code> <em>(field)</em></li>
+<li><code>var pub btn_b: float</code> <em>(field)</em></li>
+<li><code>var pub btn_hover_r: float</code> <em>(field)</em></li>
+<li><code>var pub btn_hover_g: float</code> <em>(field)</em></li>
+<li><code>var pub btn_hover_b: float</code> <em>(field)</em></li>
+<li><code>var pub font_scale: float</code> <em>(field)</em></li>
+<li><code>var pub spacing: float</code> <em>(field)</em></li>
+<li><code>var pub corner_radius: float</code> <em>(field)</em></li>
+</ul>
+</div><hr>
+<div id="default_theme_snap">
+<h3>default_theme_snap <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn default_theme_snap(): ThemeSnap</code></pre>
+</div><hr>
+<div id="snap_theme">
+<h3>snap_theme <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn snap_theme(pal: theme.ColorPalette, font_scale: float): ThemeSnap</code></pre>
+</div><hr>
+<div id="LayoutCtx">
+<h3>LayoutCtx <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame LayoutCtx</code></pre>
+<div class="summary"><p>── Layout context (stack-based, no heap alloc) ───────────────────────────────</p></div>
+<h4>Members</h4>
+<ul>
+<li><code>var pub x: float</code> <em>(field)</em></li>
+<li><code>var pub y: float</code> <em>(field)</em></li>
+<li><code>var pub avail_w: float</code> <em>(field)</em></li>
+<li><code>var pub avail_h: float</code> <em>(field)</em></li>
+<li><code>var pub spacing: float</code> <em>(field)</em></li>
+<li><code>var pub clip_x: float</code> <em>(field)</em></li>
+<li><code>var pub clip_y: float</code> <em>(field)</em></li>
+<li><code>var pub clip_w: float</code> <em>(field)</em></li>
+<li><code>var pub clip_h: float</code> <em>(field)</em></li>
+</ul>
+</div><hr>
+<div id="_add_hit">
+<h3>_add_hit <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _add_hit(dl: dlist.DrawList, hz: dlist.HitZone, ctx: LayoutCtx): nil</code></pre>
+</div><hr>
+<div id="_draw_border">
+<h3>_draw_border <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _draw_border(dl: dlist.DrawList, x: float, y: float, w: float, h: float, r: float, g: float, b: float, a: float = ...): nil</code></pre>
+<div class="summary"><p>── Drawing & Styling Helpers ─────────────────────────────────────────────────</p></div>
+</div><hr>
+<div id="_draw_shadow">
+<h3>_draw_shadow <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _draw_shadow(dl: dlist.DrawList, x: float, y: float, w: float, h: float, rad: float = ...): nil</code></pre>
+</div><hr>
+<div id="_draw_checkmark">
+<h3>_draw_checkmark <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _draw_checkmark(dl: dlist.DrawList, cx: float, cy: float, cr: float, cg: float, cb: float): nil</code></pre>
+</div><hr>
+<div id="_draw_chevron_down">
+<h3>_draw_chevron_down <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _draw_chevron_down(dl: dlist.DrawList, cx: float, cy: float, cr: float, cg: float, cb: float): nil</code></pre>
+</div><hr>
+<div id="_draw_chevron_up">
+<h3>_draw_chevron_up <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _draw_chevron_up(dl: dlist.DrawList, cx: float, cy: float, cr: float, cg: float, cb: float): nil</code></pre>
+</div><hr>
+<div id="_draw_chevron_right">
+<h3>_draw_chevron_right <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _draw_chevron_right(dl: dlist.DrawList, cx: float, cy: float, cr: float, cg: float, cb: float): nil</code></pre>
+</div><hr>
+<div id="build">
+<h3>build <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn build(root: ui.Widget, vw: float, vh: float, ts: any = ..., x: float = ..., y: float = ...): dlist.DrawList</code></pre>
+<div class="summary"><p>── Main build entry point ────────────────────────────────────────────────────
+Walks root Widget once and emits a fully-populated DrawList.</p></div>
+</div><hr>
+<div id="_emit">
+<h3>_emit <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _emit(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float</code></pre>
+<div class="summary"><p>── Widget emitter ────────────────────────────────────────────────────────────
+Returns height consumed. Adds DrawCmds and HitZones to dl in place.</p></div>
+</div><hr>
+<div id="_emit_text">
+<h3>_emit_text <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _emit_text(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float</code></pre>
+<div class="summary"><p>── Text ──────────────────────────────────────────────────────────────────────</p></div>
+</div><hr>
+<div id="_emit_button">
+<h3>_emit_button <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _emit_button(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float</code></pre>
+<div class="summary"><p>── Button ────────────────────────────────────────────────────────────────────</p></div>
+</div><hr>
+<div id="_get_natural_width">
+<h3>_get_natural_width <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _get_natural_width(child: ui.Widget): float</code></pre>
+<div class="summary"><p>── Natural Sizing Resolver for Layout ────────────────────────────────────────</p></div>
+</div><hr>
+<div id="_emit_container">
+<h3>_emit_container <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _emit_container(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float</code></pre>
+<div class="summary"><p>── Container (Column / Row / Stack) ──────────────────────────────────────────</p></div>
+</div><hr>
+<div id="_emit_slider">
+<h3>_emit_slider <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _emit_slider(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float</code></pre>
+<div class="summary"><p>── Slider ────────────────────────────────────────────────────────────────────</p></div>
+</div><hr>
+<div id="_emit_checkbox">
+<h3>_emit_checkbox <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _emit_checkbox(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float</code></pre>
+<div class="summary"><p>── Checkbox ──────────────────────────────────────────────────────────────────</p></div>
+</div><hr>
+<div id="_emit_input">
+<h3>_emit_input <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _emit_input(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float</code></pre>
+<div class="summary"><p>── Input ─────────────────────────────────────────────────────────────────────</p></div>
+</div><hr>
+<div id="_emit_progress">
+<h3>_emit_progress <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _emit_progress(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float</code></pre>
+<div class="summary"><p>── Progress ──────────────────────────────────────────────────────────────────</p></div>
+</div><hr>
+<div id="_emit_toggle">
+<h3>_emit_toggle <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _emit_toggle(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float</code></pre>
+<div class="summary"><p>── Toggle ────────────────────────────────────────────────────────────────────</p></div>
+</div><hr>
+<div id="_emit_badge">
+<h3>_emit_badge <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _emit_badge(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float</code></pre>
+<div class="summary"><p>── Badge ─────────────────────────────────────────────────────────────────────</p></div>
+</div><hr>
+<div id="_emit_card">
+<h3>_emit_card <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _emit_card(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float</code></pre>
+<div class="summary"><p>── Card ──────────────────────────────────────────────────────────────────────</p></div>
+</div><hr>
+<div id="_emit_alert">
+<h3>_emit_alert <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _emit_alert(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float</code></pre>
+<div class="summary"><p>── Alert / Toast ─────────────────────────────────────────────────────────────</p></div>
+</div><hr>
+<div id="_emit_scroll">
+<h3>_emit_scroll <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _emit_scroll(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float</code></pre>
+<div class="summary"><p>── Scroll ────────────────────────────────────────────────────────────────────</p></div>
+</div><hr>
+<div id="_emit_tabs">
+<h3>_emit_tabs <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _emit_tabs(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float</code></pre>
+<div class="summary"><p>── Tabs ──────────────────────────────────────────────────────────────────────</p></div>
+</div><hr>
+<div id="_emit_select">
+<h3>_emit_select <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _emit_select(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float</code></pre>
+<div class="summary"><p>── Select ────────────────────────────────────────────────────────────────────</p></div>
+</div><hr>
+<div id="_emit_textarea">
+<h3>_emit_textarea <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _emit_textarea(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float</code></pre>
+<div class="summary"><p>── Textarea ──────────────────────────────────────────────────────────────────</p></div>
+</div><hr>
+<div id="_emit_multi_select">
+<h3>_emit_multi_select <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _emit_multi_select(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float</code></pre>
+<div class="summary"><p>── MultiSelect ───────────────────────────────────────────────────────────────</p></div>
+</div><hr>
+<div id="_emit_table">
+<h3>_emit_table <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _emit_table(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float</code></pre>
+<div class="summary"><p>── Table ─────────────────────────────────────────────────────────────────────</p></div>
+</div><hr>
+<div id="_emit_accordion">
+<h3>_emit_accordion <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _emit_accordion(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float</code></pre>
+<div class="summary"><p>── Accordion ─────────────────────────────────────────────────────────────────</p></div>
+</div><hr>
+<div id="_emit_stat">
+<h3>_emit_stat <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _emit_stat(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float</code></pre>
+<div class="summary"><p>── Stat ──────────────────────────────────────────────────────────────────────</p></div>
+</div><hr>
+<div id="_emit_indicator">
+<h3>_emit_indicator <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _emit_indicator(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float</code></pre>
+<div class="summary"><p>── Indicator ─────────────────────────────────────────────────────────────────</p></div>
+</div><hr>
+<div id="_emit_link">
+<h3>_emit_link <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _emit_link(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float</code></pre>
+<div class="summary"><p>── Link ──────────────────────────────────────────────────────────────────────</p></div>
+</div><hr>
+<div id="_emit_stepper">
+<h3>_emit_stepper <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _emit_stepper(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float</code></pre>
+<div class="summary"><p>── Stepper ───────────────────────────────────────────────────────────────────</p></div>
+</div><hr>
+<div id="_emit_range_slider">
+<h3>_emit_range_slider <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _emit_range_slider(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float</code></pre>
+<div class="summary"><p>── RangeSlider ───────────────────────────────────────────────────────────────</p></div>
+</div><hr>
+<div id="_emit_color_picker">
+<h3>_emit_color_picker <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _emit_color_picker(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float</code></pre>
+<div class="summary"><p>── ColorPicker ───────────────────────────────────────────────────────────────</p></div>
+</div><hr>
+<div id="_emit_steps">
+<h3>_emit_steps <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _emit_steps(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float</code></pre>
+<div class="summary"><p>── Steps ─────────────────────────────────────────────────────────────────────</p></div>
+</div><hr>
+<div id="_emit_timeline">
+<h3>_emit_timeline <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _emit_timeline(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float</code></pre>
+<div class="summary"><p>── Timeline ──────────────────────────────────────────────────────────────────</p></div>
+</div><hr>
+<div id="_emit_tree_node">
+<h3>_emit_tree_node <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _emit_tree_node(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float</code></pre>
+<div class="summary"><p>── TreeNode ──────────────────────────────────────────────────────────────────</p></div>
+</div><hr>
+<div id="_emit_form_field">
+<h3>_emit_form_field <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _emit_form_field(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float</code></pre>
+<div class="summary"><p>── FormField ─────────────────────────────────────────────────────────────────</p></div>
+</div><hr>
+<div id="_emit_diff">
+<h3>_emit_diff <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _emit_diff(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float</code></pre>
+<div class="summary"><p>── Diff ──────────────────────────────────────────────────────────────────────</p></div>
+</div><hr>
+<div id="_emit_file_input">
+<h3>_emit_file_input <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _emit_file_input(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float</code></pre>
+<div class="summary"><p>── FileInput ─────────────────────────────────────────────────────────────────</p></div>
+</div><hr>
+<div id="_emit_filter">
+<h3>_emit_filter <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _emit_filter(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float</code></pre>
+<div class="summary"><p>── Filter ────────────────────────────────────────────────────────────────────</p></div>
+</div><hr>
+<div id="_emit_calendar">
+<h3>_emit_calendar <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _emit_calendar(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float</code></pre>
+<div class="summary"><p>── Calendar ──────────────────────────────────────────────────────────────────</p></div>
+</div><hr>
+<div id="_emit_bar_chart">
+<h3>_emit_bar_chart <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _emit_bar_chart(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float</code></pre>
+<div class="summary"><p>── BarChart ──────────────────────────────────────────────────────────────────</p></div>
+</div><hr>
+<div id="_emit_line_chart">
+<h3>_emit_line_chart <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _emit_line_chart(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float</code></pre>
+<div class="summary"><p>── LineChart ─────────────────────────────────────────────────────────────────</p></div>
+</div><hr>
+<div id="_emit_pie_chart">
+<h3>_emit_pie_chart <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _emit_pie_chart(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float</code></pre>
+<div class="summary"><p>── PieChart ──────────────────────────────────────────────────────────────────</p></div>
+</div><hr>
+<div id="_emit_histogram">
+<h3>_emit_histogram <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _emit_histogram(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float</code></pre>
+<div class="summary"><p>── Histogram ─────────────────────────────────────────────────────────────────</p></div>
+</div><hr>
+</main>
+</body>
+</html>

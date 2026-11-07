@@ -53,7 +53,7 @@ assert(not is_ipv4_simple("1..1.1"), "ipv4 empty seg");
 var sock = resource_create(1);
 assert(sock > 0, "socket positive");
 var conn = resource_call(sock, 6, "127.0.0.1");
-assert(conn != true, "port 0 fails");
+assert(not conn, "port 0 fails");
 resource_call(sock, 1, "x");
 resource_destroy(sock);
 

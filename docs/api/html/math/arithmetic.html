@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>arithmetic.lm - Lymar API Reference</title>
+<style>
+:root {
+  --bg-primary: #0a0e17;
+  --bg-secondary: #111827;
+  --bg-tertiary: #1f2937;
+  --accent: #38bdf8;
+  --accent-hover: #7dd3fc;
+  --text-main: #f1f5f9;
+  --text-muted: #94a3b8;
+  --border-color: #334155;
+}
+* { box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif;
+  margin: 0; padding: 0; background: var(--bg-primary); color: var(--text-main); display: flex;
+}
+nav {
+  width: 300px; height: 100vh; overflow-y: auto; background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color); padding: 24px 20px; position: fixed;
+}
+nav h2 { font-size: 1.15rem; color: var(--accent); margin-top: 0; margin-bottom: 16px; font-weight: 700; }
+#search-input {
+  width: 100%; padding: 8px 12px; background: var(--bg-tertiary); border: 1px solid var(--border-color);
+  border-radius: 6px; color: #fff; font-size: 0.85rem; margin-bottom: 16px;
+}
+#search-input:focus { outline: none; border-color: var(--accent); }
+.nav-link { display: block; color: var(--text-muted); text-decoration: none; padding: 6px 8px; font-size: 0.9rem; border-radius: 4px; }
+.nav-link:hover { color: #fff; background: var(--bg-tertiary); }
+main { margin-left: 300px; padding: 40px 48px; max-width: 950px; flex: 1; }
+h1 { color: #fff; font-size: 2.2rem; margin-top: 0; padding-bottom: 16px; border-bottom: 1px solid var(--border-color); }
+h2 { color: var(--accent); font-size: 1.4rem; margin-top: 36px; margin-bottom: 14px; }
+h3 { color: #fff; font-size: 1.25rem; margin-top: 28px; margin-bottom: 12px; display: flex; align-items: center; gap: 10px; }
+h4 { color: var(--accent); font-size: 1rem; margin-top: 20px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+.badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
+.badge-pub { background: #064e3b; color: #6ee7b7; border: 1px solid #059669; }
+.badge-private { background: #334155; color: #cbd5e1; }
+.badge-type { background: #1e1b4b; color: #c7d2fe; border: 1px solid #4338ca; }
+.code-sig { background: #090d16; border: 1px solid var(--border-color); padding: 14px 18px; border-radius: 8px; overflow-x: auto; font-family: 'Consolas', 'Fira Code', monospace; font-size: 0.95rem; color: #e2e8f0; }
+.summary { color: #cbd5e1; line-height: 1.65; margin: 14px 0; font-size: 1rem; }
+/* Callout styling */
+.callout { margin: 16px 0; padding: 14px 18px; border-radius: 8px; border-left: 4px solid; font-size: 0.92rem; }
+.callout-header { font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+.callout-tip { border-color: #10b981; background: rgba(16, 185, 129, 0.08); color: #d1fae5; }
+.callout-tip .callout-header { color: #34d399; }
+.callout-warning { border-color: #f59e0b; background: rgba(245, 158, 11, 0.08); color: #fef3c7; }
+.callout-warning .callout-header { color: #fbbf24; }
+.callout-note { border-color: #0284c7; background: rgba(2, 132, 199, 0.08); color: #e0f2fe; }
+.callout-note .callout-header { color: #38bdf8; }
+.callout-deprecated { border-color: #e11d48; background: rgba(225, 29, 72, 0.08); color: #ffe4e6; }
+.callout-deprecated .callout-header { color: #fb7185; }
+/* Example card */
+.example-card { margin: 20px 0; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: #080c14; }
+.example-header { background: #162032; padding: 8px 16px; font-size: 0.82rem; font-weight: 700; color: #94a3b8; border-bottom: 1px solid var(--border-color); }
+.example-card pre { margin: 0; padding: 14px 18px; overflow-x: auto; font-family: monospace; font-size: 0.92rem; color: #e2e8f0; }
+/* Tables */
+table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 0.92rem; }
+th { background: #162032; color: #94a3b8; text-align: left; padding: 10px 14px; font-weight: 600; border-bottom: 1px solid var(--border-color); }
+td { padding: 10px 14px; border-bottom: 1px solid #1e293b; color: #cbd5e1; }
+ul { padding-left: 20px; color: #cbd5e1; line-height: 1.6; }
+hr { border: 0; border-top: 1px solid var(--border-color); margin: 36px 0; }
+</style>
+<script>
+function filterNav() {
+  var q = document.getElementById('search-input').value.toLowerCase();
+  var links = document.querySelectorAll('.nav-link');
+  links.forEach(function(l) {
+    l.style.display = l.textContent.toLowerCase().includes(q) ? 'block' : 'none';
+  });
+}
+</script>
+</head>
+<body>
+<nav>
+<h2>arithmetic.lm</h2>
+<input type="text" id="search-input" placeholder="Filter symbols..." oninput="filterNav()">
+<div id="nav-list">
+<a class="nav-link" href="#Int">Int <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#Float">Float <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#abs">abs <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#abs_int">abs_int <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#gcd">gcd <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#lcm">lcm <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#factorial">factorial <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#permutations">permutations <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#combinations">combinations <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#min">min <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#max">max <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#clamp">clamp <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#sign">sign <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#lerp">lerp <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#floor">floor <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#ceil">ceil <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#round">round <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#trunc">trunc <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#fract">fract <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#pow">pow <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#sqrt">sqrt <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#cbrt">cbrt <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#hypot">hypot <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#log">log <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#log2">log2 <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#log10">log10 <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#exp">exp <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#exp2">exp2 <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+</div>
+</nav>
+<main>
+<h1>arithmetic.lm API Reference</h1>
+<h2>Module Overview</h2>
+<div class="summary"><p>std/math/arithmetic.lm
+Fundamental arithmetic operations, integer algorithms, rounding, powers, and roots.</p></div>
+<div id="Int">
+<h3>Int <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame Int</code></pre>
+<div class="summary"><p>Wrapper providing object-oriented arithmetic helpers for 64-bit signed integers.</p></div>
+<div class="example-card">
+<div class="example-header"><span>✨</span> Example: Idiomatic Usage</div>
+<pre><code>import std.math.arithmetic as arithmetic;
+var i = arithmetic.Int(-42);
+print(i.abs()); // 42</code></pre>
+</div>
+<h4>Members</h4>
+<ul>
+<li><code>var pub value: int</code> <em>(field)</em></li>
+<li><code>pub init(value: int)</code> <em>(constructor)</em></li>
+<li><code>pub fn abs(): int</code> <em>(method)</em></li>
+<li><code>pub fn min(other: int): int</code> <em>(method)</em></li>
+<li><code>pub fn max(other: int): int</code> <em>(method)</em></li>
+</ul>
+</div><hr>
+<div id="Float">
+<h3>Float <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame Float</code></pre>
+<div class="summary"><p>Wrapper providing object-oriented arithmetic, rounding, exponentiation, and logarithms for 64-bit floats.</p></div>
+<div class="example-card">
+<div class="example-header"><span>✨</span> Example: Idiomatic Usage</div>
+<pre><code>import std.math.arithmetic as arithmetic;
+var f = arithmetic.Float(16.0);
+print(f.sqrt()); // 4.0</code></pre>
+</div>
+<h4>Members</h4>
+<ul>
+<li><code>var pub value: float</code> <em>(field)</em></li>
+<li><code>pub init(value: float)</code> <em>(constructor)</em></li>
+<li><code>pub fn abs(): float</code> <em>(method)</em></li>
+<li><code>pub fn min(other: float): float</code> <em>(method)</em></li>
+<li><code>pub fn max(other: float): float</code> <em>(method)</em></li>
+<li><code>pub fn floor(): int</code> <em>(method)</em></li>
+<li><code>pub fn ceil(): int</code> <em>(method)</em></li>
+<li><code>pub fn round(): int</code> <em>(method)</em></li>
+<li><code>pub fn trunc(): int</code> <em>(method)</em></li>
+<li><code>pub fn fract(): float</code> <em>(method)</em></li>
+<li><code>pub fn sqrt(): float</code> <em>(method)</em></li>
+<li><code>pub fn cbrt(): float</code> <em>(method)</em></li>
+<li><code>pub fn exp(): float</code> <em>(method)</em></li>
+<li><code>pub fn log(): float</code> <em>(method)</em></li>
+<li><code>pub fn log2(): float</code> <em>(method)</em></li>
+<li><code>pub fn log10(): float</code> <em>(method)</em></li>
+<li><code>pub fn exp2(): float</code> <em>(method)</em></li>
+<li><code>pub fn pow(exponent: float): float</code> <em>(method)</em></li>
+<li><code>pub fn hypot(other: float): float</code> <em>(method)</em></li>
+</ul>
+</div><hr>
+<div id="abs">
+<h3>abs <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn abs(x: float): float</code></pre>
+<div class="summary"><p>Returns the absolute value of a 64-bit float.</p></div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>x</code></td><td>Input float.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Absolute value |x|.</p>
+</div><hr>
+<div id="abs_int">
+<h3>abs_int <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn abs_int(x: int): int</code></pre>
+<div class="summary"><p>Returns the absolute value of a 64-bit integer.</p></div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>x</code></td><td>Input integer.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Absolute value |x|.</p>
+</div><hr>
+<div id="gcd">
+<h3>gcd <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn gcd(a: int, b: int): int</code></pre>
+<div class="summary"><p>Computes the Greatest Common Divisor (GCD) of two integers using the Euclidean algorithm.</p></div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>a</code></td><td>First integer.</td></tr>
+<tr><td><code>b</code></td><td>Second integer.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Greatest common divisor.</p>
+</div><hr>
+<div id="lcm">
+<h3>lcm <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn lcm(a: int, b: int): int</code></pre>
+<div class="summary"><p>Computes the Least Common Multiple (LCM) of two integers.</p></div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>a</code></td><td>First integer.</td></tr>
+<tr><td><code>b</code></td><td>Second integer.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Least common multiple, or 0 if either operand is 0.</p>
+</div><hr>
+<div id="factorial">
+<h3>factorial <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn factorial(n: int): int</code></pre>
+<div class="summary"><p>Computes the factorial of a non-negative integer (n!).</p></div>
+<h4>Contracts & Preconditions</h4>
+<ul>
+<li><code>requires n >= 0</code></li>
+</ul>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>n</code></td><td>Non-negative integer.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Factorial n! (returns 0 for negative input).</p>
+</div><hr>
+<div id="permutations">
+<h3>permutations <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn permutations(n: int, k: int): int</code></pre>
+<div class="summary"><p>Computes the number of k-permutations of n items: P(n, k) = n! / (n - k)!.</p></div>
+<h4>Contracts & Preconditions</h4>
+<ul>
+<li><code>requires n >= 0 and k >= 0 and k <= n</code></li>
+</ul>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>n</code></td><td>Total items.</td></tr>
+<tr><td><code>k</code></td><td>Items chosen.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Permutation count.</p>
+</div><hr>
+<div id="combinations">
+<h3>combinations <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn combinations(n: int, k: int): int</code></pre>
+<div class="summary"><p>Computes the number of k-combinations of n items: C(n, k) = n! / (k! * (n - k)!).</p></div>
+<h4>Contracts & Preconditions</h4>
+<ul>
+<li><code>requires n >= 0 and k >= 0 and k <= n</code></li>
+</ul>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>n</code></td><td>Total items.</td></tr>
+<tr><td><code>k</code></td><td>Items chosen.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Combination count.</p>
+</div><hr>
+<div id="min">
+<h3>min <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn min(a: float, b: float): float</code></pre>
+<div class="summary"><p>Returns the minimum of two floating-point numbers.</p></div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>a</code></td><td>First operand.</td></tr>
+<tr><td><code>b</code></td><td>Second operand.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Lesser of a and b.</p>
+</div><hr>
+<div id="max">
+<h3>max <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn max(a: float, b: float): float</code></pre>
+<div class="summary"><p>Returns the maximum of two floating-point numbers.</p></div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>a</code></td><td>First operand.</td></tr>
+<tr><td><code>b</code></td><td>Second operand.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Greater of a and b.</p>
+</div><hr>
+<div id="clamp">
+<h3>clamp <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn clamp(value: float, low: float, high: float): float</code></pre>
+<div class="summary"><p>Clamps a value within an inclusive [low, high] interval.</p></div>
+<h4>Contracts & Preconditions</h4>
+<ul>
+<li><code>requires low <= high</code></li>
+</ul>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>value</code></td><td>Candidate value.</td></tr>
+<tr><td><code>low</code></td><td>Lower bound.</td></tr>
+<tr><td><code>high</code></td><td>Upper bound.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Clamped value.</p>
+</div><hr>
+<div id="sign">
+<h3>sign <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn sign(x: float): float</code></pre>
+<div class="summary"><p>Returns the sign of a floating-point number (-1.0, 0.0, or 1.0).</p></div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>x</code></td><td>Input float.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">1.0 if positive, -1.0 if negative, 0.0 if zero.</p>
+</div><hr>
+<div id="lerp">
+<h3>lerp <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn lerp(a: float, b: float, t: float): float</code></pre>
+<div class="summary"><p>Performs linear interpolation between two endpoints.</p></div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>a</code></td><td>Start value (t = 0.0).</td></tr>
+<tr><td><code>b</code></td><td>End value (t = 1.0).</td></tr>
+<tr><td><code>t</code></td><td>Interpolation parameter.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Interpolated float `a + (b - a) * t`.</p>
+</div><hr>
+<div id="floor">
+<h3>floor <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn floor(x: float): int</code></pre>
+<div class="summary"><p>Rounds a float down to the nearest integer.</p></div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>x</code></td><td>Input float.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Floor integer.</p>
+</div><hr>
+<div id="ceil">
+<h3>ceil <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn ceil(x: float): int</code></pre>
+<div class="summary"><p>Rounds a float up to the nearest integer.</p></div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>x</code></td><td>Input float.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Ceil integer.</p>
+</div><hr>
+<div id="round">
+<h3>round <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn round(x: float): int</code></pre>
+<div class="summary"><p>Rounds a float to the nearest integer, half away from zero.</p></div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>x</code></td><td>Input float.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Rounded integer.</p>
+</div><hr>
+<div id="trunc">
+<h3>trunc <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn trunc(x: float): int</code></pre>
+<div class="summary"><p>Truncates a float towards zero.</p></div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>x</code></td><td>Input float.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Truncated integer.</p>
+</div><hr>
+<div id="fract">
+<h3>fract <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn fract(x: float): float</code></pre>
+<div class="summary"><p>Returns the fractional part of a float.</p></div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>x</code></td><td>Input float.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Fractional component.</p>
+</div><hr>
+<div id="pow">
+<h3>pow <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn pow(base: float, exponent: float): float</code></pre>
+<div class="summary"><p>Computes base raised to the power of exponent (base^exponent).</p></div>
+<h4>Contracts & Preconditions</h4>
+<ul>
+<li><code>requires base >= 0.0</code></li>
+</ul>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>base</code></td><td>Base number.</td></tr>
+<tr><td><code>exponent</code></td><td>Exponent.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Resulting power.</p>
+</div><hr>
+<div id="sqrt">
+<h3>sqrt <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn sqrt(x: float): float</code></pre>
+<div class="summary"><p>Computes the square root of a non-negative floating-point number.</p></div>
+<h4>Contracts & Preconditions</h4>
+<ul>
+<li><code>requires x >= 0.0</code></li>
+</ul>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>x</code></td><td>Non-negative float.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Square root.</p>
+</div><hr>
+<div id="cbrt">
+<h3>cbrt <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn cbrt(x: float): float</code></pre>
+<div class="summary"><p>Computes the cube root of a floating-point number.</p></div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>x</code></td><td>Input float.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Cube root.</p>
+</div><hr>
+<div id="hypot">
+<h3>hypot <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn hypot(x: float, y: float): float</code></pre>
+<div class="summary"><p>Computes the hypotenuse length sqrt(x^2 + y^2).</p></div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>x</code></td><td>Leg length x.</td></tr>
+<tr><td><code>y</code></td><td>Leg length y.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Hypotenuse length.</p>
+</div><hr>
+<div id="log">
+<h3>log <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn log(x: float): float</code></pre>
+<div class="summary"><p>Computes the natural logarithm (base e) of a positive number.</p></div>
+<h4>Contracts & Preconditions</h4>
+<ul>
+<li><code>requires x > 0.0</code></li>
+</ul>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>x</code></td><td>Strictly positive float.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Natural logarithm.</p>
+</div><hr>
+<div id="log2">
+<h3>log2 <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn log2(x: float): float</code></pre>
+<div class="summary"><p>Computes the binary logarithm (base 2) of a positive number.</p></div>
+<h4>Contracts & Preconditions</h4>
+<ul>
+<li><code>requires x > 0.0</code></li>
+</ul>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>x</code></td><td>Strictly positive float.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Base-2 logarithm.</p>
+</div><hr>
+<div id="log10">
+<h3>log10 <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn log10(x: float): float</code></pre>
+<div class="summary"><p>Computes the common logarithm (base 10) of a positive number.</p></div>
+<h4>Contracts & Preconditions</h4>
+<ul>
+<li><code>requires x > 0.0</code></li>
+</ul>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>x</code></td><td>Strictly positive float.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Base-10 logarithm.</p>
+</div><hr>
+<div id="exp">
+<h3>exp <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn exp(x: float): float</code></pre>
+<div class="summary"><p>Computes the exponential function e^x.</p></div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>x</code></td><td>Exponent.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">e raised to x.</p>
+</div><hr>
+<div id="exp2">
+<h3>exp2 <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn exp2(x: float): float</code></pre>
+<div class="summary"><p>Computes 2^x.</p></div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>x</code></td><td>Exponent.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">2 raised to x.</p>
+</div><hr>
+</main>
+</body>
+</html>

@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>index.lm - Lymar API Reference</title>
+<style>
+:root {
+  --bg-primary: #0a0e17;
+  --bg-secondary: #111827;
+  --bg-tertiary: #1f2937;
+  --accent: #38bdf8;
+  --accent-hover: #7dd3fc;
+  --text-main: #f1f5f9;
+  --text-muted: #94a3b8;
+  --border-color: #334155;
+}
+* { box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif;
+  margin: 0; padding: 0; background: var(--bg-primary); color: var(--text-main); display: flex;
+}
+nav {
+  width: 300px; height: 100vh; overflow-y: auto; background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color); padding: 24px 20px; position: fixed;
+}
+nav h2 { font-size: 1.15rem; color: var(--accent); margin-top: 0; margin-bottom: 16px; font-weight: 700; }
+#search-input {
+  width: 100%; padding: 8px 12px; background: var(--bg-tertiary); border: 1px solid var(--border-color);
+  border-radius: 6px; color: #fff; font-size: 0.85rem; margin-bottom: 16px;
+}
+#search-input:focus { outline: none; border-color: var(--accent); }
+.nav-link { display: block; color: var(--text-muted); text-decoration: none; padding: 6px 8px; font-size: 0.9rem; border-radius: 4px; }
+.nav-link:hover { color: #fff; background: var(--bg-tertiary); }
+main { margin-left: 300px; padding: 40px 48px; max-width: 950px; flex: 1; }
+h1 { color: #fff; font-size: 2.2rem; margin-top: 0; padding-bottom: 16px; border-bottom: 1px solid var(--border-color); }
+h2 { color: var(--accent); font-size: 1.4rem; margin-top: 36px; margin-bottom: 14px; }
+h3 { color: #fff; font-size: 1.25rem; margin-top: 28px; margin-bottom: 12px; display: flex; align-items: center; gap: 10px; }
+h4 { color: var(--accent); font-size: 1rem; margin-top: 20px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+.badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
+.badge-pub { background: #064e3b; color: #6ee7b7; border: 1px solid #059669; }
+.badge-private { background: #334155; color: #cbd5e1; }
+.badge-type { background: #1e1b4b; color: #c7d2fe; border: 1px solid #4338ca; }
+.code-sig { background: #090d16; border: 1px solid var(--border-color); padding: 14px 18px; border-radius: 8px; overflow-x: auto; font-family: 'Consolas', 'Fira Code', monospace; font-size: 0.95rem; color: #e2e8f0; }
+.summary { color: #cbd5e1; line-height: 1.65; margin: 14px 0; font-size: 1rem; }
+/* Callout styling */
+.callout { margin: 16px 0; padding: 14px 18px; border-radius: 8px; border-left: 4px solid; font-size: 0.92rem; }
+.callout-header { font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+.callout-tip { border-color: #10b981; background: rgba(16, 185, 129, 0.08); color: #d1fae5; }
+.callout-tip .callout-header { color: #34d399; }
+.callout-warning { border-color: #f59e0b; background: rgba(245, 158, 11, 0.08); color: #fef3c7; }
+.callout-warning .callout-header { color: #fbbf24; }
+.callout-note { border-color: #0284c7; background: rgba(2, 132, 199, 0.08); color: #e0f2fe; }
+.callout-note .callout-header { color: #38bdf8; }
+.callout-deprecated { border-color: #e11d48; background: rgba(225, 29, 72, 0.08); color: #ffe4e6; }
+.callout-deprecated .callout-header { color: #fb7185; }
+/* Example card */
+.example-card { margin: 20px 0; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: #080c14; }
+.example-header { background: #162032; padding: 8px 16px; font-size: 0.82rem; font-weight: 700; color: #94a3b8; border-bottom: 1px solid var(--border-color); }
+.example-card pre { margin: 0; padding: 14px 18px; overflow-x: auto; font-family: monospace; font-size: 0.92rem; color: #e2e8f0; }
+/* Tables */
+table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 0.92rem; }
+th { background: #162032; color: #94a3b8; text-align: left; padding: 10px 14px; font-weight: 600; border-bottom: 1px solid var(--border-color); }
+td { padding: 10px 14px; border-bottom: 1px solid #1e293b; color: #cbd5e1; }
+ul { padding-left: 20px; color: #cbd5e1; line-height: 1.6; }
+hr { border: 0; border-top: 1px solid var(--border-color); margin: 36px 0; }
+</style>
+<script>
+function filterNav() {
+  var q = document.getElementById('search-input').value.toLowerCase();
+  var links = document.querySelectorAll('.nav-link');
+  links.forEach(function(l) {
+    l.style.display = l.textContent.toLowerCase().includes(q) ? 'block' : 'none';
+  });
+}
+</script>
+</head>
+<body>
+<nav>
+<h2>index.lm</h2>
+<input type="text" id="search-input" placeholder="Filter symbols..." oninput="filterNav()">
+<div id="nav-list">
+<a class="nav-link" href="#hash">hash <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#sha256">sha256 <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#sha512">sha512 <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#sha384">sha384 <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#sha1">sha1 <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#md5">md5 <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#hmac">hmac <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#hmac_sha256">hmac_sha256 <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#hmac_sha512">hmac_sha512 <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#encrypt_gcm">encrypt_gcm <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#decrypt_gcm">decrypt_gcm <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#encrypt_cbc">encrypt_cbc <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#decrypt_cbc">decrypt_cbc <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#random_hex">random_hex <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#uuid">uuid <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#random_int">random_int <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#random_string">random_string <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+</div>
+</nav>
+<main>
+<h1>index.lm API Reference</h1>
+<h2>Module Overview</h2>
+<div class="summary"><p>std/crypto/index.lm
+Clean, unified Cryptography standard library facade powered by OpenSSL</p></div>
+<div id="hash">
+<h3>hash <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn hash(algo, data: str): str</code></pre>
+<div class="summary"><p>Calculates a one-shot cryptographic hash of input data using the specified algorithm.</p></div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>algo</code></td><td>Algorithm (`HashAlgorithm` enum or string identifier e.g. `"sha256"`).</td></tr>
+<tr><td><code>data</code></td><td>String data to hash.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Hex-encoded digest string.</p>
+<div class="example-card">
+<div class="example-header"><span>✨</span> Example: Idiomatic Usage</div>
+<pre><code>var digest = crypto.hash("sha256", "data");</code></pre>
+</div>
+</div><hr>
+<div id="sha256">
+<h3>sha256 <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn sha256(data: str): str</code></pre>
+<div class="summary"><p>Computes SHA-256 hexadecimal digest of input data.</p></div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>data</code></td><td>Plain text or binary string to hash.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">64-character lowercase hex digest string.</p>
+</div><hr>
+<div id="sha512">
+<h3>sha512 <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn sha512(data: str): str</code></pre>
+<div class="summary"><p>Computes SHA-512 hexadecimal digest of input data.</p></div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>data</code></td><td>Plain text or binary string to hash.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">128-character lowercase hex digest string.</p>
+</div><hr>
+<div id="sha384">
+<h3>sha384 <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn sha384(data: str): str</code></pre>
+<div class="summary"><p>Computes SHA-384 hexadecimal digest of input data.</p></div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>data</code></td><td>Plain text or binary string to hash.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">96-character lowercase hex digest string.</p>
+</div><hr>
+<div id="sha1">
+<h3>sha1 <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn sha1(data: str): str</code></pre>
+<div class="summary"><p>Computes legacy SHA-1 hexadecimal digest of input data.</p></div>
+<div class="callout callout-warning">
+<div class="callout-header"><span>⚠️</span> Warning</div>
+<div class="callout-content"><p>SHA-1 is cryptographically broken; prefer SHA-256 for secure hashing.</p></div>
+</div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>data</code></td><td>Plain text or binary string to hash.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">40-character lowercase hex digest string.</p>
+</div><hr>
+<div id="md5">
+<h3>md5 <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn md5(data: str): str</code></pre>
+<div class="summary"><p>Computes legacy MD5 hexadecimal digest of input data.</p></div>
+<div class="callout callout-warning">
+<div class="callout-header"><span>⚠️</span> Warning</div>
+<div class="callout-content"><p>MD5 is cryptographically broken; use only for legacy compatibility or checksums.</p></div>
+</div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>data</code></td><td>Plain text or binary string to hash.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">32-character lowercase hex digest string.</p>
+</div><hr>
+<div id="hmac">
+<h3>hmac <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn hmac(algo: str, key: str, data: str): str</code></pre>
+<div class="summary"><p>Computes an HMAC signature using a chosen digest algorithm.</p></div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>algo</code></td><td>Digest algorithm (e.g. `"sha256"`, `"sha512"`).</td></tr>
+<tr><td><code>key</code></td><td>Secret key string.</td></tr>
+<tr><td><code>data</code></td><td>Message payload to authenticate.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Hexadecimal HMAC signature.</p>
+</div><hr>
+<div id="hmac_sha256">
+<h3>hmac_sha256 <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn hmac_sha256(key: str, data: str): str</code></pre>
+<div class="summary"><p>Computes an HMAC-SHA256 signature for message authentication.</p></div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>key</code></td><td>Secret key string.</td></tr>
+<tr><td><code>data</code></td><td>Message payload to authenticate.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">64-character lowercase hex HMAC signature.</p>
+</div><hr>
+<div id="hmac_sha512">
+<h3>hmac_sha512 <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn hmac_sha512(key: str, data: str): str</code></pre>
+<div class="summary"><p>Computes an HMAC-SHA512 signature for high-security message authentication.</p></div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>key</code></td><td>Secret key string.</td></tr>
+<tr><td><code>data</code></td><td>Message payload to authenticate.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">128-character lowercase hex HMAC signature.</p>
+</div><hr>
+<div id="encrypt_gcm">
+<h3>encrypt_gcm <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn encrypt_gcm(key: str, iv: str, plaintext: str, aad: str = ...): cipher.GcmCipher?</code></pre>
+<div class="summary"><p>Encrypts plaintext using authenticated AES-GCM (Galois/Counter Mode).</p></div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>key</code></td><td>Hex-encoded AES key (16, 24, or 32 bytes for AES-128/192/256).</td></tr>
+<tr><td><code>iv</code></td><td>Hex-encoded initialization vector (typically 12 bytes / 24 hex characters).</td></tr>
+<tr><td><code>plaintext</code></td><td>Plain text data to encrypt.</td></tr>
+<tr><td><code>aad</code></td><td>Optional additional authenticated data.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Fallible `GcmCipher` structure containing ciphertext and authentication tag.</p>
+</div><hr>
+<div id="decrypt_gcm">
+<h3>decrypt_gcm <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn decrypt_gcm(key: str, iv: str, ciphertext: str, tag: str, aad: str = ...): str?</code></pre>
+<div class="summary"><p>Decrypts and authenticates AES-GCM ciphertext using the provided authentication tag.</p></div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>key</code></td><td>Hex-encoded AES key.</td></tr>
+<tr><td><code>iv</code></td><td>Hex-encoded initialization vector.</td></tr>
+<tr><td><code>ciphertext</code></td><td>Hex-encoded ciphertext payload.</td></tr>
+<tr><td><code>tag</code></td><td>Hex-encoded 16-byte authentication tag.</td></tr>
+<tr><td><code>aad</code></td><td>Optional additional authenticated data matching encryption.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Fallible decrypted plaintext string.</p>
+</div><hr>
+<div id="encrypt_cbc">
+<h3>encrypt_cbc <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn encrypt_cbc(key: str, iv: str, plaintext: str): str?</code></pre>
+<div class="summary"><p>Encrypts plaintext using AES in CBC mode with PKCS#7 padding.</p></div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>key</code></td><td>Hex-encoded AES key.</td></tr>
+<tr><td><code>iv</code></td><td>Hex-encoded 16-byte initialization vector.</td></tr>
+<tr><td><code>plaintext</code></td><td>Plain text data to encrypt.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Fallible hex-encoded ciphertext.</p>
+</div><hr>
+<div id="decrypt_cbc">
+<h3>decrypt_cbc <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn decrypt_cbc(key: str, iv: str, ciphertext: str): str?</code></pre>
+<div class="summary"><p>Decrypts hex-encoded AES-CBC ciphertext with PKCS#7 unpadding.</p></div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>key</code></td><td>Hex-encoded AES key.</td></tr>
+<tr><td><code>iv</code></td><td>Hex-encoded 16-byte initialization vector.</td></tr>
+<tr><td><code>ciphertext</code></td><td>Hex-encoded ciphertext to decrypt.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Fallible decrypted plaintext string.</p>
+</div><hr>
+<div id="random_hex">
+<h3>random_hex <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn random_hex(num_bytes: int): str</code></pre>
+<div class="summary"><p>Generates cryptographically secure random bytes formatted as a lowercase hex string.</p></div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>num_bytes</code></td><td>Number of random bytes to generate.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Hex string of length `num_bytes * 2`.</p>
+</div><hr>
+<div id="uuid">
+<h3>uuid <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn uuid(): str</code></pre>
+<div class="summary"><p>Generates a RFC 4122 Version 4 random UUID string.</p></div>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Formatted UUID string (e.g. `"f47ac10b-58cc-4372-a567-0e02b2c3d479"`).</p>
+</div><hr>
+<div id="random_int">
+<h3>random_int <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn random_int(min: int, max: int): int</code></pre>
+<div class="summary"><p>Generates a cryptographically secure random integer within `[min, max]`.</p></div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>min</code></td><td>Minimum inclusive bound.</td></tr>
+<tr><td><code>max</code></td><td>Maximum inclusive bound.</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Random integer `n` such that `min <= n <= max`.</p>
+</div><hr>
+<div id="random_string">
+<h3>random_string <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn random_string(length: int, alphabet: str = ...): str</code></pre>
+<div class="summary"><p>Generates a cryptographically secure random string of given length using a character set.</p></div>
+<h4>Parameters</h4>
+<table>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>length</code></td><td>Number of characters to generate.</td></tr>
+<tr><td><code>alphabet</code></td><td>Character set to sample from (default: alphanumeric).</td></tr>
+</tbody>
+</table>
+<h4>Returns</h4>
+<p style="color: #cbd5e1;">Secure random string.</p>
+</div><hr>
+</main>
+</body>
+</html>

@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>forms.lm - Lymar API Reference</title>
+<style>
+:root {
+  --bg-primary: #0a0e17;
+  --bg-secondary: #111827;
+  --bg-tertiary: #1f2937;
+  --accent: #38bdf8;
+  --accent-hover: #7dd3fc;
+  --text-main: #f1f5f9;
+  --text-muted: #94a3b8;
+  --border-color: #334155;
+}
+* { box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif;
+  margin: 0; padding: 0; background: var(--bg-primary); color: var(--text-main); display: flex;
+}
+nav {
+  width: 300px; height: 100vh; overflow-y: auto; background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color); padding: 24px 20px; position: fixed;
+}
+nav h2 { font-size: 1.15rem; color: var(--accent); margin-top: 0; margin-bottom: 16px; font-weight: 700; }
+#search-input {
+  width: 100%; padding: 8px 12px; background: var(--bg-tertiary); border: 1px solid var(--border-color);
+  border-radius: 6px; color: #fff; font-size: 0.85rem; margin-bottom: 16px;
+}
+#search-input:focus { outline: none; border-color: var(--accent); }
+.nav-link { display: block; color: var(--text-muted); text-decoration: none; padding: 6px 8px; font-size: 0.9rem; border-radius: 4px; }
+.nav-link:hover { color: #fff; background: var(--bg-tertiary); }
+main { margin-left: 300px; padding: 40px 48px; max-width: 950px; flex: 1; }
+h1 { color: #fff; font-size: 2.2rem; margin-top: 0; padding-bottom: 16px; border-bottom: 1px solid var(--border-color); }
+h2 { color: var(--accent); font-size: 1.4rem; margin-top: 36px; margin-bottom: 14px; }
+h3 { color: #fff; font-size: 1.25rem; margin-top: 28px; margin-bottom: 12px; display: flex; align-items: center; gap: 10px; }
+h4 { color: var(--accent); font-size: 1rem; margin-top: 20px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+.badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
+.badge-pub { background: #064e3b; color: #6ee7b7; border: 1px solid #059669; }
+.badge-private { background: #334155; color: #cbd5e1; }
+.badge-type { background: #1e1b4b; color: #c7d2fe; border: 1px solid #4338ca; }
+.code-sig { background: #090d16; border: 1px solid var(--border-color); padding: 14px 18px; border-radius: 8px; overflow-x: auto; font-family: 'Consolas', 'Fira Code', monospace; font-size: 0.95rem; color: #e2e8f0; }
+.summary { color: #cbd5e1; line-height: 1.65; margin: 14px 0; font-size: 1rem; }
+/* Callout styling */
+.callout { margin: 16px 0; padding: 14px 18px; border-radius: 8px; border-left: 4px solid; font-size: 0.92rem; }
+.callout-header { font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+.callout-tip { border-color: #10b981; background: rgba(16, 185, 129, 0.08); color: #d1fae5; }
+.callout-tip .callout-header { color: #34d399; }
+.callout-warning { border-color: #f59e0b; background: rgba(245, 158, 11, 0.08); color: #fef3c7; }
+.callout-warning .callout-header { color: #fbbf24; }
+.callout-note { border-color: #0284c7; background: rgba(2, 132, 199, 0.08); color: #e0f2fe; }
+.callout-note .callout-header { color: #38bdf8; }
+.callout-deprecated { border-color: #e11d48; background: rgba(225, 29, 72, 0.08); color: #ffe4e6; }
+.callout-deprecated .callout-header { color: #fb7185; }
+/* Example card */
+.example-card { margin: 20px 0; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: #080c14; }
+.example-header { background: #162032; padding: 8px 16px; font-size: 0.82rem; font-weight: 700; color: #94a3b8; border-bottom: 1px solid var(--border-color); }
+.example-card pre { margin: 0; padding: 14px 18px; overflow-x: auto; font-family: monospace; font-size: 0.92rem; color: #e2e8f0; }
+/* Tables */
+table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 0.92rem; }
+th { background: #162032; color: #94a3b8; text-align: left; padding: 10px 14px; font-weight: 600; border-bottom: 1px solid var(--border-color); }
+td { padding: 10px 14px; border-bottom: 1px solid #1e293b; color: #cbd5e1; }
+ul { padding-left: 20px; color: #cbd5e1; line-height: 1.6; }
+hr { border: 0; border-top: 1px solid var(--border-color); margin: 36px 0; }
+</style>
+<script>
+function filterNav() {
+  var q = document.getElementById('search-input').value.toLowerCase();
+  var links = document.querySelectorAll('.nav-link');
+  links.forEach(function(l) {
+    l.style.display = l.textContent.toLowerCase().includes(q) ? 'block' : 'none';
+  });
+}
+</script>
+</head>
+<body>
+<nav>
+<h2>forms.lm</h2>
+<input type="text" id="search-input" placeholder="Filter symbols..." oninput="filterNav()">
+<div id="nav-list">
+<a class="nav-link" href="#ValidationResult">ValidationResult <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#ValidationRule">ValidationRule <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#required_validator">required_validator <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#min_length_validator">min_length_validator <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#max_length_validator">max_length_validator <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#email_validator">email_validator <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#min_value_validator">min_value_validator <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#max_value_validator">max_value_validator <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#pattern_validator">pattern_validator <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#FormState">FormState <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#FormBuilder">FormBuilder <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#form_builder">form_builder <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#create_form">create_form <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#bind_text_field">bind_text_field <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#bind_checkbox_field">bind_checkbox_field <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#bind_slider_field">bind_slider_field <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#field_error_widget">field_error_widget <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+</div>
+</nav>
+<main>
+<h1>forms.lm API Reference</h1>
+<h2>Module Overview</h2>
+<div class="summary"><p>std/ui/forms - Form State Management with Validation</p></div>
+<div id="ValidationResult">
+<h3>ValidationResult <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame ValidationResult</code></pre>
+<div class="summary"><p>── Validation Result ───────────────────────────────────────────────────────</p></div>
+<h4>Members</h4>
+<ul>
+<li><code>var pub is_valid: bool</code> <em>(field)</em></li>
+<li><code>var pub error_message: str</code> <em>(field)</em></li>
+<li><code>var pub field_name: str</code> <em>(field)</em></li>
+<li><code>pub init()</code> <em>(constructor)</em></li>
+<li><code>pub fn valid(): ValidationResult</code> <em>(method)</em></li>
+<li><code>pub fn error(message: str, field: str): ValidationResult</code> <em>(method)</em></li>
+</ul>
+</div><hr>
+<div id="ValidationRule">
+<h3>ValidationRule <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame ValidationRule</code></pre>
+<div class="summary"><p>── Validation Rule ────────────────────────────────────────────────────────</p></div>
+<h4>Members</h4>
+<ul>
+<li><code>var pub field_name: str</code> <em>(field)</em></li>
+<li><code>var pub validator: function</code> <em>(field)</em></li>
+<li><code>var pub is_required: bool</code> <em>(field)</em></li>
+<li><code>pub init(field: str, validator_fn: function)</code> <em>(constructor)</em></li>
+</ul>
+</div><hr>
+<div id="required_validator">
+<h3>required_validator <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn required_validator(field_name: str): ValidationRule</code></pre>
+<div class="summary"><p>── Common Validators ────────────────────────────────────────────────────────</p></div>
+</div><hr>
+<div id="min_length_validator">
+<h3>min_length_validator <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn min_length_validator(field_name: str, min_len: int): ValidationRule</code></pre>
+</div><hr>
+<div id="max_length_validator">
+<h3>max_length_validator <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn max_length_validator(field_name: str, max_len: int): ValidationRule</code></pre>
+</div><hr>
+<div id="email_validator">
+<h3>email_validator <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn email_validator(field_name: str): ValidationRule</code></pre>
+</div><hr>
+<div id="min_value_validator">
+<h3>min_value_validator <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn min_value_validator(field_name: str, min_val: float): ValidationRule</code></pre>
+</div><hr>
+<div id="max_value_validator">
+<h3>max_value_validator <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn max_value_validator(field_name: str, max_val: float): ValidationRule</code></pre>
+</div><hr>
+<div id="pattern_validator">
+<h3>pattern_validator <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn pattern_validator(field_name: str, pattern: str): ValidationRule</code></pre>
+</div><hr>
+<div id="FormState">
+<h3>FormState <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame FormState</code></pre>
+<div class="summary"><p>── Form State ─────────────────────────────────────────────────────────────</p></div>
+<h4>Members</h4>
+<ul>
+<li><code>var pub values: dict</code> <em>(field)</em></li>
+<li><code>var pub errors: dict</code> <em>(field)</em></li>
+<li><code>var pub touched: dict</code> <em>(field)</em></li>
+<li><code>var pub rules: list</code> <em>(field)</em></li>
+<li><code>var pub is_valid: state.Signal</code> <em>(field)</em></li>
+<li><code>var pub is_submitting: state.Signal</code> <em>(field)</em></li>
+<li><code>var pub on_submit: function</code> <em>(field)</em></li>
+<li><code>var pub on_success: function</code> <em>(field)</em></li>
+<li><code>var pub on_error: function</code> <em>(field)</em></li>
+<li><code>var pub initial_values: dict</code> <em>(field)</em></li>
+<li><code>pub init()</code> <em>(constructor)</em></li>
+<li><code>pub fn add_field(field_name: str, initial_value: any): nil</code> <em>(method)</em></li>
+<li><code>pub fn add_rule(rule: ValidationRule): nil</code> <em>(method)</em></li>
+<li><code>pub fn set_value(field_name: str, value: any): nil</code> <em>(method)</em></li>
+<li><code>pub fn get_value(field_name: str): any</code> <em>(method)</em></li>
+<li><code>pub fn mark_touched(field_name: str): nil</code> <em>(method)</em></li>
+<li><code>pub fn validate_field(field_name: str): ValidationResult</code> <em>(method)</em></li>
+<li><code>pub fn validate_all(): nil</code> <em>(method)</em></li>
+<li><code>pub fn get_values(): dict</code> <em>(method)</em></li>
+<li><code>pub fn get_errors(): list</code> <em>(method)</em></li>
+<li><code>pub fn submit(): nil</code> <em>(method)</em></li>
+<li><code>pub fn submit_success(values: any): nil</code> <em>(method)</em></li>
+<li><code>pub fn submit_failure(errors: any): nil</code> <em>(method)</em></li>
+<li><code>pub fn reset(): nil</code> <em>(method)</em></li>
+</ul>
+</div><hr>
+<div id="FormBuilder">
+<h3>FormBuilder <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame FormBuilder</code></pre>
+<div class="summary"><p>── Form Builder ───────────────────────────────────────────────────────────</p></div>
+<h4>Members</h4>
+<ul>
+<li><code>var pub form_state: FormState</code> <em>(field)</em></li>
+<li><code>pub init()</code> <em>(constructor)</em></li>
+<li><code>pub fn field(name: str, initial: any): FormBuilder</code> <em>(method)</em></li>
+<li><code>pub fn rule(rule: ValidationRule): FormBuilder</code> <em>(method)</em></li>
+<li><code>pub fn required(field_name: str): FormBuilder</code> <em>(method)</em></li>
+<li><code>pub fn min_length(field_name: str, min_len: int): FormBuilder</code> <em>(method)</em></li>
+<li><code>pub fn max_length(field_name: str, max_len: int): FormBuilder</code> <em>(method)</em></li>
+<li><code>pub fn email(field_name: str): FormBuilder</code> <em>(method)</em></li>
+<li><code>pub fn min_value(field_name: str, min_val: float): FormBuilder</code> <em>(method)</em></li>
+<li><code>pub fn max_value(field_name: str, max_val: float): FormBuilder</code> <em>(method)</em></li>
+<li><code>pub fn pattern(field_name: str, pattern: str): FormBuilder</code> <em>(method)</em></li>
+<li><code>pub fn submit_handler(handler: function): FormBuilder</code> <em>(method)</em></li>
+<li><code>pub fn success_handler(handler: function): FormBuilder</code> <em>(method)</em></li>
+<li><code>pub fn error_handler(handler: function): FormBuilder</code> <em>(method)</em></li>
+<li><code>pub fn build(): FormState</code> <em>(method)</em></li>
+</ul>
+</div><hr>
+<div id="form_builder">
+<h3>form_builder <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn form_builder(): FormBuilder</code></pre>
+<div class="summary"><p>── Factory Functions ──────────────────────────────────────────────────────</p></div>
+</div><hr>
+<div id="create_form">
+<h3>create_form <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn create_form(): FormState</code></pre>
+</div><hr>
+<div id="bind_text_field">
+<h3>bind_text_field <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn bind_text_field(form: FormState, field_name: str, widget: ui.Widget): ui.Widget</code></pre>
+<div class="summary"><p>── Field Binding Helpers ───────────────────────────────────────────────────</p></div>
+</div><hr>
+<div id="bind_checkbox_field">
+<h3>bind_checkbox_field <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn bind_checkbox_field(form: FormState, field_name: str, widget: ui.Widget): ui.Widget</code></pre>
+</div><hr>
+<div id="bind_slider_field">
+<h3>bind_slider_field <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn bind_slider_field(form: FormState, field_name: str, widget: ui.Widget): ui.Widget</code></pre>
+</div><hr>
+<div id="field_error_widget">
+<h3>field_error_widget <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn field_error_widget(form: FormState, field_name: str): ui.Widget</code></pre>
+</div><hr>
+</main>
+</body>
+</html>

@@ -62,60 +62,60 @@ fn main() {
     enabled_toggle.bind_checked(enabled_signal);
 
     var controls = ui.column([
-        ui.text("Controls").font_size(18.0),
-        button_row,
-        name_input,
-        enabled_toggle
+    ui.text("Controls").font_size(18.0),
+    button_row,
+    name_input,
+    enabled_toggle
     ]).spacing(12.0);
 
     // Responsive layout example
     var mobile_layout = ui.column([
-        title,
-        greeting_label,
-        controls
+    title,
+    greeting_label,
+    controls
     ]).spacing(16.0);
 
     var desktop_layout = ui.row([
-        ui.column([title, greeting_label]).spacing(16.0),
-        controls
+    ui.column([title, greeting_label]).spacing(16.0),
+    controls
     ]).spacing(24.0);
 
     var viewport_w = 800.0; // In real app, this would come from viewport
     var responsive_root = ui.responsive(mobile_layout, desktop_layout, desktop_layout, viewport_w);
 
     // Grid layout example
-    var grid_spec = ui.GridSpec(columns=3, col_gap=12.0, row_gap=12.0);
+    var _grid_spec = ui.GridSpec(columns=3, col_gap=12.0, row_gap=12.0);
     var grid_items = [
-        ui.text("Item 1").background(color.blue).padding(16.0),
-        ui.text("Item 2").background(color.green).padding(16.0),
-        ui.text("Item 3").background(color.red).padding(16.0),
-        ui.text("Item 4").background(color.yellow).padding(16.0),
-        ui.text("Item 5").background(color.indigo).padding(16.0),
-        ui.text("Item 6").background(color.gray).padding(16.0)
+    ui.text("Item 1").background(color.blue).padding(16.0),
+    ui.text("Item 2").background(color.green).padding(16.0),
+    ui.text("Item 3").background(color.red).padding(16.0),
+    ui.text("Item 4").background(color.yellow).padding(16.0),
+    ui.text("Item 5").background(color.indigo).padding(16.0),
+    ui.text("Item 6").background(color.gray).padding(16.0)
     ];
 
     var grid_layout = ui.column([
-        ui.text("Grid Layout").font_size(18.0),
-        ui.row(grid_items).spacing(12.0)
+    ui.text("Grid Layout").font_size(18.0),
+    ui.row(grid_items).spacing(12.0)
     ]).spacing(12.0);
 
     // Aspect ratio example
     var aspect_box = ui.text("16:9 Aspect Ratio")
-        .background(color.indigo)
-        .foreground(color.white)
-        .padding(20.0)
-        .aspect_ratio(16.0 / 9.0);
+    .background(color.indigo)
+    .foreground(color.white)
+    .padding(20.0)
+    .aspect_ratio(16.0 / 9.0);
 
     var aspect_section = ui.column([
-        ui.text("Aspect Ratio").font_size(18.0),
-        aspect_box
+    ui.text("Aspect Ratio").font_size(18.0),
+    aspect_box
     ]).spacing(12.0);
 
     // Combine everything
     var root = ui.column([
-        responsive_root,
-        grid_layout,
-        aspect_section
+    responsive_root,
+    grid_layout,
+    aspect_section
     ]).spacing(24.0).padding(24.0);
 
     app.ui(root);

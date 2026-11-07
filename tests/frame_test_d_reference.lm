@@ -11,7 +11,7 @@ frame Foo {
     pub fn set(v: int) {
         self.value = v;
     }
-    
+
     pub fn get(): int {
         return self.value;
     }
@@ -19,18 +19,18 @@ frame Foo {
 
 fn main(): int {
     var f = Foo();
-    
+
     f.set(42);
     var result = f.get();
-    
+
     assert(result == 42, "Value should persist across method calls");
-  //  assert(f.value == 42, "Field should retain value after method call");
-    
+    //  assert(f.value == 42, "Field should retain value after method call");
+
     // Test that multiple mutations persist
     f.set(100);
-  //  assert(f.value == 100, "Second mutation should also persist");
+    //  assert(f.value == 100, "Second mutation should also persist");
     assert(f.get() == 100, "Getter should return updated value");
-    
+
     print("Test D - Reference Identity: PASSED");
     return 0;
 }

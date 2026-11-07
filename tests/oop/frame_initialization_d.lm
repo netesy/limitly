@@ -3,11 +3,11 @@
 
 frame Counter {
     pub count: int = 0;
-    
+
     pub fn inc() {
         self.count = self.count + 1;
     }
-    
+
     pub fn get_count(): int {
         return self.count;
     }

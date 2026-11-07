@@ -1,4 +1,3 @@
-import std.serialization as serialization;
 fn main(): nil {
     print("serialization ok");
 }

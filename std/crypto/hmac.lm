@@ -85,17 +85,17 @@ pub fn hmac(algo: str, key: str, data: str): str {
                 var ok_code = ffi.foreign_call(
                     fn_hmac,
                     [
-                        ffi.cstring_as_ptr(cs_algo),
-                        ffi.cstring_as_ptr(cs_key), len(key),
-                        ffi.cstring_as_ptr(cs_data), len(data),
-                        out_buf
+                    ffi.cstring_as_ptr(cs_algo),
+                    ffi.cstring_as_ptr(cs_key), len(key),
+                    ffi.cstring_as_ptr(cs_data), len(data),
+                    out_buf
                     ],
                     ffi.TYPE_I32,
                     [
-                        ffi.TYPE_PTR,
-                        ffi.TYPE_PTR, ffi.TYPE_I32,
-                        ffi.TYPE_PTR, ffi.TYPE_I32,
-                        ffi.TYPE_PTR
+                    ffi.TYPE_PTR,
+                    ffi.TYPE_PTR, ffi.TYPE_I32,
+                    ffi.TYPE_PTR, ffi.TYPE_I32,
+                    ffi.TYPE_PTR
                     ]
                 );
 

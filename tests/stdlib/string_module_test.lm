@@ -8,11 +8,11 @@ fn test_string_frame(): int {
     assert(str_val.length() == 5, "length failed");
     assert(str_val.concat(" world") == "hello world", "concat failed");
     assert(str_val.substring(1, 4) == "ell", "substring failed");
-    assert(str_val.contains("ell") == true, "contains true failed");
-    assert(str_val.contains("xyz") == false, "contains false failed");
-    assert(str_val.starts_with("he") == true, "starts_with true failed");
-    assert(str_val.starts_with("lo") == false, "starts_with false failed");
-    assert(str_val.ends_with("lo") == true, "ends_with true failed");
+    assert(str_val.contains("ell"), "contains true failed");
+    assert(not str_val.contains("xyz"), "contains false failed");
+    assert(str_val.starts_with("he"), "starts_with true failed");
+    assert(not str_val.starts_with("lo"), "starts_with false failed");
+    assert(str_val.ends_with("lo"), "ends_with true failed");
     assert(str_val.char_at(1) == "e", "char_at failed");
     assert(str_val.repeat(2) == "hellohello", "repeat failed");
     assert(str_val.pad_left(8, "-") == "---hello", "pad_left failed");

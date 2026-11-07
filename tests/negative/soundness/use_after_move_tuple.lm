@@ -2,7 +2,7 @@
 // Using tuple after consuming it
 
 fn consume_tuple(t: (int, str)) {
-    var transferred = t;
+    var _transferred = t;
 }
 
 var data = (42, "hello");

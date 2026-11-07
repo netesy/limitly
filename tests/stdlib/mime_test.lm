@@ -5,14 +5,14 @@ fn test_parsing(): int {
 
     // Simple parsing
     var m1 = mime.parse("text/html");
-    assert(m1.is_valid == true, "m1 should be valid");
+    assert(m1.is_valid, "m1 should be valid");
     assert(m1.main_type == "text", "m1.main_type should be text");
     assert(m1.subtype == "html", "m1.subtype should be html");
     assert(m1.to_string() == "text/html", "m1.to_string() failed");
 
     // Case normalization and whitespace trimming
     var m2 = mime.parse("  TEXT/Html; charset=utf-8; Boundary=some-boundary  ");
-    assert(m2.is_valid == true, "m2 should be valid");
+    assert(m2.is_valid, "m2 should be valid");
     assert(m2.main_type == "text", "m2.main_type should be text");
     assert(m2.subtype == "html", "m2.subtype should be html");
     assert(m2.params.get("charset") == "utf-8", "charset failed");
@@ -20,13 +20,13 @@ fn test_parsing(): int {
 
     // Invalid MIME
     var m3 = mime.parse("invalid-mime-no-slash");
-    assert(m3.is_valid == false, "m3 should be invalid");
+    assert(not m3.is_valid, "m3 should be invalid");
 
     var m4 = mime.parse("text/");
-    assert(m4.is_valid == false, "m4 should be invalid");
+    assert(not m4.is_valid, "m4 should be invalid");
 
     var m5 = mime.parse("/html");
-    assert(m5.is_valid == false, "m5 should be invalid");
+    assert(not m5.is_valid, "m5 should be invalid");
 
     print("Parsing tests passed!");
     return 1;
@@ -41,13 +41,13 @@ fn test_classification(): int {
     var video = mime.parse("video/mp4");
     var app = mime.parse("application/json");
 
-    assert(text.is_text() == true, "text should be text");
-    assert(text.is_image() == false, "text should not be image");
+    assert(text.is_text(), "text should be text");
+    assert(not text.is_image(), "text should not be image");
 
-    assert(image.is_image() == true, "image should be image");
-    assert(audio.is_audio() == true, "audio should be audio");
-    assert(video.is_video() == true, "video should be video");
-    assert(app.is_application() == true, "app should be application");
+    assert(image.is_image(), "image should be image");
+    assert(audio.is_audio(), "audio should be audio");
+    assert(video.is_video(), "video should be video");
+    assert(app.is_application(), "app should be application");
 
     print("Classification tests passed!");
     return 1;
@@ -62,11 +62,11 @@ fn test_parameters(): int {
 
     assert(params.get("charset") == "utf-8", "get charset failed");
     assert(params.get("boundary") == "xyz", "get boundary failed");
-    assert(params.has("charset") == true, "has charset failed");
-    assert(params.has("none") == false, "has none failed");
+    assert(params.has("charset"), "has charset failed");
+    assert(not params.has("none"), "has none failed");
 
     params.remove("boundary");
-    assert(params.has("boundary") == false, "remove failed");
+    assert(not params.has("boundary"), "remove failed");
 
     print("Parameters tests passed!");
     return 1;

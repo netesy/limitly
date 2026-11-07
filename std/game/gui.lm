@@ -227,7 +227,7 @@ frame GUI {
         // Auto-dismiss popup & combo on outside click
         if ((self.active_popup_id != "" or self.combo_open_id != "") and self.mouse_pressed) {
             if (not (self.mouse_x >= self.popup_x and self.mouse_x <= (self.popup_x + self.popup_w) and
-                     self.mouse_y >= self.popup_y and self.mouse_y <= (self.popup_y + self.popup_h))) {
+            self.mouse_y >= self.popup_y and self.mouse_y <= (self.popup_y + self.popup_h))) {
                 self.active_popup_id = "";
                 self.combo_open_id = "";
             }
@@ -237,7 +237,7 @@ frame GUI {
     pub fn is_occluded(x: float, y: float, w: float, h: float): bool {
         if (self.active_popup_id != "" or self.combo_open_id != "") {
             if (self.mouse_x >= self.popup_x and self.mouse_x <= (self.popup_x + self.popup_w) and
-                self.mouse_y >= self.popup_y and self.mouse_y <= (self.popup_y + self.popup_h)) {
+            self.mouse_y >= self.popup_y and self.mouse_y <= (self.popup_y + self.popup_h)) {
                 return true;
             }
         }
@@ -563,7 +563,7 @@ frame GUI {
 
         gg.draw_text(text, self.cursor_x, self.cursor_y + 2.0, c.r, c.g, c.b, c.a, self.theme.font_scale);
         self.prev_item_hovered = (self.mouse_x >= self.cursor_x and self.mouse_x <= (self.cursor_x + w) and
-                                  self.mouse_y >= self.cursor_y and self.mouse_y <= (self.cursor_y + h));
+        self.mouse_y >= self.cursor_y and self.mouse_y <= (self.cursor_y + h));
         self.prev_item_rect = types.rect(self.cursor_x, self.cursor_y, w, h);
         self.advance(w, h);
     }
@@ -597,11 +597,11 @@ frame GUI {
         var by = self.cursor_y;
 
         var hovered = (self.mouse_x >= bx and self.mouse_x <= (bx + w) and
-                       self.mouse_y >= by and self.mouse_y <= (by + h));
+        self.mouse_y >= by and self.mouse_y <= (by + h));
 
         if (hovered and self.is_occluded(bx, by, w, h)) {
             var in_active_popup = (bx >= self.popup_x and (bx + w) <= (self.popup_x + self.popup_w) and
-                                   by >= self.popup_y and (by + h) <= (self.popup_y + self.popup_h));
+            by >= self.popup_y and (by + h) <= (self.popup_y + self.popup_h));
             if (not in_active_popup) {
                 hovered = false;
             }
@@ -730,7 +730,7 @@ frame GUI {
         var total_w = box_size + 8.0 + (len(label) * 8 * self.theme.font_scale) as float;
 
         var hovered = (self.mouse_x >= bx and self.mouse_x <= (bx + total_w) and
-                       self.mouse_y >= by and self.mouse_y <= (by + h));
+        self.mouse_y >= by and self.mouse_y <= (by + h));
 
         if (hovered) {
             self.hot_id = id;
@@ -775,7 +775,7 @@ frame GUI {
         var total_w = size + 8.0 + (len(label) * 8 * self.theme.font_scale) as float;
 
         var hovered = (self.mouse_x >= bx and self.mouse_x <= (bx + total_w) and
-                       self.mouse_y >= by and self.mouse_y <= (by + size));
+        self.mouse_y >= by and self.mouse_y <= (by + size));
         if (hovered) { self.hot_id = id; }
 
         var clicked = false;
@@ -812,7 +812,7 @@ frame GUI {
         var total_w = pill_w + 8.0 + (len(label) * 8 * self.theme.font_scale) as float;
 
         var hovered = (self.mouse_x >= bx and self.mouse_x <= (bx + total_w) and
-                       self.mouse_y >= by and self.mouse_y <= (by + pill_h));
+        self.mouse_y >= by and self.mouse_y <= (by + pill_h));
 
         if (hovered) {
             self.hot_id = id;
@@ -855,7 +855,7 @@ frame GUI {
         var by = self.cursor_y;
 
         var hovered = (self.mouse_x >= bx and self.mouse_x <= (bx + w) and
-                       self.mouse_y >= by and self.mouse_y <= (by + h));
+        self.mouse_y >= by and self.mouse_y <= (by + h));
 
         if (hovered) {
             self.hot_id = id;
@@ -1106,7 +1106,7 @@ frame GUI {
         var text_origin_x = bx + gutter_w + 8.0;
 
         var hovered = (self.mouse_x >= bx and self.mouse_x <= (bx + w) and
-                       self.mouse_y >= by and self.mouse_y <= (by + h));
+        self.mouse_y >= by and self.mouse_y <= (by + h));
         if (hovered and self.is_occluded(bx, by, w, h)) {
             hovered = false;
         }
@@ -1325,7 +1325,7 @@ frame GUI {
         var by = self.cursor_y;
 
         var hovered = (self.mouse_x >= bx and self.mouse_x <= (bx + w) and
-                       self.mouse_y >= by and self.mouse_y <= (by + h));
+        self.mouse_y >= by and self.mouse_y <= (by + h));
         if (hovered and self.is_occluded(bx, by, w, h)) {
             hovered = false;
         }
@@ -1399,7 +1399,7 @@ frame GUI {
         }
 
         var hovered = (self.mouse_x >= bx and self.mouse_x <= (bx + w) and
-                       self.mouse_y >= by and self.mouse_y <= (by + h));
+        self.mouse_y >= by and self.mouse_y <= (by + h));
         if (hovered) { self.hot_id = id; }
 
         var is_open = (self.combo_open_id != "" and self.combo_open_id == id);
@@ -1474,7 +1474,7 @@ frame GUI {
             while (k < item_count) {
                 var iy = popup_y + (k as float) * h;
                 var item_hovered = (self.mouse_x >= bx and self.mouse_x <= (bx + w) and
-                                    self.mouse_y >= iy and self.mouse_y <= (iy + h));
+                self.mouse_y >= iy and self.mouse_y <= (iy + h));
                 if (item_hovered) {
                     var hbg = self.get_style_color(types.COLOR_FRAME_BG_HOVER);
                     gg.draw_rect_primitive(bx, iy, w, h, hbg.r, hbg.g, hbg.b, hbg.a);
@@ -1507,7 +1507,7 @@ frame GUI {
         var full_id = self.make_id(id);
 
         var hovered = (self.mouse_x >= bx and self.mouse_x <= (bx + w) and
-                       self.mouse_y >= by and self.mouse_y <= (by + h));
+        self.mouse_y >= by and self.mouse_y <= (by + h));
         if (hovered) { self.hot_id = full_id; }
 
         var clicked = false;
@@ -1684,7 +1684,7 @@ frame GUI {
         var by = self.cursor_y;
 
         var hovered = (self.mouse_x >= bx and self.mouse_x <= (bx + w) and
-                       self.mouse_y >= by and self.mouse_y <= (by + h));
+        self.mouse_y >= by and self.mouse_y <= (by + h));
 
         if (hovered) {
             self.hot_id = id;
@@ -1730,7 +1730,7 @@ frame GUI {
         var id = self.make_id(self.cur_tab_bar_id + "/" + label);
 
         var hovered = (self.mouse_x >= bx and self.mouse_x <= (bx + w) and
-                       self.mouse_y >= by and self.mouse_y <= (by + h));
+        self.mouse_y >= by and self.mouse_y <= (by + h));
         if (hovered) { self.hot_id = id; }
 
         var clicked = false;
@@ -1781,7 +1781,7 @@ frame GUI {
         var w = 160.0;
 
         var hovered = (self.mouse_x >= bx and self.mouse_x <= (bx + w) and
-                       self.mouse_y >= by and self.mouse_y <= (by + h));
+        self.mouse_y >= by and self.mouse_y <= (by + h));
         if (hovered) { self.hot_id = id; }
 
         if (hovered and self.mouse_pressed) {
@@ -1929,7 +1929,7 @@ frame GUI {
         gg.draw_rect_primitive(bx, by, w, h, bg.r, bg.g, bg.b, bg.a);
 
         var hovered = (self.mouse_x >= bx and self.mouse_x <= (bx + w) and
-                       self.mouse_y >= by and self.mouse_y <= (by + h));
+        self.mouse_y >= by and self.mouse_y <= (by + h));
         if (hovered and self.mouse_wheel != 0.0) {
             self.scroll_y = self.scroll_y - self.mouse_wheel * 20.0;
             var max_scroll = content_h - h;
@@ -1993,7 +1993,7 @@ frame GUI {
         var wh = win.h;
 
         var title_hovered = (self.mouse_x >= wx and self.mouse_x <= (wx + ww) and
-                             self.mouse_y >= wy and self.mouse_y <= (wy + titlebar_h));
+        self.mouse_y >= wy and self.mouse_y <= (wy + titlebar_h));
 
         var id = self.make_id(title);
         if (title_hovered and self.mouse_pressed) {

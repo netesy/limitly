@@ -195,137 +195,137 @@ pub fn parse_glyph(reader: r.ByteReader, info: t.Info, glyph_idx: int): GlyphOut
             flags.append(flag);
             p = p + 1;
             if ((flag & 8) != 0) { // REPEAT flag
-                var repeat_count = reader.read_u8();
-                for (var r_idx = 0; r_idx < repeat_count; r_idx = r_idx + 1) {
-                    flags.append(flag);
-                    p = p + 1;
-                }
+            var repeat_count = reader.read_u8();
+            for (var r_idx = 0; r_idx < repeat_count; r_idx = r_idx + 1) {
+                flags.append(flag);
+                p = p + 1;
             }
         }
-
-        // Read X coordinates (delta decoded)
-        var x_coords: [float] = [];
-        var curr_x: float = 0.0;
-        for (var i = 0; i < num_points; i = i + 1) {
-            var flag = flags[i];
-            var dx: float = 0.0;
-            if ((flag & 2) != 0) { // X_SHORT_VECTOR
-                var byte_val = reader.read_u8();
-                dx = byte_val as float;
-                if ((flag & 16) == 0) { // Negative if bit 4 not set
-                    dx = 0.0 - dx;
-                }
-            } else {
-                if ((flag & 16) == 0) { // If bit 4 not set, read i16 delta
-                    dx = reader.read_i16() as float;
-                }
-                // If bit 4 is set, dx is 0 (same as previous)
-            }
-            curr_x = curr_x + dx;
-            x_coords.append(curr_x);
-        }
-
-        // Read Y coordinates (delta decoded)
-        var y_coords: [float] = [];
-        var curr_y: float = 0.0;
-        for (var i = 0; i < num_points; i = i + 1) {
-            var flag = flags[i];
-            var dy: float = 0.0;
-            if ((flag & 4) != 0) { // Y_SHORT_VECTOR
-                var byte_val = reader.read_u8();
-                dy = byte_val as float;
-                if ((flag & 32) == 0) { // Negative if bit 5 not set
-                    dy = 0.0 - dy;
-                }
-            } else {
-                if ((flag & 32) == 0) { // If bit 5 not set, read i16 delta
-                    dy = reader.read_i16() as float;
-                }
-                // If bit 5 is set, dy is 0 (same as previous)
-            }
-            curr_y = curr_y + dy;
-            y_coords.append(curr_y);
-        }
-
-        // Assemble contours
-        var contours: [[Point]] = [];
-        var pt_idx = 0;
-        for (var c = 0; c < num_contours; c = c + 1) {
-            var end_idx = end_pts[c];
-            var contour_pts: [Point] = [];
-            while (pt_idx <= end_idx) {
-                var on_c = ((flags[pt_idx] & 1) != 0);
-                contour_pts.append(Point(x_coords[pt_idx], y_coords[pt_idx], on_c));
-                pt_idx = pt_idx + 1;
-            }
-            contours.append(contour_pts);
-        }
-
-        outline.contours = contours;
-        outline.is_empty = false;
-        return outline;
-    } else {
-        // Composite Glyph (num_contours == -1)
-        var composite_contours: [[Point]] = [];
-        var more_components = true;
-
-        while (more_components) {
-            var comp_flags = reader.read_u16();
-            var sub_glyph_idx = reader.read_u16();
-
-            var arg1 = 0;
-            var arg2 = 0;
-            if ((comp_flags & 1) != 0) { // ARG_1_AND_2_ARE_WORDS
-                arg1 = reader.read_i16();
-                arg2 = reader.read_i16();
-            } else {
-                arg1 = reader.read_i8();
-                arg2 = reader.read_i8();
-            }
-
-            var scale_a: float = 1.0;
-            var scale_b: float = 0.0;
-            var scale_c: float = 0.0;
-            var scale_d: float = 1.0;
-
-            if ((comp_flags & 8) != 0) { // WE_HAVE_A_SCALE
-                scale_a = (reader.read_i16() as float) / 16384.0;
-                scale_d = scale_a;
-            } elif ((comp_flags & 64) != 0) { // WE_HAVE_AN_X_AND_Y_SCALE
-                scale_a = (reader.read_i16() as float) / 16384.0;
-                scale_d = (reader.read_i16() as float) / 16384.0;
-            } elif ((comp_flags & 128) != 0) { // WE_HAVE_A_TWO_BY_TWO
-                scale_a = (reader.read_i16() as float) / 16384.0;
-                scale_b = (reader.read_i16() as float) / 16384.0;
-                scale_c = (reader.read_i16() as float) / 16384.0;
-                scale_d = (reader.read_i16() as float) / 16384.0;
-            }
-
-            // Save reader position and recursively parse subglyph
-            var saved_pos = reader.tell();
-            var sub_outline = parse_glyph(reader, info, sub_glyph_idx);
-            reader.seek(saved_pos);
-
-            var dx = arg1 as float;
-            var dy = arg2 as float;
-
-            for (var c = 0; c < len(sub_outline.contours); c = c + 1) {
-                var sub_pts = sub_outline.contours[c];
-                var transformed: [Point] = [];
-                for (var p_i = 0; p_i < len(sub_pts); p_i = p_i + 1) {
-                    var pt = sub_pts[p_i];
-                    var tx = (scale_a * pt.x + scale_c * pt.y) + dx;
-                    var ty = (scale_b * pt.x + scale_d * pt.y) + dy;
-                    transformed.append(Point(tx, ty, pt.on_curve));
-                }
-                composite_contours.append(transformed);
-            }
-
-            more_components = ((comp_flags & 32) != 0); // MORE_COMPONENTS
-        }
-
-        outline.contours = composite_contours;
-        outline.is_empty = (len(composite_contours) == 0);
-        return outline;
     }
+
+    // Read X coordinates (delta decoded)
+    var x_coords: [float] = [];
+    var curr_x: float = 0.0;
+    for (var i = 0; i < num_points; i = i + 1) {
+        var flag = flags[i];
+        var dx: float = 0.0;
+        if ((flag & 2) != 0) { // X_SHORT_VECTOR
+        var byte_val = reader.read_u8();
+        dx = byte_val as float;
+        if ((flag & 16) == 0) { // Negative if bit 4 not set
+        dx = 0.0 - dx;
+    }
+} else {
+    if ((flag & 16) == 0) { // If bit 4 not set, read i16 delta
+    dx = reader.read_i16() as float;
+}
+// If bit 4 is set, dx is 0 (same as previous)
+}
+curr_x = curr_x + dx;
+x_coords.append(curr_x);
+}
+
+// Read Y coordinates (delta decoded)
+var y_coords: [float] = [];
+var curr_y: float = 0.0;
+for (var i = 0; i < num_points; i = i + 1) {
+    var flag = flags[i];
+    var dy: float = 0.0;
+    if ((flag & 4) != 0) { // Y_SHORT_VECTOR
+    var byte_val = reader.read_u8();
+    dy = byte_val as float;
+    if ((flag & 32) == 0) { // Negative if bit 5 not set
+    dy = 0.0 - dy;
+}
+} else {
+    if ((flag & 32) == 0) { // If bit 5 not set, read i16 delta
+    dy = reader.read_i16() as float;
+}
+// If bit 5 is set, dy is 0 (same as previous)
+}
+curr_y = curr_y + dy;
+y_coords.append(curr_y);
+}
+
+// Assemble contours
+var contours: [[Point]] = [];
+var pt_idx = 0;
+for (var c = 0; c < num_contours; c = c + 1) {
+    var end_idx = end_pts[c];
+    var contour_pts: [Point] = [];
+    while (pt_idx <= end_idx) {
+        var on_c = ((flags[pt_idx] & 1) != 0);
+        contour_pts.append(Point(x_coords[pt_idx], y_coords[pt_idx], on_c));
+        pt_idx = pt_idx + 1;
+    }
+    contours.append(contour_pts);
+}
+
+outline.contours = contours;
+outline.is_empty = false;
+return outline;
+} else {
+    // Composite Glyph (num_contours == -1)
+    var composite_contours: [[Point]] = [];
+    var more_components = true;
+
+    while (more_components) {
+        var comp_flags = reader.read_u16();
+        var sub_glyph_idx = reader.read_u16();
+
+        var arg1 = 0;
+        var arg2 = 0;
+        if ((comp_flags & 1) != 0) { // ARG_1_AND_2_ARE_WORDS
+        arg1 = reader.read_i16();
+        arg2 = reader.read_i16();
+    } else {
+        arg1 = reader.read_i8();
+        arg2 = reader.read_i8();
+    }
+
+    var scale_a: float = 1.0;
+    var scale_b: float = 0.0;
+    var scale_c: float = 0.0;
+    var scale_d: float = 1.0;
+
+    if ((comp_flags & 8) != 0) { // WE_HAVE_A_SCALE
+    scale_a = (reader.read_i16() as float) / 16384.0;
+    scale_d = scale_a;
+} elif ((comp_flags & 64) != 0) { // WE_HAVE_AN_X_AND_Y_SCALE
+scale_a = (reader.read_i16() as float) / 16384.0;
+scale_d = (reader.read_i16() as float) / 16384.0;
+} elif ((comp_flags & 128) != 0) { // WE_HAVE_A_TWO_BY_TWO
+scale_a = (reader.read_i16() as float) / 16384.0;
+scale_b = (reader.read_i16() as float) / 16384.0;
+scale_c = (reader.read_i16() as float) / 16384.0;
+scale_d = (reader.read_i16() as float) / 16384.0;
+}
+
+// Save reader position and recursively parse subglyph
+var saved_pos = reader.tell();
+var sub_outline = parse_glyph(reader, info, sub_glyph_idx);
+reader.seek(saved_pos);
+
+var dx = arg1 as float;
+var dy = arg2 as float;
+
+for (var c = 0; c < len(sub_outline.contours); c = c + 1) {
+    var sub_pts = sub_outline.contours[c];
+    var transformed: [Point] = [];
+    for (var p_i = 0; p_i < len(sub_pts); p_i = p_i + 1) {
+        var pt = sub_pts[p_i];
+        var tx = (scale_a * pt.x + scale_c * pt.y) + dx;
+        var ty = (scale_b * pt.x + scale_d * pt.y) + dy;
+        transformed.append(Point(tx, ty, pt.on_curve));
+    }
+    composite_contours.append(transformed);
+}
+
+more_components = ((comp_flags & 32) != 0); // MORE_COMPONENTS
+}
+
+outline.contours = composite_contours;
+outline.is_empty = (len(composite_contours) == 0);
+return outline;
+}
 }

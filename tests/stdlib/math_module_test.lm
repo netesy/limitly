@@ -76,7 +76,7 @@ fn test_random(): int {
     assert(f >= 0.0 and f <= 1.0, "random_float range failed");
 
     var b = math.random_bool();
-    assert(b == true or b == false, "random_bool failed");
+    assert(b or not b, "random_bool failed");
 
     var s = math.random_string(5);
     assert(length(s) == 5, "random_string len failed");
