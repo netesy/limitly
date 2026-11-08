@@ -97,32 +97,45 @@ fn main(): int {
 
         // Animated player spaceship in center of viewport
         var ship_x = sw * 0.5;
-        var ship_y = sh * 0.38;
+        var ship_y = 110.0;
         ship_angle = ship_angle + 0.015;
-        var p1x = ship_x;
-        var p1y = ship_y - 24.0;
-        var p2x = ship_x - 18.0;
-        var p2y = ship_y + 20.0;
-        var p3x = ship_x + 18.0;
-        var p3y = ship_y + 20.0;
 
-        // Engine glow
+        // Dual thruster engine flames & warp trail
         if (warp_drive) {
-            gg.draw_triangle_primitive(
-                ship_x - 10.0, ship_y + 20.0,
-                ship_x + 10.0, ship_y + 20.0,
-                ship_x, ship_y + 36.0 + (sim_tick % 8) as float,
-                1.0, 0.3, 0.1, 0.8
-            );
+            var f_left = 32.0 + ((sim_tick * 3) % 7) as float;
+            var f_right = 32.0 + ((sim_tick * 3 + 2) % 7) as float;
+            var f_mid = 38.0 + (sim_tick % 9) as float;
+            gg.draw_triangle_primitive(ship_x - 14.0, ship_y + 16.0, ship_x - 6.0, ship_y + 16.0, ship_x - 10.0, ship_y + f_left, 0.0, 0.95, 1.0, 0.85);
+            gg.draw_triangle_primitive(ship_x + 6.0, ship_y + 16.0, ship_x + 14.0, ship_y + 16.0, ship_x + 10.0, ship_y + f_right, 0.0, 0.95, 1.0, 0.85);
+            gg.draw_triangle_primitive(ship_x - 5.0, ship_y + 14.0, ship_x + 5.0, ship_y + 14.0, ship_x, ship_y + f_mid, 1.0, 0.1, 0.5, 0.95);
         }
 
-        // Ship hull
+        // Swept delta wings
         gg.draw_triangle_primitive(
-            p1x, p1y, p2x, p2y, p3x, p3y,
+            ship_x, ship_y - 28.0,
+            ship_x - 26.0, ship_y + 18.0,
+            ship_x + 26.0, ship_y + 18.0,
+            ship_color.r * 0.65, ship_color.g * 0.65, ship_color.b * 0.65, 0.95
+        );
+
+        // Main aerodynamic fuselage
+        gg.draw_triangle_primitive(
+            ship_x, ship_y - 34.0,
+            ship_x - 14.0, ship_y + 14.0,
+            ship_x + 14.0, ship_y + 14.0,
             ship_color.r, ship_color.g, ship_color.b, ship_color.a
         );
-        // Cockpit
-        gg.draw_rect_primitive(ship_x - 4.0, ship_y - 8.0, 8.0, 12.0, 1.0, 1.0, 1.0, 0.9);
+
+        // Hull specular spine highlight
+        gg.draw_triangle_primitive(
+            ship_x, ship_y - 28.0,
+            ship_x - 4.0, ship_y + 8.0,
+            ship_x + 4.0, ship_y + 8.0,
+            1.0, 1.0, 1.0, 0.4
+        );
+
+        // Sleek curved cockpit canopy
+        gg.draw_rect_rounded_primitive(ship_x - 3.5, ship_y - 14.0, 7.0, 15.0, 3.5, 0.0, 0.95, 1.0, 0.95);
 
         // ── Dynamic Responsive Layout Coordinates ──────────────────────────────
         var hud_w = 250.0;
@@ -139,8 +152,8 @@ fn main(): int {
         var log_h = sh - log_y - 16.0;
         if (log_h < 150.0) { log_h = 150.0;}
 
-        var center_w = 240.0;
-        var center_h = 260.0;
+        var center_w = 260.0;
+        var center_h = 380.0;
         var center_x = (sw - center_w) * 0.5;
         var center_y = sh - center_h - 16.0;
         if (center_y < 16.0) { center_y = 16.0;}

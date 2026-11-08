@@ -360,9 +360,9 @@ frame GUITheme {
         self.press_duration     = 0.08;
         self.enter_duration     = 0.25;
         self.exit_duration      = 0.20;
-        self.button_shadow      = nil;
-        self.window_shadow      = nil;
-        self.popup_shadow       = nil;
+        self.button_shadow      = shadow.Shadow(r=0.0, g=0.0, b=0.0, a=0.35, off_x=0.0, off_y=1.0, blur=3.0, spread=0.0);
+        self.window_shadow      = shadow.Shadow(r=0.0, g=0.0, b=0.0, a=0.50, off_x=0.0, off_y=4.0, blur=14.0, spread=0.0);
+        self.popup_shadow       = shadow.Shadow(r=0.0, g=0.0, b=0.0, a=0.65, off_x=0.0, off_y=6.0, blur=18.0, spread=0.0);
     }
 }
 
@@ -453,6 +453,9 @@ pub fn retro_theme(): GUITheme {
     t.plot_lines         = color.hex(0x008000, 1.0);
     t.plot_histogram     = color.hex(0x000080, 1.0);
     t.rounding           = 0.0;
+    t.button_shadow      = nil;
+    t.window_shadow      = nil;
+    t.popup_shadow       = nil;
     return t;
 }
 
