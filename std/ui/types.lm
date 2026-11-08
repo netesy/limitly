@@ -1757,16 +1757,15 @@ pub fn checkbox(checked: bool = false, on_change: any = nil): Widget {
     var w = Widget(KIND_CHECKBOX);
     if (checked) {
         w.is_checked = 1;
-        w.text_val = "[X]";
         w.foreground_color = color.rgb(80, 220, 130);
     } else {
         w.is_checked = 0;
-        w.text_val = "[ ]";
         w.foreground_color = color.gray;
     }
+    w.text_val = "";
     w.background_color = color.rgb(35, 38, 48);
-    w.height_val = 26.0;
-    w.width_val = 42.0;
+    w.height_val = 22.0;
+    w.width_val = 22.0;
     w.on_change_action = on_change;
     return w;
 }

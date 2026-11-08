@@ -135,13 +135,17 @@ fn _draw_overlay_shadow(dl: dlist.DrawList, x: float, y: float, w: float, h: flo
 }
 
 fn _draw_checkmark(dl: dlist.DrawList, cx: float, cy: float, cr: float, cg: float, cb: float): nil {
-    dlist.dl_add(dl, dlist.dcmd_line(cx + 4.0, cy + 9.5, cx + 7.5, cy + 13.5, cr, cg, cb, 1.0));
-    dlist.dl_add(dl, dlist.dcmd_line(cx + 7.5, cy + 13.5, cx + 14.5, cy + 4.5, cr, cg, cb, 1.0));
+    dlist.dl_add(dl, dlist.dcmd_line(cx + 4.0, cy + 9.5, cx + 7.5, cy + 13.0, cr, cg, cb, 1.0));
+    dlist.dl_add(dl, dlist.dcmd_line(cx + 7.5, cy + 13.0, cx + 14.0, cy + 5.0, cr, cg, cb, 1.0));
+    dlist.dl_add(dl, dlist.dcmd_line(cx + 4.0, cy + 10.5, cx + 7.5, cy + 14.0, cr, cg, cb, 1.0));
+    dlist.dl_add(dl, dlist.dcmd_line(cx + 7.5, cy + 14.0, cx + 14.0, cy + 6.0, cr, cg, cb, 1.0));
 }
 
 fn _draw_overlay_checkmark(dl: dlist.DrawList, cx: float, cy: float, cr: float, cg: float, cb: float): nil {
-    dlist.dl_add_overlay_cmd(dl, dlist.dcmd_line(cx + 4.0, cy + 9.5, cx + 7.5, cy + 13.5, cr, cg, cb, 1.0));
-    dlist.dl_add_overlay_cmd(dl, dlist.dcmd_line(cx + 7.5, cy + 13.5, cx + 14.5, cy + 4.5, cr, cg, cb, 1.0));
+    dlist.dl_add_overlay_cmd(dl, dlist.dcmd_line(cx + 4.0, cy + 9.5, cx + 7.5, cy + 13.0, cr, cg, cb, 1.0));
+    dlist.dl_add_overlay_cmd(dl, dlist.dcmd_line(cx + 7.5, cy + 13.0, cx + 14.0, cy + 5.0, cr, cg, cb, 1.0));
+    dlist.dl_add_overlay_cmd(dl, dlist.dcmd_line(cx + 4.0, cy + 10.5, cx + 7.5, cy + 14.0, cr, cg, cb, 1.0));
+    dlist.dl_add_overlay_cmd(dl, dlist.dcmd_line(cx + 7.5, cy + 14.0, cx + 14.0, cy + 6.0, cr, cg, cb, 1.0));
 }
 
 fn _calc_text_width(text: str): float {
@@ -447,8 +451,8 @@ fn _get_natural_width(child: ui.Widget): float {
         },
         ui.WidgetKind.Checkbox => {
             var cw = 20.0;
-            if (len(child.text_val) > 0) {
-                cw = cw + (len(child.text_val) as float) * 7.5 + 10.0;
+            if (len(child.text_val) > 0 and child.text_val != "[X]" and child.text_val != "[ ]") {
+                cw = cw + _calc_text_width(child.text_val) + 8.0;
             }
             return cw + child.padding_left + child.padding_right;
         },
@@ -666,34 +670,43 @@ fn _emit_slider(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap)
 fn _emit_checkbox(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float {
     var cx = ctx.x + w.padding_left;
     var cy = ctx.y + w.padding_top;
+    var ch = 22.0;
+    if (w.height_val > 0.0) { ch = w.height_val; }
     var box_size = 18.0;
+    var box_y = cy + (ch - box_size) * 0.5;
 
     // Box background
-    dlist.dl_add(dl, dlist.dcmd_rect_rounded(cx, cy, box_size, box_size, 4.0, ts.surface_r * 0.8, ts.surface_g * 0.8, ts.surface_b * 0.8, 1.0));
+    dlist.dl_add(dl, dlist.dcmd_rect_rounded(cx, box_y, box_size, box_size, 4.0, ts.surface_r * 0.8, ts.surface_g * 0.8, ts.surface_b * 0.8, 1.0));
 
     // Box border
     var bord_r = ts.border_r; var bord_g = ts.border_g; var bord_b = ts.border_b;
     if (w.is_checked != 0) {
         bord_r = ts.accent_r; bord_g = ts.accent_g; bord_b = ts.accent_b;
     }
-    _draw_border(dl, cx, cy, box_size, box_size, bord_r, bord_g, bord_b, 1.0, 4.0);
+    _draw_border(dl, cx, box_y, box_size, box_size, bord_r, bord_g, bord_b, 1.0, 4.0);
 
     // Checked fill & vector checkmark
     if (w.is_checked != 0) {
-        dlist.dl_add(dl, dlist.dcmd_rect_rounded(cx + 1.0, cy + 1.0, box_size - 2.0, box_size - 2.0, 3.0, ts.accent_r, ts.accent_g, ts.accent_b, 1.0));
-        _draw_checkmark(dl, cx, cy, 1.0, 1.0, 1.0);
+        dlist.dl_add(dl, dlist.dcmd_rect_rounded(cx + 1.0, box_y + 1.0, box_size - 2.0, box_size - 2.0, 3.0, ts.accent_r, ts.accent_g, ts.accent_b, 1.0));
+        _draw_checkmark(dl, cx, box_y, 1.0, 1.0, 1.0);
     }
 
     // Label
-    var label_w = (len(w.text_val) as float) * 7.5;
-    if (len(w.text_val) > 0) {
-        dlist.dl_add(dl, dlist.dcmd_text(w.text_val, cx + box_size + 8.0, cy + 4.0, ts.text_r, ts.text_g, ts.text_b, 1.0, 1.0));
+    var label_w = 0.0;
+    if (len(w.text_val) > 0 and w.text_val != "[X]" and w.text_val != "[ ]") {
+        label_w = _calc_text_width(w.text_val);
+        var ty = cy + (ch - 13.0) * 0.5;
+        dlist.dl_add(dl, dlist.dcmd_text(w.text_val, cx + box_size + 8.0, ty, ts.text_r, ts.text_g, ts.text_b, 1.0, 1.0));
     }
 
     // Hit zone
-    _add_hit(dl, dlist.make_checkbox_zone(w.text_val, cx, cy, box_size + label_w + 8.0, box_size, w.is_checked, w.on_change_action, w), ctx);
+    var hit_w = box_size + 14.0;
+    if (label_w > 0.0) {
+        hit_w = box_size + label_w + 8.0;
+    }
+    _add_hit(dl, dlist.make_checkbox_zone(w.text_val, cx, cy, hit_w, ch, w.is_checked, w.on_change_action, w), ctx);
 
-    return box_size + w.padding_top + w.padding_bottom;
+    return ch + w.padding_top + w.padding_bottom;
 }
 
 // ── Input ─────────────────────────────────────────────────────────────────────

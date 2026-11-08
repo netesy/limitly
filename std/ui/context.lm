@@ -2339,14 +2339,8 @@ pub fn dispatch_pointer_up(px: float, py: float): nil {
             py <= global_ui_context.captured_bounds_y + global_ui_context.captured_bounds_h) {
                 if (cap.is_checked == 1) {
                     cap.is_checked = 0;
-                    if (cap.text_val == "[X]") {
-                        cap.text_val = "[ ]";
-                    }
                 } else {
                     cap.is_checked = 1;
-                    if (cap.text_val == "[ ]") {
-                        cap.text_val = "[X]";
-                    }
                 }
                 event.fire_action(cap.on_change_action)? else { };
                 mark_element_dirty(1);
@@ -2491,14 +2485,8 @@ if ((w.kind == ui.KIND_CHECKBOX or w.kind == ui.KIND_TOGGLE) and w.is_focused ==
     if (key_code == 32) { // Space
     if (w.is_checked == 1) {
         w.is_checked = 0;
-        if (w.text_val == "[X]") {
-            w.text_val = "[ ]";
-        }
     } else {
         w.is_checked = 1;
-        if (w.text_val == "[ ]") {
-            w.text_val = "[X]";
-        }
     }
     event.fire_action(w.on_change_action)? else { };
     mark_element_dirty(1);

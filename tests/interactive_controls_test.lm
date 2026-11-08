@@ -74,7 +74,7 @@ fn run_tests() {
     app.push_event(app.Event(event_type=app.EventType.MouseUp, x=35, y=125));
     app.process_events();
     assert(chk.is_checked == 1, "Checkbox should toggle to checked");
-    assert(chk.text_val == "[X]", "Checkbox text should be [X]");
+    assert(chk.text_val != "[X]", "Checkbox text should not use hack text");
     print("Pass: Checkbox toggle verified");
 
     // 3. Verify Text Input Typing, Unicode, and Backspace
