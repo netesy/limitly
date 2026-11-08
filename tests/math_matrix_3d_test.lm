@@ -1,0 +1,27 @@
+import std.math.matrix as mat;
+import std.math.vector3 as v3;
+import std.math as math;
+
+fn main() {
+    print("Testing 3D Matrix...");
+    var m = mat.Matrix();
+    assert(m.get(0, 0) == 1.0, "Identity m00");
+
+    m.make_translation(10.0, 20.0, 30.0);
+    var pt = m.transform_point(1.0, 2.0, 3.0);
+    assert(pt[0] == 11.0, "Translated X");
+    assert(pt[1] == 22.0, "Translated Y");
+    assert(pt[2] == 33.0, "Translated Z");
+
+    var rot = mat.Matrix();
+    rot.make_rotation_y(math.PI * 0.5); // 90 degrees around Y: X goes to -Z, Z goes to X
+    var pt_rot = rot.transform_point(1.0, 0.0, 0.0);
+    // (1, 0, 0) -> x*cos - z*sin = 0, z*cos + x*sin = 1 -> z=1 (or near -1/1 depending on winding)
+    print("Rotated X: {pt_rot[0]}, Z: {pt_rot[2]}");
+
+    var proj = mat.Matrix();
+    proj.make_perspective(math.PI / 3.0, 16.0 / 9.0, 0.1, 100.0);
+    assert(proj.get(3, 2) == -1.0, "Perspective w-divide row");
+
+    print("Matrix 3D tests passed!");
+}

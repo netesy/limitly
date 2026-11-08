@@ -1,0 +1,183 @@
+// std/d3/geometry.lm
+// Triangular mesh geometry data structure storing vertices, normals, UVs, and face indices.
+
+import std.math.arithmetic as arith;
+
+frame Geometry {
+    pub vertices: [float];
+    pub normals: [float];
+    pub uvs: [float];
+    pub colors: [float];
+    pub indices: [int];
+
+    pub init() {
+        self.vertices = [];
+        self.normals = [];
+        self.uvs = [];
+        self.colors = [];
+        self.indices = [];
+    }
+
+    pub fn add_vertex(x: float, y: float, z: float): int {
+        var idx = len(self.vertices) / 3;
+        self.vertices.append(x);
+        self.vertices.append(y);
+        self.vertices.append(z);
+        return idx;
+    }
+
+    pub fn add_normal(nx: float, ny: float, nz: float) {
+        self.normals.append(nx);
+        self.normals.append(ny);
+        self.normals.append(nz);
+    }
+
+    pub fn add_uv(u: float, v: float) {
+        self.uvs.append(u);
+        self.uvs.append(v);
+    }
+
+    pub fn add_color(r: float, g: float, b: float) {
+        self.colors.append(r);
+        self.colors.append(g);
+        self.colors.append(b);
+    }
+
+    pub fn add_face(i0: int, i1: int, i2: int) {
+        self.indices.append(i0);
+        self.indices.append(i1);
+        self.indices.append(i2);
+    }
+
+    pub fn get_vertex_count(): int {
+        return len(self.vertices) / 3;
+    }
+
+    pub fn get_face_count(): int {
+        return len(self.indices) / 3;
+    }
+
+    pub fn get_vertex_x(idx: int): float {
+        return self.vertices[idx * 3];
+    }
+
+    pub fn get_vertex_y(idx: int): float {
+        return self.vertices[idx * 3 + 1];
+    }
+
+    pub fn get_vertex_z(idx: int): float {
+        return self.vertices[idx * 3 + 2];
+    }
+
+    pub fn compute_vertex_normals() {
+        var v_count = self.get_vertex_count();
+        var normal_accum: [float] = [];
+        var i = 0;
+        while (i < v_count * 3) {
+            normal_accum.append(0.0);
+            i = i + 1;
+        }
+
+        var f_count = self.get_face_count();
+        var f = 0;
+        while (f < f_count) {
+            var i0 = self.indices[f * 3];
+            var i1 = self.indices[f * 3 + 1];
+            var i2 = self.indices[f * 3 + 2];
+
+            if (i0 < v_count and i1 < v_count and i2 < v_count) {
+                var ax = self.vertices[i0 * 3];
+                var ay = self.vertices[i0 * 3 + 1];
+                var az = self.vertices[i0 * 3 + 2];
+
+                var bx = self.vertices[i1 * 3];
+                var by = self.vertices[i1 * 3 + 1];
+                var bz = self.vertices[i1 * 3 + 2];
+
+                var cx = self.vertices[i2 * 3];
+                var cy = self.vertices[i2 * 3 + 1];
+                var cz = self.vertices[i2 * 3 + 2];
+
+                var abx = bx - ax;
+                var aby = by - ay;
+                var abz = bz - az;
+
+                var acx = cx - ax;
+                var acy = cy - ay;
+                var acz = cz - az;
+
+                var nx = aby * acz - abz * acy;
+                var ny = abz * acx - abx * acz;
+                var nz = abx * acy - aby * acx;
+
+                var nsq = nx * nx + ny * ny + nz * nz;
+                if (nsq > 0.00000001) {
+                    var nlen = arith.sqrt(nsq);
+                    nx = nx / nlen;
+                    ny = ny / nlen;
+                    nz = nz / nlen;
+                } else {
+                    nx = 0.0;
+                    ny = 1.0;
+                    nz = 0.0;
+                }
+
+                normal_accum[i0 * 3] = normal_accum[i0 * 3] + nx;
+                normal_accum[i0 * 3 + 1] = normal_accum[i0 * 3 + 1] + ny;
+                normal_accum[i0 * 3 + 2] = normal_accum[i0 * 3 + 2] + nz;
+
+                normal_accum[i1 * 3] = normal_accum[i1 * 3] + nx;
+                normal_accum[i1 * 3 + 1] = normal_accum[i1 * 3 + 1] + ny;
+                normal_accum[i1 * 3 + 2] = normal_accum[i1 * 3 + 2] + nz;
+
+                normal_accum[i2 * 3] = normal_accum[i2 * 3] + nx;
+                normal_accum[i2 * 3 + 1] = normal_accum[i2 * 3 + 1] + ny;
+                normal_accum[i2 * 3 + 2] = normal_accum[i2 * 3 + 2] + nz;
+            }
+
+            f = f + 1;
+        }
+
+        self.normals = [];
+        var vi = 0;
+        while (vi < v_count) {
+            var nx = normal_accum[vi * 3];
+            var ny = normal_accum[vi * 3 + 1];
+            var nz = normal_accum[vi * 3 + 2];
+            var nsq = nx * nx + ny * ny + nz * nz;
+            if (nsq > 0.00000001) {
+                var nlen = arith.sqrt(nsq);
+                self.normals.append(nx / nlen);
+                self.normals.append(ny / nlen);
+                self.normals.append(nz / nlen);
+            } else {
+                self.normals.append(0.0);
+                self.normals.append(1.0);
+                self.normals.append(0.0);
+            }
+            vi = vi + 1;
+        }
+    }
+
+    pub fn scale(sx: float, sy: float, sz: float) {
+        var v_count = self.get_vertex_count();
+        var i = 0;
+        while (i < v_count) {
+            self.vertices[i * 3] = self.vertices[i * 3] * sx;
+            self.vertices[i * 3 + 1] = self.vertices[i * 3 + 1] * sy;
+            self.vertices[i * 3 + 2] = self.vertices[i * 3 + 2] * sz;
+            i = i + 1;
+        }
+    }
+
+    pub fn translate(dx: float, dy: float, dz: float) {
+        var v_count = self.get_vertex_count();
+        var i = 0;
+        while (i < v_count) {
+            self.vertices[i * 3] = self.vertices[i * 3] + dx;
+            self.vertices[i * 3 + 1] = self.vertices[i * 3 + 1] + dy;
+            self.vertices[i * 3 + 2] = self.vertices[i * 3 + 2] + dz;
+            i = i + 1;
+        }
+    }
+}

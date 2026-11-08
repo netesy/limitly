@@ -147,8 +147,12 @@ frame Game {
                     0 => { self.is_running = false; },
                     1 => { self.width = ev_x; self.height = ev_y; },
                     6 => { self.input.on_mouse_move(ev_x as float, ev_y as float); },
-                    4 => { self.input.on_mouse_down(ev_k, ev_x as float, ev_y as float); },
-                    5 => { self.input.on_mouse_up(ev_k, ev_x as float, ev_y as float); },
+                    4 => {
+                        self.input.on_mouse_down(ev_k, ev_x as float, ev_y as float);
+                    },
+                    5 => {
+                        self.input.on_mouse_up(ev_k, ev_x as float, ev_y as float);
+                    },
                     8 => { self.input.on_mouse_wheel(ev_y as float); },
                     2 => { self.input.on_key_down(ev_k); },
                     3 => { self.input.on_key_up(ev_k); },

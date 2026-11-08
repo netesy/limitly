@@ -1,0 +1,25 @@
+// std/d3/mesh.lm
+// Triangular mesh representation combining geometry, material, and spatial transform.
+
+import std.d3.transform as trans;
+import std.d3.geometry as geom;
+import std.d3.material as mtrl;
+import std.math.matrix as mat;
+import std.math.matrix show Matrix;
+
+frame Mesh {
+    embed trans.Transform3D;
+
+    pub geometry: geom.Geometry;
+    pub material: mtrl.Material;
+    pub name: str;
+    pub visible: bool;
+
+    pub init(geo: geom.Geometry, m: mtrl.Material, name: str = "") {
+        self.init_transform();
+        self.geometry = geo;
+        self.material = m;
+        self.name = name;
+        self.visible = true;
+    }
+}

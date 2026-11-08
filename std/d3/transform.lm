@@ -1,0 +1,111 @@
+// std/d3/transform.lm
+// Zero-cost spatial transformation component embedding TRS and matrix calculations.
+
+import std.math.matrix as mat;
+pub import std.math.matrix show Matrix;
+
+frame Transform3D {
+    pub position_x: float;
+    pub position_y: float;
+    pub position_z: float;
+
+    pub rotation_x: float;
+    pub rotation_y: float;
+    pub rotation_z: float;
+
+    pub scale_x: float;
+    pub scale_y: float;
+    pub scale_z: float;
+
+    pub local_matrix: Matrix;
+    pub world_matrix: Matrix;
+    pub matrix_auto_update: bool;
+
+    pub init() {
+        self.init_transform();
+    }
+
+    pub fn init_transform() {
+        self.position_x = 0.0;
+        self.position_y = 0.0;
+        self.position_z = 0.0;
+
+        self.rotation_x = 0.0;
+        self.rotation_y = 0.0;
+        self.rotation_z = 0.0;
+
+        self.scale_x = 1.0;
+        self.scale_y = 1.0;
+        self.scale_z = 1.0;
+
+        self.local_matrix = mat.Matrix();
+        self.world_matrix = mat.Matrix();
+        self.matrix_auto_update = true;
+    }
+
+    pub fn set_position(x: float, y: float, z: float) {
+        self.position_x = x;
+        self.position_y = y;
+        self.position_z = z;
+        if (self.matrix_auto_update) {
+            self.update_matrix();
+        }
+    }
+
+    pub fn set_rotation(rx: float, ry: float, rz: float) {
+        self.rotation_x = rx;
+        self.rotation_y = ry;
+        self.rotation_z = rz;
+        if (self.matrix_auto_update) {
+            self.update_matrix();
+        }
+    }
+
+    pub fn set_scale(sx: float, sy: float, sz: float) {
+        self.scale_x = sx;
+        self.scale_y = sy;
+        self.scale_z = sz;
+        if (self.matrix_auto_update) {
+            self.update_matrix();
+        }
+    }
+
+    pub fn translate(dx: float, dy: float, dz: float) {
+        self.position_x = self.position_x + dx;
+        self.position_y = self.position_y + dy;
+        self.position_z = self.position_z + dz;
+        if (self.matrix_auto_update) {
+            self.update_matrix();
+        }
+    }
+
+    pub fn rotate_x(angle: float) {
+        self.rotation_x = self.rotation_x + angle;
+        if (self.matrix_auto_update) {
+            self.update_matrix();
+        }
+    }
+
+    pub fn rotate_y(angle: float) {
+        self.rotation_y = self.rotation_y + angle;
+        if (self.matrix_auto_update) {
+            self.update_matrix();
+        }
+    }
+
+    pub fn rotate_z(angle: float) {
+        self.rotation_z = self.rotation_z + angle;
+        if (self.matrix_auto_update) {
+            self.update_matrix();
+        }
+    }
+
+    pub fn update_matrix() {
+        self.local_matrix.make_trs(
+            self.position_x, self.position_y, self.position_z,
+            self.rotation_x, self.rotation_y, self.rotation_z,
+            self.scale_x, self.scale_y, self.scale_z
+        );
+        self.world_matrix = self.local_matrix.clone();
+    }
+}

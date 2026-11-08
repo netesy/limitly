@@ -1,0 +1,79 @@
+// std/d3/obj.lm
+// Wavefront .obj 3D model parser and asset loader.
+
+import std.d3.geometry as geom;
+import std.string.split as split;
+import std.string.trim as trim_mod;
+import std.io.file as file;
+
+pub fn parse_obj(content: str): geom.Geometry {
+    var g = geom.Geometry();
+    var lines = split.split(content, "\n");
+
+    var l_i = 0;
+    while (l_i < len(lines)) {
+        var raw_line = trim_mod.trim(lines[l_i]);
+        if (len(raw_line) > 0 and raw_line[0] != "#") {
+            var parts = split.split(raw_line, " ");
+            var tokens: [str] = [];
+            var p_i = 0;
+            while (p_i < len(parts)) {
+                var p = trim_mod.trim(parts[p_i]);
+                if (len(p) > 0) {
+                    tokens.append(p);
+                }
+                p_i = p_i + 1;
+            }
+
+            if (len(tokens) >= 4 and tokens[0] == "v") {
+                var vx = tokens[1] as float;
+                var vy = tokens[2] as float;
+                var vz = tokens[3] as float;
+                g.add_vertex(vx, vy, vz);
+            } elif (len(tokens) >= 4 and tokens[0] == "vn") {
+                var nx = tokens[1] as float;
+                var ny = tokens[2] as float;
+                var nz = tokens[3] as float;
+                g.add_normal(nx, ny, nz);
+            } elif (len(tokens) >= 3 and tokens[0] == "vt") {
+                var u = tokens[1] as float;
+                var v = tokens[2] as float;
+                g.add_uv(u, v);
+            } elif (len(tokens) >= 4 and tokens[0] == "f") {
+                var face_verts: [int] = [];
+                var f_idx = 1;
+                while (f_idx < len(tokens)) {
+                    var vert_spec = tokens[f_idx];
+                    var sub = split.split(vert_spec, "/");
+                    var v_id = (sub[0] as int) - 1;
+                    face_verts.append(v_id);
+                    f_idx = f_idx + 1;
+                }
+
+                // Fan triangulation
+                var t = 1;
+                while (t < len(face_verts) - 1) {
+                    g.add_face(face_verts[0], face_verts[t], face_verts[t + 1]);
+                    t = t + 1;
+                }
+            }
+        }
+        l_i = l_i + 1;
+    }
+
+    if (len(g.normals) == 0 and g.get_vertex_count() > 0) {
+        g.compute_vertex_normals();
+    }
+
+    return g;
+}
+
+pub fn load_obj(path: str): geom.Geometry? {
+    var f = file.File(path, "r");
+    var res = f.read();
+    f.close();
+    if (res == nil) {
+        return err();
+    }
+    return ok(parse_obj(res as str));
+}

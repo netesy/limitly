@@ -1,0 +1,90 @@
+// std/d3/material.lm
+// Surface material definition defining coloration, illumination response, and shading models.
+
+import std.d3.types as types;
+
+frame Material {
+    pub color_r: float;
+    pub color_g: float;
+    pub color_b: float;
+    pub color_a: float;
+
+    pub ambient: float;
+    pub diffuse: float;
+    pub specular: float;
+    pub shininess: float;
+    pub roughness: float;
+    pub metallic: float;
+
+    pub wireframe: bool;
+    pub wireframe_thickness: float;
+    pub shading: types.ShadingModel;
+    pub cull_mode: types.CullMode;
+
+    pub init(r: float = 0.8, g: float = 0.8, b: float = 0.8, a: float = 1.0) {
+        self.color_r = r;
+        self.color_g = g;
+        self.color_b = b;
+        self.color_a = a;
+
+        self.ambient = 0.25;
+        self.diffuse = 0.75;
+        self.specular = 0.35;
+        self.shininess = 16.0;
+        self.roughness = 0.5;
+        self.metallic = 0.0;
+
+        self.wireframe = false;
+        self.wireframe_thickness = 1.5;
+        self.shading = types.ShadingModel.Flat;
+        self.cull_mode = types.CullMode.Back;
+    }
+
+    pub fn set_color(r: float, g: float, b: float, a: float = 1.0) {
+        self.color_r = r;
+        self.color_g = g;
+        self.color_b = b;
+        self.color_a = a;
+    }
+}
+
+/// Creates a flat unlit material unaffected by scene lighting.
+pub fn basic_material(r: float = 1.0, g: float = 1.0, b: float = 1.0, a: float = 1.0): Material {
+    var m = Material(r=r, g=g, b=b, a=a);
+    m.ambient = 1.0;
+    m.diffuse = 0.0;
+    m.specular = 0.0;
+    m.shading = types.ShadingModel.Unlit;
+    return m;
+}
+
+/// Creates a matte diffuse-illuminated material (Lambertian reflection).
+pub fn lambert_material(r: float = 0.8, g: float = 0.8, b: float = 0.8): Material {
+    var m = Material(r=r, g=g, b=b, a=1.0);
+    m.ambient = 0.2;
+    m.diffuse = 0.8;
+    m.specular = 0.0;
+    m.shading = types.ShadingModel.Flat;
+    return m;
+}
+
+/// Creates a glossy material with Blinn-Phong specular highlights.
+pub fn phong_material(r: float = 0.8, g: float = 0.8, b: float = 0.8, shininess: float = 32.0): Material {
+    var m = Material(r=r, g=g, b=b, a=1.0);
+    m.ambient = 0.25;
+    m.diffuse = 0.75;
+    m.specular = 0.6;
+    m.shininess = shininess;
+    m.shading = types.ShadingModel.Smooth;
+    return m;
+}
+
+/// Creates a wireframe outline material.
+pub fn wireframe_material(r: float = 0.0, g: float = 1.0, b: float = 0.8, thickness: float = 1.5): Material {
+    var m = Material(r=r, g=g, b=b, a=1.0);
+    m.wireframe = true;
+    m.wireframe_thickness = thickness;
+    m.shading = types.ShadingModel.Wireframe;
+    m.cull_mode = types.CullMode.None;
+    return m;
+}

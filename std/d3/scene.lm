@@ -1,0 +1,37 @@
+// std/d3/scene.lm
+// Scene container holding 3D meshes, illumination sources, and environment settings.
+
+import std.d3.mesh as mesh_mod;
+import std.d3.light as light_mod;
+
+frame Scene3D {
+    pub meshes: [mesh_mod.Mesh];
+    pub lights: [light_mod.Light];
+
+    pub background_r: float;
+    pub background_g: float;
+    pub background_b: float;
+    pub background_a: float;
+
+    pub init() {
+        self.meshes = [];
+        self.lights = [];
+        self.background_r = 0.05;
+        self.background_g = 0.05;
+        self.background_b = 0.08;
+        self.background_a = 1.0;
+    }
+
+    pub fn add(m: mesh_mod.Mesh) {
+        self.meshes.append(m);
+    }
+
+    pub fn add_light(l: light_mod.Light) {
+        self.lights.append(l);
+    }
+
+    pub fn clear() {
+        self.meshes = [];
+        self.lights = [];
+    }
+}

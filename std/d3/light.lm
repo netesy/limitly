@@ -1,0 +1,76 @@
+// std/d3/light.lm
+// Scene illumination sources including ambient, directional, and point lights.
+
+import std.d3.transform as trans;
+import std.d3.types as types;
+import std.math.arithmetic as arith;
+import std.math.matrix as mat;
+import std.math.matrix show Matrix;
+
+frame Light {
+    embed trans.Transform3D;
+
+    pub light_type: types.LightType;
+    pub color_r: float;
+    pub color_g: float;
+    pub color_b: float;
+    pub intensity: float;
+
+    pub direction_x: float;
+    pub direction_y: float;
+    pub direction_z: float;
+
+    pub init() {
+        self.init_transform();
+        self.light_type = types.LightType.Directional;
+        self.color_r = 1.0;
+        self.color_g = 1.0;
+        self.color_b = 1.0;
+        self.intensity = 1.0;
+
+        self.direction_x = 0.57735;
+        self.direction_y = 0.57735;
+        self.direction_z = 0.57735;
+    }
+
+    pub fn set_direction(dx: float, dy: float, dz: float) {
+        var dlen = arith.sqrt(dx * dx + dy * dy + dz * dz);
+        if (dlen > 0.000001) {
+            self.direction_x = dx / dlen;
+            self.direction_y = dy / dlen;
+            self.direction_z = dz / dlen;
+        }
+    }
+}
+
+pub fn ambient_light(r: float = 1.0, g: float = 1.0, b: float = 1.0, intensity: float = 0.3): Light {
+    var l = Light();
+    l.light_type = types.LightType.Ambient;
+    l.color_r = r;
+    l.color_g = g;
+    l.color_b = b;
+    l.intensity = intensity;
+    return l;
+}
+
+pub fn directional_light(dx: float = -0.5, dy: float = 1.0, dz: float = 0.8, r: float = 1.0, g: float = 1.0, b: float = 1.0, intensity: float = 1.0): Light {
+    var l = Light();
+    l.light_type = types.LightType.Directional;
+    l.color_r = r;
+    l.color_g = g;
+    l.color_b = b;
+    l.intensity = intensity;
+    l.set_direction(dx, dy, dz);
+    return l;
+}
+
+pub fn point_light(px: float = 0.0, py: float = 2.0, pz: float = 0.0, r: float = 1.0, g: float = 1.0, b: float = 1.0, intensity: float = 1.0): Light {
+    var l = Light();
+    l.light_type = types.LightType.Point;
+    l.color_r = r;
+    l.color_g = g;
+    l.color_b = b;
+    l.intensity = intensity;
+    l.set_position(px, py, pz);
+    return l;
+}

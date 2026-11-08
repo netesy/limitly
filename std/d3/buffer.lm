@@ -1,0 +1,38 @@
+// std/d3/buffer.lm
+// Staged frame templates for generic 3D geometry attributes and shader uniforms.
+
+staged frame BufferAttribute(T: type) {
+    pub var data: [T];
+    pub var item_size: int;
+
+    pub init(data: [T], item_size: int = 3) {
+        self.data = data;
+        self.item_size = item_size;
+    }
+
+    pub fn count(): int {
+        if (self.item_size <= 0) { return 0; }
+        return len(self.data) / self.item_size;
+    }
+
+    pub fn get(index: int, component: int = 0): T {
+        var offset = index * self.item_size + component;
+        return self.data[offset];
+    }
+
+    pub fn set(index: int, component: int, value: T) {
+        var offset = index * self.item_size + component;
+        self.data[offset] = value;
+    }
+}
+
+staged frame Uniform(T: type) {
+    pub var name: str;
+    pub var value: T;
+
+    pub init(name: str, value: T) {
+        self.name = name;
+        self.value = value;
+    }
+}
+

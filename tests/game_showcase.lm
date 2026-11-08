@@ -17,13 +17,14 @@ import std.game as game;
 import std.game.types as types;
 import std.color as color;
 import std.gg as gg;
+import std.math as math;
 
 fn main(): int {
-    print(" === Launching Lymar Game IMGUI & Typography Showcase === ");
+    print(" === Launching Lymar Game IMGUI & Interactive Space Game === ");
 
     // Default screen size is 800x600, fully configurable via Config or set_resolution
     var cfg = game.Config(
-        title = "Lymar Game Engine - IMGUI & Typography Showcase",
+        title = "Lymar Game Engine - IMGUI & Interactive Space Game",
         width = 800,
         height = 600,
         resizable = true
@@ -41,9 +42,14 @@ fn main(): int {
     app.gui.set_theme(types.cyberpunk_theme());
 
     // ── Game State ─────────────────────────────────────────────────────────────
+    var ship_x = 400.0;
+    var ship_y = 120.0;
+    var ship_vx = 0.0;
+    var ship_vy = 0.0;
     var ship_angle = 0.0;
     var ship_speed = 3.5;
     var ship_color = color.hex(0x00f0ff, 1.0);
+    var fire_cooldown = 0;
 
     var health = 85.0;
     var shield = 65.0;
@@ -58,22 +64,38 @@ fn main(): int {
     var weapons = ["Plasma Cannon", "Gauss Railgun", "Photon Torpedo", "Disruptor Beam"];
     var selected_weapon = 0;
 
+    // Active projectiles
+    var proj_x: [float] = [];
+    var proj_y: [float] = [];
+    var proj_vx: [float] = [];
+    var proj_vy: [float] = [];
+    var proj_type: [int] = [];
+    var proj_life: [int] = [];
+
+    // Asteroids
+    var ast_x: [float] = [320.0, 480.0, 390.0, 440.0];
+    var ast_y: [float] = [50.0, 60.0, 20.0, 160.0];
+    var ast_vx: [float] = [0.8, -0.6, 0.5, -0.4];
+    var ast_vy: [float] = [0.3, 0.5, -0.4, 0.6];
+    var ast_size: [float] = [18.0, 24.0, 14.0, 20.0];
+    var ast_hp: [int] = [2, 3, 1, 2];
+
     var fps_data = [60.0, 59.5, 60.2, 58.8, 61.1, 60.0, 59.9, 60.5, 60.1, 60.0];
     var frame_times = [16.6, 16.8, 16.4, 17.0, 16.3, 16.6, 16.7, 16.5, 16.6, 16.6];
 
     var active_theme_idx = 0;// 0 = Cyberpunk, 1 = Dark, 2 = Light, 3 = Retro
     var log_messages = [
-    "[00: 00.01] Engine core initialized (Sokol GLES / Metal / D3D11)",
-    "[00: 00.04] TrueType font rasterizer loaded via stb_truetype",
-    "[00: 00.07] Audio mixer initialized (44.1kHz, 32 channels)",
-    "[00: 00.12] Starship entity spawned in central orbit",
-    "[00: 00.18] Sector radar operational: 12 stellar bodies detected",
-    "[00: 00.25] Ready for pilot input"
+    "[00:00.01] Engine core initialized (Sokol GLES / Metal / D3D11)",
+    "[00:00.04] TrueType font rasterizer loaded via stb_truetype",
+    "[00:00.07] Audio mixer initialized (44.1kHz, 32 channels)",
+    "[00:00.12] Starship entity spawned in central orbit",
+    "[00:00.18] Sector radar operational: 12 stellar bodies detected",
+    "[00:00.25] Ready for pilot input - Use [W,A,S,D] & [SPACE]"
     ];
 
     var sim_tick = 0;
 
-    print("Running game showcase loop...");
+    print("Running interactive game showcase loop...");
 
     while (app.is_running) {
         app.begin_frame();
@@ -81,61 +103,6 @@ fn main(): int {
 
         var sw = app.width as float;
         var sh = app.height as float;
-
-        // ── Background Space Scene ─────────────────────────────────────────────
-        // Draw responsive grid lines
-        var gx = 0.0;
-        while (gx < sw) {
-            gg.draw_rect_primitive(gx, 0.0, 1.0, sh, 0.12, 0.15, 0.25, 0.35);
-            gx = gx + 64.0;
-        }
-        var gy = 0.0;
-        while (gy < sh) {
-            gg.draw_rect_primitive(0.0, gy, sw, 1.0, 0.12, 0.15, 0.25, 0.35);
-            gy = gy + 64.0;
-        }
-
-        // Animated player spaceship in center of viewport
-        var ship_x = sw * 0.5;
-        var ship_y = 110.0;
-        ship_angle = ship_angle + 0.015;
-
-        // Dual thruster engine flames & warp trail
-        if (warp_drive) {
-            var f_left = 32.0 + ((sim_tick * 3) % 7) as float;
-            var f_right = 32.0 + ((sim_tick * 3 + 2) % 7) as float;
-            var f_mid = 38.0 + (sim_tick % 9) as float;
-            gg.draw_triangle_primitive(ship_x - 14.0, ship_y + 16.0, ship_x - 6.0, ship_y + 16.0, ship_x - 10.0, ship_y + f_left, 0.0, 0.95, 1.0, 0.85);
-            gg.draw_triangle_primitive(ship_x + 6.0, ship_y + 16.0, ship_x + 14.0, ship_y + 16.0, ship_x + 10.0, ship_y + f_right, 0.0, 0.95, 1.0, 0.85);
-            gg.draw_triangle_primitive(ship_x - 5.0, ship_y + 14.0, ship_x + 5.0, ship_y + 14.0, ship_x, ship_y + f_mid, 1.0, 0.1, 0.5, 0.95);
-        }
-
-        // Swept delta wings
-        gg.draw_triangle_primitive(
-            ship_x, ship_y - 28.0,
-            ship_x - 26.0, ship_y + 18.0,
-            ship_x + 26.0, ship_y + 18.0,
-            ship_color.r * 0.65, ship_color.g * 0.65, ship_color.b * 0.65, 0.95
-        );
-
-        // Main aerodynamic fuselage
-        gg.draw_triangle_primitive(
-            ship_x, ship_y - 34.0,
-            ship_x - 14.0, ship_y + 14.0,
-            ship_x + 14.0, ship_y + 14.0,
-            ship_color.r, ship_color.g, ship_color.b, ship_color.a
-        );
-
-        // Hull specular spine highlight
-        gg.draw_triangle_primitive(
-            ship_x, ship_y - 28.0,
-            ship_x - 4.0, ship_y + 8.0,
-            ship_x + 4.0, ship_y + 8.0,
-            1.0, 1.0, 1.0, 0.4
-        );
-
-        // Sleek curved cockpit canopy
-        gg.draw_rect_rounded_primitive(ship_x - 3.5, ship_y - 14.0, 7.0, 15.0, 3.5, 0.0, 0.95, 1.0, 0.95);
 
         // ── Dynamic Responsive Layout Coordinates ──────────────────────────────
         var hud_w = 250.0;
@@ -157,6 +124,290 @@ fn main(): int {
         var center_x = (sw - center_w) * 0.5;
         var center_y = sh - center_h - 16.0;
         if (center_y < 16.0) { center_y = 16.0;}
+
+        // ── Background Space Scene ─────────────────────────────────────────────
+        var gx = 0.0;
+        while (gx < sw) {
+            gg.draw_rect_primitive(gx, 0.0, 1.0, sh, 0.12, 0.15, 0.25, 0.35);
+            gx = gx + 64.0;
+        }
+        var gy = 0.0;
+        while (gy < sh) {
+            gg.draw_rect_primitive(0.0, gy, sw, 1.0, 0.12, 0.15, 0.25, 0.35);
+            gy = gy + 64.0;
+        }
+
+        // ── Interactive Flight Controls & Physics ──────────────────────────────
+        if (app.input.is_key_down(game.KEY_A) or app.input.is_key_down(game.KEY_LEFT)) {
+            ship_angle = ship_angle - 0.055;
+        }
+        if (app.input.is_key_down(game.KEY_D) or app.input.is_key_down(game.KEY_RIGHT)) {
+            ship_angle = ship_angle + 0.055;
+        }
+
+        var is_thrusting = false;
+        var thrust = (ship_speed * 0.075) as float;
+        if (thrust < 0.2) { thrust = 0.2; }
+        if (warp_drive) { thrust = thrust * 1.75; }
+
+        if (app.input.is_key_down(game.KEY_W) or app.input.is_key_down(game.KEY_UP)) {
+            is_thrusting = true;
+            ship_vx = ship_vx + math.sin(ship_angle) * thrust;
+            ship_vy = ship_vy - math.cos(ship_angle) * thrust;
+        }
+        if (app.input.is_key_down(game.KEY_S) or app.input.is_key_down(game.KEY_DOWN)) {
+            ship_vx = ship_vx * 0.88;
+            ship_vy = ship_vy * 0.88;
+        }
+
+        // Space friction / inertial stabilization
+        ship_vx = ship_vx * 0.96;
+        ship_vy = ship_vy * 0.96;
+        ship_x = ship_x + ship_vx;
+        ship_y = ship_y + ship_vy;
+
+        // Wrap around viewport boundaries
+        if (ship_x < 20.0) { ship_x = sw - 20.0; }
+        if (ship_x > sw - 20.0) { ship_x = 20.0; }
+        if (ship_y < 20.0) { ship_y = sh - 20.0; }
+        if (ship_y > sh - 20.0) { ship_y = 20.0; }
+
+        if (fire_cooldown > 0) {
+            fire_cooldown = fire_cooldown - 1;
+        }
+
+        // Fire projectile via Space or clicking space outside windows
+        var want_fire = app.input.is_key_pressed(game.KEY_SPACE);
+        if (app.input.is_mouse_pressed(0)) {
+            var mx = app.input.mouse_x;
+            var my = app.input.mouse_y;
+            var over_hud = (mx >= 16.0 and mx <= 16.0 + hud_w and my >= 16.0 and my <= 16.0 + hud_h);
+            var over_tele = (mx >= tele_x and mx <= tele_x + tele_w and my >= 16.0 and my <= 16.0 + tele_h);
+            var over_studio = (mx >= center_x and mx <= center_x + center_w and my >= center_y and my <= center_y + center_h);
+            var over_log = (mx >= tele_x and mx <= tele_x + tele_w and my >= log_y and my <= log_y + log_h);
+            if (not over_hud and not over_tele and not over_studio and not over_log) {
+                want_fire = true;
+            }
+        }
+
+        if (want_fire and fire_cooldown == 0) {
+            fire_cooldown = 9;
+            var p_speed = 10.0;
+            if (selected_weapon == 1) { p_speed = 17.0; }
+            elif (selected_weapon == 2) { p_speed = 7.5; }
+            elif (selected_weapon == 3) { p_speed = 22.0; }
+
+            proj_x.append(ship_x + math.sin(ship_angle) * 26.0);
+            proj_y.append(ship_y - math.cos(ship_angle) * 26.0);
+            proj_vx.append(math.sin(ship_angle) * p_speed + ship_vx * 0.4);
+            proj_vy.append(-math.cos(ship_angle) * p_speed + ship_vy * 0.4);
+            proj_type.append(selected_weapon);
+            proj_life.append(45);
+        }
+
+        // ── Asteroids Simulation & Collision ───────────────────────────────────
+        var next_ast_x: [float] = [];
+        var next_ast_y: [float] = [];
+        var next_ast_vx: [float] = [];
+        var next_ast_vy: [float] = [];
+        var next_ast_size: [float] = [];
+        var next_ast_hp: [int] = [];
+
+        var ai = 0;
+        var ast_count = len(ast_x);
+        while (ai < ast_count) {
+            var ax = ast_x[ai] + ast_vx[ai];
+            var ay = ast_y[ai] + ast_vy[ai];
+            var asz = ast_size[ai];
+            var ahp = ast_hp[ai];
+
+            if (ax < 0.0) { ax = sw; }
+            if (ax > sw) { ax = 0.0; }
+            if (ay < 0.0) { ay = sh; }
+            if (ay > sh) { ay = 0.0; }
+
+            // Projectile collision check
+            var pi = 0;
+            while (pi < len(proj_x)) {
+                var dx = proj_x[pi] - ax;
+                var dy = proj_y[pi] - ay;
+                var dist = math.sqrt(dx * dx + dy * dy);
+                if (dist < asz + 6.0) {
+                    ahp = ahp - 1;
+                    proj_life[pi] = 0;
+                    _score = _score + 50 * level;
+                    break;
+                }
+                pi = pi + 1;
+            }
+
+            // Ship collision check
+            var ship_dx = ship_x - ax;
+            var ship_dy = ship_y - ay;
+            var ship_dist = math.sqrt(ship_dx * ship_dx + ship_dy * ship_dy);
+            if (ship_dist < asz + 18.0) {
+                if (god_mode) {
+                    ast_vx[ai] = -ast_vx[ai] * 1.5;
+                    ast_vy[ai] = -ast_vy[ai] * 1.5;
+                } else {
+                    if (shield > 10.0) {
+                        shield = shield - 15.0;
+                        if (shield < 0.0) { shield = 0.0; }
+                    } else {
+                        health = health - 20.0;
+                        if (health < 0.0) { health = 0.0; }
+                    }
+                    ahp = 0;
+                    log_messages.append("[Impact] Hull collision with space debris!");
+                }
+            }
+
+            if (ahp > 0) {
+                next_ast_x.append(ax);
+                next_ast_y.append(ay);
+                next_ast_vx.append(ast_vx[ai]);
+                next_ast_vy.append(ast_vy[ai]);
+                next_ast_size.append(asz);
+                next_ast_hp.append(ahp);
+
+                // Render faceted asteroid
+                var rock_r = 0.42; var rock_g = 0.45; var rock_b = 0.55;
+                if (ahp == 1) { rock_r = 0.70; rock_g = 0.30; rock_b = 0.35; }
+                gg.draw_rect_rounded_primitive(ax - asz * 0.5, ay - asz * 0.5, asz, asz, asz * 0.35, rock_r, rock_g, rock_b, 0.9);
+                gg.draw_rect_border_primitive(ax - asz * 0.5, ay - asz * 0.5, asz, asz, asz * 0.35, 1.5, rock_r * 1.35, rock_g * 1.35, rock_b * 1.35, 0.95);
+                gg.draw_rect_primitive(ax - asz * 0.2, ay - asz * 0.2, asz * 0.35, asz * 0.35, rock_r * 0.65, rock_g * 0.65, rock_b * 0.65, 0.75);
+            } else {
+                _score = _score + 100 * level;
+                log_messages.append("[Combat] Target destroyed! +{100 * level} PTS");
+            }
+            ai = ai + 1;
+        }
+
+        // Replenish asteroids
+        if (len(next_ast_x) < 5) {
+            var rx = (sim_tick * 73 % 360 + 220) as float;
+            var rvx_seed = (sim_tick % 5) as float;
+            var rvy_seed = (sim_tick % 3) as float;
+            var rsz_seed = (sim_tick % 3) * 6 + 16;
+            next_ast_x.append(rx);
+            next_ast_y.append(15.0);
+            next_ast_vx.append((rvx_seed - 2.0) * 0.35);
+            next_ast_vy.append((rvy_seed + 1.0) * 0.45);
+            next_ast_size.append(rsz_seed as float);
+            next_ast_hp.append(2);
+        }
+
+        ast_x = next_ast_x;
+        ast_y = next_ast_y;
+        ast_vx = next_ast_vx;
+        ast_vy = next_ast_vy;
+        ast_size = next_ast_size;
+        ast_hp = next_ast_hp;
+
+        // ── Projectiles Update & Render ────────────────────────────────────────
+        var next_p_x: [float] = [];
+        var next_p_y: [float] = [];
+        var next_p_vx: [float] = [];
+        var next_p_vy: [float] = [];
+        var next_p_type: [int] = [];
+        var next_p_life: [int] = [];
+
+        var p_i = 0;
+        var p_count = len(proj_x);
+        while (p_i < p_count) {
+            var pl = proj_life[p_i] - 1;
+            if (pl > 0) {
+                var px = proj_x[p_i] + proj_vx[p_i];
+                var py = proj_y[p_i] + proj_vy[p_i];
+                var pt = proj_type[p_i];
+
+                next_p_x.append(px);
+                next_p_y.append(py);
+                next_p_vx.append(proj_vx[p_i]);
+                next_p_vy.append(proj_vy[p_i]);
+                next_p_type.append(pt);
+                next_p_life.append(pl);
+
+                if (pt == 0) {
+                    // Plasma Cannon (Cyan orb)
+                    gg.draw_rect_rounded_primitive(px - 3.5, py - 3.5, 7.0, 7.0, 3.5, 0.0, 0.95, 1.0, 1.0);
+                } elif (pt == 1) {
+                    // Gauss Railgun (Green kinetic tracer)
+                    gg.draw_line_primitive(px, py, px - proj_vx[p_i] * 1.5, py - proj_vy[p_i] * 1.5, 0.2, 1.0, 0.4, 0.95, 2.5);
+                } elif (pt == 2) {
+                    // Photon Torpedo (Orange explosive warhead)
+                    gg.draw_rect_rounded_primitive(px - 5.0, py - 5.0, 10.0, 10.0, 5.0, 1.0, 0.45, 0.0, 1.0);
+                } else {
+                    // Disruptor Beam (Magenta beam)
+                    gg.draw_line_primitive(px, py, px - proj_vx[p_i] * 2.5, py - proj_vy[p_i] * 2.5, 1.0, 0.0, 0.65, 1.0, 3.0);
+                }
+            }
+            p_i = p_i + 1;
+        }
+        proj_x = next_p_x;
+        proj_y = next_p_y;
+        proj_vx = next_p_vx;
+        proj_vy = next_p_vy;
+        proj_type = next_p_type;
+        proj_life = next_p_life;
+
+        // ── Render Spaceship (Rotated with Heading Angle) ───────────────────────
+        var cos_a = math.cos(ship_angle);
+        var sin_a = math.sin(ship_angle);
+
+        // Thruster flame when accelerating or warp drive active
+        if (is_thrusting or warp_drive) {
+            var fl = 24.0 + ((sim_tick * 4) % 9) as float;
+            var t_tip_x = ship_x - sin_a * fl;
+            var t_tip_y = ship_y + cos_a * fl;
+            var t_l_x = ship_x + (-8.0 * cos_a - 14.0 * -sin_a);
+            var t_l_y = ship_y + (-8.0 * sin_a + 14.0 * cos_a);
+            var t_r_x = ship_x + (8.0 * cos_a - 14.0 * -sin_a);
+            var t_r_y = ship_y + (8.0 * sin_a + 14.0 * cos_a);
+            gg.draw_triangle_primitive(t_l_x, t_l_y, t_r_x, t_r_y, t_tip_x, t_tip_y, 1.0, 0.2, 0.5, 0.9);
+        }
+
+        // Swept delta wings
+        var w_nose_x = ship_x + (-24.0 * -sin_a);
+        var w_nose_y = ship_y + (-24.0 * cos_a);
+        var w_l_x = ship_x + (-26.0 * cos_a - 16.0 * -sin_a);
+        var w_l_y = ship_y + (-26.0 * sin_a + 16.0 * cos_a);
+        var w_r_x = ship_x + (26.0 * cos_a - 16.0 * -sin_a);
+        var w_r_y = ship_y + (26.0 * sin_a + 16.0 * cos_a);
+        gg.draw_triangle_primitive(w_nose_x, w_nose_y, w_l_x, w_l_y, w_r_x, w_r_y, ship_color.r * 0.65, ship_color.g * 0.65, ship_color.b * 0.65, 0.95);
+
+        // Main aerodynamic fuselage
+        var f_nose_x = ship_x + (-32.0 * -sin_a);
+        var f_nose_y = ship_y + (-32.0 * cos_a);
+        var f_l_x = ship_x + (-14.0 * cos_a - 14.0 * -sin_a);
+        var f_l_y = ship_y + (-14.0 * sin_a + 14.0 * cos_a);
+        var f_r_x = ship_x + (14.0 * cos_a - 14.0 * -sin_a);
+        var f_r_y = ship_y + (14.0 * sin_a + 14.0 * cos_a);
+        gg.draw_triangle_primitive(f_nose_x, f_nose_y, f_l_x, f_l_y, f_r_x, f_r_y, ship_color.r, ship_color.g, ship_color.b, ship_color.a);
+
+        // Hull specular spine highlight
+        var s_nose_x = ship_x + (-26.0 * -sin_a);
+        var s_nose_y = ship_y + (-26.0 * cos_a);
+        var s_l_x = ship_x + (-4.0 * cos_a - 8.0 * -sin_a);
+        var s_l_y = ship_y + (-4.0 * sin_a + 8.0 * cos_a);
+        var s_r_x = ship_x + (4.0 * cos_a - 8.0 * -sin_a);
+        var s_r_y = ship_y + (4.0 * sin_a + 8.0 * cos_a);
+        gg.draw_triangle_primitive(s_nose_x, s_nose_y, s_l_x, s_l_y, s_r_x, s_r_y, 1.0, 1.0, 1.0, 0.45);
+
+        // Cockpit canopy
+        var c_x = ship_x + (-10.0 * -sin_a);
+        var c_y = ship_y + (-10.0 * cos_a);
+        gg.draw_rect_rounded_primitive(c_x - 3.5, c_y - 4.5, 7.0, 9.0, 3.5, 0.0, 0.95, 1.0, 0.95);
+
+        // Invulnerability Forcefield Bubble
+        if (god_mode) {
+            gg.draw_rect_rounded_primitive(ship_x - 32.0, ship_y - 32.0, 64.0, 64.0, 32.0, 0.0, 0.95, 1.0, 0.22);
+            gg.draw_rect_border_primitive(ship_x - 32.0, ship_y - 32.0, 64.0, 64.0, 32.0, 1.5, 0.0, 0.95, 1.0, 0.75);
+        }
+
+        // Live Space Game Status Banner
+        gg.draw_text("SCORE: {_score}", sw * 0.5 - 60.0, 16.0, 1.0, 0.9, 0.2, 1.0, 1);
+        gg.draw_text("[W,A,S,D] Fly | [SPACE/Click] Fire | HUD Controls Engine", sw * 0.5 - 200.0, 34.0, 0.55, 0.65, 0.8, 0.85, 1);
 
         // ── Window 1: Starship Command HUD ─────────────────────────────────────
         if (app.gui.begin_window("Starship Command HUD", 16.0, 16.0, hud_w, hud_h)) {

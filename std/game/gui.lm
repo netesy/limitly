@@ -85,6 +85,16 @@ frame GUI {
     pub var popup_h: float;
     pub var cur_tab_bar_id: str;
     pub var combo_open_id: str;
+    pub var has_deferred_combo: bool;
+    pub var deferred_combo_bx: float;
+    pub var deferred_combo_by: float;
+    pub var deferred_combo_w: float;
+    pub var deferred_combo_h: float;
+    pub var deferred_combo_items: [str];
+    pub var deferred_combo_selected: int;
+    pub var deferred_combo_id: str;
+    pub var combo_selected_new: int;
+    pub var combo_selected_changed: bool;
     pub var editor_controllers: {str: any};
     pub var scroll_offsets: {str: float};
     pub var focus_manager: focus.Manager;
@@ -134,6 +144,7 @@ frame GUI {
         self.dt = 0.016;
 
         self.hot_id = "";
+        self.has_deferred_combo = false;
         self.active_id = "";
         self.id_prefix = "";
         self.prev_item_hovered = false;
@@ -161,6 +172,16 @@ frame GUI {
         self.popup_h = 0.0;
         self.cur_tab_bar_id = "";
         self.combo_open_id = "";
+        self.has_deferred_combo = false;
+        self.deferred_combo_bx = 0.0;
+        self.deferred_combo_by = 0.0;
+        self.deferred_combo_w = 0.0;
+        self.deferred_combo_h = 0.0;
+        self.deferred_combo_items = [] as [str];
+        self.deferred_combo_selected = 0;
+        self.deferred_combo_id = "";
+        self.combo_selected_new = -1;
+        self.combo_selected_changed = false;
         self.editor_controllers = {} as {str: any};
         self.scroll_offsets = {} as {str: float};
         self.focus_manager = focus.Manager();
@@ -203,6 +224,7 @@ frame GUI {
         self.dt = dt;
 
         self.hot_id = "";
+        self.has_deferred_combo = false;
 
         self.cursor_x = 10.0;
         self.cursor_y = 10.0;
@@ -226,8 +248,14 @@ frame GUI {
 
         // Auto-dismiss popup & combo on outside click
         if ((self.active_popup_id != "" or self.combo_open_id != "") and self.mouse_pressed) {
-            if (not (self.mouse_x >= self.popup_x and self.mouse_x <= (self.popup_x + self.popup_w) and
-            self.mouse_y >= self.popup_y and self.mouse_y <= (self.popup_y + self.popup_h))) {
+            var in_popup = (self.mouse_x >= self.popup_x and self.mouse_x <= (self.popup_x + self.popup_w) and
+            self.mouse_y >= self.popup_y and self.mouse_y <= (self.popup_y + self.popup_h));
+            var in_combo_btn = false;
+            if (self.combo_open_id != "") {
+                in_combo_btn = (self.mouse_x >= self.deferred_combo_bx and self.mouse_x <= (self.deferred_combo_bx + self.deferred_combo_w) and
+                self.mouse_y >= self.deferred_combo_by and self.mouse_y <= (self.deferred_combo_by + self.deferred_combo_h));
+            }
+            if (not in_popup and not in_combo_btn) {
                 self.active_popup_id = "";
                 self.combo_open_id = "";
             }
@@ -244,9 +272,75 @@ frame GUI {
         return false;
     }
 
+    pub fn render_deferred_combo(): nil {
+        if (not self.has_deferred_combo) { return; }
+
+        var bx = self.deferred_combo_bx;
+        var by = self.deferred_combo_by;
+        var w = self.deferred_combo_w;
+        var h = self.deferred_combo_h;
+        var items = self.deferred_combo_items;
+        var selected_idx = self.deferred_combo_selected;
+        var item_count = len(items);
+        var popup_h = (item_count as float) * h;
+        var popup_y = by + h + 2.0;
+        var rad = self.get_style_var(types.VAR_ROUNDING, self.theme.rounding);
+
+        // Elevation drop shadow for combo dropdown (top z-index)
+        var raw_csh = self.get_active_shadow(self.theme.popup_shadow);
+        if (raw_csh != nil) {
+            var csh = raw_csh as shadow.Shadow;
+            if (csh.a > 0.0) {
+                gg.draw_shadow_primitive(bx, popup_y, w, popup_h, csh.r, csh.g, csh.b, csh.a, csh.offset_x, csh.offset_y, csh.blur_radius, csh.spread_radius);
+            }
+        }
+
+        var pbg = self.get_style_color(types.COLOR_PANEL_BG);
+        var popup_border = self.get_style_color(types.COLOR_ACCENT);
+        if (rad > 0.0) {
+            gg.draw_rect_rounded_primitive(bx, popup_y, w, popup_h, rad, pbg.r, pbg.g, pbg.b, pbg.a);
+            gg.draw_rect_border_primitive(bx, popup_y, w, popup_h, rad, 1.0, popup_border.r, popup_border.g, popup_border.b, popup_border.a);
+        } else {
+            gg.draw_rect_primitive(bx, popup_y, w, popup_h, pbg.r, pbg.g, pbg.b, pbg.a);
+            gg.draw_rect_primitive(bx, popup_y, w, 1.0, popup_border.r, popup_border.g, popup_border.b, popup_border.a);
+            gg.draw_rect_primitive(bx, popup_y + popup_h - 1.0, w, 1.0, popup_border.r, popup_border.g, popup_border.b, popup_border.a);
+            gg.draw_rect_primitive(bx, popup_y, 1.0, popup_h, popup_border.r, popup_border.g, popup_border.b, popup_border.a);
+            gg.draw_rect_primitive(bx + w - 1.0, popup_y, 1.0, popup_h, popup_border.r, popup_border.g, popup_border.b, popup_border.a);
+        }
+
+        var k = 0;
+        while (k < item_count) {
+            var iy = popup_y + (k as float) * h;
+            var item_hovered = (self.mouse_x >= bx and self.mouse_x <= (bx + w) and
+            self.mouse_y >= iy and self.mouse_y <= (iy + h));
+            if (item_hovered) {
+                var hbg = self.get_style_color(types.COLOR_FRAME_BG_HOVER);
+                if (rad > 0.0) {
+                    gg.draw_rect_rounded_primitive(bx + 2.0, iy + 1.0, w - 4.0, h - 2.0, rad, hbg.r, hbg.g, hbg.b, hbg.a);
+                } else {
+                    gg.draw_rect_primitive(bx, iy, w, h, hbg.r, hbg.g, hbg.b, hbg.a);
+                }
+                if (self.mouse_pressed) {
+                    self.combo_selected_new = k;
+                    self.combo_selected_changed = true;
+                    self.combo_open_id = "";
+                    self.active_popup_id = "";
+                    self.has_deferred_combo = false;
+                }
+            }
+            var itc = self.get_style_color(types.COLOR_TEXT);
+            if (k == selected_idx) { itc = self.get_style_color(types.COLOR_ACCENT); }
+            gg.draw_text(items[k], bx + 8.0, iy + (h - 8.0 * (self.theme.font_scale as float)) / 2.0, itc.r, itc.g, itc.b, itc.a, self.theme.font_scale);
+            k = k + 1;
+        }
+    }
+
     pub fn end(): nil {
         if (self.in_window) {
             self.end_window();
+        }
+        if (self.has_deferred_combo) {
+            self.render_deferred_combo();
         }
         if (self.mouse_released) {
             self.active_id = "";
@@ -599,6 +693,7 @@ frame GUI {
         var hovered = (self.mouse_x >= bx and self.mouse_x <= (bx + w) and
         self.mouse_y >= by and self.mouse_y <= (by + h));
 
+
         if (hovered and self.is_occluded(bx, by, w, h)) {
             var in_active_popup = (bx >= self.popup_x and (bx + w) <= (self.popup_x + self.popup_w) and
             by >= self.popup_y and (by + h) <= (self.popup_y + self.popup_h));
@@ -747,6 +842,10 @@ frame GUI {
         var hovered = (self.mouse_x >= bx and self.mouse_x <= (bx + total_w) and
         self.mouse_y >= by and self.mouse_y <= (by + h));
 
+        if (hovered and self.is_occluded(bx, by, total_w, h)) {
+            hovered = false;
+        }
+
         if (hovered) {
             self.hot_id = id;
         }
@@ -853,6 +952,10 @@ frame GUI {
         var hovered = (self.mouse_x >= bx and self.mouse_x <= (bx + total_w) and
         self.mouse_y >= by and self.mouse_y <= (by + h));
 
+        if (hovered and self.is_occluded(bx, by, total_w, h)) {
+            hovered = false;
+        }
+
         if (hovered) {
             self.hot_id = id;
         }
@@ -899,6 +1002,11 @@ frame GUI {
 
         var hovered = (self.mouse_x >= bx and self.mouse_x <= (bx + w) and
         self.mouse_y >= by and self.mouse_y <= (by + h));
+
+
+        if (hovered and self.is_occluded(bx, by, w, h)) {
+            hovered = false;
+        }
 
         if (hovered) {
             self.hot_id = id;
@@ -1160,6 +1268,7 @@ frame GUI {
 
         var hovered = (self.mouse_x >= bx and self.mouse_x <= (bx + w) and
         self.mouse_y >= by and self.mouse_y <= (by + h));
+
         if (hovered and self.is_occluded(bx, by, w, h)) {
             hovered = false;
         }
@@ -1379,6 +1488,7 @@ frame GUI {
 
         var hovered = (self.mouse_x >= bx and self.mouse_x <= (bx + w) and
         self.mouse_y >= by and self.mouse_y <= (by + h));
+
         if (hovered and self.is_occluded(bx, by, w, h)) {
             hovered = false;
         }
@@ -1453,6 +1563,7 @@ frame GUI {
 
         var hovered = (self.mouse_x >= bx and self.mouse_x <= (bx + w) and
         self.mouse_y >= by and self.mouse_y <= (by + h));
+
         if (hovered) { self.hot_id = id; }
 
         var is_open = (self.combo_open_id != "" and self.combo_open_id == id);
@@ -1500,7 +1611,22 @@ frame GUI {
         }
 
         var new_idx = selected_idx;
+        if (self.combo_selected_changed and self.combo_open_id == "" and id == self.deferred_combo_id) {
+            new_idx = self.combo_selected_new;
+            self.combo_selected_changed = false;
+            self.combo_selected_new = -1;
+        }
+
         if (is_open) {
+            self.has_deferred_combo = true;
+            self.deferred_combo_bx = bx;
+            self.deferred_combo_by = by;
+            self.deferred_combo_w = w;
+            self.deferred_combo_h = h;
+            self.deferred_combo_items = items;
+            self.deferred_combo_selected = new_idx;
+            self.deferred_combo_id = id;
+
             var item_count = len(items);
             var popup_h = (item_count as float) * h;
             var popup_y = by + h + 2.0;
@@ -1510,48 +1636,6 @@ frame GUI {
             self.popup_w = w;
             self.popup_h = popup_h;
             self.active_popup_id = id;
-
-            // Optional elevation drop shadow for combo dropdown (opt-in)
-            var raw_csh = self.get_active_shadow(self.theme.popup_shadow);
-            if (raw_csh != nil) {
-                var csh = raw_csh as shadow.Shadow;
-                if (csh.a > 0.0) {
-                    gg.draw_shadow_primitive(bx, popup_y, w, popup_h, csh.r, csh.g, csh.b, csh.a, csh.offset_x, csh.offset_y, csh.blur_radius, csh.spread_radius);
-                }
-            }
-
-            var pbg = self.get_style_color(types.COLOR_PANEL_BG);
-            var popup_border = self.get_style_color(types.COLOR_ACCENT);
-            if (rad > 0.0) {
-                gg.draw_rect_rounded_primitive(bx, popup_y, w, popup_h, rad, pbg.r, pbg.g, pbg.b, pbg.a);
-                gg.draw_rect_border_primitive(bx, popup_y, w, popup_h, rad, 1.0, popup_border.r, popup_border.g, popup_border.b, popup_border.a);
-            } else {
-                gg.draw_rect_primitive(bx, popup_y, w, popup_h, pbg.r, pbg.g, pbg.b, pbg.a);
-                gg.draw_rect_primitive(bx, popup_y, w, 1.0, popup_border.r, popup_border.g, popup_border.b, popup_border.a);
-                gg.draw_rect_primitive(bx, popup_y + popup_h - 1.0, w, 1.0, popup_border.r, popup_border.g, popup_border.b, popup_border.a);
-                gg.draw_rect_primitive(bx, popup_y, 1.0, popup_h, popup_border.r, popup_border.g, popup_border.b, popup_border.a);
-                gg.draw_rect_primitive(bx + w - 1.0, popup_y, 1.0, popup_h, popup_border.r, popup_border.g, popup_border.b, popup_border.a);
-            }
-
-            var k = 0;
-            while (k < item_count) {
-                var iy = popup_y + (k as float) * h;
-                var item_hovered = (self.mouse_x >= bx and self.mouse_x <= (bx + w) and
-                self.mouse_y >= iy and self.mouse_y <= (iy + h));
-                if (item_hovered) {
-                    var hbg = self.get_style_color(types.COLOR_FRAME_BG_HOVER);
-                    gg.draw_rect_primitive(bx, iy, w, h, hbg.r, hbg.g, hbg.b, hbg.a);
-                    if (self.mouse_pressed) {
-                        new_idx = k;
-                        self.combo_open_id = "";
-                        self.active_popup_id = "";
-                    }
-                }
-                var itc = self.get_style_color(types.COLOR_TEXT);
-                if (k == selected_idx) { itc = self.get_style_color(types.COLOR_ACCENT); }
-                gg.draw_text(items[k], bx + 6.0, iy + (h - 8.0 * (self.theme.font_scale as float)) / 2.0, itc.r, itc.g, itc.b, itc.a, self.theme.font_scale);
-                k = k + 1;
-            }
         }
 
         self.prev_item_hovered = hovered;
@@ -1571,6 +1655,7 @@ frame GUI {
 
         var hovered = (self.mouse_x >= bx and self.mouse_x <= (bx + w) and
         self.mouse_y >= by and self.mouse_y <= (by + h));
+
         if (hovered) { self.hot_id = full_id; }
 
         var clicked = false;
@@ -1786,6 +1871,7 @@ frame GUI {
         var hovered = (self.mouse_x >= bx and self.mouse_x <= (bx + w) and
         self.mouse_y >= by and self.mouse_y <= (by + h));
 
+
         if (hovered) {
             self.hot_id = id;
             if (self.mouse_pressed) {
@@ -1831,6 +1917,7 @@ frame GUI {
 
         var hovered = (self.mouse_x >= bx and self.mouse_x <= (bx + w) and
         self.mouse_y >= by and self.mouse_y <= (by + h));
+
         if (hovered) { self.hot_id = id; }
 
         var clicked = false;
@@ -1882,6 +1969,7 @@ frame GUI {
 
         var hovered = (self.mouse_x >= bx and self.mouse_x <= (bx + w) and
         self.mouse_y >= by and self.mouse_y <= (by + h));
+
         if (hovered) { self.hot_id = id; }
 
         if (hovered and self.mouse_pressed) {
@@ -2037,6 +2125,7 @@ frame GUI {
 
         var hovered = (self.mouse_x >= bx and self.mouse_x <= (bx + w) and
         self.mouse_y >= by and self.mouse_y <= (by + h));
+
         if (hovered and self.mouse_wheel != 0.0) {
             self.scroll_y = self.scroll_y - self.mouse_wheel * 20.0;
             var max_scroll = content_h - h;

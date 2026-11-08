@@ -1,0 +1,31 @@
+// std/d3/index.lm
+// Public entrypoint and facade for Lymar 3D graphics library (std.d3).
+
+/// Comprehensive 3D graphics and spatial rendering library for Lymar.
+///
+/// Designed with inspiration from Three.js and built natively on Lymar's strengths:
+/// zero-cost frame embedding, nominal enums, compile-time TRS transformation,
+/// depth-sorted rasterization, illumination models, and 3D asset loaders.
+///
+/// @example
+/// import std.d3 as d3;
+/// var scene = d3.Scene();
+/// var camera = d3.perspective_camera(60.0, 16.0 / 9.0);
+/// var mesh = d3.Mesh(d3.box(2.0, 2.0, 2.0), d3.phong_material(0.2, 0.8, 1.0));
+/// scene.add(mesh);
+/// scene.add_light(d3.directional_light());
+/// var renderer = d3.Renderer(800, 600);
+/// renderer.render(scene, camera);
+
+pub import std.d3.types show ShadingModel, LightType, CameraType, CullMode;
+pub import std.d3.buffer show BufferAttribute, Uniform;
+pub import std.d3.transform show Transform3D;
+pub import std.d3.geometry show Geometry;
+pub import std.d3.primitives show box, sphere, cylinder, plane, cone, torus, box_face_count, sphere_face_count, sphere_vertex_count, cylinder_face_count, plane_face_count;
+pub import std.d3.material show Material, basic_material, lambert_material, phong_material, wireframe_material;
+pub import std.d3.mesh show Mesh;
+pub import std.d3.light show Light, ambient_light, directional_light, point_light;
+pub import std.d3.camera show Camera3D, perspective_camera, orthographic_camera;
+pub import std.d3.scene show Scene3D;
+pub import std.d3.renderer show Renderer3D;
+pub import std.d3.obj show parse_obj, load_obj;

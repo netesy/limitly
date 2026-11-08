@@ -1,6 +1,9 @@
 // std/math/matrix.lm
 // 4x4 row-major transformation matrix.
 
+import std.math.trigonometry as trig;
+import std.math.arithmetic as arith;
+
 /// Represents a 4x4 floating-point transformation matrix stored in row-major order.
 ///
 /// Defaults to an identity matrix upon initialization.
@@ -15,10 +18,10 @@ frame Matrix {
 
     pub init() {
         self.data = [
-        1.0, 0.0, 0.0, 0.0,
-        0.0, 1.0, 0.0, 0.0,
-        0.0, 0.0, 1.0, 0.0,
-        0.0, 0.0, 0.0, 1.0
+            1.0, 0.0, 0.0, 0.0,
+            0.0, 1.0, 0.0, 0.0,
+            0.0, 0.0, 1.0, 0.0,
+            0.0, 0.0, 0.0, 1.0
         ];
     }
 
@@ -42,5 +45,224 @@ frame Matrix {
     pub fn set(row: int, col: int, value_val: float) {
         contract(row >= 0 and row < 4 and col >= 0 and col < 4, "Matrix row and col must be in range [0, 3]");
         self.data[row * 4 + col] = value_val;
+    }
+
+    pub fn clone(): Matrix {
+        var m = Matrix();
+        var i = 0;
+        while (i < 16) {
+            m.data[i] = self.data[i];
+            i = i + 1;
+        }
+        return m;
+    }
+
+    pub fn identity() {
+        self.data = [
+            1.0, 0.0, 0.0, 0.0,
+            0.0, 1.0, 0.0, 0.0,
+            0.0, 0.0, 1.0, 0.0,
+            0.0, 0.0, 0.0, 1.0
+        ];
+    }
+
+    pub fn multiply(other: Matrix): Matrix {
+        var a = self.data;
+        var b = other.data;
+        var res = Matrix();
+        res.data = [
+            a[0]*b[0] + a[1]*b[4] + a[2]*b[8] + a[3]*b[12],
+            a[0]*b[1] + a[1]*b[5] + a[2]*b[9] + a[3]*b[13],
+            a[0]*b[2] + a[1]*b[6] + a[2]*b[10] + a[3]*b[14],
+            a[0]*b[3] + a[1]*b[7] + a[2]*b[11] + a[3]*b[15],
+
+            a[4]*b[0] + a[5]*b[4] + a[6]*b[8] + a[7]*b[12],
+            a[4]*b[1] + a[5]*b[5] + a[6]*b[9] + a[7]*b[13],
+            a[4]*b[2] + a[5]*b[6] + a[6]*b[10] + a[7]*b[14],
+            a[4]*b[3] + a[5]*b[7] + a[6]*b[11] + a[7]*b[15],
+
+            a[8]*b[0] + a[9]*b[4] + a[10]*b[8] + a[11]*b[12],
+            a[8]*b[1] + a[9]*b[5] + a[10]*b[9] + a[11]*b[13],
+            a[8]*b[2] + a[9]*b[6] + a[10]*b[10] + a[11]*b[14],
+            a[8]*b[3] + a[9]*b[7] + a[10]*b[11] + a[11]*b[15],
+
+            a[12]*b[0] + a[13]*b[4] + a[14]*b[8] + a[15]*b[12],
+            a[12]*b[1] + a[13]*b[5] + a[14]*b[9] + a[15]*b[13],
+            a[12]*b[2] + a[13]*b[6] + a[14]*b[10] + a[15]*b[14],
+            a[12]*b[3] + a[13]*b[7] + a[14]*b[11] + a[15]*b[15]
+        ];
+        return res;
+    }
+
+    /// Sets this matrix directly from translation (tx, ty, tz), Euler angles (rx, ry, rz), and scale (sx, sy, sz)
+    /// in a single pass without allocating intermediate rotation or scale matrices.
+    pub fn make_trs(tx: float, ty: float, tz: float, rx: float, ry: float, rz: float, sx: float, sy: float, sz: float) {
+        var cx = trig.cos(rx);
+        var sx_r = trig.sin(rx);
+        var cy = trig.cos(ry);
+        var sy_r = trig.sin(ry);
+        var cz = trig.cos(rz);
+        var sz_r = trig.sin(rz);
+
+        var r00 = cy * cz;
+        var r01 = sx_r * sy_r * cz - cx * sz_r;
+        var r02 = cx * sy_r * cz + sx_r * sz_r;
+
+        var r10 = cy * sz_r;
+        var r11 = sx_r * sy_r * sz_r + cx * cz;
+        var r12 = cx * sy_r * sz_r - sx_r * cz;
+
+        var r20 = 0.0 - sy_r;
+        var r21 = sx_r * cy;
+        var r22 = cx * cy;
+
+        self.data = [
+            r00 * sx, r01 * sy, r02 * sz, tx,
+            r10 * sx, r11 * sy, r12 * sz, ty,
+            r20 * sx, r21 * sy, r22 * sz, tz,
+            0.0,      0.0,      0.0,      1.0
+        ];
+    }
+
+    pub fn make_translation(x: float, y: float, z: float) {
+        self.identity();
+        self.data[3] = x;
+        self.data[7] = y;
+        self.data[11] = z;
+    }
+
+    pub fn make_scale(sx: float, sy: float, sz: float) {
+        self.identity();
+        self.data[0] = sx;
+        self.data[5] = sy;
+        self.data[10] = sz;
+    }
+
+    pub fn make_rotation_x(angle: float) {
+        self.identity();
+        var c = trig.cos(angle);
+        var s = trig.sin(angle);
+        self.data[5] = c;
+        self.data[6] = -s;
+        self.data[9] = s;
+        self.data[10] = c;
+    }
+
+    pub fn make_rotation_y(angle: float) {
+        self.identity();
+        var c = trig.cos(angle);
+        var s = trig.sin(angle);
+        self.data[0] = c;
+        self.data[2] = s;
+        self.data[8] = -s;
+        self.data[10] = c;
+    }
+
+    pub fn make_rotation_z(angle: float) {
+        self.identity();
+        var c = trig.cos(angle);
+        var s = trig.sin(angle);
+        self.data[0] = c;
+        self.data[1] = -s;
+        self.data[4] = s;
+        self.data[5] = c;
+    }
+
+    pub fn make_perspective(fov_rad: float, aspect: float, near: float, far: float) {
+        self.identity();
+        var tan_half = trig.tan(fov_rad * 0.5);
+        if (tan_half == 0.0 or aspect == 0.0 or far == near) {
+            return;
+        }
+        var m00 = 1.0 / (aspect * tan_half);
+        var m11 = 1.0 / tan_half;
+        var m22 = -(far + near) / (far - near);
+        var m23 = -(2.0 * far * near) / (far - near);
+
+        self.data = [
+            m00, 0.0, 0.0, 0.0,
+            0.0, m11, 0.0, 0.0,
+            0.0, 0.0, m22, m23,
+            0.0, 0.0, -1.0, 0.0
+        ];
+    }
+
+    pub fn make_orthographic(left: float, right: float, top: float, bottom: float, near: float, far: float) {
+        self.identity();
+        var w = right - left;
+        var h = top - bottom;
+        var d = far - near;
+        if (w == 0.0 or h == 0.0 or d == 0.0) {
+            return;
+        }
+        self.data = [
+            2.0 / w, 0.0,     0.0,      -(right + left) / w,
+            0.0,     2.0 / h, 0.0,      -(top + bottom) / h,
+            0.0,     0.0,     -2.0 / d, -(far + near) / d,
+            0.0,     0.0,     0.0,       1.0
+        ];
+    }
+
+    pub fn make_look_at(eye_x: float, eye_y: float, eye_z: float,
+                         target_x: float, target_y: float, target_z: float,
+                         up_x: float, up_y: float, up_z: float) {
+        var fx = eye_x - target_x;
+        var fy = eye_y - target_y;
+        var fz = eye_z - target_z;
+        var flen = arith.sqrt(fx * fx + fy * fy + fz * fz);
+        if (flen > 0.000001) {
+            fx = fx / flen;
+            fy = fy / flen;
+            fz = fz / flen;
+        } else {
+            fz = 1.0;
+        }
+
+        var rx = up_y * fz - up_z * fy;
+        var ry = up_z * fx - up_x * fz;
+        var rz = up_x * fy - up_y * fx;
+        var rlen = arith.sqrt(rx * rx + ry * ry + rz * rz);
+        if (rlen > 0.000001) {
+            rx = rx / rlen;
+            ry = ry / rlen;
+            rz = rz / rlen;
+        } else {
+            rx = 1.0;
+        }
+
+        var ux = fy * rz - fz * ry;
+        var uy = fz * rx - fx * rz;
+        var uz = fx * ry - fy * rx;
+
+        var tx = -(rx * eye_x + ry * eye_y + rz * eye_z);
+        var ty = -(ux * eye_x + uy * eye_y + uz * eye_z);
+        var tz = -(fx * eye_x + fy * eye_y + fz * eye_z);
+
+        self.data = [
+            rx,  ry,  rz,  tx,
+            ux,  uy,  uz,  ty,
+            fx,  fy,  fz,  tz,
+            0.0, 0.0, 0.0, 1.0
+        ];
+    }
+
+    pub fn transform_point(px: float, py: float, pz: float): [float] {
+        var x = self.data[0] * px + self.data[1] * py + self.data[2] * pz + self.data[3];
+        var y = self.data[4] * px + self.data[5] * py + self.data[6] * pz + self.data[7];
+        var z = self.data[8] * px + self.data[9] * py + self.data[10] * pz + self.data[11];
+        var w = self.data[12] * px + self.data[13] * py + self.data[14] * pz + self.data[15];
+
+        if (w != 0.0 and w != 1.0) {
+            var inv_w = 1.0 / w;
+            return [x * inv_w, y * inv_w, z * inv_w, w];
+        }
+        return [x, y, z, w];
+    }
+
+    pub fn transform_direction(dx: float, dy: float, dz: float): [float] {
+        var x = self.data[0] * dx + self.data[1] * dy + self.data[2] * dz;
+        var y = self.data[4] * dx + self.data[5] * dy + self.data[6] * dz;
+        var z = self.data[8] * dx + self.data[9] * dy + self.data[10] * dz;
+        return [x, y, z];
     }
 }

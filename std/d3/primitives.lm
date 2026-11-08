@@ -1,0 +1,332 @@
+// std/d3/primitives.lm
+// Parametric and procedural 3D geometric shapes inspired by Three.js.
+
+import std.d3.geometry as geom;
+import std.math.constants as const;
+import std.math.trigonometry as trig;
+
+/// Returns the number of triangular faces in a box geometry.
+pub fn box_face_count(): int {
+    return 12;
+}
+
+/// Computes the face count of a UV sphere based on segments.
+pub fn sphere_face_count(segments_w: int, segments_h: int): int {
+    return segments_w * segments_h * 2;
+}
+
+/// Computes the vertex count of a UV sphere.
+pub fn sphere_vertex_count(segments_w: int, segments_h: int): int {
+    return (segments_w + 1) * (segments_h + 1);
+}
+
+/// Computes the face count of a cylinder with end caps.
+pub fn cylinder_face_count(radial_segments: int): int {
+    return radial_segments * 4;
+}
+
+/// Computes the face count of a segmented plane mesh.
+pub fn plane_face_count(segments_w: int, segments_h: int): int {
+    return segments_w * segments_h * 2;
+}
+
+/// Creates a 3D rectangular cuboid geometry centered at the origin.
+pub fn box(width: float = 1.0, height: float = 1.0, depth: float = 1.0): geom.Geometry {
+    var g = geom.Geometry();
+    var w2 = width * 0.5;
+    var h2 = height * 0.5;
+    var dp2 = depth * 0.5;
+
+    // Front face
+    var v0 = g.add_vertex(-w2, -h2,  dp2);
+    var v1 = g.add_vertex( w2, -h2,  dp2);
+    var v2 = g.add_vertex( w2,  h2,  dp2);
+    var v3 = g.add_vertex(-w2,  h2,  dp2);
+    g.add_face(v0, v1, v2);
+    g.add_face(v0, v2, v3);
+
+    // Back face
+    var v4 = g.add_vertex( w2, -h2, -dp2);
+    var v5 = g.add_vertex(-w2, -h2, -dp2);
+    var v6 = g.add_vertex(-w2,  h2, -dp2);
+    var v7 = g.add_vertex( w2,  h2, -dp2);
+    g.add_face(v4, v5, v6);
+    g.add_face(v4, v6, v7);
+
+    // Top face
+    var v8  = g.add_vertex(-w2,  h2,  dp2);
+    var v9  = g.add_vertex( w2,  h2,  dp2);
+    var v10 = g.add_vertex( w2,  h2, -dp2);
+    var v11 = g.add_vertex(-w2,  h2, -dp2);
+    g.add_face(v8, v9, v10);
+    g.add_face(v8, v10, v11);
+
+    // Bottom face
+    var v12 = g.add_vertex(-w2, -h2, -dp2);
+    var v13 = g.add_vertex( w2, -h2, -dp2);
+    var v14 = g.add_vertex( w2, -h2,  dp2);
+    var v15 = g.add_vertex(-w2, -h2,  dp2);
+    g.add_face(v12, v13, v14);
+    g.add_face(v12, v14, v15);
+
+    // Right face
+    var v16 = g.add_vertex( w2, -h2,  dp2);
+    var v17 = g.add_vertex( w2, -h2, -dp2);
+    var v18 = g.add_vertex( w2,  h2, -dp2);
+    var v19 = g.add_vertex( w2,  h2,  dp2);
+    g.add_face(v16, v17, v18);
+    g.add_face(v16, v18, v19);
+
+    // Left face
+    var v20 = g.add_vertex(-w2, -h2, -dp2);
+    var v21 = g.add_vertex(-w2, -h2,  dp2);
+    var v22 = g.add_vertex(-w2,  h2,  dp2);
+    var v23 = g.add_vertex(-w2,  h2, -dp2);
+    g.add_face(v20, v21, v22);
+    g.add_face(v20, v22, v23);
+
+    g.compute_vertex_normals();
+    return g;
+}
+
+/// Creates a UV sphere geometry.
+pub fn sphere(radius: float = 1.0, width_segments: int = 16, height_segments: int = 12): geom.Geometry {
+    var g = geom.Geometry();
+
+    var y = 0;
+    while (y <= height_segments) {
+        var v = (y as float) / (height_segments as float);
+        var phi = v * const.PI;
+
+        var x = 0;
+        while (x <= width_segments) {
+            var u = (x as float) / (width_segments as float);
+            var theta = u * const.TAU;
+
+            var px = radius * trig.sin(phi) * trig.cos(theta);
+            var py = radius * trig.cos(phi);
+            var pz = radius * trig.sin(phi) * trig.sin(theta);
+
+            g.add_vertex(px, py, pz);
+            g.add_uv(u, 1.0 - v);
+            x = x + 1;
+        }
+        y = y + 1;
+    }
+
+    var stride = width_segments + 1;
+    var sy = 0;
+    while (sy < height_segments) {
+        var sx = 0;
+        while (sx < width_segments) {
+            var i0 = sy * stride + sx;
+            var i1 = (sy + 1) * stride + sx;
+            var i2 = (sy + 1) * stride + (sx + 1);
+            var i3 = sy * stride + (sx + 1);
+
+            if (sy != 0) {
+                g.add_face(i0, i1, i3);
+            }
+            if (sy != height_segments - 1) {
+                g.add_face(i3, i1, i2);
+            }
+            sx = sx + 1;
+        }
+        sy = sy + 1;
+    }
+
+    g.compute_vertex_normals();
+    return g;
+}
+
+/// Creates a cylinder or frustum geometry.
+pub fn cylinder(radius_top: float = 1.0, radius_bottom: float = 1.0, height: float = 2.0, radial_segments: int = 16): geom.Geometry {
+    var g = geom.Geometry();
+    var half_h = height * 0.5;
+
+    // Body vertices
+    var i = 0;
+    while (i <= radial_segments) {
+        var u = (i as float) / (radial_segments as float);
+        var theta = u * const.TAU;
+        var c = trig.cos(theta);
+        var s = trig.sin(theta);
+
+        g.add_vertex(radius_top * c, half_h, radius_top * s);
+        g.add_vertex(radius_bottom * c, -half_h, radius_bottom * s);
+        i = i + 1;
+    }
+
+    // Body faces
+    var f = 0;
+    while (f < radial_segments) {
+        var v0 = f * 2;
+        var v1 = f * 2 + 1;
+        var v2 = (f + 1) * 2 + 1;
+        var v3 = (f + 1) * 2;
+
+        g.add_face(v0, v1, v2);
+        g.add_face(v0, v2, v3);
+        f = f + 1;
+    }
+
+    // Top cap
+    var top_center = g.add_vertex(0.0, half_h, 0.0);
+    var tc = 0;
+    while (tc < radial_segments) {
+        var c0 = tc * 2;
+        var c1 = (tc + 1) * 2;
+        g.add_face(top_center, c1, c0);
+        tc = tc + 1;
+    }
+
+    // Bottom cap
+    var bot_center = g.add_vertex(0.0, -half_h, 0.0);
+    var bc = 0;
+    while (bc < radial_segments) {
+        var b0 = bc * 2 + 1;
+        var b1 = (bc + 1) * 2 + 1;
+        g.add_face(bot_center, b0, b1);
+        bc = bc + 1;
+    }
+
+    g.compute_vertex_normals();
+    return g;
+}
+
+/// Creates a 2D plane geometry lying in the X-Z plane.
+pub fn plane(width: float = 2.0, height: float = 2.0, width_segments: int = 1, height_segments: int = 1): geom.Geometry {
+    var g = geom.Geometry();
+    var half_w = width * 0.5;
+    var half_h = height * 0.5;
+
+    var iz = 0;
+    while (iz <= height_segments) {
+        var v = (iz as float) / (height_segments as float);
+        var z = v * height - half_h;
+
+        var ix = 0;
+        while (ix <= width_segments) {
+            var u = (ix as float) / (width_segments as float);
+            var x = u * width - half_w;
+
+            g.add_vertex(x, 0.0, z);
+            g.add_uv(u, v);
+            ix = ix + 1;
+        }
+        iz = iz + 1;
+    }
+
+    var stride = width_segments + 1;
+    var fz = 0;
+    while (fz < height_segments) {
+        var fx = 0;
+        while (fx < width_segments) {
+            var i0 = fz * stride + fx;
+            var i1 = (fz + 1) * stride + fx;
+            var i2 = (fz + 1) * stride + (fx + 1);
+            var i3 = fz * stride + (fx + 1);
+
+            g.add_face(i0, i1, i2);
+            g.add_face(i0, i2, i3);
+            fx = fx + 1;
+        }
+        fz = fz + 1;
+    }
+
+    g.compute_vertex_normals();
+    return g;
+}
+
+/// Creates a 3D cone geometry with a circular base and apex at the top.
+pub fn cone(radius: float = 1.0, height: float = 2.0, radial_segments: int = 16): geom.Geometry {
+    var g = geom.Geometry();
+    var half_h = height * 0.5;
+
+    // Apex vertex
+    var apex = g.add_vertex(0.0, half_h, 0.0);
+
+    // Base ring vertices
+    var i = 0;
+    while (i <= radial_segments) {
+        var u = (i as float) / (radial_segments as float);
+        var theta = u * (const.PI * 2.0);
+        var x = radius * trig.sin(theta);
+        var z = radius * trig.cos(theta);
+        g.add_vertex(x, -half_h, z);
+        g.add_uv(u, 0.0);
+        i = i + 1;
+    }
+
+    // Side faces connecting base to apex
+    var s = 0;
+    while (s < radial_segments) {
+        var b0 = s + 1;
+        var b1 = (s + 1) + 1;
+        g.add_face(apex, b0, b1);
+        s = s + 1;
+    }
+
+    // Base bottom center and cap
+    var base_center = g.add_vertex(0.0, -half_h, 0.0);
+    var b = 0;
+    while (b < radial_segments) {
+        var p0 = b + 1;
+        var p1 = (b + 1) + 1;
+        g.add_face(base_center, p1, p0);
+        b = b + 1;
+    }
+
+    g.compute_vertex_normals();
+    return g;
+}
+
+/// Creates a 3D torus (donut-shaped) geometry.
+pub fn torus(radius: float = 1.0, tube: float = 0.35, radial_segments: int = 12, tubular_segments: int = 16): geom.Geometry {
+    var g = geom.Geometry();
+
+    var j = 0;
+    while (j <= radial_segments) {
+        var v = (j as float) / (radial_segments as float);
+        var phi = v * (const.PI * 2.0);
+        var cos_phi = trig.cos(phi);
+        var sin_phi = trig.sin(phi);
+
+        var i = 0;
+        while (i <= tubular_segments) {
+            var u = (i as float) / (tubular_segments as float);
+            var theta = u * (const.PI * 2.0);
+            var cos_theta = trig.cos(theta);
+            var sin_theta = trig.sin(theta);
+
+            var x = (radius + tube * cos_phi) * cos_theta;
+            var y = tube * sin_phi;
+            var z = (radius + tube * cos_phi) * sin_theta;
+
+            g.add_vertex(x, y, z);
+            g.add_uv(u, v);
+            i = i + 1;
+        }
+        j = j + 1;
+    }
+
+    var stride = tubular_segments + 1;
+    var tj = 0;
+    while (tj < radial_segments) {
+        var ti = 0;
+        while (ti < tubular_segments) {
+            var a = tj * stride + ti;
+            var b = (tj + 1) * stride + ti;
+            var c = (tj + 1) * stride + (ti + 1);
+            var d = tj * stride + (ti + 1);
+
+            g.add_face(a, b, c);
+            g.add_face(a, c, d);
+            ti = ti + 1;
+        }
+        tj = tj + 1;
+    }
+
+    g.compute_vertex_normals();
+    return g;
+}

@@ -1,0 +1,31 @@
+// std/d3/types.lm
+// Enums and fundamental types for the 3D graphics library.
+
+/// Defines how surface polygons are shaded and illuminated.
+enum ShadingModel {
+    Flat,
+    Smooth,
+    Unlit,
+    Wireframe,
+    NormalVisualizer
+}
+
+/// Defines the physical type and attenuation behaviour of a light source.
+enum LightType {
+    Ambient,
+    Directional,
+    Point
+}
+
+/// Defines the camera projection model.
+enum CameraType {
+    Perspective,
+    Orthographic
+}
+
+/// Face culling mode during rasterization.
+enum CullMode {
+    None,
+    Back,
+    Front
+}

@@ -1,0 +1,269 @@
+// tests/d3_showcase.lm
+// Interactive 3D Showcase demonstrating std.d3 real-time 3D graphics in Lymar.
+
+import std.d3 as d3;
+import std.gg as gg;
+import std.game as game;
+import std.game.types as types;
+import std.color as color;
+import std.math as math;
+
+fn build_starfighter(): d3.Geometry {
+    var g = d3.Geometry();
+    var nose = g.add_vertex(0.0, 0.0, 3.2);
+    var f_top = g.add_vertex(0.0, 0.35, 1.2);
+    var f_bot = g.add_vertex(0.0, -0.3, 1.2);
+    var f_left = g.add_vertex(-0.45, 0.0, 1.2);
+    var f_right = g.add_vertex(0.45, 0.0, 1.2);
+
+    g.add_face(nose, f_top, f_left);
+    g.add_face(nose, f_right, f_top);
+    g.add_face(nose, f_bot, f_right);
+    g.add_face(nose, f_left, f_bot);
+
+    var c_top = g.add_vertex(0.0, 0.75, 0.0);
+    var c_mid_l = g.add_vertex(-0.6, 0.2, 0.0);
+    var c_mid_r = g.add_vertex(0.6, 0.2, 0.0);
+    var c_bot = g.add_vertex(0.0, -0.4, 0.0);
+
+    g.add_face(f_top, c_top, c_mid_l);
+    g.add_face(f_top, c_mid_r, c_top);
+    g.add_face(f_left, f_top, c_mid_l);
+    g.add_face(f_right, c_mid_r, f_top);
+    g.add_face(f_bot, c_bot, c_mid_l);
+    g.add_face(f_bot, c_mid_r, c_bot);
+
+    var r_top = g.add_vertex(0.0, 0.45, -1.8);
+    var r_bot = g.add_vertex(0.0, -0.35, -1.8);
+    var r_left = g.add_vertex(-0.65, 0.0, -1.8);
+    var r_right = g.add_vertex(0.65, 0.0, -1.8);
+
+    g.add_face(c_top, r_top, r_left);
+    g.add_face(c_top, r_right, r_top);
+    g.add_face(c_mid_l, c_top, r_left);
+    g.add_face(c_mid_r, r_right, c_top);
+    g.add_face(c_bot, r_bot, r_left);
+    g.add_face(c_bot, r_right, r_bot);
+
+    g.add_face(r_top, r_right, r_bot);
+    g.add_face(r_top, r_bot, r_left);
+
+    var pw_tip = g.add_vertex(-3.2, -0.05, -1.4);
+    var pw_tip_thick = g.add_vertex(-3.2, 0.05, -1.4);
+    g.add_face(c_mid_l, pw_tip, r_left);
+    g.add_face(c_mid_l, r_left, pw_tip_thick);
+
+    var sw_tip = g.add_vertex(3.2, -0.05, -1.4);
+    var sw_tip_thick = g.add_vertex(3.2, 0.05, -1.4);
+    g.add_face(c_mid_r, r_right, sw_tip);
+    g.add_face(c_mid_r, sw_tip_thick, r_right);
+
+    var fin_l_tip = g.add_vertex(-0.7, 1.2, -1.7);
+    g.add_face(r_left, fin_l_tip, c_top);
+    g.add_face(r_left, c_top, fin_l_tip);
+
+    var fin_r_tip = g.add_vertex(0.7, 1.2, -1.7);
+    g.add_face(r_right, c_top, fin_r_tip);
+    g.add_face(r_right, fin_r_tip, c_top);
+
+    g.compute_vertex_normals();
+    return g;
+}
+
+fn main(): int {
+    print(" === Launching Limitless 3D Starfighter Showcase (std.d3) === ");
+
+    var cfg = game.Config(
+        title = "Limitless 3D - Starfighter Showcase (std.d3)",
+        width = 1000,
+        height = 700,
+        resizable = true
+    );
+    cfg.bg_color = color.hex(0x0a0c16, 1.0);
+
+    var app = game.Game(cfg);
+    if (not app.setup()) {
+        print("Error: Failed to initialize graphics context.");
+        return 1;
+    }
+
+    app.gui.set_theme(types.cyberpunk_theme());
+
+    // ── Build 3D Scene & Lighting ──────────────────────────────────────────
+    var scene = d3.Scene3D();
+    scene.background_r = 0.04;
+    scene.background_g = 0.05;
+    scene.background_b = 0.09;
+
+    // Ambient fill light
+    scene.add_light(d3.ambient_light(0.8, 0.9, 1.0, 0.35));
+
+    // Key directional light (sun)
+    var sun = d3.directional_light(-0.6, 0.8, 0.7, 1.0, 0.96, 0.88, 1.2);
+    scene.add_light(sun);
+
+    // Rim light (cyan / magenta cyber backlight)
+    var rim_light = d3.directional_light(0.8, -0.4, -0.6, 0.3, 0.7, 1.0, 0.8);
+    scene.add_light(rim_light);
+
+    // ── Starfighter Hero Mesh ──────────────────────────────────────────────
+    var ship_geo = build_starfighter();
+    var ship_mat = d3.phong_material(0.85, 0.92, 1.0, 48.0);
+    var ship = d3.Mesh(ship_geo, ship_mat, "Starfighter");
+    ship.set_position(0.0, 0.0, 0.0);
+    scene.add(ship);
+
+    // ── Surrounding Asteroid Field ─────────────────────────────────────────
+    var rock_geo = d3.box(1.0, 1.0, 1.0);
+    var rock_mat = d3.phong_material(0.65, 0.6, 0.55, 16.0);
+
+    var rock1 = d3.Mesh(rock_geo, rock_mat, "AsteroidAlpha");
+    rock1.set_position(-3.5, 1.8, -2.5);
+    rock1.set_scale(1.2, 0.8, 1.0);
+    scene.add(rock1);
+
+    var rock2 = d3.Mesh(rock_geo, rock_mat, "AsteroidBeta");
+    rock2.set_position(4.0, -1.5, -3.0);
+    rock2.set_scale(0.9, 1.3, 0.8);
+    scene.add(rock2);
+
+    var rock3 = d3.Mesh(rock_geo, rock_mat, "AsteroidGamma");
+    rock3.set_position(2.5, 2.2, -4.5);
+    rock3.set_scale(1.5, 1.5, 1.5);
+    scene.add(rock3);
+
+    // ── 3D Camera & Renderer ───────────────────────────────────────────────
+    var camera = d3.perspective_camera(55.0, 1000.0 / 700.0, 0.1, 100.0);
+    camera.set_position(0.0, 1.8, 6.5);
+    camera.look_at(0.0, 0.0, 0.0);
+
+    var renderer = d3.Renderer3D(1000, 700);
+
+    // Interactive state
+    var auto_rotate: bool = true;
+    var wireframe_mode: bool = false;
+    var ship_yaw: float = 0.0;
+    var ship_pitch: float = 0.15;
+    var ship_roll: float = 0.0;
+    var cam_distance: float = 6.5;
+    var anim_tick: int = 0;
+
+    print("Running 3D render loop...");
+
+    while (app.is_running) {
+        app.begin_frame();
+        anim_tick = anim_tick + 1;
+
+        var sw = app.width as float;
+        var sh = app.height as float;
+        renderer.set_size(app.width, app.height);
+        camera.aspect = sw / sh;
+        camera.update_projection_matrix();
+
+        // ── Input Handling ──────────────────────────────────────────────────
+        if (app.input.is_key_down(game.KEY_LEFT) or app.input.is_key_down(game.KEY_A)) {
+            ship_yaw = ship_yaw - 0.035;
+            auto_rotate = false;
+        }
+        if (app.input.is_key_down(game.KEY_RIGHT) or app.input.is_key_down(game.KEY_D)) {
+            ship_yaw = ship_yaw + 0.035;
+            auto_rotate = false;
+        }
+        if (app.input.is_key_down(game.KEY_UP) or app.input.is_key_down(game.KEY_W)) {
+            ship_pitch = ship_pitch - 0.025;
+            auto_rotate = false;
+        }
+        if (app.input.is_key_down(game.KEY_DOWN) or app.input.is_key_down(game.KEY_S)) {
+            ship_pitch = ship_pitch + 0.025;
+            auto_rotate = false;
+        }
+
+        if (auto_rotate) {
+            ship_yaw = ship_yaw + 0.015;
+            ship_pitch = math.sin((anim_tick as float) * 0.02) * 0.15;
+            ship_roll = math.cos((anim_tick as float) * 0.025) * 0.12;
+        }
+
+        // Tumble surrounding asteroids
+        rock1.rotate_x(0.012);
+        rock1.rotate_y(0.018);
+        rock2.rotate_y(-0.015);
+        rock2.rotate_z(0.02);
+        rock3.rotate_x(-0.008);
+        rock3.rotate_y(0.01);
+
+        // Update Ship Orientation
+        ship.set_rotation(ship_pitch, ship_yaw, ship_roll);
+
+        // Update Camera Orbit
+        camera.set_position(0.0, 1.8, cam_distance);
+        camera.look_at(0.0, 0.0, 0.0);
+
+        // ── Background Starfield Grid ───────────────────────────────────────
+        var g_i = 0;
+        while (g_i < 15) {
+            var gx = (g_i as float) * 70.0;
+            gg.draw_rect_primitive(gx, 0.0, 1.0, sh, 0.1, 0.14, 0.22, 0.3);
+            var gy = (g_i as float) * 50.0;
+            gg.draw_rect_primitive(0.0, gy, sw, 1.0, 0.1, 0.14, 0.22, 0.3);
+            g_i = g_i + 1;
+        }
+
+        // ── Render 3D Scene ─────────────────────────────────────────────────
+        renderer.render(scene, camera, 0.0, 0.0, sw, sh);
+        if (anim_tick == 1) {
+            print("tick 1: rendered 3D scene");
+        }
+
+        // ── 2D Immediate-Mode GUI Overlay ───────────────────────────────────
+        if (app.gui.begin_window("3D Starfighter Control (std.d3)", 20.0, 20.0, 310.0, 420.0)) {
+            app.gui.label("Real-time 3D Model with PBR/Phong Shading");
+            app.gui.separator();
+
+            auto_rotate = app.gui.toggle("Auto-Rotation Orbit", auto_rotate);
+
+            var new_wire = app.gui.toggle("Wireframe Mode", wireframe_mode);
+            if (new_wire != wireframe_mode) {
+                wireframe_mode = new_wire;
+                ship_mat.wireframe = wireframe_mode;
+                rock_mat.wireframe = wireframe_mode;
+            }
+
+            app.gui.label("Camera Distance (Zoom): {cam_distance}");
+            cam_distance = app.gui.slider("Distance", cam_distance, 3.5, 12.0);
+
+            app.gui.label("Ship Yaw: {ship_yaw}");
+            ship_yaw = app.gui.slider("Yaw", ship_yaw, -3.14, 3.14);
+
+            app.gui.label("Ship Pitch: {ship_pitch}");
+            ship_pitch = app.gui.slider("Pitch", ship_pitch, -1.57, 1.57);
+
+            app.gui.separator();
+            app.gui.label("Telemetry:");
+            var total_polys = ship_geo.get_face_count() + d3.box_face_count() * 3;
+            app.gui.label("Polygons Rendered: {total_polys}");
+            app.gui.label("Shading: Blinn-Phong + Specular");
+            app.gui.label("Culling: Backface Screen Cross");
+            app.gui.label("Pipeline: std.d3 -> std.gg");
+
+            if (app.gui.button("Reset Ship Angle")) {
+                ship_yaw = 0.0;
+                ship_pitch = 0.15;
+                ship_roll = 0.0;
+                cam_distance = 6.5;
+            }
+
+            app.gui.end_window();
+        }
+
+        app.end_frame();
+
+        if (anim_tick > 120 and app.input.is_key_down(game.KEY_ESCAPE)) {
+            app.is_running = false;
+        }
+    }
+
+    app.shutdown();
+    print("Showcase terminated cleanly.");
+    return 0;
+}
