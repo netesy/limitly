@@ -531,67 +531,70 @@ public:
                 } else {
                     double max_r = std::min(w * 0.5, h * 0.5);
                     if (rad > max_r) rad = max_r;
-                    double cx_left = x + rad;
-                    double cx_right = x + w - rad;
-                    double cy_top = y + rad;
-                    double cy_bot = y + h - rad;
+                    if (rad < 0.0) rad = 0.0;
+
+                    double half_w = w * 0.5;
+                    double half_h = h * 0.5;
+                    double cx = x + half_w;
+                    double cy = y + half_h;
+                    double bx = half_w - rad;
+                    double by = half_h - rad;
+
+                    auto eval_sdf = [&](double px, double py) -> double {
+                        double qx = std::abs(px - cx) - bx;
+                        double qy = std::abs(py - cy) - by;
+                        double ox = std::max(qx, 0.0);
+                        double oy = std::max(qy, 0.0);
+                        double outside = std::sqrt(ox * ox + oy * oy);
+                        double inside = std::min(std::max(qx, qy), 0.0);
+                        return outside + inside - rad;
+                    };
+
+                    auto stroke_dist = [&](double d) -> double {
+                        return std::max(d, -(d + border_w));
+                    };
 
                     for (int py = y0; py < y1; ++py) {
                         double pY = py + 0.5;
                         for (int px = x0; px < x1; ++px) {
                             double pX = px + 0.5;
 
-                            float cov = 1.0f;
-                            if (rad > 0.0) {
-                                double c_dx = 0.0;
-                                double c_dy = 0.0;
-                                bool in_corner = false;
+                            float cov = 0.0f;
+                            double d_center = eval_sdf(pX, pY);
 
-                                if (pX < cx_left) {
-                                    if (pY < cy_top) {
-                                        c_dx = pX - cx_left; c_dy = pY - cy_top; in_corner = true;
-                                    } else if (pY > cy_bot) {
-                                        c_dx = pX - cx_left; c_dy = pY - cy_bot; in_corner = true;
-                                    }
-                                } else if (pX > cx_right) {
-                                    if (pY < cy_top) {
-                                        c_dx = pX - cx_right; c_dy = pY - cy_top; in_corner = true;
-                                    } else if (pY > cy_bot) {
-                                        c_dx = pX - cx_right; c_dy = pY - cy_bot; in_corner = true;
-                                    }
-                                }
-
-                                if (in_corner) {
-                                    double dist = std::sqrt(c_dx * c_dx + c_dy * c_dy);
-                                    if (dist > rad + 0.5) {
-                                        continue;
-                                    } else if (dist > rad - 0.5) {
-                                        cov = static_cast<float>(rad + 0.5 - dist);
-                                    }
-                                    if (border_w > 0.0) {
-                                        double inner_r = rad - border_w;
-                                        if (inner_r > 0.0) {
-                                            if (dist < inner_r - 0.5) {
-                                                continue;
-                                            } else if (dist < inner_r + 0.5) {
-                                                cov *= static_cast<float>(dist - (inner_r - 0.5));
-                                            }
-                                        }
-                                    }
-                                } else if (border_w > 0.0) {
-                                    double d_edge = std::min({pX - x, (x + w) - pX, pY - y, (y + h) - pY});
-                                    if (d_edge > border_w + 0.5) {
-                                        continue;
-                                    } else if (d_edge > border_w - 0.5) {
-                                        cov *= static_cast<float>(border_w + 0.5 - d_edge);
-                                    }
-                                }
-                            } else if (border_w > 0.0) {
-                                double d_edge = std::min({pX - x, (x + w) - pX, pY - y, (y + h) - pY});
-                                if (d_edge > border_w + 0.5) {
+                            if (border_w <= 0.0) {
+                                if (d_center < -1.5) {
+                                    cov = 1.0f;
+                                } else if (d_center > 1.5) {
                                     continue;
-                                } else if (d_edge > border_w - 0.5) {
-                                    cov *= static_cast<float>(border_w + 0.5 - d_edge);
+                                } else {
+                                    double d0 = eval_sdf(pX - 0.25, pY - 0.25);
+                                    double d1 = eval_sdf(pX + 0.25, pY - 0.25);
+                                    double d2 = eval_sdf(pX - 0.25, pY + 0.25);
+                                    double d3 = eval_sdf(pX + 0.25, pY + 0.25);
+
+                                    auto sample_cov = [](double d) -> float {
+                                        return static_cast<float>(std::clamp(0.5 - d, 0.0, 1.0));
+                                    };
+                                    cov = (sample_cov(d0) + sample_cov(d1) + sample_cov(d2) + sample_cov(d3)) * 0.25f;
+                                }
+                            } else {
+                                double s_center = stroke_dist(d_center);
+                                if (s_center > 1.5) {
+                                    continue;
+                                } else if (s_center < -1.5) {
+                                    cov = 1.0f;
+                                } else {
+                                    double d0 = eval_sdf(pX - 0.25, pY - 0.25);
+                                    double d1 = eval_sdf(pX + 0.25, pY - 0.25);
+                                    double d2 = eval_sdf(pX - 0.25, pY + 0.25);
+                                    double d3 = eval_sdf(pX + 0.25, pY + 0.25);
+
+                                    auto sample_cov = [&](double d) -> float {
+                                        double s = stroke_dist(d);
+                                        return static_cast<float>(std::clamp(0.5 - s, 0.0, 1.0));
+                                    };
+                                    cov = (sample_cov(d0) + sample_cov(d1) + sample_cov(d2) + sample_cov(d3)) * 0.25f;
                                 }
                             }
 

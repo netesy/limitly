@@ -940,6 +940,14 @@ frame Widget : WidgetTrait {
     pub fn background_color(c: Color): Widget {
         return self.background(c);
     }
+    pub fn horizontal(): Widget {
+        self.is_vertical = 0;
+        return self;
+    }
+    pub fn vertical(): Widget {
+        self.is_vertical = 1;
+        return self;
+    }
 
     // ── Signal Binding Modifiers ───────────────────────────────────────────
     pub fn bind_text(sig: any): Widget {
@@ -1557,7 +1565,17 @@ pub fn steps(step_titles: [str], active_step: int = 0): Widget {
     var w = Widget(KIND_STEPS);
     w.tab_titles = step_titles;
     w.active_tab = active_step;
-    w.height_val = 32.0;
+    w.is_vertical = 0;
+    w.height_val = 58.0;
+    return w;
+}
+
+pub fn steps_vertical(step_titles: [str], active_step: int = 0): Widget {
+    var w = Widget(KIND_STEPS);
+    w.tab_titles = step_titles;
+    w.active_tab = active_step;
+    w.is_vertical = 1;
+    w.height_val = (len(step_titles) as float) * 44.0;
     return w;
 }
 

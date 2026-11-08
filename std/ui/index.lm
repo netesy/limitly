@@ -209,6 +209,7 @@ pub fn stack(children: [Widget]): Widget { return ui_types.stack(children); }
 pub fn stat(title: str, value: str, desc: str = ""): Widget { return ui_types.stat(title, value, desc); }
 pub fn stepper(value: int = 0, step: int = 1, min_val: int = 0, max_val: int = 100, on_change: any = nil): Widget { return ui_types.stepper(value, step, min_val, max_val, on_change); }
 pub fn steps(step_titles: [str], active_step: int = 0): Widget { return ui_types.steps(step_titles, active_step); }
+pub fn steps_vertical(step_titles: [str], active_step: int = 0): Widget { return ui_types.steps_vertical(step_titles, active_step); }
 pub fn table(headers: [str], rows: [[Widget]]): Widget { return ui_types.table(headers, rows); }
 pub fn tabs(titles: [str], pages: [Widget], active: int = 0, on_change: any = nil): Widget { return ui_types.tabs(titles, pages, active, on_change); }
 pub fn text(content: str): Widget { return ui_types.text(content); }
