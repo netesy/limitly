@@ -1,0 +1,201 @@
+// tests/extracted_modules_test.lm
+// Rigorous verification test suite for extracted modules:
+// - std.theme
+// - std.camera
+// - std.widget
+
+import std.theme as theme;
+import std.camera as cam;
+import std.widget as widget;
+import std.math as math;
+
+fn test_theme_system() {
+    print("[Test 1] Testing std.theme...");
+
+    // Presets instantiation
+    var t_dark = theme.dark_theme();
+    assert(t_dark.padding == 10.0, "Dark theme padding should be 10.0");
+    assert(t_dark.spacing == 6.0, "Dark theme spacing should be 6.0");
+    assert(t_dark.item_height == 24.0, "Dark theme item_height should be 24.0");
+
+    var t_light = theme.light_theme();
+    assert(t_light.padding == 10.0, "Light theme padding should be 10.0");
+    assert(t_light.item_height == 24.0, "Light theme item_height should be 24.0");
+
+    var t_cyber = theme.cyberpunk_theme();
+    assert(t_cyber.rounding == 4.0, "Cyberpunk theme rounding should be 4.0");
+
+    var t_retro = theme.retro_theme();
+    assert(t_retro.rounding == 0.0, "Retro theme rounding should be 0.0");
+
+    var t_nord = theme.nord_theme();
+    assert(t_nord.rounding == 4.0, "Nord theme rounding should be 4.0");
+
+    // Dynamic role mapping and set_color
+    var role_win = theme.color_role_from_index(theme.COLOR_WINDOW_BG);
+    var orig_c = t_dark.get_color(role_win);
+    assert(orig_c.a > 0.9, "Window bg alpha should be ~0.95");
+
+    var role_btn = theme.color_role_from_index(theme.COLOR_BUTTON);
+    var btn_c = t_dark.get_color(role_btn);
+    assert(btn_c.a == 1.0, "Button alpha should be 1.0");
+
+    // StyleVar index mapping
+    var sv_pad = theme.style_var_from_index(theme.VAR_PADDING);
+    match (sv_pad) {
+        theme.StyleVar.Padding => {},
+        _ => { assert(false, "Style var should be Padding"); }
+    }
+
+    // Token bundles
+    assert(t_dark.spacing_tokens.md == 16.0, "Spacing md token should be 16.0");
+    assert(t_dark.typography_tokens.body_size == 14.0, "Typography body_size token should be 14.0");
+    assert(t_dark.shape_tokens.corner_md == 8.0, "Shape corner_md token should be 8.0");
+
+    print("  -> std.theme passed!");
+}
+
+fn test_widget_system() {
+    print("[Test 2] Testing std.widget...");
+
+    // Point & Insets
+    var pt1 = widget.Point(x=10.0, y=20.0);
+    var pt2 = widget.Point(x=30.0, y=40.0);
+    var pt_sum = pt1.add(pt2);
+    assert(pt_sum.x == 40.0 and pt_sum.y == 60.0, "Point add failed");
+    var pt_sub = pt2.sub(pt1);
+    assert(pt_sub.x == 20.0 and pt_sub.y == 20.0, "Point sub failed");
+    var pt_scaled = pt1.scale(2.0);
+    assert(pt_scaled.x == 20.0 and pt_scaled.y == 40.0, "Point scale failed");
+
+    var insets = widget.Insets(left=4.0, top=8.0, right=12.0, bottom=16.0);
+    assert(insets.horizontal() == 16.0, "Insets horizontal should be 16.0");
+    assert(insets.vertical() == 24.0, "Insets vertical should be 24.0");
+
+    // Rect containment, center, and expansion
+    var r1 = widget.Rect(x=10.0, y=10.0, w=100.0, h=50.0);
+    assert(r1.contains(20.0, 30.0), "Rect should contain (20, 30)");
+    assert(not r1.contains(5.0, 5.0), "Rect should not contain (5, 5)");
+    assert(r1.contains_point(pt1), "Rect should contain Point(10, 20)");
+
+    var r1_center = r1.center();
+    assert(r1_center.x == 60.0 and r1_center.y == 35.0, "Rect center failed");
+
+    var r1_expanded = r1.expand(5.0);
+    assert(r1_expanded.x == 5.0 and r1_expanded.y == 5.0, "Rect expand pos failed");
+    assert(r1_expanded.w == 110.0 and r1_expanded.h == 60.0, "Rect expand size failed");
+
+    // Rect intersection & union
+    var r2 = widget.Rect(x=50.0, y=30.0, w=100.0, h=50.0);
+    assert(r1.intersects(r2), "r1 and r2 should intersect");
+
+    var r_isect = r1.intersection(r2);
+    assert(r_isect.x == 50.0 and r_isect.y == 30.0, "Intersection pos failed");
+    assert(r_isect.w == 60.0 and r_isect.h == 30.0, "Intersection size failed");
+
+    var r_union = r1.union_rect(r2);
+    assert(r_union.x == 10.0 and r_union.y == 10.0, "Union pos failed");
+    assert(r_union.w == 140.0 and r_union.h == 70.0, "Union size failed");
+
+    // Math: value_to_ratio, ratio_to_value, step_value
+    var ratio = widget.value_to_ratio(50.0, 0.0, 100.0);
+    assert(ratio == 0.5, "Ratio should be 0.5");
+    var ratio_clamped = widget.value_to_ratio(150.0, 0.0, 100.0);
+    assert(ratio_clamped == 1.0, "Clamped ratio should be 1.0");
+
+    var val_back = widget.ratio_to_value(0.75, 0.0, 200.0);
+    assert(val_back == 150.0, "ratio_to_value failed");
+
+    var stepped = widget.step_value(4.8, 1.0, 0.0);
+    assert(stepped == 5.0, "step_value failed");
+
+    // Slider thumb & progress calculations
+    var track = widget.Rect(x=10.0, y=20.0, w=100.0, h=6.0);
+    var thumb = widget.calculate_thumb_rect(track, 0.5, 12.0, 12.0, false);
+    assert(thumb.w == 12.0 and thumb.h == 12.0, "Thumb dimensions failed");
+    assert(thumb.x == 54.0, "Horizontal thumb travel failed");
+
+    var prog = widget.calculate_progress_rect(track, 0.6, false);
+    assert(prog.w == 60.0 and prog.h == 6.0, "Progress rect failed");
+
+    // State resolution
+    var st_idle = widget.resolve_state(true, false, false, false);
+    match (st_idle) {
+        widget.WidgetState.Idle => {},
+        _ => { assert(false, "Should be Idle"); }
+    }
+    var st_disabled = widget.resolve_state(false, true, true, true);
+    match (st_disabled) {
+        widget.WidgetState.Disabled => {},
+        _ => { assert(false, "Should be Disabled"); }
+    }
+    var st_active = widget.resolve_state(true, true, true, false);
+    match (st_active) {
+        widget.WidgetState.Active => {},
+        _ => { assert(false, "Should be Active"); }
+    }
+
+    print("  -> std.widget passed!");
+}
+
+fn test_camera_system() {
+    print("[Test 3] Testing std.camera...");
+
+    // 2D Camera
+    var c2d = cam.Camera2D();
+    c2d.set_viewport(800.0, 600.0);
+    assert(c2d.offset.x == 400.0 and c2d.offset.y == 300.0, "Viewport offset failed");
+
+    var world_pt = cam.Vec2(x=150.0, y=250.0);
+    var screen_pt = c2d.world_to_screen(world_pt);
+    assert(screen_pt.x == 550.0 and screen_pt.y == 550.0, "World to screen projection failed");
+
+    var unprojected = c2d.screen_to_world(screen_pt);
+    var dx = unprojected.x - world_pt.x;
+    if (dx < 0.0) { dx = -dx; }
+    var dy = unprojected.y - world_pt.y;
+    if (dy < 0.0) { dy = -dy; }
+    assert(dx < 0.001 and dy < 0.001, "Screen to world round trip failed");
+
+    // Camera follow and trauma shake
+    c2d.follow(cam.Vec2(x=200.0, y=200.0), 0.5, 0.016);
+    assert(c2d.target.x > 0.0, "Camera target lerp failed");
+
+    c2d.add_trauma(0.8);
+    assert(c2d.trauma == 0.8, "Trauma add failed");
+    c2d.update(0.016);
+    assert(c2d.trauma < 0.8, "Trauma decay failed");
+    assert(c2d.shake_offset.mag_sq() > 0.0 or c2d.shake_rotation != 0.0, "Screenshake should generate offset/rotation");
+
+    // 3D Perspective Camera
+    var c3d = cam.perspective_camera(60.0, 1.777, 0.1, 1000.0);
+    assert(c3d.fov_degrees == 60.0, "Perspective FOV failed");
+    assert(c3d.near == 0.1, "Perspective near failed");
+    assert(c3d.far == 1000.0, "Perspective far failed");
+
+    c3d.look_at(0.0, 0.0, 0.0, 0.0, 1.0, 0.0);
+
+    // 3D Orthographic Camera
+    var ortho = cam.orthographic_camera(-50.0, 50.0, 40.0, -40.0, 1.0, 500.0);
+    assert(ortho.ortho_left == -50.0 and ortho.ortho_right == 50.0, "Ortho bounds failed");
+    match (ortho.camera_type) {
+        cam.CameraType.Orthographic => {},
+        _ => { assert(false, "CameraType should be Orthographic"); }
+    }
+
+    print("  -> std.camera passed!");
+}
+
+fn main() {
+    print("========================================");
+    print("Testing Extracted Modules (theme, widget, camera)");
+    print("========================================");
+
+    test_theme_system();
+    test_widget_system();
+    test_camera_system();
+
+    print("========================================");
+    print("ALL EXTRACTED MODULE TESTS PASSED!");
+    print("========================================");
+}

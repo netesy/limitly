@@ -1,0 +1,145 @@
+// std/widget/geometry.lm
+// Universal 2D geometric primitives for UI, widgets, and layouts.
+
+import std.math as math;
+
+frame Point {
+    pub var x: float;
+    pub var y: float;
+
+    pub init(x: float = 0.0, y: float = 0.0) {
+        self.x = x;
+        self.y = y;
+    }
+
+    pub fn add(other: Point): Point {
+        return Point(x=self.x + other.x, y=self.y + other.y);
+    }
+
+    pub fn sub(other: Point): Point {
+        return Point(x=self.x - other.x, y=self.y - other.y);
+    }
+
+    pub fn scale(s: float): Point {
+        return Point(x=self.x * s, y=self.y * s);
+    }
+
+    pub fn offset(dx: float, dy: float): Point {
+        return Point(x=self.x + dx, y=self.y + dy);
+    }
+
+    pub fn dist_sq(other: Point): float {
+        var dx = self.x - other.x;
+        var dy = self.y - other.y;
+        return dx * dx + dy * dy;
+    }
+}
+
+frame Insets {
+    pub var left: float;
+    pub var top: float;
+    pub var right: float;
+    pub var bottom: float;
+
+    pub init(left: float = 0.0, top: float = 0.0, right: float = 0.0, bottom: float = 0.0) {
+        self.left = left;
+        self.top = top;
+        self.right = right;
+        self.bottom = bottom;
+    }
+
+    pub fn horizontal(): float {
+        return self.left + self.right;
+    }
+
+    pub fn vertical(): float {
+        return self.top + self.bottom;
+    }
+}
+
+frame Rect {
+    pub var x: float;
+    pub var y: float;
+    pub var w: float;
+    pub var h: float;
+
+    pub init(x: float = 0.0, y: float = 0.0, w: float = 0.0, h: float = 0.0) {
+        self.x = x;
+        self.y = y;
+        self.w = w;
+        self.h = h;
+    }
+
+    pub fn contains(px: float, py: float): bool {
+        return px >= self.x and px <= (self.x + self.w) and py >= self.y and py <= (self.y + self.h);
+    }
+
+    pub fn contains_point(pt: Point): bool {
+        return self.contains(pt.x, pt.y);
+    }
+
+    pub fn contains_vec(pt: Point): bool {
+        return self.contains(pt.x, pt.y);
+    }
+
+    pub fn intersects(other: Rect): bool {
+        return not (self.x + self.w < other.x or
+        other.x + other.w < self.x or
+        self.y + self.h < other.y or
+        other.y + other.h < self.y);
+    }
+
+    pub fn intersection(other: Rect): Rect {
+        var ix = math.max(self.x, other.x);
+        var iy = math.max(self.y, other.y);
+        var rx = math.min(self.x + self.w, other.x + other.w);
+        var by = math.min(self.y + self.h, other.y + other.h);
+        if (rx > ix and by > iy) {
+            return Rect(x=ix, y=iy, w=rx - ix, h=by - iy);
+        }
+        return Rect();
+    }
+
+    pub fn union_rect(other: Rect): Rect {
+        var min_x = math.min(self.x, other.x);
+        var min_y = math.min(self.y, other.y);
+        var max_x = math.max(self.x + self.w, other.x + other.w);
+        var max_y = math.max(self.y + self.h, other.y + other.h);
+        return Rect(x=min_x, y=min_y, w=max_x - min_x, h=max_y - min_y);
+    }
+
+    pub fn center_x(): float {
+        return self.x + self.w * 0.5;
+    }
+
+    pub fn center_y(): float {
+        return self.y + self.h * 0.5;
+    }
+
+    pub fn center(): Point {
+        return Point(x=self.center_x(), y=self.center_y());
+    }
+
+    pub fn expand(amount: float): Rect {
+        return Rect(
+            x=self.x - amount,
+            y=self.y - amount,
+            w=self.w + amount * 2.0,
+            h=self.h + amount * 2.0
+        );
+    }
+
+    pub fn shrink(amount: float): Rect {
+        return self.expand(-amount);
+    }
+
+    pub fn offset(dx: float, dy: float): Rect {
+        return Rect(x=self.x + dx, y=self.y + dy, w=self.w, h=self.h);
+    }
+
+    pub fn clamp_point(px: float, py: float): Point {
+        var cx = math.clamp(px, self.x, self.x + self.w);
+        var cy = math.clamp(py, self.y, self.y + self.h);
+        return Point(x=cx, y=cy);
+    }
+}

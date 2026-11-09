@@ -1,5 +1,7 @@
 // tests/d3_showcase.lm
 // Interactive 3D Showcase demonstrating std.d3 real-time 3D graphics in Lymar.
+// Features the Valkyrie SF-9 Aerospace Interceptor with multi-material subsystems,
+// interactive orbit controls, procedural asteroids, and real-time IMGUI sliders.
 
 import std.d3 as d3;
 import std.gg as gg;
@@ -8,63 +10,364 @@ import std.game.types as types;
 import std.color as color;
 import std.math as math;
 
-fn build_starfighter(): d3.Geometry {
+fn add_tri(g: d3.Geometry, i0: int, i1: int, i2: int) {
+    g.add_face(i0, i1, i2);
+}
+
+fn add_quad(g: d3.Geometry, i0: int, i1: int, i2: int, i3: int) {
+    g.add_face(i0, i1, i2);
+    g.add_face(i0, i2, i3);
+}
+
+// ── 1. Aerodynamic Titanium Fuselage with Integrated Engine Nacelles ──
+fn build_starfighter_hull(): d3.Geometry {
     var g = d3.Geometry();
-    var nose = g.add_vertex(0.0, 0.0, 3.2);
-    var f_top = g.add_vertex(0.0, 0.35, 1.2);
-    var f_bot = g.add_vertex(0.0, -0.3, 1.2);
-    var f_left = g.add_vertex(-0.45, 0.0, 1.2);
-    var f_right = g.add_vertex(0.45, 0.0, 1.2);
 
-    g.add_face(nose, f_top, f_left);
-    g.add_face(nose, f_right, f_top);
-    g.add_face(nose, f_bot, f_right);
-    g.add_face(nose, f_left, f_bot);
+    // ── 1. Needle-Nose & Stealth Chines (z = 2.8 -> 2.0 -> 1.0) ──
+    var p_tip   = g.add_vertex(0.0, 0.02, 2.8);          // 0: needle nose probe
+    var n1_top  = g.add_vertex(0.0, 0.16, 2.0);          // 1
+    var n1_cl   = g.add_vertex(-0.28, 0.04, 2.0);        // 2
+    var n1_cr   = g.add_vertex(0.28, 0.04, 2.0);         // 3
+    var n1_bot  = g.add_vertex(0.0, -0.14, 2.0);         // 4
 
-    var c_top = g.add_vertex(0.0, 0.75, 0.0);
-    var c_mid_l = g.add_vertex(-0.6, 0.2, 0.0);
-    var c_mid_r = g.add_vertex(0.6, 0.2, 0.0);
-    var c_bot = g.add_vertex(0.0, -0.4, 0.0);
+    add_tri(g, p_tip, n1_top, n1_cl);
+    add_tri(g, p_tip, n1_cr, n1_top);
+    add_tri(g, p_tip, n1_cl, n1_bot);
+    add_tri(g, p_tip, n1_bot, n1_cr);
 
-    g.add_face(f_top, c_top, c_mid_l);
-    g.add_face(f_top, c_mid_r, c_top);
-    g.add_face(f_left, f_top, c_mid_l);
-    g.add_face(f_right, c_mid_r, f_top);
-    g.add_face(f_bot, c_bot, c_mid_l);
-    g.add_face(f_bot, c_mid_r, c_bot);
+    var n2_top  = g.add_vertex(0.0, 0.28, 1.0);          // 5: cockpit nose sill
+    var n2_cl   = g.add_vertex(-0.55, 0.05, 1.0);        // 6
+    var n2_cr   = g.add_vertex(0.55, 0.05, 1.0);         // 7
+    var n2_bot  = g.add_vertex(0.0, -0.22, 1.0);         // 8
 
-    var r_top = g.add_vertex(0.0, 0.45, -1.8);
-    var r_bot = g.add_vertex(0.0, -0.35, -1.8);
-    var r_left = g.add_vertex(-0.65, 0.0, -1.8);
-    var r_right = g.add_vertex(0.65, 0.0, -1.8);
+    add_quad(g, n1_top, n2_top, n2_cl, n1_cl);
+    add_quad(g, n1_top, n1_cr, n2_cr, n2_top);
+    add_quad(g, n1_bot, n1_cl, n2_cl, n2_bot);
+    add_quad(g, n1_bot, n2_bot, n2_cr, n1_cr);
 
-    g.add_face(c_top, r_top, r_left);
-    g.add_face(c_top, r_right, r_top);
-    g.add_face(c_mid_l, c_top, r_left);
-    g.add_face(c_mid_r, r_right, c_top);
-    g.add_face(c_bot, r_bot, r_left);
-    g.add_face(c_bot, r_right, r_bot);
+    // ── 2. Cockpit Sills & Blended Mid Fuselage (z = 1.0 -> 0.1 -> -0.7) ──
+    var s_mid_l = g.add_vertex(-0.35, 0.32, 0.1);        // 9
+    var s_mid_r = g.add_vertex(0.35, 0.32, 0.1);         // 10
+    var s_aft_l = g.add_vertex(-0.30, 0.35, -0.7);       // 11
+    var s_aft_r = g.add_vertex(0.30, 0.35, -0.7);        // 12
+    var s_aft_c = g.add_vertex(0.0, 0.44, -0.8);         // 13: rear canopy apex
 
-    g.add_face(r_top, r_right, r_bot);
-    g.add_face(r_top, r_bot, r_left);
+    var c_mid_l = g.add_vertex(-0.85, 0.04, 0.1);        // 14
+    var c_mid_r = g.add_vertex(0.85, 0.04, 0.1);         // 15
+    var c_aft_l = g.add_vertex(-1.00, 0.02, -0.7);       // 16
+    var c_aft_r = g.add_vertex(1.00, 0.02, -0.7);        // 17
 
-    var pw_tip = g.add_vertex(-3.2, -0.05, -1.4);
-    var pw_tip_thick = g.add_vertex(-3.2, 0.05, -1.4);
-    g.add_face(c_mid_l, pw_tip, r_left);
-    g.add_face(c_mid_l, r_left, pw_tip_thick);
+    var k_mid   = g.add_vertex(0.0, -0.30, 0.1);         // 18: ventral keel
+    var k_aft   = g.add_vertex(0.0, -0.32, -0.7);        // 19
 
-    var sw_tip = g.add_vertex(3.2, -0.05, -1.4);
-    var sw_tip_thick = g.add_vertex(3.2, 0.05, -1.4);
-    g.add_face(c_mid_r, r_right, sw_tip);
-    g.add_face(c_mid_r, sw_tip_thick, r_right);
+    // Upper deck flanks
+    add_tri(g, n2_top, s_mid_l, n2_cl);
+    add_tri(g, n2_cl, s_mid_l, c_mid_l);
+    add_quad(g, s_mid_l, s_aft_l, c_aft_l, c_mid_l);
+    add_tri(g, s_aft_l, s_aft_c, c_aft_l);
 
-    var fin_l_tip = g.add_vertex(-0.7, 1.2, -1.7);
-    g.add_face(r_left, fin_l_tip, c_top);
-    g.add_face(r_left, c_top, fin_l_tip);
+    add_tri(g, n2_top, n2_cr, s_mid_r);
+    add_tri(g, n2_cr, c_mid_r, s_mid_r);
+    add_quad(g, s_mid_r, c_mid_r, c_aft_r, s_aft_r);
+    add_tri(g, s_aft_r, c_aft_r, s_aft_c);
 
-    var fin_r_tip = g.add_vertex(0.7, 1.2, -1.7);
-    g.add_face(r_right, c_top, fin_r_tip);
-    g.add_face(r_right, fin_r_tip, c_top);
+    // Ventral hull flanks
+    add_quad(g, n2_bot, n2_cl, c_mid_l, k_mid);
+    add_quad(g, n2_bot, k_mid, c_mid_r, n2_cr);
+    add_quad(g, k_mid, c_mid_l, c_aft_l, k_aft);
+    add_quad(g, k_mid, k_aft, c_aft_r, c_mid_r);
+
+    // ── 3. Twin Sculpted Engine Nacelles & Stern (z = -0.7 -> -1.6 -> -2.5) ──
+    var sp_mid  = g.add_vertex(0.0, 0.50, -1.6);         // 20: raised dorsal spine
+    var sp_aft  = g.add_vertex(0.0, 0.40, -2.5);         // 21
+
+    var en_p_top = g.add_vertex(-0.62, 0.38, -1.6);      // 22
+    var en_p_out = g.add_vertex(-0.95, 0.06, -1.6);      // 23
+    var en_p_bot = g.add_vertex(-0.62, -0.22, -1.6);     // 24
+    var st_p_top = g.add_vertex(-0.60, 0.32, -2.5);      // 25
+    var st_p_out = g.add_vertex(-0.90, 0.05, -2.5);      // 26
+    var st_p_bot = g.add_vertex(-0.60, -0.20, -2.5);     // 27
+    var st_p_in  = g.add_vertex(-0.25, 0.05, -2.5);      // 28
+
+    var en_s_top = g.add_vertex(0.62, 0.38, -1.6);       // 29
+    var en_s_out = g.add_vertex(0.95, 0.06, -1.6);       // 30
+    var en_s_bot = g.add_vertex(0.62, -0.22, -1.6);      // 31
+    var st_s_top = g.add_vertex(0.60, 0.32, -2.5);       // 32
+    var st_s_out = g.add_vertex(0.90, 0.05, -2.5);       // 33
+    var st_s_bot = g.add_vertex(0.60, -0.20, -2.5);      // 34
+    var st_s_in  = g.add_vertex(0.25, 0.05, -2.5);       // 35
+
+    var v_mid   = g.add_vertex(0.0, -0.14, -1.6);        // 36
+    var v_aft   = g.add_vertex(0.0, -0.12, -2.5);        // 37
+
+    add_tri(g, s_aft_c, sp_mid, en_p_top);
+    add_tri(g, s_aft_c, en_s_top, sp_mid);
+    add_quad(g, s_aft_c, en_p_top, en_p_out, c_aft_l);
+    add_quad(g, s_aft_c, c_aft_r, en_s_out, en_s_top);
+
+    add_quad(g, sp_mid, sp_aft, st_p_top, en_p_top);
+    add_quad(g, sp_mid, en_s_top, st_s_top, sp_aft);
+
+    add_quad(g, en_p_top, st_p_top, st_p_out, en_p_out);
+    add_quad(g, en_p_out, st_p_out, st_p_bot, en_p_bot);
+    add_quad(g, en_s_top, en_s_out, st_s_out, st_s_top);
+    add_quad(g, en_s_out, en_s_bot, st_s_bot, st_s_out);
+
+    add_quad(g, k_aft, c_aft_l, en_p_out, en_p_bot);
+    add_tri(g, k_aft, en_p_bot, v_mid);
+    add_quad(g, k_aft, en_s_bot, en_s_out, c_aft_r);
+    add_tri(g, k_aft, v_mid, en_s_bot);
+
+    add_quad(g, v_mid, en_p_bot, st_p_bot, v_aft);
+    add_quad(g, v_mid, v_aft, st_s_bot, en_s_bot);
+
+    // Center stern collar
+    add_quad(g, sp_aft, st_p_in, v_aft, st_s_in);
+    add_tri(g, sp_aft, st_p_top, st_p_in);
+    add_tri(g, sp_aft, st_s_in, st_s_top);
+
+    // ── 4. 3D Swept Delta Wings with True Airfoil & Canted Winglets ──
+    var pw_le_tip = g.add_vertex(-2.45, 0.04, -0.9);     // 38
+    var pw_te_tip = g.add_vertex(-2.30, -0.02, -1.7);    // 39
+    var pw_spar_u = g.add_vertex(-1.60, 0.08, -0.9);     // 40
+    var pw_spar_d = g.add_vertex(-1.60, -0.10, -0.9);    // 41
+    var pw_wlet_t = g.add_vertex(-2.65, 0.48, -1.4);     // 42
+
+    add_tri(g, c_mid_l, pw_spar_u, pw_le_tip);
+    add_tri(g, c_mid_l, c_aft_l, pw_spar_u);
+    add_tri(g, c_aft_l, en_p_out, pw_spar_u);
+    add_tri(g, pw_spar_u, en_p_out, pw_te_tip);
+    add_tri(g, pw_spar_u, pw_te_tip, pw_le_tip);
+
+    add_tri(g, c_mid_l, pw_le_tip, pw_spar_d);
+    add_tri(g, c_mid_l, pw_spar_d, c_aft_l);
+    add_tri(g, c_aft_l, pw_spar_d, en_p_out);
+    add_tri(g, pw_spar_d, pw_te_tip, en_p_out);
+    add_tri(g, pw_spar_d, pw_le_tip, pw_te_tip);
+
+    add_tri(g, pw_le_tip, pw_wlet_t, pw_te_tip);
+    add_tri(g, pw_le_tip, pw_te_tip, pw_wlet_t);
+
+    var sw_le_tip = g.add_vertex(2.45, 0.04, -0.9);      // 43
+    var sw_te_tip = g.add_vertex(2.30, -0.02, -1.7);     // 44
+    var sw_spar_u = g.add_vertex(1.60, 0.08, -0.9);      // 45
+    var sw_spar_d = g.add_vertex(1.60, -0.10, -0.9);     // 46
+    var sw_wlet_t = g.add_vertex(2.65, 0.48, -1.4);      // 47
+
+    add_tri(g, c_mid_r, sw_le_tip, sw_spar_u);
+    add_tri(g, c_mid_r, sw_spar_u, c_aft_r);
+    add_tri(g, c_aft_r, sw_spar_u, en_s_out);
+    add_tri(g, sw_spar_u, sw_te_tip, en_s_out);
+    add_tri(g, sw_spar_u, sw_le_tip, sw_te_tip);
+
+    add_tri(g, c_mid_r, sw_spar_d, sw_le_tip);
+    add_tri(g, c_mid_r, c_aft_r, sw_spar_d);
+    add_tri(g, c_aft_r, sw_spar_d, en_s_out);
+    add_tri(g, sw_spar_d, en_s_out, sw_te_tip);
+    add_tri(g, sw_spar_d, sw_te_tip, sw_le_tip);
+
+    add_tri(g, sw_le_tip, sw_te_tip, sw_wlet_t);
+    add_tri(g, sw_le_tip, sw_wlet_t, sw_te_tip);
+
+    // ── 5. Twin Canted V-Tail Vertical Stabilizers (28 deg cant) ──
+    var pf_b_le  = g.add_vertex(-0.62, 0.38, -1.1);      // 48
+    var pf_b_te  = g.add_vertex(-0.60, 0.32, -2.4);      // 49
+    var pf_t_le  = g.add_vertex(-1.12, 1.32, -1.7);      // 50
+    var pf_t_te  = g.add_vertex(-1.18, 1.25, -2.3);      // 51
+
+    add_tri(g, pf_b_le, pf_t_le, pf_t_te);
+    add_tri(g, pf_b_le, pf_t_te, pf_b_te);
+    add_tri(g, pf_b_le, pf_t_te, pf_t_le);
+    add_tri(g, pf_b_le, pf_b_te, pf_t_te);
+
+    var sf_b_le  = g.add_vertex(0.62, 0.38, -1.1);       // 52
+    var sf_b_te  = g.add_vertex(0.60, 0.32, -2.4);       // 53
+    var sf_t_le  = g.add_vertex(1.12, 1.32, -1.7);       // 54
+    var sf_t_te  = g.add_vertex(1.18, 1.25, -2.3);       // 55
+
+    add_tri(g, sf_b_le, sf_t_te, sf_t_le);
+    add_tri(g, sf_b_le, sf_b_te, sf_t_te);
+    add_tri(g, sf_b_le, sf_t_le, sf_t_te);
+    add_tri(g, sf_b_le, sf_t_te, sf_b_te);
+
+    g.compute_vertex_normals();
+    return g;
+}
+
+// ── 2. Faceted Cockpit Canopy Glass (Sits perfectly flush on the sill) ──
+fn build_starfighter_canopy(): d3.Geometry {
+    var g = d3.Geometry();
+
+    var cn_fwd = g.add_vertex(0.0, 0.28, 1.0);           // 0
+    var cn_l1  = g.add_vertex(-0.35, 0.32, 0.1);         // 1
+    var cn_r1  = g.add_vertex(0.35, 0.32, 0.1);          // 2
+    var cn_l2  = g.add_vertex(-0.30, 0.35, -0.7);        // 3
+    var cn_r2  = g.add_vertex(0.30, 0.35, -0.7);         // 4
+    var cn_aft = g.add_vertex(0.0, 0.44, -0.8);          // 5
+
+    var cr_wind = g.add_vertex(0.0, 0.52, 0.4);          // 6: windscreen peak
+    var cr_dome = g.add_vertex(0.0, 0.58, -0.2);         // 7: canopy crown
+
+    add_tri(g, cn_fwd, cr_wind, cn_l1);
+    add_tri(g, cn_fwd, cn_r1, cr_wind);
+    add_tri(g, cr_wind, cr_dome, cn_l1);
+    add_tri(g, cr_dome, cn_l2, cn_l1);
+    add_tri(g, cr_wind, cn_r1, cr_dome);
+    add_tri(g, cr_dome, cn_r1, cn_r2);
+    add_tri(g, cr_dome, cn_aft, cn_l2);
+    add_tri(g, cr_dome, cn_r2, cn_aft);
+
+    g.compute_vertex_normals();
+    return g;
+}
+
+// ── 3. Integrated Chine Autocannons & Dorsal Spine Blade Fairing ──
+fn build_starfighter_trim(): d3.Geometry {
+    var g = d3.Geometry();
+
+    // Port Chine Autocannon (x = -0.72)
+    var p_gun_f  = g.add_vertex(-0.72, 0.05, 1.35);
+    var p_gun_t  = g.add_vertex(-0.72, 0.12, 0.3);
+    var p_gun_b  = g.add_vertex(-0.72, -0.04, 0.3);
+    var p_gun_l  = g.add_vertex(-0.80, 0.04, 0.3);
+    var p_gun_r  = g.add_vertex(-0.64, 0.04, 0.3);
+    var p_gun_bk = g.add_vertex(-0.72, 0.04, -0.3);
+
+    add_tri(g, p_gun_f, p_gun_t, p_gun_l);
+    add_tri(g, p_gun_f, p_gun_l, p_gun_b);
+    add_tri(g, p_gun_f, p_gun_b, p_gun_r);
+    add_tri(g, p_gun_f, p_gun_r, p_gun_t);
+    add_tri(g, p_gun_t, p_gun_bk, p_gun_l);
+    add_tri(g, p_gun_l, p_gun_bk, p_gun_b);
+    add_tri(g, p_gun_b, p_gun_bk, p_gun_r);
+    add_tri(g, p_gun_r, p_gun_bk, p_gun_t);
+
+    // Starboard Chine Autocannon (x = 0.72)
+    var s_gun_f  = g.add_vertex(0.72, 0.05, 1.35);
+    var s_gun_t  = g.add_vertex(0.72, 0.12, 0.3);
+    var s_gun_b  = g.add_vertex(0.72, -0.04, 0.3);
+    var s_gun_l  = g.add_vertex(0.64, 0.04, 0.3);
+    var s_gun_r  = g.add_vertex(0.80, 0.04, 0.3);
+    var s_gun_bk = g.add_vertex(0.72, 0.04, -0.3);
+
+    add_tri(g, s_gun_f, s_gun_l, s_gun_t);
+    add_tri(g, s_gun_f, s_gun_b, s_gun_l);
+    add_tri(g, s_gun_f, s_gun_r, s_gun_b);
+    add_tri(g, s_gun_f, s_gun_t, s_gun_r);
+    add_tri(g, s_gun_t, s_gun_l, s_gun_bk);
+    add_tri(g, s_gun_l, s_gun_b, s_gun_bk);
+    add_tri(g, s_gun_b, s_gun_r, s_gun_bk);
+    add_tri(g, s_gun_r, s_gun_t, s_gun_bk);
+
+    // Dorsal Spine Blade Fairing
+    var sp_blade_f = g.add_vertex(0.0, 0.52, -0.6);
+    var sp_blade_t = g.add_vertex(0.0, 0.58, -1.6);
+    var sp_blade_b = g.add_vertex(0.0, 0.44, -2.4);
+    var sp_side_l  = g.add_vertex(-0.06, 0.48, -1.6);
+    var sp_side_r  = g.add_vertex(0.06, 0.48, -1.6);
+
+    add_tri(g, sp_blade_f, sp_blade_t, sp_side_l);
+    add_tri(g, sp_blade_f, sp_side_r, sp_blade_t);
+    add_tri(g, sp_blade_t, sp_blade_b, sp_side_l);
+    add_tri(g, sp_blade_t, sp_side_r, sp_blade_b);
+
+    g.compute_vertex_normals();
+    return g;
+}
+
+// ── 4. Twin Recessed Afterburner Thrust Nozzles ──
+fn build_starfighter_thrusters(): d3.Geometry {
+    var g = d3.Geometry();
+
+    // Port Nozzle (Facing -Z)
+    var pn0 = g.add_vertex(-0.60, 0.18, -2.52);
+    var pn1 = g.add_vertex(-0.46, 0.08, -2.52);
+    var pn2 = g.add_vertex(-0.46, -0.08, -2.52);
+    var pn3 = g.add_vertex(-0.60, -0.18, -2.52);
+    var pn4 = g.add_vertex(-0.74, -0.08, -2.52);
+    var pn5 = g.add_vertex(-0.74, 0.08, -2.52);
+    var pnc = g.add_vertex(-0.60, 0.0, -2.78);
+
+    add_tri(g, pnc, pn1, pn0);
+    add_tri(g, pnc, pn2, pn1);
+    add_tri(g, pnc, pn3, pn2);
+    add_tri(g, pnc, pn4, pn3);
+    add_tri(g, pnc, pn5, pn4);
+    add_tri(g, pnc, pn0, pn5);
+
+    // Starboard Nozzle (Facing -Z)
+    var sn0 = g.add_vertex(0.60, 0.18, -2.52);
+    var sn1 = g.add_vertex(0.74, 0.08, -2.52);
+    var sn2 = g.add_vertex(0.74, -0.08, -2.52);
+    var sn3 = g.add_vertex(0.60, -0.18, -2.52);
+    var sn4 = g.add_vertex(0.46, -0.08, -2.52);
+    var sn5 = g.add_vertex(0.46, 0.08, -2.52);
+    var snc = g.add_vertex(0.60, 0.0, -2.78);
+
+    add_tri(g, snc, sn1, sn0);
+    add_tri(g, snc, sn2, sn1);
+    add_tri(g, snc, sn3, sn2);
+    add_tri(g, snc, sn4, sn3);
+    add_tri(g, snc, sn5, sn4);
+    add_tri(g, snc, sn0, sn5);
+
+    g.compute_vertex_normals();
+    return g;
+}
+
+// ── 5. Procedural Faceted Celestial Asteroid (Cratered Polyhedron) ──
+fn build_asteroid_mesh(scale: float): d3.Geometry {
+    var g = d3.Geometry();
+    var s = scale;
+
+    var v0  = g.add_vertex( 0.0,       s * 1.15,   0.0);
+    var v1  = g.add_vertex(-s * 0.72,  s * 0.75,   s * 0.65);
+    var v2  = g.add_vertex( s * 0.68,  s * 0.82,   s * 0.58);
+    var v3  = g.add_vertex( s * 0.85,  s * 0.65,  -s * 0.62);
+    var v4  = g.add_vertex(-s * 0.65,  s * 0.70,  -s * 0.75);
+
+    var v5  = g.add_vertex(-s * 1.10, -s * 0.10,   s * 0.75);
+    var v6  = g.add_vertex( s * 1.15,  s * 0.05,   s * 0.70);
+    var v7  = g.add_vertex( s * 1.05, -s * 0.15,  -s * 0.85);
+    var v8  = g.add_vertex(-s * 0.95,  s * 0.08,  -s * 0.90);
+
+    var v9  = g.add_vertex(-s * 0.65, -s * 0.85,   s * 0.55);
+    var v10 = g.add_vertex( s * 0.72, -s * 0.78,   s * 0.62);
+    var v11 = g.add_vertex( s * 0.60, -s * 0.88,  -s * 0.68);
+    var v12 = g.add_vertex(-s * 0.75, -s * 0.80,  -s * 0.60);
+    var v13 = g.add_vertex( 0.0,      -s * 1.12,   0.0);
+
+    // Top cap facets
+    add_tri(g, v0, v1, v2);
+    add_tri(g, v0, v2, v3);
+    add_tri(g, v0, v3, v4);
+    add_tri(g, v0, v4, v1);
+
+    // Upper equator facets
+    add_tri(g, v1, v5, v6);
+    add_tri(g, v1, v6, v2);
+    add_tri(g, v2, v6, v7);
+    add_tri(g, v2, v7, v3);
+    add_tri(g, v3, v7, v8);
+    add_tri(g, v3, v8, v4);
+    add_tri(g, v4, v8, v5);
+    add_tri(g, v4, v5, v1);
+
+    // Lower equator facets
+    add_tri(g, v5, v9, v10);
+    add_tri(g, v5, v10, v6);
+    add_tri(g, v6, v10, v11);
+    add_tri(g, v6, v11, v7);
+    add_tri(g, v7, v11, v12);
+    add_tri(g, v7, v12, v8);
+    add_tri(g, v8, v12, v9);
+    add_tri(g, v8, v9, v5);
+
+    // Bottom cap facets
+    add_tri(g, v13, v10, v9);
+    add_tri(g, v13, v11, v10);
+    add_tri(g, v13, v12, v11);
+    add_tri(g, v13, v9, v12);
 
     g.compute_vertex_normals();
     return g;
@@ -74,12 +377,12 @@ fn main(): int {
     print(" === Launching Limitless 3D Starfighter Showcase (std.d3) === ");
 
     var cfg = game.Config(
-        title = "Limitless 3D - Starfighter Showcase (std.d3)",
+        title = "Limitless 3D - Valkyrie SF-9 Interceptor (std.d3)",
         width = 1000,
         height = 700,
         resizable = true
     );
-    cfg.bg_color = color.hex(0x0a0c16, 1.0);
+    cfg.bg_color = color.hex(0x080914, 1.0);
 
     var app = game.Game(cfg);
     if (not app.setup()) {
@@ -91,61 +394,85 @@ fn main(): int {
 
     // ── Build 3D Scene & Lighting ──────────────────────────────────────────
     var scene = d3.Scene3D();
-    scene.background_r = 0.04;
-    scene.background_g = 0.05;
-    scene.background_b = 0.09;
+    scene.background_r = 0.03;
+    scene.background_g = 0.04;
+    scene.background_b = 0.08;
 
-    // Ambient fill light
     scene.add_light(d3.ambient_light(0.8, 0.9, 1.0, 0.35));
 
-    // Key directional light (sun)
-    var sun = d3.directional_light(-0.6, 0.8, 0.7, 1.0, 0.96, 0.88, 1.2);
+    var sun = d3.directional_light(-0.6, 0.8, 0.7, 1.0, 0.96, 0.88, 1.25);
     scene.add_light(sun);
 
-    // Rim light (cyan / magenta cyber backlight)
-    var rim_light = d3.directional_light(0.8, -0.4, -0.6, 0.3, 0.7, 1.0, 0.8);
+    var rim_light = d3.directional_light(0.8, -0.4, -0.6, 0.3, 0.7, 1.0, 0.85);
     scene.add_light(rim_light);
 
-    // ── Starfighter Hero Mesh ──────────────────────────────────────────────
-    var ship_geo = build_starfighter();
-    var ship_mat = d3.phong_material(0.85, 0.92, 1.0, 48.0);
-    var ship = d3.Mesh(ship_geo, ship_mat, "Starfighter");
-    ship.set_position(0.0, 0.0, 0.0);
-    scene.add(ship);
+    // ── Starfighter Subsystem Meshes ───────────────────────────────────────
+    // 1. Titanium Hull: Sleek metallic plating
+    var hull_geo = build_starfighter_hull();
+    var hull_mat = d3.phong_material(0.88, 0.92, 0.98, 64.0);
+    hull_mat.specular = 0.9;
+    var hull_mesh = d3.Mesh(hull_geo, hull_mat, "StarfighterHull");
+    scene.add(hull_mesh);
 
-    // ── Surrounding Asteroid Field ─────────────────────────────────────────
-    var rock_geo = d3.box(1.0, 1.0, 1.0);
-    var rock_mat = d3.phong_material(0.65, 0.6, 0.55, 16.0);
+    // 2. Canopy: Tinted Solar Cyan Crystal Cockpit Glass
+    var canopy_geo = build_starfighter_canopy();
+    var canopy_mat = d3.phong_material(0.10, 0.85, 0.98, 128.0);
+    canopy_mat.specular = 0.95;
+    canopy_mat.cull_mode = types.CullMode.None;
+    var canopy_mesh = d3.Mesh(canopy_geo, canopy_mat, "StarfighterCanopy");
+    scene.add(canopy_mesh);
 
-    var rock1 = d3.Mesh(rock_geo, rock_mat, "AsteroidAlpha");
-    rock1.set_position(-3.5, 1.8, -2.5);
-    rock1.set_scale(1.2, 0.8, 1.0);
+    // 3. Trim: Integrated Chine Autocannons & Spine Fairing
+    var trim_geo = build_starfighter_trim();
+    var trim_mat = d3.phong_material(0.20, 0.22, 0.28, 48.0);
+    var trim_mesh = d3.Mesh(trim_geo, trim_mat, "StarfighterTrim");
+    scene.add(trim_mesh);
+
+    // 4. Thrusters: Glowing Neon Cyan Ion Plasma
+    var thruster_geo = build_starfighter_thrusters();
+    var thruster_mat = d3.basic_material(0.0, 0.95, 1.0);
+    thruster_mat.cull_mode = types.CullMode.None;
+    var thruster_mesh = d3.Mesh(thruster_geo, thruster_mat, "StarfighterThrusters");
+    scene.add(thruster_mesh);
+
+    // ── Procedural Asteroid Field ──────────────────────────────────────────
+    var rock1_geo = build_asteroid_mesh(1.15);
+    var rock2_geo = build_asteroid_mesh(0.85);
+    var rock3_geo = build_asteroid_mesh(1.45);
+    var rock_mat  = d3.phong_material(0.62, 0.58, 0.52, 16.0);
+
+    var rock1 = d3.Mesh(rock1_geo, rock_mat, "AsteroidAlpha");
+    rock1.set_position(-3.6, 1.8, -2.2);
     scene.add(rock1);
 
-    var rock2 = d3.Mesh(rock_geo, rock_mat, "AsteroidBeta");
-    rock2.set_position(4.0, -1.5, -3.0);
-    rock2.set_scale(0.9, 1.3, 0.8);
+    var rock2 = d3.Mesh(rock2_geo, rock_mat, "AsteroidBeta");
+    rock2.set_position(4.2, -1.6, -2.8);
     scene.add(rock2);
 
-    var rock3 = d3.Mesh(rock_geo, rock_mat, "AsteroidGamma");
-    rock3.set_position(2.5, 2.2, -4.5);
-    rock3.set_scale(1.5, 1.5, 1.5);
+    var rock3 = d3.Mesh(rock3_geo, rock_mat, "AsteroidGamma");
+    rock3.set_position(2.8, 2.4, -4.5);
     scene.add(rock3);
 
     // ── 3D Camera & Renderer ───────────────────────────────────────────────
-    var camera = d3.perspective_camera(55.0, 1000.0 / 700.0, 0.1, 100.0);
-    camera.set_position(0.0, 1.8, 6.5);
-    camera.look_at(0.0, 0.0, 0.0);
+    var camera = d3.perspective_camera(50.0, 1000.0 / 700.0, 0.1, 100.0);
+    camera.set_position(-1.2, 1.6, 6.8);
+    camera.look_at(-1.2, 0.0, 0.0);
 
     var renderer = d3.Renderer3D(1000, 700);
 
-    // Interactive state
     var auto_rotate: bool = true;
     var wireframe_mode: bool = false;
-    var ship_yaw: float = 0.0;
-    var ship_pitch: float = 0.15;
-    var ship_roll: float = 0.0;
-    var cam_distance: float = 6.5;
+    var ship_yaw: float = 0.55;
+    var ship_pitch: float = 0.28;
+    var ship_roll: float = -0.05;
+    var cam_distance: float = 6.8;
+    var last_cam_distance: float = 6.8;
+    var sun_angle: float = 0.85;
+    var thruster_glow: float = 1.0;
+    var livery_id: int = 0; // 0 = Ghost, 1 = Crimson, 2 = Void, 3 = Viper Gold
+    var orbit_speed: float = 1.0;
+    var last_w: int = 1000;
+    var last_h: int = 700;
     var anim_tick: int = 0;
 
     print("Running 3D render loop...");
@@ -156,11 +483,25 @@ fn main(): int {
 
         var sw = app.width as float;
         var sh = app.height as float;
-        renderer.set_size(app.width, app.height);
-        camera.aspect = sw / sh;
-        camera.update_projection_matrix();
+        if (app.width != last_w or app.height != last_h) {
+            renderer.set_size(app.width, app.height);
+            camera.aspect = sw / sh;
+            camera.update_projection_matrix();
+            last_w = app.width;
+            last_h = app.height;
+        }
 
-        // ── Input Handling ──────────────────────────────────────────────────
+        // ── Direct 3D Viewport Mouse Drag Rotation (Arcball) ────────────────
+        if (app.input.is_mouse_down(0) and app.input.mouse_x > 330.0) {
+            auto_rotate = false;
+            var m_delta = app.input.mouse_delta();
+            ship_yaw = ship_yaw + m_delta.x * 0.012;
+            ship_pitch = ship_pitch + m_delta.y * 0.012;
+            if (ship_pitch > 1.55) { ship_pitch = 1.55; }
+            if (ship_pitch < -1.55) { ship_pitch = -1.55; }
+        }
+
+        // ── Keyboard Shortcuts ──────────────────────────────────────────────
         if (app.input.is_key_down(game.KEY_LEFT) or app.input.is_key_down(game.KEY_A)) {
             ship_yaw = ship_yaw - 0.035;
             auto_rotate = false;
@@ -177,35 +518,95 @@ fn main(): int {
             ship_pitch = ship_pitch + 0.025;
             auto_rotate = false;
         }
-
-        if (auto_rotate) {
-            ship_yaw = ship_yaw + 0.015;
-            ship_pitch = math.sin((anim_tick as float) * 0.02) * 0.15;
-            ship_roll = math.cos((anim_tick as float) * 0.025) * 0.12;
+        if (app.input.is_key_down(game.KEY_Q)) {
+            ship_roll = ship_roll - 0.035;
+            auto_rotate = false;
+        }
+        if (app.input.is_key_down(game.KEY_E)) {
+            ship_roll = ship_roll + 0.035;
+            auto_rotate = false;
+        }
+        if (app.input.is_key_pressed(game.KEY_SPACE)) {
+            auto_rotate = not auto_rotate;
         }
 
-        // Tumble surrounding asteroids
-        rock1.rotate_x(0.012);
-        rock1.rotate_y(0.018);
-        rock2.rotate_y(-0.015);
-        rock2.rotate_z(0.02);
-        rock3.rotate_x(-0.008);
-        rock3.rotate_y(0.01);
+        // Livery hotkeys
+        if (app.input.is_key_down(game.KEY_1)) {
+            livery_id = 0;
+            hull_mat.set_color(0.88, 0.92, 0.98);
+            canopy_mat.set_color(0.10, 0.85, 0.98);
+            trim_mat.set_color(0.20, 0.22, 0.28);
+            thruster_mat.set_color(0.0, 0.95 * thruster_glow, 1.0 * thruster_glow);
+        }
+        if (app.input.is_key_down(game.KEY_2)) {
+            livery_id = 1;
+            hull_mat.set_color(0.85, 0.12, 0.18);
+            canopy_mat.set_color(0.98, 0.82, 0.15);
+            trim_mat.set_color(0.14, 0.14, 0.18);
+            thruster_mat.set_color(1.0 * thruster_glow, 0.45 * thruster_glow, 0.05);
+        }
+        if (app.input.is_key_down(game.KEY_3)) {
+            livery_id = 2;
+            hull_mat.set_color(0.18, 0.20, 0.24);
+            canopy_mat.set_color(0.82, 0.22, 0.96);
+            trim_mat.set_color(0.10, 0.10, 0.14);
+            thruster_mat.set_color(0.95 * thruster_glow, 0.10 * thruster_glow, 1.0);
+        }
+        if (app.input.is_key_down(game.KEY_4)) {
+            livery_id = 3;
+            hull_mat.set_color(0.95, 0.78, 0.12);
+            canopy_mat.set_color(0.15, 0.95, 0.55);
+            trim_mat.set_color(0.16, 0.18, 0.22);
+            thruster_mat.set_color(0.20 * thruster_glow, 0.85 * thruster_glow, 1.0);
+        }
+        if (app.input.is_key_down(game.KEY_R)) {
+            ship_yaw = 0.55;
+            ship_pitch = 0.28;
+            ship_roll = -0.05;
+            cam_distance = 6.8;
+            sun_angle = 0.85;
+            thruster_glow = 1.0;
+            orbit_speed = 1.0;
+            sun.direction_x = math.cos(0.85) * 0.8;
+            sun.direction_z = math.sin(0.85) * 0.8;
+            auto_rotate = true;
+        }
 
-        // Update Ship Orientation
-        ship.set_rotation(ship_pitch, ship_yaw, ship_roll);
+        // Smooth Auto-Orbit Animation
+        if (auto_rotate) {
+            ship_yaw = ship_yaw + 0.014 * orbit_speed;
+            ship_pitch = 0.25 + math.sin((anim_tick as float) * 0.02 * orbit_speed) * 0.12;
+            ship_roll = math.cos((anim_tick as float) * 0.025 * orbit_speed) * 0.08;
+        }
 
-        // Update Camera Orbit
-        camera.set_position(0.0, 1.8, cam_distance);
-        camera.look_at(0.0, 0.0, 0.0);
+        // Tumble surrounding celestial asteroids
+        rock1.rotation_x = rock1.rotation_x + 0.012;
+        rock1.rotation_y = rock1.rotation_y + 0.018;
+        rock2.rotation_y = rock2.rotation_y - 0.015;
+        rock2.rotation_z = rock2.rotation_z + 0.020;
+        rock3.rotation_x = rock3.rotation_x - 0.008;
+        rock3.rotation_y = rock3.rotation_y + 0.010;
 
-        // ── Background Starfield Grid ───────────────────────────────────────
+        // Synchronize all starfighter subsystem orientations
+        hull_mesh.set_rotation(ship_pitch, ship_yaw, ship_roll);
+        canopy_mesh.set_rotation(ship_pitch, ship_yaw, ship_roll);
+        trim_mesh.set_rotation(ship_pitch, ship_yaw, ship_roll);
+        thruster_mesh.set_rotation(ship_pitch, ship_yaw, ship_roll);
+
+        // Update Camera Position when Distance changes
+        if (cam_distance != last_cam_distance or anim_tick == 1) {
+            camera.set_position(-1.2, 1.6, cam_distance);
+            camera.look_at(-1.2, 0.0, 0.0);
+            last_cam_distance = cam_distance;
+        }
+
+        // ── Deep-Space Starfield Grid Background ───────────────────────────
         var g_i = 0;
-        while (g_i < 15) {
-            var gx = (g_i as float) * 70.0;
-            gg.draw_rect_primitive(gx, 0.0, 1.0, sh, 0.1, 0.14, 0.22, 0.3);
-            var gy = (g_i as float) * 50.0;
-            gg.draw_rect_primitive(0.0, gy, sw, 1.0, 0.1, 0.14, 0.22, 0.3);
+        while (g_i < 16) {
+            var gx = (g_i as float) * 65.0;
+            gg.draw_rect_primitive(gx, 0.0, 1.0, sh, 0.08, 0.12, 0.20, 0.25);
+            var gy = (g_i as float) * 45.0;
+            gg.draw_rect_primitive(0.0, gy, sw, 1.0, 0.08, 0.12, 0.20, 0.25);
             g_i = g_i + 1;
         }
 
@@ -215,42 +616,123 @@ fn main(): int {
             print("tick 1: rendered 3D scene");
         }
 
-        // ── 2D Immediate-Mode GUI Overlay ───────────────────────────────────
-        if (app.gui.begin_window("3D Starfighter Control (std.d3)", 20.0, 20.0, 310.0, 420.0)) {
-            app.gui.label("Real-time 3D Model with PBR/Phong Shading");
+        // ── 2D Immediate-Mode GUI Studio Controls ───────────────────────────
+        if (app.gui.begin_window("Valkyrie SF-9 Studio (std.d3)", 15.0, 15.0, 315.0, 670.0)) {
+            app.gui.label("Aerospace Superiority Interceptor");
             app.gui.separator();
 
-            auto_rotate = app.gui.toggle("Auto-Rotation Orbit", auto_rotate);
+            auto_rotate = app.gui.toggle("Auto-Orbit Spin", auto_rotate);
 
             var new_wire = app.gui.toggle("Wireframe Mode", wireframe_mode);
             if (new_wire != wireframe_mode) {
                 wireframe_mode = new_wire;
-                ship_mat.wireframe = wireframe_mode;
+                hull_mat.wireframe = wireframe_mode;
+                canopy_mat.wireframe = wireframe_mode;
+                trim_mat.wireframe = wireframe_mode;
+                thruster_mat.wireframe = wireframe_mode;
                 rock_mat.wireframe = wireframe_mode;
             }
 
-            app.gui.label("Camera Distance (Zoom): {cam_distance}");
-            cam_distance = app.gui.slider("Distance", cam_distance, 3.5, 12.0);
+            app.gui.separator();
+            app.gui.label("Flight Attitude Controls:");
 
-            app.gui.label("Ship Yaw: {ship_yaw}");
-            ship_yaw = app.gui.slider("Yaw", ship_yaw, -3.14, 3.14);
+            var prev_yaw = ship_yaw;
+            ship_yaw = app.gui.slider("Yaw", ship_yaw, -3.14, 3.14, 185.0);
+            if (ship_yaw != prev_yaw) {
+                auto_rotate = false;
+            }
 
-            app.gui.label("Ship Pitch: {ship_pitch}");
-            ship_pitch = app.gui.slider("Pitch", ship_pitch, -1.57, 1.57);
+            var prev_pitch = ship_pitch;
+            ship_pitch = app.gui.slider("Pitch", ship_pitch, -1.57, 1.57, 185.0);
+            if (ship_pitch != prev_pitch) {
+                auto_rotate = false;
+            }
+
+            var prev_roll = ship_roll;
+            ship_roll = app.gui.slider("Roll", ship_roll, -3.14, 3.14, 185.0);
+            if (ship_roll != prev_roll) {
+                auto_rotate = false;
+            }
 
             app.gui.separator();
-            app.gui.label("Telemetry:");
-            var total_polys = ship_geo.get_face_count() + d3.box_face_count() * 3;
-            app.gui.label("Polygons Rendered: {total_polys}");
-            app.gui.label("Shading: Blinn-Phong + Specular");
-            app.gui.label("Culling: Backface Screen Cross");
-            app.gui.label("Pipeline: std.d3 -> std.gg");
+            app.gui.label("Optics & Environment:");
 
-            if (app.gui.button("Reset Ship Angle")) {
-                ship_yaw = 0.0;
-                ship_pitch = 0.15;
-                ship_roll = 0.0;
-                cam_distance = 6.5;
+            cam_distance = app.gui.slider("Zoom", cam_distance, 4.0, 14.0, 185.0);
+
+            var prev_sun = sun_angle;
+            sun_angle = app.gui.slider("Sun Orbit", sun_angle, 0.0, 6.28, 185.0);
+            if (sun_angle != prev_sun) {
+                sun.direction_x = math.cos(sun_angle) * 0.8;
+                sun.direction_z = math.sin(sun_angle) * 0.8;
+            }
+
+            var prev_glow = thruster_glow;
+            thruster_glow = app.gui.slider("Thrust", thruster_glow, 0.2, 2.5, 185.0);
+            if (thruster_glow != prev_glow) {
+                if (livery_id == 0) {
+                    thruster_mat.set_color(0.0, 0.95 * thruster_glow, 1.0 * thruster_glow);
+                } elif (livery_id == 1) {
+                    thruster_mat.set_color(1.0 * thruster_glow, 0.45 * thruster_glow, 0.05);
+                } elif (livery_id == 2) {
+                    thruster_mat.set_color(0.95 * thruster_glow, 0.10 * thruster_glow, 1.0);
+                } else {
+                    thruster_mat.set_color(0.20 * thruster_glow, 0.85 * thruster_glow, 1.0);
+                }
+            }
+
+            orbit_speed = app.gui.slider("Orbit Rate", orbit_speed, 0.0, 3.0, 185.0);
+
+            app.gui.separator();
+            app.gui.label("Fleet Livery Theme:");
+            if (app.gui.button("Ghost (Titanium / Cyan)")) {
+                livery_id = 0;
+                hull_mat.set_color(0.88, 0.92, 0.98);
+                canopy_mat.set_color(0.10, 0.85, 0.98);
+                trim_mat.set_color(0.20, 0.22, 0.28);
+                thruster_mat.set_color(0.0, 0.95 * thruster_glow, 1.0 * thruster_glow);
+            }
+            if (app.gui.button("Crimson Fury (Red / Gold)")) {
+                livery_id = 1;
+                hull_mat.set_color(0.85, 0.12, 0.18);
+                canopy_mat.set_color(0.98, 0.82, 0.15);
+                trim_mat.set_color(0.14, 0.14, 0.18);
+                thruster_mat.set_color(1.0 * thruster_glow, 0.45 * thruster_glow, 0.05);
+            }
+            if (app.gui.button("Void Shadow (Stealth / Violet)")) {
+                livery_id = 2;
+                hull_mat.set_color(0.18, 0.20, 0.24);
+                canopy_mat.set_color(0.82, 0.22, 0.96);
+                trim_mat.set_color(0.10, 0.10, 0.14);
+                thruster_mat.set_color(0.95 * thruster_glow, 0.10 * thruster_glow, 1.0);
+            }
+            if (app.gui.button("Viper Gold (Gold / Emerald)")) {
+                livery_id = 3;
+                hull_mat.set_color(0.95, 0.78, 0.12);
+                canopy_mat.set_color(0.15, 0.95, 0.55);
+                trim_mat.set_color(0.16, 0.18, 0.22);
+                thruster_mat.set_color(0.20 * thruster_glow, 0.85 * thruster_glow, 1.0);
+            }
+
+            app.gui.separator();
+            app.gui.label("Telemetry & Controls:");
+            app.gui.label("Performance: {app.fps as int} FPS");
+            var ship_polys = hull_geo.get_face_count() + canopy_geo.get_face_count() + trim_geo.get_face_count() + thruster_geo.get_face_count();
+            var total_polys = ship_polys + rock1_geo.get_face_count() * 3;
+            app.gui.label("Ship Polys: {ship_polys} | Scene: {total_polys}");
+            app.gui.label("Navigation: Drag on 3D View or Sliders");
+            app.gui.label("Hotkeys: 1-4 Liveries | WASD/QE Move | R Reset");
+
+            if (app.gui.button("Reset Ship & Camera")) {
+                ship_yaw = 0.55;
+                ship_pitch = 0.28;
+                ship_roll = -0.05;
+                cam_distance = 6.8;
+                sun_angle = 0.85;
+                thruster_glow = 1.0;
+                orbit_speed = 1.0;
+                sun.direction_x = math.cos(0.85) * 0.8;
+                sun.direction_z = math.sin(0.85) * 0.8;
+                auto_rotate = true;
             }
 
             app.gui.end_window();

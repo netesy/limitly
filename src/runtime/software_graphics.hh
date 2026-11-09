@@ -667,32 +667,51 @@ public:
                 uint8_t bu = static_cast<uint8_t>(std::clamp(b * 255.0, 0.0, 255.0));
                 uint8_t au = static_cast<uint8_t>(std::clamp(a * 255.0, 0.0, 255.0));
 
-                for (int py = min_y; py < max_y; ++py) {
-                    for (int px = min_x; px < max_x; ++px) {
-                        double pX = px + 0.5;
-                        double pY = py + 0.5;
-                        double w0 = edge(x2, y2, x3, y3, pX, pY);
-                        double w1 = edge(x3, y3, x1, y1, pX, pY);
-                        double w2 = edge(x1, y1, x2, y2, pX, pY);
+                double step_x0 = y3 - y2;
+                double step_y0 = -(x3 - x2);
+                double step_x1 = y1 - y3;
+                double step_y1 = -(x1 - x3);
+                double step_x2 = y2 - y1;
+                double step_y2 = -(x2 - x1);
 
+                double start_px = min_x + 0.5;
+                double start_py = min_y + 0.5;
+                double w0_row = edge(x2, y2, x3, y3, start_px, start_py);
+                double w1_row = edge(x3, y3, x1, y1, start_px, start_py);
+                double w2_row = edge(x1, y1, x2, y2, start_px, start_py);
+
+                for (int py = min_y; py < max_y; ++py) {
+                    double w0 = w0_row;
+                    double w1 = w1_row;
+                    double w2 = w2_row;
+                    size_t idx = static_cast<size_t>(py * width_ + min_x) * 4;
+
+                    for (int px = min_x; px < max_x; ++px) {
                         if ((w0 >= 0 && w1 >= 0 && w2 >= 0) || (w0 <= 0 && w1 <= 0 && w2 <= 0)) {
-                            size_t idx = static_cast<size_t>(py * width_ + px) * 4;
-                            if (idx + 3 >= pixels_.size()) continue;
-                            if (au >= 255) {
-                                pixels_[idx]     = ru;
-                                pixels_[idx + 1] = gu;
-                                pixels_[idx + 2] = bu;
-                                pixels_[idx + 3] = 255;
-                            } else if (au > 0) {
-                                float af = au / 255.0f;
-                                float inv = 1.0f - af;
-                                pixels_[idx]     = static_cast<uint8_t>(ru * af + pixels_[idx] * inv);
-                                pixels_[idx + 1] = static_cast<uint8_t>(gu * af + pixels_[idx + 1] * inv);
-                                pixels_[idx + 2] = static_cast<uint8_t>(bu * af + pixels_[idx + 2] * inv);
-                                pixels_[idx + 3] = std::max(pixels_[idx + 3], au);
+                            if (idx + 3 < pixels_.size()) {
+                                if (au >= 255) {
+                                    pixels_[idx]     = ru;
+                                    pixels_[idx + 1] = gu;
+                                    pixels_[idx + 2] = bu;
+                                    pixels_[idx + 3] = 255;
+                                } else if (au > 0) {
+                                    float af = au / 255.0f;
+                                    float inv = 1.0f - af;
+                                    pixels_[idx]     = static_cast<uint8_t>(ru * af + pixels_[idx] * inv);
+                                    pixels_[idx + 1] = static_cast<uint8_t>(gu * af + pixels_[idx + 1] * inv);
+                                    pixels_[idx + 2] = static_cast<uint8_t>(bu * af + pixels_[idx + 2] * inv);
+                                    pixels_[idx + 3] = std::max(pixels_[idx + 3], au);
+                                }
                             }
                         }
+                        w0 += step_x0;
+                        w1 += step_x1;
+                        w2 += step_x2;
+                        idx += 4;
                     }
+                    w0_row += step_y0;
+                    w1_row += step_y1;
+                    w2_row += step_y2;
                 }
                 return value_true;
             }

@@ -1,0 +1,118 @@
+// std/camera/camera3d.lm
+// Universal 3D camera defining viewport projections and eye view transforms.
+
+import std.d3.transform as trans;
+import std.camera.types as types;
+import std.math.matrix as mat;
+import std.math.matrix show Matrix;
+import std.math.constants as const;
+
+frame Camera3D {
+    embed trans.Transform3D;
+
+    pub camera_type: types.CameraType;
+    pub fov_degrees: float;
+    pub aspect: float;
+    pub near: float;
+    pub far: float;
+
+    pub ortho_left: float;
+    pub ortho_right: float;
+    pub ortho_top: float;
+    pub ortho_bottom: float;
+
+    pub projection_matrix: mat.Matrix;
+    pub view_matrix: mat.Matrix;
+    pub view_projection_matrix: mat.Matrix;
+
+    pub init() {
+        self.init_transform();
+
+        self.camera_type = types.CameraType.Perspective;
+        self.fov_degrees = 60.0;
+        self.aspect = 1.33333;
+        self.near = 0.1;
+        self.far = 1000.0;
+
+        self.ortho_left = -10.0;
+        self.ortho_right = 10.0;
+        self.ortho_top = 10.0;
+        self.ortho_bottom = -10.0;
+
+        self.projection_matrix = mat.Matrix();
+        self.view_matrix = mat.Matrix();
+        self.view_projection_matrix = mat.Matrix();
+
+        var fov_rad = self.fov_degrees * (const.PI / 180.0);
+        self.projection_matrix.make_perspective(fov_rad, self.aspect, self.near, self.far);
+
+        self.view_matrix.make_look_at(
+            0.0, 0.0, 5.0,
+            0.0, 0.0, 0.0,
+            0.0, 1.0, 0.0
+        );
+
+        self.view_projection_matrix = self.projection_matrix.multiply(self.view_matrix);
+    }
+
+    pub fn update_projection_matrix() {
+        match (self.camera_type) {
+            types.CameraType.Perspective => {
+                var fov_rad = self.fov_degrees * (const.PI / 180.0);
+                self.projection_matrix.make_perspective(fov_rad, self.aspect, self.near, self.far);
+            },
+            types.CameraType.Orthographic => {
+                self.projection_matrix.make_orthographic(self.ortho_left, self.ortho_right, self.ortho_top, self.ortho_bottom, self.near, self.far);
+            }
+        }
+        self.update_view_projection();
+    }
+
+    pub fn update_view_matrix() {
+        self.update_matrix();
+        self.view_matrix.make_look_at(
+            self.position_x, self.position_y, self.position_z,
+            self.position_x, self.position_y, self.position_z - 1.0,
+            0.0, 1.0, 0.0
+        );
+        self.update_view_projection();
+    }
+
+    pub fn look_at(target_x: float, target_y: float, target_z: float, up_x: float = 0.0, up_y: float = 1.0, up_z: float = 0.0) {
+        self.view_matrix.make_look_at(
+            self.position_x, self.position_y, self.position_z,
+            target_x, target_y, target_z,
+            up_x, up_y, up_z
+        );
+        self.update_view_projection();
+    }
+
+    pub fn update_view_projection() {
+        self.view_projection_matrix = self.projection_matrix.multiply(self.view_matrix);
+    }
+}
+
+pub fn perspective_camera(fov_deg: float = 60.0, aspect: float = 1.33333, near: float = 0.1, far: float = 1000.0): Camera3D {
+    var c = Camera3D();
+    c.camera_type = types.CameraType.Perspective;
+    c.fov_degrees = fov_deg;
+    c.aspect = aspect;
+    c.near = near;
+    c.far = far;
+    c.update_projection_matrix();
+    return c;
+}
+
+pub fn orthographic_camera(left: float = -10.0, right: float = 10.0, top: float = 10.0, bottom: float = -10.0, near: float = 0.1, far: float = 1000.0): Camera3D {
+    var c = Camera3D();
+    c.camera_type = types.CameraType.Orthographic;
+    c.ortho_left = left;
+    c.ortho_right = right;
+    c.ortho_top = top;
+    c.ortho_bottom = bottom;
+    c.near = near;
+    c.far = far;
+    c.update_projection_matrix();
+    return c;
+}
+

@@ -51,6 +51,30 @@ frame RenderTriangle {
     }
 }
 
+fn _quicksort_triangles(tri_list: [RenderTriangle], low: int, high: int) {
+    if (low < high) {
+        var pivot_z = tri_list[high].avg_z;
+        var i = low - 1;
+        var j = low;
+        while (j < high) {
+            if (tri_list[j].avg_z >= pivot_z) {
+                i = i + 1;
+                var tmp = tri_list[i];
+                tri_list[i] = tri_list[j];
+                tri_list[j] = tmp;
+            }
+            j = j + 1;
+        }
+        var p = i + 1;
+        var tmp2 = tri_list[p];
+        tri_list[p] = tri_list[high];
+        tri_list[high] = tmp2;
+
+        _quicksort_triangles(tri_list, low, p - 1);
+        _quicksort_triangles(tri_list, p + 1, high);
+    }
+}
+
 pub fn render_scene(renderer: Renderer3D, target_scene: sc.Scene3D, target_camera: cam.Camera3D, viewport_x: float, viewport_y: float, viewport_w: float, viewport_h: float) {
     var vw = viewport_w;
     var vh = viewport_h;
@@ -64,43 +88,95 @@ pub fn render_scene(renderer: Renderer3D, target_scene: sc.Scene3D, target_camer
     // Camera view-projection matrix
     var vp = target_camera.view_projection_matrix;
 
+    // Pre-accumulate ambient lights once per frame
+    var amb_r: float = 0.0;
+    var amb_g: float = 0.0;
+    var amb_b: float = 0.0;
+    var s_lights = target_scene.lights;
+    var n_lights = len(s_lights);
+    var li = 0;
+    while (li < n_lights) {
+        var cl = s_lights[li];
+        if (cl.light_type == types.LightType.Ambient) {
+            amb_r = amb_r + cl.color_r * cl.intensity;
+            amb_g = amb_g + cl.color_g * cl.intensity;
+            amb_b = amb_b + cl.color_b * cl.intensity;
+        }
+        li = li + 1;
+    }
+
+    var half_vw = 0.5 * vw;
+    var half_vh = 0.5 * vh;
+    var bound_w = vw * 2.5;
+    var bound_h = vh * 2.5;
+    var bound_min_x = -vw * 0.5;
+    var bound_max_x = vw * 1.5;
+    var bound_min_y = -vh * 0.5;
+    var bound_max_y = vh * 1.5;
+
     // Collect and project all triangles
     var tri_list: [RenderTriangle] = [];
     var s_meshes = target_scene.meshes;
-    var s_lights = target_scene.lights;
+    var n_meshes = len(s_meshes);
 
     var m_idx = 0;
-    while (m_idx < len(s_meshes)) {
+    while (m_idx < n_meshes) {
         var cur_mesh = s_meshes[m_idx];
         if (cur_mesh.visible) {
             cur_mesh.update_matrix();
             var mvp = vp.multiply(cur_mesh.world_matrix);
 
-            // Normal matrix for transforming normals (rotation part of world matrix)
+            // Normal matrix for transforming normals
             var rot_m: Matrix = cur_mesh.world_matrix;
+            var rm = rot_m.data;
+            var rm0 = rm[0]; var rm1 = rm[1]; var rm2 = rm[2];
+            var rm4 = rm[4]; var rm5 = rm[5]; var rm6 = rm[6];
+            var rm8 = rm[8]; var rm9 = rm[9]; var rm10 = rm[10];
 
             var geo: Geometry = cur_mesh.geometry;
             var cur_mat: Material = cur_mesh.material;
             var v_count = geo.get_vertex_count();
             var f_count = geo.get_face_count();
 
-            // Project all vertices of this mesh into clip & screen space
-            var screen_x: [float] = [];
-            var screen_y: [float] = [];
-            var screen_z: [float] = [];
-            var clip_w: [float] = [];
+            var g_verts = geo.vertices;
+            var g_inds = geo.indices;
+            var g_norms = geo.normals;
+            var has_norms = len(g_norms) >= v_count * 3;
 
+            var mat_amb = cur_mat.ambient;
+            var mat_diff = cur_mat.diffuse;
+            var mat_spec = cur_mat.specular;
+            var mat_col_r = cur_mat.color_r;
+            var mat_col_g = cur_mat.color_g;
+            var mat_col_b = cur_mat.color_b;
+            var mat_col_a = cur_mat.color_a;
+            var mat_wire = cur_mat.wireframe;
+            var mat_wire_w = cur_mat.wireframe_thickness;
+            var mat_cull = cur_mat.cull_mode;
+
+            var base_ill_r = mat_amb + amb_r;
+            var base_ill_g = mat_amb + amb_g;
+            var base_ill_b = mat_amb + amb_b;
+
+            // Project all vertices of this mesh into clip & screen space (packed flat: sx, sy, cz, cw)
+            var proj: [float] = [];
             var m = mvp.data;
+            var m0 = m[0]; var m1 = m[1]; var m2 = m[2]; var m3 = m[3];
+            var m4 = m[4]; var m5 = m[5]; var m6 = m[6]; var m7 = m[7];
+            var m8 = m[8]; var m9 = m[9]; var m10 = m[10]; var m11 = m[11];
+            var m12 = m[12]; var m13 = m[13]; var m14 = m[14]; var m15 = m[15];
+
             var vi = 0;
             while (vi < v_count) {
-                var lx = geo.vertices[vi * 3];
-                var ly = geo.vertices[vi * 3 + 1];
-                var lz = geo.vertices[vi * 3 + 2];
+                var v_idx = vi * 3;
+                var lx = g_verts[v_idx];
+                var ly = g_verts[v_idx + 1];
+                var lz = g_verts[v_idx + 2];
 
-                var cw = m[12] * lx + m[13] * ly + m[14] * lz + m[15];
-                var cx = m[0] * lx + m[1] * ly + m[2] * lz + m[3];
-                var cy = m[4] * lx + m[5] * ly + m[6] * lz + m[7];
-                var cz = m[8] * lx + m[9] * ly + m[10] * lz + m[11];
+                var cw = m12 * lx + m13 * ly + m14 * lz + m15;
+                var cx = m0 * lx + m1 * ly + m2 * lz + m3;
+                var cy = m4 * lx + m5 * ly + m6 * lz + m7;
+                var cz = m8 * lx + m9 * ly + m10 * lz + m11;
 
                 if (cw != 0.0 and cw != 1.0) {
                     var inv_w = 1.0 / cw;
@@ -109,14 +185,13 @@ pub fn render_scene(renderer: Renderer3D, target_scene: sc.Scene3D, target_camer
                     cz = cz * inv_w;
                 }
 
-                clip_w.append(cw);
-                screen_z.append(cz);
+                var sx = viewport_x + (cx + 1.0) * half_vw;
+                var sy = viewport_y + (1.0 - cy) * half_vh;
 
-                // Map NDC to screen
-                var sx = viewport_x + (cx + 1.0) * 0.5 * vw;
-                var sy = viewport_y + (1.0 - cy) * 0.5 * vh;
-                screen_x.append(sx);
-                screen_y.append(sy);
+                proj.append(sx);
+                proj.append(sy);
+                proj.append(cz);
+                proj.append(cw);
 
                 vi = vi + 1;
             }
@@ -124,90 +199,106 @@ pub fn render_scene(renderer: Renderer3D, target_scene: sc.Scene3D, target_camer
             // Process faces
             var fi = 0;
             while (fi < f_count) {
-                var i0 = geo.indices[fi * 3];
-                var i1 = geo.indices[fi * 3 + 1];
-                var i2 = geo.indices[fi * 3 + 2];
+                var f_idx = fi * 3;
+                var i0 = g_inds[f_idx];
+                var i1 = g_inds[f_idx + 1];
+                var i2 = g_inds[f_idx + 2];
 
-                var w0 = clip_w[i0];
-                var w1 = clip_w[i1];
-                var w2 = clip_w[i2];
+                var b0 = i0 * 4;
+                var w0 = proj[b0 + 3];
+                var b1 = i1 * 4;
+                var w1 = proj[b1 + 3];
+                var b2 = i2 * 4;
+                var w2 = proj[b2 + 3];
 
                 // Frustum near plane clip
-                if (w0 > 0.01 and w1 > 0.01 and w2 > 0.01) {
-                    var p0_x = screen_x[i0];
-                    var p0_y = screen_y[i0];
-                    var p1_x = screen_x[i1];
-                    var p1_y = screen_y[i1];
-                    var p2_x = screen_x[i2];
-                    var p2_y = screen_y[i2];
+                if (w0 > 0.1 and w1 > 0.1 and w2 > 0.1) {
+                    var p0_x = proj[b0];
+                    var p0_y = proj[b0 + 1];
+                    var p1_x = proj[b1];
+                    var p1_y = proj[b1 + 1];
+                    var p2_x = proj[b2];
+                    var p2_y = proj[b2 + 1];
 
-                    // Backface culling in screen coordinates (Y down)
-                    var e1x = p1_x - p0_x;
-                    var e1y = p1_y - p0_y;
-                    var e2x = p2_x - p0_x;
-                    var e2y = p2_y - p0_y;
-                    var cross_z = e1x * e2y - e1y * e2x;
+                    // Discard degenerate or blown-up triangles beyond viewport
+                    var tri_min_x = p0_x;
+                    if (p1_x < tri_min_x) { tri_min_x = p1_x; }
+                    if (p2_x < tri_min_x) { tri_min_x = p2_x; }
+                    var tri_max_x = p0_x;
+                    if (p1_x > tri_max_x) { tri_max_x = p1_x; }
+                    if (p2_x > tri_max_x) { tri_max_x = p2_x; }
 
-                    var should_cull = false;
-                    match (cur_mat.cull_mode) {
-                        types.CullMode.Back => {
-                            if (cross_z >= 0.0) { should_cull = true; }
-                        },
-                        types.CullMode.Front => {
-                            if (cross_z <= 0.0) { should_cull = true; }
-                        },
-                        types.CullMode.None => {
-                            should_cull = false;
-                        }
-                    }
+                    var tri_min_y = p0_y;
+                    if (p1_y < tri_min_y) { tri_min_y = p1_y; }
+                    if (p2_y < tri_min_y) { tri_min_y = p2_y; }
+                    var tri_max_y = p0_y;
+                    if (p1_y > tri_max_y) { tri_max_y = p1_y; }
+                    if (p2_y > tri_max_y) { tri_max_y = p2_y; }
 
-                    if (not should_cull) {
-                        // Compute face normal in world space for lighting
-                        var n_idx = i0 * 3;
-                        var fnx = 0.0;
-                        var fny = 1.0;
-                        var fnz = 0.0;
-                        if (len(geo.normals) > n_idx + 2) {
-                            var lx = geo.normals[n_idx];
-                            var ly = geo.normals[n_idx + 1];
-                            var lz = geo.normals[n_idx + 2];
-                            var rm = rot_m.data;
-                            fnx = rm[0] * lx + rm[1] * ly + rm[2] * lz;
-                            fny = rm[4] * lx + rm[5] * ly + rm[6] * lz;
-                            fnz = rm[8] * lx + rm[9] * ly + rm[10] * lz;
-                            var nlen = arith.sqrt(fnx * fnx + fny * fny + fnz * fnz);
-                            if (nlen > 0.000001) {
-                                fnx = fnx / nlen;
-                                fny = fny / nlen;
-                                fnz = fnz / nlen;
+                    if ((tri_max_x - tri_min_x < bound_w) and (tri_max_y - tri_min_y < bound_h) and
+                        (tri_max_x > bound_min_x) and (tri_min_x < bound_max_x) and
+                        (tri_max_y > bound_min_y) and (tri_min_y < bound_max_y)) {
+
+                        // Backface culling in screen coordinates (Y down)
+                        var e1x = p1_x - p0_x;
+                        var e1y = p1_y - p0_y;
+                        var e2x = p2_x - p0_x;
+                        var e2y = p2_y - p0_y;
+                        var cross_z = e1x * e2y - e1y * e2x;
+
+                        var should_cull = false;
+                        match (mat_cull) {
+                            types.CullMode.Back => {
+                                if (cross_z >= 0.0) { should_cull = true; }
+                            },
+                            types.CullMode.Front => {
+                                if (cross_z <= 0.0) { should_cull = true; }
+                            },
+                            types.CullMode.None => {
+                                should_cull = false;
                             }
                         }
 
-                        // Illumination calculation
-                        var ill_r = cur_mat.ambient;
-                        var ill_g = cur_mat.ambient;
-                        var ill_b = cur_mat.ambient;
+                        if (not should_cull) {
+                            // Compute face normal in world space for lighting
+                            var fnx = 0.0;
+                            var fny = 1.0;
+                            var fnz = 0.0;
+                            if (has_norms) {
+                                var n_idx = i0 * 3;
+                                var lx = g_norms[n_idx];
+                                var ly = g_norms[n_idx + 1];
+                                var lz = g_norms[n_idx + 2];
+                                fnx = rm0 * lx + rm1 * ly + rm2 * lz;
+                                fny = rm4 * lx + rm5 * ly + rm6 * lz;
+                                fnz = rm8 * lx + rm9 * ly + rm10 * lz;
+                                var nlen = arith.sqrt(fnx * fnx + fny * fny + fnz * fnz);
+                                if (nlen > 0.000001) {
+                                    var inv_nlen = 1.0 / nlen;
+                                    fnx = fnx * inv_nlen;
+                                    fny = fny * inv_nlen;
+                                    fnz = fnz * inv_nlen;
+                                }
+                            }
 
-                        var li = 0;
-                        while (li < len(s_lights)) {
-                            var cur_light: lgt.Light = s_lights[li];
-                            match (cur_light.light_type) {
-                                types.LightType.Ambient => {
-                                    ill_r = ill_r + cur_light.color_r * cur_light.intensity;
-                                    ill_g = ill_g + cur_light.color_g * cur_light.intensity;
-                                    ill_b = ill_b + cur_light.color_b * cur_light.intensity;
-                                },
-                                types.LightType.Directional => {
+                            // Illumination calculation
+                            var ill_r = base_ill_r;
+                            var ill_g = base_ill_g;
+                            var ill_b = base_ill_b;
+
+                            var l_i = 0;
+                            while (l_i < n_lights) {
+                                var cur_light: lgt.Light = s_lights[l_i];
+                                if (cur_light.light_type == types.LightType.Directional) {
                                     var dot_val = fnx * cur_light.direction_x + fny * cur_light.direction_y + fnz * cur_light.direction_z;
                                     if (dot_val > 0.0) {
-                                        var diff = dot_val * cur_mat.diffuse * cur_light.intensity;
+                                        var diff = dot_val * mat_diff * cur_light.intensity;
                                         ill_r = ill_r + cur_light.color_r * diff;
                                         ill_g = ill_g + cur_light.color_g * diff;
                                         ill_b = ill_b + cur_light.color_b * diff;
 
                                         // Specular highlight (Blinn-Phong)
-                                        if (cur_mat.specular > 0.0) {
-                                            // Approx halfway with camera along Z
+                                        if (mat_spec > 0.0) {
                                             var hx = cur_light.direction_x;
                                             var hy = cur_light.direction_y;
                                             var hz = cur_light.direction_z + 1.0;
@@ -215,8 +306,8 @@ pub fn render_scene(renderer: Renderer3D, target_scene: sc.Scene3D, target_camer
                                             if (hlen > 0.000001) {
                                                 var ndoth = (fnx * hx + fny * hy + fnz * hz) / hlen;
                                                 if (ndoth > 0.0) {
-                                                    var spec_p = ndoth * ndoth * ndoth * ndoth; // power approximation
-                                                    var spec = spec_p * cur_mat.specular * cur_light.intensity;
+                                                    var spec_p = ndoth * ndoth * ndoth * ndoth;
+                                                    var spec = spec_p * mat_spec * cur_light.intensity;
                                                     ill_r = ill_r + spec;
                                                     ill_g = ill_g + spec;
                                                     ill_b = ill_b + spec;
@@ -224,43 +315,38 @@ pub fn render_scene(renderer: Renderer3D, target_scene: sc.Scene3D, target_camer
                                             }
                                         }
                                     }
-                                },
-                                types.LightType.Point => {
-                                    // Simple diffuse approximation
+                                } elif (cur_light.light_type == types.LightType.Point) {
                                     var pdot = fny * 0.5 + 0.5;
-                                    ill_r = ill_r + cur_light.color_r * cur_light.intensity * pdot * 0.3;
-                                    ill_g = ill_g + cur_light.color_g * cur_light.intensity * pdot * 0.3;
-                                    ill_b = ill_b + cur_light.color_b * cur_light.intensity * pdot * 0.3;
+                                    var pfact = cur_light.intensity * pdot * 0.3;
+                                    ill_r = ill_r + cur_light.color_r * pfact;
+                                    ill_g = ill_g + cur_light.color_g * pfact;
+                                    ill_b = ill_b + cur_light.color_b * pfact;
                                 }
+                                l_i = l_i + 1;
                             }
-                            li = li + 1;
+
+                            // Clamp color
+                            if (ill_r > 1.0) { ill_r = 1.0; }
+                            if (ill_g > 1.0) { ill_g = 1.0; }
+                            if (ill_b > 1.0) { ill_b = 1.0; }
+
+                            var tri = RenderTriangle();
+                            tri.x0 = p0_x;
+                            tri.y0 = p0_y;
+                            tri.x1 = p1_x;
+                            tri.y1 = p1_y;
+                            tri.x2 = p2_x;
+                            tri.y2 = p2_y;
+                            tri.avg_z = (proj[b0 + 2] + proj[b1 + 2] + proj[b2 + 2]) * 0.33333333;
+                            tri.r = mat_col_r * ill_r;
+                            tri.g = mat_col_g * ill_g;
+                            tri.b = mat_col_b * ill_b;
+                            tri.a = mat_col_a;
+                            tri.is_wireframe = mat_wire;
+                            tri.wire_w = mat_wire_w;
+
+                            tri_list.append(tri);
                         }
-
-                        // Clamp color
-                        if (ill_r > 1.0) { ill_r = 1.0; }
-                        if (ill_g > 1.0) { ill_g = 1.0; }
-                        if (ill_b > 1.0) { ill_b = 1.0; }
-
-                        var final_r = cur_mat.color_r * ill_r;
-                        var final_g = cur_mat.color_g * ill_g;
-                        var final_b = cur_mat.color_b * ill_b;
-
-                        var tri = RenderTriangle();
-                        tri.x0 = p0_x;
-                        tri.y0 = p0_y;
-                        tri.x1 = p1_x;
-                        tri.y1 = p1_y;
-                        tri.x2 = p2_x;
-                        tri.y2 = p2_y;
-                        tri.avg_z = (screen_z[i0] + screen_z[i1] + screen_z[i2]) / 3.0;
-                        tri.r = final_r;
-                        tri.g = final_g;
-                        tri.b = final_b;
-                        tri.a = cur_mat.color_a;
-                        tri.is_wireframe = cur_mat.wireframe;
-                        tri.wire_w = cur_mat.wireframe_thickness;
-
-                        tri_list.append(tri);
                     }
                 }
                 fi = fi + 1;
@@ -269,18 +355,10 @@ pub fn render_scene(renderer: Renderer3D, target_scene: sc.Scene3D, target_camer
         m_idx = m_idx + 1;
     }
 
-    // Depth Sort: Painter's algorithm (Sort triangles by avg_z descending)
+    // Depth Sort: Painter's algorithm with fast in-place quicksort
     var n_tri = len(tri_list);
-    var i = 1;
-    while (i < n_tri) {
-        var key_tri = tri_list[i];
-        var j = i - 1;
-        while (j >= 0 and tri_list[j].avg_z < key_tri.avg_z) {
-            tri_list[j + 1] = tri_list[j];
-            j = j - 1;
-        }
-        tri_list[j + 1] = key_tri;
-        i = i + 1;
+    if (n_tri > 1) {
+        _quicksort_triangles(tri_list, 0, n_tri - 1);
     }
 
     // Rasterize triangles to screen

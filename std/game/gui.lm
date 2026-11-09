@@ -13,6 +13,7 @@ import std.graphics.text_layout as layout;
 import std.ui.viewport as viewport;
 import std.animation as anim;
 import std.graphics.shadow as shadow;
+import std.widget as widget;
 
 frame WindowState {
     embed types.Rect;
@@ -287,7 +288,10 @@ frame GUI {
         var rad = self.get_style_var(types.VAR_ROUNDING, self.theme.rounding);
 
         // Elevation drop shadow for combo dropdown (top z-index)
-        var raw_csh = self.get_active_shadow(self.theme.popup_shadow);
+        var raw_csh = self.get_active_shadow();
+        if (raw_csh == nil) {
+            raw_csh = self.theme.popup_shadow;
+        }
         if (raw_csh != nil) {
             var csh = raw_csh as shadow.Shadow;
             if (csh.a > 0.0) {
@@ -442,7 +446,7 @@ frame GUI {
         }
     }
 
-    pub fn get_active_shadow(theme_default: any = nil): any {
+    pub fn get_active_shadow(): any {
         if (self.has_next_shadow) {
             var s = self.next_shadow;
             self.has_next_shadow = false;
@@ -452,9 +456,6 @@ frame GUI {
         var n = len(self.shadow_stack);
         if (n > 0) {
             return self.shadow_stack[n - 1];
-        }
-        if (theme_default != nil) {
-            return theme_default;
         }
         return nil;
     }
@@ -761,7 +762,10 @@ frame GUI {
         }
 
         // Optional Button Elevation Drop Shadow (opt-in via set_next_shadow, shadow(), shadow_stack, or theme)
-        var raw_sh = self.get_active_shadow(self.theme.button_shadow);
+        var raw_sh = self.get_active_shadow();
+        if (raw_sh == nil) {
+            raw_sh = self.theme.button_shadow;
+        }
         if (raw_sh != nil and not is_disabled) {
             var sh = raw_sh as shadow.Shadow;
             if (sh.a > 0.0) {
@@ -1015,19 +1019,15 @@ frame GUI {
         var current_val = value;
         if (self.active_id == id) {
             if (self.mouse_down) {
-                var norm = (self.mouse_x - bx) / w;
-                if (norm < 0.0) { norm = 0.0; }
-                if (norm > 1.0) { norm = 1.0; }
-                current_val = min_val + norm * (max_val - min_val);
+                var norm = widget.clamp_value((self.mouse_x - bx) / w, 0.0, 1.0);
+                current_val = widget.ratio_to_value(norm, min_val, max_val);
             } else {
                 self.active_id = "";
             }
-        } elif (hovered and (self.mouse_pressed or self.mouse_down)) {
+        } elif ((self.active_id == "" or self.active_id == id) and hovered and (self.mouse_pressed or (self.mouse_down and self.active_id == id))) {
             self.active_id = id;
-            var norm2 = (self.mouse_x - bx) / w;
-            if (norm2 < 0.0) { norm2 = 0.0; }
-            if (norm2 > 1.0) { norm2 = 1.0; }
-            current_val = min_val + norm2 * (max_val - min_val);
+            var norm2 = widget.clamp_value((self.mouse_x - bx) / w, 0.0, 1.0);
+            current_val = widget.ratio_to_value(norm2, min_val, max_val);
         }
 
         var track_y = by + (h - track_h) / 2.0;
@@ -1035,11 +1035,7 @@ frame GUI {
         var track_color = self.get_style_color(types.COLOR_SLIDER_TRACK);
         gg.draw_rect_rounded_primitive(bx, track_y, w, track_h, track_rad, track_color.r, track_color.g, track_color.b, track_color.a);
 
-        var range = max_val - min_val;
-        if (range <= 0.0) { range = 1.0; }
-        var t = (current_val - min_val) / range;
-        if (t < 0.0) { t = 0.0; }
-        if (t > 1.0) { t = 1.0; }
+        var t = widget.value_to_ratio(current_val, min_val, max_val);
 
         // Active fill from left to thumb
         var fill_w = t * w;
@@ -1054,7 +1050,11 @@ frame GUI {
 
         var thumb_color = self.get_style_color(types.COLOR_SLIDER_THUMB);
         if (self.active_id == id or self.hot_id == id) {
-            thumb_color = self.theme.slider_thumb_hover;
+            if (self.theme.slider_thumb_hover != nil) {
+                thumb_color = self.theme.slider_thumb_hover;
+            } else {
+                thumb_color = self.get_style_color(types.COLOR_ACCENT);
+            }
         }
         gg.draw_rect_rounded_primitive(thumb_x, thumb_y, thumb_size, thumb_size, thumb_rad, thumb_color.r, thumb_color.g, thumb_color.b, thumb_color.a);
         gg.draw_rect_border_primitive(thumb_x, thumb_y, thumb_size, thumb_size, thumb_rad, 1.5, 1.0, 1.0, 1.0, 0.95);
@@ -1913,7 +1913,8 @@ frame GUI {
         var h = self.get_style_var(types.VAR_ITEM_HEIGHT, self.theme.item_height);
         var bx = self.cursor_x;
         var by = self.cursor_y;
-        var id = self.make_id(self.cur_tab_bar_id + "/" + label);
+        var tab_bar_id = self.cur_tab_bar_id;
+        var id = self.make_id(tab_bar_id + "/" + label);
 
         var hovered = (self.mouse_x >= bx and self.mouse_x <= (bx + w) and
         self.mouse_y >= by and self.mouse_y <= (by + h));
@@ -2047,7 +2048,10 @@ frame GUI {
         self.popup_h = h;
 
         // Optional popup drop shadow (opt-in)
-        var raw_psh = self.get_active_shadow(self.theme.popup_shadow);
+        var raw_psh = self.get_active_shadow();
+        if (raw_psh == nil) {
+            raw_psh = self.theme.popup_shadow;
+        }
         if (raw_psh != nil) {
             var psh = raw_psh as shadow.Shadow;
             if (psh.a > 0.0) {
@@ -2222,7 +2226,10 @@ frame GUI {
         var rad = self.get_style_var(types.VAR_ROUNDING, self.theme.rounding);
 
         // Optional window elevation drop shadow (opt-in)
-        var raw_wsh = self.get_active_shadow(self.theme.window_shadow);
+        var raw_wsh = self.get_active_shadow();
+        if (raw_wsh == nil) {
+            raw_wsh = self.theme.window_shadow;
+        }
         if (raw_wsh != nil) {
             var wsh = raw_wsh as shadow.Shadow;
             if (wsh.a > 0.0) {

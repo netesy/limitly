@@ -1,0 +1,332 @@
+// std/theme/types.lm
+// Universal Design Tokens and Theme specifications for Limitless / Lymar.
+
+import std.color as color;
+import std.graphics.shadow as shadow;
+
+enum ThemeMode {
+    Dark,
+    Light
+}
+
+enum ColorRole {
+    WindowBg,
+    WindowTitle,
+    PanelBg,
+    Text,
+    TextMuted,
+    Accent,
+    Button,
+    ButtonHover,
+    ButtonActive,
+    SliderTrack,
+    SliderThumb,
+    SliderThumbHover,
+    CheckboxBorder,
+    CheckboxCheck,
+    Separator,
+    FrameBg,
+    FrameBgHover,
+    FrameBgActive,
+    Tab,
+    TabActive,
+    PlotLines,
+    PlotHistogram,
+    Success,
+    Warning,
+    Danger,
+    Info
+}
+
+enum StyleVar {
+    Padding,
+    Spacing,
+    ItemHeight,
+    Rounding,
+    FontScale
+}
+
+pub const COLOR_WINDOW_BG: int = 0;
+pub const COLOR_WINDOW_TITLE: int = 1;
+pub const COLOR_PANEL_BG: int = 2;
+pub const COLOR_TEXT: int = 3;
+pub const COLOR_TEXT_MUTED: int = 4;
+pub const COLOR_ACCENT: int = 5;
+pub const COLOR_BUTTON: int = 6;
+pub const COLOR_BUTTON_HOVER: int = 7;
+pub const COLOR_BUTTON_ACTIVE: int = 8;
+pub const COLOR_SLIDER_TRACK: int = 9;
+pub const COLOR_SLIDER_THUMB: int = 10;
+pub const COLOR_CHECKBOX_BORDER: int = 11;
+pub const COLOR_CHECKBOX_CHECK: int = 12;
+pub const COLOR_SEPARATOR: int = 13;
+pub const COLOR_FRAME_BG: int = 14;
+pub const COLOR_FRAME_BG_HOVER: int = 15;
+pub const COLOR_FRAME_BG_ACTIVE: int = 16;
+pub const COLOR_TAB: int = 17;
+pub const COLOR_TAB_ACTIVE: int = 18;
+pub const COLOR_PLOT_LINES: int = 19;
+pub const COLOR_PLOT_HISTOGRAM: int = 20;
+
+pub const VAR_PADDING: int = 0;
+pub const VAR_SPACING: int = 1;
+pub const VAR_ITEM_HEIGHT: int = 2;
+pub const VAR_ROUNDING: int = 3;
+
+pub fn color_role_from_index(idx: int): ColorRole {
+    match (idx) {
+        0 => { return ColorRole.WindowBg; },
+        1 => { return ColorRole.WindowTitle; },
+        2 => { return ColorRole.PanelBg; },
+        3 => { return ColorRole.Text; },
+        4 => { return ColorRole.TextMuted; },
+        5 => { return ColorRole.Accent; },
+        6 => { return ColorRole.Button; },
+        7 => { return ColorRole.ButtonHover; },
+        8 => { return ColorRole.ButtonActive; },
+        9 => { return ColorRole.SliderTrack; },
+        10 => { return ColorRole.SliderThumb; },
+        11 => { return ColorRole.CheckboxBorder; },
+        12 => { return ColorRole.CheckboxCheck; },
+        13 => { return ColorRole.Separator; },
+        14 => { return ColorRole.FrameBg; },
+        15 => { return ColorRole.FrameBgHover; },
+        16 => { return ColorRole.FrameBgActive; },
+        17 => { return ColorRole.Tab; },
+        18 => { return ColorRole.TabActive; },
+        19 => { return ColorRole.PlotLines; },
+        20 => { return ColorRole.PlotHistogram; },
+        _ => { return ColorRole.Text; }
+    }
+}
+
+pub fn style_var_from_index(idx: int): StyleVar {
+    match (idx) {
+        0 => { return StyleVar.Padding; },
+        1 => { return StyleVar.Spacing; },
+        2 => { return StyleVar.ItemHeight; },
+        3 => { return StyleVar.Rounding; },
+        _ => { return StyleVar.Padding; }
+    }
+}
+
+frame SpacingTokens {
+    pub var xs: float;
+    pub var sm: float;
+    pub var md: float;
+    pub var lg: float;
+    pub var xl: float;
+
+    pub init() {
+        self.xs = 4.0;
+        self.sm = 8.0;
+        self.md = 16.0;
+        self.lg = 24.0;
+        self.xl = 32.0;
+    }
+}
+
+frame TypographyTokens {
+    pub var font_family: str;
+    pub var display_size: float;
+    pub var headline_size: float;
+    pub var title_size: float;
+    pub var body_size: float;
+    pub var label_size: float;
+
+    pub init() {
+        self.font_family = "";
+        self.display_size = 32.0;
+        self.headline_size = 24.0;
+        self.title_size = 18.0;
+        self.body_size = 14.0;
+        self.label_size = 12.0;
+    }
+}
+
+frame ShapeTokens {
+    pub var corner_xs: float;
+    pub var corner_sm: float;
+    pub var corner_md: float;
+    pub var corner_lg: float;
+
+    pub init() {
+        self.corner_xs = 2.0;
+        self.corner_sm = 4.0;
+        self.corner_md = 8.0;
+        self.corner_lg = 16.0;
+    }
+}
+
+frame Theme {
+    // Core surfaces and text
+    pub var bg_window: color.Color;
+    pub var bg_window_title: color.Color;
+    pub var bg_panel: color.Color;
+    pub var text: color.Color;
+    pub var text_muted: color.Color;
+    pub var accent: color.Color;
+
+    // Interactive controls
+    pub var btn_normal: color.Color;
+    pub var btn_hover: color.Color;
+    pub var btn_active: color.Color;
+
+    // Sliders & inputs
+    pub var slider_track: color.Color;
+    pub var slider_thumb: color.Color;
+    pub var slider_thumb_hover: color.Color;
+    pub var checkbox_border: color.Color;
+    pub var checkbox_check: color.Color;
+
+    // Containers & framing
+    pub var separator: color.Color;
+    pub var frame_bg: color.Color;
+    pub var frame_bg_hover: color.Color;
+    pub var frame_bg_active: color.Color;
+    pub var tab_normal: color.Color;
+    pub var tab_active: color.Color;
+
+    // Diagnostics & charts
+    pub var plot_lines: color.Color;
+    pub var plot_histogram: color.Color;
+    pub var success: color.Color;
+    pub var warning: color.Color;
+    pub var danger: color.Color;
+    pub var info: color.Color;
+
+    // Spacing & geometry metrics
+    pub var padding: float;
+    pub var spacing: float;
+    pub var item_height: float;
+    pub var rounding: float;
+    pub var font_scale: int;
+
+    // Transition animations
+    pub var hover_duration: float;
+    pub var press_duration: float;
+    pub var enter_duration: float;
+    pub var exit_duration: float;
+
+    // Elevation shadows
+    pub var button_shadow: shadow.Shadow?;
+    pub var window_shadow: shadow.Shadow?;
+    pub var popup_shadow: shadow.Shadow?;
+
+    // Token bundles
+    pub var spacing_tokens: SpacingTokens;
+    pub var typography_tokens: TypographyTokens;
+    pub var shape_tokens: ShapeTokens;
+
+    pub init() {
+        self.bg_window          = color.hex(0x181a1f, 0.95);
+        self.bg_window_title    = color.hex(0x21252b, 1.0);
+        self.bg_panel           = color.hex(0x282c34, 0.90);
+        self.text               = color.hex(0xabb2bf, 1.0);
+        self.text_muted         = color.hex(0x5c6370, 1.0);
+        self.accent             = color.hex(0x61afef, 1.0);
+        self.btn_normal         = color.hex(0x2c313a, 1.0);
+        self.btn_hover          = color.hex(0x3e4451, 1.0);
+        self.btn_active         = color.hex(0x4b5263, 1.0);
+        self.slider_track       = color.hex(0x1e2227, 1.0);
+        self.slider_thumb       = color.hex(0x61afef, 1.0);
+        self.slider_thumb_hover = color.hex(0x98c379, 1.0);
+        self.checkbox_border    = color.hex(0x4b5263, 1.0);
+        self.checkbox_check     = color.hex(0x98c379, 1.0);
+        self.separator          = color.hex(0x3e4451, 0.6);
+        self.frame_bg           = color.hex(0x21252b, 1.0);
+        self.frame_bg_hover     = color.hex(0x2c313a, 1.0);
+        self.frame_bg_active    = color.hex(0x3e4451, 1.0);
+        self.tab_normal         = color.hex(0x21252b, 1.0);
+        self.tab_active         = color.hex(0x61afef, 1.0);
+        self.plot_lines         = color.hex(0x98c379, 1.0);
+        self.plot_histogram     = color.hex(0xe5c07b, 1.0);
+        self.success            = color.hex(0x98c379, 1.0);
+        self.warning            = color.hex(0xe5c07b, 1.0);
+        self.danger             = color.hex(0xe06c75, 1.0);
+        self.info               = color.hex(0x61afef, 1.0);
+
+        self.padding            = 10.0;
+        self.spacing            = 6.0;
+        self.item_height        = 24.0;
+        self.rounding           = 4.0;
+        self.font_scale         = 1;
+
+        self.hover_duration     = 0.15;
+        self.press_duration     = 0.08;
+        self.enter_duration     = 0.25;
+        self.exit_duration      = 0.20;
+
+        self.button_shadow      = shadow.Shadow(r=0.0, g=0.0, b=0.0, a=0.35, off_x=0.0, off_y=1.0, blur=3.0, spread=0.0);
+        self.window_shadow      = shadow.Shadow(r=0.0, g=0.0, b=0.0, a=0.50, off_x=0.0, off_y=4.0, blur=14.0, spread=0.0);
+        self.popup_shadow       = shadow.Shadow(r=0.0, g=0.0, b=0.0, a=0.65, off_x=0.0, off_y=6.0, blur=18.0, spread=0.0);
+
+        self.spacing_tokens     = SpacingTokens();
+        self.typography_tokens  = TypographyTokens();
+        self.shape_tokens       = ShapeTokens();
+    }
+
+    pub fn get_color(role: ColorRole): color.Color {
+        match (role) {
+            ColorRole.WindowBg => { return self.bg_window; },
+            ColorRole.WindowTitle => { return self.bg_window_title; },
+            ColorRole.PanelBg => { return self.bg_panel; },
+            ColorRole.Text => { return self.text; },
+            ColorRole.TextMuted => { return self.text_muted; },
+            ColorRole.Accent => { return self.accent; },
+            ColorRole.Button => { return self.btn_normal; },
+            ColorRole.ButtonHover => { return self.btn_hover; },
+            ColorRole.ButtonActive => { return self.btn_active; },
+            ColorRole.SliderTrack => { return self.slider_track; },
+            ColorRole.SliderThumb => { return self.slider_thumb; },
+            ColorRole.SliderThumbHover => { return self.slider_thumb_hover; },
+            ColorRole.CheckboxBorder => { return self.checkbox_border; },
+            ColorRole.CheckboxCheck => { return self.checkbox_check; },
+            ColorRole.Separator => { return self.separator; },
+            ColorRole.FrameBg => { return self.frame_bg; },
+            ColorRole.FrameBgHover => { return self.frame_bg_hover; },
+            ColorRole.FrameBgActive => { return self.frame_bg_active; },
+            ColorRole.Tab => { return self.tab_normal; },
+            ColorRole.TabActive => { return self.tab_active; },
+            ColorRole.PlotLines => { return self.plot_lines; },
+            ColorRole.PlotHistogram => { return self.plot_histogram; },
+            ColorRole.Success => { return self.success; },
+            ColorRole.Warning => { return self.warning; },
+            ColorRole.Danger => { return self.danger; },
+            ColorRole.Info => { return self.info; },
+            _ => { return self.text; }
+        }
+    }
+
+    pub fn set_color(role: ColorRole, c: color.Color): nil {
+        match (role) {
+            ColorRole.WindowBg => { self.bg_window = c; },
+            ColorRole.WindowTitle => { self.bg_window_title = c; },
+            ColorRole.PanelBg => { self.bg_panel = c; },
+            ColorRole.Text => { self.text = c; },
+            ColorRole.TextMuted => { self.text_muted = c; },
+            ColorRole.Accent => { self.accent = c; },
+            ColorRole.Button => { self.btn_normal = c; },
+            ColorRole.ButtonHover => { self.btn_hover = c; },
+            ColorRole.ButtonActive => { self.btn_active = c; },
+            ColorRole.SliderTrack => { self.slider_track = c; },
+            ColorRole.SliderThumb => { self.slider_thumb = c; },
+            ColorRole.SliderThumbHover => { self.slider_thumb_hover = c; },
+            ColorRole.CheckboxBorder => { self.checkbox_border = c; },
+            ColorRole.CheckboxCheck => { self.checkbox_check = c; },
+            ColorRole.Separator => { self.separator = c; },
+            ColorRole.FrameBg => { self.frame_bg = c; },
+            ColorRole.FrameBgHover => { self.frame_bg_hover = c; },
+            ColorRole.FrameBgActive => { self.frame_bg_active = c; },
+            ColorRole.Tab => { self.tab_normal = c; },
+            ColorRole.TabActive => { self.tab_active = c; },
+            ColorRole.PlotLines => { self.plot_lines = c; },
+            ColorRole.PlotHistogram => { self.plot_histogram = c; },
+            ColorRole.Success => { self.success = c; },
+            ColorRole.Warning => { self.warning = c; },
+            ColorRole.Danger => { self.danger = c; },
+            ColorRole.Info => { self.info = c; },
+            _ => {}
+        }
+    }
+}

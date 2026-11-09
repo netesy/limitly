@@ -1,0 +1,143 @@
+// std/theme/presets.lm
+// Curated theme presets for Limitless / Lymar.
+
+import std.color as color;
+import std.theme.types as types;
+import std.theme.types show Theme;
+
+pub fn default_theme(): Theme {
+    return Theme();
+}
+
+pub fn dark_theme(): Theme {
+    return Theme();
+}
+
+pub fn light_theme(): Theme {
+    var t = Theme();
+    t.bg_window          = color.hex(0xf0f2f5, 0.98);
+    t.bg_window_title    = color.hex(0xdde1e6, 1.0);
+    t.bg_panel           = color.hex(0xffffff, 1.0);
+    t.text               = color.hex(0x161616, 1.0);
+    t.text_muted         = color.hex(0x6f6f6f, 1.0);
+    t.accent             = color.hex(0x0f62fe, 1.0);
+    t.btn_normal         = color.hex(0xe0e0e0, 1.0);
+    t.btn_hover          = color.hex(0xd1d1d1, 1.0);
+    t.btn_active         = color.hex(0x0f62fe, 1.0);
+    t.slider_track       = color.hex(0xd0d0d0, 1.0);
+    t.slider_thumb       = color.hex(0x0f62fe, 1.0);
+    t.slider_thumb_hover = color.hex(0x0043ce, 1.0);
+    t.checkbox_border    = color.hex(0x8d8d8d, 1.0);
+    t.checkbox_check     = color.hex(0x0f62fe, 1.0);
+    t.separator          = color.hex(0xc6c6c6, 0.8);
+    t.frame_bg           = color.hex(0xffffff, 1.0);
+    t.frame_bg_hover     = color.hex(0xebebeb, 1.0);
+    t.frame_bg_active    = color.hex(0xdddddd, 1.0);
+    t.tab_normal         = color.hex(0xe0e0e0, 1.0);
+    t.tab_active         = color.hex(0x0f62fe, 1.0);
+    t.plot_lines         = color.hex(0x198038, 1.0);
+    t.plot_histogram     = color.hex(0x0f62fe, 1.0);
+    t.success            = color.hex(0x198038, 1.0);
+    t.warning            = color.hex(0xf1c21b, 1.0);
+    t.danger             = color.hex(0xda1e28, 1.0);
+    t.info               = color.hex(0x0043ce, 1.0);
+    return t;
+}
+
+pub fn cyberpunk_theme(): Theme {
+    var t = Theme();
+    t.bg_window          = color.hex(0x0d0d1a, 0.95);
+    t.bg_window_title    = color.hex(0x160033, 1.0);
+    t.bg_panel           = color.hex(0x180040, 0.90);
+    t.text               = color.hex(0x00f0ff, 1.0);
+    t.text_muted         = color.hex(0x7928ca, 1.0);
+    t.accent             = color.hex(0xff0055, 1.0);
+    t.btn_normal         = color.hex(0x220055, 1.0);
+    t.btn_hover          = color.hex(0xff007f, 1.0);
+    t.btn_active         = color.hex(0x00f0ff, 1.0);
+    t.slider_track       = color.hex(0x1a0033, 1.0);
+    t.slider_thumb       = color.hex(0xff0055, 1.0);
+    t.slider_thumb_hover = color.hex(0x00f0ff, 1.0);
+    t.checkbox_border    = color.hex(0xff0055, 1.0);
+    t.checkbox_check     = color.hex(0x00f0ff, 1.0);
+    t.separator          = color.hex(0xff007f, 0.6);
+    t.frame_bg           = color.hex(0x160033, 1.0);
+    t.frame_bg_hover     = color.hex(0x2a0066, 1.0);
+    t.frame_bg_active    = color.hex(0x3a0088, 1.0);
+    t.tab_normal         = color.hex(0x220055, 1.0);
+    t.tab_active         = color.hex(0xff0055, 1.0);
+    t.plot_lines         = color.hex(0x00f0ff, 1.0);
+    t.plot_histogram     = color.hex(0xff0055, 1.0);
+    t.success            = color.hex(0x00ff66, 1.0);
+    t.warning            = color.hex(0xffcc00, 1.0);
+    t.danger             = color.hex(0xff0055, 1.0);
+    t.info               = color.hex(0x00f0ff, 1.0);
+    return t;
+}
+
+pub fn retro_theme(): Theme {
+    var t = Theme();
+    t.bg_window          = color.hex(0xc0c0c0, 1.0);
+    t.bg_window_title    = color.hex(0x000080, 1.0);
+    t.bg_panel           = color.hex(0xd4d0c8, 1.0);
+    t.text               = color.hex(0x000000, 1.0);
+    t.text_muted         = color.hex(0x808080, 1.0);
+    t.accent             = color.hex(0x000080, 1.0);
+    t.btn_normal         = color.hex(0xc0c0c0, 1.0);
+    t.btn_hover          = color.hex(0xd4d0c8, 1.0);
+    t.btn_active         = color.hex(0x808080, 1.0);
+    t.slider_track       = color.hex(0x808080, 1.0);
+    t.slider_thumb       = color.hex(0xc0c0c0, 1.0);
+    t.slider_thumb_hover = color.hex(0xffffff, 1.0);
+    t.checkbox_border    = color.hex(0x808080, 1.0);
+    t.checkbox_check     = color.hex(0x000000, 1.0);
+    t.separator          = color.hex(0x808080, 1.0);
+    t.frame_bg           = color.hex(0xffffff, 1.0);
+    t.frame_bg_hover     = color.hex(0xffffff, 1.0);
+    t.frame_bg_active    = color.hex(0xe0e0e0, 1.0);
+    t.tab_normal         = color.hex(0xc0c0c0, 1.0);
+    t.tab_active         = color.hex(0xffffff, 1.0);
+    t.plot_lines         = color.hex(0x008000, 1.0);
+    t.plot_histogram     = color.hex(0x000080, 1.0);
+    t.success            = color.hex(0x008000, 1.0);
+    t.warning            = color.hex(0x808000, 1.0);
+    t.danger             = color.hex(0x800000, 1.0);
+    t.info               = color.hex(0x000080, 1.0);
+    t.rounding           = 0.0;
+    t.button_shadow      = nil;
+    t.window_shadow      = nil;
+    t.popup_shadow       = nil;
+    return t;
+}
+
+pub fn nord_theme(): Theme {
+    var t = Theme();
+    t.bg_window          = color.hex(0x2e3440, 0.96);
+    t.bg_window_title    = color.hex(0x3b4252, 1.0);
+    t.bg_panel           = color.hex(0x434c5e, 0.92);
+    t.text               = color.hex(0xeceff4, 1.0);
+    t.text_muted         = color.hex(0xd8dee9, 0.7);
+    t.accent             = color.hex(0x88c0d0, 1.0);
+    t.btn_normal         = color.hex(0x4c566a, 1.0);
+    t.btn_hover          = color.hex(0x5e81ac, 1.0);
+    t.btn_active         = color.hex(0x81a1c1, 1.0);
+    t.slider_track       = color.hex(0x3b4252, 1.0);
+    t.slider_thumb       = color.hex(0x88c0d0, 1.0);
+    t.slider_thumb_hover = color.hex(0x8fbcbb, 1.0);
+    t.checkbox_border    = color.hex(0x4c566a, 1.0);
+    t.checkbox_check     = color.hex(0xa3be8c, 1.0);
+    t.separator          = color.hex(0x4c566a, 0.6);
+    t.frame_bg           = color.hex(0x3b4252, 1.0);
+    t.frame_bg_hover     = color.hex(0x434c5e, 1.0);
+    t.frame_bg_active    = color.hex(0x4c566a, 1.0);
+    t.tab_normal         = color.hex(0x3b4252, 1.0);
+    t.tab_active         = color.hex(0x88c0d0, 1.0);
+    t.plot_lines         = color.hex(0xa3be8c, 1.0);
+    t.plot_histogram     = color.hex(0xebcb8b, 1.0);
+    t.success            = color.hex(0xa3be8c, 1.0);
+    t.warning            = color.hex(0xebcb8b, 1.0);
+    t.danger             = color.hex(0xbf616a, 1.0);
+    t.info               = color.hex(0x81a1c1, 1.0);
+    return t;
+}
+

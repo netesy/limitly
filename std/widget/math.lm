@@ -1,0 +1,67 @@
+// std/widget/math.lm
+// Headless mathematical normalization, snapping, and layout computations for widgets.
+
+import std.math as math;
+import std.widget.geometry as geom;
+import std.widget.geometry show Rect;
+
+pub fn clamp_value(v: float, min_val: float, max_val: float): float {
+    if (v < min_val) { return min_val; }
+    if (v > max_val) { return max_val; }
+    return v;
+}
+
+pub fn value_to_ratio(v: float, min_val: float, max_val: float): float {
+    var span = max_val - min_val;
+    if (span <= 0.0) {
+        return 0.0;
+    }
+    var r = (v - min_val) / span;
+    if (r < 0.0) { return 0.0; }
+    if (r > 1.0) { return 1.0; }
+    return r;
+}
+
+pub fn ratio_to_value(ratio: float, min_val: float, max_val: float): float {
+    var clamped_ratio = ratio;
+    if (clamped_ratio < 0.0) { clamped_ratio = 0.0; }
+    if (clamped_ratio > 1.0) { clamped_ratio = 1.0; }
+    return min_val + (max_val - min_val) * clamped_ratio;
+}
+
+pub fn step_value(v: float, step: float, min_val: float): float {
+    if (step <= 0.0) {
+        return v;
+    }
+    var steps = math.round((v - min_val) / step);
+    return min_val + steps * step;
+}
+
+pub fn calculate_thumb_rect(track: Rect, ratio: float, thumb_w: float, thumb_h: float, is_vertical: bool): Rect {
+    var clamped_ratio = math.clamp(ratio, 0.0, 1.0);
+    if (is_vertical) {
+        var travel = track.h - thumb_h;
+        var ty = track.y + (1.0 - clamped_ratio) * travel;
+        var tx = track.x + (track.w - thumb_w) * 0.5;
+        return Rect(x=tx, y=ty, w=thumb_w, h=thumb_h);
+    } else {
+        var travel = track.w - thumb_w;
+        var tx = track.x + clamped_ratio * travel;
+        var ty = track.y + (track.h - thumb_h) * 0.5;
+        return Rect(x=tx, y=ty, w=thumb_w, h=thumb_h);
+    }
+}
+
+pub fn calculate_progress_rect(track: Rect, ratio: float, is_vertical: bool): Rect {
+    var clamped_ratio = math.clamp(ratio, 0.0, 1.0);
+    if (is_vertical) {
+        var fill_h = track.h * clamped_ratio;
+        return Rect(x=track.x, y=track.y + track.h - fill_h, w=track.w, h=fill_h);
+    } else {
+        return Rect(x=track.x, y=track.y, w=track.w * clamped_ratio, h=track.h);
+    }
+}
+
+pub fn hit_test(bounds: Rect, px: float, py: float): bool {
+    return bounds.contains(px, py);
+}

@@ -78,19 +78,10 @@ enum LifecycleState {
 // reading their packed int/string fields; the conversion happens once, through
 // `match`, at the fluent call site (jump-table dispatch lowered in the LIR).
 
-enum Alignment {
-    Start,
-    Center,
-    End
-}
+// Re-export common layout alignment and axis enums from std.widget
+pub import std.widget show Alignment, Axis;
 
 type Align = Alignment;
-
-enum Axis {
-    Horizontal,
-    Vertical,
-    Stacked
-}
 
 enum Weight {
     Normal,

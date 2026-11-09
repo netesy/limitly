@@ -1,0 +1,39 @@
+// std/widget/state.lm
+// Universal widget state, alignment, and axis primitives.
+
+enum WidgetState {
+    Idle,
+    Hovered,
+    Active,
+    Focused,
+    Disabled
+}
+
+enum Alignment {
+    Start,
+    Center,
+    End
+}
+
+enum Axis {
+    Horizontal,
+    Vertical,
+    Stacked
+}
+
+pub fn resolve_state(is_enabled: bool, is_active: bool, is_hovered: bool, is_focused: bool): WidgetState {
+    if (not is_enabled) {
+        return WidgetState.Disabled;
+    }
+    if (is_active) {
+        return WidgetState.Active;
+    }
+    if (is_hovered) {
+        return WidgetState.Hovered;
+    }
+    if (is_focused) {
+        return WidgetState.Focused;
+    }
+    return WidgetState.Idle;
+}
+

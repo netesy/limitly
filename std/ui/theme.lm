@@ -37,56 +37,8 @@ frame ColorPalette {
     }
 }
 
-// Spacing tokens
-frame SpacingTokens {
-    pub var xs: float;
-    pub var sm: float;
-    pub var md: float;
-    pub var lg: float;
-    pub var xl: float;
-
-    pub init() {
-        self.xs = 4.0;
-        self.sm = 8.0;
-        self.md = 16.0;
-        self.lg = 24.0;
-        self.xl = 32.0;
-    }
-}
-
-// Typography tokens
-frame TypographyTokens {
-    pub var font_family: str;
-    pub var display_size: float;
-    pub var headline_size: float;
-    pub var title_size: float;
-    pub var body_size: float;
-    pub var label_size: float;
-
-    pub init() {
-        self.font_family = "";
-        self.display_size = 32.0;
-        self.headline_size = 24.0;
-        self.title_size = 18.0;
-        self.body_size = 14.0;
-        self.label_size = 12.0;
-    }
-}
-
-// Border radius tokens
-frame ShapeTokens {
-    pub var corner_xs: float;
-    pub var corner_sm: float;
-    pub var corner_md: float;
-    pub var corner_lg: float;
-
-    pub init() {
-        self.corner_xs = 2.0;
-        self.corner_sm = 4.0;
-        self.corner_md = 8.0;
-        self.corner_lg = 16.0;
-    }
-}
+// Spacing, Typography, and Shape tokens from std.theme
+pub import std.theme show SpacingTokens, TypographyTokens, ShapeTokens;
 
 // Complete theme
 frame Theme {

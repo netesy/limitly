@@ -8,7 +8,7 @@ pub import std.game.types show
 Vec2, vec2,
 Rect, rect,
 ColorRole, StyleVar,
-GUITheme, default_theme, dark_theme, light_theme, cyberpunk_theme, retro_theme;
+GUITheme, default_theme, dark_theme, light_theme, cyberpunk_theme, retro_theme, nord_theme;
 
 pub import std.game.math show
 Circle, circle,
@@ -46,6 +46,13 @@ pub const KEY_W: int             = input_mod.KEY_W;
 pub const KEY_A: int             = input_mod.KEY_A;
 pub const KEY_S: int             = input_mod.KEY_S;
 pub const KEY_D: int             = input_mod.KEY_D;
+pub const KEY_Q: int             = input_mod.KEY_Q;
+pub const KEY_E: int             = input_mod.KEY_E;
+pub const KEY_R: int             = input_mod.KEY_R;
+pub const KEY_1: int             = input_mod.KEY_1;
+pub const KEY_2: int             = input_mod.KEY_2;
+pub const KEY_3: int             = input_mod.KEY_3;
+pub const KEY_4: int             = input_mod.KEY_4;
 pub const KEY_F: int             = input_mod.KEY_F;
 pub const KEY_H: int             = input_mod.KEY_H;
 pub const KEY_F3: int            = input_mod.KEY_F3;

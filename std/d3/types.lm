@@ -1,6 +1,8 @@
 // std/d3/types.lm
 // Enums and fundamental types for the 3D graphics library.
 
+pub import std.camera show CameraType;
+
 /// Defines how surface polygons are shaded and illuminated.
 enum ShadingModel {
     Flat,
@@ -15,12 +17,6 @@ enum LightType {
     Ambient,
     Directional,
     Point
-}
-
-/// Defines the camera projection model.
-enum CameraType {
-    Perspective,
-    Orthographic
 }
 
 /// Face culling mode during rasterization.

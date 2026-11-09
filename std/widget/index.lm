@@ -1,0 +1,7 @@
+// std/widget/index.lm
+// Public facade for std.widget. Headless widget primitives, states, geometries, and math.
+
+pub import std.widget.state show WidgetState, Alignment, Axis, resolve_state;
+pub import std.widget.geometry show Point, Insets, Rect;
+pub import std.widget.math show clamp_value, value_to_ratio, ratio_to_value, step_value, calculate_thumb_rect, calculate_progress_rect, hit_test;
+
