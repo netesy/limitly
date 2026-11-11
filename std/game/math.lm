@@ -5,23 +5,23 @@ import std.math as math;
 import std.game.types as types;
 
 // Re-export core types
-pub fn Vec2(x: float = 0.0, y: float = 0.0): types.Vec2 { return types.Vec2(x=x, y=y); }
-pub fn vec2(x: float, y: float): types.Vec2 { return types.Vec2(x=x, y=y); }
+pub fn Vec2(x: float = 0.0, y: float = 0.0): types.Vector2 { return types.Vec2(x=x, y=y); }
+pub fn vec2(x: float, y: float): types.Vector2 { return types.Vec2(x=x, y=y); }
 pub fn Rect(x: float = 0.0, y: float = 0.0, w: float = 0.0, h: float = 0.0): types.Rect { return types.Rect(x=x, y=y, w=w, h=h); }
 pub fn rect(x: float, y: float, w: float, h: float): types.Rect { return types.Rect(x=x, y=y, w=w, h=h); }
 
 // ── Circle Primitive ──────────────────────────────────────────────────────────
 
 frame Circle {
-    pub var center: types.Vec2;
+    pub var center: types.Vector2;
     pub var radius: float;
 
-    pub init(center: types.Vec2 = types.Vec2(), radius: float = 10.0) {
+    pub init(center: types.Vector2 = types.Vec2(), radius: float = 10.0) {
         self.center = center;
         self.radius = radius;
     }
 
-    pub fn contains(p: types.Vec2): bool {
+    pub fn contains(p: types.Vector2): bool {
         return self.center.dist_sq(p) <= (self.radius * self.radius);
     }
 
@@ -38,17 +38,17 @@ frame Circle {
     }
 }
 
-pub fn circle(center: types.Vec2 = types.Vec2(), radius: float = 10.0): Circle {
+pub fn circle(center: types.Vector2 = types.Vec2(), radius: float = 10.0): Circle {
     return Circle(center=center, radius=radius);
 }
 
 // ── Ray2D Primitive ───────────────────────────────────────────────────────────
 
 frame Ray2D {
-    pub var origin: types.Vec2;
-    pub var direction: types.Vec2;
+    pub var origin: types.Vector2;
+    pub var direction: types.Vector2;
 
-    pub init(origin: types.Vec2 = types.Vec2(), direction: types.Vec2 = types.Vec2(1.0, 0.0)) {
+    pub init(origin: types.Vector2 = types.Vec2(), direction: types.Vector2 = types.Vec2(1.0, 0.0)) {
         self.origin = origin;
         if (direction.x == 0.0 and direction.y == 0.0) {
             self.direction = types.Vec2(x=1.0, y=0.0);
@@ -57,12 +57,12 @@ frame Ray2D {
         }
     }
 
-    pub fn point_at(t: float): types.Vec2 {
+    pub fn point_at(t: float): types.Vector2 {
         return self.origin.add(self.direction.scale(t));
     }
 }
 
-pub fn ray2d(origin: types.Vec2 = types.Vec2(), direction: types.Vec2 = types.Vec2(1.0, 0.0)): Ray2D {
+pub fn ray2d(origin: types.Vector2 = types.Vec2(), direction: types.Vector2 = types.Vec2(1.0, 0.0)): Ray2D {
     return Ray2D(origin=origin, direction=direction);
 }
 
@@ -70,11 +70,11 @@ pub fn ray2d(origin: types.Vec2 = types.Vec2(), direction: types.Vec2 = types.Ve
 
 frame Contact2D {
     pub var collided: bool;
-    pub var normal: types.Vec2;
+    pub var normal: types.Vector2;
     pub var penetration: float;
-    pub var point: types.Vec2;
+    pub var point: types.Vector2;
 
-    pub init(collided: bool = false, normal: types.Vec2 = types.Vec2(), penetration: float = 0.0, point: types.Vec2 = types.Vec2()) {
+    pub init(collided: bool = false, normal: types.Vector2 = types.Vec2(), penetration: float = 0.0, point: types.Vector2 = types.Vec2()) {
         self.collided = collided;
         self.normal = normal;
         self.penetration = penetration;
@@ -84,11 +84,11 @@ frame Contact2D {
 
 frame RayHit2D {
     pub var hit: bool;
-    pub var point: types.Vec2;
-    pub var normal: types.Vec2;
+    pub var point: types.Vector2;
+    pub var normal: types.Vector2;
     pub var distance: float;
 
-    pub init(hit: bool = false, point: types.Vec2 = types.Vec2(), normal: types.Vec2 = types.Vec2(), distance: float = 0.0) {
+    pub init(hit: bool = false, point: types.Vector2 = types.Vec2(), normal: types.Vector2 = types.Vec2(), distance: float = 0.0) {
         self.hit = hit;
         self.point = point;
         self.normal = normal;
@@ -99,12 +99,12 @@ frame RayHit2D {
 // ── Collision Detection & Resolution Functions ────────────────────────────────
 
 pub fn test_aabb_aabb(a: types.Rect, b: types.Rect): Contact2D {
-    if (not a.intersects(b)) {
+    if (a.x + a.w < b.x or b.x + b.w < a.x or a.y + a.h < b.y or b.y + b.h < a.y) {
         return Contact2D(collided=false);
     }
 
-    var a_center = a.center();
-    var b_center = b.center();
+    var a_center = types.Vec2(a.x + a.w * 0.5, a.y + a.h * 0.5);
+    var b_center = types.Vec2(b.x + b.w * 0.5, b.y + b.h * 0.5);
     var diff = b_center.sub(a_center);
 
     var a_half_w = a.w * 0.5;

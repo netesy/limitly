@@ -365,6 +365,7 @@ frame Car {
 - [x] On a name collision the host's own member wins; a promoted member never overwrites it
 - [x] Promoted members count as real members, so they can satisfy a trait the host conforms to
 - [ ] Embedded components are **not** auto-destroyed: the component's `deinit()` is neither promoted nor called when the host is destroyed. Forward it from the host's own `deinit()` if cleanup is required.
+- [x] Embedded components' `init()` is **not** run: `embed` flattens field declarations only. Give embedded fields field-level defaults (`pub var x: T = <default>;`) or assign the promoted fields in the host's `init()` — otherwise they stay `nil`/zero until set.
 - [x] A host may embed several components, and may embed a mixin as well as a frame
 
 ---

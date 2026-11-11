@@ -8,6 +8,7 @@
 //   Middleware   — optional pre-navigation guard (e.g. auth check)
 
 import std.ui.types as ui;
+import std.ui.components as comp;
 import std.color as color;
 
 // ── Route Params ──────────────────────────────────────────────────────────────
@@ -156,7 +157,7 @@ fn match_pattern(pattern: str, path: str): (bool, RouterParams) {
 }
 
 // ── Route ─────────────────────────────────────────────────────────────────────
-type RouteFn = fn(RouterParams): ui.Widget;
+type RouteFn = fn(RouterParams): comp.Fluent;
 
 frame Route {
     pub var pattern: str;
@@ -208,10 +209,10 @@ frame Router {
         self.current_path  = "";
         self.current_params = RouterParams();
         self.current_route = -1;
-        self.not_found_fn  = fn(p: RouterParams): ui.Widget {
-            return ui.column([
-            ui.text("404 — Page Not Found").font_size(24.0),
-            ui.text("The requested path was not found.").opacity(0.6)
+        self.not_found_fn  = fn(p: RouterParams): comp.Fluent {
+            return comp.column([
+            comp.Label("404 — Page Not Found").font_size(24.0),
+            comp.Label("The requested path was not found.").opacity(0.6)
             ]).padding(40.0);
         };
         self.middlewares = [];
@@ -404,7 +405,7 @@ frame Router {
     }
 
     // ── Rendering ─────────────────────────────────────────────────────
-    pub fn current_widget(): ui.Widget {
+    pub fn current_widget(): comp.Fluent {
         if (self.current_route >= 0 and self.current_route < len(self.routes)) {
             var handler: RouteFn = self.routes[self.current_route].handler;
             return handler(self.current_params);
@@ -412,13 +413,13 @@ frame Router {
         return self.not_found_fn(self.current_params);
     }
 
-    pub fn widget_for(path: str): ui.Widget {
+    pub fn widget_for(path: str): comp.Fluent {
         var saved_path   = self.current_path;
         var saved_route  = self.current_route;
         var saved_params = self.current_params;
 
         var idx = self.find_match(path);
-        var w = ui.empty();
+        var w: comp.Fluent = comp.empty();
         if (idx >= 0) {
             var handler: RouteFn = self.routes[idx].handler;
             w = handler(self.current_params);
@@ -484,8 +485,8 @@ pub fn make_router_with_base(base: str): Router {
 }
 
 // ── Link Widget ───────────────────────────────────────────────────────────────
-pub fn router_link(label: str, path: str, router: Router): ui.Widget {
-    return ui.button(label, fn(): nil {
+pub fn router_link(label: str, path: str, router: Router): comp.Button {
+    return comp.Button(label, fn(): nil {
         router.navigate(path);
     })
     .aria_label(label)
@@ -493,14 +494,14 @@ pub fn router_link(label: str, path: str, router: Router): ui.Widget {
 }
 
 // ── Tab Bar Widget ────────────────────────────────────────────────────────────
-pub fn tab_bar(routes: [(str, str)], router: Router): ui.Widget {
-    var btns: [ui.Widget] = [];
+pub fn tab_bar(routes: [(str, str)], router: Router): comp.Container {
+    var btns: [comp.Fluent] = [];
     var i = 0;
     while (i < len(routes)) {
         var label = routes[i].0;
         var path  = routes[i].1;
         var is_active = (router.current_path == path);
-        var btn = ui.button(label, fn(): nil { router.navigate(path); });
+        var btn = comp.Button(label, fn(): nil { router.navigate(path); });
         if (is_active) {
             btn = btn.background(color.indigo);
         } else {
@@ -509,25 +510,33 @@ pub fn tab_bar(routes: [(str, str)], router: Router): ui.Widget {
         btns.append(btn.role(ui.Semantic.TabList).aria_label(label));
         i = i + 1;
     }
-    return ui.row(btns).spacing(4.0);
+    val row_c = comp.Container(false);
+    i = 0;
+    while (i < len(btns)) {
+        row_c.add(btns[i]);
+        i = i + 1;
+    }
+    return row_c.spacing(4.0);
 }
 
 // ── Breadcrumb Widget ─────────────────────────────────────────────────────────
-pub fn breadcrumbs(router: Router): ui.Widget {
-    var items: [ui.Widget] = [];
+pub fn breadcrumbs(router: Router): comp.Container {
+    var items: [comp.Fluent] = [];
     var i = 0;
     while (i <= router.history_idx and i < len(router.history)) {
         var entry = router.history[i];
         var path  = entry.path;
         if (i > 0) {
-            items.append(ui.text(" › ").opacity(0.4));
+            items.append(comp.Label(" › ").opacity(0.4));
         }
         if (i == router.history_idx) {
-            items.append(ui.text(path).opacity(1.0));
+            items.append(comp.Label(path).opacity(1.0));
         } else {
             items.append(router_link(path, path, router));
         }
         i = i + 1;
     }
-    return ui.row(items).spacing(2.0).aria_label("Breadcrumb navigation").role(ui.Semantic.Navigation);
+    val row_c = comp.Container(false);
+    iter (it in items) { row_c.add(it); }
+    return row_c.spacing(2.0).aria_label("Breadcrumb navigation").role(ui.Semantic.Navigation);
 }

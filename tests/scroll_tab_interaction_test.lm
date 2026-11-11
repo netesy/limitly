@@ -57,8 +57,8 @@ fn run_scroll_tab_tests() {
     // 1. Initial State Checks
     assert(tv.active_tab == 0, "Initial tab must be 0");
     assert(scr_a.scroll_y == 0.0, "Initial scroll_y must be 0.0");
-    assert(chk_b.is_checked == 1, "Tab B checkbox initially checked");
-    assert(sld_b.slider_val == 75.0, "Tab B slider initially 75.0");
+    assert(chk_b.is_checked, "Tab B checkbox initially checked");
+    assert(sld_b.value == 75.0, "Tab B slider initially 75.0");
 
     // 2. Scroll Tab A by wheel
     app.push_event(app.Event(event_type=app.EventType.MouseMove, x=100, y=100));
@@ -110,8 +110,8 @@ fn run_scroll_tab_tests() {
 
     assert(tv.active_tab == 0, "Active tab preserved after window resize");
     assert(scr_a.scroll_y == saved_scroll_y, "Scroll offset preserved after window resize");
-    assert(chk_b.is_checked == 1, "Checkbox state preserved after resize");
-    assert(sld_b.slider_val == 75.0, "Slider value preserved after resize");
+    assert(chk_b.is_checked, "Checkbox state preserved after resize");
+    assert(sld_b.value == 75.0, "Slider value preserved after resize");
     print("Pass: Window resize preserves tab, scroll, checkbox, and slider state");
 
     // 7. Focus and edit Input inside ScrollView
@@ -119,19 +119,20 @@ fn run_scroll_tab_tests() {
     // The input is rendered inside viewport: click within input's visible area
     // Reset scroll to 0 for exact hit testing
     scr_a.scroll_y = 0.0;
+    app.ui(root);
     app.present_frame();
 
     // In Tab A, tab header is 32px + 8px gap = 40px down, ScrollView starts at y=60
-    // btn1 is y=66..106, spacer1 is 60px, inp1 is at y=166..196
-    app.push_event(app.Event(event_type=app.EventType.MouseDown, x=100, y=175));
-    app.push_event(app.Event(event_type=app.EventType.MouseUp, x=100, y=175));
+    // btn1 is y=66..106, spacer1 is 60px, inp1 hit zone is at y=188..218
+    app.push_event(app.Event(event_type=app.EventType.MouseDown, x=100, y=203));
+    app.push_event(app.Event(event_type=app.EventType.MouseUp, x=100, y=203));
     app.process_events();
-    assert(inp1.is_focused == 1, "Input inside ScrollView should become focused");
+    assert(inp1.is_focused, "Input inside ScrollView should become focused");
 
     // Type text into input
     app.push_event(app.Event(event_type=app.EventType.Char, key_code=65)); // 'A'
     app.process_events();
-    assert(inp1.text_val == "initial_textA", "Input inside ScrollView accepts text input");
+    assert(inp1.text == "initial_textA", "Input inside ScrollView accepts text input");
     print("Pass: Input inside ScrollView hit testing and text entry verified");
 
     app.app_shutdown();

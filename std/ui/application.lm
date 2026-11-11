@@ -1,27 +1,25 @@
 // std/ui/application.lm
-// Application submodule for std.ui. User interface widgets, layout engines, styling, and application framework.
-
-import std.ui.types as ui_types;
+import std.ui.components as comp;
 import std.app as app;
 
 frame Application {
     pub var name: str;
-    pub var root_widget: ui_types.Widget;
+    pub var root_widget: comp.Fluent;
 
     pub init(n: str = "LymarApp") {
         self.name = n;
-        self.root_widget = ui_types.empty();
+        self.root_widget = comp.empty();
     }
 
-    pub fn set_root(widget: ui_types.Widget): nil {
+    pub fn set_root(widget: comp.Fluent): nil {
         self.root_widget = widget;
     }
 
     pub fn run(): nil {
-        var cfg = app.default_window_config();
+        val cfg = app.default_window_config();
         cfg.title = self.name;
         app.init(cfg);
-        app.set_ui(self.root_widget);
+        app.ui(self.root_widget);
         app.run();
         app.shutdown();
     }

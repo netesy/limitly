@@ -2,16 +2,16 @@
 
 import std.algorithm as algo;
 
-fn is_even(x: int): bool {
-    return x % 2 == 0;
+fn is_even(x: any): bool {
+    return (x as int) % 2 == 0;
 }
 
-fn add_ten(x: int): int {
-    return x + 10;
+fn add_ten(x: any): int {
+    return (x as int) + 10;
 }
 
-fn sum_reducer(acc: int, x: int): int {
-    return acc + x;
+fn sum_reducer(acc: any, x: any): int {
+    return (acc as int) + (x as int);
 }
 
 fn test_search(): int {

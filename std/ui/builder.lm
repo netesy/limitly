@@ -1,19 +1,15 @@
 // std/ui/builder.lm
-// Single-pass hybrid builder: walks Widget tree ONCE, emits DrawList + HitZones.
-//
-// Retained mode in syntax and developer ergonomics, but immediate mode in execution:
-//   - Walks the composable Widget tree in a single linear pass
-//   - Emits flat DrawCmds and HitZones directly into a DrawList
-//   - The DrawList is cached and replayed by replay.lm each frame at zero cost
-//   - Interactive events hit-test against the flat HitZone list in O(n) time
+// Single-pass hybrid builder over zero-cost embedded `comp.Fluent` components.
+// Emits flat DrawCmds and HitZones into a pooled DrawList (zero allocations on
+// rebuilds via `build_into`).
 
 import std.ui.types as ui;
+import std.ui.components as comp;
 import std.ui.draw_list as dlist;
 import std.ui.theme as theme;
-import std.text.controller as text_ctrl;
+import std.math as math;
 
 // ── Theme snapshot ────────────────────────────────────────────────────────────
-// Flat color values extracted once per build — avoids repeated field access
 frame ThemeSnap {
     pub var text_r: float; pub var text_g: float; pub var text_b: float;
     pub var text2_r: float; pub var text2_g: float; pub var text2_b: float;
@@ -45,14 +41,14 @@ pub fn default_theme_snap(): ThemeSnap {
 }
 
 pub fn snap_theme(pal: theme.ColorPalette, font_scale: float): ThemeSnap {
-    var text_c = pal.text_primary;
-    var text2_c = pal.text_secondary;
-    var bg_c = pal.background;
-    var surf_c = pal.surface;
-    var surf_v = pal.surface_variant;
-    var acc_c = pal.primary;
-    var bord_c = pal.border;
-    var s = ThemeSnap(
+    val text_c = pal.text_primary;
+    val text2_c = pal.text_secondary;
+    val bg_c = pal.background;
+    val surf_c = pal.surface;
+    val surf_v = pal.surface_variant;
+    val acc_c = pal.primary;
+    val bord_c = pal.border;
+    return ThemeSnap(
         text_r=text_c.r, text_g=text_c.g, text_b=text_c.b,
         text2_r=text2_c.r, text2_g=text2_c.g, text2_b=text2_c.b,
         bg_r=bg_c.r, bg_g=bg_c.g, bg_b=bg_c.b,
@@ -65,20 +61,19 @@ pub fn snap_theme(pal: theme.ColorPalette, font_scale: float): ThemeSnap {
         spacing=6.0,
         corner_radius=6.0
     );
-    return s;
 }
 
-// ── Layout context (stack-based, no heap alloc) ───────────────────────────────
+// ── Layout context ────────────────────────────────────────────────────────────
 frame LayoutCtx {
-    pub var x: float;         // current cursor x
-    pub var y: float;         // current cursor y
-    pub var avail_w: float;   // available width for this container
-    pub var avail_h: float;   // available height for this container
-    pub var spacing: float;   // vertical spacing between items
-    pub var clip_x: float;    // active clip rect x
-    pub var clip_y: float;    // active clip rect y
-    pub var clip_w: float;    // active clip rect width (0.0 = unclipped)
-    pub var clip_h: float;    // active clip rect height (0.0 = unclipped)
+    pub var x: float;
+    pub var y: float;
+    pub var avail_w: float;
+    pub var avail_h: float;
+    pub var spacing: float;
+    pub var clip_x: float;
+    pub var clip_y: float;
+    pub var clip_w: float;
+    pub var clip_h: float;
 }
 
 fn _add_hit(dl: dlist.DrawList, hz: dlist.HitZone, ctx: LayoutCtx): nil {
@@ -97,2172 +92,1071 @@ fn _add_overlay_hit(dl: dlist.DrawList, hz: dlist.HitZone): nil {
     dlist.dl_add_overlay_hit(dl, hz);
 }
 
-// ── Drawing & Styling Helpers ─────────────────────────────────────────────────
+// ── Drawing Helpers ───────────────────────────────────────────────────────────
 fn _draw_border(dl: dlist.DrawList, x: float, y: float, w: float, h: float, r: float, g: float, b: float, a: float = 1.0, rad: float = 0.0): nil {
-    if (rad > 0.0) {
-        dlist.dl_add(dl, dlist.dcmd_border_rounded(x, y, w, h, rad, 1.0, r, g, b, a));
-    } else {
-        dlist.dl_add(dl, dlist.dcmd_rect(x, y, w, 1.0, r, g, b, a));
-        dlist.dl_add(dl, dlist.dcmd_rect(x, y + h - 1.0, w, 1.0, r, g, b, a));
-        dlist.dl_add(dl, dlist.dcmd_rect(x, y, 1.0, h, r, g, b, a));
-        dlist.dl_add(dl, dlist.dcmd_rect(x + w - 1.0, y, 1.0, h, r, g, b, a));
-    }
+    dlist.dl_emit_rect_border(dl, x, y, w, h, rad, 1.0, r, g, b, a);
 }
 
 fn _draw_overlay_border(dl: dlist.DrawList, x: float, y: float, w: float, h: float, r: float, g: float, b: float, a: float = 1.0, rad: float = 0.0): nil {
-    if (rad > 0.0) {
-        dlist.dl_add_overlay_cmd(dl, dlist.dcmd_border_rounded(x, y, w, h, rad, 1.0, r, g, b, a));
-    } else {
-        dlist.dl_add_overlay_cmd(dl, dlist.dcmd_rect(x, y, w, 1.0, r, g, b, a));
-        dlist.dl_add_overlay_cmd(dl, dlist.dcmd_rect(x, y + h - 1.0, w, 1.0, r, g, b, a));
-        dlist.dl_add_overlay_cmd(dl, dlist.dcmd_rect(x, y, 1.0, h, r, g, b, a));
-        dlist.dl_add_overlay_cmd(dl, dlist.dcmd_rect(x + w - 1.0, y, 1.0, h, r, g, b, a));
-    }
+    dlist.dl_add_overlay_cmd(dl, dlist.dcmd_border_rounded(x, y, w, h, rad, 1.0, r, g, b, a));
 }
 
 fn _draw_shadow(dl: dlist.DrawList, x: float, y: float, w: float, h: float, rad: float = 6.0): nil {
-    dlist.dl_add(dl, dlist.dcmd_rect_rounded(x - 1.0, y + 1.0, w + 2.0, h + 2.0, rad + 1.0, 0.0, 0.0, 0.0, 0.08));
-    dlist.dl_add(dl, dlist.dcmd_rect_rounded(x - 2.0, y + 3.0, w + 4.0, h + 4.0, rad + 2.0, 0.0, 0.0, 0.0, 0.06));
-    dlist.dl_add(dl, dlist.dcmd_rect_rounded(x - 3.0, y + 6.0, w + 6.0, h + 6.0, rad + 3.0, 0.0, 0.0, 0.0, 0.04));
-    dlist.dl_add(dl, dlist.dcmd_rect_rounded(x - 4.0, y + 10.0, w + 8.0, h + 8.0, rad + 4.0, 0.0, 0.0, 0.0, 0.02));
+    dlist.dl_emit_rect_rounded(dl, x + 2.0, y + 3.0, w, h, rad, 0.0, 0.0, 0.0, 0.25);
 }
 
 fn _draw_overlay_shadow(dl: dlist.DrawList, x: float, y: float, w: float, h: float, rad: float = 6.0): nil {
-    dlist.dl_add_overlay_cmd(dl, dlist.dcmd_rect_rounded(x - 1.0, y + 1.0, w + 2.0, h + 2.0, rad + 1.0, 0.0, 0.0, 0.0, 0.08));
-    dlist.dl_add_overlay_cmd(dl, dlist.dcmd_rect_rounded(x - 2.0, y + 3.0, w + 4.0, h + 4.0, rad + 2.0, 0.0, 0.0, 0.0, 0.06));
-    dlist.dl_add_overlay_cmd(dl, dlist.dcmd_rect_rounded(x - 3.0, y + 6.0, w + 6.0, h + 6.0, rad + 3.0, 0.0, 0.0, 0.0, 0.04));
-    dlist.dl_add_overlay_cmd(dl, dlist.dcmd_rect_rounded(x - 4.0, y + 10.0, w + 8.0, h + 8.0, rad + 4.0, 0.0, 0.0, 0.0, 0.02));
+    dlist.dl_add_overlay_cmd(dl, dlist.dcmd_rect_rounded(x + 2.0, y + 3.0, w, h, rad, 0.0, 0.0, 0.0, 0.25));
 }
 
 fn _draw_checkmark(dl: dlist.DrawList, cx: float, cy: float, cr: float, cg: float, cb: float): nil {
     dlist.dl_add(dl, dlist.dcmd_line(cx + 4.0, cy + 9.5, cx + 7.5, cy + 13.0, cr, cg, cb, 1.0));
     dlist.dl_add(dl, dlist.dcmd_line(cx + 7.5, cy + 13.0, cx + 14.0, cy + 5.0, cr, cg, cb, 1.0));
-    dlist.dl_add(dl, dlist.dcmd_line(cx + 4.0, cy + 10.5, cx + 7.5, cy + 14.0, cr, cg, cb, 1.0));
-    dlist.dl_add(dl, dlist.dcmd_line(cx + 7.5, cy + 14.0, cx + 14.0, cy + 6.0, cr, cg, cb, 1.0));
 }
 
 fn _draw_overlay_checkmark(dl: dlist.DrawList, cx: float, cy: float, cr: float, cg: float, cb: float): nil {
     dlist.dl_add_overlay_cmd(dl, dlist.dcmd_line(cx + 4.0, cy + 9.5, cx + 7.5, cy + 13.0, cr, cg, cb, 1.0));
     dlist.dl_add_overlay_cmd(dl, dlist.dcmd_line(cx + 7.5, cy + 13.0, cx + 14.0, cy + 5.0, cr, cg, cb, 1.0));
-    dlist.dl_add_overlay_cmd(dl, dlist.dcmd_line(cx + 4.0, cy + 10.5, cx + 7.5, cy + 14.0, cr, cg, cb, 1.0));
-    dlist.dl_add_overlay_cmd(dl, dlist.dcmd_line(cx + 7.5, cy + 14.0, cx + 14.0, cy + 6.0, cr, cg, cb, 1.0));
-}
-
-fn _calc_text_width(text: str): float {
-    var n = len(text);
-    if (n == 0) { return 0.0; }
-    var w = 0.0;
-    var i = 0;
-    while (i < n) {
-        var b = _builtin_string_byte_at(text, i);
-        // Very narrow characters: i, l, I, space, ., ,, !, ;, :, '
-        if (b == 105 or b == 108 or b == 73 or b == 32 or b == 46 or b == 44 or b == 33 or b == 59 or b == 58 or b == 39) {
-            w = w + 3.0;
-        // Narrow characters: j, f, t, r, 1, [, ], (, ), -, /
-        } elif (b == 106 or b == 102 or b == 116 or b == 114 or b == 49 or b == 91 or b == 93 or b == 40 or b == 41 or b == 45 or b == 47) {
-            w = w + 4.5;
-        // Extra wide characters: W, M
-        } elif (b == 87 or b == 77) {
-            w = w + 9.5;
-        // Wide lowercase: w, m
-        } elif (b == 119 or b == 109) {
-            w = w + 8.5;
-        // Wide uppercase: O, Q, G, D, C, U, N, H, A, B, K, R, V, X, Y, Z
-        } elif (b == 79 or b == 81 or b == 71 or b == 68 or b == 67 or b == 85 or b == 78 or b == 72 or b == 65 or b == 66 or b == 75 or b == 82 or b == 86 or b == 88 or b == 89 or b == 90) {
-            w = w + 6.5;
-        // Narrow uppercase: E, F, L, P, S, T, J
-        } elif (b == 69 or b == 70 or b == 76 or b == 80 or b == 83 or b == 84 or b == 74) {
-            w = w + 5.8;
-        // Digits 0, 2..9
-        } elif (b >= 48 and b <= 57) {
-            w = w + 6.0;
-        // Default lowercase (a..z)
-        } else {
-            w = w + 5.5;
-        }
-        i = i + 1;
-    }
-    return w;
 }
 
 fn _draw_chevron_down(dl: dlist.DrawList, cx: float, cy: float, cr: float, cg: float, cb: float): nil {
-    dlist.dl_add(dl, dlist.dcmd_line(cx + 1.0, cy + 3.0, cx + 5.5, cy + 7.5, cr, cg, cb, 1.0));
-    dlist.dl_add(dl, dlist.dcmd_line(cx + 5.5, cy + 7.5, cx + 10.0, cy + 3.0, cr, cg, cb, 1.0));
+    dlist.dl_add(dl, dlist.dcmd_line(cx, cy, cx + 4.5, cy + 4.5, cr, cg, cb, 1.0));
+    dlist.dl_add(dl, dlist.dcmd_line(cx + 4.5, cy + 4.5, cx + 9.0, cy, cr, cg, cb, 1.0));
 }
 
 fn _draw_chevron_up(dl: dlist.DrawList, cx: float, cy: float, cr: float, cg: float, cb: float): nil {
-    dlist.dl_add(dl, dlist.dcmd_line(cx + 1.0, cy + 7.5, cx + 5.5, cy + 3.0, cr, cg, cb, 1.0));
-    dlist.dl_add(dl, dlist.dcmd_line(cx + 5.5, cy + 3.0, cx + 10.0, cy + 7.5, cr, cg, cb, 1.0));
+    dlist.dl_add(dl, dlist.dcmd_line(cx, cy + 4.5, cx + 4.5, cy, cr, cg, cb, 1.0));
+    dlist.dl_add(dl, dlist.dcmd_line(cx + 4.5, cy, cx + 9.0, cy + 4.5, cr, cg, cb, 1.0));
 }
 
-fn _draw_chevron_right(dl: dlist.DrawList, cx: float, cy: float, cr: float, cg: float, cb: float): nil {
-    dlist.dl_add(dl, dlist.dcmd_line(cx + 2.0, cy + 1.0, cx + 6.5, cy + 5.5, cr, cg, cb, 1.0));
-    dlist.dl_add(dl, dlist.dcmd_line(cx + 6.5, cy + 5.5, cx + 2.0, cy + 10.0, cr, cg, cb, 1.0));
-}
-
-// ── Main build entry point ────────────────────────────────────────────────────
-// Walks root Widget once and emits a fully-populated DrawList.
-pub fn build(root: ui.Widget, vw: float, vh: float, ts: any = nil, x: float = 0.0, y: float = 0.0): dlist.DrawList {
-    var dl = dlist.draw_list();
+// ── Build APIs ────────────────────────────────────────────────────────────────
+pub fn build_into(
+    dl: dlist.DrawList,
+    root: comp.Fluent,
+    vw: float,
+    vh: float,
+    ts: ThemeSnap | nil = nil,
+    x: float = 0.0,
+    y: float = 0.0
+): nil {
+    dl.clear();
     var actual_ts = default_theme_snap();
     if (ts != nil) {
         actual_ts = ts as ThemeSnap;
     }
-    var ctx = LayoutCtx(
+    val ctx = LayoutCtx(
         x=x, y=y, avail_w=vw, avail_h=vh, spacing=actual_ts.spacing,
         clip_x=0.0, clip_y=0.0, clip_w=0.0, clip_h=0.0
     );
     _emit(dl, root, ctx, actual_ts);
     dlist.dl_flush_overlays(dl);
     dl.is_valid = 1;
+}
+
+pub fn build(
+    root: comp.Fluent,
+    vw: float,
+    vh: float,
+    ts: ThemeSnap | nil = nil,
+    x: float = 0.0,
+    y: float = 0.0
+): dlist.DrawList {
+    val dl = dlist.draw_list();
+    build_into(dl, root, vw, vh, ts, x, y);
     return dl;
 }
 
-// ── Widget emitter ────────────────────────────────────────────────────────────
-// Returns height consumed. Adds DrawCmds and HitZones to dl in place.
-fn _emit(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float {
-    // Enum-valued dispatch via `match` (tag compare lowered over the WidgetKind
-    // variants). Qualified arms on the imported enum resolve against the scrutinee's
-    // own enum type, so no `==` fallback is needed here.
-    match (w.kind) {
-        ui.WidgetKind.Text => { return _emit_text(dl, w, ctx, ts); },
-        ui.WidgetKind.Button => { return _emit_button(dl, w, ctx, ts); },
-        ui.WidgetKind.Container => { return _emit_container(dl, w, ctx, ts); },
+// ── Widget Dispatcher ─────────────────────────────────────────────────────────
+fn _emit(dl: dlist.DrawList, w: comp.Fluent, ctx: LayoutCtx, ts: ThemeSnap): float {
+    match (w.widget_kind()) {
+        ui.WidgetKind.Text => { return _emit_text(dl, w as comp.Label, ctx, ts); },
+        ui.WidgetKind.Button => { return _emit_button(dl, w as comp.Button, ctx, ts); },
+        ui.WidgetKind.Container => { return _emit_container(dl, w as comp.Container, ctx, ts); },
+        ui.WidgetKind.List => { return _emit_container(dl, w as comp.Container, ctx, ts); },
+        ui.WidgetKind.Join => { return _emit_container(dl, w as comp.Container, ctx, ts); },
+        ui.WidgetKind.Dock => { return _emit_container(dl, w as comp.Container, ctx, ts); },
         ui.WidgetKind.Spacer => {
-            if (w.height_val > 0.0) { return w.height_val; }
+            val h = w.get_height();
+            if (h > 0.0) { return h; }
             return ts.spacing;
         },
-        ui.WidgetKind.Slider => { return _emit_slider(dl, w, ctx, ts); },
-        ui.WidgetKind.Checkbox => { return _emit_checkbox(dl, w, ctx, ts); },
-        ui.WidgetKind.Input => { return _emit_input(dl, w, ctx, ts); },
-        ui.WidgetKind.Progress => { return _emit_progress(dl, w, ctx, ts); },
-        ui.WidgetKind.Toggle => { return _emit_toggle(dl, w, ctx, ts); },
-        ui.WidgetKind.Badge => { return _emit_badge(dl, w, ctx, ts); },
-        ui.WidgetKind.Card => { return _emit_card(dl, w, ctx, ts); },
-        ui.WidgetKind.Alert => { return _emit_alert(dl, w, ctx, ts); },
-        ui.WidgetKind.Toast => { return _emit_alert(dl, w, ctx, ts); },
-        ui.WidgetKind.Scroll => { return _emit_scroll(dl, w, ctx, ts); },
-        ui.WidgetKind.Tabs => { return _emit_tabs(dl, w, ctx, ts); },
-        ui.WidgetKind.Select => { return _emit_select(dl, w, ctx, ts); },
-        ui.WidgetKind.MultiSelect => { return _emit_multi_select(dl, w, ctx, ts); },
-        ui.WidgetKind.Textarea => { return _emit_textarea(dl, w, ctx, ts); },
-        ui.WidgetKind.Table => { return _emit_table(dl, w, ctx, ts); },
-        ui.WidgetKind.Accordion => { return _emit_accordion(dl, w, ctx, ts); },
-        ui.WidgetKind.Stat => { return _emit_stat(dl, w, ctx, ts); },
-        ui.WidgetKind.Indicator => { return _emit_indicator(dl, w, ctx, ts); },
-        ui.WidgetKind.Link => { return _emit_link(dl, w, ctx, ts); },
-        ui.WidgetKind.Stepper => { return _emit_stepper(dl, w, ctx, ts); },
-        ui.WidgetKind.RangeSlider => { return _emit_range_slider(dl, w, ctx, ts); },
-        ui.WidgetKind.ColorPicker => { return _emit_color_picker(dl, w, ctx, ts); },
-        ui.WidgetKind.Steps => { return _emit_steps(dl, w, ctx, ts); },
-        ui.WidgetKind.Timeline => { return _emit_timeline(dl, w, ctx, ts); },
-        ui.WidgetKind.TreeNode => { return _emit_tree_node(dl, w, ctx, ts); },
-        ui.WidgetKind.FormField => { return _emit_form_field(dl, w, ctx, ts); },
-        ui.WidgetKind.Diff => { return _emit_diff(dl, w, ctx, ts); },
-        ui.WidgetKind.FileInput => { return _emit_file_input(dl, w, ctx, ts); },
-        ui.WidgetKind.Filter => { return _emit_filter(dl, w, ctx, ts); },
-        ui.WidgetKind.Calendar => { return _emit_calendar(dl, w, ctx, ts); },
-        ui.WidgetKind.BarChart => { return _emit_bar_chart(dl, w, ctx, ts); },
-        ui.WidgetKind.LineChart => { return _emit_line_chart(dl, w, ctx, ts); },
-        ui.WidgetKind.PieChart => { return _emit_pie_chart(dl, w, ctx, ts); },
-        ui.WidgetKind.DoughnutChart => { return _emit_pie_chart(dl, w, ctx, ts); },
-        ui.WidgetKind.PolarAreaChart => { return _emit_pie_chart(dl, w, ctx, ts); },
-        ui.WidgetKind.PlotHistogram => { return _emit_histogram(dl, w, ctx, ts); },
-        ui.WidgetKind.PlotLines => { return _emit_line_chart(dl, w, ctx, ts); },
-        ui.WidgetKind.List => { return _emit_container(dl, w, ctx, ts); },
-        ui.WidgetKind.Join => { return _emit_container(dl, w, ctx, ts); },
-        ui.WidgetKind.Dock => { return _emit_container(dl, w, ctx, ts); },
-        ui.WidgetKind.Tooltip => {
-            if (len(w.children) > 0) { return _emit(dl, w.children[0], ctx, ts); }
+        ui.WidgetKind.Slider => { return _emit_slider(dl, w as comp.Slider, ctx, ts); },
+        ui.WidgetKind.RangeSlider => { return _emit_range_slider(dl, w as comp.RangeSlider, ctx, ts); },
+        ui.WidgetKind.Checkbox => { return _emit_checkbox(dl, w as comp.Checkbox, ctx, ts); },
+        ui.WidgetKind.Toggle => { return _emit_toggle(dl, w as comp.Toggle, ctx, ts); },
+        ui.WidgetKind.Input => { return _emit_input(dl, w as comp.TextInput, ctx, ts); },
+        ui.WidgetKind.Textarea => { return _emit_textarea(dl, w as comp.TextInput, ctx, ts); },
+        ui.WidgetKind.Progress => { return _emit_progress(dl, w as comp.ProgressBar, ctx, ts); },
+        ui.WidgetKind.Badge => { return _emit_badge(dl, w as comp.Badge, ctx, ts); },
+        ui.WidgetKind.Card => { return _emit_card(dl, w as comp.Card, ctx, ts); },
+        ui.WidgetKind.Alert => { return _emit_alert(dl, w as comp.Alert, ctx, ts); },
+        ui.WidgetKind.Toast => { return _emit_alert(dl, w as comp.Alert, ctx, ts); },
+        ui.WidgetKind.Scroll => { return _emit_scroll(dl, w as comp.ScrollView, ctx, ts); },
+        ui.WidgetKind.Tabs => { return _emit_tabs(dl, w as comp.Tabs, ctx, ts); },
+        ui.WidgetKind.Select => { return _emit_select(dl, w as comp.Select, ctx, ts); },
+        ui.WidgetKind.MultiSelect => { return _emit_multi_select(dl, w as comp.Select, ctx, ts); },
+        ui.WidgetKind.Stepper => { return _emit_stepper(dl, w as comp.Stepper, ctx, ts); },
+        ui.WidgetKind.Table => { return _emit_table(dl, w as comp.Table, ctx, ts); },
+        ui.WidgetKind.Accordion => { return _emit_accordion(dl, w as comp.Accordion, ctx, ts); },
+        ui.WidgetKind.Stat => { return _emit_stat(dl, w as comp.Stat, ctx, ts); },
+        ui.WidgetKind.Indicator => { return _emit_indicator(dl, w as comp.Indicator, ctx, ts); },
+        ui.WidgetKind.Link => { return _emit_link(dl, w as comp.Link, ctx, ts); },
+        ui.WidgetKind.ColorPicker => { return _emit_color_picker(dl, w as comp.ColorPicker, ctx, ts); },
+        ui.WidgetKind.Steps => { return _emit_steps(dl, w as comp.Steps, ctx, ts); },
+        ui.WidgetKind.Timeline => { return _emit_timeline(dl, w as comp.Timeline, ctx, ts); },
+        ui.WidgetKind.TreeNode => { return _emit_tree_node(dl, w as comp.TreeNode, ctx, ts); },
+        ui.WidgetKind.FormField => { return _emit_form_field(dl, w as comp.FormField, ctx, ts); },
+        ui.WidgetKind.Diff => { return _emit_diff(dl, w as comp.Diff, ctx, ts); },
+        ui.WidgetKind.FileInput => { return _emit_file_input(dl, w as comp.FileInput, ctx, ts); },
+        ui.WidgetKind.Filter => { return _emit_filter(dl, w as comp.Filter, ctx, ts); },
+        ui.WidgetKind.Calendar => { return _emit_calendar(dl, w as comp.Calendar, ctx, ts); },
+        ui.WidgetKind.Image => { return _emit_image(dl, w as comp.Image, ctx, ts); },
+        ui.WidgetKind.BarChart => { return _emit_bar_chart(dl, w as comp.Chart, ctx, ts); },
+        ui.WidgetKind.BubbleChart => { return _emit_bar_chart(dl, w as comp.Chart, ctx, ts); },
+        ui.WidgetKind.ScatterChart => { return _emit_line_chart(dl, w as comp.Chart, ctx, ts); },
+        ui.WidgetKind.LineChart => { return _emit_line_chart(dl, w as comp.Chart, ctx, ts); },
+        ui.WidgetKind.PlotLines => { return _emit_line_chart(dl, w as comp.Chart, ctx, ts); },
+        ui.WidgetKind.PieChart => { return _emit_pie_chart(dl, w as comp.Chart, ctx, ts); },
+        ui.WidgetKind.DoughnutChart => { return _emit_pie_chart(dl, w as comp.Chart, ctx, ts); },
+        ui.WidgetKind.PolarAreaChart => { return _emit_pie_chart(dl, w as comp.Chart, ctx, ts); },
+        ui.WidgetKind.RadarChart => { return _emit_pie_chart(dl, w as comp.Chart, ctx, ts); },
+        ui.WidgetKind.PlotHistogram => { return _emit_histogram(dl, w as comp.Chart, ctx, ts); },
+        ui.WidgetKind.Overlay => {
+            val c = w as comp.Container;
+            if (len(c.children) > 0) {
+                var ox = ctx.x;
+                var oy = ctx.y;
+                if (c.overlay_x > 0.0) { ox = c.overlay_x; }
+                if (c.overlay_y > 0.0) { oy = c.overlay_y; }
+                var ow = ctx.avail_w;
+                var oh = ctx.avail_h;
+                if (c.overlay_w > 0.0) { ow = c.overlay_w; }
+                if (c.overlay_h > 0.0) { oh = c.overlay_h; }
+                val ov_ctx = LayoutCtx(
+                    x=ox, y=oy, avail_w=ow, avail_h=oh, spacing=ctx.spacing,
+                    clip_x=0.0, clip_y=0.0, clip_w=0.0, clip_h=0.0
+                );
+                return _emit(dl, c.children[0], ov_ctx, ts);
+            }
             return 0.0;
         },
-        ui.WidgetKind.Overlay => {
-            if (len(w.children) > 0) { return _emit(dl, w.children[0], ctx, ts); }
+        ui.WidgetKind.Tooltip => {
+            val c = w as comp.Container;
+            if (len(c.children) > 0) { return _emit(dl, c.children[0], ctx, ts); }
             return 0.0;
         },
         ui.WidgetKind.Mask => {
-            if (len(w.children) > 0) { return _emit(dl, w.children[0], ctx, ts); }
+            val c = w as comp.Container;
+            if (len(c.children) > 0) { return _emit(dl, c.children[0], ctx, ts); }
             return 0.0;
         },
         _ => {
-            // Unknown widget — emit a placeholder rect
-            dlist.dl_add(dl, dlist.dcmd_rect(ctx.x, ctx.y, ctx.avail_w, 24.0, 0.3, 0.3, 0.3, 0.5));
+            dlist.dl_emit_rect(dl, ctx.x, ctx.y, ctx.avail_w, 24.0, 0.3, 0.3, 0.3, 0.5);
             return 24.0;
         }
     }
 }
 
-// ── Text ──────────────────────────────────────────────────────────────────────
-fn _emit_text(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float {
+// ── Text / Label ──────────────────────────────────────────────────────────────
+fn _emit_text(dl: dlist.DrawList, w: comp.Label, ctx: LayoutCtx, ts: ThemeSnap): float {
+    val txt = w.resolved_text();
     var fs = w.font_size_val;
     if (fs <= 0.0) { fs = 14.0; }
-    var scale = fs / 14.0;
-    var text_len = len(w.text_val) as float;
-    var text_w = text_len * 8.0 * scale;
-    var total_w = text_w + w.padding_left + w.padding_right;
+    val scale = fs / 14.0;
+    val text_w = (len(txt) as float) * 8.0 * scale;
+    var total_w = text_w + w.pad_l + w.pad_r;
     if (w.width_val > 0.0) { total_w = w.width_val; }
 
-    var h = fs + w.padding_top + w.padding_bottom + 4.0;
+    var h = fs + w.pad_t + w.pad_b + 4.0;
     if (w.height_val > 0.0) { h = w.height_val; }
 
-    // Optional background
-    if (w.background_color.a > 0.0) {
-        var rad = w.corner_radius_val;
-        if (rad > 0.0) {
-            dlist.dl_add(dl, dlist.dcmd_rect_rounded(ctx.x, ctx.y, total_w, h, rad, w.background_color.r, w.background_color.g, w.background_color.b, w.background_color.a));
+    if (w.bg.a > 0.0) {
+        if (w.radius > 0.0) {
+            dlist.dl_emit_rect_rounded(dl, ctx.x, ctx.y, total_w, h, w.radius, w.bg.r, w.bg.g, w.bg.b, w.bg.a);
         } else {
-            dlist.dl_add(dl, dlist.dcmd_rect(ctx.x, ctx.y, total_w, h, w.background_color.r, w.background_color.g, w.background_color.b, w.background_color.a));
+            dlist.dl_emit_rect(dl, ctx.x, ctx.y, total_w, h, w.bg.r, w.bg.g, w.bg.b, w.bg.a);
         }
     }
 
-    var tx = ctx.x + w.padding_left;
-    var ty = ctx.y + w.padding_top;
     var cr = ts.text_r; var cg = ts.text_g; var cb = ts.text_b; var ca = 1.0;
-    if (w.foreground_color.a > 0.0) {
-        cr = w.foreground_color.r;
-        cg = w.foreground_color.g;
-        cb = w.foreground_color.b;
-        ca = w.foreground_color.a;
+    if (w.fg.a > 0.0) {
+        cr = w.fg.r; cg = w.fg.g; cb = w.fg.b; ca = w.fg.a * w.opacity_val;
     }
-    dlist.dl_add(dl, dlist.dcmd_text(w.text_val, tx, ty, cr, cg, cb, ca, scale));
+    dlist.dl_emit_text(dl, txt, ctx.x + w.pad_l, ctx.y + w.pad_t, cr, cg, cb, ca, scale);
 
     if (w.on_click_action != nil) {
-        _add_hit(dl, dlist.make_button_zone(w.text_val, ctx.x, ctx.y, total_w, h, w.on_click_action, w), ctx);
+        _add_hit(dl, dlist.make_button_zone_for(txt, ctx.x, ctx.y, total_w, h, w.on_click_action, w), ctx);
     }
-
     return h;
 }
 
 // ── Button ────────────────────────────────────────────────────────────────────
-fn _emit_button(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float {
+fn _emit_button(dl: dlist.DrawList, w: comp.Button, ctx: LayoutCtx, ts: ThemeSnap): float {
     var bw = w.width_val;
     if (bw <= 0.0) {
-        bw = (len(w.text_val) as float) * 7.5 + w.padding_left + w.padding_right + 20.0;
+        bw = (len(w.label) as float) * 7.5 + w.pad_l + w.pad_r + 20.0;
         if (bw < 64.0) { bw = 64.0; }
     }
     var bh = w.height_val;
-    if (bh <= 0.0) { bh = 30.0 + w.padding_top + w.padding_bottom; }
+    if (bh <= 0.0) { bh = 20.0 + w.pad_t + w.pad_b; }
 
-    var bx = ctx.x; var by = ctx.y;
-    var rad = w.corner_radius_val;
+    val bx = ctx.x; val by = ctx.y;
+    var rad = w.radius;
     if (rad <= 0.0) { rad = ts.corner_radius; }
 
-    // Background color resolution
     var bgr = ts.btn_r; var bgg = ts.btn_g; var bgb = ts.btn_b; var bga = 1.0;
-    if (w.background_color.a > 0.0) {
-        bgr = w.background_color.r;
-        bgg = w.background_color.g;
-        bgb = w.background_color.b;
-        bga = w.background_color.a;
+    if (w.bg.a > 0.0) {
+        bgr = w.bg.r; bgg = w.bg.g; bgb = w.bg.b; bga = w.bg.a;
     }
 
-    if (w.is_pressed != 0) {
-        if (w.pressed_style_val != nil) {
-            var ps = w.pressed_style_val as ui.Style;
-            if (ps.has_bg) {
-                bgr = ps.bg.r; bgg = ps.bg.g; bgb = ps.bg.b; bga = ps.bg.a;
-            } else {
-                bgr = bgr * 0.7; bgg = bgg * 0.7; bgb = bgb * 0.7;
-            }
+    if (w.is_pressed) {
+        val ps_opt = w.pressed_style_val;
+        if (ps_opt != nil and (ps_opt as ui.Style).has_bg) {
+            val ps = ps_opt as ui.Style;
+            bgr = ps.bg.r; bgg = ps.bg.g; bgb = ps.bg.b; bga = ps.bg.a;
         } else {
             bgr = bgr * 0.7; bgg = bgg * 0.7; bgb = bgb * 0.7;
         }
-    } elif (w.is_hovered != 0) {
-        bgr = ts.btn_hover_r; bgg = ts.btn_hover_g; bgb = ts.btn_hover_b;
+    } elif (w.is_hovered) {
+        val hs_opt = w.hover_style_val;
+        if (hs_opt != nil and (hs_opt as ui.Style).has_bg) {
+            val hs = hs_opt as ui.Style;
+            bgr = hs.bg.r; bgg = hs.bg.g; bgb = hs.bg.b; bga = hs.bg.a;
+        } else {
+            bgr = ts.btn_hover_r; bgg = ts.btn_hover_g; bgb = ts.btn_hover_b;
+        }
     }
 
     if (rad > 0.0) {
-        dlist.dl_add(dl, dlist.dcmd_rect_rounded(bx, by, bw, bh, rad, bgr, bgg, bgb, bga));
+        dlist.dl_emit_rect_rounded(dl, bx, by, bw, bh, rad, bgr, bgg, bgb, bga);
     } else {
-        dlist.dl_add(dl, dlist.dcmd_rect(bx, by, bw, bh, bgr, bgg, bgb, bga));
+        dlist.dl_emit_rect(dl, bx, by, bw, bh, bgr, bgg, bgb, bga);
     }
 
-    // Subtle 1px border for crisp tactile feel
     var bord_r = ts.border_r; var bord_g = ts.border_g; var bord_b = ts.border_b; var bord_a = 0.7;
-    if (w.is_hovered != 0) {
+    if (w.is_hovered) {
         bord_r = ts.accent_r; bord_g = ts.accent_g; bord_b = ts.accent_b; bord_a = 0.9;
     }
     _draw_border(dl, bx, by, bw, bh, bord_r, bord_g, bord_b, bord_a, rad);
 
-    // Label with accurate proportional font centering
-    var fs = w.font_size_val;
     var scale = 1.0;
-    if (fs > 0.0) { scale = fs / 14.0; }
-    var text_w = (len(w.text_val) as float) * 7.5 * scale;
-    var tx = bx + (bw - text_w) / 2.0;
-    var ty = by + (bh - 10.0 * scale) / 2.0;
-
-    if (w.is_pressed != 0) {
-        tx = tx + 1.0; ty = ty + 1.0;
-    }
+    if (w.font_size_val > 0.0) { scale = w.font_size_val / 14.0; }
+    val text_w = (len(w.label) as float) * 7.5 * scale;
+    var tx = bx + (bw - text_w) * 0.5;
+    var ty = by + (bh - 10.0 * scale) * 0.5;
+    if (w.is_pressed) { tx = tx + 1.0; ty = ty + 1.0; }
 
     var tr = ts.text_r; var tg = ts.text_g; var tb = ts.text_b; var ta = 1.0;
-    if (w.foreground_color.a > 0.0) {
-        tr = w.foreground_color.r;
-        tg = w.foreground_color.g;
-        tb = w.foreground_color.b;
-        ta = w.foreground_color.a;
+    if (w.fg.a > 0.0) {
+        tr = w.fg.r; tg = w.fg.g; tb = w.fg.b; ta = w.fg.a;
     }
-    if (w.is_pressed != 0 and w.pressed_style_val != nil) {
-        var ps = w.pressed_style_val as ui.Style;
-        if (ps.has_fg) {
-            tr = ps.fg.r; tg = ps.fg.g; tb = ps.fg.b; ta = ps.fg.a;
-        }
-    }
-    dlist.dl_add(dl, dlist.dcmd_text(w.text_val, tx, ty, tr, tg, tb, ta, scale));
+    dlist.dl_emit_text(dl, w.label, tx, ty, tr, tg, tb, ta, scale);
 
-    // Hit zone
-    _add_hit(dl, dlist.make_button_zone(w.text_val, bx, by, bw, bh, w.on_click_action, w), ctx);
-
+    _add_hit(dl, dlist.make_button_zone_for(w.label, bx, by, bw, bh, w.on_click_action, w), ctx);
     return bh;
 }
 
-// ── Natural Sizing Resolver for Layout ────────────────────────────────────────
-fn _get_natural_width(child: ui.Widget): float {
-    if (child.width_val > 0.0) { return child.width_val; }
-    match (child.kind) {
+// ── Natural width helper for horizontal Row layout ────────────────────────────
+fn _get_natural_width(child: comp.Fluent): float {
+    val ww = child.get_width();
+    if (ww > 0.0) { return ww; }
+    match (child.widget_kind()) {
+        ui.WidgetKind.Text => {
+            val lbl = child as comp.Label;
+            var scale = 1.0;
+            if (lbl.font_size_val > 0.0) { scale = lbl.font_size_val / 14.0; }
+            return (len(lbl.resolved_text()) as float) * 7.5 * scale + lbl.pad_l + lbl.pad_r;
+        },
         ui.WidgetKind.Button => {
-            var bw = (len(child.text_val) as float) * 8.0 + child.padding_left + child.padding_right + 20.0;
-            if (bw < 64.0) { return 64.0; }
+            val btn = child as comp.Button;
+            var bw = (len(btn.label) as float) * 7.5 + btn.pad_l + btn.pad_r + 20.0;
+            if (bw < 64.0) { bw = 64.0; }
             return bw;
         },
-        ui.WidgetKind.Text => {
-            return (len(child.text_val) as float) * 8.0 + child.padding_left + child.padding_right;
-        },
         ui.WidgetKind.Badge => {
-            return _calc_text_width(child.text_val) + 16.0 + child.padding_left + child.padding_right;
+            val bdg = child as comp.Badge;
+            return (len(bdg.label) as float) * 7.0 + bdg.pad_l + bdg.pad_r;
         },
-        ui.WidgetKind.Slider => { return 210.0; },
-        ui.WidgetKind.RangeSlider => { return 210.0; },
-        ui.WidgetKind.Stepper => { return 110.0; },
-        ui.WidgetKind.ColorPicker => { return 130.0; },
-        ui.WidgetKind.Select => { return 230.0; },
-        ui.WidgetKind.MultiSelect => { return 230.0; },
-        ui.WidgetKind.Input => { return 220.0; },
+        ui.WidgetKind.Checkbox => { return 18.0 + child.get_pad_l() + child.get_pad_r(); },
+        ui.WidgetKind.Toggle => { return 48.0; },
+        ui.WidgetKind.Indicator => {
+            val ind = child as comp.Indicator;
+            return 16.0 + (len(ind.label) as float) * 7.5;
+        },
+        ui.WidgetKind.Link => {
+            val lnk = child as comp.Link;
+            return (len(lnk.text) as float) * 7.5;
+        },
         ui.WidgetKind.Progress => { return 160.0; },
-        ui.WidgetKind.Stat => { return 160.0; },
-        ui.WidgetKind.Card => { return 220.0; },
-        ui.WidgetKind.Toggle => {
-            var tw = 40.0;
-            if (len(child.text_val) > 0) {
-                tw = tw + (len(child.text_val) as float) * 7.5 + 10.0;
-            }
-            return tw + child.padding_left + child.padding_right;
-        },
-        ui.WidgetKind.Checkbox => {
-            var cw = 20.0;
-            if (len(child.text_val) > 0 and child.text_val != "[X]" and child.text_val != "[ ]") {
-                cw = cw + _calc_text_width(child.text_val) + 8.0;
-            }
-            return cw + child.padding_left + child.padding_right;
-        },
+        ui.WidgetKind.Slider => { return 180.0; },
+        ui.WidgetKind.Input => { return 200.0; },
         ui.WidgetKind.Container => {
-            var cn = len(child.children);
-            if (cn == 0) { return 80.0; }
-            if (child.is_vertical == 1) {
-                var max_w = 0.0;
-                var ci = 0;
-                while (ci < cn) {
-                    var sub_w = _get_natural_width(child.children[ci]);
-                    if (sub_w > max_w) { max_w = sub_w; }
-                    ci = ci + 1;
+            val c = child as comp.Container;
+            if (not c.is_vertical()) {
+                var tot = c.pad_l + c.pad_r;
+                val n = len(c.children);
+                if (n > 0) {
+                    iter (i in 0..n) {
+                        tot = tot + _get_natural_width(c.children[i]);
+                    }
                 }
-                return max_w + child.padding_left + child.padding_right;
-            } else {
-                var sum_w = 0.0;
-                var ci = 0;
-                while (ci < cn) {
-                    sum_w = sum_w + _get_natural_width(child.children[ci]);
-                    ci = ci + 1;
-                }
-                if (cn > 1) { sum_w = sum_w + ((cn - 1) as float) * 8.0; }
-                return sum_w + child.padding_left + child.padding_right;
+                return tot;
             }
+            return 220.0;
         },
-        _ => { return 120.0; }
+        _ => { return 140.0; }
     }
 }
 
 // ── Container (Column / Row / Stack) ──────────────────────────────────────────
-fn _emit_container(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float {
-    var ox = ctx.x + w.padding_left;
-    var oy = ctx.y + w.padding_top;
-    var inner_w = ctx.avail_w - w.padding_left - w.padding_right;
+fn _emit_container(dl: dlist.DrawList, w: comp.Container, ctx: LayoutCtx, ts: ThemeSnap): float {
+    val ox = ctx.x + w.pad_l;
+    val oy = ctx.y + w.pad_t;
+    var cont_w = ctx.avail_w;
+    if (w.width_val > 0.0) { cont_w = w.width_val; }
+    val inner_w = cont_w - w.pad_l - w.pad_r;
     var spacing = w.spacing_val;
     if (spacing <= 0.0) { spacing = ts.spacing; }
+    val n = len(w.children);
 
-    var i = 0;
-    var n = len(w.children);
+    var bg_h = ctx.avail_h;
+    if (w.height_val > 0.0) { bg_h = w.height_val; }
+    if (w.bg.a > 0.0) {
+        if (w.radius > 0.0) {
+            dlist.dl_emit_rect_rounded(dl, ctx.x, ctx.y, cont_w, bg_h, w.radius, w.bg.r, w.bg.g, w.bg.b, w.bg.a);
+        } else {
+            dlist.dl_emit_rect(dl, ctx.x, ctx.y, cont_w, bg_h, w.bg.r, w.bg.g, w.bg.b, w.bg.a);
+        }
+    }
 
-    if (w.is_vertical == 1) {
-        // Column layout
-        // First compute total height to draw background properly
+    if (w.flow == comp.Flow.Vertical) {
         var cy = oy;
-        var total_h = w.padding_top + w.padding_bottom;
-
-        // Background added first if container has known height or bounds
-        var bg_h = ctx.avail_h;
-        if (w.height_val > 0.0) { bg_h = w.height_val; }
-        if (w.background_color.a > 0.0) {
-            var rad = w.corner_radius_val;
-            var bg = w.background_color;
-            if (rad > 0.0) {
-                dlist.dl_add(dl, dlist.dcmd_rect_rounded(ctx.x, ctx.y, ctx.avail_w, bg_h, rad, bg.r, bg.g, bg.b, bg.a));
-            } else {
-                dlist.dl_add(dl, dlist.dcmd_rect(ctx.x, ctx.y, ctx.avail_w, bg_h, bg.r, bg.g, bg.b, bg.a));
+        var total_h = w.pad_t + w.pad_b;
+        if (n > 0) {
+            iter (i in 0..n) {
+                val child_ctx = LayoutCtx(
+                    x=ox, y=cy, avail_w=inner_w, avail_h=0.0, spacing=spacing,
+                    clip_x=ctx.clip_x, clip_y=ctx.clip_y, clip_w=ctx.clip_w, clip_h=ctx.clip_h
+                );
+                val ch = _emit(dl, w.children[i], child_ctx, ts);
+                cy = cy + ch;
+                total_h = total_h + ch;
+                if (i < n - 1) {
+                    cy = cy + spacing;
+                    total_h = total_h + spacing;
+                }
             }
         }
-
-        while (i < n) {
-            var child_ctx = LayoutCtx(
-                x=ox, y=cy, avail_w=inner_w, avail_h=0.0, spacing=spacing,
-                clip_x=ctx.clip_x, clip_y=ctx.clip_y, clip_w=ctx.clip_w, clip_h=ctx.clip_h
-            );
-            var ch = _emit(dl, w.children[i], child_ctx, ts);
-            cy = cy + ch;
-            total_h = total_h + ch;
-            if (i < n - 1) {
-                cy = cy + spacing;
-                total_h = total_h + spacing;
-            }
-            i = i + 1;
-        }
+        if (w.height_val > 0.0 and w.height_val > total_h) { return w.height_val; }
         return total_h;
-    } elif (w.is_vertical == 0) {
-        // Row layout — measure fixed widths first, then distribute remaining to spacers/grow children
+    } elif (w.flow == comp.Flow.Horizontal) {
         var fixed_total = 0.0;
         var grow_count = 0;
-        var j = 0;
-        while (j < n) {
-            var child = w.children[j];
-            if (child.kind == ui.KIND_SPACER or child.grow > 0.0) {
-                grow_count = grow_count + 1;
-            } else {
-                var cw = child.width_val;
-                if (cw <= 0.0) {
-                    cw = _get_natural_width(child);
+        if (n > 0) {
+            iter (j in 0..n) {
+                val child = w.children[j];
+                if (child.widget_kind() == ui.WidgetKind.Spacer or child.get_grow() > 0.0) {
+                    grow_count = grow_count + 1;
+                } else {
+                    fixed_total = fixed_total + _get_natural_width(child);
                 }
-                fixed_total = fixed_total + cw;
             }
-            j = j + 1;
         }
         var gap_total = 0.0;
-        if (n > 1) {
-            gap_total = ((n - 1) as float) * spacing;
-        }
+        if (n > 1) { gap_total = ((n - 1) as float) * spacing; }
         var grow_unit = 0.0;
         if (grow_count > 0) {
-            var remaining = inner_w - fixed_total - gap_total;
-            if (remaining > 0.0) {
-                grow_unit = remaining / (grow_count as float);
-            }
-        }
-
-        var bg_h = ctx.avail_h;
-        if (w.height_val > 0.0) { bg_h = w.height_val; }
-        if (w.background_color.a > 0.0) {
-            var rad = w.corner_radius_val;
-            var bg = w.background_color;
-            if (rad > 0.0) {
-                dlist.dl_add(dl, dlist.dcmd_rect_rounded(ctx.x, ctx.y, ctx.avail_w, bg_h, rad, bg.r, bg.g, bg.b, bg.a));
-            } else {
-                dlist.dl_add(dl, dlist.dcmd_rect(ctx.x, ctx.y, ctx.avail_w, bg_h, bg.r, bg.g, bg.b, bg.a));
-            }
+            val remaining = inner_w - fixed_total - gap_total;
+            if (remaining > 0.0) { grow_unit = remaining / (grow_count as float); }
         }
 
         var cx = ox;
         var max_h = 0.0;
-        while (i < n) {
-            var child = w.children[i];
-            if (child.kind == ui.KIND_SPACER) {
-                cx = cx + grow_unit;
-            } else {
-                var cw = child.width_val;
-                if (child.grow > 0.0) {
-                    cw = grow_unit * child.grow;
-                } elif (cw <= 0.0) {
-                    cw = _get_natural_width(child);
+        if (n > 0) {
+            iter (i in 0..n) {
+                val child = w.children[i];
+                if (child.widget_kind() == ui.WidgetKind.Spacer) {
+                    cx = cx + grow_unit;
+                } else {
+                    var cw = _get_natural_width(child);
+                    if (child.get_grow() > 0.0) {
+                        cw = grow_unit * child.get_grow();
+                    }
+                    val child_ctx = LayoutCtx(
+                        x=cx, y=oy, avail_w=cw, avail_h=0.0, spacing=spacing,
+                        clip_x=ctx.clip_x, clip_y=ctx.clip_y, clip_w=ctx.clip_w, clip_h=ctx.clip_h
+                    );
+                    val ch = _emit(dl, child, child_ctx, ts);
+                    if (ch > max_h) { max_h = ch; }
+                    cx = cx + cw;
                 }
-                var child_ctx = LayoutCtx(
-                    x=cx, y=oy, avail_w=cw, avail_h=0.0, spacing=spacing,
+                if (i < n - 1) { cx = cx + spacing; }
+            }
+        }
+        val ret_h = w.pad_t + w.pad_b + max_h;
+        if (w.height_val > 0.0 and w.height_val > ret_h) { return w.height_val; }
+        return ret_h;
+    } else {
+        var max_h = 0.0;
+        if (n > 0) {
+            iter (i in 0..n) {
+                val child_ctx = LayoutCtx(
+                    x=ox, y=oy, avail_w=inner_w, avail_h=ctx.avail_h, spacing=spacing,
                     clip_x=ctx.clip_x, clip_y=ctx.clip_y, clip_w=ctx.clip_w, clip_h=ctx.clip_h
                 );
-                var ch = _emit(dl, child, child_ctx, ts);
+                val ch = _emit(dl, w.children[i], child_ctx, ts);
                 if (ch > max_h) { max_h = ch; }
-                cx = cx + cw;
-            }
-            if (i < n - 1) { cx = cx + spacing; }
-            i = i + 1;
-        }
-        return w.padding_top + w.padding_bottom + max_h;
-    } else {
-        // Stack layout
-        if (w.background_color.a > 0.0) {
-            var rad = w.corner_radius_val;
-            var bg = w.background_color;
-            if (rad > 0.0) {
-                dlist.dl_add(dl, dlist.dcmd_rect_rounded(ctx.x, ctx.y, ctx.avail_w, ctx.avail_h, rad, bg.r, bg.g, bg.b, bg.a));
-            } else {
-                dlist.dl_add(dl, dlist.dcmd_rect(ctx.x, ctx.y, ctx.avail_w, ctx.avail_h, bg.r, bg.g, bg.b, bg.a));
             }
         }
-        var max_h = 0.0;
-        while (i < n) {
-            var child_ctx = LayoutCtx(
-                x=ox, y=oy, avail_w=inner_w, avail_h=0.0, spacing=spacing,
-                clip_x=ctx.clip_x, clip_y=ctx.clip_y, clip_w=ctx.clip_w, clip_h=ctx.clip_h
-            );
-            var ch = _emit(dl, w.children[i], child_ctx, ts);
-            if (ch > max_h) { max_h = ch; }
-            i = i + 1;
-        }
-        return w.padding_top + w.padding_bottom + max_h;
+        return w.pad_t + w.pad_b + max_h;
     }
 }
 
-// ── Slider ────────────────────────────────────────────────────────────────────
-fn _emit_slider(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float {
-    var sw = w.width_val;
-    if (sw <= 0.0) { sw = ctx.avail_w - w.padding_left - w.padding_right; }
-    if (sw <= 0.0) { sw = 140.0; }
-    var sh = 28.0;
-    var sx = ctx.x + w.padding_left;
-    var sy = ctx.y + w.padding_top;
+// ── Slider & RangeSlider ──────────────────────────────────────────────────────
+fn _emit_slider(dl: dlist.DrawList, w: comp.Slider, ctx: LayoutCtx, ts: ThemeSnap): float {
+    var sw = 180.0;
+    if (w.width_val > 0.0) { sw = w.width_val; }
+    val sh = 20.0;
+    val sx = ctx.x + w.pad_l;
+    val sy = ctx.y + w.pad_t;
+    val track_y = sy + 7.0;
+    val track_h = 6.0;
 
-    var extra_h = 0.0;
-    if (len(w.text_val) > 0) {
-        dlist.dl_add(dl, dlist.dcmd_text(w.text_val, sx, sy, ts.text2_r, ts.text2_g, ts.text2_b, 1.0, 0.9));
-        sy = sy + 18.0;
-        extra_h = 18.0;
-    }
-
-    var track_y = sy + 12.0;
-    // Track
-    dlist.dl_add(dl, dlist.dcmd_rect_rounded(sx, track_y, sw, 4.0, 2.0, ts.border_r, ts.border_g, ts.border_b, 1.0));
-
-    // Fill
-    var range = w.slider_max - w.slider_min;
-    var t = 0.0;
-    if (range > 0.0) {
-        t = (w.slider_val - w.slider_min) / range;
-    }
-    var fill_w = sw * t;
+    dlist.dl_emit_rect_rounded(dl, sx, track_y, sw, track_h, 3.0, ts.surface_r, ts.surface_g, ts.surface_b, 1.0);
+    val ratio = w.ratio();
+    val fill_w = sw * ratio;
     if (fill_w > 0.0) {
-        dlist.dl_add(dl, dlist.dcmd_rect_rounded(sx, track_y, fill_w, 4.0, 2.0, ts.accent_r, ts.accent_g, ts.accent_b, 1.0));
+        dlist.dl_emit_rect_rounded(dl, sx, track_y, fill_w, track_h, 3.0, ts.accent_r, ts.accent_g, ts.accent_b, 1.0);
     }
+    val kx = sx + fill_w - 7.0;
+    dlist.dl_emit_rect_rounded(dl, kx, sy + 2.0, 14.0, 14.0, 7.0, 1.0, 1.0, 1.0, 1.0);
+    _draw_border(dl, kx, sy + 2.0, 14.0, 14.0, ts.accent_r, ts.accent_g, ts.accent_b, 1.0, 7.0);
 
-    // Thumb with subtle shadow and border
-    var thumb_x = sx + fill_w - 7.0;
-    dlist.dl_add(dl, dlist.dcmd_rect_rounded(thumb_x, track_y - 5.0, 14.0, 14.0, 7.0, 0.0, 0.0, 0.0, 0.25));
-    dlist.dl_add(dl, dlist.dcmd_rect_rounded(thumb_x, track_y - 6.0, 14.0, 14.0, 7.0, 1.0, 1.0, 1.0, 1.0));
-    _draw_border(dl, thumb_x, track_y - 6.0, 14.0, 14.0, ts.accent_r, ts.accent_g, ts.accent_b, 1.0, 7.0);
-
-    // Hit zone
-    _add_hit(dl, dlist.make_slider_zone(
-        w.text_val, sx, sy, sw, sh,
-        w.slider_min, w.slider_max, w.slider_val, w.on_change_action, w
-    ), ctx);
-
-    return sh + extra_h + w.padding_top + w.padding_bottom;
+    _add_hit(dl, dlist.make_slider_zone_for("slider", sx, sy, sw, sh, w.min_val, w.max_val, w.resolved_value(), w.on_change_action, w), ctx);
+    return sh + w.pad_t + w.pad_b;
 }
 
-// ── Checkbox ──────────────────────────────────────────────────────────────────
-fn _emit_checkbox(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float {
-    var cx = ctx.x + w.padding_left;
-    var cy = ctx.y + w.padding_top;
-    var ch = 22.0;
-    if (w.height_val > 0.0) { ch = w.height_val; }
-    var box_size = 18.0;
-    var box_y = cy + (ch - box_size) * 0.5;
+fn _emit_range_slider(dl: dlist.DrawList, w: comp.RangeSlider, ctx: LayoutCtx, ts: ThemeSnap): float {
+    var sw = 200.0;
+    if (w.width_val > 0.0) { sw = w.width_val; }
+    val sx = ctx.x + w.pad_l;
+    val sy = ctx.y + w.pad_t;
+    var span = w.max_val - w.min_val;
+    if (span <= 0.0) { span = 1.0; }
+    val r1 = math.clamp((w.low_val - w.min_val) / span, 0.0, 1.0);
+    val r2 = math.clamp((w.high_val - w.min_val) / span, 0.0, 1.0);
 
-    // Box background
-    dlist.dl_add(dl, dlist.dcmd_rect_rounded(cx, box_y, box_size, box_size, 4.0, ts.surface_r * 0.8, ts.surface_g * 0.8, ts.surface_b * 0.8, 1.0));
-
-    // Box border
-    var bord_r = ts.border_r; var bord_g = ts.border_g; var bord_b = ts.border_b;
-    if (w.is_checked != 0) {
-        bord_r = ts.accent_r; bord_g = ts.accent_g; bord_b = ts.accent_b;
-    }
-    _draw_border(dl, cx, box_y, box_size, box_size, bord_r, bord_g, bord_b, 1.0, 4.0);
-
-    // Checked fill & vector checkmark
-    if (w.is_checked != 0) {
-        dlist.dl_add(dl, dlist.dcmd_rect_rounded(cx + 1.0, box_y + 1.0, box_size - 2.0, box_size - 2.0, 3.0, ts.accent_r, ts.accent_g, ts.accent_b, 1.0));
-        _draw_checkmark(dl, cx, box_y, 1.0, 1.0, 1.0);
-    }
-
-    // Label
-    var label_w = 0.0;
-    if (len(w.text_val) > 0 and w.text_val != "[X]" and w.text_val != "[ ]") {
-        label_w = _calc_text_width(w.text_val);
-        var ty = cy + (ch - 13.0) * 0.5;
-        dlist.dl_add(dl, dlist.dcmd_text(w.text_val, cx + box_size + 8.0, ty, ts.text_r, ts.text_g, ts.text_b, 1.0, 1.0));
-    }
-
-    // Hit zone
-    var hit_w = box_size + 14.0;
-    if (label_w > 0.0) {
-        hit_w = box_size + label_w + 8.0;
-    }
-    _add_hit(dl, dlist.make_checkbox_zone(w.text_val, cx, cy, hit_w, ch, w.is_checked, w.on_change_action, w), ctx);
-
-    return ch + w.padding_top + w.padding_bottom;
+    dlist.dl_emit_rect_rounded(dl, sx, sy + 8.0, sw, 6.0, 3.0, ts.surface_r, ts.surface_g, ts.surface_b, 1.0);
+    dlist.dl_emit_rect_rounded(dl, sx + sw * r1, sy + 8.0, sw * (r2 - r1), 6.0, 3.0, ts.accent_r, ts.accent_g, ts.accent_b, 1.0);
+    dlist.dl_emit_rect_rounded(dl, sx + sw * r1 - 6.0, sy + 4.0, 12.0, 14.0, 6.0, 1.0, 1.0, 1.0, 1.0);
+    dlist.dl_emit_rect_rounded(dl, sx + sw * r2 - 6.0, sy + 4.0, 12.0, 14.0, 6.0, 1.0, 1.0, 1.0, 1.0);
+    return 24.0 + w.pad_t + w.pad_b;
 }
 
-// ── Input ─────────────────────────────────────────────────────────────────────
-fn _emit_input(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float {
-    var iw = w.width_val;
-    if (iw <= 0.0) { iw = ctx.avail_w - w.padding_left - w.padding_right; }
-    if (iw <= 0.0) { iw = 220.0; }
+// ── Checkbox & Toggle ─────────────────────────────────────────────────────────
+fn _emit_checkbox(dl: dlist.DrawList, w: comp.Checkbox, ctx: LayoutCtx, ts: ThemeSnap): float {
+    val bx = ctx.x + w.pad_l;
+    val by = ctx.y + w.pad_t;
+    val size = 18.0;
+    val checked = w.resolved_checked();
+    var c_flag = 0;
+    if (checked) { c_flag = 1; }
+
+    if (checked) {
+        dlist.dl_emit_rect_rounded(dl, bx, by, size, size, 4.0, ts.accent_r, ts.accent_g, ts.accent_b, 1.0);
+        _draw_checkmark(dl, bx, by, 1.0, 1.0, 1.0);
+    } else {
+        dlist.dl_emit_rect_rounded(dl, bx, by, size, size, 4.0, ts.surface_r, ts.surface_g, ts.surface_b, 1.0);
+        _draw_border(dl, bx, by, size, size, ts.border_r, ts.border_g, ts.border_b, 1.0, 4.0);
+    }
+
+    var hit_w = size;
+    if (len(w.label) > 0) {
+        dlist.dl_emit_text(dl, w.label, bx + size + 8.0, by + 2.0, ts.text_r, ts.text_g, ts.text_b, 1.0, 1.0);
+        hit_w = size + 8.0 + (len(w.label) as float) * 7.5;
+    }
+
+    _add_hit(dl, dlist.make_checkbox_zone_for(w.label, bx, by, hit_w, size, c_flag, w.on_change_action, w), ctx);
+    return size + w.pad_t + w.pad_b;
+}
+
+fn _emit_toggle(dl: dlist.DrawList, w: comp.Toggle, ctx: LayoutCtx, ts: ThemeSnap): float {
+    val tw = 44.0;
+    val th = 22.0;
+    val tx = ctx.x + w.pad_l;
+    val ty = ctx.y + w.pad_t;
+    val on = w.resolved_checked();
+    var c_flag = 0;
+    if (on) { c_flag = 1; }
+
+    if (on) {
+        dlist.dl_emit_rect_rounded(dl, tx, ty, tw, th, 11.0, 0.16, 0.72, 0.45, 1.0);
+        dlist.dl_emit_rect_rounded(dl, tx + tw - 19.0, ty + 3.0, 16.0, 16.0, 8.0, 1.0, 1.0, 1.0, 1.0);
+    } else {
+        dlist.dl_emit_rect_rounded(dl, tx, ty, tw, th, 11.0, ts.surface_r, ts.surface_g, ts.surface_b, 1.0);
+        _draw_border(dl, tx, ty, tw, th, ts.border_r, ts.border_g, ts.border_b, 1.0, 11.0);
+        dlist.dl_emit_rect_rounded(dl, tx + 3.0, ty + 3.0, 16.0, 16.0, 8.0, 0.75, 0.78, 0.85, 1.0);
+    }
+
+    val hz = dlist.make_checkbox_zone_for("toggle", tx, ty, tw, th, c_flag, w.on_change_action, w);
+    hz.kind = dlist.HitZoneKind.Toggle;
+    _add_hit(dl, hz, ctx);
+    return th + w.pad_t + w.pad_b;
+}
+
+// ── TextInput & Textarea ──────────────────────────────────────────────────────
+fn _emit_input(dl: dlist.DrawList, w: comp.TextInput, ctx: LayoutCtx, ts: ThemeSnap): float {
+    var iw = 200.0;
+    if (w.width_val > 0.0) { iw = w.width_val; }
     var ih = 32.0;
     if (w.height_val > 0.0) { ih = w.height_val; }
-    var ix = ctx.x + w.padding_left;
-    var iy = ctx.y + w.padding_top;
+    val ix = ctx.x + w.pad_l;
+    val iy = ctx.y + w.pad_t;
 
-    // Background
-    dlist.dl_add(dl, dlist.dcmd_rect_rounded(ix, iy, iw, ih, 6.0, ts.surface_r * 0.7, ts.surface_g * 0.7, ts.surface_b * 0.7, 1.0));
-
-    // Full 4-sided border
-    var bord_r = ts.border_r; var bord_g = ts.border_g; var bord_b = ts.border_b;
-    if (w.is_focused != 0) {
-        bord_r = ts.accent_r; bord_g = ts.accent_g; bord_b = ts.accent_b;
-    }
-    _draw_border(dl, ix, iy, iw, ih, bord_r, bord_g, bord_b, 1.0, 6.0);
-
-    // Text or placeholder with dynamic vertical and horizontal centering
-    var display = w.text_val;
-    var tr = ts.text_r; var tg = ts.text_g; var tb = ts.text_b;
-    if (len(display) == 0 and len(w.placeholder_val) > 0) {
-        display = w.placeholder_val;
-        tr = ts.text2_r; tg = ts.text2_g; tb = ts.text2_b;
-    }
-    var text_y = iy + (ih - 10.0) * 0.5;
-    var text_x = ix + 12.0;
-    if (w.align_val == 1) {
-        text_x = ix + (iw - (len(display) as float) * 7.5) * 0.5;
-    }
-    if (len(display) > 0) {
-        dlist.dl_add(dl, dlist.dcmd_text(display, text_x, text_y, tr, tg, tb, 1.0, 1.0));
-    }
-    if (w.is_focused != 0) {
-        var cursor_x = text_x + (len(display) as float) * 7.2;
-        dlist.dl_add(dl, dlist.dcmd_rect(cursor_x, text_y - 1.0, 1.5, 14.0, ts.accent_r, ts.accent_g, ts.accent_b, 0.9));
+    dlist.dl_emit_rect_rounded(dl, ix, iy, iw, ih, 4.0, ts.bg_r * 0.9, ts.bg_g * 0.9, ts.bg_b * 1.1, 1.0);
+    if (w.is_focused) {
+        _draw_border(dl, ix, iy, iw, ih, ts.accent_r, ts.accent_g, ts.accent_b, 1.0, 4.0);
+    } else {
+        _draw_border(dl, ix, iy, iw, ih, ts.border_r, ts.border_g, ts.border_b, 1.0, 4.0);
     }
 
-    _add_hit(dl, dlist.make_input_zone(w.text_val, ix, iy, iw, ih, w), ctx);
+    val txt = w.resolved_text();
+    if (len(txt) > 0) {
+        dlist.dl_emit_text(dl, txt, ix + 8.0, iy + (ih - 12.0) * 0.5, ts.text_r, ts.text_g, ts.text_b, 1.0, 1.0);
+    } else {
+        dlist.dl_emit_text(dl, w.placeholder, ix + 8.0, iy + (ih - 12.0) * 0.5, ts.text2_r, ts.text2_g, ts.text2_b, 0.65, 1.0);
+    }
+    if (w.is_focused) {
+        val cx = ix + 8.0 + (len(txt) as float) * 7.5;
+        dlist.dl_emit_rect(dl, cx, iy + 6.0, 1.5, ih - 12.0, ts.accent_r, ts.accent_g, ts.accent_b, 1.0);
+    }
 
-    return ih + w.padding_top + w.padding_bottom;
+    _add_hit(dl, dlist.make_input_zone_for("input", ix, iy, iw, ih, w), ctx);
+    return ih + w.pad_t + w.pad_b;
 }
 
-// ── Progress ──────────────────────────────────────────────────────────────────
-fn _emit_progress(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float {
-    var pw = ctx.avail_w - w.padding_left - w.padding_right;
-    var ph = 8.0;
-    var px = ctx.x + w.padding_left;
-    var py = ctx.y + w.padding_top + 4.0;
+fn _emit_textarea(dl: dlist.DrawList, w: comp.TextInput, ctx: LayoutCtx, ts: ThemeSnap): float {
+    var iw = 320.0;
+    if (w.width_val > 0.0) { iw = w.width_val; }
+    var ih = 72.0;
+    if (w.height_val > 0.0) { ih = w.height_val; }
+    val ix = ctx.x;
+    val iy = ctx.y;
 
-    // Track
-    dlist.dl_add(dl, dlist.dcmd_rect_rounded(px, py, pw, ph, 4.0, ts.border_r, ts.border_g, ts.border_b, 1.0));
+    dlist.dl_emit_rect_rounded(dl, ix, iy, iw, ih, 4.0, ts.bg_r * 0.9, ts.bg_g * 0.9, ts.bg_b * 1.1, 1.0);
+    if (w.is_focused) {
+        _draw_border(dl, ix, iy, iw, ih, ts.accent_r, ts.accent_g, ts.accent_b, 1.0, 4.0);
+    } else {
+        _draw_border(dl, ix, iy, iw, ih, ts.border_r, ts.border_g, ts.border_b, 1.0, 4.0);
+    }
 
-    // Fill
-    var fill_w = pw * w.slider_val; // slider_val used as 0-1 progress value
-    if (fill_w > pw) { fill_w = pw; }
+    val txt = w.resolved_text();
+    if (len(txt) > 0) {
+        dlist.dl_emit_text(dl, txt, ix + 8.0, iy + 8.0, ts.text_r, ts.text_g, ts.text_b, 1.0, 1.0);
+    } else {
+        dlist.dl_emit_text(dl, w.placeholder, ix + 8.0, iy + 8.0, ts.text2_r, ts.text2_g, ts.text2_b, 0.65, 1.0);
+    }
+
+    _add_hit(dl, dlist.make_input_zone_for("textarea", ix, iy, iw, ih, w), ctx);
+    return ih;
+}
+
+// ── Progress, Badge, Alert, Card ──────────────────────────────────────────────
+fn _emit_progress(dl: dlist.DrawList, w: comp.ProgressBar, ctx: LayoutCtx, ts: ThemeSnap): float {
+    var pw = 180.0;
+    if (w.width_val > 0.0) { pw = w.width_val; }
+    val ph = 10.0;
+    val px = ctx.x + w.pad_l;
+    val py = ctx.y + w.pad_t;
+    dlist.dl_emit_rect_rounded(dl, px, py, pw, ph, 5.0, ts.surface_r, ts.surface_g, ts.surface_b, 1.0);
+    val fill_w = pw * w.ratio();
     if (fill_w > 0.0) {
-        dlist.dl_add(dl, dlist.dcmd_rect_rounded(px, py, fill_w, ph, 4.0, ts.accent_r, ts.accent_g, ts.accent_b, 1.0));
+        dlist.dl_emit_rect_rounded(dl, px, py, fill_w, ph, 5.0, ts.accent_r, ts.accent_g, ts.accent_b, 1.0);
     }
-
-    return ph + w.padding_top + w.padding_bottom + 8.0;
+    return ph + w.pad_t + w.pad_b;
 }
 
-// ── Toggle ────────────────────────────────────────────────────────────────────
-fn _emit_toggle(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float {
-    var tx = ctx.x + w.padding_left;
-    var ty = ctx.y + w.padding_top;
-    var tw = 40.0; var th = 22.0;
-
-    // Track
-    var track_r = ts.surface_r * 0.8; var track_g = ts.surface_g * 0.8; var track_b = ts.surface_b * 0.8;
-    if (w.is_checked != 0) {
-        track_r = 0.06; track_g = 0.72; track_b = 0.50; // Emerald active state
-    }
-    dlist.dl_add(dl, dlist.dcmd_rect_rounded(tx, ty, tw, th, 11.0, track_r, track_g, track_b, 1.0));
-    if (w.is_checked == 0) {
-        _draw_border(dl, tx, ty, tw, th, ts.border_r, ts.border_g, ts.border_b, 1.0, 11.0);
-    }
-
-    // Thumb
-    var thumb_x = tx + 3.0;
-    if (w.is_checked != 0) { thumb_x = tx + tw - 19.0; }
-    // Thumb shadow
-    dlist.dl_add(dl, dlist.dcmd_rect_rounded(thumb_x, ty + 4.0, 16.0, 16.0, 8.0, 0.0, 0.0, 0.0, 0.25));
-    // Thumb disc
-    dlist.dl_add(dl, dlist.dcmd_rect_rounded(thumb_x, ty + 3.0, 16.0, 16.0, 8.0, 1.0, 1.0, 1.0, 1.0));
-
-    // Label
-    var label_w = (len(w.text_val) as float) * 7.5;
-    if (len(w.text_val) > 0) {
-        dlist.dl_add(dl, dlist.dcmd_text(w.text_val, tx + tw + 10.0, ty + 6.0, ts.text_r, ts.text_g, ts.text_b, 1.0, 1.0));
-    }
-
-    // Hit zone
-    _add_hit(dl, dlist.make_checkbox_zone(w.text_val, tx, ty, tw + label_w + 10.0, th, w.is_checked, w.on_change_action, w), ctx);
-
-    return th + w.padding_top + w.padding_bottom;
-}
-
-// ── Badge ─────────────────────────────────────────────────────────────────────
-fn _emit_badge(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float {
-    var text_w = _calc_text_width(w.text_val);
-    var bw = text_w + 16.0 + w.padding_left + w.padding_right;
-    if (w.width_val > 0.0) { bw = w.width_val; }
-    var bh = 20.0 + w.padding_top + w.padding_bottom;
-    if (w.height_val > 0.0) { bh = w.height_val; }
-    var bx = ctx.x; var by = ctx.y;
-    var bg = w.background_color;
-    var bgr = ts.accent_r; var bgg = ts.accent_g; var bgb = ts.accent_b;
-    if (bg.a > 0.0) { bgr = bg.r; bgg = bg.g; bgb = bg.b; }
-
-    // DaisyUI pre-blended surface against dark theme base-100 (#0F1117):
-    var surf_r = 0.06 * 0.82 + bgr * 0.18;
-    var surf_g = 0.07 * 0.82 + bgg * 0.18;
-    var surf_b = 0.09 * 0.82 + bgb * 0.18;
-    // High-contrast readable text:
-    var txt_r = bgr * 0.65 + 0.35;
-    var txt_g = bgg * 0.65 + 0.35;
-    var txt_b = bgb * 0.65 + 0.35;
-
-    dlist.dl_add(dl, dlist.dcmd_rect_rounded(bx, by, bw, bh, bh * 0.5, surf_r, surf_g, surf_b, 1.0));
-    _draw_border(dl, bx, by, bw, bh, bgr, bgg, bgb, 1.0, bh * 0.5);
-
-    var tx = bx + (bw - text_w) * 0.5;
-    var ty = by + (bh - 7.0) * 0.5;
-    dlist.dl_add(dl, dlist.dcmd_text(w.text_val, tx, ty, txt_r, txt_g, txt_b, 1.0, 0.85));
+fn _emit_badge(dl: dlist.DrawList, w: comp.Badge, ctx: LayoutCtx, ts: ThemeSnap): float {
+    val bw = (len(w.label) as float) * 7.2 + 16.0;
+    val bh = 22.0;
+    var bgr = w.bg.r; var bgg = w.bg.g; var bgb = w.bg.b;
+    if (w.bg.a <= 0.0) { bgr = ts.accent_r; bgg = ts.accent_g; bgb = ts.accent_b; }
+    var fgr = 1.0; var fgg = 1.0; var fgb = 1.0;
+    if (w.fg.a > 0.0) { fgr = w.fg.r; fgg = w.fg.g; fgb = w.fg.b; }
+    dlist.dl_emit_rect_rounded(dl, ctx.x, ctx.y, bw, bh, 11.0, bgr, bgg, bgb, 1.0);
+    dlist.dl_emit_text(dl, w.label, ctx.x + 8.0, ctx.y + 5.0, fgr, fgg, fgb, 1.0, 0.85);
     return bh;
 }
 
-// ── Card ──────────────────────────────────────────────────────────────────────
-fn _emit_card(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float {
+fn _emit_alert(dl: dlist.DrawList, w: comp.Alert, ctx: LayoutCtx, ts: ThemeSnap): float {
+    var aw = ctx.avail_w;
+    if (w.width_val > 0.0) { aw = w.width_val; }
+    val ah = 36.0;
+    dlist.dl_emit_rect_rounded(dl, ctx.x, ctx.y, aw, ah, 6.0, w.bg.r, w.bg.g, w.bg.b, 0.92);
+    dlist.dl_emit_text(dl, w.message, ctx.x + 12.0, ctx.y + 11.0, 1.0, 1.0, 1.0, 1.0, 1.0);
+    return ah;
+}
+
+fn _emit_card(dl: dlist.DrawList, w: comp.Card, ctx: LayoutCtx, ts: ThemeSnap): float {
     var cw = ctx.avail_w;
     if (w.width_val > 0.0) { cw = w.width_val; }
-    var rad = w.corner_radius_val;
-    if (rad <= 0.0) { rad = 8.0; }
-
-    var bgr = ts.surface_r; var bgg = ts.surface_g; var bgb = ts.surface_b; var bga = 1.0;
-    if (w.background_color.a > 0.0) {
-        bgr = w.background_color.r; bgg = w.background_color.g; bgb = w.background_color.b; bga = w.background_color.a;
-    }
-
-    // 4-layer soft drop shadow prior to card background
-    var s1_idx = len(dl.cmds);
-    dlist.dl_add(dl, dlist.dcmd_rect_rounded(ctx.x - 1.0, ctx.y + 1.0, cw + 2.0, 0.0, rad + 1.0, 0.0, 0.0, 0.0, 0.08));
-    var s2_idx = len(dl.cmds);
-    dlist.dl_add(dl, dlist.dcmd_rect_rounded(ctx.x - 2.0, ctx.y + 3.0, cw + 4.0, 0.0, rad + 2.0, 0.0, 0.0, 0.0, 0.06));
-    var s3_idx = len(dl.cmds);
-    dlist.dl_add(dl, dlist.dcmd_rect_rounded(ctx.x - 3.0, ctx.y + 6.0, cw + 6.0, 0.0, rad + 3.0, 0.0, 0.0, 0.0, 0.04));
-    var s4_idx = len(dl.cmds);
-    dlist.dl_add(dl, dlist.dcmd_rect_rounded(ctx.x - 4.0, ctx.y + 10.0, cw + 8.0, 0.0, rad + 4.0, 0.0, 0.0, 0.0, 0.02));
-
-    var bg_cmd_idx = len(dl.cmds);
-    dlist.dl_add(dl, dlist.dcmd_rect_rounded(ctx.x, ctx.y, cw, 0.0, rad, bgr, bgg, bgb, bga));
-
-    var cy = ctx.y + w.padding_top;
-    if (len(w.text_val) > 0) {
-        dlist.dl_add(dl, dlist.dcmd_text(w.text_val, ctx.x + w.padding_left + 4.0, ctx.y + w.padding_top + 6.0, ts.text_r, ts.text_g, ts.text_b, 1.0, 1.05));
-        cy = cy + 28.0;
-        dlist.dl_add(dl, dlist.dcmd_rect(ctx.x, cy - 6.0, cw, 1.0, ts.border_r, ts.border_g, ts.border_b, 0.45));
-    }
-    var i = 0;
-    while (i < len(w.children)) {
-        var child_ctx = LayoutCtx(
-            x=ctx.x + w.padding_left, y=cy, avail_w=cw - w.padding_left - w.padding_right, avail_h=0.0, spacing=ts.spacing,
-            clip_x=ctx.clip_x, clip_y=ctx.clip_y, clip_w=ctx.clip_w, clip_h=ctx.clip_h
+    val header_h = 34.0;
+    var body_h = 40.0;
+    if (len(w.children) > 0) {
+        val child_ctx = LayoutCtx(
+            x=ctx.x + 12.0, y=ctx.y + header_h + 6.0, avail_w=cw - 24.0, avail_h=ctx.avail_h,
+            spacing=ts.spacing, clip_x=ctx.clip_x, clip_y=ctx.clip_y, clip_w=ctx.clip_w, clip_h=ctx.clip_h
         );
-        var ch = _emit(dl, w.children[i], child_ctx, ts);
-        cy = cy + ch + ts.spacing;
-        i = i + 1;
+        body_h = _emit(dl, w.children[0], child_ctx, ts) + 14.0;
     }
-    var total_h = cy - ctx.y + w.padding_bottom;
-    if (w.height_val > 0.0) { total_h = w.height_val; }
-
-    dl.cmds[s1_idx].h = total_h + 2.0;
-    dl.cmds[s2_idx].h = total_h + 4.0;
-    dl.cmds[s3_idx].h = total_h + 6.0;
-    dl.cmds[s4_idx].h = total_h + 8.0;
-    dl.cmds[bg_cmd_idx].h = total_h;
-    _draw_border(dl, ctx.x, ctx.y, cw, total_h, ts.border_r, ts.border_g, ts.border_b, 0.8, rad);
-
+    val total_h = header_h + body_h;
+    _draw_shadow(dl, ctx.x, ctx.y, cw, total_h, 8.0);
+    dlist.dl_emit_rect_rounded(dl, ctx.x, ctx.y, cw, header_h, 8.0, ts.surface_r, ts.surface_g, ts.surface_b, 1.0);
+    dlist.dl_emit_text(dl, w.title, ctx.x + 12.0, ctx.y + 10.0, ts.text_r, ts.text_g, ts.text_b, 1.0, 1.05);
+    _draw_border(dl, ctx.x, ctx.y, cw, total_h, ts.border_r, ts.border_g, ts.border_b, 1.0, 8.0);
     return total_h;
 }
 
-// ── Alert / Toast ─────────────────────────────────────────────────────────────
-fn _emit_alert(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float {
-    var aw = ctx.avail_w;
-    if (w.width_val > 0.0) { aw = w.width_val; }
-    var ah = 40.0;
-    var bgr = ts.surface_r; var bgg = ts.surface_g; var bgb = ts.surface_b; var bga = 1.0;
-    if (w.background_color.a > 0.0) {
-        bgr = w.background_color.r; bgg = w.background_color.g; bgb = w.background_color.b; bga = w.background_color.a;
-    }
-    dlist.dl_add(dl, dlist.dcmd_rect_rounded(ctx.x, ctx.y, aw, ah, 6.0, bgr, bgg, bgb, bga));
-    _draw_border(dl, ctx.x, ctx.y, aw, ah, ts.border_r, ts.border_g, ts.border_b, 0.8, 6.0);
-
-    // Left accent bar (4px thick)
-    var bar_r = ts.accent_r; var bar_g = ts.accent_g; var bar_b = ts.accent_b;
-    if (w.foreground_color.a > 0.0) {
-        bar_r = w.foreground_color.r; bar_g = w.foreground_color.g; bar_b = w.foreground_color.b;
-    }
-    dlist.dl_add(dl, dlist.dcmd_rect(ctx.x, ctx.y, 4.0, ah, bar_r, bar_g, bar_b, 1.0));
-
-    dlist.dl_add(dl, dlist.dcmd_text(w.text_val, ctx.x + 14.0, ctx.y + 15.0, ts.text_r, ts.text_g, ts.text_b, 1.0, 1.0));
-
-    if (w.on_click_action != nil) {
-        dlist.dl_add(dl, dlist.dcmd_text("x", ctx.x + aw - 20.0, ctx.y + 12.0, ts.text2_r, ts.text2_g, ts.text2_b, 1.0, 0.9));
-        var hz = dlist.make_button_zone("alert_close", ctx.x + aw - 26.0, ctx.y + 8.0, 20.0, 24.0, w.on_click_action, w);
-        _add_hit(dl, hz, ctx);
-    }
-
-    return ah + ts.spacing;
-}
-
-// ── Scroll ────────────────────────────────────────────────────────────────────
-fn _emit_scroll(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float {
-    var sw = ctx.avail_w;
-    if (w.width_val > 0.0) { sw = w.width_val; }
-    var sh = ctx.avail_h;
+// ── ScrollView & Tabs ─────────────────────────────────────────────────────────
+fn _emit_scroll(dl: dlist.DrawList, w: comp.ScrollView, ctx: LayoutCtx, ts: ThemeSnap): float {
+    var sh = 180.0;
     if (w.height_val > 0.0) { sh = w.height_val; }
-    if (sh <= 0.0) { sh = 200.0; }
+    val sw = ctx.avail_w;
 
-    // Push clip rect for scroll viewport
+    dlist.dl_emit_rect_rounded(dl, ctx.x, ctx.y, sw, sh, 4.0, ts.surface_r * 0.7, ts.surface_g * 0.7, ts.surface_b * 0.7, 1.0);
     dlist.dl_add(dl, dlist.dcmd_clip_push(ctx.x, ctx.y, sw, sh));
-
-    // Calculate intersected clip bounds for children
-    var sc_x = ctx.x;
-    var sc_y = ctx.y;
-    var sc_w = sw;
-    var sc_h = sh;
-    if (ctx.clip_w > 0.0 and ctx.clip_h > 0.0) {
-        var r1 = sc_x + sc_w;
-        var b1 = sc_y + sc_h;
-        var r2 = ctx.clip_x + ctx.clip_w;
-        var b2 = ctx.clip_y + ctx.clip_h;
-        if (ctx.clip_x > sc_x) { sc_x = ctx.clip_x; }
-        if (ctx.clip_y > sc_y) { sc_y = ctx.clip_y; }
-        var min_r = r1; if (r2 < min_r) { min_r = r2; }
-        var min_b = b1; if (b2 < min_b) { min_b = b2; }
-        sc_w = min_r - sc_x;
-        sc_h = min_b - sc_y;
-        if (sc_w < 0.0) { sc_w = 0.0; }
-        if (sc_h < 0.0) { sc_h = 0.0; }
+    if (len(w.children) > 0) {
+        val child_ctx = LayoutCtx(
+            x=ctx.x + 6.0, y=ctx.y + 6.0 - w.scroll_y, avail_w=sw - 12.0, avail_h=sh,
+            spacing=ts.spacing, clip_x=ctx.x, clip_y=ctx.y, clip_w=sw, clip_h=sh
+        );
+        val total_h = _emit(dl, w.children[0], child_ctx, ts);
+        w.content_h = total_h;
+        var max_sy = total_h - sh + 12.0;
+        if (max_sy < 0.0) { max_sy = 0.0; }
+        w.max_scroll_y = max_sy;
     }
-
-    // Emit children with scroll offset and measure total height for max_scroll_y
-    var child_ctx = LayoutCtx(
-        x=ctx.x, y=ctx.y - w.scroll_y, avail_w=sw, avail_h=0.0, spacing=ts.spacing,
-        clip_x=sc_x, clip_y=sc_y, clip_w=sc_w, clip_h=sc_h
-    );
-    var i = 0;
-    var total_child_h = 0.0;
-    while (i < len(w.children)) {
-        var ch = _emit(dl, w.children[i], child_ctx, ts);
-        total_child_h = total_child_h + ch;
-        child_ctx.y = child_ctx.y + ch + ts.spacing;
-        i = i + 1;
-    }
-
-    var max_s = total_child_h - sh;
-    if (max_s < 0.0) { max_s = 0.0; }
-    w.max_scroll_y = max_s;
-    if (w.scroll_y > max_s) { w.scroll_y = max_s; }
-    if (w.scroll_y < 0.0) { w.scroll_y = 0.0; }
-
-    // Pop clip
     dlist.dl_add(dl, dlist.dcmd_clip_pop());
+    _draw_border(dl, ctx.x, ctx.y, sw, sh, ts.border_r, ts.border_g, ts.border_b, 1.0, 4.0);
     return sh;
 }
 
-// ── Tabs ──────────────────────────────────────────────────────────────────────
-fn _emit_tabs(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float {
-    // 1. Emit active page content first
+fn _emit_tabs(dl: dlist.DrawList, w: comp.Tabs, ctx: LayoutCtx, ts: ThemeSnap): float {
     var content_h = 0.0;
-    if (len(w.children) > 0 and w.active_tab < len(w.children)) {
-        var page_ctx = LayoutCtx(
-            x=ctx.x, y=ctx.y + 40.0, avail_w=ctx.avail_w, avail_h=ctx.avail_h - 40.0, spacing=ts.spacing,
-            clip_x=ctx.clip_x, clip_y=ctx.clip_y, clip_w=ctx.clip_w, clip_h=ctx.clip_h
+    if (w.active_tab >= 0 and w.active_tab < len(w.children)) {
+        val page_ctx = LayoutCtx(
+            x=ctx.x, y=ctx.y + 40.0, avail_w=ctx.avail_w, avail_h=ctx.avail_h - 40.0,
+            spacing=ts.spacing, clip_x=ctx.clip_x, clip_y=ctx.clip_y, clip_w=ctx.clip_w, clip_h=ctx.clip_h
         );
         content_h = _emit(dl, w.children[w.active_tab], page_ctx, ts);
     }
 
-    // 2. Emit tab header bar on top of page content
     var tab_x = ctx.x;
-    var tab_h = 32.0;
-    var i = 0;
-    while (i < len(w.tab_titles)) {
-        var title = w.tab_titles[i];
-        var item_w = (len(title) as float) * 8.0 + 24.0;
-        var is_sel = 0;
-        if (i == w.active_tab) { is_sel = 1; }
+    val tab_h = 32.0;
+    val nt = len(w.tab_titles);
+    if (nt > 0) {
+        iter (i in 0..nt) {
+            val title = w.tab_titles[i];
+            val item_w = (len(title) as float) * 8.0 + 24.0;
+            val is_sel = (i == w.active_tab);
 
-        var bgr = ts.surface_r; var bgg = ts.surface_g; var bgb = ts.surface_b;
-        if (is_sel == 1) {
-            bgr = ts.surface_r * 1.5; bgg = ts.surface_g * 1.5; bgb = ts.surface_b * 1.8;
+            var bgr = ts.surface_r; var bgg = ts.surface_g; var bgb = ts.surface_b;
+            if (is_sel) { bgr = bgr * 1.5; bgg = bgg * 1.5; bgb = bgb * 1.8; }
+            dlist.dl_emit_rect(dl, tab_x, ctx.y, item_w, tab_h, bgr, bgg, bgb, 1.0);
+            if (is_sel) {
+                dlist.dl_emit_rect(dl, tab_x, ctx.y + tab_h - 2.0, item_w, 2.0, ts.accent_r, ts.accent_g, ts.accent_b, 1.0);
+            }
+            var tr = ts.text2_r; var tg = ts.text2_g; var tb = ts.text2_b;
+            if (is_sel) { tr = ts.text_r; tg = ts.text_g; tb = ts.text_b; }
+            val tx = tab_x + (item_w - (len(title) as float) * 7.5) * 0.5;
+            dlist.dl_emit_text(dl, title, tx, ctx.y + 10.0, tr, tg, tb, 1.0, 1.0);
+
+            val hz = dlist.make_button_zone_for(title, tab_x, ctx.y, item_w, tab_h, w.on_change_action, w);
+            hz.kind = dlist.HitZoneKind.Tab;
+            hz.tab_index = i;
+            _add_hit(dl, hz, ctx);
+            tab_x = tab_x + item_w + w.spacing_val;
         }
-        dlist.dl_add(dl, dlist.dcmd_rect(tab_x, ctx.y, item_w, tab_h, bgr, bgg, bgb, 1.0));
-
-        if (is_sel == 1) {
-            dlist.dl_add(dl, dlist.dcmd_rect(tab_x, ctx.y + tab_h - 2.0, item_w, 2.0, ts.accent_r, ts.accent_g, ts.accent_b, 1.0));
-        }
-
-        var tr = ts.text2_r; var tg = ts.text2_g; var tb = ts.text2_b;
-        if (is_sel == 1) {
-            tr = ts.text_r; tg = ts.text_g; tb = ts.text_b;
-        }
-        var tw = (len(title) as float) * 7.5;
-        var tx = tab_x + (item_w - tw) * 0.5;
-        var ty = ctx.y + (tab_h - 10.0) / 2.0;
-        dlist.dl_add(dl, dlist.dcmd_text(title, tx, ty, tr, tg, tb, 1.0, 1.0));
-
-        // Add hit zone for tab switching
-        var hz = dlist.make_button_zone(title, tab_x, ctx.y, item_w, tab_h, nil, w);
-        hz.tab_index = i;
-        _add_hit(dl, hz, ctx);
-
-        tab_x = tab_x + item_w + w.spacing_val;
-        i = i + 1;
     }
-
     return 40.0 + content_h;
 }
 
-// ── Select ────────────────────────────────────────────────────────────────────
-fn _emit_select(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float {
+// ── Select & MultiSelect ──────────────────────────────────────────────────────
+fn _emit_select(dl: dlist.DrawList, w: comp.Select, ctx: LayoutCtx, ts: ThemeSnap): float {
     var sel_w = 190.0;
     if (w.width_val > 0.0) { sel_w = w.width_val; }
     var sel_h = 30.0;
     if (w.height_val > 0.0) { sel_h = w.height_val; }
-    var sx = ctx.x + w.padding_left;
-    var sy = ctx.y + w.padding_top;
+    val sx = ctx.x + w.pad_l;
+    val sy = ctx.y + w.pad_t;
 
-    // Background
-    var bgr = ts.surface_r; var bgg = ts.surface_g; var bgb = ts.surface_b;
-    if (w.is_hovered != 0 or w.is_open != 0) {
-        bgr = ts.surface_r * 1.3; bgg = ts.surface_g * 1.3; bgb = ts.surface_b * 1.5;
+    var label = "Select...";
+    if (w.selected_idx >= 0 and w.selected_idx < len(w.options)) {
+        label = w.options[w.selected_idx];
     }
-    dlist.dl_add(dl, dlist.dcmd_rect_rounded(sx, sy, sel_w, sel_h, 4.0, bgr, bgg, bgb, 1.0));
 
-    // Border
-    var bord_r = ts.border_r; var bord_g = ts.border_g; var bord_b = ts.border_b;
-    if (w.is_open != 0) {
-        bord_r = ts.accent_r; bord_g = ts.accent_g; bord_b = ts.accent_b;
-    }
-    _draw_border(dl, sx, sy, sel_w, sel_h, bord_r, bord_g, bord_b, 1.0, 4.0);
+    dlist.dl_emit_rect_rounded(dl, sx, sy, sel_w, sel_h, 4.0, ts.surface_r, ts.surface_g, ts.surface_b, 1.0);
+    _draw_border(dl, sx, sy, sel_w, sel_h, ts.border_r, ts.border_g, ts.border_b, 1.0, 4.0);
+    dlist.dl_emit_text(dl, label, sx + 10.0, sy + (sel_h - 10.0) * 0.5, ts.text_r, ts.text_g, ts.text_b, 1.0, 1.0);
 
-    // Text
-    var ty = sy + (sel_h - 10.0) / 2.0;
-    dlist.dl_add(dl, dlist.dcmd_text(w.text_val, sx + 10.0, ty, ts.text_r, ts.text_g, ts.text_b, 1.0, 1.0));
-
-    // Vector Chevron
-    if (w.is_open != 0) {
+    if (w.is_open) {
         _draw_chevron_up(dl, sx + sel_w - 18.0, sy + 13.0, ts.text2_r, ts.text2_g, ts.text2_b);
     } else {
         _draw_chevron_down(dl, sx + sel_w - 18.0, sy + 13.0, ts.text2_r, ts.text2_g, ts.text2_b);
     }
 
-    // Hit zone for select header (-1 indicates toggling dropdown)
-    var hz = dlist.make_button_zone(w.text_val, sx, sy, sel_w, sel_h, nil, w);
+    val hz = dlist.make_button_zone_for(label, sx, sy, sel_w, sel_h, w.on_change_action, w);
     hz.kind = dlist.HitZoneKind.Select;
     hz.tab_index = -1;
     _add_hit(dl, hz, ctx);
 
-    // If open, render options list into OVERLAY layer so it floats above all other widgets
-    if (w.is_open != 0 and len(w.select_options) > 0) {
-        var menu_y = sy + sel_h + 4.0;
-        var item_h = 28.0;
-        var num_opts = len(w.select_options);
-        var menu_h = (num_opts as float) * item_h + 8.0;
-
-        // Shadow & Menu Background
+    if (w.is_open and len(w.options) > 0) {
+        val menu_y = sy + sel_h + 4.0;
+        val item_h = 28.0;
+        val num_opts = len(w.options);
+        val menu_h = (num_opts as float) * item_h + 8.0;
         _draw_overlay_shadow(dl, sx, menu_y, sel_w, menu_h, 6.0);
         dlist.dl_add_overlay_cmd(dl, dlist.dcmd_rect_rounded(sx, menu_y, sel_w, menu_h, 6.0, ts.surface_r * 0.95, ts.surface_g * 0.95, ts.surface_b * 0.95, 1.0));
         _draw_overlay_border(dl, sx, menu_y, sel_w, menu_h, ts.border_r * 1.3, ts.border_g * 1.3, ts.border_b * 1.3, 1.0, 6.0);
 
-        var opt_idx = 0;
-        while (opt_idx < num_opts) {
-            var opt_item_y = menu_y + 4.0 + (opt_idx as float) * item_h;
+        iter (opt_idx in 0..num_opts) {
+            val opt_y = menu_y + 4.0 + (opt_idx as float) * item_h;
             if (opt_idx == w.selected_idx) {
-                dlist.dl_add_overlay_cmd(dl, dlist.dcmd_rect_rounded(sx + 4.0, opt_item_y, sel_w - 8.0, item_h, 4.0, ts.accent_r * 0.25, ts.accent_g * 0.25, ts.accent_b * 0.25, 1.0));
-                _draw_overlay_checkmark(dl, sx + sel_w - 22.0, opt_item_y + 9.0, ts.accent_r, ts.accent_g, ts.accent_b);
+                dlist.dl_add_overlay_cmd(dl, dlist.dcmd_rect_rounded(sx + 4.0, opt_y, sel_w - 8.0, item_h, 4.0, ts.accent_r * 0.25, ts.accent_g * 0.25, ts.accent_b * 0.25, 1.0));
+                _draw_overlay_checkmark(dl, sx + sel_w - 22.0, opt_y + 9.0, ts.accent_r, ts.accent_g, ts.accent_b);
             }
-            var opt_text = w.select_options[opt_idx];
-            dlist.dl_add_overlay_cmd(dl, dlist.dcmd_text(opt_text, sx + 10.0, opt_item_y + 9.0, ts.text_r, ts.text_g, ts.text_b, 1.0, 1.0));
+            val opt_text = w.options[opt_idx];
+            dlist.dl_add_overlay_cmd(dl, dlist.dcmd_text(opt_text, sx + 10.0, opt_y + 9.0, ts.text_r, ts.text_g, ts.text_b, 1.0, 1.0));
 
-            var opt_hz = dlist.make_button_zone(opt_text, sx, opt_item_y, sel_w, item_h, nil, w);
+            val opt_hz = dlist.make_button_zone_for(opt_text, sx, opt_y, sel_w, item_h, w.on_change_action, w);
             opt_hz.kind = dlist.HitZoneKind.Select;
             opt_hz.tab_index = opt_idx;
             _add_overlay_hit(dl, opt_hz);
-
-            opt_idx = opt_idx + 1;
         }
     }
-
-    return sel_h + w.padding_top + w.padding_bottom;
+    return sel_h + w.pad_t + w.pad_b;
 }
 
-// ── Textarea ──────────────────────────────────────────────────────────────────
-fn _emit_textarea(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float {
-    var iw = ctx.avail_w;
-    if (w.width_val > 0.0) { iw = w.width_val; }
-    var ih = 120.0;
-    if (w.height_val > 0.0) { ih = w.height_val; }
-    var ix = ctx.x + w.padding_left;
-    var iy = ctx.y + w.padding_top;
-
-    if (w.text_editor_state == nil) {
-        w.text_editor_state = text_ctrl.EditorController(w.text_val);
-    }
-    var ctrl = w.text_editor_state as text_ctrl.EditorController;
-
-    // Background
-    dlist.dl_add(dl, dlist.dcmd_rect_rounded(ix, iy, iw, ih, 4.0, ts.surface_r * 0.8, ts.surface_g * 0.8, ts.surface_b * 0.8, 1.0));
-
-    // Border
-    var bord_r = ts.border_r; var bord_g = ts.border_g; var bord_b = ts.border_b;
-    if (w.is_focused != 0) {
-        bord_r = ts.accent_r; bord_g = ts.accent_g; bord_b = ts.accent_b;
-    }
-    _draw_border(dl, ix, iy, iw, ih, bord_r, bord_g, bord_b, 1.0, 4.0);
-
-    // Clip to textarea interior
-    dlist.dl_add(dl, dlist.dcmd_clip_push(ix + 1.0, iy + 1.0, iw - 2.0, ih - 2.0));
-
-    var is_empty_doc = (ctrl.get_line_count() == 1);
-    if (is_empty_doc) {
-        var line0 = ctrl.get_line(0);
-        if (len(line0) > 0) { is_empty_doc = false; }
-    }
-
-    if (is_empty_doc and len(w.placeholder_val) > 0 and w.is_focused == 0) {
-        dlist.dl_add(dl, dlist.dcmd_text(w.placeholder_val, ix + 8.0, iy + 8.0, ts.text2_r, ts.text2_g, ts.text2_b, 1.0, 1.0));
-    } else {
-        var line_idx = 0;
-        var line_h = 18.0;
-        var cur_y = iy + 8.0;
-        var total_lines = ctrl.get_line_count();
-        while (line_idx < total_lines) {
-            var line_text = ctrl.get_line(line_idx);
-            if (line_text == nil) { line_text = ""; }
-            if (len(line_text) > 0) {
-                dlist.dl_add(dl, dlist.dcmd_text(line_text, ix + 8.0, cur_y, ts.text_r, ts.text_g, ts.text_b, 1.0, 1.0));
-            }
-            cur_y = cur_y + line_h;
-            line_idx = line_idx + 1;
-        }
-    }
-
-    dlist.dl_add(dl, dlist.dcmd_clip_pop());
-
-    // Hit zone
-    _add_hit(dl, dlist.make_input_zone(w.text_val, ix, iy, iw, ih, w), ctx);
-
-    return ih + w.padding_top + w.padding_bottom;
+fn _emit_multi_select(dl: dlist.DrawList, w: comp.Select, ctx: LayoutCtx, ts: ThemeSnap): float {
+    return _emit_select(dl, w, ctx, ts);
 }
 
-// ── MultiSelect ───────────────────────────────────────────────────────────────
-fn _emit_multi_select(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float {
-    var sel_w = 220.0;
-    if (w.width_val > 0.0) { sel_w = w.width_val; }
-    var sel_h = 30.0;
-    if (w.height_val > 0.0) { sel_h = w.height_val; }
-    var sx = ctx.x + w.padding_left;
-    var sy = ctx.y + w.padding_top;
+// ── Stepper, Table, Accordion, Stat, Indicator, Link, ColorPicker ─────────────
+fn _emit_stepper(dl: dlist.DrawList, w: comp.Stepper, ctx: LayoutCtx, ts: ThemeSnap): float {
+    val sw = 110.0;
+    val sh = 30.0;
+    dlist.dl_emit_rect_rounded(dl, ctx.x, ctx.y, sw, sh, 4.0, ts.surface_r, ts.surface_g, ts.surface_b, 1.0);
+    _draw_border(dl, ctx.x, ctx.y, sw, sh, ts.border_r, ts.border_g, ts.border_b, 1.0, 4.0);
+    dlist.dl_emit_text(dl, "-", ctx.x + 12.0, ctx.y + 8.0, ts.text_r, ts.text_g, ts.text_b, 1.0, 1.0);
+    dlist.dl_emit_text(dl, "{w.value}", ctx.x + 48.0, ctx.y + 8.0, ts.text_r, ts.text_g, ts.text_b, 1.0, 1.0);
+    dlist.dl_emit_text(dl, "+", ctx.x + 90.0, ctx.y + 8.0, ts.text_r, ts.text_g, ts.text_b, 1.0, 1.0);
+    return sh;
+}
 
-    var bgr = ts.surface_r; var bgg = ts.surface_g; var bgb = ts.surface_b;
-    if (w.is_hovered != 0 or w.is_open != 0) {
-        bgr = ts.surface_r * 1.3; bgg = ts.surface_g * 1.3; bgb = ts.surface_b * 1.5;
+fn _emit_table(dl: dlist.DrawList, w: comp.Table, ctx: LayoutCtx, ts: ThemeSnap): float {
+    val nh = len(w.headers);
+    if (nh == 0) { return 24.0; }
+    val col_w = ctx.avail_w / (nh as float);
+    var cy = ctx.y;
+    dlist.dl_emit_rect(dl, ctx.x, cy, ctx.avail_w, 28.0, ts.surface_r, ts.surface_g, ts.surface_b, 1.0);
+    iter (hi in 0..nh) {
+        dlist.dl_emit_text(dl, w.headers[hi], ctx.x + (hi as float) * col_w + 8.0, cy + 7.0, ts.text_r, ts.text_g, ts.text_b, 1.0, 1.0);
     }
-    dlist.dl_add(dl, dlist.dcmd_rect_rounded(sx, sy, sel_w, sel_h, 4.0, bgr, bgg, bgb, 1.0));
-
-    var bord_r = ts.border_r; var bord_g = ts.border_g; var bord_b = ts.border_b;
-    if (w.is_open != 0) {
-        bord_r = ts.accent_r; bord_g = ts.accent_g; bord_b = ts.accent_b;
-    }
-    _draw_border(dl, sx, sy, sel_w, sel_h, bord_r, bord_g, bord_b, 1.0, 4.0);
-
-    var n_sel = len(w.selected_indices);
-    var label = "Select options...";
-    var tr = ts.text2_r; var tg = ts.text2_g; var tb = ts.text2_b;
-    if (n_sel > 0) {
-        label = "{n_sel} selected";
-        tr = ts.text_r; tg = ts.text_g; tb = ts.text_b;
-    }
-    var ty = sy + (sel_h - 10.0) / 2.0;
-    dlist.dl_add(dl, dlist.dcmd_text(label, sx + 10.0, ty, tr, tg, tb, 1.0, 1.0));
-
-    if (w.is_open != 0) {
-        _draw_chevron_up(dl, sx + sel_w - 18.0, sy + 13.0, ts.text2_r, ts.text2_g, ts.text2_b);
-    } else {
-        _draw_chevron_down(dl, sx + sel_w - 18.0, sy + 13.0, ts.text2_r, ts.text2_g, ts.text2_b);
-    }
-
-    var hz = dlist.make_button_zone(label, sx, sy, sel_w, sel_h, nil, w);
-    hz.kind = dlist.HitZoneKind.Select;
-    hz.tab_index = -1;
-    _add_hit(dl, hz, ctx);
-
-    if (w.is_open != 0 and len(w.select_options) > 0) {
-        var menu_y = sy + sel_h + 4.0;
-        var item_h = 28.0;
-        var num_opts = len(w.select_options);
-        var menu_h = (num_opts as float) * item_h + 8.0;
-
-        _draw_overlay_shadow(dl, sx, menu_y, sel_w, menu_h, 6.0);
-        dlist.dl_add_overlay_cmd(dl, dlist.dcmd_rect_rounded(sx, menu_y, sel_w, menu_h, 6.0, ts.surface_r * 0.95, ts.surface_g * 0.95, ts.surface_b * 0.95, 1.0));
-        _draw_overlay_border(dl, sx, menu_y, sel_w, menu_h, ts.border_r * 1.3, ts.border_g * 1.3, ts.border_b * 1.3, 1.0, 6.0);
-
-        var opt_idx = 0;
-        while (opt_idx < num_opts) {
-            var opt_item_y = menu_y + 4.0 + (opt_idx as float) * item_h;
-            var is_item_sel = 0;
-            var s_i = 0;
-            while (s_i < len(w.selected_indices)) {
-                if (w.selected_indices[s_i] == opt_idx) {
-                    is_item_sel = 1;
+    cy = cy + 28.0;
+    val nr = len(w.rows);
+    if (nr > 0) {
+        iter (ri in 0..nr) {
+            val row_items = w.rows[ri];
+            val nc = len(row_items);
+            if (nc > 0) {
+                iter (ci in 0..nc) {
+                    val cctx = LayoutCtx(
+                        x=ctx.x + (ci as float) * col_w + 6.0, y=cy + 4.0,
+                        avail_w=col_w - 12.0, avail_h=24.0, spacing=ts.spacing,
+                        clip_x=ctx.clip_x, clip_y=ctx.clip_y, clip_w=ctx.clip_w, clip_h=ctx.clip_h
+                    );
+                    _emit(dl, row_items[ci], cctx, ts);
                 }
-                s_i = s_i + 1;
             }
-
-            if (is_item_sel == 1) {
-                dlist.dl_add_overlay_cmd(dl, dlist.dcmd_rect_rounded(sx + 4.0, opt_item_y, sel_w - 8.0, item_h, 4.0, ts.accent_r * 0.22, ts.accent_g * 0.22, ts.accent_b * 0.22, 1.0));
-            }
-
-            // Sleek mini checkbox on the left
-            var box_x = sx + 8.0;
-            var box_y = opt_item_y + 7.0;
-            dlist.dl_add_overlay_cmd(dl, dlist.dcmd_rect_rounded(box_x, box_y, 14.0, 14.0, 3.0, ts.surface_r * 0.7, ts.surface_g * 0.7, ts.surface_b * 0.7, 1.0));
-            _draw_overlay_border(dl, box_x, box_y, 14.0, 14.0, ts.border_r, ts.border_g, ts.border_b, 1.0, 3.0);
-
-            if (is_item_sel == 1) {
-                dlist.dl_add_overlay_cmd(dl, dlist.dcmd_rect_rounded(box_x, box_y, 14.0, 14.0, 3.0, ts.accent_r, ts.accent_g, ts.accent_b, 1.0));
-                _draw_overlay_checkmark(dl, box_x - 1.0, box_y - 2.0, 1.0, 1.0, 1.0);
-            }
-
-            var opt_text = w.select_options[opt_idx];
-            dlist.dl_add_overlay_cmd(dl, dlist.dcmd_text(opt_text, sx + 28.0, opt_item_y + 9.0, ts.text_r, ts.text_g, ts.text_b, 1.0, 1.0));
-
-            var opt_hz = dlist.make_button_zone(opt_text, sx, opt_item_y, sel_w, item_h, nil, w);
-            opt_hz.kind = dlist.HitZoneKind.Select;
-            opt_hz.tab_index = opt_idx;
-            _add_overlay_hit(dl, opt_hz);
-
-            opt_idx = opt_idx + 1;
+            cy = cy + 28.0;
         }
     }
-
-    return sel_h + w.padding_top + w.padding_bottom;
+    return cy - ctx.y;
 }
 
-// ── Table ─────────────────────────────────────────────────────────────────────
-fn _emit_table(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float {
-    var tw = ctx.avail_w - w.padding_left - w.padding_right;
-    var tx = ctx.x + w.padding_left;
-    var ty = ctx.y + w.padding_top;
-
-    var num_cols = len(w.tab_titles);
-    if (num_cols == 0) { num_cols = 1; }
-    var col_w = tw / (num_cols as float);
-
-    var cur_y = ty;
-
-    // Header bar
-    dlist.dl_add(dl, dlist.dcmd_rect_rounded(tx, cur_y, tw, 30.0, 4.0, ts.surface_r * 0.85, ts.surface_g * 0.85, ts.surface_b * 0.85, 1.0));
-    _draw_border(dl, tx, cur_y, tw, 30.0, ts.border_r, ts.border_g, ts.border_b, 1.0, 4.0);
-
-    var col_idx = 0;
-    while (col_idx < len(w.tab_titles)) {
-        var col_x = tx + (col_idx as float) * col_w + 10.0;
-        var h_text = w.tab_titles[col_idx];
-        dlist.dl_add(dl, dlist.dcmd_text(h_text, col_x, cur_y + 10.0, ts.text2_r * 1.3, ts.text2_g * 1.3, ts.text2_b * 1.3, 1.0, 0.95));
-        col_idx = col_idx + 1;
-    }
-    cur_y = cur_y + 30.0;
-
-    if (w.text_editor_state != nil) {
-        var rows = w.text_editor_state as [[ui.Widget]];
-        var row_idx = 0;
-        while (row_idx < len(rows)) {
-            var row_y = cur_y;
-            var row_cells = rows[row_idx];
-            var is_odd = row_idx % 2;
-            if (is_odd == 1) {
-                dlist.dl_add(dl, dlist.dcmd_rect(tx, row_y, tw, 30.0, ts.surface_r * 0.95, ts.surface_g * 0.95, ts.surface_b * 0.95, 0.5));
-            }
-            dlist.dl_add(dl, dlist.dcmd_rect(tx, row_y + 29.0, tw, 1.0, ts.border_r, ts.border_g, ts.border_b, 0.4));
-
-            var cell_idx = 0;
-            while (cell_idx < len(row_cells)) {
-                var cell_x = tx + (cell_idx as float) * col_w + 10.0;
-                var cell_widget = row_cells[cell_idx];
-
-                if (cell_widget.kind == ui.WidgetKind.Badge) {
-                    var btw = _calc_text_width(cell_widget.text_val);
-                    var bw = btw + 14.0;
-                    var bh = 18.0;
-                    var bx = cell_x;
-                    var by = row_y + 6.0;
-                    var bgr = ts.accent_r; var bgg = ts.accent_g; var bgb = ts.accent_b;
-                    if (cell_widget.background_color.a > 0.0) {
-                        bgr = cell_widget.background_color.r;
-                        bgg = cell_widget.background_color.g;
-                        bgb = cell_widget.background_color.b;
-                    }
-                    dlist.dl_add(dl, dlist.dcmd_rect_rounded(bx, by, bw, bh, 9.0, bgr, bgg, bgb, 0.25));
-                    _draw_border(dl, bx, by, bw, bh, bgr, bgg, bgb, 0.6, 9.0);
-                    var btx = bx + (bw - btw) * 0.5;
-                    var bty = by + (18.0 - 7.0) * 0.5;
-                    dlist.dl_add(dl, dlist.dcmd_text(cell_widget.text_val, btx, bty, bgr, bgg, bgb, 1.0, 0.8));
-                } else {
-                    dlist.dl_add(dl, dlist.dcmd_text(cell_widget.text_val, cell_x, row_y + 10.0, ts.text_r, ts.text_g, ts.text_b, 1.0, 0.95));
-                }
-                cell_idx = cell_idx + 1;
-            }
-            cur_y = cur_y + 30.0;
-            row_idx = row_idx + 1;
-        }
-    }
-
-    var total_h = cur_y - ty;
-    _draw_border(dl, tx, ty, tw, total_h, ts.border_r, ts.border_g, ts.border_b, 1.0, 4.0);
-    return total_h + w.padding_top + w.padding_bottom;
-}
-
-// ── Accordion ─────────────────────────────────────────────────────────────────
-fn _emit_accordion(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float {
-    var aw = ctx.avail_w - w.padding_left - w.padding_right;
-    var ax = ctx.x + w.padding_left;
-    var ay = ctx.y + w.padding_top;
-    var head_h = 36.0;
-
-    dlist.dl_add(dl, dlist.dcmd_rect_rounded(ax, ay, aw, head_h, 6.0, ts.surface_r * 1.1, ts.surface_g * 1.1, ts.surface_b * 1.1, 1.0));
-    _draw_border(dl, ax, ay, aw, head_h, ts.border_r, ts.border_g, ts.border_b, 1.0, 6.0);
-
-    if (w.is_open != 0) {
-        _draw_chevron_down(dl, ax + 14.0, ay + 15.0, ts.accent_r, ts.accent_g, ts.accent_b);
-    } else {
-        _draw_chevron_right(dl, ax + 14.0, ay + 15.0, ts.text2_r, ts.text2_g, ts.text2_b);
-    }
-    dlist.dl_add(dl, dlist.dcmd_text(w.text_val, ax + 30.0, ay + 13.0, ts.text_r, ts.text_g, ts.text_b, 1.0, 1.0));
-
-    var hz = dlist.HitZone();
-    hz.id = "accordion_head";
-    hz.kind = dlist.HitZoneKind.TreeNode;
-    hz.x = ax; hz.y = ay; hz.w = aw; hz.h = head_h;
-    hz.widget = w;
-    _add_hit(dl, hz, ctx);
-
-    var total_h = head_h;
-    if (w.is_open != 0 and len(w.children) > 0) {
-        var child_ctx = LayoutCtx(
-            x=ax + 20.0, y=ay + head_h + 8.0, avail_w=aw - 28.0, avail_h=0.0, spacing=ts.spacing,
-            clip_x=ctx.clip_x, clip_y=ctx.clip_y, clip_w=ctx.clip_w, clip_h=ctx.clip_h
+fn _emit_accordion(dl: dlist.DrawList, w: comp.Accordion, ctx: LayoutCtx, ts: ThemeSnap): float {
+    val hh = 32.0;
+    dlist.dl_emit_rect_rounded(dl, ctx.x, ctx.y, ctx.avail_w, hh, 4.0, ts.surface_r, ts.surface_g, ts.surface_b, 1.0);
+    dlist.dl_emit_text(dl, w.title, ctx.x + 12.0, ctx.y + 9.0, ts.text_r, ts.text_g, ts.text_b, 1.0, 1.0);
+    _add_hit(dl, dlist.make_button_zone_for(w.title, ctx.x, ctx.y, ctx.avail_w, hh, w.on_click_action, w), ctx);
+    if (w.is_open and len(w.children) > 0) {
+        val cctx = LayoutCtx(
+            x=ctx.x + 12.0, y=ctx.y + hh + 6.0, avail_w=ctx.avail_w - 24.0, avail_h=ctx.avail_h,
+            spacing=ts.spacing, clip_x=ctx.clip_x, clip_y=ctx.clip_y, clip_w=ctx.clip_w, clip_h=ctx.clip_h
         );
-        var ch = _emit(dl, w.children[0], child_ctx, ts);
-        dlist.dl_add(dl, dlist.dcmd_rect(ax + 8.0, ay + head_h + 8.0, 3.0, ch, ts.accent_r, ts.accent_g, ts.accent_b, 1.0));
-        total_h = head_h + 8.0 + ch + 8.0;
+        return hh + 12.0 + _emit(dl, w.children[0], cctx, ts);
     }
-
-    return total_h + w.padding_top + w.padding_bottom;
+    return hh;
 }
 
-// ── Stat ──────────────────────────────────────────────────────────────────────
-fn _emit_stat(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float {
-    var sw = 160.0;
-    if (w.width_val > 0.0) { sw = w.width_val; }
-    var sh = 84.0;
-    if (w.height_val > 0.0) { sh = w.height_val; }
-    var sx = ctx.x + w.padding_left;
-    var sy = ctx.y + w.padding_top;
-
-    dlist.dl_add(dl, dlist.dcmd_rect_rounded(sx, sy, sw, sh, 6.0, ts.surface_r, ts.surface_g, ts.surface_b, 1.0));
-    _draw_border(dl, sx, sy, sw, sh, ts.border_r, ts.border_g, ts.border_b, 0.8, 6.0);
-    // Top accent line
-    dlist.dl_add(dl, dlist.dcmd_rect_rounded(sx, sy, sw, 3.0, 2.0, ts.accent_r, ts.accent_g, ts.accent_b, 1.0));
-
-    dlist.dl_add(dl, dlist.dcmd_text(w.text_val, sx + 12.0, sy + 10.0, ts.text2_r, ts.text2_g, ts.text2_b, 1.0, 0.85));
-    dlist.dl_add(dl, dlist.dcmd_text(w.placeholder_val, sx + 12.0, sy + 28.0, ts.text_r, ts.text_g, ts.text_b, 1.0, 1.6));
-
-    if (len(w.focus_key) > 0) {
-        var pw = (len(w.focus_key) as float) * 6.5 + 14.0;
-        var px = sx + 12.0;
-        var py = sy + 58.0;
-        dlist.dl_add(dl, dlist.dcmd_rect_rounded(px, py, pw, 18.0, 9.0, 0.08, 0.35, 0.18, 0.4));
-        _draw_border(dl, px, py, pw, 18.0, 0.1, 0.6, 0.3, 0.6, 9.0);
-        var ptw = (len(w.focus_key) as float) * 6.0;
-        var ptx = px + (pw - ptw) * 0.5;
-        var pty = py + (18.0 - 8.0) * 0.5;
-        dlist.dl_add(dl, dlist.dcmd_text(w.focus_key, ptx, pty, 0.3, 0.85, 0.5, 1.0, 0.8));
+fn _emit_stat(dl: dlist.DrawList, w: comp.Stat, ctx: LayoutCtx, ts: ThemeSnap): float {
+    val sw = 180.0;
+    val sh = 74.0;
+    dlist.dl_emit_rect_rounded(dl, ctx.x, ctx.y, sw, sh, 6.0, ts.surface_r, ts.surface_g, ts.surface_b, 1.0);
+    dlist.dl_emit_text(dl, w.title, ctx.x + 12.0, ctx.y + 10.0, ts.text2_r, ts.text2_g, ts.text2_b, 1.0, 0.85);
+    dlist.dl_emit_text(dl, w.value_text, ctx.x + 12.0, ctx.y + 30.0, ts.text_r, ts.text_g, ts.text_b, 1.0, 1.4);
+    if (len(w.desc) > 0) {
+        dlist.dl_emit_text(dl, w.desc, ctx.x + 12.0, ctx.y + 54.0, ts.accent_r, ts.accent_g, ts.accent_b, 1.0, 0.8);
     }
-
-    return sh + w.padding_top + w.padding_bottom;
+    return sh;
 }
 
-// ── Indicator ─────────────────────────────────────────────────────────────────
-fn _emit_indicator(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float {
-    var ix = ctx.x + w.padding_left;
-    var iy = ctx.y + w.padding_top;
-
-    var ir = w.foreground_color.r;
-    var ig = w.foreground_color.g;
-    var ib = w.foreground_color.b;
-
-    dlist.dl_add(dl, dlist.dcmd_rect_rounded(ix, iy + 4.0, 8.0, 8.0, 4.0, ir, ig, ib, 1.0));
-
-    var label = w.text_val;
-    if (len(label) == 0) { label = w.placeholder_val; }
-    if (len(label) > 0) {
-        dlist.dl_add(dl, dlist.dcmd_text(label, ix + 14.0, iy + 3.5, ts.text_r, ts.text_g, ts.text_b, 1.0, 1.0));
+fn _emit_indicator(dl: dlist.DrawList, w: comp.Indicator, ctx: LayoutCtx, ts: ThemeSnap): float {
+    dlist.dl_emit_rect_rounded(dl, ctx.x, ctx.y + 4.0, 10.0, 10.0, 5.0, w.fg.r, w.fg.g, w.fg.b, 1.0);
+    if (len(w.label) > 0) {
+        dlist.dl_emit_text(dl, w.label, ctx.x + 16.0, ctx.y + 2.0, ts.text_r, ts.text_g, ts.text_b, 1.0, 0.9);
     }
-
-    return 18.0 + w.padding_top + w.padding_bottom;
+    return 18.0;
 }
 
-// ── Link ──────────────────────────────────────────────────────────────────────
-fn _emit_link(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float {
-    var lx = ctx.x + w.padding_left;
-    var ly = ctx.y + w.padding_top;
-    var text_len = len(w.text_val) as float;
-    var text_w = text_len * 8.0;
-
-    dlist.dl_add(dl, dlist.dcmd_text(w.text_val, lx, ly, ts.accent_r, ts.accent_g, ts.accent_b, 1.0, 1.0));
-    dlist.dl_add(dl, dlist.dcmd_rect(lx, ly + 14.0, text_w, 1.0, ts.accent_r, ts.accent_g, ts.accent_b, 1.0));
-
-    _add_hit(dl, dlist.make_button_zone(w.text_val, lx, ly, text_w, 16.0, w.on_click_action, w), ctx);
-    return 18.0 + w.padding_top + w.padding_bottom;
+fn _emit_link(dl: dlist.DrawList, w: comp.Link, ctx: LayoutCtx, ts: ThemeSnap): float {
+    val tw = (len(w.text) as float) * 7.5;
+    val h = 20.0;
+    dlist.dl_emit_text(dl, w.text, ctx.x, ctx.y + 2.0, ts.accent_r, ts.accent_g, ts.accent_b, 1.0, 1.0);
+    _add_hit(dl, dlist.make_button_zone_for(w.text, ctx.x, ctx.y, tw, h, w.on_click_action, w), ctx);
+    return h;
 }
 
-// ── Stepper ───────────────────────────────────────────────────────────────────
-fn _emit_stepper(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float {
-    var sw = 110.0;
-    if (w.width_val > 0.0) { sw = w.width_val; }
-    var sh = 28.0;
-    if (w.height_val > 0.0) { sh = w.height_val; }
-    var sx = ctx.x + w.padding_left;
-    var sy = ctx.y + w.padding_top;
-
-    var extra_h = 0.0;
-    if (len(w.text_val) > 0) {
-        dlist.dl_add(dl, dlist.dcmd_text(w.text_val, sx, sy, ts.text2_r, ts.text2_g, ts.text2_b, 1.0, 0.9));
-        sy = sy + 18.0;
-        extra_h = 18.0;
-    }
-
-    // Outer rounded container
-    dlist.dl_add(dl, dlist.dcmd_rect_rounded(sx, sy, sw, sh, 6.0, ts.surface_r, ts.surface_g, ts.surface_b, 1.0));
-    _draw_border(dl, sx, sy, sw, sh, ts.border_r, ts.border_g, ts.border_b, 1.0, 6.0);
-
-    // Subtle button backgrounds
-    dlist.dl_add(dl, dlist.dcmd_rect_rounded(sx + 1.0, sy + 1.0, 27.0, sh - 2.0, 5.0, ts.surface_r * 1.35, ts.surface_g * 1.35, ts.surface_b * 1.35, 0.7));
-    dlist.dl_add(dl, dlist.dcmd_rect_rounded(sx + sw - 28.0, sy + 1.0, 27.0, sh - 2.0, 5.0, ts.surface_r * 1.35, ts.surface_g * 1.35, ts.surface_b * 1.35, 0.7));
-
-    // Dividers
-    dlist.dl_add(dl, dlist.dcmd_rect(sx + 28.0, sy + 2.0, 1.0, sh - 4.0, ts.border_r, ts.border_g, ts.border_b, 0.8));
-    dlist.dl_add(dl, dlist.dcmd_rect(sx + sw - 29.0, sy + 2.0, 1.0, sh - 4.0, ts.border_r, ts.border_g, ts.border_b, 0.8));
-
-    // Minus glyph (centered at sx + 14.0)
-    dlist.dl_add(dl, dlist.dcmd_line(sx + 9.0, sy + sh * 0.5, sx + 19.0, sy + sh * 0.5, ts.text_r, ts.text_g, ts.text_b, 1.0));
-
-    // Plus glyph (centered at sx + sw - 14.5)
-    dlist.dl_add(dl, dlist.dcmd_line(sx + sw - 19.5, sy + sh * 0.5, sx + sw - 9.5, sy + sh * 0.5, ts.text_r, ts.text_g, ts.text_b, 1.0));
-    dlist.dl_add(dl, dlist.dcmd_line(sx + sw - 14.5, sy + sh * 0.5 - 5.0, sx + sw - 14.5, sy + sh * 0.5 + 5.0, ts.text_r, ts.text_g, ts.text_b, 1.0));
-
-    // Centered value text
-    var val_int = w.slider_val as int;
-    var val_str = "{val_int}";
-    var text_w = (len(val_str) as float) * 7.5;
-    var text_x = sx + (sw - text_w) * 0.5;
-    var text_y = sy + (sh - 10.0) * 0.5;
-    dlist.dl_add(dl, dlist.dcmd_text(val_str, text_x, text_y, ts.text_r, ts.text_g, ts.text_b, 1.0, 1.0));
-
-    // Hit zones for decrement and increment buttons
-    var hz_dec = dlist.make_button_zone("stepper_dec", sx, sy, 28.0, sh, w.on_change_action, w);
-    hz_dec.tab_index = -1;
-    _add_hit(dl, hz_dec, ctx);
-
-    var hz_inc = dlist.make_button_zone("stepper_inc", sx + sw - 28.0, sy, 28.0, sh, w.on_change_action, w);
-    hz_inc.tab_index = 1;
-    _add_hit(dl, hz_inc, ctx);
-
-    return sh + extra_h + w.padding_top + w.padding_bottom;
+fn _emit_color_picker(dl: dlist.DrawList, w: comp.ColorPicker, ctx: LayoutCtx, ts: ThemeSnap): float {
+    dlist.dl_emit_rect_rounded(dl, ctx.x, ctx.y + 2.0, 24.0, 24.0, 4.0, w.picked_color.r, w.picked_color.g, w.picked_color.b, 1.0);
+    _draw_border(dl, ctx.x, ctx.y + 2.0, 24.0, 24.0, ts.border_r, ts.border_g, ts.border_b, 1.0, 4.0);
+    dlist.dl_emit_text(dl, w.label, ctx.x + 32.0, ctx.y + 7.0, ts.text_r, ts.text_g, ts.text_b, 1.0, 1.0);
+    return 28.0;
 }
 
-// ── RangeSlider ───────────────────────────────────────────────────────────────
-fn _emit_range_slider(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float {
-    var rw = 180.0;
-    if (w.width_val > 0.0) { rw = w.width_val; }
-    var rx = ctx.x + w.padding_left;
-    var ry = ctx.y + w.padding_top;
-    var rh = 28.0;
-
-    var extra_h = 0.0;
-    if (len(w.text_val) > 0) {
-        dlist.dl_add(dl, dlist.dcmd_text(w.text_val, rx, ry, ts.text2_r, ts.text2_g, ts.text2_b, 1.0, 0.9));
-        ry = ry + 18.0;
-        extra_h = 18.0;
+fn _emit_steps(dl: dlist.DrawList, w: comp.Steps, ctx: LayoutCtx, ts: ThemeSnap): float {
+    val ns = len(w.step_titles);
+    if (ns == 0) { return 24.0; }
+    var sx = ctx.x;
+    iter (i in 0..ns) {
+        val active = (i <= w.active_step);
+        var cr = ts.surface_r; var cg = ts.surface_g; var cb = ts.surface_b;
+        if (active) { cr = ts.accent_r; cg = ts.accent_g; cb = ts.accent_b; }
+        dlist.dl_emit_rect_rounded(dl, sx, ctx.y, 22.0, 22.0, 11.0, cr, cg, cb, 1.0);
+        dlist.dl_emit_text(dl, "{i + 1}", sx + 7.0, ctx.y + 5.0, 1.0, 1.0, 1.0, 1.0, 0.9);
+        dlist.dl_emit_text(dl, w.step_titles[i], sx + 28.0, ctx.y + 5.0, ts.text_r, ts.text_g, ts.text_b, 1.0, 0.9);
+        sx = sx + 120.0;
     }
-
-    var track_y = ry + 12.0;
-    dlist.dl_add(dl, dlist.dcmd_rect_rounded(rx, track_y, rw, 4.0, 2.0, ts.border_r, ts.border_g, ts.border_b, 1.0));
-
-    var range_span = w.slider_max - w.slider_min;
-    if (range_span <= 0.0) { range_span = 100.0; }
-    var low_pct = (w.slider_val - w.slider_min) / range_span;
-    if (low_pct < 0.0) { low_pct = 0.0; }
-    if (low_pct > 1.0) { low_pct = 1.0; }
-    var high_pct = (w.slider_high - w.slider_min) / range_span;
-    if (high_pct < 0.0) { high_pct = 0.0; }
-    if (high_pct > 1.0) { high_pct = 1.0; }
-
-    var low_x = rx + low_pct * rw;
-    var high_x = rx + high_pct * rw;
-    var fill_w = high_x - low_x;
-    if (fill_w > 0.0) {
-        dlist.dl_add(dl, dlist.dcmd_rect(low_x, track_y, fill_w, 4.0, ts.accent_r, ts.accent_g, ts.accent_b, 1.0));
-    }
-
-    // Low thumb with shadow & outline
-    dlist.dl_add(dl, dlist.dcmd_rect_rounded(low_x - 7.0, track_y - 5.0, 14.0, 14.0, 7.0, 0.0, 0.0, 0.0, 0.25));
-    dlist.dl_add(dl, dlist.dcmd_rect_rounded(low_x - 7.0, track_y - 6.0, 14.0, 14.0, 7.0, 1.0, 1.0, 1.0, 1.0));
-    _draw_border(dl, low_x - 7.0, track_y - 6.0, 14.0, 14.0, ts.accent_r, ts.accent_g, ts.accent_b, 1.0, 7.0);
-
-    // High thumb with shadow & outline
-    dlist.dl_add(dl, dlist.dcmd_rect_rounded(high_x - 7.0, track_y - 5.0, 14.0, 14.0, 7.0, 0.0, 0.0, 0.0, 0.25));
-    dlist.dl_add(dl, dlist.dcmd_rect_rounded(high_x - 7.0, track_y - 6.0, 14.0, 14.0, 7.0, 1.0, 1.0, 1.0, 1.0));
-    _draw_border(dl, high_x - 7.0, track_y - 6.0, 14.0, 14.0, ts.accent_r, ts.accent_g, ts.accent_b, 1.0, 7.0);
-
-    // Register interactive slider zone
-    var hz = dlist.make_slider_zone("range_slider", rx, track_y - 6.0, rw, 16.0, w.slider_min, w.slider_max, w.slider_val, w.on_change_action, w);
-    _add_hit(dl, hz, ctx);
-
-    return rh + extra_h + w.padding_top + w.padding_bottom;
+    return 28.0;
 }
 
-// ── ColorPicker ───────────────────────────────────────────────────────────────
-fn _emit_color_picker(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float {
-    var cx = ctx.x + w.padding_left;
-    var cy = ctx.y + w.padding_top;
-
-    var c = w.foreground_color;
-    dlist.dl_add(dl, dlist.dcmd_rect_rounded(cx, cy + 2.0, 26.0, 20.0, 4.0, c.r, c.g, c.b, 1.0));
-    dlist.dl_add(dl, dlist.dcmd_rect(cx, cy + 2.0, 26.0, 1.0, ts.border_r, ts.border_g, ts.border_b, 1.0));
-    dlist.dl_add(dl, dlist.dcmd_rect(cx, cy + 21.0, 26.0, 1.0, ts.border_r, ts.border_g, ts.border_b, 1.0));
-
-    dlist.dl_add(dl, dlist.dcmd_text(w.text_val, cx + 34.0, cy + 5.0, ts.text_r, ts.text_g, ts.text_b, 1.0, 1.0));
-
-    var hz = dlist.make_button_zone("color_picker", cx, cy, 26.0, 20.0, w.on_change_action, w);
-    _add_hit(dl, hz, ctx);
-
-    return 26.0 + w.padding_top + w.padding_bottom;
-}
-
-// ── Steps ─────────────────────────────────────────────────────────────────────
-fn _emit_steps(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float {
-    var sx = ctx.x + w.padding_left;
-    var sy = ctx.y + w.padding_top;
-    var num_steps = len(w.tab_titles);
-    if (num_steps == 0) { return 32.0; }
-
-    if (w.is_vertical == 1) {
-        // Vertical Steps (DaisyUI steps-vertical):
-        // Nodes along left track, connector runs vertically down, text beside circle
-        var step_h = 44.0;
-        var i = 0;
-        while (i < num_steps) {
-            var node_y = sy + (i as float) * step_h;
-            var circle_x = sx + 4.0;
-            var is_done = 0;
-            if (i <= w.active_tab) { is_done = 1; }
-
-            // Vertical connecting line to next step
-            if (i < num_steps - 1) {
-                var line_r = ts.border_r; var line_g = ts.border_g; var line_b = ts.border_b;
-                if (i < w.active_tab) {
-                    line_r = ts.accent_r; line_g = ts.accent_g; line_b = ts.accent_b;
-                }
-                dlist.dl_add(dl, dlist.dcmd_rect(circle_x + 11.0, node_y + 24.0, 2.0, step_h - 24.0, line_r, line_g, line_b, 1.0));
-            }
-
-            // Step circle (24x24, radius 12.0)
-            var nr = ts.surface_r; var ng = ts.surface_g; var nb = ts.surface_b;
-            if (is_done == 1) {
-                nr = ts.accent_r; ng = ts.accent_g; nb = ts.accent_b;
-            }
-            dlist.dl_add(dl, dlist.dcmd_rect_rounded(circle_x, node_y, 24.0, 24.0, 12.0, nr, ng, nb, 1.0));
-            if (is_done == 0) {
-                _draw_border(dl, circle_x, node_y, 24.0, 24.0, ts.border_r, ts.border_g, ts.border_b, 1.0, 12.0);
-            }
-
-            // Step number (optically centered in 24px circle)
-            var num_str = "{i + 1}";
-            var num_tr = 1.0; var num_tg = 1.0; var num_tb = 1.0;
-            if (is_done == 0) {
-                num_tr = ts.text2_r; num_tg = ts.text2_g; num_tb = ts.text2_b;
-            }
-            dlist.dl_add(dl, dlist.dcmd_text(num_str, circle_x + 8.5, node_y + 7.0, num_tr, num_tg, num_tb, 1.0, 0.9));
-
-            // Title text beside the circle (horizontally adjacent, vertically centered with circle)
-            var title = w.tab_titles[i];
-            var tr = ts.text_r; var tg = ts.text_g; var tb = ts.text_b;
-            if (is_done == 0) {
-                tr = ts.text2_r; tg = ts.text2_g; tb = ts.text2_b;
-            }
-            dlist.dl_add(dl, dlist.dcmd_text(title, circle_x + 36.0, node_y + 7.0, tr, tg, tb, 1.0, 0.95));
-
-            var hz = dlist.make_button_zone("step_" + num_str, circle_x, node_y, ctx.avail_w - 8.0, 32.0, w.on_change_action, w);
-            hz.tab_index = i;
-            _add_hit(dl, hz, ctx);
-
-            i = i + 1;
-        }
-        return (num_steps as float) * step_h + w.padding_top + w.padding_bottom;
-    }
-
-    // Horizontal Steps (DaisyUI steps / steps-horizontal):
-    // Connecting line runs between circles along top track.
-    // Title text is placed UNDER the circle, centered horizontally in each step column.
-    var avail_w = ctx.avail_w - w.padding_left - w.padding_right;
-    if (avail_w < 100.0) { avail_w = 400.0; }
-    var step_w = avail_w / (num_steps as float);
-    var i = 0;
-    while (i < num_steps) {
-        var cx_i = sx + ((i as float) + 0.5) * step_w;
-        var circle_x = cx_i - 12.0;
-        var is_done = 0;
-        if (i <= w.active_tab) { is_done = 1; }
-
-        // Horizontal connecting line to next step (from circle right edge to next circle left edge)
-        if (i < num_steps - 1) {
-            var next_cx = sx + (((i + 1) as float) + 0.5) * step_w;
-            var line_start_x = circle_x + 24.0;
-            var line_len = next_cx - 12.0 - line_start_x;
-            var line_r = ts.border_r; var line_g = ts.border_g; var line_b = ts.border_b;
-            if (i < w.active_tab) {
-                line_r = ts.accent_r; line_g = ts.accent_g; line_b = ts.accent_b;
-            }
-            dlist.dl_add(dl, dlist.dcmd_rect(line_start_x, sy + 11.0, line_len, 2.0, line_r, line_g, line_b, 1.0));
-        }
-
-        // Step circle (24x24, radius 12.0)
-        var nr = ts.surface_r; var ng = ts.surface_g; var nb = ts.surface_b;
-        if (is_done == 1) {
-            nr = ts.accent_r; ng = ts.accent_g; nb = ts.accent_b;
-        }
-        dlist.dl_add(dl, dlist.dcmd_rect_rounded(circle_x, sy, 24.0, 24.0, 12.0, nr, ng, nb, 1.0));
-        if (is_done == 0) {
-            _draw_border(dl, circle_x, sy, 24.0, 24.0, ts.border_r, ts.border_g, ts.border_b, 1.0, 12.0);
-        }
-
-        // Step number (optically centered in 24px circle)
-        var num_str = "{i + 1}";
-        var num_tr = 1.0; var num_tg = 1.0; var num_tb = 1.0;
-        if (is_done == 0) {
-            num_tr = ts.text2_r; num_tg = ts.text2_g; num_tb = ts.text2_b;
-        }
-        dlist.dl_add(dl, dlist.dcmd_text(num_str, circle_x + 8.5, sy + 7.0, num_tr, num_tg, num_tb, 1.0, 0.9));
-
-        // Title text placed UNDER the circle, centered horizontally in this step column
-        var title = w.tab_titles[i];
-        var text_w = (len(title) as float) * 6.5 * 0.9;
-        var text_x = cx_i - text_w * 0.5;
-        // Keep within slot margins with 2px padding
-        var slot_left = sx + (i as float) * step_w + 2.0;
-        if (text_x < slot_left) { text_x = slot_left; }
-        var text_y = sy + 32.0;
-
-        var tr = ts.text_r; var tg = ts.text_g; var tb = ts.text_b;
-        if (is_done == 0) {
-            tr = ts.text2_r; tg = ts.text2_g; tb = ts.text2_b;
-        }
-        dlist.dl_add(dl, dlist.dcmd_text(title, text_x, text_y, tr, tg, tb, 1.0, 0.9));
-
-        // Hit zone covering the step column
-        var slot_x = sx + (i as float) * step_w;
-        var hz = dlist.make_button_zone("step_" + num_str, slot_x, sy, step_w, 56.0, w.on_change_action, w);
-        hz.tab_index = i;
-        _add_hit(dl, hz, ctx);
-
-        i = i + 1;
-    }
-
-    return 56.0 + w.padding_top + w.padding_bottom;
-}
-
-// ── Timeline ──────────────────────────────────────────────────────────────────
-fn _emit_timeline(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float {
-    var tx = ctx.x + w.padding_left;
-    var ty = ctx.y + w.padding_top;
-    var cur_y = ty;
-
-    var n = len(w.children);
-    var i = 0;
-    while (i < n) {
-        dlist.dl_add(dl, dlist.dcmd_rect_rounded(tx + 4.0, cur_y + 4.0, 8.0, 8.0, 4.0, ts.accent_r, ts.accent_g, ts.accent_b, 1.0));
-
-        var child_ctx = LayoutCtx(
-            x=tx + 22.0, y=cur_y, avail_w=ctx.avail_w - 22.0, avail_h=0.0, spacing=ts.spacing,
-            clip_x=ctx.clip_x, clip_y=ctx.clip_y, clip_w=ctx.clip_w, clip_h=ctx.clip_h
+fn _emit_timeline(dl: dlist.DrawList, w: comp.Timeline, ctx: LayoutCtx, ts: ThemeSnap): float {
+    var cy = ctx.y;
+    iter (ch_w in w.children) {
+        dlist.dl_emit_rect_rounded(dl, ctx.x + 4.0, cy + 4.0, 10.0, 10.0, 5.0, ts.accent_r, ts.accent_g, ts.accent_b, 1.0);
+        val cctx = LayoutCtx(
+            x=ctx.x + 22.0, y=cy, avail_w=ctx.avail_w - 22.0, avail_h=ctx.avail_h,
+            spacing=ts.spacing, clip_x=ctx.clip_x, clip_y=ctx.clip_y, clip_w=ctx.clip_w, clip_h=ctx.clip_h
         );
-        var ch = _emit(dl, w.children[i], child_ctx, ts);
-
-        if (i < n - 1) {
-            dlist.dl_add(dl, dlist.dcmd_rect(tx + 7.0, cur_y + 12.0, 2.0, ch + ts.spacing - 8.0, ts.border_r, ts.border_g, ts.border_b, 0.8));
-        }
-
-        cur_y = cur_y + ch + ts.spacing;
-        i = i + 1;
+        cy = cy + _emit(dl, ch_w, cctx, ts) + ts.spacing;
     }
-
-    return cur_y - ty + w.padding_top + w.padding_bottom;
+    return cy - ctx.y;
 }
 
-// ── TreeNode ──────────────────────────────────────────────────────────────────
-fn _emit_tree_node(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float {
-    var nx = ctx.x + w.padding_left;
-    var ny = ctx.y + w.padding_top;
-
-    var chev = "> ";
-    if (w.is_open != 0) { chev = "v "; }
-    dlist.dl_add(dl, dlist.dcmd_text(chev, nx, ny + 4.0, ts.accent_r, ts.accent_g, ts.accent_b, 1.0, 1.0));
-    dlist.dl_add(dl, dlist.dcmd_text(w.text_val, nx + 16.0, ny + 4.0, ts.text_r, ts.text_g, ts.text_b, 1.0, 1.0));
-
-    var hz = dlist.HitZone();
-    hz.id = "tree_node_head";
+fn _emit_tree_node(dl: dlist.DrawList, w: comp.TreeNode, ctx: LayoutCtx, ts: ThemeSnap): float {
+    val row_h = 24.0;
+    dlist.dl_emit_text(dl, w.label, ctx.x + 16.0, ctx.y + 4.0, ts.text_r, ts.text_g, ts.text_b, 1.0, 1.0);
+    val hz = dlist.make_button_zone_for(w.label, ctx.x, ctx.y, ctx.avail_w, row_h, w.on_click_action, w);
     hz.kind = dlist.HitZoneKind.TreeNode;
-    hz.x = nx; hz.y = ny; hz.w = ctx.avail_w; hz.h = 24.0;
-    hz.widget = w;
     _add_hit(dl, hz, ctx);
-
-    var total_h = 24.0;
-    if (w.is_open != 0) {
-        var cy = ny + 24.0;
-        var i = 0;
-        while (i < len(w.children)) {
-            var child_ctx = LayoutCtx(
-                x=nx + 16.0, y=cy, avail_w=ctx.avail_w - 16.0, avail_h=0.0, spacing=ts.spacing,
-                clip_x=ctx.clip_x, clip_y=ctx.clip_y, clip_w=ctx.clip_w, clip_h=ctx.clip_h
+    var total_h = row_h;
+    if (w.is_open) {
+        iter (ch in w.children) {
+            val cctx = LayoutCtx(
+                x=ctx.x + 18.0, y=ctx.y + total_h, avail_w=ctx.avail_w - 18.0, avail_h=ctx.avail_h,
+                spacing=ts.spacing, clip_x=ctx.clip_x, clip_y=ctx.clip_y, clip_w=ctx.clip_w, clip_h=ctx.clip_h
             );
-            var ch = _emit(dl, w.children[i], child_ctx, ts);
-            cy = cy + ch + ts.spacing;
-            i = i + 1;
+            total_h = total_h + _emit(dl, ch, cctx, ts);
         }
-        total_h = cy - ny;
     }
-
-    return total_h + w.padding_top + w.padding_bottom;
+    return total_h;
 }
 
-// ── FormField ─────────────────────────────────────────────────────────────────
-fn _emit_form_field(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float {
-    var fx = ctx.x + w.padding_left;
-    var fy = ctx.y + w.padding_top;
-
-    dlist.dl_add(dl, dlist.dcmd_text(w.text_val, fx, fy, ts.text_r, ts.text_g, ts.text_b, 1.0, 0.9));
-    var cur_y = fy + 18.0;
-
+fn _emit_form_field(dl: dlist.DrawList, w: comp.FormField, ctx: LayoutCtx, ts: ThemeSnap): float {
+    var cy = ctx.y;
+    dlist.dl_emit_text(dl, w.label_text, ctx.x, cy, ts.text_r, ts.text_g, ts.text_b, 1.0, 0.9);
+    cy = cy + 18.0;
     if (len(w.children) > 0) {
-        var child_ctx = LayoutCtx(
-            x=fx, y=cur_y, avail_w=ctx.avail_w, avail_h=0.0, spacing=ts.spacing,
-            clip_x=ctx.clip_x, clip_y=ctx.clip_y, clip_w=ctx.clip_w, clip_h=ctx.clip_h
+        val cctx = LayoutCtx(
+            x=ctx.x, y=cy, avail_w=ctx.avail_w, avail_h=ctx.avail_h,
+            spacing=ts.spacing, clip_x=ctx.clip_x, clip_y=ctx.clip_y, clip_w=ctx.clip_w, clip_h=ctx.clip_h
         );
-        var ch = _emit(dl, w.children[0], child_ctx, ts);
-        cur_y = cur_y + ch + 4.0;
+        cy = cy + _emit(dl, w.children[0], cctx, ts) + 4.0;
     }
-
-    if (len(w.focus_key) > 0) {
-        dlist.dl_add(dl, dlist.dcmd_text(w.focus_key, fx, cur_y, 0.95, 0.35, 0.35, 1.0, 0.85));
-        cur_y = cur_y + 16.0;
-    } elif (len(w.placeholder_val) > 0) {
-        dlist.dl_add(dl, dlist.dcmd_text(w.placeholder_val, fx, cur_y, ts.text2_r, ts.text2_g, ts.text2_b, 1.0, 0.85));
-        cur_y = cur_y + 16.0;
+    if (len(w.error_text) > 0) {
+        dlist.dl_emit_text(dl, w.error_text, ctx.x, cy, 0.95, 0.35, 0.35, 1.0, 0.85);
+        cy = cy + 16.0;
+    } elif (len(w.help_text) > 0) {
+        dlist.dl_emit_text(dl, w.help_text, ctx.x, cy, ts.text2_r, ts.text2_g, ts.text2_b, 1.0, 0.85);
+        cy = cy + 16.0;
     }
-
-    return cur_y - fy + w.padding_top + w.padding_bottom;
+    return cy - ctx.y;
 }
 
-// ── Diff ──────────────────────────────────────────────────────────────────────
-fn _emit_diff(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float {
-    var dx = ctx.x + w.padding_left;
-    var dy = ctx.y + w.padding_top;
-    var dw = ctx.avail_w - w.padding_left - w.padding_right;
-
-    dlist.dl_add(dl, dlist.dcmd_rect_rounded(dx, dy, dw, 56.0, 4.0, ts.surface_r * 0.8, ts.surface_g * 0.8, ts.surface_b * 0.8, 1.0));
-    _draw_border(dl, dx, dy, dw, 56.0, ts.border_r, ts.border_g, ts.border_b, 0.8, 4.0);
-
-    // Deletion
-    dlist.dl_add(dl, dlist.dcmd_rect(dx + 1.0, dy + 2.0, dw - 2.0, 24.0, 0.4, 0.1, 0.14, 0.3));
-    dlist.dl_add(dl, dlist.dcmd_rect(dx + 1.0, dy + 2.0, 3.0, 24.0, 0.9, 0.25, 0.3, 1.0));
-    dlist.dl_add(dl, dlist.dcmd_text("- " + w.text_val, dx + 12.0, dy + 7.0, 1.0, 0.6, 0.65, 1.0, 0.95));
-
-    // Addition
-    dlist.dl_add(dl, dlist.dcmd_rect(dx + 1.0, dy + 28.0, dw - 2.0, 24.0, 0.1, 0.35, 0.18, 0.3));
-    dlist.dl_add(dl, dlist.dcmd_rect(dx + 1.0, dy + 28.0, 3.0, 24.0, 0.2, 0.85, 0.45, 1.0));
-    dlist.dl_add(dl, dlist.dcmd_text("+ " + w.placeholder_val, dx + 12.0, dy + 33.0, 0.5, 1.0, 0.65, 1.0, 0.95));
-
-    return 58.0 + w.padding_top + w.padding_bottom;
+fn _emit_diff(dl: dlist.DrawList, w: comp.Diff, ctx: LayoutCtx, ts: ThemeSnap): float {
+    dlist.dl_emit_rect_rounded(dl, ctx.x, ctx.y, ctx.avail_w, 48.0, 4.0, ts.surface_r, ts.surface_g, ts.surface_b, 1.0);
+    dlist.dl_emit_text(dl, "- " + w.old_text, ctx.x + 8.0, ctx.y + 6.0, 0.95, 0.45, 0.45, 1.0, 0.95);
+    dlist.dl_emit_text(dl, "+ " + w.new_text, ctx.x + 8.0, ctx.y + 26.0, 0.40, 0.90, 0.55, 1.0, 0.95);
+    return 48.0;
 }
 
-// ── FileInput ─────────────────────────────────────────────────────────────────
-fn _emit_file_input(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float {
-    var fx = ctx.x + w.padding_left;
-    var fy = ctx.y + w.padding_top;
-    var fw = 240.0;
+fn _emit_file_input(dl: dlist.DrawList, w: comp.FileInput, ctx: LayoutCtx, ts: ThemeSnap): float {
+    var fw = 220.0;
     if (w.width_val > 0.0) { fw = w.width_val; }
-    var fh = 32.0;
-    if (w.height_val > 0.0) { fh = w.height_val; }
-
-    dlist.dl_add(dl, dlist.dcmd_rect_rounded(fx, fy, fw, fh, 6.0, ts.surface_r * 0.7, ts.surface_g * 0.7, ts.surface_b * 0.7, 1.0));
-    _draw_border(dl, fx, fy, fw, fh, ts.border_r, ts.border_g, ts.border_b, 1.0, 6.0);
-
-    var btn_w = 76.0;
-    dlist.dl_add(dl, dlist.dcmd_rect_rounded(fx + 2.0, fy + 2.0, btn_w, fh - 4.0, 4.0, ts.accent_r * 0.8, ts.accent_g * 0.8, ts.accent_b * 0.8, 1.0));
-    _draw_border(dl, fx + 2.0, fy + 2.0, btn_w, fh - 4.0, ts.accent_r, ts.accent_g, ts.accent_b, 0.9, 4.0);
-
-    var text_y = fy + (fh - 9.5) * 0.5;
-    var btw = (len("Browse...") as float) * 7.5 * 0.9;
-    var btx = (fx + 2.0) + (btn_w - btw) * 0.5;
-    dlist.dl_add(dl, dlist.dcmd_text("Browse...", btx, text_y, 1.0, 1.0, 1.0, 1.0, 0.9));
-    dlist.dl_add(dl, dlist.dcmd_text(w.text_val, fx + btn_w + 10.0, text_y, ts.text2_r, ts.text2_g, ts.text2_b, 1.0, 0.9));
-
-    var hz = dlist.make_button_zone("file_browse", fx, fy, btn_w, fh, w.on_change_action, w);
-    _add_hit(dl, hz, ctx);
-
-    return fh + w.padding_top + w.padding_bottom;
+    val fh = 32.0;
+    dlist.dl_emit_rect_rounded(dl, ctx.x, ctx.y, fw, fh, 4.0, ts.surface_r, ts.surface_g, ts.surface_b, 1.0);
+    _draw_border(dl, ctx.x, ctx.y, fw, fh, ts.border_r, ts.border_g, ts.border_b, 1.0, 4.0);
+    dlist.dl_emit_text(dl, w.label, ctx.x + 10.0, ctx.y + 9.0, ts.text_r, ts.text_g, ts.text_b, 1.0, 1.0);
+    _add_hit(dl, dlist.make_button_zone_for(w.label, ctx.x, ctx.y, fw, fh, w.on_click_action, w), ctx);
+    return fh;
 }
 
-// ── Filter ────────────────────────────────────────────────────────────────────
-fn _emit_filter(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float {
-    var fx = ctx.x + w.padding_left;
-    var fy = ctx.y + w.padding_top;
+fn _emit_filter(dl: dlist.DrawList, w: comp.Filter, ctx: LayoutCtx, ts: ThemeSnap): float {
     var fw = 200.0;
     if (w.width_val > 0.0) { fw = w.width_val; }
-    var fh = 32.0;
-    if (w.height_val > 0.0) { fh = w.height_val; }
-
-    dlist.dl_add(dl, dlist.dcmd_rect_rounded(fx, fy, fw, fh, 6.0, ts.surface_r * 0.7, ts.surface_g * 0.7, ts.surface_b * 0.7, 1.0));
-    _draw_border(dl, fx, fy, fw, fh, ts.border_r, ts.border_g, ts.border_b, 1.0, 6.0);
-
-    // Vector Search Magnifying Glass Icon (ring + diagonal handle)
-    var icon_cy = fy + fh * 0.5;
-    dlist.dl_add(dl, dlist.dcmd_rect_rounded(fx + 9.0, icon_cy - 6.0, 9.0, 9.0, 4.5, ts.text2_r, ts.text2_g, ts.text2_b, 0.2));
-    _draw_border(dl, fx + 9.0, icon_cy - 6.0, 9.0, 9.0, ts.accent_r, ts.accent_g, ts.accent_b, 0.9, 4.5);
-    dlist.dl_add(dl, dlist.dcmd_line(fx + 16.5, icon_cy + 1.5, fx + 20.0, icon_cy + 5.0, ts.accent_r, ts.accent_g, ts.accent_b, 1.0));
-
-    var disp = w.text_val;
-    var tr = ts.text_r; var tg = ts.text_g; var tb = ts.text_b;
-    if (len(disp) == 0) {
-        disp = w.placeholder_val;
-        tr = ts.text2_r; tg = ts.text2_g; tb = ts.text2_b;
-    }
-    var text_y = fy + (fh - 9.5) * 0.5;
-    dlist.dl_add(dl, dlist.dcmd_text(disp, fx + 26.0, text_y, tr, tg, tb, 1.0, 0.95));
-
-    return fh + w.padding_top + w.padding_bottom;
+    val fh = 30.0;
+    dlist.dl_emit_rect_rounded(dl, ctx.x, ctx.y, fw, fh, 4.0, ts.bg_r * 0.9, ts.bg_g * 0.9, ts.bg_b * 1.1, 1.0);
+    _draw_border(dl, ctx.x, ctx.y, fw, fh, ts.border_r, ts.border_g, ts.border_b, 1.0, 4.0);
+    var disp = w.query;
+    if (len(disp) == 0) { disp = w.placeholder; }
+    dlist.dl_emit_text(dl, disp, ctx.x + 10.0, ctx.y + 8.0, ts.text_r, ts.text_g, ts.text_b, 1.0, 1.0);
+    return fh;
 }
 
-// ── Calendar ──────────────────────────────────────────────────────────────────
-fn _emit_calendar(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float {
-    var cx = ctx.x + w.padding_left;
-    var cy = ctx.y + w.padding_top;
-    var cw = 230.0;
-    if (w.width_val > 0.0) { cw = w.width_val; }
-    var ch = 200.0;
-    if (w.height_val > 0.0) { ch = w.height_val; }
-
-    // Drop shadow & container
-    _draw_shadow(dl, cx, cy, cw, ch, 8.0);
-    dlist.dl_add(dl, dlist.dcmd_rect_rounded(cx, cy, cw, ch, 8.0, ts.surface_r, ts.surface_g, ts.surface_b, 1.0));
-    _draw_border(dl, cx, cy, cw, ch, ts.border_r, ts.border_g, ts.border_b, 0.8, 8.0);
-
-    // Prev vector chevron (<)
-    dlist.dl_add(dl, dlist.dcmd_line(cx + 17.0, cy + 11.0, cx + 13.0, cy + 15.5, ts.text2_r, ts.text2_g, ts.text2_b, 1.0));
-    dlist.dl_add(dl, dlist.dcmd_line(cx + 13.0, cy + 15.5, cx + 17.0, cy + 20.0, ts.text2_r, ts.text2_g, ts.text2_b, 1.0));
-
-    // Centered Title
-    var cal_title = "November 2026";
-    var tw = (len(cal_title) as float) * 7.2;
-    dlist.dl_add(dl, dlist.dcmd_text(cal_title, cx + (cw - tw) * 0.5, cy + 9.0, ts.text_r, ts.text_g, ts.text_b, 1.0, 1.0));
-
-    // Next vector chevron (>)
-    dlist.dl_add(dl, dlist.dcmd_line(cx + cw - 17.0, cy + 11.0, cx + cw - 13.0, cy + 15.5, ts.text2_r, ts.text2_g, ts.text2_b, 1.0));
-    dlist.dl_add(dl, dlist.dcmd_line(cx + cw - 13.0, cy + 15.5, cx + cw - 17.0, cy + 20.0, ts.text2_r, ts.text2_g, ts.text2_b, 1.0));
-
-    // Day of week column headers
-    var days_header: [str] = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
-    var grid_pad = 10.0;
-    var grid_w = cw - (grid_pad * 2.0);
-    var col_w = grid_w / 7.0;
-
-    var dh_i = 0;
-    while (dh_i < 7) {
-        var h_name = days_header[dh_i];
-        var hx = cx + grid_pad + (dh_i as float) * col_w + (col_w - 14.0) * 0.5;
-        var hr = ts.text2_r; var hg = ts.text2_g; var hb = ts.text2_b;
-        if (dh_i >= 5) {
-            hr = ts.text2_r * 0.8; hg = ts.text2_g * 0.8; hb = ts.text2_b * 0.8;
-        }
-        dlist.dl_add(dl, dlist.dcmd_text(h_name, hx, cy + 32.0, hr, hg, hb, 1.0, 0.85));
-        dh_i = dh_i + 1;
-    }
-
-    // Divider below day names
-    dlist.dl_add(dl, dlist.dcmd_rect(cx + grid_pad, cy + 48.0, grid_w, 1.0, ts.border_r, ts.border_g, ts.border_b, 0.45));
-
-    // Days grid: November 2026 starts on Sunday (col 6 in Mo..Su week)
-    // Trailing October days (dimmed)
-    var oct_days: [int] = [26, 27, 28, 29, 30, 31];
-    var oi = 0;
-    while (oi < 6) {
-        var od_str = "{oct_days[oi]}";
-        var od_x = cx + grid_pad + (oi as float) * col_w + (col_w - 13.0) * 0.5;
-        dlist.dl_add(dl, dlist.dcmd_text(od_str, od_x, cy + 56.0 + 6.5, ts.text2_r * 0.5, ts.text2_g * 0.5, ts.text2_b * 0.5, 0.5, 0.85));
-        oi = oi + 1;
-    }
-
-    // November days 1..30
-    var d = 1;
-    var cell_h = 22.0;
-    while (d <= 30) {
-        var cell_idx = d + 5; // offset 6 for Sunday start (d=1 is index 6)
-        var col = cell_idx % 7;
-        var row = cell_idx / 7;
-        var cell_x = cx + grid_pad + (col as float) * col_w;
-        var cell_y = cy + 56.0 + (row as float) * cell_h;
-
-        var d_str = "{d}";
-        var tw2 = 6.5;
-        if (d >= 10) { tw2 = 13.0; }
-        var tx = cell_x + (col_w - tw2) * 0.5;
-        var ty = cell_y + 6.5;
-
-        if (d == 14) {
-            // Selected active day: pill capsule
-            var pill_size = 20.0;
-            var pill_x = cell_x + (col_w - pill_size) * 0.5;
-            dlist.dl_add(dl, dlist.dcmd_rect_rounded(pill_x, cell_y + 1.0, pill_size, pill_size, 10.0, ts.accent_r, ts.accent_g, ts.accent_b, 1.0));
-            dlist.dl_add(dl, dlist.dcmd_text(d_str, tx, ty, 1.0, 1.0, 1.0, 1.0, 0.85));
-        } elif (d == 8) {
-            // "Today" subtle outline indicator
-            var pill_size = 20.0;
-            var pill_x = cell_x + (col_w - pill_size) * 0.5;
-            _draw_border(dl, pill_x, cell_y + 1.0, pill_size, pill_size, ts.accent_r, ts.accent_g, ts.accent_b, 0.8, 10.0);
-            dlist.dl_add(dl, dlist.dcmd_text(d_str, tx, ty, ts.accent_r, ts.accent_g, ts.accent_b, 1.0, 0.85));
-        } else {
-            var tr = ts.text_r; var tg = ts.text_g; var tb = ts.text_b;
-            if (col >= 5) {
-                tr = ts.text2_r; tg = ts.text2_g; tb = ts.text2_b;
-            }
-            dlist.dl_add(dl, dlist.dcmd_text(d_str, tx, ty, tr, tg, tb, 1.0, 0.85));
-        }
-        d = d + 1;
-    }
-
-    // Leading December days (dimmed) in last row (col 1..6)
-    var dec_d = 1;
-    while (dec_d <= 6) {
-        var dec_col = dec_d;
-        var dec_x = cx + grid_pad + (dec_col as float) * col_w + (col_w - 7.0) * 0.5;
-        var dec_y = cy + 56.0 + 5.0 * cell_h + 6.5;
-        var dec_str = "{dec_d}";
-        dlist.dl_add(dl, dlist.dcmd_text(dec_str, dec_x, dec_y, ts.text2_r * 0.5, ts.text2_g * 0.5, ts.text2_b * 0.5, 0.5, 0.85));
-        dec_d = dec_d + 1;
-    }
-
-    return ch + w.padding_top + w.padding_bottom;
+fn _emit_calendar(dl: dlist.DrawList, w: comp.Calendar, ctx: LayoutCtx, ts: ThemeSnap): float {
+    val cw = 220.0;
+    val ch = 160.0;
+    dlist.dl_emit_rect_rounded(dl, ctx.x, ctx.y, cw, ch, 6.0, ts.surface_r, ts.surface_g, ts.surface_b, 1.0);
+    _draw_border(dl, ctx.x, ctx.y, cw, ch, ts.border_r, ts.border_g, ts.border_b, 1.0, 6.0);
+    dlist.dl_emit_text(dl, w.selected_date, ctx.x + 12.0, ctx.y + 10.0, ts.text_r, ts.text_g, ts.text_b, 1.0, 1.0);
+    return ch;
 }
 
-// ── BarChart ──────────────────────────────────────────────────────────────────
-fn _emit_bar_chart(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float {
+fn _emit_image(dl: dlist.DrawList, w: comp.Image, ctx: LayoutCtx, ts: ThemeSnap): float {
+    var iw = 120.0;
+    if (w.width_val > 0.0) { iw = w.width_val; }
+    var ih = 90.0;
+    if (w.height_val > 0.0) { ih = w.height_val; }
+    dlist.dl_emit_rect_rounded(dl, ctx.x, ctx.y, iw, ih, 4.0, ts.surface_r, ts.surface_g, ts.surface_b, 1.0);
+    dlist.dl_emit_text(dl, w.source, ctx.x + 8.0, ctx.y + ih * 0.5 - 6.0, ts.text2_r, ts.text2_g, ts.text2_b, 1.0, 0.85);
+    return ih;
+}
+
+// ── Charts ────────────────────────────────────────────────────────────────────
+fn _emit_bar_chart(dl: dlist.DrawList, w: comp.Chart, ctx: LayoutCtx, ts: ThemeSnap): float {
     var cw = 220.0;
     if (w.width_val > 0.0) { cw = w.width_val; }
     var ch = 110.0;
     if (w.height_val > 0.0) { ch = w.height_val; }
-    var cx = ctx.x + w.padding_left;
-    var cy = ctx.y + w.padding_top;
-
-    dlist.dl_add(dl, dlist.dcmd_rect_rounded(cx, cy, cw, ch, 6.0, ts.surface_r, ts.surface_g, ts.surface_b, 1.0));
-    _draw_border(dl, cx, cy, cw, ch, ts.border_r, ts.border_g, ts.border_b, 1.0, 6.0);
-
-    dlist.dl_add(dl, dlist.dcmd_text(w.text_val, cx + 12.0, cy + 8.0, ts.text_r, ts.text_g, ts.text_b, 1.0, 0.9));
-
-    // Guide lines
-    var grid1_y = cy + 34.0;
-    var grid2_y = cy + 58.0;
-    var grid3_y = cy + 82.0;
-    dlist.dl_add(dl, dlist.dcmd_rect(cx + 12.0, grid1_y, cw - 24.0, 1.0, ts.border_r, ts.border_g, ts.border_b, 0.35));
-    dlist.dl_add(dl, dlist.dcmd_rect(cx + 12.0, grid2_y, cw - 24.0, 1.0, ts.border_r, ts.border_g, ts.border_b, 0.35));
-    dlist.dl_add(dl, dlist.dcmd_rect(cx + 12.0, grid3_y, cw - 24.0, 1.0, ts.border_r, ts.border_g, ts.border_b, 0.35));
-
-    var base_y = cy + ch - 22.0;
-    dlist.dl_add(dl, dlist.dcmd_rect(cx + 12.0, base_y, cw - 24.0, 1.0, ts.border_r, ts.border_g, ts.border_b, 1.0));
-
-    if (w.text_editor_state != nil) {
-        var vals = w.text_editor_state as [float];
-        var n_bars = len(vals);
-        if (n_bars > 0) {
-            var bar_slot = (cw - 28.0) / (n_bars as float);
-            var bar_w = bar_slot * 0.65;
-            var max_val = 1.0;
-            var i = 0;
-            while (i < n_bars) {
-                if (vals[i] > max_val) { max_val = vals[i]; }
-                i = i + 1;
-            }
-
-            var b_i = 0;
-            while (b_i < n_bars) {
-                var val_h = (vals[b_i] / max_val) * (ch - 48.0);
-                var bar_x = cx + 16.0 + (b_i as float) * bar_slot;
-                var bar_y = base_y - val_h;
-                dlist.dl_add(dl, dlist.dcmd_rect_rounded(bar_x, bar_y, bar_w, val_h, 3.0, ts.accent_r, ts.accent_g, ts.accent_b, 1.0));
-
-                if (b_i < len(w.tab_titles)) {
-                    dlist.dl_add(dl, dlist.dcmd_text(w.tab_titles[b_i], bar_x, base_y + 4.0, ts.text2_r, ts.text2_g, ts.text2_b, 1.0, 0.75));
-                }
-                b_i = b_i + 1;
-            }
+    dlist.dl_emit_rect_rounded(dl, ctx.x, ctx.y, cw, ch, 6.0, ts.surface_r, ts.surface_g, ts.surface_b, 1.0);
+    dlist.dl_emit_text(dl, w.label, ctx.x + 10.0, ctx.y + 8.0, ts.text_r, ts.text_g, ts.text_b, 1.0, 0.9);
+    val nv = len(w.values);
+    if (nv > 0) {
+        var max_v = 1.0;
+        iter (v in w.values) {
+            if (v > max_v) { max_v = v; }
+        }
+        val bar_w = (cw - 24.0) / (nv as float);
+        val plot_h = ch - 36.0;
+        iter (i in 0..nv) {
+            val bh = (w.values[i] / max_v) * plot_h;
+            val bx = ctx.x + 12.0 + (i as float) * bar_w + 2.0;
+            val by = ctx.y + ch - 8.0 - bh;
+            dlist.dl_emit_rect_rounded(dl, bx, by, bar_w - 4.0, bh, 2.0, ts.accent_r, ts.accent_g, ts.accent_b, 1.0);
         }
     }
-
-    return ch + w.padding_top + w.padding_bottom;
+    return ch;
 }
 
-// ── LineChart ─────────────────────────────────────────────────────────────────
-fn _emit_line_chart(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float {
+fn _emit_line_chart(dl: dlist.DrawList, w: comp.Chart, ctx: LayoutCtx, ts: ThemeSnap): float {
+    var cw = 220.0;
+    if (w.width_val > 0.0) { cw = w.width_val; }
+    var ch = 100.0;
+    if (w.height_val > 0.0) { ch = w.height_val; }
+    dlist.dl_emit_rect_rounded(dl, ctx.x, ctx.y, cw, ch, 6.0, ts.surface_r, ts.surface_g, ts.surface_b, 1.0);
+    dlist.dl_emit_text(dl, w.label, ctx.x + 10.0, ctx.y + 8.0, ts.text_r, ts.text_g, ts.text_b, 1.0, 0.9);
+    val nv = len(w.values);
+    if (nv > 1) {
+        var max_v = 1.0;
+        iter (v in w.values) {
+            if (v > max_v) { max_v = v; }
+        }
+        val dx = (cw - 24.0) / ((nv - 1) as float);
+        val plot_h = ch - 36.0;
+        iter (i in 0..(nv - 1)) {
+            val x1 = ctx.x + 12.0 + (i as float) * dx;
+            val y1 = ctx.y + ch - 10.0 - (w.values[i] / max_v) * plot_h;
+            val x2 = ctx.x + 12.0 + ((i + 1) as float) * dx;
+            val y2 = ctx.y + ch - 10.0 - (w.values[i + 1] / max_v) * plot_h;
+            dlist.dl_add(dl, dlist.dcmd_line(x1, y1, x2, y2, w.fg.r, w.fg.g, w.fg.b, 1.0));
+        }
+    }
+    return ch;
+}
+
+fn _emit_pie_chart(dl: dlist.DrawList, w: comp.Chart, ctx: LayoutCtx, ts: ThemeSnap): float {
     var cw = 220.0;
     if (w.width_val > 0.0) { cw = w.width_val; }
     var ch = 110.0;
     if (w.height_val > 0.0) { ch = w.height_val; }
-    var cx = ctx.x + w.padding_left;
-    var cy = ctx.y + w.padding_top;
+    dlist.dl_emit_rect_rounded(dl, ctx.x, ctx.y, cw, ch, 6.0, ts.surface_r, ts.surface_g, ts.surface_b, 1.0);
+    dlist.dl_emit_text(dl, w.label, ctx.x + 12.0, ctx.y + 8.0, ts.text_r, ts.text_g, ts.text_b, 1.0, 0.9);
 
-    dlist.dl_add(dl, dlist.dcmd_rect_rounded(cx, cy, cw, ch, 6.0, ts.surface_r, ts.surface_g, ts.surface_b, 1.0));
-    _draw_border(dl, cx, cy, cw, ch, ts.border_r, ts.border_g, ts.border_b, 1.0, 6.0);
-
-    dlist.dl_add(dl, dlist.dcmd_text(w.text_val, cx + 12.0, cy + 8.0, ts.text_r, ts.text_g, ts.text_b, 1.0, 0.9));
-
-    // Guide lines
-    var grid1_y = cy + 34.0;
-    var grid2_y = cy + 58.0;
-    var grid3_y = cy + 82.0;
-    dlist.dl_add(dl, dlist.dcmd_rect(cx + 12.0, grid1_y, cw - 24.0, 1.0, ts.border_r, ts.border_g, ts.border_b, 0.35));
-    dlist.dl_add(dl, dlist.dcmd_rect(cx + 12.0, grid2_y, cw - 24.0, 1.0, ts.border_r, ts.border_g, ts.border_b, 0.35));
-    dlist.dl_add(dl, dlist.dcmd_rect(cx + 12.0, grid3_y, cw - 24.0, 1.0, ts.border_r, ts.border_g, ts.border_b, 0.35));
-
-    var base_y = cy + ch - 20.0;
-    dlist.dl_add(dl, dlist.dcmd_rect(cx + 12.0, base_y, cw - 24.0, 1.0, ts.border_r, ts.border_g, ts.border_b, 1.0));
-
-    if (w.text_editor_state != nil) {
-        var vals = w.text_editor_state as [float];
-        var n_pts = len(vals);
-        if (n_pts > 1) {
-            var step_x = (cw - 30.0) / ((n_pts - 1) as float);
-            var max_val = 1.0;
-            var i = 0;
-            while (i < n_pts) {
-                if (vals[i] > max_val) { max_val = vals[i]; }
-                i = i + 1;
-            }
-
-            var p_i = 0;
-            while (p_i < n_pts) {
-                var pt_x = cx + 15.0 + (p_i as float) * step_x;
-                var pt_y = base_y - (vals[p_i] / max_val) * (ch - 46.0);
-
-                dlist.dl_add(dl, dlist.dcmd_rect_rounded(pt_x - 3.0, pt_y - 3.0, 6.0, 6.0, 3.0, ts.accent_r, ts.accent_g, ts.accent_b, 1.0));
-
-                if (p_i < n_pts - 1) {
-                    var next_x = cx + 15.0 + ((p_i + 1) as float) * step_x;
-                    var next_y = base_y - (vals[p_i + 1] / max_val) * (ch - 46.0);
-                    dlist.dl_add(dl, dlist.dcmd_line(pt_x, pt_y, next_x, next_y, ts.accent_r, ts.accent_g, ts.accent_b, 1.0));
-                }
-                p_i = p_i + 1;
-            }
-        }
-    }
-
-    return ch + w.padding_top + w.padding_bottom;
-}
-
-// ── Fast Math for Charts ──────────────────────────────────────────────────────
-fn _sin(rad: float): float {
-    var PI = 3.141592653589793;
-    var x = rad;
-    while (x > PI) { x = x - 2.0 * PI; }
-    while (x < -PI) { x = x + 2.0 * PI; }
-    var sum = 0.0;
-    var term = x;
-    var i = 1;
-    while (i < 10) {
-        var i_f = i as float;
-        sum = sum + term;
-        term = -term * x * x / ((2.0 * i_f) * (2.0 * i_f + 1.0));
-        i = i + 1;
-    }
-    return sum;
-}
-
-fn _cos(rad: float): float {
-    return _sin(rad + 1.5707963267948966);
-}
-
-// ── PieChart & DoughnutChart ──────────────────────────────────────────────────
-fn _emit_pie_chart(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float {
-    var cw = 220.0;
-    if (w.width_val > 0.0) { cw = w.width_val; }
-    var ch = 110.0;
-    if (w.height_val > 0.0) { ch = w.height_val; }
-    var cx = ctx.x + w.padding_left;
-    var cy = ctx.y + w.padding_top;
-
-    _draw_shadow(dl, cx, cy, cw, ch, 6.0);
-    dlist.dl_add(dl, dlist.dcmd_rect_rounded(cx, cy, cw, ch, 6.0, ts.surface_r, ts.surface_g, ts.surface_b, 1.0));
-    _draw_border(dl, cx, cy, cw, ch, ts.border_r, ts.border_g, ts.border_b, 1.0, 6.0);
-
-    dlist.dl_add(dl, dlist.dcmd_text(w.text_val, cx + 12.0, cy + 8.0, ts.text_r, ts.text_g, ts.text_b, 1.0, 0.9));
-
-    // Data values
-    var vals: [float] = [65.0, 25.0, 10.0];
-    if (w.text_editor_state != nil) {
-        vals = w.text_editor_state as [float];
-    }
+    var vals = w.values;
+    if (len(vals) == 0) { vals = [65.0, 25.0, 10.0]; }
     var total_val = 0.0;
-    var vi = 0;
-    while (vi < len(vals)) {
-        total_val = total_val + vals[vi];
-        vi = vi + 1;
-    }
+    iter (v in vals) { total_val = total_val + v; }
     if (total_val <= 0.0) { total_val = 1.0; }
 
-    // Dynamic radius scaled to container height
     var pie_r = (ch - 44.0) * 0.48;
     if (pie_r > 64.0) { pie_r = 64.0; }
     if (pie_r < 28.0) { pie_r = 28.0; }
-    var pie_cx = cx + pie_r + 22.0;
-    var pie_cy = cy + (ch * 0.5) + 8.0;
+    val pie_cx = ctx.x + pie_r + 22.0;
+    val pie_cy = ctx.y + (ch * 0.5) + 8.0;
 
-    // Palette: Indigo, Emerald, Amber, Rose, Sky, Purple
-    var pal_r: [float] = [0.39, 0.06, 0.96, 0.94, 0.23, 0.55];
-    var pal_g: [float] = [0.40, 0.72, 0.62, 0.27, 0.51, 0.36];
-    var pal_b: [float] = [0.95, 0.50, 0.04, 0.27, 0.96, 0.96];
+    val pal_r: [float] = [0.39, 0.06, 0.96, 0.94, 0.23, 0.55];
+    val pal_g: [float] = [0.40, 0.72, 0.62, 0.27, 0.51, 0.36];
+    val pal_b: [float] = [0.95, 0.50, 0.04, 0.27, 0.96, 0.96];
 
-    var cur_angle = -1.5707963; // 12 o'clock
-    var slice_i = 0;
-    var n_slices = len(vals);
-    while (slice_i < n_slices) {
-        var v = vals[slice_i];
-        if (v > 0.0) {
-            var sweep = (v / total_val) * 6.2831853;
-            var end_ang = cur_angle + sweep;
-
-            var cr = pal_r[slice_i % 6];
-            var cg = pal_g[slice_i % 6];
-            var cb = pal_b[slice_i % 6];
-
-            var a = cur_angle;
-            var step_size = 0.05;
-            while (a < end_ang) {
-                var next_a = a + step_size;
-                if (next_a > end_ang) { next_a = end_ang; }
-
-                var x1 = pie_cx + pie_r * _cos(a);
-                var y1 = pie_cy + pie_r * _sin(a);
-                var x2 = pie_cx + pie_r * _cos(next_a);
-                var y2 = pie_cy + pie_r * _sin(next_a);
-
-                dlist.dl_add(dl, dlist.dcmd_triangle(pie_cx, pie_cy, x1, y1, x2, y2, cr, cg, cb, 1.0));
-                a = next_a;
+    var cur_angle = -1.5707963;
+    val ns = len(vals);
+    if (ns > 0) {
+        iter (si in 0..ns) {
+            val v = vals[si];
+            if (v > 0.0) {
+                val sweep = (v / total_val) * 6.2831853;
+                val end_ang = cur_angle + sweep;
+                val cr = pal_r[si % 6];
+                val cg = pal_g[si % 6];
+                val cb = pal_b[si % 6];
+                var a = cur_angle;
+                while (a < end_ang) {
+                    var next_a = a + 0.08;
+                    if (next_a > end_ang) { next_a = end_ang; }
+                    val x1 = pie_cx + pie_r * math.cos(a);
+                    val y1 = pie_cy + pie_r * math.sin(a);
+                    val x2 = pie_cx + pie_r * math.cos(next_a);
+                    val y2 = pie_cy + pie_r * math.sin(next_a);
+                    dlist.dl_add(dl, dlist.dcmd_triangle(pie_cx, pie_cy, x1, y1, x2, y2, cr, cg, cb, 1.0));
+                    a = next_a;
+                }
+                cur_angle = end_ang;
             }
-
-            // Radial separator line between slices
-            var sep_x = pie_cx + (pie_r + 0.5) * _cos(end_ang);
-            var sep_y = pie_cy + (pie_r + 0.5) * _sin(end_ang);
-            dlist.dl_add(dl, dlist.dcmd_line(pie_cx, pie_cy, sep_x, sep_y, ts.surface_r, ts.surface_g, ts.surface_b, 1.0));
-
-            cur_angle = end_ang;
         }
-        slice_i = slice_i + 1;
     }
-
-    // Cutout center hole for doughnut chart
-    if (w.kind == ui.WidgetKind.DoughnutChart) {
-        var inner_r = pie_r * 0.55;
-        dlist.dl_add(dl, dlist.dcmd_rect_rounded(pie_cx - inner_r, pie_cy - inner_r, inner_r * 2.0, inner_r * 2.0, inner_r, ts.surface_r, ts.surface_g, ts.surface_b, 1.0));
-        _draw_border(dl, pie_cx - inner_r, pie_cy - inner_r, inner_r * 2.0, inner_r * 2.0, ts.border_r, ts.border_g, ts.border_b, 0.4, inner_r);
-    }
-
-    // Dynamic legend with computed percentages and labels, centered vertically
-    var leg_x = pie_cx + pie_r + 24.0;
-    var total_leg_h = (n_slices as float) * 22.0;
-    var leg_y = pie_cy - (total_leg_h * 0.5) + 2.0;
-    if (leg_y < cy + 30.0) { leg_y = cy + 30.0; }
-
-    var leg_i = 0;
-    while (leg_i < n_slices and leg_i < 6) {
-        var cr = pal_r[leg_i % 6];
-        var cg = pal_g[leg_i % 6];
-        var cb = pal_b[leg_i % 6];
-
-        var pct = ((vals[leg_i] / total_val) * 100.0) as int;
-        var item_label = "Segment {leg_i + 1}";
-        if (leg_i < len(w.tab_titles) and len(w.tab_titles[leg_i]) > 0) {
-            item_label = w.tab_titles[leg_i];
-        }
-        var entry_text = "{item_label} ({pct}%)";
-
-        var row_y = leg_y + (leg_i as float) * 22.0;
-        dlist.dl_add(dl, dlist.dcmd_rect_rounded(leg_x, row_y + 3.0, 10.0, 10.0, 3.0, cr, cg, cb, 1.0));
-        dlist.dl_add(dl, dlist.dcmd_text(entry_text, leg_x + 16.0, row_y + 3.5, ts.text_r, ts.text_g, ts.text_b, 1.0, 0.9));
-
-        leg_i = leg_i + 1;
-    }
-
-    return ch + w.padding_top + w.padding_bottom;
+    return ch;
 }
 
-// ── Histogram ─────────────────────────────────────────────────────────────────
-fn _emit_histogram(dl: dlist.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float {
-    var cw = 180.0;
-    if (w.width_val > 0.0) { cw = w.width_val; }
-    var ch = 68.0;
-    if (w.height_val > 0.0) { ch = w.height_val; }
-    var cx = ctx.x + w.padding_left;
-    var cy = ctx.y + w.padding_top;
-
-    dlist.dl_add(dl, dlist.dcmd_rect_rounded(cx, cy, cw, ch, 6.0, ts.surface_r, ts.surface_g, ts.surface_b, 1.0));
-    _draw_border(dl, cx, cy, cw, ch, ts.border_r, ts.border_g, ts.border_b, 1.0, 6.0);
-
-    dlist.dl_add(dl, dlist.dcmd_text(w.text_val, cx + 10.0, cy + 6.0, ts.text_r, ts.text_g, ts.text_b, 1.0, 0.85));
-
-    var base_y = cy + ch - 10.0;
-    dlist.dl_add(dl, dlist.dcmd_rect(cx + 8.0, base_y, cw - 16.0, 1.0, ts.border_r, ts.border_g, ts.border_b, 1.0));
-
-    if (w.text_editor_state != nil) {
-        var vals = w.text_editor_state as [float];
-        var n_bins = len(vals);
-        if (n_bins > 0) {
-            var max_val = 0.001;
-            var mi = 0;
-            while (mi < n_bins) {
-                if (vals[mi] > max_val) { max_val = vals[mi]; }
-                mi = mi + 1;
-            }
-            var bin_w = (cw - 20.0) / (n_bins as float);
-            var b_i = 0;
-            while (b_i < n_bins) {
-                var bin_h = (vals[b_i] / max_val) * (ch - 24.0);
-                var bx = cx + 10.0 + (b_i as float) * bin_w;
-                dlist.dl_add(dl, dlist.dcmd_rect_rounded(bx, base_y - bin_h, bin_w - 2.0, bin_h, 2.0, 0.06, 0.72, 0.50, 1.0));
-                b_i = b_i + 1;
-            }
-        }
-    }
-
-    return ch + w.padding_top + w.padding_bottom;
+fn _emit_histogram(dl: dlist.DrawList, w: comp.Chart, ctx: LayoutCtx, ts: ThemeSnap): float {
+    return _emit_bar_chart(dl, w, ctx, ts);
 }

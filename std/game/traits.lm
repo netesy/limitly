@@ -1,10 +1,12 @@
 // std/game/traits.lm
 // Behavioral contracts for the game loop: things the loop can tick and paint.
 
+import std.camera show Camera2D;
+
 trait Updatable {
     fn update(dt: float): nil;
 }
 
 trait Drawable {
-    fn draw(camera: any): nil;
+    fn draw(camera: Camera2D | nil): nil;
 }

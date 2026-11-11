@@ -1,11 +1,6 @@
 // std/ui/label - Semantic text label widget
-import std.ui.types as ui_types;
-import std.color as color;
-pub import std.ui.components show Label;
+import std.ui.components as comp;
 
-pub fn label(text_val: str): ui_types.Widget {
-    var w = ui_types.text(text_val);
-    w.font_size_val = 12.0;
-    w.foreground_color = color.gray;
-    return w;
+pub fn label(text_val: str): comp.Label {
+    return comp.Label(text_val);
 }

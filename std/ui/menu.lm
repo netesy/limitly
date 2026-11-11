@@ -1,15 +1,15 @@
 // std/ui/menu - Dropdown and context menus
-import std.ui.types as ui_types;
+import std.ui.components as comp;
 import std.color as color;
+import std.graphics.shadow as shadow;
 
-// Menu item frame
 frame MenuItem {
     pub var label: str;
     pub var icon: str;
-    pub var action: any;
+    pub var action: (fn(): nil) | nil;
     pub var enabled: bool;
 
-    pub init(lbl: str, icn: str = "", act: any = nil) {
+    pub init(lbl: str, icn: str = "", act: (fn(): nil) | nil = nil) {
         self.label = lbl;
         self.icon = icn;
         self.action = act;
@@ -17,82 +17,64 @@ frame MenuItem {
     }
 }
 
-// Create a simple dropdown menu from items
-pub fn menu(items: [str], on_select: any = nil): ui_types.Widget {
-    var item_widgets: [ui_types.Widget] = [];
-    var i = 0;
-    while (i < len(items)) {
-        var item = ui_types.button(items[i])
-        .background(color.rgb(28, 30, 40))
-        .width(160.0)
-        .height(28.0);
+pub fn menu(items: [str], on_select: (fn(): nil) | nil = nil): comp.Container {
+    val item_widgets: [comp.Fluent] = [];
+    iter (lbl in items) {
+        val item = comp.Button(lbl, on_select)
+            .background(color.rgb(28, 30, 40))
+            .width(160.0)
+            .height(28.0);
         item_widgets.append(item);
-        i = i + 1;
     }
 
-    var w = ui_types.column(item_widgets);
-    w.background_color = color.rgb(24, 26, 34);
-    w.foreground_color = color.white;
-    w.padding_left = 4.0;
-    w.padding_top = 4.0;
-    w.padding_right = 4.0;
-    w.padding_bottom = 4.0;
+    val w = comp.Container(true);
+    w.children = item_widgets;
+    w.bg = color.rgb(24, 26, 34);
+    w.fg = color.white;
+    w.set_padding(4.0);
     w.spacing_val = 2.0;
-    w.corner_radius_val = 4.0;
-    w.on_change_action = on_select;
-
+    w.radius = 4.0;
+    w.on_click_action = on_select;
     return w;
 }
 
-// Create menu from MenuItems
-pub fn menu_items(items: [MenuItem]): ui_types.Widget {
-    var item_widgets: [ui_types.Widget] = [];
-    var i = 0;
-    while (i < len(items)) {
-        var mi = items[i];
+pub fn menu_items(items: [MenuItem]): comp.Container {
+    val item_widgets: [comp.Fluent] = [];
+    iter (mi in items) {
         var label = mi.label;
         if (len(mi.icon) > 0) {
             label = mi.icon + " " + mi.label;
         }
-        var btn = ui_types.button(label)
-        .background(color.rgb(28, 30, 40))
-        .width(180.0)
-        .height(32.0)
-        .on_click(mi.action);
+        val btn = comp.Button(label, mi.action)
+            .background(color.rgb(28, 30, 40))
+            .width(180.0)
+            .height(32.0);
         if (not mi.enabled) {
-            btn = btn.disabled();
+            btn.disabled(true);
         }
         item_widgets.append(btn);
-        i = i + 1;
     }
 
-    var w = ui_types.column(item_widgets);
-    w.background_color = color.rgb(20, 22, 28);
-    w.foreground_color = color.white;
-    w.padding_left = 4.0;
-    w.padding_top = 4.0;
-    w.padding_right = 4.0;
-    w.padding_bottom = 4.0;
+    val w = comp.Container(true);
+    w.children = item_widgets;
+    w.bg = color.rgb(20, 22, 28);
+    w.fg = color.white;
+    w.set_padding(4.0);
     w.spacing_val = 2.0;
-    w.corner_radius_val = 6.0;
-    w.shadow_val = ui_types.shadow(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
-
+    w.radius = 6.0;
+    w.shadow_val = shadow.shadow(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
     return w;
 }
 
-// Context menu (positioned absolutely)
-pub fn context_menu(x: float, y: float, items: [str], on_select: any = nil): ui_types.Widget {
-    var m = menu(items, on_select);
-    return ui_types.overlay(m, x, y, 0.0, 0.0);
+pub fn context_menu(x: float, y: float, items: [str], on_select: (fn(): nil) | nil = nil): comp.Container {
+    val m = menu(items, on_select);
+    return comp.overlay(m, x, y, 0.0, 0.0);
 }
 
-// Dropdown menu button
-pub fn dropdown_menu(button_label: str, items: [str], on_select: any = nil): ui_types.Widget {
-    var btn = ui_types.button(button_label);
-    var dropdown = menu(items, on_select);
-
-    var container = ui_types.column([btn, dropdown]);
+pub fn dropdown_menu(button_label: str, items: [str], on_select: (fn(): nil) | nil = nil): comp.Container {
+    val btn = comp.Button(button_label);
+    val dropdown = menu(items, on_select);
+    val container = comp.column([btn, dropdown]);
     container.spacing_val = 0.0;
     return container;
 }
-

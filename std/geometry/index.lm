@@ -2,19 +2,14 @@
 // Public entrypoint and facade for std.geometry. Geometric shapes, intersections, bounding boxes, and containment.
 
 import std.math as math;
+import std.math.vector2 show Vector2;
 
 /// Axis-aligned 2D rectangle defined by position (x, y) and dimensions (width, height).
-///
-/// @example
-/// ```lymar
-/// var r = Rect(0.0, 0.0, 100.0, 50.0);
-/// assert(r.contains(10.0, 10.0));
-/// ```
 frame Rect {
-    pub var x: float;
-    pub var y: float;
-    pub var w: float;
-    pub var h: float;
+    pub var x: float = 0.0;
+    pub var y: float = 0.0;
+    pub var w: float = 0.0;
+    pub var h: float = 0.0;
 
     pub init(x: float = 0.0, y: float = 0.0, w: float = 0.0, h: float = 0.0) {
         self.x = x;
@@ -23,41 +18,65 @@ frame Rect {
         self.h = h;
     }
 
-    /// Tests whether a 2D coordinate lies within the boundary of this rectangle.
-    ///
-    /// @param px Target X coordinate.
-    /// @param py Target Y coordinate.
-    /// @return True if point is inside or on the boundary.
     pub fn contains(px: float, py: float): bool {
         return px >= self.x and px <= self.x + self.w and py >= self.y and py <= self.y + self.h;
     }
 
-    /// Tests whether this rectangle overlaps with another rectangle.
-    ///
-    /// @param other Another rectangle to test intersection with.
-    /// @return True if bounding boxes overlap.
-    pub fn intersects(other: Rect): bool {
-        return not (other.x > self.x + self.w or
-        other.x + other.w < self.x or
-        other.y > self.y + self.h or
-        other.y + other.h < self.y);
+    pub fn contains_vec(p: Vector2): bool {
+        return self.contains(p.x, p.y);
     }
 
-    /// Calculates the area of the rectangle.
-    ///
-    /// @return Non-negative area (width * height).
+    pub fn intersects(other: Rect): bool {
+        return not (other.x > self.x + self.w or
+            other.x + other.w < self.x or
+            other.y > self.y + self.h or
+            other.y + other.h < self.y);
+    }
+
+    pub fn intersection(other: Rect): Rect {
+        val ix = math.max(self.x, other.x);
+        val iy = math.max(self.y, other.y);
+        val rx = math.min(self.x + self.w, other.x + other.w);
+        val by = math.min(self.y + self.h, other.y + other.h);
+        if (rx > ix and by > iy) {
+            return Rect(x=ix, y=iy, w=rx - ix, h=by - iy);
+        }
+        return Rect();
+    }
+
+    pub fn union_rect(other: Rect): Rect {
+        val min_x = math.min(self.x, other.x);
+        val min_y = math.min(self.y, other.y);
+        val max_x = math.max(self.x + self.w, other.x + other.w);
+        val max_y = math.max(self.y + self.h, other.y + other.h);
+        return Rect(x=min_x, y=min_y, w=max_x - min_x, h=max_y - min_y);
+    }
+
+    pub fn center(): Vector2 {
+        return Vector2(self.x + self.w * 0.5, self.y + self.h * 0.5);
+    }
+
+    pub fn expand(amount: float): Rect {
+        return Rect(
+            x=self.x - amount,
+            y=self.y - amount,
+            w=self.w + amount * 2.0,
+            h=self.h + amount * 2.0
+        );
+    }
+
+    pub fn clamp_point(p: Vector2): Vector2 {
+        val cx = math.clamp(p.x, self.x, self.x + self.w);
+        val cy = math.clamp(p.y, self.y, self.y + self.h);
+        return Vector2(cx, cy);
+    }
+
     pub fn area(): float {
         return self.w * self.h;
     }
 }
 
 /// 2D circle defined by center (x, y) and radius r.
-///
-/// @example
-/// ```lymar
-/// var c = Circle(0.0, 0.0, 10.0);
-/// assert(c.contains(5.0, 5.0));
-/// ```
 frame Circle {
     pub var x: float;
     pub var y: float;
@@ -70,20 +89,12 @@ frame Circle {
         self.r = r;
     }
 
-    /// Tests whether a 2D coordinate lies within or on this circle.
-    ///
-    /// @param px Target X coordinate.
-    /// @param py Target Y coordinate.
-    /// @return True if point is within radius.
     pub fn contains(px: float, py: float): bool {
-        var dx = px - self.x;
-        var dy = py - self.y;
+        val dx = px - self.x;
+        val dy = py - self.y;
         return dx * dx + dy * dy <= self.r * self.r;
     }
 
-    /// Calculates the area enclosed by the circle.
-    ///
-    /// @return Circle area (π * r²).
     pub fn area(): float {
         return math.PI * self.r * self.r;
     }

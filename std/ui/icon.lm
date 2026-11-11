@@ -1,8 +1,7 @@
 // std/ui/icon - Icon widget with Unicode symbols
-import std.ui.types as ui_types;
+import std.ui.components as comp;
 import std.color as color;
 
-// Common icon symbols (Unicode)
 pub const ICON_CLOSE: str = "✕";
 pub const ICON_MENU: str = "☰";
 pub const ICON_HOME: str = "🏠";
@@ -22,31 +21,22 @@ pub const ICON_USER: str = "👤";
 pub const ICON_TRASH: str = "🗑";
 pub const ICON_EDIT: str = "✎";
 
-// Create an icon widget
-pub fn icon(glyph: str, size: float = 24.0, color_val: color.Color = color.white): ui_types.Widget {
-    var w = ui_types.text(glyph);
+pub fn icon(glyph: str, size: float = 24.0, color_val: color.Color = color.white): comp.Label {
+    val w = comp.Label(glyph);
     w.font_size_val = size;
     w.width_val = size;
     w.height_val = size;
-    w.foreground_color = color_val;
-    w.is_a11y_hidden = true;
+    w.fg = color_val;
+    w.a11y_role = "presentation";
     return w;
 }
 
-// Icon button (icon + optional label)
-pub fn icon_button(glyph: str, label: str = "", on_click: any = nil, size: float = 20.0): ui_types.Widget {
+pub fn icon_button(glyph: str, label: str = "", on_click: (fn(): nil) | nil = nil, size: float = 20.0): comp.Button {
+    var text_val = glyph;
     if (len(label) > 0) {
-        var row = ui_types.row([
-        icon(glyph, size),
-        ui_types.text(label)
-        ]);
-        row.spacing_val = 8.0;
-        var btn = ui_types.button("").on_click(on_click);
-        btn.children = [row];
-        return btn;
+        text_val = glyph + " " + label;
     }
-    var ic = icon(glyph, size);
-    var btn = ui_types.button("").on_click(on_click);
-    btn.children = [ic];
+    val btn = comp.Button(text_val, on_click);
+    btn.font_size_val = size;
     return btn;
 }

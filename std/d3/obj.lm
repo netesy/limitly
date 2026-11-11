@@ -7,45 +7,33 @@ import std.string.trim as trim_mod;
 import std.io.file as file;
 
 pub fn parse_obj(content: str): geom.Geometry {
-    var g = geom.Geometry();
-    var lines = split.split(content, "\n");
+    val g = geom.Geometry();
+    val lines = split.split(content, "\n");
 
-    var l_i = 0;
-    while (l_i < len(lines)) {
-        var raw_line = trim_mod.trim(lines[l_i]);
+    iter (raw in lines) {
+        val raw_line = trim_mod.trim(raw);
         if (len(raw_line) > 0 and raw_line[0] != "#") {
-            var parts = split.split(raw_line, " ");
+            val parts = split.split(raw_line, " ");
             var tokens: [str] = [];
-            var p_i = 0;
-            while (p_i < len(parts)) {
-                var p = trim_mod.trim(parts[p_i]);
+            iter (part in parts) {
+                val p = trim_mod.trim(part);
                 if (len(p) > 0) {
                     tokens.append(p);
                 }
-                p_i = p_i + 1;
             }
 
             if (len(tokens) >= 4 and tokens[0] == "v") {
-                var vx = tokens[1] as float;
-                var vy = tokens[2] as float;
-                var vz = tokens[3] as float;
-                g.add_vertex(vx, vy, vz);
+                g.add_vertex(tokens[1] as float, tokens[2] as float, tokens[3] as float);
             } elif (len(tokens) >= 4 and tokens[0] == "vn") {
-                var nx = tokens[1] as float;
-                var ny = tokens[2] as float;
-                var nz = tokens[3] as float;
-                g.add_normal(nx, ny, nz);
+                g.add_normal(tokens[1] as float, tokens[2] as float, tokens[3] as float);
             } elif (len(tokens) >= 3 and tokens[0] == "vt") {
-                var u = tokens[1] as float;
-                var v = tokens[2] as float;
-                g.add_uv(u, v);
+                g.add_uv(tokens[1] as float, tokens[2] as float);
             } elif (len(tokens) >= 4 and tokens[0] == "f") {
                 var face_verts: [int] = [];
                 var f_idx = 1;
                 while (f_idx < len(tokens)) {
-                    var vert_spec = tokens[f_idx];
-                    var sub = split.split(vert_spec, "/");
-                    var v_id = (sub[0] as int) - 1;
+                    val sub = split.split(tokens[f_idx], "/");
+                    val v_id = (sub[0] as int) - 1;
                     face_verts.append(v_id);
                     f_idx = f_idx + 1;
                 }
@@ -58,7 +46,6 @@ pub fn parse_obj(content: str): geom.Geometry {
                 }
             }
         }
-        l_i = l_i + 1;
     }
 
     if (len(g.normals) == 0 and g.get_vertex_count() > 0) {
@@ -69,8 +56,8 @@ pub fn parse_obj(content: str): geom.Geometry {
 }
 
 pub fn load_obj(path: str): geom.Geometry? {
-    var f = file.File(path, "r");
-    var res = f.read();
+    val f = file.File(path, "r");
+    val res = f.read();
     f.close();
     if (res == nil) {
         return err();

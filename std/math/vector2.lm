@@ -2,75 +2,115 @@
 // Two-dimensional floating-point geometric vector.
 
 import std.math.arithmetic as arith;
+import std.math.trigonometry as trig;
 
 /// Represents a 2D Euclidean vector with x and y Cartesian coordinates.
-///
-/// Supports basic vector arithmetic (addition, subtraction, scalar scaling),
-/// dot product, magnitude calculation, and normalization.
-///
-/// @example
-/// import std.math.vector2 as v2;
-/// var a = v2.Vector2(3.0, 4.0);
-/// print(a.mag()); // 5.0
-/// var b = a.normalize();
 frame Vector2 {
-    pub x: float;
-    pub y: float;
+    pub x: float = 0.0;
+    pub y: float = 0.0;
 
     pub init(x: float = 0.0, y: float = 0.0) {
         self.x = x;
         self.y = y;
     }
 
-    /// Adds another 2D vector to this vector.
-    ///
-    /// @param other Vector to add.
-    /// @return Component-wise sum vector.
     pub fn add(other: Vector2): Vector2 {
         return Vector2(self.x + other.x, self.y + other.y);
     }
 
-    /// Subtracts another 2D vector from this vector.
-    ///
-    /// @param other Vector to subtract.
-    /// @return Component-wise difference vector.
     pub fn sub(other: Vector2): Vector2 {
         return Vector2(self.x - other.x, self.y - other.y);
     }
 
-    /// Multiplies both components by a scalar value.
-    ///
-    /// @param s Scaling factor.
-    /// @return Scaled vector.
     pub fn scale(s: float): Vector2 {
         return Vector2(self.x * s, self.y * s);
     }
 
-    /// Computes the dot product of this vector and another 2D vector.
-    ///
-    /// @param other Vector to dot with.
-    /// @return Scalar dot product.
+    pub fn mul(other: Vector2): Vector2 {
+        return Vector2(self.x * other.x, self.y * other.y);
+    }
+
+    pub fn div(s: float): Vector2 {
+        if (s == 0.0) { return Vector2(); }
+        return Vector2(self.x / s, self.y / s);
+    }
+
     pub fn dot(other: Vector2): float {
         return self.x * other.x + self.y * other.y;
     }
 
-    /// Computes the Euclidean magnitude (length) of the vector.
-    ///
-    /// @return Vector length.
+    pub fn cross(other: Vector2): float {
+        return self.x * other.y - self.y * other.x;
+    }
+
+    pub fn mag_sq(): float {
+        return self.x * self.x + self.y * self.y;
+    }
+
     pub fn mag(): float {
         return arith.sqrt(self.x * self.x + self.y * self.y);
     }
 
-    /// Computes the unit-length direction vector.
-    ///
-    /// @tip Returns a zero vector if magnitude is zero.
-    ///
-    /// @return Normalized unit vector.
+    pub fn length(): float {
+        return self.mag();
+    }
+
+    pub fn length_sq(): float {
+        return self.mag_sq();
+    }
+
     pub fn normalize(): Vector2 {
-        var m = self.mag();
+        val m = self.mag();
         if (m == 0.0) {
             return Vector2(0.0, 0.0);
         }
         return self.scale(1.0 / m);
+    }
+
+    pub fn dist_sq(other: Vector2): float {
+        val dx = self.x - other.x;
+        val dy = self.y - other.y;
+        return dx * dx + dy * dy;
+    }
+
+    pub fn dist(other: Vector2): float {
+        return arith.sqrt(self.dist_sq(other));
+    }
+
+    pub fn lerp(target: Vector2, t: float): Vector2 {
+        return Vector2(
+            self.x + (target.x - self.x) * t,
+            self.y + (target.y - self.y) * t
+        );
+    }
+
+    pub fn angle(): float {
+        return trig.atan2(self.y, self.x);
+    }
+
+    pub fn rotate(radians: float): Vector2 {
+        val c = trig.cos(radians);
+        val s = trig.sin(radians);
+        return Vector2(
+            self.x * c - self.y * s,
+            self.x * s + self.y * c
+        );
+    }
+
+    pub fn perpendicular(): Vector2 {
+        return Vector2(0.0 - self.y, self.x);
+    }
+
+    pub fn reflect(normal: Vector2): Vector2 {
+        val d = self.dot(normal) * 2.0;
+        return self.sub(normal.scale(d));
+    }
+
+    pub fn clamp_length(max_len: float): Vector2 {
+        val l_sq = self.mag_sq();
+        if (l_sq > max_len * max_len and l_sq > 0.0) {
+            return self.normalize().scale(max_len);
+        }
+        return Vector2(self.x, self.y);
     }
 }

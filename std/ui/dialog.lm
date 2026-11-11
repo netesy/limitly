@@ -1,44 +1,42 @@
 // std/ui/dialog - Modal dialog and overlay widgets
-import std.ui.types as ui_types;
+import std.ui.components as comp;
 import std.color as color;
 import std.ui.viewport as viewport;
 
-// Modal dialog with title, content, close button, and dynamic viewport centering
-pub fn dialog(title: str, content: ui_types.Widget, is_open: bool = true, width: float = 400.0, height: float = 300.0, on_close: any = nil): ui_types.Widget {
+pub fn dialog(
+    title: str,
+    content: comp.Fluent,
+    is_open: bool = true,
+    width: float = 400.0,
+    height: float = 300.0,
+    on_close: (fn(): nil) | nil = nil
+): comp.Container {
     if (not is_open) {
-        return ui_types.empty();
+        return comp.empty();
     }
 
-    var close_btn = ui_types.button("✕")
-    .width(32.0)
-    .height(32.0)
-    .background(color.rgb(255, 100, 100))
-    .on_click(on_close);
+    val close_btn = comp.Button("✕", on_close)
+        .width(32.0)
+        .height(32.0)
+        .background(color.rgb(255, 100, 100));
 
-    var header = ui_types.row([
-    ui_types.text(title).font_size(18.0).bold(),
-    ui_types.spacer(1.0),
-    close_btn
+    val header = comp.row([
+        comp.Label(title).font_size(18.0).bold(),
+        comp.Spacer(1.0),
+        close_btn
     ]);
     header.spacing_val = 8.0;
-    header.padding_bottom = 12.0;
+    header.pad_b = 12.0;
 
-    var dialog_content = ui_types.column([
-    header,
-    content
-    ]);
-    dialog_content.background_color = color.rgb(24, 26, 34);
-    dialog_content.foreground_color = color.white;
-    dialog_content.padding_left = 20.0;
-    dialog_content.padding_top = 20.0;
-    dialog_content.padding_right = 20.0;
-    dialog_content.padding_bottom = 20.0;
-    dialog_content.corner_radius_val = 8.0;
+    val dialog_content = comp.column([header, content]);
+    dialog_content.bg = color.rgb(24, 26, 34);
+    dialog_content.fg = color.white;
+    dialog_content.set_padding(20.0);
+    dialog_content.radius = 8.0;
     dialog_content.spacing_val = 12.0;
     dialog_content.width_val = width;
     dialog_content.height_val = height;
 
-    // Dynamic centering using active viewport
     var vw = viewport.global_viewport.width;
     if (vw <= 0.0) { vw = 800.0; }
     var vh = viewport.global_viewport.height;
@@ -49,63 +47,61 @@ pub fn dialog(title: str, content: ui_types.Widget, is_open: bool = true, width:
     if (x < 0.0) { x = 0.0; }
     if (y < 0.0) { y = 0.0; }
 
-    return ui_types.overlay(dialog_content, x, y, width, height);
+    return comp.overlay(dialog_content, x, y, width, height);
 }
 
-// Alert dialog (modal with message and OK button)
-pub fn alert(title: str, message: str, on_ok: any = nil): ui_types.Widget {
-    var ok_btn = ui_types.button("OK").on_click(on_ok);
-
-    var content = ui_types.column([
-    ui_types.text(message),
-    ui_types.spacer(0.5),
-    ok_btn
+pub fn alert(title: str, message: str, on_ok: (fn(): nil) | nil = nil): comp.Container {
+    val ok_btn = comp.Button("OK", on_ok);
+    val content = comp.column([
+        comp.Label(message),
+        comp.Spacer(0.5),
+        ok_btn
     ]);
     content.spacing_val = 12.0;
-
     return dialog(title, content, true, 320.0, 180.0, on_ok);
 }
 
-pub fn alert_dialog(title: str, message: str, on_ok: any = nil): ui_types.Widget {
+pub fn alert_dialog(title: str, message: str, on_ok: (fn(): nil) | nil = nil): comp.Container {
     return alert(title, message, on_ok);
 }
 
-// Confirm dialog (modal with message and Yes/No buttons)
-pub fn confirm(title: str, message: str, on_yes: any = nil, on_no: any = nil): ui_types.Widget {
-    var yes_btn = ui_types.button("Yes")
-    .background(color.rgb(80, 220, 130))
-    .on_click(on_yes);
-    var no_btn = ui_types.button("No")
-    .background(color.rgb(255, 100, 100))
-    .on_click(on_no);
-
-    var buttons = ui_types.row([yes_btn, no_btn]);
+pub fn confirm(
+    title: str,
+    message: str,
+    on_yes: (fn(): nil) | nil = nil,
+    on_no: (fn(): nil) | nil = nil
+): comp.Container {
+    val yes_btn = comp.Button("Yes", on_yes).background(color.rgb(80, 220, 130));
+    val no_btn = comp.Button("No", on_no).background(color.rgb(255, 100, 100));
+    val buttons = comp.row([yes_btn, no_btn]);
     buttons.spacing_val = 12.0;
 
-    var content = ui_types.column([
-    ui_types.text(message),
-    ui_types.spacer(0.5),
-    buttons
+    val content = comp.column([
+        comp.Label(message),
+        comp.Spacer(0.5),
+        buttons
     ]);
     content.spacing_val = 12.0;
-
     return dialog(title, content, true, 360.0, 200.0, on_no);
 }
 
-pub fn confirm_dialog(title: str, message: str, on_yes: any = nil, on_no: any = nil): ui_types.Widget {
+pub fn confirm_dialog(
+    title: str,
+    message: str,
+    on_yes: (fn(): nil) | nil = nil,
+    on_no: (fn(): nil) | nil = nil
+): comp.Container {
     return confirm(title, message, on_yes, on_no);
 }
 
-// Modal backdrop (darkened background behind dialog)
-pub fn modal_backdrop(alpha: float = 0.6): ui_types.Widget {
+pub fn modal_backdrop(alpha: float = 0.6): comp.Container {
     var vw = viewport.global_viewport.width;
     if (vw <= 0.0) { vw = 800.0; }
     var vh = viewport.global_viewport.height;
     if (vh <= 0.0) { vh = 600.0; }
 
-    var backdrop = ui_types.empty();
-    backdrop.kind = ui_types.KIND_CONTAINER;
-    backdrop.background_color = color.rgba(0.0, 0.0, 0.0, alpha);
+    val backdrop = comp.empty();
+    backdrop.bg = color.rgba(0.0, 0.0, 0.0, alpha);
     backdrop.width_val = vw;
     backdrop.height_val = vh;
     return backdrop;

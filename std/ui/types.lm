@@ -1,15 +1,14 @@
-// std.ui.types - Type definitions for Fluent, Retained UI System
+// std/ui/types.lm
+// Canonical Enums, Style Model, and Consolidated Geometry for Lymar Retained UI
+//
+// Retires the legacy 65-field `Widget` monolith and `Blueprint` tree.
+// Concrete UI widgets live in `std.ui.components` using zero-cost `embed`.
 
-import std.text.controller as text_ctrl;
-import std.animation as anim;
-import std.graphics.shadow as shadow;
-import std.ui.state as state;
 import std.color as color;
-pub import std.graphics.shadow show Shadow, shadow;
-pub import std.color show Color;
+pub import std.widget show Alignment, Axis;
+pub import std.geometry show Rect;
+pub import std.widget.geometry show Point;
 
-// Widget identity enum: `==`/`match` on WidgetKind take the tag-compare
-// path lowered in the LIR generator, so dispatch is type-checked.
 enum WidgetKind {
     Container,
     Text,
@@ -64,22 +63,12 @@ enum WidgetKind {
     MultiSelect
 }
 
-// Widget lifecycle phase (enter/exit transitions).
 enum LifecycleState {
     Entering,
     Active,
     Exiting,
     Removed
 }
-
-// ── Nominal dispatch enums ───────────────────────────────────────────────────
-// Every cross-cutting choice that used to hide behind a magic int, an int-packed
-// frame, or a stringly-typed parameter is a nominal enum here. Renderers keep
-// reading their packed int/string fields; the conversion happens once, through
-// `match`, at the fluent call site (jump-table dispatch lowered in the LIR).
-
-// Re-export common layout alignment and axis enums from std.widget
-pub import std.widget show Alignment, Axis;
 
 type Align = Alignment;
 
@@ -90,9 +79,6 @@ enum Weight {
     Bold
 }
 
-// Accessibility semantics. `Semantic` reads as "the semantic role this widget
-// claims": ui.Semantic.Heading. The legacy string spelling stays available on
-// Widget as `role_str` for hand-written ARIA values.
 enum Semantic {
     Generic,
     Button,
@@ -132,31 +118,10 @@ enum MaskShape {
     Squircle
 }
 
-// Blueprint discriminant: 1 = Container, 2 = Text, 3 = Button.
-enum BlueprintVariant {
-    Container,
-    Text,
-    Button
-}
-
-// LayoutConstraint encoding consumed by the blueprint evaluator:
-// mode 0 = fixed size, mode 1 = minimum, mode 2 = maximum.
 enum ConstraintMode {
     Fixed,
     Min,
     Max
-}
-
-trait WidgetTrait {
-    fn mark_for_removal(): nil;
-}
-
-// WidgetState is decomposed into per-concern mixins (shared state only -- mixins are
-// not interfaces and never dispatch dynamically). The Widget frame mixes all of them;
-// fields flatten onto the frame unchanged, so every `self.<field>` site keeps working.
-mixin WidgetIdentity {
-    pub var kind: WidgetKind;
-    pub var lifecycle_state: LifecycleState;
 }
 
 enum Role {
@@ -167,158 +132,29 @@ enum Role {
     High
 }
 
-mixin TextualContent {
-    pub var text_val: str;
-    pub var placeholder_val: str;
-    pub var focus_key: str;
-    pub var text_editor_state: any;
-    // Typed payload lanes. The `any` fields above stay as the storage the
-    // renderers read; these record *what kind* of payload is parked there so
-    // constructors and hit-testers dispatch with `match` instead of assuming.
-    pub var payload_role: Role;
-    // Semantic alert/status kind carried by Alert & Toast (Info lane is the
-    // neutral default for widgets that never set it).
-    pub var alert_kind: AlertKind;
-    // Dot state for Indicator widgets.
-    pub var dot_state: DotState;
-}
-
-mixin VisualStyle {
-    pub var foreground_color: Color;
-    pub var background_color: Color;
-    pub var font_size_val: float;
-    pub var font_weight_val: int;
-    pub var corner_radius_val: float;
-    pub var pressed_style_val: Style;
-    pub var hover_style_val: Style;
-    pub var opacity_val: float;
-    pub var scale_val: float;
-    pub var shadow_val: shadow.Shadow;
-}
-
-mixin LayoutMetrics {
-    pub var padding_left: float;
-    pub var padding_top: float;
-    pub var padding_right: float;
-    pub var padding_bottom: float;
-    pub var spacing_val: float;
-    pub var is_vertical: int;
-    pub var align_val: int;
-    // Declared through the `align` fluent modifier; kept as the packed int the
-    // flexbox walkers read (0/1/2 — see Align).
-    pub var align_kind: Align;
-    pub var flex_val: float;
-    pub var width_val: float;
-    pub var height_val: float;
-
-    // ── Layout Constraints ────────────────────────────────────────────────
-    pub var min_width: float;
-    pub var max_width: float;
-    pub var min_height: float;
-    pub var max_height: float;
-    pub var grow: float;
-    pub var shrink: float;
-    pub var aspect_ratio: float;
-}
-
-mixin InteractionState {
-    pub var is_enabled: int;
-    pub var is_pressed: int;
-    pub var is_hovered: int;
-    pub var is_focused: int;
-    pub var is_open: int;
-    pub var click_count: int;
-    // Callback slot: holds a `fn(): nil` (see the `fire_*` helpers in
-    // std.ui.event, which invoke it fallibly as `EventResult?`).
-    pub var on_click_action: any;
-    pub var on_change_action: any;
-}
-
-mixin ToggleValue {
-    pub var is_checked: int;
-}
-
-mixin SliderValue {
-    pub var slider_val: float;
-    pub var slider_high: float;
-    pub var slider_min: float;
-    pub var slider_max: float;
-}
-
-mixin TabState {
-    pub var active_tab: int;
-    pub var hovered_tab: int;
-    pub var tab_titles: [str];
-}
-
-mixin SelectValue {
-    pub var select_options: [str];
-    pub var selected_idx: int;
-    pub var selected_indices: [int];
-}
-
-mixin ScrollState {
-    pub var scroll_x: float;
-    pub var scroll_y: float;
-    pub var max_scroll_x: float;
-    pub var max_scroll_y: float;
-}
-
-mixin AnimationState {
-    pub var enter_transition: anim.Transition;
-    pub var exit_transition: anim.Transition;
-    pub var anim_property: anim.PropertyAnimation;
-    pub var active_transition: anim.Transition;
-}
-
-mixin Accessibility {
-    pub var a11y_role: str;
-    pub var a11y_label: str;
-    pub var a11y_hint: str;
-    pub var a11y_live: str;
-    pub var tab_index: int;
-    pub var is_a11y_hidden: bool;
-}
-
-// ── Widget Lifecycle States ──────────────────────────────────────────────────
 pub const LIFECYCLE_ENTERING = LifecycleState.Entering;
-pub const LIFECYCLE_ACTIVE = LifecycleState.Active;
-pub const LIFECYCLE_EXITING = LifecycleState.Exiting;
-pub const LIFECYCLE_REMOVED = LifecycleState.Removed;
+pub const LIFECYCLE_ACTIVE   = LifecycleState.Active;
+pub const LIFECYCLE_EXITING  = LifecycleState.Exiting;
+pub const LIFECYCLE_REMOVED  = LifecycleState.Removed;
 
-frame Point {
-    pub var x: float;
-    pub var y: float;
-}
+pub const AXIS_HORIZONTAL: Axis = Axis.Horizontal;
+pub const AXIS_VERTICAL: Axis   = Axis.Vertical;
+pub const AXIS_STACKED: Axis    = Axis.Stacked;
+
+pub const align_start: Align  = Align.Start;
+pub const align_center: Align = Align.Center;
+pub const align_end: Align    = Align.End;
+
+pub const normal: Weight = Weight.Normal;
+pub const bold: Weight   = Weight.Bold;
 
 pub fn point(x: float, y: float): Point {
     return Point(x=x, y=y);
 }
 
-frame Size {
-    pub var width: float;
-    pub var height: float;
-}
-
-pub fn size(w: float, h: float): Size {
-    return Size(width=w, height=h);
-}
-
-frame Rect {
-    pub var x: float;
-    pub var y: float;
-    pub var w: float;
-    pub var h: float;
-}
-
 pub fn rect(x: float, y: float, w: float, h: float): Rect {
     return Rect(x=x, y=y, w=w, h=h);
 }
-
-// ── Enum ⇄ packed-field bridges ──────────────────────────────────────────────
-// The retained renderer walks `is_vertical` / `align_val` ints directly; these
-// helpers are the single place where a nominal enum crosses into that packing,
-// dispatched by `match` rather than by an if/elif ladder.
 
 pub fn axis_flag(a: Axis): int {
     match (a) {
@@ -338,10 +174,6 @@ pub fn align_flag(a: Align): int {
     return 0;
 }
 
-pub const AXIS_HORIZONTAL: Axis = Axis.Horizontal;
-pub const AXIS_VERTICAL: Axis = Axis.Vertical;
-pub const AXIS_STACKED: Axis = Axis.Stacked;
-
 pub fn weight_value(w: Weight): int {
     match (w) {
         Weight.Normal => { return 400; },
@@ -352,10 +184,6 @@ pub fn weight_value(w: Weight): int {
     return 400;
 }
 
-pub const normal: Weight = Weight.Normal;
-pub const bold: Weight = Weight.Bold;
-
-// ARIA spelling for each semantic role.
 pub fn semantic_name(s: Semantic): str {
     match (s) {
         Semantic.Generic => { return "generic"; },
@@ -388,7 +216,6 @@ pub fn mask_shape_name(m: MaskShape): str {
     return "circle";
 }
 
-// Stringly-typed legacy spellings fold into the nominal domain through match.
 pub fn alert_kind_of(type_val: str): AlertKind {
     match (type_val) {
         "error" => { return AlertKind.Danger; },
@@ -409,29 +236,6 @@ pub fn dot_state_of(status: str): DotState {
     }
 }
 
-
-pub fn semantic_alert_name(kind: AlertKind): str {
-    match (kind) {
-        AlertKind.Danger => { return "danger"; },
-        AlertKind.Warning => { return "warning"; },
-        AlertKind.Success => { return "success"; },
-        _ => { return "info"; }
-    }
-}
-
-pub fn dot_state_name(state: DotState): str {
-    match (state) {
-        DotState.Online => { return "online"; },
-        DotState.Busy => { return "busy"; },
-        _ => { return "offline"; }
-    }
-}
-pub const align_start: Align = Align.Start;
-pub const align_center: Align = Align.Center;
-pub const align_end: Align = Align.End;
-
-// Canonical spellings written back into the legacy string lanes the renderers
-// still read, so the enum stays the single source of truth.
 pub fn alert_kind_name(k: AlertKind): str {
     match (k) {
         AlertKind.Info => { return "info"; },
@@ -454,9 +258,9 @@ pub fn dot_state_name(s: DotState): str {
 // Reusable Style Model (LVGL / CSS Inspired)
 frame Style {
     pub var has_bg: bool;
-    pub var bg: Color;
+    pub var bg: color.Color;
     pub var has_fg: bool;
-    pub var fg: Color;
+    pub var fg: color.Color;
     pub var has_padding: bool;
     pub var pad_l: float;
     pub var pad_t: float;
@@ -477,10 +281,7 @@ frame Style {
         self.has_fg = false;
         self.fg = color.white;
         self.has_padding = false;
-        self.pad_l = 0.0;
-        self.pad_t = 0.0;
-        self.pad_r = 0.0;
-        self.pad_b = 0.0;
+        self.pad_l = 0.0; self.pad_t = 0.0; self.pad_r = 0.0; self.pad_b = 0.0;
         self.has_radius = false;
         self.radius = 0.0;
         self.has_font_size = false;
@@ -491,37 +292,31 @@ frame Style {
         self.spacing_val = 0.0;
     }
 
-    pub fn background(c: Color): Style {
+    pub fn background(c: color.Color): Style {
         self.has_bg = true;
         self.bg = c;
         return self;
     }
 
-    pub fn foreground(c: Color): Style {
+    pub fn foreground(c: color.Color): Style {
         self.has_fg = true;
         self.fg = c;
         return self;
     }
 
-    pub fn color(c: Color): Style {
+    pub fn color(c: color.Color): Style {
         return self.foreground(c);
     }
 
     pub fn padding(p: float): Style {
         self.has_padding = true;
-        self.pad_l = p;
-        self.pad_t = p;
-        self.pad_r = p;
-        self.pad_b = p;
+        self.pad_l = p; self.pad_t = p; self.pad_r = p; self.pad_b = p;
         return self;
     }
 
     pub fn padding_xy(x: float, y: float): Style {
         self.has_padding = true;
-        self.pad_l = x;
-        self.pad_t = y;
-        self.pad_r = x;
-        self.pad_b = y;
+        self.pad_l = x; self.pad_t = y; self.pad_r = x; self.pad_b = y;
         return self;
     }
 
@@ -554,33 +349,21 @@ frame Style {
     }
 
     pub fn merge(other: Style): Style {
-        var s = Style();
-        s.has_bg = self.has_bg;
-        s.bg = self.bg;
-        s.has_fg = self.has_fg;
-        s.fg = self.fg;
+        val s = Style();
+        s.has_bg = self.has_bg; s.bg = self.bg;
+        s.has_fg = self.has_fg; s.fg = self.fg;
         s.has_padding = self.has_padding;
-        s.pad_l = self.pad_l;
-        s.pad_t = self.pad_t;
-        s.pad_r = self.pad_r;
-        s.pad_b = self.pad_b;
-        s.has_radius = self.has_radius;
-        s.radius = self.radius;
-        s.has_font_size = self.has_font_size;
-        s.font_size_val = self.font_size_val;
-        s.has_weight = self.has_weight;
-        s.weight_val = self.weight_val;
-        s.has_spacing = self.has_spacing;
-        s.spacing_val = self.spacing_val;
+        s.pad_l = self.pad_l; s.pad_t = self.pad_t; s.pad_r = self.pad_r; s.pad_b = self.pad_b;
+        s.has_radius = self.has_radius; s.radius = self.radius;
+        s.has_font_size = self.has_font_size; s.font_size_val = self.font_size_val;
+        s.has_weight = self.has_weight; s.weight_val = self.weight_val;
+        s.has_spacing = self.has_spacing; s.spacing_val = self.spacing_val;
 
         if (other.has_bg) { s.has_bg = true; s.bg = other.bg; }
         if (other.has_fg) { s.has_fg = true; s.fg = other.fg; }
         if (other.has_padding) {
             s.has_padding = true;
-            s.pad_l = other.pad_l;
-            s.pad_t = other.pad_t;
-            s.pad_r = other.pad_r;
-            s.pad_b = other.pad_b;
+            s.pad_l = other.pad_l; s.pad_t = other.pad_t; s.pad_r = other.pad_r; s.pad_b = other.pad_b;
         }
         if (other.has_radius) { s.has_radius = true; s.radius = other.radius; }
         if (other.has_font_size) { s.has_font_size = true; s.font_size_val = other.font_size_val; }
@@ -592,1219 +375,4 @@ frame Style {
 
 pub fn style(): Style {
     return Style();
-}
-
-pub const KIND_CONTAINER = WidgetKind.Container;
-pub const KIND_TEXT = WidgetKind.Text;
-pub const KIND_BUTTON = WidgetKind.Button;
-pub const KIND_SPACER = WidgetKind.Spacer;
-pub const KIND_IMAGE = WidgetKind.Image;
-pub const KIND_INPUT = WidgetKind.Input;
-pub const KIND_CHECKBOX = WidgetKind.Checkbox;
-pub const KIND_SLIDER = WidgetKind.Slider;
-pub const KIND_TABS = WidgetKind.Tabs;
-pub const KIND_SCROLL = WidgetKind.Scroll;
-pub const KIND_BADGE = WidgetKind.Badge;
-pub const KIND_SELECT = WidgetKind.Select;
-pub const KIND_TEXTAREA = WidgetKind.Textarea;
-pub const KIND_TOGGLE = WidgetKind.Toggle;
-pub const KIND_STEPPER = WidgetKind.Stepper;
-pub const KIND_PLOT_LINES = WidgetKind.PlotLines;
-pub const KIND_PLOT_HISTOGRAM = WidgetKind.PlotHistogram;
-pub const KIND_TREE_NODE = WidgetKind.TreeNode;
-pub const KIND_COLOR_PICKER = WidgetKind.ColorPicker;
-pub const KIND_TABLE = WidgetKind.Table;
-pub const KIND_ACCORDION = WidgetKind.Accordion;
-pub const KIND_ALERT = WidgetKind.Alert;
-pub const KIND_CALENDAR = WidgetKind.Calendar;
-pub const KIND_CARD = WidgetKind.Card;
-pub const KIND_DIFF = WidgetKind.Diff;
-pub const KIND_DOCK = WidgetKind.Dock;
-pub const KIND_FILE_INPUT = WidgetKind.FileInput;
-pub const KIND_FILTER = WidgetKind.Filter;
-pub const KIND_INDICATOR = WidgetKind.Indicator;
-pub const KIND_JOIN = WidgetKind.Join;
-pub const KIND_LINK = WidgetKind.Link;
-pub const KIND_LIST = WidgetKind.List;
-pub const KIND_PROGRESS = WidgetKind.Progress;
-pub const KIND_RANGE_SLIDER = WidgetKind.RangeSlider;
-pub const KIND_STAT = WidgetKind.Stat;
-pub const KIND_TIMELINE = WidgetKind.Timeline;
-pub const KIND_TOOLTIP = WidgetKind.Tooltip;
-pub const KIND_TOAST = WidgetKind.Toast;
-pub const KIND_STEPS = WidgetKind.Steps;
-pub const KIND_MASK = WidgetKind.Mask;
-pub const KIND_BAR_CHART = WidgetKind.BarChart;
-pub const KIND_BUBBLE_CHART = WidgetKind.BubbleChart;
-pub const KIND_DOUGHNUT_CHART = WidgetKind.DoughnutChart;
-pub const KIND_LINE_CHART = WidgetKind.LineChart;
-pub const KIND_POLAR_AREA_CHART = WidgetKind.PolarAreaChart;
-pub const KIND_RADAR_CHART = WidgetKind.RadarChart;
-pub const KIND_SCATTER_CHART = WidgetKind.ScatterChart;
-pub const KIND_PIE_CHART = WidgetKind.PieChart;
-pub const KIND_OVERLAY = WidgetKind.Overlay;
-pub const KIND_FORM_FIELD = WidgetKind.FormField;
-pub const KIND_MULTI_SELECT = WidgetKind.MultiSelect;
-pub var _shared_empty_style: Style = Style();
-pub var _shared_empty_shadow: shadow.Shadow = shadow.Shadow();
-pub var _shared_empty_trans: anim.Transition = anim.Transition();
-pub var _shared_empty_anim: anim.PropertyAnimation = anim.PropertyAnimation();
-
-// Unified Retained UI Node with Fluent Modifiers
-frame Widget : WidgetTrait {
-    mixin WidgetIdentity;
-    mixin TextualContent;
-    mixin VisualStyle;
-    mixin LayoutMetrics;
-    mixin InteractionState;
-    mixin ToggleValue;
-    mixin SliderValue;
-    mixin TabState;
-    mixin SelectValue;
-    mixin ScrollState;
-    mixin AnimationState;
-    mixin Accessibility;
-
-    pub var children: [Widget];
-
-    pub init(k: WidgetKind) {
-        self.kind = k;
-        self.text_val = "";
-        self.on_click_action = nil;
-        self.children = [] as [Widget];
-        self.foreground_color = color.white;
-        self.background_color = color.transparent;
-        self.font_size_val = 14.0;
-        self.font_weight_val = 400;
-        self.padding_left = 0.0;
-        self.padding_top = 0.0;
-        self.padding_right = 0.0;
-        self.padding_bottom = 0.0;
-        self.corner_radius_val = 0.0;
-        self.spacing_val = 0.0;
-        self.is_vertical = 1;
-        self.align_val = 0;
-        // Enum-side defaults mirror the packed ints above.
-        self.align_kind = Align.Start;
-        self.payload_role = Role.Text;
-        self.alert_kind = AlertKind.Info;
-        self.dot_state = DotState.Offline;
-        self.flex_val = 1.0;
-        self.is_enabled = 1;
-        self.is_pressed = 0;
-        self.is_hovered = 0;
-        self.click_count = 0;
-        self.width_val = 0.0;
-        self.height_val = 0.0;
-        self.pressed_style_val = _shared_empty_style;
-        self.hover_style_val = _shared_empty_style;
-        self.is_checked = 0;
-        self.slider_val = 0.0;
-        self.slider_high = 1.0;
-        self.slider_min = 0.0;
-        self.slider_max = 1.0;
-        self.is_focused = 0;
-        self.active_tab = 0;
-        self.hovered_tab = -1;
-        self.tab_titles = [] as [str];
-        self.on_change_action = nil;
-        self.select_options = [] as [str];
-        self.selected_idx = 0;
-        self.selected_indices = [] as [int];
-        self.is_open = 0;
-        self.opacity_val = 1.0;
-        self.scale_val = 1.0;
-        self.shadow_val = _shared_empty_shadow;
-        self.lifecycle_state = LIFECYCLE_ACTIVE;
-        self.enter_transition = _shared_empty_trans;
-        self.exit_transition = _shared_empty_trans;
-        self.anim_property = _shared_empty_anim;
-        self.active_transition = _shared_empty_trans;
-
-        self.text_editor_state = nil;
-        self.scroll_x = 0.0;
-        self.scroll_y = 0.0;
-        self.max_scroll_x = 0.0;
-        self.max_scroll_y = 0.0;
-        self.placeholder_val = "";
-        self.focus_key = "";
-
-        // Constraints
-        self.min_width = 0.0;
-        self.max_width = 0.0;
-        self.min_height = 0.0;
-        self.max_height = 0.0;
-        self.grow = 0.0;
-        self.shrink = 1.0;
-        self.aspect_ratio = 0.0;
-
-        // Accessibility
-        self.a11y_role = "";
-        self.a11y_label = "";
-        self.a11y_hint = "";
-        self.a11y_live = "";
-        self.tab_index = 0;
-        self.is_a11y_hidden = false;
-    }
-
-    pub fn color(c: Color): Widget {
-        self.foreground_color = c;
-        return self;
-    }
-
-    pub fn foreground(c: Color): Widget {
-        self.foreground_color = c;
-        return self;
-    }
-
-    pub fn background(c: Color): Widget {
-        self.background_color = c;
-        return self;
-    }
-
-    pub fn font_size(s: float): Widget {
-        self.font_size_val = s;
-        return self;
-    }
-
-    pub fn bold(): Widget {
-        self.font_weight_val = weight_value(Weight.Bold);
-        return self;
-    }
-
-    // Semantic weight: the Weight enum crosses into the packed int once, here.
-    pub fn weight(w: Weight): Widget {
-        self.font_weight_val = weight_value(w);
-        return self;
-    }
-
-    pub fn padding(p: float): Widget {
-        self.padding_left = p;
-        self.padding_top = p;
-        self.padding_right = p;
-        self.padding_bottom = p;
-        return self;
-    }
-
-    pub fn padding_xy(x: float, y: float): Widget {
-        self.padding_left = x;
-        self.padding_top = y;
-        self.padding_right = x;
-        self.padding_bottom = y;
-        return self;
-    }
-
-    pub fn padding_rect(l: float, t: float, r: float, b: float): Widget {
-        self.padding_left = l;
-        self.padding_top = t;
-        self.padding_right = r;
-        self.padding_bottom = b;
-        return self;
-    }
-
-    pub fn corner_radius(r: float): Widget {
-        self.corner_radius_val = r;
-        return self;
-    }
-
-    pub fn spacing(s: float): Widget {
-        self.spacing_val = s;
-        return self;
-    }
-
-    pub fn align(a: Align): Widget {
-        self.align_kind = a;
-        self.align_val = align_flag(a);
-        return self;
-    }
-
-    pub fn width(w: float): Widget {
-        self.width_val = w;
-        return self;
-    }
-
-    pub fn height(h: float): Widget {
-        self.height_val = h;
-        return self;
-    }
-
-    pub fn size(w: float, h: float): Widget {
-        self.width_val = w;
-        self.height_val = h;
-        return self;
-    }
-
-    pub fn on_click(act: any): Widget {
-        self.on_click_action = act;
-        return self;
-    }
-
-    pub fn pressed(s: Style): Widget {
-        self.pressed_style_val = s;
-        return self;
-    }
-
-    pub fn style(s: Style): Widget {
-        if (s.has_bg) {
-            self.background_color = s.bg;
-        }
-        if (s.has_fg) {
-            self.foreground_color = s.fg;
-        }
-        if (s.has_padding) {
-            self.padding_left = s.pad_l;
-            self.padding_top = s.pad_t;
-            self.padding_right = s.pad_r;
-            self.padding_bottom = s.pad_b;
-        }
-        if (s.has_radius) {
-            self.corner_radius_val = s.radius;
-        }
-        if (s.has_font_size) {
-            self.font_size_val = s.font_size_val;
-        }
-        if (s.has_weight) {
-            self.font_weight_val = s.weight_val;
-        }
-        if (s.has_spacing) {
-            self.spacing_val = s.spacing_val;
-        }
-        return self;
-    }
-
-    // ── Layout Constraint Modifiers ───────────────────────────────────────
-    pub fn min_width(w: float): Widget { self.min_width = w; return self; }
-    pub fn max_width(w: float): Widget { self.max_width = w; return self; }
-    pub fn min_height(h: float): Widget { self.min_height = h; return self; }
-    pub fn max_height(h: float): Widget { self.max_height = h; return self; }
-    pub fn grow(factor: float): Widget { self.grow = factor; return self; }
-    pub fn shrink(factor: float): Widget { self.shrink = factor; return self; }
-    pub fn aspect_ratio(ratio: float): Widget { self.aspect_ratio = ratio; return self; }
-    pub fn fill(): Widget { self.grow = 1.0; return self; }
-
-    // ── Accessibility Modifiers ───────────────────────────────────────────
-    // Nominal semantics: `widget.role(Semantic.Heading)`.
-    pub fn role(s: Semantic): Widget {
-        self.a11y_role = semantic_name(s);
-        return self;
-    }
-
-    // Escape hatch for hand-written ARIA strings.
-    pub fn role_str(r: str): Widget { self.a11y_role = r; return self; }
-
-    pub fn aria_label(lbl: str): Widget { self.a11y_label = lbl; return self; }
-    pub fn aria_hint(hint: str): Widget { self.a11y_hint = hint; return self; }
-    pub fn aria_live(mode: str): Widget { self.a11y_live = mode; return self; }
-    pub fn focusable(idx: int = 0): Widget { self.tab_index = idx; return self; }
-    pub fn hidden_from_a11y(): Widget { self.is_a11y_hidden = true; return self; }
-
-    // ── Retained Visual & Animation Modifiers ──────────────────────────────
-    pub fn opacity(o: float): Widget { self.opacity_val = o; return self; }
-    pub fn scale(s: float): Widget { self.scale_val = s; return self; }
-    pub fn shadow(s: shadow.Shadow): Widget { self.shadow_val = s; return self; }
-    pub fn animate(dur: float = 0.25, easing: anim.Easing = anim.Easing.Linear): Widget {
-        self.anim_property = anim.PropertyAnimation(0.0, 1.0, dur, easing);
-        return self;
-    }
-    pub fn spring(stiffness: float = 180.0, damping: float = 12.0): Widget {
-        self.anim_property.spring_model = anim.Spring(stiffness, damping);
-        self.anim_property.is_spring = true;
-        return self;
-    }
-    pub fn transition(trans: anim.Transition): Widget { self.active_transition = trans; return self; }
-    pub fn on_change(cb: any): Widget { self.on_change_action = cb; return self; }
-    pub fn checked(c: bool): Widget { if (c) { self.is_checked = 1; } else { self.is_checked = 0; } return self; }
-    pub fn disabled(): Widget { self.is_enabled = 0; return self; }
-    pub fn hover(s: Style): Widget { self.hover_style_val = s; return self; }
-    pub fn enter(t: anim.Transition): Widget {
-        self.enter_transition = t;
-        self.lifecycle_state = LIFECYCLE_ENTERING;
-        return self;
-    }
-    pub fn exit(t: anim.Transition): Widget {
-        self.exit_transition = t;
-        return self;
-    }
-    pub fn mark_for_removal(): nil {
-        self.lifecycle_state = LIFECYCLE_EXITING;
-    }
-    pub fn background_color(c: Color): Widget {
-        return self.background(c);
-    }
-    pub fn horizontal(): Widget {
-        self.is_vertical = 0;
-        return self;
-    }
-    pub fn vertical(): Widget {
-        self.is_vertical = 1;
-        return self;
-    }
-
-    // ── Signal Binding Modifiers ───────────────────────────────────────────
-    pub fn bind_text(sig: any): Widget {
-        var s = sig as state.Signal;
-        if (s != nil) {
-            s.subscribe(fn(new_val: any): nil {
-                var txt = new_val as str;
-                self.text_val = txt;
-            });
-        }
-        return self;
-    }
-
-    pub fn bind_checked(sig: any): Widget {
-        var s = sig as state.Signal;
-        if (s != nil) {
-            s.subscribe(fn(new_val: any): nil {
-                var checked = new_val as bool;
-                if (checked) {
-                    self.is_checked = 1;
-                } else {
-                    self.is_checked = 0;
-                }
-            });
-        }
-        return self;
-    }
-
-    pub fn bind_value(sig: any): Widget {
-        var s = sig as state.Signal;
-        if (s != nil) {
-            s.subscribe(fn(new_val: any): nil {
-                var v = new_val as float;
-                self.slider_val = v;
-            });
-        }
-        return self;
-    }
-
-    pub fn bind_enabled(sig: any): Widget {
-        var s = sig as state.Signal;
-        if (s != nil) {
-            s.subscribe(fn(new_val: any): nil {
-                var enabled = new_val as bool;
-                if (enabled) {
-                    self.is_enabled = 1;
-                } else {
-                    self.is_enabled = 0;
-                }
-            });
-        }
-        return self;
-    }
-}
-
-// Semantic Widget Constructors
-pub fn text(content: str): Widget {
-    var w = Widget(KIND_TEXT);
-    w.text_val = content;
-    w.foreground_color = color.white;
-    return w;
-}
-
-pub fn button(label: str, on_click: any = nil): Widget {
-    var w = Widget(KIND_BUTTON);
-    w.text_val = label;
-    w.on_click_action = on_click;
-    w.background_color = color.blue;
-    w.foreground_color = color.white;
-    w.padding_left = 10.0;
-    w.padding_top = 8.0;
-    w.padding_right = 10.0;
-    w.padding_bottom = 8.0;
-    w.corner_radius_val = 4.0;
-    w.height_val = 36.0;
-    return w;
-}
-
-pub fn textarea(content: str): Widget {
-    var w = Widget(KIND_TEXTAREA);
-    w.text_val = content;
-    w.text_editor_state = text_ctrl.EditorController(content);
-    w.payload_role = Role.Text;
-    w.focus_key = "ta_default";
-    w.foreground_color = color.white;
-    w.padding_left = 8.0;
-    w.padding_top = 8.0;
-    w.padding_right = 8.0;
-    w.padding_bottom = 8.0;
-    w.width_val = 300.0;
-    w.height_val = 120.0;
-    return w;
-}
-
-pub fn column(children: [Widget]): Widget {
-    var w = Widget(KIND_CONTAINER);
-    w.is_vertical = 1;
-    w.children = children;
-    return w;
-}
-
-pub fn row(children: [Widget]): Widget {
-    var w = Widget(KIND_CONTAINER);
-    w.is_vertical = 0;
-    w.children = children;
-    return w;
-}
-
-pub fn stack(children: [Widget]): Widget {
-    var w = Widget(KIND_CONTAINER);
-    w.is_vertical = 2;
-    w.children = children;
-    return w;
-}
-
-pub fn spacer(flex: float = 1.0): Widget {
-    var w = Widget(KIND_SPACER);
-    w.flex_val = flex;
-    return w;
-}
-
-pub fn empty(): Widget {
-    return Widget(KIND_CONTAINER);
-}
-
-// Blueprint data structures
-frame ContainerData {
-    pub var axis: Axis;
-    pub var spacing: float;
-    pub var padding: Rect;
-    pub var background: Color;
-}
-
-pub fn container_data(axis: Axis): ContainerData {
-    return ContainerData(
-        axis=axis,
-        spacing=0.0,
-        padding=rect(0.0, 0.0, 0.0, 0.0),
-        background=color.color_rgba(0.0, 0.0, 0.0, 0.0)
-    );
-}
-
-frame TextData {
-    pub var content: str;
-    pub var font_size: float;
-    pub var color: Color;
-    pub var font_weight: int;
-}
-
-pub fn text_data(content: str): TextData {
-    return TextData(content=content, font_size=14.0, color=color.color_rgb(1.0, 1.0, 1.0), font_weight=400);
-}
-
-frame ButtonData {
-    pub var label: str;
-    pub var background: Color;
-    pub var text_color: Color;
-    pub var corner_radius: float;
-    pub var padding: Rect;
-    pub var enabled: int;
-}
-
-pub fn button_data(label: str): ButtonData {
-    return ButtonData(
-        label=label,
-        background=color_rgb8(60, 120, 210),
-        text_color=color_rgb8(255, 255, 255),
-        corner_radius=4.0,
-        padding=rect(8.0, 4.0, 8.0, 4.0),
-        enabled=1
-    );
-}
-
-frame LayoutConstraint {
-    pub var mode: int;
-    pub var value_num: int;
-}
-
-frame Blueprint {
-    pub var variant_type: int; // 1 = Container, 2 = Text, 3 = Button
-    pub var container_data_val: ContainerData;
-    pub var text_data_val: TextData;
-    pub var button_data_val: ButtonData;
-    pub var constraints: [LayoutConstraint];
-    pub var children: [Blueprint];
-}
-
-pub fn empty_constraints(): [LayoutConstraint] {
-    var res: [LayoutConstraint] = [];
-    return res;
-}
-
-pub fn empty_blueprints(): [Blueprint] {
-    var res: [Blueprint] = [];
-    return res;
-}
-
-pub fn blueprint_add_constraint(bp: Blueprint, c: LayoutConstraint): Blueprint {
-    bp.constraints.append(c);
-    return bp;
-}
-
-pub fn blueprint_add_child(bp: Blueprint, child: Blueprint): Blueprint {
-    bp.children.append(child);
-    return bp;
-}
-
-// ── Nominal blueprint builders ────────────────────────────────────
-// The evaluator walks the packed `variant_type` int (1/2/3); these helpers are
-// the only place new blueprints are minted, so call sites never spell a raw
-// discriminant.
-
-pub fn variant_code(v: BlueprintVariant): int {
-    match (v) {
-        BlueprintVariant.Container => { return 1; },
-        BlueprintVariant.Text => { return 2; },
-        BlueprintVariant.Button => { return 3; }
-    }
-    return 1;
-}
-
-pub fn blueprint_container(children: [Blueprint] = empty_blueprints(), axis: Axis = AXIS_VERTICAL): Blueprint {
-    return Blueprint(
-        variant_type=variant_code(BlueprintVariant.Container),
-        container_data_val=container_data(axis),
-        text_data_val=text_data(""),
-        button_data_val=button_data(""),
-        constraints=empty_constraints(),
-        children=children
-    );
-}
-
-pub fn blueprint_text(content: str): Blueprint {
-    return Blueprint(
-        variant_type=variant_code(BlueprintVariant.Text),
-        container_data_val=container_data(AXIS_VERTICAL),
-        text_data_val=text_data(content),
-        button_data_val=button_data(""),
-        constraints=empty_constraints(),
-        children=empty_blueprints()
-    );
-}
-
-pub fn blueprint_button(label: str): Blueprint {
-    return Blueprint(
-        variant_type=variant_code(BlueprintVariant.Button),
-        container_data_val=container_data(AXIS_VERTICAL),
-        text_data_val=text_data(""),
-        button_data_val=button_data(label),
-        constraints=empty_constraints(),
-        children=empty_blueprints()
-    );
-}
-
-// Typed constraint: the ConstraintMode enum crosses into the packed int once,
-// through match.
-pub fn constraint(m: ConstraintMode, value: int): LayoutConstraint {
-    var encoded = 0;
-    match (m) {
-        ConstraintMode.Fixed => { encoded = 0; },
-        ConstraintMode.Min => { encoded = 1; },
-        ConstraintMode.Max => { encoded = 2; }
-    }
-    return LayoutConstraint(mode=encoded, value_num=value);
-}
-
-// Extra widgets from std/ui.lm
-pub fn select(options: [str], selected_idx: int = 0, on_change: any = nil): Widget {
-    var w = Widget(KIND_SELECT);
-    w.select_options = options;
-    w.selected_idx = selected_idx;
-    w.on_change_action = on_change;
-    w.is_open = 0;
-    w.background_color = color.rgb(28, 30, 38);
-    w.foreground_color = color.white;
-    w.height_val = 28.0;
-    w.width_val = 180.0;
-    w.padding_left = 10.0;
-    w.padding_right = 10.0;
-    w.corner_radius_val = 4.0;
-    if (len(options) > selected_idx) {
-        w.text_val = options[selected_idx];
-    }
-    return w;
-}
-
-pub fn multi_select(options: [str], selected_indices: [int] = [] as [int], on_change: any = nil): Widget {
-    var w = Widget(KIND_MULTI_SELECT);
-    w.select_options = options;
-    w.selected_indices = selected_indices;
-    w.on_change_action = on_change;
-    w.is_open = 0;
-    w.background_color = color.rgb(28, 30, 38);
-    w.foreground_color = color.white;
-    w.height_val = 28.0;
-    w.width_val = 200.0;
-    w.padding_left = 10.0;
-    w.padding_right = 10.0;
-    w.corner_radius_val = 4.0;
-    return w;
-}
-
-pub fn link(text_val: str, url: str = "", on_click: any = nil): Widget {
-    var w = Widget(KIND_LINK);
-    w.text_val = text_val;
-    w.placeholder_val = url;
-    w.on_click_action = on_click;
-    w.foreground_color = color.rgb(100, 180, 255);
-    w.height_val = 20.0;
-    return w;
-}
-
-pub fn pie_chart(label: str, values: [float], labels: [str] = [] as [str]): Widget {
-    var w = Widget(KIND_PIE_CHART);
-    w.text_val = label;
-    w.tab_titles = labels;
-    w.height_val = 120.0;
-    w.width_val = 120.0;
-    w.background_color = color.rgb(24, 26, 34);
-    w.text_editor_state = values;
-    w.payload_role = Role.ChartValues;
-    return w;
-}
-
-pub fn table(headers: [str], rows: [[Widget]]): Widget {
-    var w = Widget(KIND_TABLE);
-    w.tab_titles = headers;
-    w.background_color = color.rgb(24, 26, 34);
-    w.foreground_color = color.white;
-    w.text_editor_state = rows;
-    w.payload_role = Role.Rows;
-    return w;
-}
-
-pub fn alert(message: str, type_val: str = "info"): Widget {
-    return alert_k(message, alert_kind_of(type_val));
-}
-
-// Nominal form: the palette is chosen by an exhaustive match, never a ladder.
-pub fn alert_k(message: str, kind: AlertKind): Widget {
-    var w = Widget(KIND_ALERT);
-    w.text_val = message;
-    w.alert_kind = kind;
-    w.placeholder_val = alert_kind_name(kind);
-    match (kind) {
-        AlertKind.Danger => {
-            w.background_color = color.rgb(80, 25, 30);
-            w.foreground_color = color.rgb(255, 120, 130);
-        },
-        AlertKind.Warning => {
-            w.background_color = color.rgb(70, 55, 20);
-            w.foreground_color = color.rgb(255, 210, 90);
-        },
-        AlertKind.Success => {
-            w.background_color = color.rgb(25, 65, 35);
-            w.foreground_color = color.rgb(100, 230, 140);
-        },
-        AlertKind.Info => {
-            w.background_color = color.rgb(30, 45, 70);
-            w.foreground_color = color.rgb(120, 180, 255);
-        }
-    }
-    w.height_val = 36.0;
-    return w;
-}
-
-pub fn accordion(title: str, content: Widget, default_open: bool = false): Widget {
-    var w = Widget(KIND_ACCORDION);
-    w.text_val = title;
-    w.children = [content];
-    if (default_open) w.is_open = 1; else w.is_open = 0;
-    w.background_color = color.rgb(28, 30, 40);
-    w.foreground_color = color.white;
-    return w;
-}
-
-pub fn bar_chart(label: str, values: [float], labels: [str] = [] as [str]): Widget {
-    var w = Widget(KIND_BAR_CHART);
-    w.text_val = label;
-    w.tab_titles = labels;
-    w.height_val = 100.0;
-    w.width_val = 200.0;
-    w.background_color = color.rgb(24, 26, 34);
-    w.foreground_color = color.rgb(80, 180, 255);
-    w.text_editor_state = values;
-    w.payload_role = Role.ChartValues;
-    return w;
-}
-
-pub fn image(source: str = ""): Widget {
-    var w = Widget(KIND_IMAGE);
-    w.text_val = source;
-    w.payload_role = Role.Image;
-    return w;
-}
-
-pub fn plot_histogram(label: str, values: [float], min_val: float = 0.0, max_val: float = 1.0): Widget {
-    var w = Widget(KIND_PLOT_HISTOGRAM);
-    w.text_val = label;
-    w.slider_min = min_val;
-    w.slider_max = max_val;
-    w.height_val = 50.0;
-    w.width_val = 180.0;
-    w.background_color = color.rgb(24, 26, 34);
-    w.foreground_color = color.rgb(80, 220, 130);
-    w.text_editor_state = values;
-    w.payload_role = Role.ChartValues;
-    return w;
-}
-
-pub fn stat(title: str, value: str, desc: str = ""): Widget {
-    var w = Widget(KIND_STAT);
-    w.text_val = title;
-    w.placeholder_val = value;
-    w.focus_key = desc;
-    w.background_color = color.rgb(24, 26, 34);
-    w.foreground_color = color.white;
-    w.height_val = 70.0;
-    w.width_val = 160.0;
-    return w;
-}
-
-pub fn timeline(events: [Widget]): Widget {
-    var w = Widget(KIND_TIMELINE);
-    w.children = events;
-    return w;
-}
-
-pub fn color_rgb8(r: int, g: int, b: int): Color {
-    return color.rgb(r, g, b);
-}
-
-pub fn range_slider(low: float = 20.0, high: float = 80.0, min_val: float = 0.0, max_val: float = 100.0): Widget {
-    var w = Widget(KIND_RANGE_SLIDER);
-    w.slider_min = min_val;
-    w.slider_max = max_val;
-    w.slider_val = low;
-    w.slider_high = high;
-    w.payload_role = Role.High;
-    w.height_val = 24.0;
-    w.width_val = 160.0;
-    w.background_color = color.rgb(35, 38, 48);
-    w.foreground_color = color.rgb(100, 180, 255);
-    return w;
-}
-
-pub fn mask(shape: str = "circle", child: Widget = empty()): Widget {
-    var w = Widget(KIND_MASK);
-    w.text_val = shape;
-    w.children = [child];
-    return w;
-}
-
-// Nominal form of `mask`.
-pub fn mask_shape(shape: MaskShape, child: Widget = empty()): Widget {
-    return mask(mask_shape_name(shape), child);
-}
-
-pub fn stepper(value: int = 0, step: int = 1, min_val: int = 0, max_val: int = 100, on_change: any = nil): Widget {
-    var w = Widget(KIND_STEPPER);
-    w.slider_val = value as float;
-    w.slider_min = min_val as float;
-    w.slider_max = max_val as float;
-    w.spacing_val = step as float;
-    w.on_change_action = on_change;
-    w.height_val = 28.0;
-    w.width_val = 120.0;
-    w.background_color = color.rgb(28, 30, 38);
-    w.foreground_color = color.white;
-    return w;
-}
-
-pub fn calendar(selected_date: str = "2025-01-01"): Widget {
-    var w = Widget(KIND_CALENDAR);
-    w.text_val = selected_date;
-    w.background_color = color.rgb(24, 26, 34);
-    w.foreground_color = color.white;
-    w.height_val = 180.0;
-    w.width_val = 220.0;
-    return w;
-}
-
-pub fn toggle(enabled: bool = false, on_change: any = nil): Widget {
-    var w = Widget(KIND_TOGGLE);
-    if (enabled) {
-        w.is_checked = 1;
-        w.foreground_color = color.rgb(80, 220, 130);
-    } else {
-        w.is_checked = 0;
-        w.foreground_color = color.gray;
-    }
-    w.background_color = color.rgb(35, 38, 48);
-    w.height_val = 22.0;
-    w.width_val = 44.0;
-    w.on_change_action = on_change;
-    return w;
-}
-
-pub fn line_chart(label: str, values: [float]): Widget {
-    var w = Widget(KIND_LINE_CHART);
-    w.text_val = label;
-    w.height_val = 100.0;
-    w.width_val = 200.0;
-    w.background_color = color.rgb(24, 26, 34);
-    w.foreground_color = color.rgb(100, 220, 160);
-    w.text_editor_state = values;
-    w.payload_role = Role.ChartValues;
-    return w;
-}
-
-pub fn form_field(label_text: str, control: Widget, help_text: str = "", error_text: str = ""): Widget {
-    var w = Widget(KIND_FORM_FIELD);
-    w.text_val = label_text;
-    w.placeholder_val = help_text;
-    w.focus_key = error_text;
-    w.children = [control];
-    return w;
-}
-
-pub fn tooltip(label: str, content: Widget): Widget {
-    var w = Widget(KIND_TOOLTIP);
-    w.text_val = label;
-    w.children = [content];
-    return w;
-}
-
-pub fn progress(fraction: float = 0.0, width_val: float = 160.0): Widget {
-    var w = Widget(KIND_PROGRESS);
-    w.slider_val = fraction;
-    w.width_val = width_val;
-    w.height_val = 16.0;
-    w.background_color = color.rgb(35, 38, 48);
-    w.foreground_color = color.rgb(80, 180, 255);
-    return w;
-}
-
-pub fn tree_node(label: str, children: [Widget], default_open: bool = false): Widget {
-    var w = Widget(KIND_TREE_NODE);
-    w.text_val = label;
-    w.children = children;
-    if (default_open) {
-        w.is_open = 1;
-    } else {
-        w.is_open = 0;
-    }
-    w.foreground_color = color.white;
-    return w;
-}
-
-pub fn grid(columns_count: int, children: [Widget], spacing_val: float = 8.0): Widget {
-    var w = Widget(KIND_CONTAINER);
-    w.is_vertical = 0;
-    w.active_tab = columns_count;
-    w.spacing_val = spacing_val;
-    w.children = children;
-    return w;
-}
-
-pub fn radar_chart(label: str, values: [float], labels: [str] = [] as [str]): Widget {
-    var w = Widget(KIND_RADAR_CHART);
-    w.text_val = label;
-    w.tab_titles = labels;
-    w.height_val = 120.0;
-    w.width_val = 120.0;
-    w.background_color = color.rgb(24, 26, 34);
-    w.foreground_color = color.rgb(100, 200, 255);
-    w.text_editor_state = values;
-    w.payload_role = Role.ChartValues;
-    return w;
-}
-
-pub fn list(items: [Widget]): Widget {
-    var w = Widget(KIND_LIST);
-    w.children = items;
-    w.is_vertical = 1;
-    return w;
-}
-
-pub fn badge(label: str): Widget {
-    var w = Widget(KIND_BADGE);
-    w.text_val = label;
-    w.background_color = color.blue;
-    w.foreground_color = color.white;
-    w.height_val = 20.0;
-    w.corner_radius_val = 4.0;
-    w.padding_left = 6.0;
-    w.padding_right = 6.0;
-    w.padding_top = 2.0;
-    w.padding_bottom = 2.0;
-    return w;
-}
-
-pub fn color_picker(label: str, color: Color, on_change: any = nil): Widget {
-    var w = Widget(KIND_COLOR_PICKER);
-    w.text_val = label;
-    w.foreground_color = color;
-    w.on_change_action = on_change;
-    w.height_val = 32.0;
-    w.width_val = 200.0;
-    return w;
-}
-
-pub fn file_input(label: str = "Choose File...", on_select: any = nil): Widget {
-    var w = Widget(KIND_FILE_INPUT);
-    w.text_val = label;
-    w.on_change_action = on_select;
-    w.background_color = color.rgb(35, 40, 52);
-    w.foreground_color = color.white;
-    w.height_val = 32.0;
-    w.width_val = 220.0;
-    return w;
-}
-
-pub fn steps(step_titles: [str], active_step: int = 0): Widget {
-    var w = Widget(KIND_STEPS);
-    w.tab_titles = step_titles;
-    w.active_tab = active_step;
-    w.is_vertical = 0;
-    w.height_val = 58.0;
-    return w;
-}
-
-pub fn steps_vertical(step_titles: [str], active_step: int = 0): Widget {
-    var w = Widget(KIND_STEPS);
-    w.tab_titles = step_titles;
-    w.active_tab = active_step;
-    w.is_vertical = 1;
-    w.height_val = (len(step_titles) as float) * 44.0;
-    return w;
-}
-
-pub fn toast(message: str, type_val: str = "info"): Widget {
-    return toast_k(message, alert_kind_of(type_val));
-}
-
-pub fn toast_k(message: str, kind: AlertKind): Widget {
-    var w = Widget(KIND_TOAST);
-    w.text_val = message;
-    w.alert_kind = kind;
-    w.placeholder_val = alert_kind_name(kind);
-    w.background_color = color.rgb(28, 30, 42);
-    w.foreground_color = color.white;
-    w.height_val = 36.0;
-    w.width_val = 240.0;
-    return w;
-}
-
-pub fn filter(query: str = "", placeholder: str = "Filter...", on_change: any = nil): Widget {
-    var w = Widget(KIND_FILTER);
-    w.text_val = query;
-    w.placeholder_val = placeholder;
-    w.on_change_action = on_change;
-    w.background_color = color.rgb(20, 22, 28);
-    w.foreground_color = color.white;
-    w.height_val = 28.0;
-    w.width_val = 180.0;
-    return w;
-}
-
-pub fn card(title: str, content: Widget): Widget {
-    var w = Widget(KIND_CARD);
-    w.text_val = title;
-    w.children = [content];
-    w.background_color = color.rgb(24, 26, 34);
-    w.foreground_color = color.white;
-    w.padding_left = 12.0;
-    w.padding_top = 12.0;
-    w.padding_right = 12.0;
-    w.padding_bottom = 12.0;
-    return w;
-}
-
-pub fn scroll(content: Widget): Widget {
-    var w = Widget(KIND_SCROLL);
-    w.children = [content];
-    w.height_val = 0.0;
-    w.scroll_y = 0.0;
-    w.background_color = color.rgb(20, 22, 28);
-    return w;
-}
-
-pub fn plot_lines(label: str, values: [float], min_val: float = 0.0, max_val: float = 1.0): Widget {
-    var w = Widget(KIND_PLOT_LINES);
-    w.text_val = label;
-    w.slider_min = min_val;
-    w.slider_max = max_val;
-    w.height_val = 50.0;
-    w.width_val = 180.0;
-    w.background_color = color.rgb(24, 26, 34);
-    w.foreground_color = color.rgb(100, 180, 255);
-    w.text_editor_state = values;
-    w.payload_role = Role.ChartValues;
-    return w;
-}
-
-pub fn text_area(value: str = "", placeholder: str = "Type here...", on_change: any = nil): Widget {
-    var w = Widget(KIND_TEXTAREA);
-    w.text_val = value;
-    w.placeholder_val = placeholder;
-    w.on_change_action = on_change;
-    w.text_editor_state = text_ctrl.EditorController(value);
-    w.focus_key = "ta_default";
-    w.background_color = color.rgb(20, 22, 28);
-    w.foreground_color = color.white;
-    w.height_val = 120.0;
-    w.width_val = 300.0;
-    w.padding_left = 8.0;
-    w.padding_right = 8.0;
-    w.padding_top = 6.0;
-    w.padding_bottom = 6.0;
-    return w;
-}
-
-pub fn tabs(titles: [str], pages: [Widget], active: int = 0, on_change: any = nil): Widget {
-    var w = Widget(KIND_TABS);
-    w.tab_titles = titles;
-    w.children = pages;
-    w.active_tab = active;
-    w.on_change_action = on_change;
-    w.height_val = 0.0;
-    w.spacing_val = 6.0;
-    return w;
-}
-
-pub fn polar_area_chart(label: str, values: [float], labels: [str] = [] as [str]): Widget {
-    var w = Widget(KIND_POLAR_AREA_CHART);
-    w.text_val = label;
-    w.tab_titles = labels;
-    w.height_val = 120.0;
-    w.width_val = 120.0;
-    w.background_color = color.rgb(24, 26, 34);
-    w.text_editor_state = values;
-    w.payload_role = Role.ChartValues;
-    return w;
-}
-
-pub fn join(items: [Widget]): Widget {
-    var w = Widget(KIND_JOIN);
-    w.children = items;
-    w.is_vertical = 0;
-    return w;
-}
-
-pub fn dock(items: [Widget]): Widget {
-    var w = Widget(KIND_DOCK);
-    w.children = items;
-    w.background_color = color.rgb(28, 30, 40);
-    w.height_val = 48.0;
-    return w;
-}
-
-pub fn bubble_chart(label: str, values: [float]): Widget {
-    var w = Widget(KIND_BUBBLE_CHART);
-    w.text_val = label;
-    w.height_val = 100.0;
-    w.width_val = 180.0;
-    w.background_color = color.rgb(24, 26, 34);
-    w.foreground_color = color.rgb(255, 180, 90);
-    w.text_editor_state = values;
-    w.payload_role = Role.ChartValues;
-    return w;
-}
-
-pub fn scatter_chart(label: str, values: [float]): Widget {
-    var w = Widget(KIND_SCATTER_CHART);
-    w.text_val = label;
-    w.height_val = 100.0;
-    w.width_val = 180.0;
-    w.background_color = color.rgb(24, 26, 34);
-    w.foreground_color = color.rgb(220, 120, 255);
-    w.text_editor_state = values;
-    w.payload_role = Role.ChartValues;
-    return w;
-}
-
-pub fn doughnut_chart(label: str, values: [float], labels: [str] = [] as [str]): Widget {
-    var w = Widget(KIND_DOUGHNUT_CHART);
-    w.text_val = label;
-    w.tab_titles = labels;
-    w.height_val = 120.0;
-    w.width_val = 120.0;
-    w.background_color = color.rgb(24, 26, 34);
-    w.text_editor_state = values;
-    w.payload_role = Role.ChartValues;
-    return w;
-}
-
-pub fn overlay(content: Widget, x: float = 0.0, y: float = 0.0, width_val: float = 0.0, height_val: float = 0.0): Widget {
-    var w = Widget(KIND_OVERLAY);
-    w.children = [content];
-    w.padding_left = x;
-    w.padding_top = y;
-    w.width_val = width_val;
-    w.height_val = height_val;
-    return w;
-}
-
-pub fn diff(old_text: str, new_text: str): Widget {
-    var w = Widget(KIND_DIFF);
-    w.text_val = old_text;
-    w.placeholder_val = new_text;
-    w.background_color = color.rgb(20, 22, 28);
-    return w;
-}
-
-pub fn checkbox(checked: bool = false, on_change: any = nil): Widget {
-    var w = Widget(KIND_CHECKBOX);
-    if (checked) {
-        w.is_checked = 1;
-        w.foreground_color = color.rgb(80, 220, 130);
-    } else {
-        w.is_checked = 0;
-        w.foreground_color = color.gray;
-    }
-    w.text_val = "";
-    w.background_color = color.rgb(35, 38, 48);
-    w.height_val = 22.0;
-    w.width_val = 22.0;
-    w.on_change_action = on_change;
-    return w;
-}
-
-pub fn indicator(status: str = "online", label: str = ""): Widget {
-    return indicator_k(dot_state_of(status), label);
-}
-
-// Nominal form: dot color chosen by exhaustive match.
-pub fn indicator_k(status: DotState, label: str = ""): Widget {
-    var w = Widget(KIND_INDICATOR);
-    w.dot_state = status;
-    w.placeholder_val = dot_state_name(status);
-    w.text_val = label;
-    match (status) {
-        DotState.Online => { w.foreground_color = color.rgb(80, 220, 130); },
-        DotState.Busy => { w.foreground_color = color.rgb(255, 200, 80); },
-        DotState.Offline => { w.foreground_color = color.rgb(150, 155, 170); }
-    }
-    w.height_val = 20.0;
-    return w;
-}
-
-pub fn slider(value: float = 50.0, min_val: float = 0.0, max_val: float = 100.0, on_change: any = nil): Widget {
-    var w = Widget(KIND_SLIDER);
-    w.slider_val = value;
-    w.slider_min = min_val;
-    w.slider_max = max_val;
-    w.on_change_action = on_change;
-    w.height_val = 24.0;
-    w.width_val = 140.0;
-    w.background_color = color.rgb(35, 38, 48);
-    w.foreground_color = color.rgb(100, 180, 255);
-    return w;
-}
-
-pub fn input(value: str = "", placeholder: str = "Type here...", on_change: any = nil): Widget {
-    var w = Widget(KIND_INPUT);
-    w.text_val = value;
-    w.placeholder_val = placeholder;
-    w.on_change_action = on_change;
-    w.background_color = color.rgb(20, 22, 28);
-    w.foreground_color = color.white;
-    w.height_val = 28.0;
-    w.width_val = 220.0;
-    w.padding_left = 8.0;
-    w.padding_right = 8.0;
-    w.padding_top = 6.0;
-    w.padding_bottom = 6.0;
-    return w;
 }

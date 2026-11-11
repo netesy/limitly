@@ -1,0 +1,115 @@
+// tests/d3_sculpt_test.lm
+// Unit and integration test suite for procedural sculpting, lofts, extrusions, and environments in std.d3.
+
+import std.d3 as d3;
+
+fn main() {
+    print("=================================================");
+    print("Testing std.d3 Sculpting, Lofts & Environments");
+    print("=================================================");
+
+    // 1. Test Geometry Clone & Merge
+    print("[Test 1] Geometry Clone & Merge...");
+    var g1 = d3.box(1.0, 1.0, 1.0);
+    assert(g1.get_vertex_count() == 24, "Box 1 vertex count");
+    assert(g1.get_face_count() == 12, "Box 1 face count");
+
+    var g2 = d3.box(2.0, 2.0, 2.0);
+    g1.merge(g2, 5.0, 0.0, 0.0);
+    assert(g1.get_vertex_count() == 48, "Merged vertex count (24 + 24)");
+    assert(g1.get_face_count() == 24, "Merged face count (12 + 12)");
+    // Check that vertices were translated
+    assert(g1.get_vertex_x(24) >= 4.0, "Merged geometry translated along X");
+
+    // 2. Test Geometry Mirror
+    print("[Test 2] Geometry Symmetry Mirroring...");
+    var half = d3.Geometry();
+    half.add_vertex(-1.0, 0.0, 0.0);
+    half.add_vertex(-2.0, 1.0, 0.0);
+    half.add_vertex(-1.0, 1.0, 0.0);
+    half.add_face(0, 1, 2);
+
+    var mirrored = half.mirror(0); // mirror across X
+    assert(mirrored.get_vertex_count() == 3, "Mirrored vertex count");
+    assert(mirrored.get_face_count() == 1, "Mirrored face count");
+    // Mirrored X should be positive
+    assert(mirrored.get_vertex_x(0) == 1.0, "Mirrored X coordinate");
+    assert(mirrored.get_vertex_x(1) == 2.0, "Mirrored X coordinate 2");
+
+    var compound = d3.mirror_compound(half, 0);
+    assert(compound.get_vertex_count() == 6, "Compound symmetric mesh vertex count");
+    assert(compound.get_face_count() == 2, "Compound symmetric mesh face count");
+
+    // 3. Test Profile Extrusion
+    print("[Test 3] Profile Extrusion (extrude)...");
+    // Square 2D profile
+    val sq_profile: [float] = [
+        -1.0, -1.0,
+         1.0, -1.0,
+         1.0,  1.0,
+        -1.0,  1.0
+    ];
+    val extruded = d3.extrude(sq_profile, depth=4.0, taper=0.5, twist=0.0);
+    // 4 front + 4 back + 2 center points = 10 vertices
+    assert(extruded.get_vertex_count() == 10, "Extruded vertex count");
+    // 4 side quads (8 tris) + 4 front fan tris + 4 back fan tris = 16 tris
+    assert(extruded.get_face_count() == 16, "Extruded face count");
+    assert(len(extruded.normals) == 30, "Extruded normals generated");
+
+    // 4. Test Lathe / Revolve
+    print("[Test 4] Lathe / Revolve (revolve)...");
+    // Half-profile of a nozzle/cylinder
+    val cyl_profile: [float] = [
+        1.0, -2.0,
+        1.0,  0.0,
+        1.5,  2.0
+    ];
+    val revolved = d3.revolve(cyl_profile, segments=8);
+    assert(revolved.get_vertex_count() > 0, "Revolved vertex count");
+    assert(revolved.get_face_count() == 32, "Revolved face count (8 segments * 2 quad bands * 2 tris)");
+
+    // 5. Test Multi-Station Lofting
+    print("[Test 5] Multi-Station Skinning (loft)...");
+    val sec0: [float] = [-0.2, -0.2,  0.2, -0.2,  0.2,  0.2, -0.2,  0.2];
+    val sec1: [float] = [-1.0, -0.5,  1.0, -0.5,  1.0,  0.5, -1.0,  0.5];
+    val sec2: [float] = [-0.5, -0.3,  0.5, -0.3,  0.5,  0.3, -0.5,  0.3];
+    val sections: [[float]] = [sec0, sec1, sec2];
+    val z_pos: [float] = [2.0, 0.0, -2.0];
+
+    val lofted = d3.loft(sections, z_pos, cap_start=true, cap_end=true);
+    // 3 sections * 4 points + 2 center caps = 14 vertices
+    assert(lofted.get_vertex_count() == 14, "Lofted vertex count");
+    // 2 bands * 4 quads * 2 = 16 tris + 4 start cap + 4 end cap = 24 tris
+    assert(lofted.get_face_count() == 24, "Lofted face count");
+
+    // 6. Test Procedural Terrain Heightmap
+    print("[Test 6] Procedural Terrain Generation (terrain)...");
+    val terr = d3.terrain(width=30.0, depth=30.0, cols=8, rows=8, height_scale=4.0, seed=42);
+    // (8 + 1) * (8 + 1) = 81 vertices
+    assert(terr.get_vertex_count() == 81, "Terrain vertex count (9x9 grid)");
+    // 8 * 8 * 2 = 128 triangular faces
+    assert(terr.get_face_count() == 128, "Terrain face count (64 quads * 2)");
+    assert(len(terr.normals) == 81 * 3, "Terrain normals computed");
+    assert(len(terr.colors) == 81 * 3, "Terrain vertex colors generated");
+
+    // 7. Test Procedural Asteroid Craggy Polyhedron
+    print("[Test 7] Procedural Celestial Asteroid (asteroid)...");
+    val ast = d3.asteroid(radius=2.0, roughness=0.3, segments_w=8, segments_h=6, seed=7);
+    assert(ast.get_vertex_count() > 0, "Asteroid vertex count");
+    assert(ast.get_face_count() > 0, "Asteroid face count");
+    assert(len(ast.normals) == ast.get_vertex_count() * 3, "Asteroid normals computed");
+
+    // 8. Test Geodesic Icosphere
+    print("[Test 8] Geodesic Icosphere (icosphere)...");
+    val ico0 = d3.icosphere(radius=1.0, subdivisions=0);
+    assert(ico0.get_vertex_count() == 12, "Base icosahedron vertex count");
+    assert(ico0.get_face_count() == 20, "Base icosahedron face count (20 equilateral triangles)");
+
+    val ico1 = d3.icosphere(radius=1.0, subdivisions=1);
+    assert(ico1.get_face_count() == 80, "Subdivided icosphere face count (20 * 4 = 80)");
+
+    print("=================================================");
+    print("All 8 Sculpting & Environment Tests Passed! 100%");
+    print("=================================================");
+}
+

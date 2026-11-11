@@ -107,7 +107,7 @@ This document provides essential guidelines for AI agents generating code for th
 - **Dictionaries**: Shorthand: `{str: int}`. Literal: `{"a": 1, "b": 2}`. Bare identifiers are allowed as string keys: `{name: "John"}`.
 - **Tuples**: Shorthand: `(int, str)`. Literal: `(42, "hello")`. Indexed with dot notation: `tuple.0`.
 - **Objects (frames)**: Construct with the frame's constructor — `var p = Point();` then assign fields, or `Point(10, 20)` when the frame declares `init(x: int, y: int)`. The brace literal `Point { x: 10, y: 20 }` **parses but is rejected by the type checker** (`E003: Unknown expression type`, followed by a spurious `Type 'Nil' has no member ...`), so do not use it.
-- **Ranges**: `1..10` (inclusive).
+- **Ranges**: `1..10` yields `1` through `9` — the end bound is **exclusive**. To iterate all `n` elements of a list use `0..n`, not `0..(n - 1)`.
 
 ---
 
@@ -216,6 +216,7 @@ c.rpm = 3000;             // promoted field, same storage the method reads
 - On a name collision the host's own member wins; promoted members never overwrite an existing one.
 - Promoted members count as real members, so `frame Car: Drivable { embed Engine; }` satisfies `Drivable`.
 - The component's `deinit()` is **not** called when the host is destroyed. Forward cleanup explicitly from the host's `deinit()`.
+- The component's `init()` is **not** run for embedded frames — `embed` flattens field declarations only. Give embedded fields field-level defaults (`pub var x: T = <default>;`) or assign the promoted fields in the host's `init()`; otherwise they stay `nil`/zero until set.
 
 ---
 

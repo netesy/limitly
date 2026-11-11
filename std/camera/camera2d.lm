@@ -2,12 +2,11 @@
 // Universal 2D Camera with projection, tracking, zoom, rotation, and trauma-based screen shake.
 
 import std.math as math;
-import std.camera.types as types;
-import std.camera.types show Vec2;
+import std.camera.types show Vector2;
 
 frame Camera2D {
-    pub var target: Vec2;
-    pub var offset: Vec2;
+    pub var target: Vector2;
+    pub var offset: Vector2;
     pub var rotation: float;
     pub var zoom: float;
 
@@ -17,10 +16,10 @@ frame Camera2D {
     pub var max_shake_offset: float;
     pub var max_shake_angle: float;
     pub var shake_time: float;
-    pub var shake_offset: Vec2;
+    pub var shake_offset: Vector2;
     pub var shake_rotation: float;
 
-    pub init(target: Vec2 = Vec2(), offset: Vec2 = Vec2(), zoom: float = 1.0, rotation: float = 0.0) {
+    pub init(target: Vector2 = Vector2(), offset: Vector2 = Vector2(), zoom: float = 1.0, rotation: float = 0.0) {
         self.target = target;
         self.offset = offset;
         self.zoom = zoom;
@@ -34,16 +33,16 @@ frame Camera2D {
         self.max_shake_offset = 18.0;
         self.max_shake_angle = 0.08;
         self.shake_time = 0.0;
-        self.shake_offset = Vec2();
+        self.shake_offset = Vector2();
         self.shake_rotation = 0.0;
     }
 
     pub fn set_viewport(width: float, height: float): nil {
-        self.offset = Vec2(x=width * 0.5, y=height * 0.5);
+        self.offset = Vector2(width * 0.5, height * 0.5);
     }
 
-    pub fn screen_to_world(screen_pos: Vec2): Vec2 {
-        var total_shake_rot = self.rotation + self.shake_rotation;
+    pub fn screen_to_world(screen_pos: Vector2): Vector2 {
+        val total_shake_rot = self.rotation + self.shake_rotation;
         var p = screen_pos.sub(self.offset).sub(self.shake_offset);
         if (self.zoom != 0.0) {
             p = p.scale(1.0 / self.zoom);
@@ -54,8 +53,8 @@ frame Camera2D {
         return p.add(self.target);
     }
 
-    pub fn world_to_screen(world_pos: Vec2): Vec2 {
-        var total_shake_rot = self.rotation + self.shake_rotation;
+    pub fn world_to_screen(world_pos: Vector2): Vector2 {
+        val total_shake_rot = self.rotation + self.shake_rotation;
         var p = world_pos.sub(self.target);
         if (total_shake_rot != 0.0) {
             p = p.rotate(total_shake_rot);
@@ -64,8 +63,8 @@ frame Camera2D {
         return p.add(self.offset).add(self.shake_offset);
     }
 
-    pub fn follow(target_pos: Vec2, smoothness: float = 0.1, dt: float = 0.016): nil {
-        var s = math.clamp(smoothness * dt * 60.0, 0.0, 1.0);
+    pub fn follow(target_pos: Vector2, smoothness: float = 0.1, dt: float = 0.016): nil {
+        val s = math.clamp(smoothness * dt * 60.0, 0.0, 1.0);
         self.target = self.target.lerp(target_pos, s);
     }
 
@@ -77,21 +76,20 @@ frame Camera2D {
         self.shake_time = self.shake_time + dt;
         if (self.trauma > 0.0) {
             self.trauma = math.max(0.0, self.trauma - self.trauma_decay * dt);
-            var shake = self.trauma * self.trauma; // Quadratic response curve
+            val shake = self.trauma * self.trauma;
 
-            var s1 = math.sin(self.shake_time * 38.0);
-            var s2 = math.cos(self.shake_time * 47.0);
-            var s3 = math.sin(self.shake_time * 31.0);
+            val s1 = math.sin(self.shake_time * 38.0);
+            val s2 = math.cos(self.shake_time * 47.0);
+            val s3 = math.sin(self.shake_time * 31.0);
 
-            self.shake_offset = Vec2(
-                x=s1 * self.max_shake_offset * shake,
-                y=s2 * self.max_shake_offset * shake
+            self.shake_offset = Vector2(
+                s1 * self.max_shake_offset * shake,
+                s2 * self.max_shake_offset * shake
             );
             self.shake_rotation = s3 * self.max_shake_angle * shake;
         } else {
-            self.shake_offset = Vec2(x=0.0, y=0.0);
+            self.shake_offset = Vector2(0.0, 0.0);
             self.shake_rotation = 0.0;
         }
     }
 }
-

@@ -28,4 +28,6 @@ pub import std.d3.light show Light, ambient_light, directional_light, point_ligh
 pub import std.d3.camera show Camera3D, perspective_camera, orthographic_camera;
 pub import std.d3.scene show Scene3D;
 pub import std.d3.renderer show Renderer3D;
+pub import std.d3.sculpt show extrude, revolve, loft, mirror_compound;
+pub import std.d3.environment show terrain, asteroid, icosphere;
 pub import std.d3.obj show parse_obj, load_obj;

@@ -1,77 +1,102 @@
 // std/d3/renderer.lm
-// 3D scene rasterizer and projection pipeline with lighting, depth sorting, and face culling.
+// 3D scene rasterizer and projection pipeline with pooled SoA triangle buffers,
+// exhaustive shading/light dispatch, depth sorting, and face culling.
 
 import std.d3.scene as sc;
-import std.d3.scene show Scene3D;
 import std.d3.camera as cam;
-import std.d3.camera show Camera3D;
 import std.d3.mesh as msh;
-import std.d3.mesh show Mesh;
 import std.d3.light as lgt;
-import std.d3.light show Light;
 import std.d3.geometry as geom;
-import std.d3.geometry show Geometry;
 import std.d3.material as mtrl;
-import std.d3.material show Material;
 import std.d3.types as types;
 import std.gg as gg;
 import std.math.arithmetic as arith;
-import std.math.matrix as mat;
 import std.math.matrix show Matrix;
 
-frame RenderTriangle {
-    pub x0: float;
-    pub y0: float;
-    pub x1: float;
-    pub y1: float;
-    pub x2: float;
-    pub y2: float;
-    pub avg_z: float;
-    pub r: float;
-    pub g: float;
-    pub b: float;
-    pub a: float;
-    pub is_wireframe: bool;
-    pub wire_w: float;
-
-    pub init() {
-        self.x0 = 0.0;
-        self.y0 = 0.0;
-        self.x1 = 0.0;
-        self.y1 = 0.0;
-        self.x2 = 0.0;
-        self.y2 = 0.0;
-        self.avg_z = 0.0;
-        self.r = 1.0;
-        self.g = 1.0;
-        self.b = 1.0;
-        self.a = 1.0;
-        self.is_wireframe = false;
-        self.wire_w = 1.5;
-    }
-}
-
-fn _quicksort_triangles(tri_list: [RenderTriangle], low: int, high: int) {
+fn _quicksort_tri_order(order: [int], coords: [float], low: int, high: int) {
     if (low < high) {
-        var pivot_z = tri_list[high].avg_z;
+        val pivot_idx = order[high];
+        val pivot_z = coords[pivot_idx * 7 + 6];
         var i = low - 1;
         var j = low;
         while (j < high) {
-            if (tri_list[j].avg_z >= pivot_z) {
+            val oj = order[j];
+            if (coords[oj * 7 + 6] >= pivot_z) {
                 i = i + 1;
-                var tmp = tri_list[i];
-                tri_list[i] = tri_list[j];
-                tri_list[j] = tmp;
+                val tmp = order[i];
+                order[i] = oj;
+                order[j] = tmp;
             }
             j = j + 1;
         }
-        var p = i + 1;
-        var tmp2 = tri_list[p];
-        tri_list[p] = tri_list[high];
-        tri_list[high] = tmp2;
+        val p = i + 1;
+        val tmp2 = order[p];
+        order[p] = order[high];
+        order[high] = tmp2;
 
-        _quicksort_triangles(tri_list, low, p - 1);
-        _quicksort_triangles(tri_list, p + 1, high);
+        _quicksort_tri_order(order, coords, low, p - 1);
+        _quicksort_tri_order(order, coords, p + 1, high);
+    }
+}
+
+fn _project_vertices_parallel(
+    g_verts: [float],
+    m: [float],
+    v_count: int,
+    viewport_x: float,
+    viewport_y: float,
+    half_vw: float,
+    half_vh: float,
+    proj_buf: [float]
+) {
+    val m0 = m[0]; val m1 = m[1]; val m2 = m[2]; val m3 = m[3];
+    val m4 = m[4]; val m5 = m[5]; val m6 = m[6]; val m7 = m[7];
+    val m8 = m[8]; val m9 = m[9]; val m10 = m[10]; val m11 = m[11];
+    val m12 = m[12]; val m13 = m[13]; val m14 = m[14]; val m15 = m[15];
+
+    var p_chunks: [[float]] = [[] as [float], [] as [float], [] as [float], [] as [float]];
+    val workers = 4;
+    parallel(cores=4) {
+        iter (wid in 0..4) {
+            var lp: [float] = [];
+            val chunk = (v_count + workers - 1) / workers;
+            val start_v = wid * chunk;
+            var end_v = start_v + chunk;
+            if (end_v > v_count) { end_v = v_count; }
+            var vi = start_v;
+            while (vi < end_v) {
+                val v_idx = vi * 3;
+                val lx = g_verts[v_idx];
+                val ly = g_verts[v_idx + 1];
+                val lz = g_verts[v_idx + 2];
+
+                val cw = m12 * lx + m13 * ly + m14 * lz + m15;
+                var cx = m0 * lx + m1 * ly + m2 * lz + m3;
+                var cy = m4 * lx + m5 * ly + m6 * lz + m7;
+                var cz = m8 * lx + m9 * ly + m10 * lz + m11;
+
+                if (cw != 0.0 and cw != 1.0) {
+                    val inv_w = 1.0 / cw;
+                    cx = cx * inv_w;
+                    cy = cy * inv_w;
+                    cz = cz * inv_w;
+                }
+
+                lp.append(viewport_x + (cx + 1.0) * half_vw);
+                lp.append(viewport_y + (1.0 - cy) * half_vh);
+                lp.append(cz);
+                lp.append(cw);
+                vi = vi + 1;
+            }
+            p_chunks[wid] = lp;
+        }
+    }
+    var write_i = 0;
+    iter (wid in 0..4) {
+        iter (pv in p_chunks[wid]) {
+            proj_buf[write_i] = pv;
+            write_i = write_i + 1;
+        }
     }
 }
 
@@ -81,146 +106,148 @@ pub fn render_scene(renderer: Renderer3D, target_scene: sc.Scene3D, target_camer
     if (vw <= 0.0) { vw = renderer.width as float; }
     if (vh <= 0.0) { vh = renderer.height as float; }
 
+    gg.begin_batch();
+
     if (renderer.clear_color) {
         gg.draw_rect_primitive(viewport_x, viewport_y, vw, vh, target_scene.background_r, target_scene.background_g, target_scene.background_b, target_scene.background_a);
     }
 
-    // Camera view-projection matrix
-    var vp = target_camera.view_projection_matrix;
+    val vp = target_camera.view_projection_matrix;
+    val s_lights = target_scene.lights;
+    val n_lights = len(s_lights);
 
     // Pre-accumulate ambient lights once per frame
     var amb_r: float = 0.0;
     var amb_g: float = 0.0;
     var amb_b: float = 0.0;
-    var s_lights = target_scene.lights;
-    var n_lights = len(s_lights);
-    var li = 0;
-    while (li < n_lights) {
-        var cl = s_lights[li];
-        if (cl.light_type == types.LightType.Ambient) {
-            amb_r = amb_r + cl.color_r * cl.intensity;
-            amb_g = amb_g + cl.color_g * cl.intensity;
-            amb_b = amb_b + cl.color_b * cl.intensity;
+    iter (li in 0..n_lights) {
+        val cl = s_lights[li];
+        match (cl.light_type) {
+            types.LightType.Ambient => {
+                amb_r = amb_r + cl.color_r * cl.intensity;
+                amb_g = amb_g + cl.color_g * cl.intensity;
+                amb_b = amb_b + cl.color_b * cl.intensity;
+            },
+            _ => { }
         }
-        li = li + 1;
     }
 
-    var half_vw = 0.5 * vw;
-    var half_vh = 0.5 * vh;
-    var bound_w = vw * 2.5;
-    var bound_h = vh * 2.5;
-    var bound_min_x = -vw * 0.5;
-    var bound_max_x = vw * 1.5;
-    var bound_min_y = -vh * 0.5;
-    var bound_max_y = vh * 1.5;
+    val half_vw = 0.5 * vw;
+    val half_vh = 0.5 * vh;
+    val bound_w = vw * 2.5;
+    val bound_h = vh * 2.5;
+    val bound_min_x = -vw * 0.5;
+    val bound_max_x = vw * 1.5;
+    val bound_min_y = -vh * 0.5;
+    val bound_max_y = vh * 1.5;
 
-    // Collect and project all triangles
-    var tri_list: [RenderTriangle] = [];
-    var s_meshes = target_scene.meshes;
-    var n_meshes = len(s_meshes);
+    // Reset pooled SoA triangle buffer without reallocating backing lists
+    renderer.tri_count = 0;
 
-    var m_idx = 0;
-    while (m_idx < n_meshes) {
-        var cur_mesh = s_meshes[m_idx];
+    val s_meshes = target_scene.meshes;
+    val n_meshes = len(s_meshes);
+    iter (m_idx in 0..n_meshes) {
+        val cur_mesh = s_meshes[m_idx];
         if (cur_mesh.visible) {
             cur_mesh.update_matrix();
-            var mvp = vp.multiply(cur_mesh.world_matrix);
+            val mvp = vp.multiply(cur_mesh.world_matrix);
 
-            // Normal matrix for transforming normals
-            var rot_m: Matrix = cur_mesh.world_matrix;
-            var rm = rot_m.data;
-            var rm0 = rm[0]; var rm1 = rm[1]; var rm2 = rm[2];
-            var rm4 = rm[4]; var rm5 = rm[5]; var rm6 = rm[6];
-            var rm8 = rm[8]; var rm9 = rm[9]; var rm10 = rm[10];
+            val rot_m: Matrix = cur_mesh.world_matrix;
+            val rm = rot_m.data;
+            val rm0 = rm[0]; val rm1 = rm[1]; val rm2 = rm[2]; val rm3 = rm[3];
+            val rm4 = rm[4]; val rm5 = rm[5]; val rm6 = rm[6]; val rm7 = rm[7];
+            val rm8 = rm[8]; val rm9 = rm[9]; val rm10 = rm[10]; val rm11 = rm[11];
 
-            var geo: Geometry = cur_mesh.geometry;
-            var cur_mat: Material = cur_mesh.material;
-            var v_count = geo.get_vertex_count();
-            var f_count = geo.get_face_count();
+            val geo: geom.Geometry = cur_mesh.geometry;
+            val cur_mat: mtrl.Material = cur_mesh.material;
+            val v_count = geo.get_vertex_count();
+            val f_count = geo.get_face_count();
 
-            var g_verts = geo.vertices;
-            var g_inds = geo.indices;
-            var g_norms = geo.normals;
-            var has_norms = len(g_norms) >= v_count * 3;
+            val g_verts = geo.vertices;
+            val g_inds = geo.indices;
+            val g_norms = geo.normals;
+            val has_norms = len(g_norms) >= v_count * 3;
 
-            var mat_amb = cur_mat.ambient;
-            var mat_diff = cur_mat.diffuse;
-            var mat_spec = cur_mat.specular;
-            var mat_col_r = cur_mat.color_r;
-            var mat_col_g = cur_mat.color_g;
-            var mat_col_b = cur_mat.color_b;
-            var mat_col_a = cur_mat.color_a;
-            var mat_wire = cur_mat.wireframe;
-            var mat_wire_w = cur_mat.wireframe_thickness;
-            var mat_cull = cur_mat.cull_mode;
+            val mat_amb = cur_mat.ambient;
+            val mat_diff = cur_mat.diffuse;
+            val mat_spec = cur_mat.specular;
+            val mat_shin = cur_mat.shininess;
+            val mat_col_r = cur_mat.color_r;
+            val mat_col_g = cur_mat.color_g;
+            val mat_col_b = cur_mat.color_b;
+            val mat_col_a = cur_mat.color_a;
+            val mat_wire = cur_mat.wireframe;
+            val mat_wire_w = cur_mat.wireframe_thickness;
+            val mat_cull = cur_mat.cull_mode;
+            val mat_shading = cur_mat.shading;
 
-            var base_ill_r = mat_amb + amb_r;
-            var base_ill_g = mat_amb + amb_g;
-            var base_ill_b = mat_amb + amb_b;
+            val base_ill_r = mat_amb + amb_r;
+            val base_ill_g = mat_amb + amb_g;
+            val base_ill_b = mat_amb + amb_b;
 
-            // Project all vertices of this mesh into clip & screen space (packed flat: sx, sy, cz, cw)
-            var proj: [float] = [];
-            var m = mvp.data;
-            var m0 = m[0]; var m1 = m[1]; var m2 = m[2]; var m3 = m[3];
-            var m4 = m[4]; var m5 = m[5]; var m6 = m[6]; var m7 = m[7];
-            var m8 = m[8]; var m9 = m[9]; var m10 = m[10]; var m11 = m[11];
-            var m12 = m[12]; var m13 = m[13]; var m14 = m[14]; var m15 = m[15];
+            // Ensure pooled projection buffer capacity for v_count * 4 floats
+            val needed_proj = v_count * 4;
+            while (len(renderer.proj_buf) < needed_proj) {
+                renderer.proj_buf.append(0.0);
+            }
 
-            var vi = 0;
-            while (vi < v_count) {
-                var v_idx = vi * 3;
-                var lx = g_verts[v_idx];
-                var ly = g_verts[v_idx + 1];
-                var lz = g_verts[v_idx + 2];
+            val m = mvp.data;
+            if (v_count >= 512) {
+                _project_vertices_parallel(g_verts, m, v_count, viewport_x, viewport_y, half_vw, half_vh, renderer.proj_buf);
+            } else {
+                val m0 = m[0]; val m1 = m[1]; val m2 = m[2]; val m3 = m[3];
+                val m4 = m[4]; val m5 = m[5]; val m6 = m[6]; val m7 = m[7];
+                val m8 = m[8]; val m9 = m[9]; val m10 = m[10]; val m11 = m[11];
+                val m12 = m[12]; val m13 = m[13]; val m14 = m[14]; val m15 = m[15];
+                iter (vi in 0..v_count) {
+                    val v_idx = vi * 3;
+                    val lx = g_verts[v_idx];
+                    val ly = g_verts[v_idx + 1];
+                    val lz = g_verts[v_idx + 2];
 
-                var cw = m12 * lx + m13 * ly + m14 * lz + m15;
-                var cx = m0 * lx + m1 * ly + m2 * lz + m3;
-                var cy = m4 * lx + m5 * ly + m6 * lz + m7;
-                var cz = m8 * lx + m9 * ly + m10 * lz + m11;
+                    val cw = m12 * lx + m13 * ly + m14 * lz + m15;
+                    var cx = m0 * lx + m1 * ly + m2 * lz + m3;
+                    var cy = m4 * lx + m5 * ly + m6 * lz + m7;
+                    var cz = m8 * lx + m9 * ly + m10 * lz + m11;
 
-                if (cw != 0.0 and cw != 1.0) {
-                    var inv_w = 1.0 / cw;
-                    cx = cx * inv_w;
-                    cy = cy * inv_w;
-                    cz = cz * inv_w;
+                    if (cw != 0.0 and cw != 1.0) {
+                        val inv_w = 1.0 / cw;
+                        cx = cx * inv_w;
+                        cy = cy * inv_w;
+                        cz = cz * inv_w;
+                    }
+
+                    val b = vi * 4;
+                    renderer.proj_buf[b] = viewport_x + (cx + 1.0) * half_vw;
+                    renderer.proj_buf[b + 1] = viewport_y + (1.0 - cy) * half_vh;
+                    renderer.proj_buf[b + 2] = cz;
+                    renderer.proj_buf[b + 3] = cw;
                 }
-
-                var sx = viewport_x + (cx + 1.0) * half_vw;
-                var sy = viewport_y + (1.0 - cy) * half_vh;
-
-                proj.append(sx);
-                proj.append(sy);
-                proj.append(cz);
-                proj.append(cw);
-
-                vi = vi + 1;
             }
 
             // Process faces
-            var fi = 0;
-            while (fi < f_count) {
-                var f_idx = fi * 3;
-                var i0 = g_inds[f_idx];
-                var i1 = g_inds[f_idx + 1];
-                var i2 = g_inds[f_idx + 2];
+            iter (fi in 0..f_count) {
+                val f_idx = fi * 3;
+                val i0 = g_inds[f_idx];
+                val i1 = g_inds[f_idx + 1];
+                val i2 = g_inds[f_idx + 2];
 
-                var b0 = i0 * 4;
-                var w0 = proj[b0 + 3];
-                var b1 = i1 * 4;
-                var w1 = proj[b1 + 3];
-                var b2 = i2 * 4;
-                var w2 = proj[b2 + 3];
+                val b0 = i0 * 4;
+                val w0 = renderer.proj_buf[b0 + 3];
+                val b1 = i1 * 4;
+                val w1 = renderer.proj_buf[b1 + 3];
+                val b2 = i2 * 4;
+                val w2 = renderer.proj_buf[b2 + 3];
 
                 // Frustum near plane clip
                 if (w0 > 0.1 and w1 > 0.1 and w2 > 0.1) {
-                    var p0_x = proj[b0];
-                    var p0_y = proj[b0 + 1];
-                    var p1_x = proj[b1];
-                    var p1_y = proj[b1 + 1];
-                    var p2_x = proj[b2];
-                    var p2_y = proj[b2 + 1];
+                    val p0_x = renderer.proj_buf[b0];
+                    val p0_y = renderer.proj_buf[b0 + 1];
+                    val p1_x = renderer.proj_buf[b1];
+                    val p1_y = renderer.proj_buf[b1 + 1];
+                    val p2_x = renderer.proj_buf[b2];
+                    val p2_y = renderer.proj_buf[b2 + 1];
 
-                    // Discard degenerate or blown-up triangles beyond viewport
                     var tri_min_x = p0_x;
                     if (p1_x < tri_min_x) { tri_min_x = p1_x; }
                     if (p2_x < tri_min_x) { tri_min_x = p2_x; }
@@ -240,11 +267,11 @@ pub fn render_scene(renderer: Renderer3D, target_scene: sc.Scene3D, target_camer
                         (tri_max_y > bound_min_y) and (tri_min_y < bound_max_y)) {
 
                         // Backface culling in screen coordinates (Y down)
-                        var e1x = p1_x - p0_x;
-                        var e1y = p1_y - p0_y;
-                        var e2x = p2_x - p0_x;
-                        var e2y = p2_y - p0_y;
-                        var cross_z = e1x * e2y - e1y * e2x;
+                        val e1x = p1_x - p0_x;
+                        val e1y = p1_y - p0_y;
+                        val e2x = p2_x - p0_x;
+                        val e2y = p2_y - p0_y;
+                        val cross_z = e1x * e2y - e1y * e2x;
 
                         var should_cull = false;
                         match (mat_cull) {
@@ -260,120 +287,216 @@ pub fn render_scene(renderer: Renderer3D, target_scene: sc.Scene3D, target_camer
                         }
 
                         if (not should_cull) {
-                            // Compute face normal in world space for lighting
-                            var fnx = 0.0;
-                            var fny = 1.0;
-                            var fnz = 0.0;
-                            if (has_norms) {
-                                var n_idx = i0 * 3;
-                                var lx = g_norms[n_idx];
-                                var ly = g_norms[n_idx + 1];
-                                var lz = g_norms[n_idx + 2];
-                                fnx = rm0 * lx + rm1 * ly + rm2 * lz;
-                                fny = rm4 * lx + rm5 * ly + rm6 * lz;
-                                fnz = rm8 * lx + rm9 * ly + rm10 * lz;
-                                var nlen = arith.sqrt(fnx * fnx + fny * fny + fnz * fnz);
-                                if (nlen > 0.000001) {
-                                    var inv_nlen = 1.0 / nlen;
-                                    fnx = fnx * inv_nlen;
-                                    fny = fny * inv_nlen;
-                                    fnz = fnz * inv_nlen;
-                                }
-                            }
+                            var out_r = mat_col_r;
+                            var out_g = mat_col_g;
+                            var out_b = mat_col_b;
+                            var is_wire = mat_wire;
 
-                            // Illumination calculation
-                            var ill_r = base_ill_r;
-                            var ill_g = base_ill_g;
-                            var ill_b = base_ill_b;
-
-                            var l_i = 0;
-                            while (l_i < n_lights) {
-                                var cur_light: lgt.Light = s_lights[l_i];
-                                if (cur_light.light_type == types.LightType.Directional) {
-                                    var dot_val = fnx * cur_light.direction_x + fny * cur_light.direction_y + fnz * cur_light.direction_z;
-                                    if (dot_val > 0.0) {
-                                        var diff = dot_val * mat_diff * cur_light.intensity;
-                                        ill_r = ill_r + cur_light.color_r * diff;
-                                        ill_g = ill_g + cur_light.color_g * diff;
-                                        ill_b = ill_b + cur_light.color_b * diff;
-
-                                        // Specular highlight (Blinn-Phong)
-                                        if (mat_spec > 0.0) {
-                                            var hx = cur_light.direction_x;
-                                            var hy = cur_light.direction_y;
-                                            var hz = cur_light.direction_z + 1.0;
-                                            var hlen = arith.sqrt(hx * hx + hy * hy + hz * hz);
-                                            if (hlen > 0.000001) {
-                                                var ndoth = (fnx * hx + fny * hy + fnz * hz) / hlen;
-                                                if (ndoth > 0.0) {
-                                                    var spec_p = ndoth * ndoth * ndoth * ndoth;
-                                                    var spec = spec_p * mat_spec * cur_light.intensity;
-                                                    ill_r = ill_r + spec;
-                                                    ill_g = ill_g + spec;
-                                                    ill_b = ill_b + spec;
-                                                }
-                                            }
+                            match (mat_shading) {
+                                types.ShadingModel.Unlit => {
+                                    // Unlit bypasses normal transformation and lighting completely
+                                },
+                                types.ShadingModel.Wireframe => {
+                                    is_wire = true;
+                                },
+                                types.ShadingModel.NormalVisualizer => {
+                                    var fnx = 0.0; var fny = 1.0; var fnz = 0.0;
+                                    if (has_norms) {
+                                        val n_idx = i0 * 3;
+                                        val lx = g_norms[n_idx];
+                                        val ly = g_norms[n_idx + 1];
+                                        val lz = g_norms[n_idx + 2];
+                                        fnx = rm0 * lx + rm1 * ly + rm2 * lz;
+                                        fny = rm4 * lx + rm5 * ly + rm6 * lz;
+                                        fnz = rm8 * lx + rm9 * ly + rm10 * lz;
+                                        val nlen = arith.sqrt(fnx * fnx + fny * fny + fnz * fnz);
+                                        if (nlen > 0.000001) {
+                                            val inv_n = 1.0 / nlen;
+                                            fnx = fnx * inv_n; fny = fny * inv_n; fnz = fnz * inv_n;
                                         }
                                     }
-                                } elif (cur_light.light_type == types.LightType.Point) {
-                                    var pdot = fny * 0.5 + 0.5;
-                                    var pfact = cur_light.intensity * pdot * 0.3;
-                                    ill_r = ill_r + cur_light.color_r * pfact;
-                                    ill_g = ill_g + cur_light.color_g * pfact;
-                                    ill_b = ill_b + cur_light.color_b * pfact;
+                                    out_r = fnx * 0.5 + 0.5;
+                                    out_g = fny * 0.5 + 0.5;
+                                    out_b = fnz * 0.5 + 0.5;
+                                },
+                                types.ShadingModel.Flat => {
+                                    var fnx = 0.0; var fny = 1.0; var fnz = 0.0;
+                                    if (has_norms) {
+                                        val n_idx = i0 * 3;
+                                        val lx = g_norms[n_idx];
+                                        val ly = g_norms[n_idx + 1];
+                                        val lz = g_norms[n_idx + 2];
+                                        fnx = rm0 * lx + rm1 * ly + rm2 * lz;
+                                        fny = rm4 * lx + rm5 * ly + rm6 * lz;
+                                        fnz = rm8 * lx + rm9 * ly + rm10 * lz;
+                                        val nlen = arith.sqrt(fnx * fnx + fny * fny + fnz * fnz);
+                                        if (nlen > 0.000001) {
+                                            val inv_n = 1.0 / nlen;
+                                            fnx = fnx * inv_n; fny = fny * inv_n; fnz = fnz * inv_n;
+                                        }
+                                    }
+                                    val wcx = rm0 * g_verts[i0 * 3] + rm1 * g_verts[i0 * 3 + 1] + rm2 * g_verts[i0 * 3 + 2] + rm3;
+                                    val wcy = rm4 * g_verts[i0 * 3] + rm5 * g_verts[i0 * 3 + 1] + rm6 * g_verts[i0 * 3 + 2] + rm7;
+                                    val wcz = rm8 * g_verts[i0 * 3] + rm9 * g_verts[i0 * 3 + 1] + rm10 * g_verts[i0 * 3 + 2] + rm11;
+                                    val ill = _accumulate_lights(s_lights, n_lights, base_ill_r, base_ill_g, base_ill_b, fnx, fny, fnz, wcx, wcy, wcz, mat_diff, mat_spec, mat_shin);
+                                    out_r = mat_col_r * ill.0;
+                                    out_g = mat_col_g * ill.1;
+                                    out_b = mat_col_b * ill.2;
+                                },
+                                types.ShadingModel.Smooth => {
+                                    var fnx = 0.0; var fny = 1.0; var fnz = 0.0;
+                                    if (has_norms) {
+                                        val n0 = i0 * 3;
+                                        val n1 = i1 * 3;
+                                        val n2 = i2 * 3;
+                                        val lx = (g_norms[n0] + g_norms[n1] + g_norms[n2]) * 0.33333333;
+                                        val ly = (g_norms[n0 + 1] + g_norms[n1 + 1] + g_norms[n2 + 1]) * 0.33333333;
+                                        val lz = (g_norms[n0 + 2] + g_norms[n1 + 2] + g_norms[n2 + 2]) * 0.33333333;
+                                        fnx = rm0 * lx + rm1 * ly + rm2 * lz;
+                                        fny = rm4 * lx + rm5 * ly + rm6 * lz;
+                                        fnz = rm8 * lx + rm9 * ly + rm10 * lz;
+                                        val nlen = arith.sqrt(fnx * fnx + fny * fny + fnz * fnz);
+                                        if (nlen > 0.000001) {
+                                            val inv_n = 1.0 / nlen;
+                                            fnx = fnx * inv_n; fny = fny * inv_n; fnz = fnz * inv_n;
+                                        }
+                                    }
+                                    val lcx = (g_verts[i0 * 3] + g_verts[i1 * 3] + g_verts[i2 * 3]) * 0.33333333;
+                                    val lcy = (g_verts[i0 * 3 + 1] + g_verts[i1 * 3 + 1] + g_verts[i2 * 3 + 1]) * 0.33333333;
+                                    val lcz = (g_verts[i0 * 3 + 2] + g_verts[i1 * 3 + 2] + g_verts[i2 * 3 + 2]) * 0.33333333;
+                                    val wcx = rm0 * lcx + rm1 * lcy + rm2 * lcz + rm3;
+                                    val wcy = rm4 * lcx + rm5 * lcy + rm6 * lcz + rm7;
+                                    val wcz = rm8 * lcx + rm9 * lcy + rm10 * lcz + rm11;
+                                    val ill = _accumulate_lights(s_lights, n_lights, base_ill_r, base_ill_g, base_ill_b, fnx, fny, fnz, wcx, wcy, wcz, mat_diff, mat_spec, mat_shin);
+                                    out_r = mat_col_r * ill.0;
+                                    out_g = mat_col_g * ill.1;
+                                    out_b = mat_col_b * ill.2;
                                 }
-                                l_i = l_i + 1;
                             }
 
-                            // Clamp color
-                            if (ill_r > 1.0) { ill_r = 1.0; }
-                            if (ill_g > 1.0) { ill_g = 1.0; }
-                            if (ill_b > 1.0) { ill_b = 1.0; }
-
-                            var tri = RenderTriangle();
-                            tri.x0 = p0_x;
-                            tri.y0 = p0_y;
-                            tri.x1 = p1_x;
-                            tri.y1 = p1_y;
-                            tri.x2 = p2_x;
-                            tri.y2 = p2_y;
-                            tri.avg_z = (proj[b0 + 2] + proj[b1 + 2] + proj[b2 + 2]) * 0.33333333;
-                            tri.r = mat_col_r * ill_r;
-                            tri.g = mat_col_g * ill_g;
-                            tri.b = mat_col_b * ill_b;
-                            tri.a = mat_col_a;
-                            tri.is_wireframe = mat_wire;
-                            tri.wire_w = mat_wire_w;
-
-                            tri_list.append(tri);
+                            val avg_z = (renderer.proj_buf[b0 + 2] + renderer.proj_buf[b1 + 2] + renderer.proj_buf[b2 + 2]) * 0.33333333;
+                            renderer.push_triangle(p0_x, p0_y, p1_x, p1_y, p2_x, p2_y, avg_z, out_r, out_g, out_b, mat_col_a, is_wire, mat_wire_w);
                         }
                     }
                 }
-                fi = fi + 1;
             }
         }
-        m_idx = m_idx + 1;
     }
 
-    // Depth Sort: Painter's algorithm with fast in-place quicksort
-    var n_tri = len(tri_list);
+    // Depth Sort: Painter's algorithm over flat index array
+    val n_tri = renderer.tri_count;
     if (n_tri > 1) {
-        _quicksort_triangles(tri_list, 0, n_tri - 1);
+        _quicksort_tri_order(renderer.tri_order, renderer.tri_coords, 0, n_tri - 1);
     }
 
     // Rasterize triangles to screen
-    var r_i = 0;
-    while (r_i < n_tri) {
-        var t = tri_list[r_i];
-        if (t.is_wireframe) {
-            gg.draw_line_primitive(t.x0, t.y0, t.x1, t.y1, t.r, t.g, t.b, t.a, t.wire_w);
-            gg.draw_line_primitive(t.x1, t.y1, t.x2, t.y2, t.r, t.g, t.b, t.a, t.wire_w);
-            gg.draw_line_primitive(t.x2, t.y2, t.x0, t.y0, t.r, t.g, t.b, t.a, t.wire_w);
+    iter (r_i in 0..n_tri) {
+        val tid = renderer.tri_order[r_i];
+        val cb = tid * 7;
+        val colb = tid * 4;
+        val x0 = renderer.tri_coords[cb];
+        val y0 = renderer.tri_coords[cb + 1];
+        val x1 = renderer.tri_coords[cb + 2];
+        val y1 = renderer.tri_coords[cb + 3];
+        val x2 = renderer.tri_coords[cb + 4];
+        val y2 = renderer.tri_coords[cb + 5];
+        val cr = renderer.tri_colors[colb];
+        val cg = renderer.tri_colors[colb + 1];
+        val cblue = renderer.tri_colors[colb + 2];
+        val ca = renderer.tri_colors[colb + 3];
+
+        if (renderer.tri_wire[tid]) {
+            val ww = renderer.tri_wire_w[tid];
+            gg.draw_line_primitive(x0, y0, x1, y1, cr, cg, cblue, ca, ww);
+            gg.draw_line_primitive(x1, y1, x2, y2, cr, cg, cblue, ca, ww);
+            gg.draw_line_primitive(x2, y2, x0, y0, cr, cg, cblue, ca, ww);
         } else {
-            gg.draw_triangle_primitive(t.x0, t.y0, t.x1, t.y1, t.x2, t.y2, t.r, t.g, t.b, t.a);
+            gg.draw_triangle_primitive(x0, y0, x1, y1, x2, y2, cr, cg, cblue, ca);
         }
-        r_i = r_i + 1;
     }
+
+    gg.end_batch();
+}
+
+fn _accumulate_lights(
+    s_lights: [lgt.Light],
+    n_lights: int,
+    base_r: float,
+    base_g: float,
+    base_b: float,
+    fnx: float,
+    fny: float,
+    fnz: float,
+    wcx: float,
+    wcy: float,
+    wcz: float,
+    mat_diff: float,
+    mat_spec: float,
+    mat_shin: float
+): (float, float, float) {
+    var ill_r = base_r;
+    var ill_g = base_g;
+    var ill_b = base_b;
+
+    iter (l_i in 0..n_lights) {
+        val cur_light = s_lights[l_i];
+        match (cur_light.light_type) {
+            types.LightType.Ambient => {
+                // Already pre-accumulated once per frame
+            },
+            types.LightType.Directional => {
+                val dot_val = fnx * cur_light.direction_x + fny * cur_light.direction_y + fnz * cur_light.direction_z;
+                if (dot_val > 0.0) {
+                    val diff = dot_val * mat_diff * cur_light.intensity;
+                    ill_r = ill_r + cur_light.color_r * diff;
+                    ill_g = ill_g + cur_light.color_g * diff;
+                    ill_b = ill_b + cur_light.color_b * diff;
+
+                    if (mat_spec > 0.0) {
+                        val hx = cur_light.direction_x;
+                        val hy = cur_light.direction_y;
+                        val hz = cur_light.direction_z + 1.0;
+                        val hlen = arith.sqrt(hx * hx + hy * hy + hz * hz);
+                        if (hlen > 0.000001) {
+                            val ndoth = (fnx * hx + fny * hy + fnz * hz) / hlen;
+                            if (ndoth > 0.0) {
+                                var spec_p = ndoth * ndoth * ndoth * ndoth;
+                                if (mat_shin >= 16.0) { spec_p = spec_p * spec_p; }
+                                if (mat_shin >= 32.0) { spec_p = spec_p * spec_p; }
+                                val spec = spec_p * mat_spec * cur_light.intensity;
+                                ill_r = ill_r + spec;
+                                ill_g = ill_g + spec;
+                                ill_b = ill_b + spec;
+                            }
+                        }
+                    }
+                }
+            },
+            types.LightType.Point => {
+                val lx = cur_light.position_x - wcx;
+                val ly = cur_light.position_y - wcy;
+                val lz = cur_light.position_z - wcz;
+                val dist_sq = lx * lx + ly * ly + lz * lz;
+                if (dist_sq > 0.000001) {
+                    val dist = arith.sqrt(dist_sq);
+                    val inv_d = 1.0 / dist;
+                    val pdot = (fnx * lx + fny * ly + fnz * lz) * inv_d;
+                    if (pdot > 0.0) {
+                        val atten = 1.0 / (1.0 + 0.09 * dist + 0.032 * dist_sq);
+                        val pfact = pdot * mat_diff * cur_light.intensity * atten;
+                        ill_r = ill_r + cur_light.color_r * pfact;
+                        ill_g = ill_g + cur_light.color_g * pfact;
+                        ill_b = ill_b + cur_light.color_b * pfact;
+                    }
+                }
+            }
+        }
+    }
+
+    if (ill_r > 1.0) { ill_r = 1.0; }
+    if (ill_g > 1.0) { ill_g = 1.0; }
+    if (ill_b > 1.0) { ill_b = 1.0; }
+    return (ill_r, ill_g, ill_b);
 }
 
 frame Renderer3D {
@@ -381,10 +504,68 @@ frame Renderer3D {
     pub height: int;
     pub clear_color: bool;
 
+    // Pooled SoA render buffers reused across frames
+    pub proj_buf: [float];
+    pub tri_coords: [float];
+    pub tri_colors: [float];
+    pub tri_wire: [bool];
+    pub tri_wire_w: [float];
+    pub tri_order: [int];
+    pub tri_count: int;
+
     pub init(w: int = 800, h: int = 600) {
         self.width = w;
         self.height = h;
         self.clear_color = false;
+        self.proj_buf = [];
+        self.tri_coords = [];
+        self.tri_colors = [];
+        self.tri_wire = [];
+        self.tri_wire_w = [];
+        self.tri_order = [];
+        self.tri_count = 0;
+    }
+
+    pub fn push_triangle(
+        x0: float, y0: float, x1: float, y1: float, x2: float, y2: float,
+        avg_z: float, r: float, g: float, b: float, a: float,
+        is_wire: bool, wire_w: float
+    ) {
+        val idx = self.tri_count;
+        val cb = idx * 7;
+        val colb = idx * 4;
+        if (idx < len(self.tri_wire)) {
+            self.tri_coords[cb] = x0;
+            self.tri_coords[cb + 1] = y0;
+            self.tri_coords[cb + 2] = x1;
+            self.tri_coords[cb + 3] = y1;
+            self.tri_coords[cb + 4] = x2;
+            self.tri_coords[cb + 5] = y2;
+            self.tri_coords[cb + 6] = avg_z;
+            self.tri_colors[colb] = r;
+            self.tri_colors[colb + 1] = g;
+            self.tri_colors[colb + 2] = b;
+            self.tri_colors[colb + 3] = a;
+            self.tri_wire[idx] = is_wire;
+            self.tri_wire_w[idx] = wire_w;
+            self.tri_order[idx] = idx;
+        } else {
+            self.tri_coords.append(x0);
+            self.tri_coords.append(y0);
+            self.tri_coords.append(x1);
+            self.tri_coords.append(y1);
+            self.tri_coords.append(x2);
+            self.tri_coords.append(y2);
+            self.tri_coords.append(avg_z);
+            self.tri_colors.append(r);
+            self.tri_colors.append(g);
+            self.tri_colors.append(b);
+            self.tri_colors.append(a);
+            self.tri_wire.append(is_wire);
+            self.tri_wire_w.append(wire_w);
+            self.tri_order.append(idx);
+        }
+        self.tri_count = idx + 1;
     }
 
     pub fn set_size(w: int, h: int) {

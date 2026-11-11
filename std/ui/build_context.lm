@@ -1,17 +1,16 @@
 // std/ui/build_context - Build-time context for widget construction
-import std.ui.types as ui_types;
+import std.ui.components as comp;
 
 frame BuildContext {
     pub var depth: int;
-    pub var size_constraints: ui_types.Widget;
+    pub var size_constraints: comp.Fluent;
 
     pub init(d: int = 0) {
         self.depth = d;
-        self.size_constraints = ui_types.empty();
+        self.size_constraints = comp.empty();
+    }
+
+    pub fn push(): BuildContext {
+        return BuildContext(d=self.depth + 1);
     }
 }
-
-pub fn new_build_context(): BuildContext {
-    return BuildContext();
-}
-

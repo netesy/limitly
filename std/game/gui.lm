@@ -96,14 +96,15 @@ frame GUI {
     pub var deferred_combo_id: str;
     pub var combo_selected_new: int;
     pub var combo_selected_changed: bool;
-    pub var editor_controllers: {str: any};
+    pub var editor_controllers: {str: text_ctrl.EditorController};
     pub var scroll_offsets: {str: float};
     pub var focus_manager: focus.Manager;
 
     // Immediate-mode Modifier Support (Shadows, Opacity, Disabled)
-    pub var next_shadow: any;
+    pub var next_shadow: shadow.Shadow | nil;
     pub var has_next_shadow: bool;
-    pub var shadow_stack: [any];
+    pub var shadow_stack: [shadow.Shadow];
+    pub var shadow_stack_top: int;
     pub var next_opacity: float;
     pub var has_next_opacity: bool;
     pub var next_disabled: bool;
@@ -122,13 +123,15 @@ frame GUI {
     pub var headers: {str: bool};
     pub var anim_store: anim.IMGUIAnimationStore;
 
-    // Moddable Style Stack
+    // Moddable Style Stack (O(1) push/pop via top cursors)
     pub var style_color_indices: [int];
     pub var style_color_stack: [color.Color];
+    pub var style_color_top: int;
     pub var style_var_indices: [int];
     pub var style_var_stack: [float];
+    pub var style_var_top: int;
 
-    pub init(theme: any = nil) {
+    pub init(theme: types.GUITheme | nil = nil) {
         if (theme == nil) {
             self.theme = types.default_theme();
         } else {
@@ -183,13 +186,14 @@ frame GUI {
         self.deferred_combo_id = "";
         self.combo_selected_new = -1;
         self.combo_selected_changed = false;
-        self.editor_controllers = {} as {str: any};
+        self.editor_controllers = {} as {str: text_ctrl.EditorController};
         self.scroll_offsets = {} as {str: float};
         self.focus_manager = focus.Manager();
 
         self.next_shadow = nil;
         self.has_next_shadow = false;
-        self.shadow_stack = [] as [any];
+        self.shadow_stack = [] as [shadow.Shadow];
+        self.shadow_stack_top = 0;
         self.next_opacity = 1.0;
         self.has_next_opacity = false;
         self.next_disabled = false;
@@ -208,8 +212,10 @@ frame GUI {
 
         self.style_color_indices = [];
         self.style_color_stack = [];
+        self.style_color_top = 0;
         self.style_var_indices = [];
         self.style_var_stack = [];
+        self.style_var_top = 0;
     }
 
     // ── Frame Lifecycle ────────────────────────────────────────────────────────
@@ -289,11 +295,13 @@ frame GUI {
 
         // Elevation drop shadow for combo dropdown (top z-index)
         var raw_csh = self.get_active_shadow();
-        if (raw_csh == nil) {
-            raw_csh = self.theme.popup_shadow;
-        }
         if (raw_csh != nil) {
-            var csh = raw_csh as shadow.Shadow;
+            val csh = raw_csh as shadow.Shadow;
+            if (csh.a > 0.0) {
+                gg.draw_shadow_primitive(bx, popup_y, w, popup_h, csh.r, csh.g, csh.b, csh.a, csh.offset_x, csh.offset_y, csh.blur_radius, csh.spread_radius);
+            }
+        } elif (self.theme.popup_shadow != nil) {
+            val csh = self.theme.popup_shadow as shadow.Shadow;
             if (csh.a > 0.0) {
                 gg.draw_shadow_primitive(bx, popup_y, w, popup_h, csh.r, csh.g, csh.b, csh.a, csh.offset_x, csh.offset_y, csh.blur_radius, csh.spread_radius);
             }
@@ -358,8 +366,14 @@ frame GUI {
     // ── Moddability: Style Stack ───────────────────────────────────────────────
 
     pub fn push_style_color(idx: int, c: color.Color): nil {
-        self.style_color_indices.append(idx);
-        self.style_color_stack.append(c);
+        if (self.style_color_top < len(self.style_color_indices)) {
+            self.style_color_indices[self.style_color_top] = idx;
+            self.style_color_stack[self.style_color_top] = c;
+        } else {
+            self.style_color_indices.append(idx);
+            self.style_color_stack.append(c);
+        }
+        self.style_color_top = self.style_color_top + 1;
     }
 
     pub fn push_color_role(role: types.ColorRole, c: color.Color): nil {
@@ -367,52 +381,34 @@ frame GUI {
     }
 
     pub fn pop_style_color(count: int = 1): nil {
-        var n = len(self.style_color_indices);
-        var new_n = n - count;
-        if (new_n < 0) { new_n = 0; }
-        // Truncate to new_n elements in a single pass (O(new_n) not O(n*count))
-        var new_indices: [int] = [];
-        var new_stack: [color.Color] = [];
-        var i = 0;
-        while (i < new_n) {
-            new_indices.append(self.style_color_indices[i]);
-            new_stack.append(self.style_color_stack[i]);
-            i = i + 1;
-        }
-        self.style_color_indices = new_indices;
-        self.style_color_stack = new_stack;
+        self.style_color_top = self.style_color_top - count;
+        if (self.style_color_top < 0) { self.style_color_top = 0; }
     }
 
     pub fn push_style_var(idx: int, value: float): nil {
-        self.style_var_indices.append(idx);
-        self.style_var_stack.append(value);
+        if (self.style_var_top < len(self.style_var_indices)) {
+            self.style_var_indices[self.style_var_top] = idx;
+            self.style_var_stack[self.style_var_top] = value;
+        } else {
+            self.style_var_indices.append(idx);
+            self.style_var_stack.append(value);
+        }
+        self.style_var_top = self.style_var_top + 1;
     }
 
     pub fn pop_style_var(count: int = 1): nil {
-        var n = len(self.style_var_indices);
-        var new_n = n - count;
-        if (new_n < 0) { new_n = 0; }
-        // Truncate to new_n elements in a single pass (O(new_n) not O(n*count))
-        var new_indices: [int] = [];
-        var new_stack: [float] = [];
-        var i = 0;
-        while (i < new_n) {
-            new_indices.append(self.style_var_indices[i]);
-            new_stack.append(self.style_var_stack[i]);
-            i = i + 1;
-        }
-        self.style_var_indices = new_indices;
-        self.style_var_stack = new_stack;
+        self.style_var_top = self.style_var_top - count;
+        if (self.style_var_top < 0) { self.style_var_top = 0; }
     }
 
     // ── Immediate-Mode Modifiers (Shadows & Effects) ─────────────────────────
 
-    pub fn set_next_shadow(s: any): nil {
+    pub fn set_next_shadow(s: shadow.Shadow | nil): nil {
         self.next_shadow = s;
         self.has_next_shadow = true;
     }
 
-    pub fn shadow(s: any): GUI {
+    pub fn shadow(s: shadow.Shadow | nil): GUI {
         self.set_next_shadow(s);
         return self;
     }
@@ -429,40 +425,36 @@ frame GUI {
         return self;
     }
 
-    pub fn push_shadow(s: any): nil {
-        self.shadow_stack.append(s);
+    pub fn push_shadow(s: shadow.Shadow): nil {
+        if (self.shadow_stack_top < len(self.shadow_stack)) {
+            self.shadow_stack[self.shadow_stack_top] = s;
+        } else {
+            self.shadow_stack.append(s);
+        }
+        self.shadow_stack_top = self.shadow_stack_top + 1;
     }
 
     pub fn pop_shadow(): nil {
-        var n = len(self.shadow_stack);
-        if (n > 0) {
-            var new_stack: [any] = [];
-            var i = 0;
-            while (i < n - 1) {
-                new_stack.append(self.shadow_stack[i]);
-                i = i + 1;
-            }
-            self.shadow_stack = new_stack;
+        if (self.shadow_stack_top > 0) {
+            self.shadow_stack_top = self.shadow_stack_top - 1;
         }
     }
 
-    pub fn get_active_shadow(): any {
+    pub fn get_active_shadow(): shadow.Shadow | nil {
         if (self.has_next_shadow) {
-            var s = self.next_shadow;
+            val s = self.next_shadow;
             self.has_next_shadow = false;
             self.next_shadow = nil;
             return s;
         }
-        var n = len(self.shadow_stack);
-        if (n > 0) {
-            return self.shadow_stack[n - 1];
+        if (self.shadow_stack_top > 0) {
+            return self.shadow_stack[self.shadow_stack_top - 1];
         }
         return nil;
     }
 
     pub fn get_style_color(idx: int): color.Color {
-        var n = len(self.style_color_indices);
-        var i = n - 1;
+        var i = self.style_color_top - 1;
         while (i >= 0) {
             if (self.style_color_indices[i] == idx) {
                 return self.style_color_stack[i];
@@ -473,8 +465,7 @@ frame GUI {
     }
 
     pub fn get_style_var(idx: int, default_value: float): float {
-        var n = len(self.style_var_indices);
-        var i = n - 1;
+        var i = self.style_var_top - 1;
         while (i >= 0) {
             if (self.style_var_indices[i] == idx) {
                 return self.style_var_stack[i];
@@ -644,11 +635,30 @@ frame GUI {
 
     // ── Basic IMGUI Controls ───────────────────────────────────────────────────
 
+    fn _draw_button_shadow(sh: shadow.Shadow, bx: float, by: float, w: float, h: float, active_opacity: float, hovered: bool, is_active: bool): nil {
+        if (sh.a > 0.0) {
+            var s_alpha = sh.a * active_opacity;
+            var s_y = sh.offset_y;
+            var s_blur = sh.blur_radius;
+            if (is_active) {
+                s_alpha = s_alpha * 0.5;
+                s_y = s_y * 0.5;
+                s_blur = s_blur * 0.5;
+            } elif (hovered) {
+                s_alpha = s_alpha * 1.25;
+                if (s_alpha > 1.0) { s_alpha = 1.0; }
+                s_y = s_y * 1.3;
+                s_blur = s_blur * 1.3;
+            }
+            gg.draw_shadow_primitive(bx, by, w, h, sh.r, sh.g, sh.b, s_alpha, sh.offset_x, s_y, s_blur, sh.spread_radius);
+        }
+    }
+
     pub fn draw_rect(x: float, y: float, w: float, h: float, col: color.Color): nil {
         gg.draw_rect_primitive(x, y, w, h, col.r, col.g, col.b, col.a);
     }
 
-    pub fn label(text: str, custom_color: any = nil): nil {
+    pub fn label(text: str, custom_color: color.Color | nil = nil): nil {
         var c = self.get_style_color(types.COLOR_TEXT);
         if (custom_color != nil) {
             c = custom_color as color.Color;
@@ -762,27 +772,12 @@ frame GUI {
         }
 
         // Optional Button Elevation Drop Shadow (opt-in via set_next_shadow, shadow(), shadow_stack, or theme)
-        var raw_sh = self.get_active_shadow();
-        if (raw_sh == nil) {
-            raw_sh = self.theme.button_shadow;
-        }
-        if (raw_sh != nil and not is_disabled) {
-            var sh = raw_sh as shadow.Shadow;
-            if (sh.a > 0.0) {
-                var s_alpha = sh.a * active_opacity;
-                var s_y = sh.offset_y;
-                var s_blur = sh.blur_radius;
-                if (self.active_id == id) {
-                    s_alpha = s_alpha * 0.5;
-                    s_y = s_y * 0.5;
-                    s_blur = s_blur * 0.5;
-                } elif (hovered) {
-                    s_alpha = s_alpha * 1.25;
-                    if (s_alpha > 1.0) { s_alpha = 1.0; }
-                    s_y = s_y * 1.3;
-                    s_blur = s_blur * 1.3;
-                }
-                gg.draw_shadow_primitive(bx, by, w, h, sh.r, sh.g, sh.b, s_alpha, sh.offset_x, s_y, s_blur, sh.spread_radius);
+        if (not is_disabled) {
+            var raw_sh = self.get_active_shadow();
+            if (raw_sh != nil) {
+                self._draw_button_shadow(raw_sh as shadow.Shadow, bx, by, w, h, active_opacity, hovered, self.active_id == id);
+            } elif (self.theme.button_shadow != nil) {
+                self._draw_button_shadow(self.theme.button_shadow as shadow.Shadow, bx, by, w, h, active_opacity, hovered, self.active_id == id);
             }
         }
 
@@ -1190,7 +1185,7 @@ frame GUI {
         return self.typed_chars;
     }
 
-    pub fn get_editor_controller(label: str): any {
+    pub fn get_editor_controller(label: str): text_ctrl.EditorController | nil {
         var id = self.make_id(label);
         return self.editor_controllers[id];
     }
@@ -2049,11 +2044,13 @@ frame GUI {
 
         // Optional popup drop shadow (opt-in)
         var raw_psh = self.get_active_shadow();
-        if (raw_psh == nil) {
-            raw_psh = self.theme.popup_shadow;
-        }
         if (raw_psh != nil) {
-            var psh = raw_psh as shadow.Shadow;
+            val psh = raw_psh as shadow.Shadow;
+            if (psh.a > 0.0) {
+                gg.draw_shadow_primitive(x, y, w, h, psh.r, psh.g, psh.b, psh.a, psh.offset_x, psh.offset_y, psh.blur_radius, psh.spread_radius);
+            }
+        } elif (self.theme.popup_shadow != nil) {
+            val psh = self.theme.popup_shadow as shadow.Shadow;
             if (psh.a > 0.0) {
                 gg.draw_shadow_primitive(x, y, w, h, psh.r, psh.g, psh.b, psh.a, psh.offset_x, psh.offset_y, psh.blur_radius, psh.spread_radius);
             }
@@ -2227,11 +2224,13 @@ frame GUI {
 
         // Optional window elevation drop shadow (opt-in)
         var raw_wsh = self.get_active_shadow();
-        if (raw_wsh == nil) {
-            raw_wsh = self.theme.window_shadow;
-        }
         if (raw_wsh != nil) {
-            var wsh = raw_wsh as shadow.Shadow;
+            val wsh = raw_wsh as shadow.Shadow;
+            if (wsh.a > 0.0) {
+                gg.draw_shadow_primitive(wx, wy, ww, panel_h, wsh.r, wsh.g, wsh.b, wsh.a, wsh.offset_x, wsh.offset_y, wsh.blur_radius, wsh.spread_radius);
+            }
+        } elif (self.theme.window_shadow != nil) {
+            val wsh = self.theme.window_shadow as shadow.Shadow;
             if (wsh.a > 0.0) {
                 gg.draw_shadow_primitive(wx, wy, ww, panel_h, wsh.r, wsh.g, wsh.b, wsh.a, wsh.offset_x, wsh.offset_y, wsh.blur_radius, wsh.spread_radius);
             }

@@ -132,10 +132,15 @@ frame Float {
         if (self.value == 0.0) return 0.0;
         var x = self.value;
         var y = 1.0;
-        var e = 0.000000000000001;
-        while (Float(x - y).abs() > e) {
-            x = (x + y) / 2.0;
+        var step = 0;
+        while (step < 32) {
+            var next_x = (x + y) / 2.0;
+            if (next_x == x) {
+                return x;
+            }
+            x = next_x;
             y = self.value / x;
+            step = step + 1;
         }
         return x;
     }
@@ -146,18 +151,22 @@ frame Float {
     pub fn cbrt(): float {
         if (self.value == 0.0) return 0.0;
         var x = self.value;
-        var y = 1.0;
+        var sign = 1.0;
         if (x < 0.0) {
             x = -x;
-            while (Float(x - y * y * y).abs() > 0.000000000000001) {
-                y = (2.0 * y + x / (y * y)) / 3.0;
+            sign = -1.0;
+        }
+        var y = 1.0;
+        var step = 0;
+        while (step < 32) {
+            var next_y = (2.0 * y + x / (y * y)) / 3.0;
+            if (next_y == y) {
+                return sign * y;
             }
-            return -y;
+            y = next_y;
+            step = step + 1;
         }
-        while (Float(x - y * y * y).abs() > 0.000000000000001) {
-            y = (2.0 * y + x / (y * y)) / 3.0;
-        }
-        return y;
+        return sign * y;
     }
 
     /// Computes the exponential function e^x via Taylor series expansion.

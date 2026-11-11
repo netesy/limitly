@@ -240,6 +240,12 @@ frame Car {
 - **`deinit` is not promoted and is not synthesised.** Because flattening leaves no
   embedded sub-object, the embedded frame's `deinit()` does not run when the host is
   destroyed. Forward it explicitly from the host if cleanup is required.
+- **`init` is not invoked for embedded frames.** `embed` copies field *declarations*
+  into the host — it does not run the component's `pub init(...)`. Any state the
+  component's constructor would have set stays at its declared default (or `nil` for
+  fields without one). Give embedded fields field-level defaults
+  (`pub var bg: Color = Color(0.0, 0.0, 0.0, 1.0);`), or assign the promoted fields
+  explicitly inside the host's own `init()`.
 
 ## 4. Control Flow
 
@@ -273,6 +279,9 @@ Two facts that bite in practice:
   frame method; both defects were fixed on 2026-10-31, verified on VM and AOT.)
 - **A string iterates as code points**, not characters: `iter (cp in "AB")`
   yields `65`, `66`. Slice with `substring` when you want characters.
+- **A `..` range is exclusive of its end**: `iter (i in 0..n)` yields `0` through
+  `n - 1`. To visit every element of a list of length `n`, write `0..n` —
+  `0..(n - 1)` silently skips the last element.
 
 `iter` works inside frame methods — list, dict, range and string iteration all
 lower correctly in linear (method) mode and match the VM at every opt level.

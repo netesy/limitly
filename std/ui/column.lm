@@ -1,7 +1,8 @@
-// std/ui/column - Vertical flex layout container
-import std.ui.types as ui_types;
-pub import std.ui.components show Container;
+// std/ui/column - Vertical layout container
+import std.ui.components as comp;
 
-pub fn column(children: [ui_types.Widget]): ui_types.Widget {
-    return ui_types.column(children);
+pub fn column(children: [comp.Fluent]): comp.Container {
+    val c = comp.Container(true);
+    c.children = children;
+    return c;
 }

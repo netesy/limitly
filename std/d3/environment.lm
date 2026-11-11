@@ -1,0 +1,344 @@
+// std/d3/environment.lm
+// Procedural environment, terrain, and celestial body generators for Lymar 3D (std.d3).
+
+import std.d3.geometry as geom;
+import std.math.arithmetic as arith;
+import std.math.constants as mconst;
+import std.math.trigonometry as trig;
+
+const ICO_PHI: float = 1.6180339887;
+const ICO_RAW_VERTS: [float] = [
+    -1.0,  ICO_PHI,  0.0,
+     1.0,  ICO_PHI,  0.0,
+    -1.0, -ICO_PHI,  0.0,
+     1.0, -ICO_PHI,  0.0,
+
+     0.0, -1.0,  ICO_PHI,
+     0.0,  1.0,  ICO_PHI,
+     0.0, -1.0, -ICO_PHI,
+     0.0,  1.0, -ICO_PHI,
+
+     ICO_PHI,  0.0, -1.0,
+     ICO_PHI,  0.0,  1.0,
+    -ICO_PHI,  0.0, -1.0,
+    -ICO_PHI,  0.0,  1.0
+];
+const ICO_RAW_FACES: [int] = [
+    0, 11, 5,    0, 5, 1,     0, 1, 7,     0, 7, 10,    0, 10, 11,
+    1, 5, 9,     5, 11, 4,    11, 10, 2,   10, 7, 6,    7, 1, 8,
+    3, 9, 4,     3, 4, 2,     3, 2, 6,     3, 6, 8,     3, 8, 9,
+    4, 9, 5,     2, 4, 11,    6, 2, 10,    8, 6, 7,     9, 8, 1
+];
+
+/// Deterministic 2D spatial hash returning values in [-1.0, 1.0].
+fn hash_2d(ix: int, iz: int, seed: int): float {
+    val h = (ix * 374761393 + iz * 668265263 + seed * 962458421) ^ 0x5bf03635;
+    val h2 = (h ^ (h >> 13)) * 1274126177;
+    val pos = (h2 & 0x7fffffff) as float;
+    return (pos / 1073741824.0) - 1.0;
+}
+
+/// Smooth continuous 2D value noise with cubic Hermite interpolation.
+fn value_noise_2d(x: float, z: float, seed: int): float {
+    var ix = x as int;
+    var iz = z as int;
+    if (x < 0.0) { ix = ix - 1; }
+    if (z < 0.0) { iz = iz - 1; }
+
+    val fx = x - (ix as float);
+    val fz = z - (iz as float);
+
+    // Cubic Hermite smoothstep
+    val sx = fx * fx * (3.0 - 2.0 * fx);
+    val sz = fz * fz * (3.0 - 2.0 * fz);
+
+    val h00 = hash_2d(ix, iz, seed);
+    val h10 = hash_2d(ix + 1, iz, seed);
+    val h01 = hash_2d(ix, iz + 1, seed);
+    val h11 = hash_2d(ix + 1, iz + 1, seed);
+
+    val nx0 = h00 + sx * (h10 - h00);
+    val nx1 = h01 + sx * (h11 - h01);
+    return nx0 + sz * (nx1 - nx0);
+}
+
+/// Multi-octave fractal Brownian motion (fBm) elevation generator.
+fn fractal_elevation(x: float, z: float, seed: int): float {
+    var total = 0.0;
+    var amp = 1.0;
+    var freq = 1.0;
+    var oct = 0;
+    while (oct < 4) {
+        total = total + value_noise_2d(x * freq, z * freq, seed + oct * 101) * amp;
+        amp = amp * 0.5;
+        freq = freq * 2.0;
+        oct = oct + 1;
+    }
+    return total;
+}
+
+/// Deterministic 3D spatial hash returning values in [-1.0, 1.0].
+fn hash_3d(ix: int, iy: int, iz: int, seed: int): float {
+    val h = (ix * 374761393 + iy * 1013904223 + iz * 668265263 + seed * 962458421) ^ 0x5bf03635;
+    val h2 = (h ^ (h >> 13)) * 1274126177;
+    val pos = (h2 & 0x7fffffff) as float;
+    return (pos / 1073741824.0) - 1.0;
+}
+
+/// Generates a continuous 3D heightmap terrain grid with mountains, valleys, and smooth normals.
+/// @param width Total physical width along the X axis.
+/// @param depth Total physical depth along the Z axis.
+/// @param cols Number of horizontal grid subdivisions.
+/// @param rows Number of depth grid subdivisions.
+/// @param height_scale Vertical elevation multiplier.
+/// @param seed Random seed for the procedural terrain generation.
+pub fn terrain(width: float = 20.0, depth: float = 20.0, cols: int = 16, rows: int = 16, height_scale: float = 3.0, seed: int = 1): geom.Geometry {
+    var g = geom.Geometry();
+    if (cols < 1 or rows < 1) {
+        return g;
+    }
+
+    val dx = width / (cols as float);
+    val dz = depth / (rows as float);
+    val half_w = width * 0.5;
+    val half_d = depth * 0.5;
+
+    // 1. Generate Vertex Grid (parallelized for larger terrain grids)
+    if ((rows + 1) * (cols + 1) >= 256) {
+        var row_verts: [[float]] = [[] as [float], [] as [float], [] as [float], [] as [float]];
+        var row_cols: [[float]] = [[] as [float], [] as [float], [] as [float], [] as [float]];
+        val workers = 4;
+        val total_rows = rows + 1;
+        parallel(cores=4) {
+            iter (wid in 0..4) {
+                var lv: [float] = [];
+                var lc: [float] = [];
+                val chunk = (total_rows + workers - 1) / workers;
+                val start_r = wid * chunk;
+                var end_r = start_r + chunk;
+                if (end_r > total_rows) { end_r = total_rows; }
+                var iz = start_r;
+                while (iz < end_r) {
+                    val z = (iz as float) * dz - half_d;
+                    var ix = 0;
+                    while (ix <= cols) {
+                        val x = (ix as float) * dx - half_w;
+                        val elev = fractal_elevation(x * 0.35, z * 0.35, seed);
+                        val y = elev * height_scale;
+                        lv.append(x);
+                        lv.append(y);
+                        lv.append(z);
+                        if (y > height_scale * 0.5) {
+                            lc.append(0.92); lc.append(0.95); lc.append(0.98);
+                        } elif (y > 0.0) {
+                            lc.append(0.48); lc.append(0.44); lc.append(0.38);
+                        } else {
+                            lc.append(0.22); lc.append(0.38); lc.append(0.22);
+                        }
+                        ix = ix + 1;
+                    }
+                    iz = iz + 1;
+                }
+                row_verts[wid] = lv;
+                row_cols[wid] = lc;
+            }
+        }
+        iter (wid in 0..4) {
+            iter (v in row_verts[wid]) { g.vertices.append(v); }
+            iter (c in row_cols[wid]) { g.colors.append(c); }
+        }
+    } else {
+        var iz = 0;
+        while (iz <= rows) {
+            val z = (iz as float) * dz - half_d;
+            var ix = 0;
+            while (ix <= cols) {
+                val x = (ix as float) * dx - half_w;
+
+                // Multi-octave continuous elevation
+                val elev = fractal_elevation(x * 0.35, z * 0.35, seed);
+                val y = elev * height_scale;
+
+                g.add_vertex(x, y, z);
+
+                // Add procedural vertex colors based on height
+                if (y > height_scale * 0.5) {
+                    g.add_color(0.92, 0.95, 0.98); // Snow peak
+                } elif (y > 0.0) {
+                    g.add_color(0.48, 0.44, 0.38); // Rocky slope
+                } else {
+                    g.add_color(0.22, 0.38, 0.22); // Valley floor
+                }
+
+                ix = ix + 1;
+            }
+            iz = iz + 1;
+        }
+    }
+
+    // 2. Connect Grid Quads
+    val stride = cols + 1;
+    var r = 0;
+    while (r < rows) {
+        var c = 0;
+        while (c < cols) {
+            val i00 = r * stride + c;
+            val i10 = r * stride + c + 1;
+            val i01 = (r + 1) * stride + c;
+            val i11 = (r + 1) * stride + c + 1;
+
+            // CCW triangles: (i00, i01, i10) and (i10, i01, i11)
+            g.add_face(i00, i01, i10);
+            g.add_face(i10, i01, i11);
+            c = c + 1;
+        }
+        r = r + 1;
+    }
+
+    g.compute_vertex_normals();
+    return g;
+}
+
+/// Generates an irregular, cratered celestial asteroid using radial 3D noise displacement.
+/// @param radius Base spherical radius of the asteroid.
+/// @param roughness Maximum radial displacement ratio (default 0.35).
+/// @param segments_w Horizontal longitude segments (default 12).
+/// @param segments_h Vertical latitude segments (default 8).
+/// @param seed Random seed controlling crater distribution.
+pub fn asteroid(radius: float = 1.0, roughness: float = 0.35, segments_w: int = 12, segments_h: int = 8, seed: int = 1): geom.Geometry {
+    var g = geom.Geometry();
+    val pi = 3.1415926535;
+
+    // 1. Generate displaced sphere vertices
+    var iy = 0;
+    while (iy <= segments_h) {
+        val v = (iy as float) / (segments_h as float);
+        val phi = v * pi; // [0 .. PI]
+        val sin_phi = trig.sin(phi);
+        val cos_phi = trig.cos(phi);
+
+        var ix = 0;
+        while (ix <= segments_w) {
+            val u = (ix as float) / (segments_w as float);
+            val theta = u * (pi * 2.0); // [0 .. 2*PI]
+            val sin_theta = trig.sin(theta);
+            val cos_theta = trig.cos(theta);
+
+            // Unit sphere direction vector
+            val nx = sin_phi * cos_theta;
+            val ny = cos_phi;
+            val nz = sin_phi * sin_theta;
+
+            // 3D procedural noise displacement
+            val n_val = hash_3d((nx * 10.0) as int, (ny * 10.0) as int, (nz * 10.0) as int, seed);
+            val r_displaced = radius * (1.0 + n_val * roughness);
+
+            g.add_vertex(nx * r_displaced, ny * r_displaced, nz * r_displaced);
+            ix = ix + 1;
+        }
+        iy = iy + 1;
+    }
+
+    // 2. Connect sphere quads
+    val stride = segments_w + 1;
+    var lat = 0;
+    while (lat < segments_h) {
+        var lon = 0;
+        while (lon < segments_w) {
+            val a = lat * stride + lon;
+            val b = (lat + 1) * stride + lon;
+            val c = (lat + 1) * stride + lon + 1;
+            val d = lat * stride + lon + 1;
+
+            if (lat > 0) {
+                g.add_face(a, b, d);
+            }
+            if (lat < segments_h - 1) {
+                g.add_face(b, c, d);
+            }
+            lon = lon + 1;
+        }
+        lat = lat + 1;
+    }
+
+    g.compute_vertex_normals();
+    return g;
+}
+
+/// Generates a geodesic icosahedron sphere (icosphere) with uniform triangle distribution.
+/// @param radius Target radius of the icosphere.
+/// @param subdivisions Number of recursive edge subdivisions (0 = 20 faces, 1 = 80 faces, 2 = 320 faces).
+pub fn icosphere(radius: float = 1.0, subdivisions: int = 1): geom.Geometry {
+    var g = geom.Geometry();
+
+    iter (vi in 0..12) {
+        val x = ICO_RAW_VERTS[vi * 3];
+        val y = ICO_RAW_VERTS[vi * 3 + 1];
+        val z = ICO_RAW_VERTS[vi * 3 + 2];
+        val len_sq = x * x + y * y + z * z;
+        val inv_len = radius / arith.sqrt(len_sq);
+        g.add_vertex(x * inv_len, y * inv_len, z * inv_len);
+    }
+
+    iter (fi in 0..20) {
+        g.add_face(ICO_RAW_FACES[fi * 3], ICO_RAW_FACES[fi * 3 + 1], ICO_RAW_FACES[fi * 3 + 2]);
+    }
+
+    // Recursive Subdivision
+    var sub = 0;
+    while (sub < subdivisions) {
+        var new_g = geom.Geometry();
+        // Copy current vertices
+        var cur_v = 0;
+        val cur_vcount = g.get_vertex_count();
+        while (cur_v < cur_vcount) {
+            new_g.add_vertex(g.vertices[cur_v * 3], g.vertices[cur_v * 3 + 1], g.vertices[cur_v * 3 + 2]);
+            cur_v = cur_v + 1;
+        }
+
+        // Subdivide each triangle into 4 smaller triangles
+        val cur_fcount = g.get_face_count();
+        var f = 0;
+        while (f < cur_fcount) {
+            val i0 = g.indices[f * 3];
+            val i1 = g.indices[f * 3 + 1];
+            val i2 = g.indices[f * 3 + 2];
+
+            // Midpoint 0-1
+            val m01_x = (g.vertices[i0 * 3] + g.vertices[i1 * 3]) * 0.5;
+            val m01_y = (g.vertices[i0 * 3 + 1] + g.vertices[i1 * 3 + 1]) * 0.5;
+            val m01_z = (g.vertices[i0 * 3 + 2] + g.vertices[i1 * 3 + 2]) * 0.5;
+            val l01 = radius / arith.sqrt(m01_x * m01_x + m01_y * m01_y + m01_z * m01_z);
+            val a = new_g.add_vertex(m01_x * l01, m01_y * l01, m01_z * l01);
+
+            // Midpoint 1-2
+            val m12_x = (g.vertices[i1 * 3] + g.vertices[i2 * 3]) * 0.5;
+            val m12_y = (g.vertices[i1 * 3 + 1] + g.vertices[i2 * 3 + 1]) * 0.5;
+            val m12_z = (g.vertices[i1 * 3 + 2] + g.vertices[i2 * 3 + 2]) * 0.5;
+            val l12 = radius / arith.sqrt(m12_x * m12_x + m12_y * m12_y + m12_z * m12_z);
+            val b = new_g.add_vertex(m12_x * l12, m12_y * l12, m12_z * l12);
+
+            // Midpoint 2-0
+            val m20_x = (g.vertices[i2 * 3] + g.vertices[i0 * 3]) * 0.5;
+            val m20_y = (g.vertices[i2 * 3 + 1] + g.vertices[i0 * 3 + 1]) * 0.5;
+            val m20_z = (g.vertices[i2 * 3 + 2] + g.vertices[i0 * 3 + 2]) * 0.5;
+            val l20 = radius / arith.sqrt(m20_x * m20_x + m20_y * m20_y + m20_z * m20_z);
+            val c = new_g.add_vertex(m20_x * l20, m20_y * l20, m20_z * l20);
+
+            // 4 sub-triangles
+            new_g.add_face(i0, a, c);
+            new_g.add_face(i1, b, a);
+            new_g.add_face(i2, c, b);
+            new_g.add_face(a, b, c);
+
+            f = f + 1;
+        }
+
+        g = new_g;
+        sub = sub + 1;
+    }
+
+    g.compute_vertex_normals();
+    return g;
+}
+

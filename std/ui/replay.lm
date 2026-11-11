@@ -8,13 +8,13 @@ import std.ui.draw_list as dl;
 
 // Replays a DrawList to the GPU — pure linear iteration, zero recursion.
 pub fn replay(draw_list: dl.DrawList): nil {
-    var i = 0;
-    var n = len(draw_list.cmds);
-    while (i < n) {
-        var cmd = draw_list.cmds[i];
-        // Enum-valued dispatch via `match` (tag compare lowered over the DrawCmdKind
-        // variants). Qualified arms on an imported enum resolve against the scrutinee's
-        // own enum type, so no `==` fallback is needed here.
+    val n = draw_list.cmd_count;
+    if (n <= 0) {
+        return;
+    }
+    gg.begin_batch();
+    iter (i in 0..n) {
+        val cmd = draw_list.cmds[i];
         match (cmd.kind) {
             dl.DrawCmdKind.Rect => {
                 gg.draw_rect_primitive(cmd.x, cmd.y, cmd.w, cmd.h, cmd.r, cmd.g, cmd.b, cmd.a);
@@ -45,6 +45,6 @@ pub fn replay(draw_list: dl.DrawList): nil {
             },
             _ => { }
         }
-        i = i + 1;
     }
+    gg.end_batch();
 }

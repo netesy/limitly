@@ -321,11 +321,11 @@ frame InputManager {
         return false;
     }
 
-    pub fn mouse_pos(): types.Vec2 {
+    pub fn mouse_pos(): types.Vector2 {
         return types.Vec2(x=self.mouse_x, y=self.mouse_y);
     }
 
-    pub fn mouse_delta(): types.Vec2 {
+    pub fn mouse_delta(): types.Vector2 {
         return types.Vec2(x=self.mouse_delta_x, y=self.mouse_delta_y);
     }
 

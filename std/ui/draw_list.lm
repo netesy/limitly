@@ -1,7 +1,8 @@
 // std/ui/draw_list.lm
-// Flat, ordered GPU draw command list.
-// Replaces the recursive Widget tree as the engine's internal representation.
+// Flat, ordered GPU draw command list with zero-allocation buffer reuse.
 // Emitted by builder.lm in a single pass; replayed by replay.lm without recursion.
+
+import std.ui.components as comp;
 
 // ── Draw command kinds ────────────────────────────────────────────────────────
 // Real enum: dispatch on `cmd.kind` is type-checked and lowered to the tag
@@ -151,8 +152,8 @@ frame HitZone {
     pub var clip_y: float;
     pub var clip_w: float;
     pub var clip_h: float;
-    pub var on_click: any;
-    pub var on_change: any;
+    pub var on_click: (fn(): nil) | nil;
+    pub var on_change: (fn(): nil) | nil;
     // Slider-specific data
     pub var slider_min: float;
     pub var slider_max: float;
@@ -162,7 +163,7 @@ frame HitZone {
     // Checkbox/toggle
     pub var is_checked: int;
     // Widget reference for retained-state mutation
-    pub var widget: any;
+    pub var widget: comp.Fluent | nil;
 
     pub init() {
         self.id = "";
@@ -182,8 +183,11 @@ frame HitZone {
     }
 }
 
-pub fn make_button_zone(id: str, x: float, y: float, w: float, h: float, on_click, widget = nil): HitZone {
-    var hz = HitZone();
+pub fn make_button_zone(
+    id: str, x: float, y: float, w: float, h: float,
+    on_click: (fn(): nil) | nil = nil, widget: comp.Fluent | nil = nil
+): HitZone {
+    val hz = HitZone();
     hz.id = id; hz.kind = HitZoneKind.Button;
     hz.x = x; hz.y = y; hz.w = w; hz.h = h;
     hz.on_click = on_click;
@@ -191,8 +195,21 @@ pub fn make_button_zone(id: str, x: float, y: float, w: float, h: float, on_clic
     return hz;
 }
 
-pub fn make_slider_zone(id: str, x: float, y: float, w: float, h: float, min_v: float, max_v: float, cur_v: float, on_change, widget = nil): HitZone {
-    var hz = HitZone();
+pub fn make_button_zone_for(
+    id: str, x: float, y: float, w: float, h: float,
+    on_click: (fn(): nil) | nil, widget: comp.Fluent
+): HitZone {
+    val hz = make_button_zone(id, x, y, w, h, on_click, nil);
+    hz.widget = widget;
+    return hz;
+}
+
+pub fn make_slider_zone(
+    id: str, x: float, y: float, w: float, h: float,
+    min_v: float, max_v: float, cur_v: float,
+    on_change: (fn(): nil) | nil = nil, widget: comp.Fluent | nil = nil
+): HitZone {
+    val hz = HitZone();
     hz.id = id; hz.kind = HitZoneKind.Slider;
     hz.x = x; hz.y = y; hz.w = w; hz.h = h;
     hz.slider_min = min_v; hz.slider_max = max_v; hz.slider_val = cur_v;
@@ -201,8 +218,21 @@ pub fn make_slider_zone(id: str, x: float, y: float, w: float, h: float, min_v: 
     return hz;
 }
 
-pub fn make_checkbox_zone(id: str, x: float, y: float, w: float, h: float, checked: int, on_change, widget = nil): HitZone {
-    var hz = HitZone();
+pub fn make_slider_zone_for(
+    id: str, x: float, y: float, w: float, h: float,
+    min_v: float, max_v: float, cur_v: float,
+    on_change: (fn(): nil) | nil, widget: comp.Fluent
+): HitZone {
+    val hz = make_slider_zone(id, x, y, w, h, min_v, max_v, cur_v, on_change, nil);
+    hz.widget = widget;
+    return hz;
+}
+
+pub fn make_checkbox_zone(
+    id: str, x: float, y: float, w: float, h: float, checked: int,
+    on_change: (fn(): nil) | nil = nil, widget: comp.Fluent | nil = nil
+): HitZone {
+    val hz = HitZone();
     hz.id = id; hz.kind = HitZoneKind.Checkbox;
     hz.x = x; hz.y = y; hz.w = w; hz.h = h;
     hz.is_checked = checked;
@@ -211,20 +241,47 @@ pub fn make_checkbox_zone(id: str, x: float, y: float, w: float, h: float, check
     return hz;
 }
 
-pub fn make_input_zone(id: str, x: float, y: float, w: float, h: float, widget: any = nil): HitZone {
-    var hz = HitZone();
+pub fn make_checkbox_zone_for(
+    id: str, x: float, y: float, w: float, h: float, checked: int,
+    on_change: (fn(): nil) | nil, widget: comp.Fluent
+): HitZone {
+    val hz = make_checkbox_zone(id, x, y, w, h, checked, on_change, nil);
+    hz.widget = widget;
+    return hz;
+}
+
+pub fn make_input_zone(
+    id: str, x: float, y: float, w: float, h: float,
+    widget: comp.Fluent | nil = nil
+): HitZone {
+    val hz = HitZone();
     hz.id = id; hz.kind = HitZoneKind.Input;
     hz.x = x; hz.y = y; hz.w = w; hz.h = h;
     hz.widget = widget;
     return hz;
 }
 
+pub fn make_input_zone_for(
+    id: str, x: float, y: float, w: float, h: float,
+    widget: comp.Fluent
+): HitZone {
+    val hz = make_input_zone(id, x, y, w, h, nil);
+    hz.widget = widget;
+    return hz;
+}
+
 // ── DrawList ──────────────────────────────────────────────────────────────────
+// Keeps backing lists and pre-allocated DrawCmd/HitZone slots across rebuilds
+// so `clear()` resets cursor counts in O(1) with zero per-frame allocations.
 frame DrawList {
     pub var cmds: [DrawCmd];
     pub var hits: [HitZone];
     pub var overlay_cmds: [DrawCmd];
     pub var overlay_hits: [HitZone];
+    pub var cmd_count: int;
+    pub var hit_count: int;
+    pub var overlay_cmd_count: int;
+    pub var overlay_hit_count: int;
     pub var is_valid: int;
 
     pub init() {
@@ -232,6 +289,18 @@ frame DrawList {
         self.hits = [] as [HitZone];
         self.overlay_cmds = [] as [DrawCmd];
         self.overlay_hits = [] as [HitZone];
+        self.cmd_count = 0;
+        self.hit_count = 0;
+        self.overlay_cmd_count = 0;
+        self.overlay_hit_count = 0;
+        self.is_valid = 0;
+    }
+
+    pub fn clear(): nil {
+        self.cmd_count = 0;
+        self.hit_count = 0;
+        self.overlay_cmd_count = 0;
+        self.overlay_hit_count = 0;
         self.is_valid = 0;
     }
 }
@@ -240,47 +309,136 @@ pub fn draw_list(): DrawList {
     return DrawList();
 }
 
+pub fn dl_alloc_cmd(dl: DrawList): DrawCmd {
+    val idx = dl.cmd_count;
+    dl.cmd_count = idx + 1;
+    if (idx < len(dl.cmds)) {
+        val c = dl.cmds[idx];
+        c.kind = DrawCmdKind.None;
+        c.radius = 0.0;
+        c.border_width = 0.0;
+        c.text = "";
+        c.font_scale = 1.0;
+        return c;
+    }
+    val c = DrawCmd();
+    dl.cmds.append(c);
+    return c;
+}
+
+pub fn dl_alloc_overlay_cmd(dl: DrawList): DrawCmd {
+    val idx = dl.overlay_cmd_count;
+    dl.overlay_cmd_count = idx + 1;
+    if (idx < len(dl.overlay_cmds)) {
+        val c = dl.overlay_cmds[idx];
+        c.kind = DrawCmdKind.None;
+        c.radius = 0.0;
+        c.border_width = 0.0;
+        c.text = "";
+        c.font_scale = 1.0;
+        return c;
+    }
+    val c = DrawCmd();
+    dl.overlay_cmds.append(c);
+    return c;
+}
+
+pub fn dl_emit_rect(dl: DrawList, x: float, y: float, w: float, h: float, r: float, g: float, b: float, a: float = 1.0): nil {
+    val c = dl_alloc_cmd(dl);
+    c.kind = DrawCmdKind.Rect;
+    c.x = x; c.y = y; c.w = w; c.h = h;
+    c.r = r; c.g = g; c.b = b; c.a = a;
+}
+
+pub fn dl_emit_rect_rounded(dl: DrawList, x: float, y: float, w: float, h: float, rad: float, r: float, g: float, b: float, a: float = 1.0): nil {
+    val c = dl_alloc_cmd(dl);
+    c.kind = DrawCmdKind.RectRounded;
+    c.x = x; c.y = y; c.w = w; c.h = h;
+    c.radius = rad;
+    c.r = r; c.g = g; c.b = b; c.a = a;
+}
+
+pub fn dl_emit_rect_border(dl: DrawList, x: float, y: float, w: float, h: float, rad: float, bw: float, r: float, g: float, b: float, a: float = 1.0): nil {
+    val c = dl_alloc_cmd(dl);
+    c.kind = DrawCmdKind.RectRounded;
+    c.x = x; c.y = y; c.w = w; c.h = h;
+    c.radius = rad; c.border_width = bw;
+    c.r = r; c.g = g; c.b = b; c.a = a;
+}
+
+pub fn dl_emit_text(dl: DrawList, txt: str, x: float, y: float, r: float, g: float, b: float, a: float = 1.0, scale: float = 1.0): nil {
+    val c = dl_alloc_cmd(dl);
+    c.kind = DrawCmdKind.Text;
+    c.text = txt;
+    c.x = x; c.y = y;
+    c.r = r; c.g = g; c.b = b; c.a = a;
+    c.font_scale = scale;
+}
+
 pub fn dl_add(dl: DrawList, cmd: DrawCmd): nil {
-    dl.cmds.append(cmd);
+    val idx = dl.cmd_count;
+    dl.cmd_count = idx + 1;
+    if (idx < len(dl.cmds)) {
+        dl.cmds[idx] = cmd;
+    } else {
+        dl.cmds.append(cmd);
+    }
 }
 
 pub fn dl_add_hit(dl: DrawList, hz: HitZone): nil {
-    dl.hits.append(hz);
+    val idx = dl.hit_count;
+    dl.hit_count = idx + 1;
+    if (idx < len(dl.hits)) {
+        dl.hits[idx] = hz;
+    } else {
+        dl.hits.append(hz);
+    }
 }
 
 pub fn dl_add_overlay_cmd(dl: DrawList, cmd: DrawCmd): nil {
-    dl.overlay_cmds.append(cmd);
+    val idx = dl.overlay_cmd_count;
+    dl.overlay_cmd_count = idx + 1;
+    if (idx < len(dl.overlay_cmds)) {
+        dl.overlay_cmds[idx] = cmd;
+    } else {
+        dl.overlay_cmds.append(cmd);
+    }
 }
 
 pub fn dl_add_overlay_hit(dl: DrawList, hz: HitZone): nil {
-    dl.overlay_hits.append(hz);
+    val idx = dl.overlay_hit_count;
+    dl.overlay_hit_count = idx + 1;
+    if (idx < len(dl.overlay_hits)) {
+        dl.overlay_hits[idx] = hz;
+    } else {
+        dl.overlay_hits.append(hz);
+    }
 }
 
 pub fn dl_flush_overlays(dl: DrawList): nil {
-    var c_i = 0;
-    while (c_i < len(dl.overlay_cmds)) {
-        dl.cmds.append(dl.overlay_cmds[c_i]);
-        c_i = c_i + 1;
+    if (dl.overlay_cmd_count > 0) {
+        iter (c_i in 0..dl.overlay_cmd_count) {
+            dl_add(dl, dl.overlay_cmds[c_i]);
+        }
+        dl.overlay_cmd_count = 0;
     }
-    dl.overlay_cmds = [] as [DrawCmd];
 
-    var h_i = 0;
-    while (h_i < len(dl.overlay_hits)) {
-        dl.hits.append(dl.overlay_hits[h_i]);
-        h_i = h_i + 1;
+    if (dl.overlay_hit_count > 0) {
+        iter (h_i in 0..dl.overlay_hit_count) {
+            dl_add_hit(dl, dl.overlay_hits[h_i]);
+        }
+        dl.overlay_hit_count = 0;
     }
-    dl.overlay_hits = [] as [HitZone];
 }
 
-// Hit test: returns the topmost HitZone under (px, py), or nil.
+// Hit test: returns the topmost HitZone under (px, py), or empty HitZone.
 // O(n) linear scan — no recursion.
 pub fn dl_hit_test(dl: DrawList, px: float, py: float): HitZone {
-    var empty = HitZone();
-    var n = len(dl.hits);
-    // Scan in reverse — last added = topmost
+    val empty = HitZone();
+    val n = dl.hit_count;
     var i = n - 1;
     while (i >= 0) {
-        var hz = dl.hits[i];
+        val hz = dl.hits[i];
         if (hz.clip_w > 0.0 and hz.clip_h > 0.0) {
             if (px < hz.clip_x or px > hz.clip_x + hz.clip_w or py < hz.clip_y or py > hz.clip_y + hz.clip_h) {
                 i = i - 1;
@@ -296,9 +454,5 @@ pub fn dl_hit_test(dl: DrawList, px: float, py: float): HitZone {
 }
 
 pub fn dl_clear(dl: DrawList): nil {
-    dl.cmds = [] as [DrawCmd];
-    dl.hits = [] as [HitZone];
-    dl.overlay_cmds = [] as [DrawCmd];
-    dl.overlay_hits = [] as [HitZone];
-    dl.is_valid = 0;
+    dl.clear();
 }

@@ -194,10 +194,12 @@ TypePtr TypeChecker::check_function_declaration(std::shared_ptr<LM::Frontend::AS
     TypePtr body_type = check_statement(func->body);
 
     // Infer return type for unannotated non-main functions from body.
+    bool inferred_return = false;
     if (func->name != "main" && !func->returnType.has_value() && body_type) {
         return_type = body_type;
         signature.return_type = return_type;
         function_signatures[func->name] = signature;
+        inferred_return = true;
     }
     
     // Validate function body error types
@@ -208,6 +210,15 @@ TypePtr TypeChecker::check_function_declaration(std::shared_ptr<LM::Frontend::AS
     
     current_function = nullptr;
     current_return_type = nullptr;
+    
+    // The function name was declared before its body was checked, with an `any`
+    // return type for unannotated signatures. Now that the return type has been
+    // inferred, refresh the declared type so the function value carries the
+    // precise signature at call sites and in callback positions.
+    if (inferred_return) {
+        TypePtr refined_type = type_system.createFunctionType(param_names, signature.param_types, return_type, signature.has_default_values);
+        declare_variable(func->name, refined_type);
+    }
     
     func->inferred_type = return_type;
     return return_type;

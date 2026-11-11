@@ -1,195 +1,20 @@
-// ── State Management with Batch Updates ──────────────────────────────────────
-// Dirty notification callback — set by context.lm at startup via register_dirty_notifier()
-pub var _dirty_notifier: fn(): nil = nil;
+// std/ui/state.lm
+// Type-Safe Reactive State Management (Zero `any` via Staged Frame Templates)
+
+pub var _dirty_notifier: (fn(): nil) | nil = nil;
+pub var _batch_depth: int = 0;
 
 pub fn register_dirty_notifier(cb: fn(): nil): nil {
     _dirty_notifier = cb;
 }
 
-// ── Composition vocabulary ───────────────────────────────────────────────────
-// Subscriber lists and dependency edges are the shared moving parts of every
-// reactive node. Factoring them into mixins keeps Signal / ComputedSignal /
-// Effect honest about one storage layout each, and `Reactive` is the contract
-// consumers can hold regardless of which node produced the value.
-
-mixin Subscriptions {
-    pub var subscribers: [fn(any): nil];
-
-    pub fn subscribe(callback: fn(any): nil): nil {
-        self.subscribers.append(callback);
+fn mark_element_dirty_signal(): nil {
+    if (_dirty_notifier != nil) {
+        val f = _dirty_notifier as fn(): nil;
+        f();
     }
 }
 
-mixin Dependencies {
-    pub var dependencies: [Signal];
-}
-
-trait Reactive {
-    fn get(): any;
-    fn subscribe(callback: fn(any): nil): nil;
-}
-
-frame Signal: Reactive {
-    mixin Subscriptions;
-
-    pub var value: any;
-    pub init(init_val: any) {
-        self.value = init_val;
-        self.subscribers = [] as [fn(any): nil];
-    }
-    // Introspection: number of live subscriptions (Subscriptions mixin storage)
-    pub fn subscriber_count(): int { return len(self.subscribers); }
-    pub fn get(): any { return self.value; }
-    pub fn set(new_val: any): nil {
-        self.value = new_val;
-        // Notify subscribers
-        var i = 0;
-        while (i < len(self.subscribers)) {
-            var sub = self.subscribers[i];
-            sub(new_val);
-            i = i + 1;
-        }
-        // Mark dirty only if not in batch
-        if (_batch_depth == 0) {
-            mark_element_dirty_signal();
-        }
-    }
-}
-
-frame ComputedSignal: Reactive {
-    mixin Subscriptions;
-    mixin Dependencies;
-
-    pub var compute_fn: fn(): any;
-    pub var value: any;
-    pub var is_dirty: int;
-
-    pub init(compute: fn(): any, deps: [Signal]) {
-        self.compute_fn = compute;
-        self.dependencies = deps;
-        self.value = compute();
-        self.subscribers = [] as [fn(any): nil];
-        self.is_dirty = 0;
-        // Subscribe to dependency changes
-        var i = 0;
-        while (i < len(deps)) {
-            deps[i].subscribe(fn(nv: any): nil { self._computed_dep_changed(nv); });
-            i = i + 1;
-        }
-    }
-
-    pub fn get(): any {
-        if (self.is_dirty == 1) {
-            self.value = self.compute_fn();
-            self.is_dirty = 0;
-        }
-        return self.value;
-    }
-
-    // Introspection: dependency arity (Dependencies mixin) and recompute trigger
-    pub fn dep_count(): int { return len(self.dependencies); }
-
-    pub fn poke(): nil { self._computed_dep_changed(0); }
-
-    fn _computed_dep_changed(new_val: any): nil {
-        self.is_dirty = 1;
-        // Notify subscribers
-        var i = 0;
-        while (i < len(self.subscribers)) {
-            var sub = self.subscribers[i];
-            sub(self.get());
-            i = i + 1;
-        }
-        mark_element_dirty_signal();
-    }
-}
-
-frame Effect {
-    mixin Dependencies;
-
-    pub var effect_fn: fn(): nil;
-    pub var cleanup_fn: fn(): nil;
-    pub var is_active: int;
-
-    pub init(user_effect: fn(): nil, deps: [Signal]) {
-        self.effect_fn = user_effect;
-        self.dependencies = deps;
-        self.cleanup_fn = nil;
-        self.is_active = 1;
-        // Subscribe to dependency changes
-        var i = 0;
-        while (i < len(deps)) {
-            deps[i].subscribe(fn(nv: any): nil { self._effect_dep_changed(nv); });
-            i = i + 1;
-        }
-        // Run effect immediately
-        user_effect();
-    }
-
-    pub fn dispose(): nil {
-        if (self.is_active == 1 and self.cleanup_fn != nil) {
-            var cleanup: fn(): nil = self.cleanup_fn as fn(): nil;
-            cleanup();
-        }
-        self.is_active = 0;
-    }
-
-    // Introspection: dependency arity (Dependencies mixin)
-    pub fn dep_count(): int { return len(self.dependencies); }
-
-    fn _effect_dep_changed(new_val: any): nil {
-        if (self.is_active == 1) {
-            // Run cleanup if exists
-            if (self.cleanup_fn != nil) {
-                var cleanup: fn(): nil = self.cleanup_fn as fn(): nil;
-                cleanup();
-            }
-            // Re-run effect
-            self.effect_fn();
-        }
-    }
-}
-
-pub var _batch_depth: int = 0;
-pub var _active_effects: [Effect] = [] as [Effect];
-
-pub fn signal(init_val): Signal { return Signal(init_val); }
-pub fn signal_bool(init_val: bool): Signal { return Signal(init_val); }
-pub fn signal_int(init_val: int): Signal { return Signal(init_val); }
-pub fn signal_float(init_val: float): Signal { return Signal(init_val); }
-pub fn signal_str(init_val: str): Signal { return Signal(init_val); }
-
-// Computed signal (derived state)
-pub fn computed(compute_fn: fn(): any, deps: [Signal]): ComputedSignal {
-    return ComputedSignal(compute_fn, deps);
-}
-
-// Effect (side effect that runs when dependencies change)
-pub fn effect(effect_fn: fn(): nil, deps: [Signal]): Effect {
-    var eff = Effect(effect_fn, deps);
-    _active_effects.append(eff);
-    return eff;
-}
-
-// Effect with cleanup
-pub fn effect_with_cleanup(effect_fn: fn(): nil, cleanup_fn: fn(): nil, deps: [Signal]): Effect {
-    var eff = Effect(effect_fn, deps);
-    eff.cleanup_fn = cleanup_fn;
-    _active_effects.append(eff);
-    return eff;
-}
-
-// Dispose all active effects
-pub fn dispose_all_effects(): nil {
-    var i = 0;
-    while (i < len(_active_effects)) {
-        _active_effects[i].dispose();
-        i = i + 1;
-    }
-    _active_effects = [] as [Effect];
-}
-
-// Batch state updates (debounces dirty marking)
 pub fn batch_begin(): nil {
     _batch_depth = _batch_depth + 1;
 }
@@ -201,83 +26,344 @@ pub fn batch_end(): nil {
     }
 }
 
-// Notify the UI context that something changed
-fn mark_element_dirty_signal(): nil {
-    if (_dirty_notifier != nil) {
-        var f: fn(): nil = _dirty_notifier as fn(): nil;
-        f();
-    }
-}
-
-// Batch update pattern
 pub fn batch_updates(updates: fn(): nil): nil {
     batch_begin();
     updates();
     batch_end();
 }
 
-// ── Widget Signal Binding Helpers ───────────────────────────────────────────
-// Bind a signal's value to a widget's text property
-pub fn bind_text(sig: Signal, widget_mutator: fn(str): nil): nil {
-    sig.subscribe(fn(new_val: any): nil {
-        var s = new_val as str;
-        widget_mutator(s);
-    });
+// ── Type-Erased Dependency Graph Edge (No `any` payload) ──────────────────────
+
+frame SignalNode {
+    pub var listeners: [fn(): nil];
+
+    pub init() {
+        self.listeners = [] as [fn(): nil];
+    }
+
+    pub fn attach(cb: fn(): nil): nil {
+        self.listeners.append(cb);
+    }
+
+    pub fn notify(): nil {
+        iter (i in 0..len(self.listeners)) {
+            val cb = self.listeners[i];
+            cb();
+        }
+    }
+
+    pub fn listener_count(): int {
+        return len(self.listeners);
+    }
 }
 
-// Bind a signal's value to a widget's boolean property (e.g., is_checked, is_enabled)
-pub fn bind_bool(sig: Signal, widget_mutator: fn(bool): nil): nil {
-    sig.subscribe(fn(new_val: any): nil {
-        var b = new_val as bool;
-        widget_mutator(b);
-    });
+// ── Staged Type-Safe Reactive Primitives ─────────────────────────────────────
+
+staged frame Signal(T: type) {
+    pub var value: T;
+    pub var subscribers: [fn(T): nil];
+    pub var node: SignalNode;
+
+    pub init(init_val: T) {
+        self.value = init_val;
+        self.subscribers = [] as [fn(T): nil];
+        self.node = SignalNode();
+    }
+
+    pub fn subscriber_count(): int {
+        return len(self.subscribers);
+    }
+
+    pub fn subscribe(callback: fn(T): nil): nil {
+        self.subscribers.append(callback);
+    }
+
+    pub fn get(): T {
+        return self.value;
+    }
+
+    pub fn set(new_val: T): nil {
+        self.value = new_val;
+        iter (i in 0..len(self.subscribers)) {
+            val sub = self.subscribers[i];
+            sub(new_val);
+        }
+        self.node.notify();
+        if (_batch_depth == 0) {
+            mark_element_dirty_signal();
+        }
+    }
 }
 
-// Bind a signal's value to a widget's float property (e.g., slider_val, opacity_val)
-pub fn bind_float(sig: Signal, widget_mutator: fn(float): nil): nil {
-    sig.subscribe(fn(new_val: any): nil {
-        var f = new_val as float;
-        widget_mutator(f);
-    });
+staged frame ComputedSignal(T: type) {
+    pub var compute_fn: fn(): T;
+    pub var value: T;
+    pub var is_dirty: int;
+    pub var subscribers: [fn(T): nil];
+    pub var dependencies: [SignalNode];
+    pub var node: SignalNode;
+
+    pub init(compute: fn(): T, deps: [SignalNode]) {
+        self.compute_fn = compute;
+        self.dependencies = deps;
+        self.value = compute();
+        self.subscribers = [] as [fn(T): nil];
+        self.is_dirty = 0;
+        self.node = SignalNode();
+        iter (i in 0..len(deps)) {
+            deps[i].attach(fn(): nil { self.poke(); });
+        }
+    }
+
+    pub fn subscribe(callback: fn(T): nil): nil {
+        self.subscribers.append(callback);
+    }
+
+    pub fn dep_count(): int {
+        return len(self.dependencies);
+    }
+
+    pub fn get(): T {
+        if (self.is_dirty == 1) {
+            self.value = self.compute_fn();
+            self.is_dirty = 0;
+        }
+        return self.value;
+    }
+
+    pub fn poke(): nil {
+        self.is_dirty = 1;
+        val nv = self.get();
+        iter (i in 0..len(self.subscribers)) {
+            val sub = self.subscribers[i];
+            sub(nv);
+        }
+        self.node.notify();
+        if (_batch_depth == 0) {
+            mark_element_dirty_signal();
+        }
+    }
 }
 
-// Bind a signal's value to a widget's int property
-pub fn bind_int(sig: Signal, widget_mutator: fn(int): nil): nil {
-    sig.subscribe(fn(new_val: any): nil {
-        var i = new_val as int;
-        widget_mutator(i);
-    });
+frame Effect {
+    pub var effect_fn: fn(): nil;
+    pub var cleanup_fn: (fn(): nil) | nil;
+    pub var is_active: int;
+    pub var dependencies: [SignalNode];
+
+    pub init(user_effect: fn(): nil, deps: [SignalNode]) {
+        self.effect_fn = user_effect;
+        self.dependencies = deps;
+        self.cleanup_fn = nil;
+        self.is_active = 1;
+        iter (i in 0..len(deps)) {
+            deps[i].attach(fn(): nil { self._effect_dep_changed(); });
+        }
+        user_effect();
+    }
+
+    pub fn dispose(): nil {
+        if (self.is_active == 1 and self.cleanup_fn != nil) {
+            val cleanup = self.cleanup_fn as fn(): nil;
+            cleanup();
+        }
+        self.is_active = 0;
+    }
+
+    pub fn dep_count(): int {
+        return len(self.dependencies);
+    }
+
+    fn _effect_dep_changed(): nil {
+        if (self.is_active == 1) {
+            if (self.cleanup_fn != nil) {
+                val cleanup = self.cleanup_fn as fn(): nil;
+                cleanup();
+            }
+            self.effect_fn();
+        }
+    }
 }
 
-// Two-way binding: signal to widget and widget to signal
-// Returns a cleanup function to unsubscribe
-pub fn bind_two_way_text(sig: Signal, get_widget_fn: fn(): str, set_widget_fn: fn(str): nil): fn(): nil {
-    // Signal -> Widget
-    sig.subscribe(fn(new_val: any): nil {
-        var s = new_val as str;
-        set_widget_fn(s);
-    });
-    // Widget -> Signal (caller must invoke this on widget change)
-    return fn(): nil {
-        // Cleanup would require unsubscribe capability
-        // For now, this is a placeholder
-    };
+pub var _active_effects: [Effect] = [] as [Effect];
+
+pub fn effect(effect_fn: fn(): nil, deps: [SignalNode]): Effect {
+    val eff = Effect(effect_fn, deps);
+    _active_effects.append(eff);
+    return eff;
 }
 
-// Two-way binding for boolean (checkbox, toggle)
-pub fn bind_two_way_bool(sig: Signal, get_widget_fn: fn(): bool, set_widget_fn: fn(bool): nil): fn(): nil {
-    sig.subscribe(fn(new_val: any): nil {
-        var b = new_val as bool;
-        set_widget_fn(b);
-    });
-    return fn(): nil {};
+pub fn effect_with_cleanup(effect_fn: fn(): nil, cleanup_fn: fn(): nil, deps: [SignalNode]): Effect {
+    val eff = Effect(effect_fn, deps);
+    eff.cleanup_fn = cleanup_fn;
+    _active_effects.append(eff);
+    return eff;
 }
 
-// Two-way binding for float (slider)
-pub fn bind_two_way_float(sig: Signal, get_widget_fn: fn(): float, set_widget_fn: fn(float): nil): fn(): nil {
-    sig.subscribe(fn(new_val: any): nil {
-        var f = new_val as float;
-        set_widget_fn(f);
-    });
-    return fn(): nil {};
+pub fn dispose_all_effects(): nil {
+    iter (i in 0..len(_active_effects)) {
+        _active_effects[i].dispose();
+    }
+    _active_effects = [] as [Effect];
+}
+
+// ── Concrete Typed Signal Wrappers (Cross-Module Safe) ───────────────────────
+
+frame BoolSignal {
+    pub var value: bool;
+    pub var subscribers: [fn(bool): nil];
+    pub var node: SignalNode;
+
+    pub init(init_val: bool = false) {
+        self.value = init_val;
+        self.subscribers = [] as [fn(bool): nil];
+        self.node = SignalNode();
+    }
+
+    pub fn subscribe(callback: fn(bool): nil): nil { self.subscribers.append(callback); }
+    pub fn get(): bool { return self.value; }
+    pub fn set(new_val: bool): nil {
+        self.value = new_val;
+        iter (i in 0..len(self.subscribers)) {
+            val sub = self.subscribers[i];
+            sub(new_val);
+        }
+        self.node.notify();
+        if (_batch_depth == 0) { mark_element_dirty_signal(); }
+    }
+}
+
+frame IntSignal {
+    pub var value: int;
+    pub var subscribers: [fn(int): nil];
+    pub var node: SignalNode;
+
+    pub init(init_val: int = 0) {
+        self.value = init_val;
+        self.subscribers = [] as [fn(int): nil];
+        self.node = SignalNode();
+    }
+
+    pub fn subscribe(callback: fn(int): nil): nil { self.subscribers.append(callback); }
+    pub fn get(): int { return self.value; }
+    pub fn set(new_val: int): nil {
+        self.value = new_val;
+        iter (i in 0..len(self.subscribers)) {
+            val sub = self.subscribers[i];
+            sub(new_val);
+        }
+        self.node.notify();
+        if (_batch_depth == 0) { mark_element_dirty_signal(); }
+    }
+}
+
+frame FloatSignal {
+    pub var value: float;
+    pub var subscribers: [fn(float): nil];
+    pub var node: SignalNode;
+
+    pub init(init_val: float = 0.0) {
+        self.value = init_val;
+        self.subscribers = [] as [fn(float): nil];
+        self.node = SignalNode();
+    }
+
+    pub fn subscribe(callback: fn(float): nil): nil { self.subscribers.append(callback); }
+    pub fn get(): float { return self.value; }
+    pub fn set(new_val: float): nil {
+        self.value = new_val;
+        iter (i in 0..len(self.subscribers)) {
+            val sub = self.subscribers[i];
+            sub(new_val);
+        }
+        self.node.notify();
+        if (_batch_depth == 0) { mark_element_dirty_signal(); }
+    }
+}
+
+frame StrSignal {
+    pub var value: str;
+    pub var subscribers: [fn(str): nil];
+    pub var node: SignalNode;
+
+    pub init(init_val: str = "") {
+        self.value = init_val;
+        self.subscribers = [] as [fn(str): nil];
+        self.node = SignalNode();
+    }
+
+    pub fn subscribe(callback: fn(str): nil): nil { self.subscribers.append(callback); }
+    pub fn get(): str { return self.value; }
+    pub fn set(new_val: str): nil {
+        self.value = new_val;
+        iter (i in 0..len(self.subscribers)) {
+            val sub = self.subscribers[i];
+            sub(new_val);
+        }
+        self.node.notify();
+        if (_batch_depth == 0) { mark_element_dirty_signal(); }
+    }
+}
+
+frame ComputedStr {
+    pub var compute_fn: fn(): str;
+    pub var value: str;
+    pub var is_dirty: int;
+    pub var subscribers: [fn(str): nil];
+    pub var dependencies: [SignalNode];
+    pub var node: SignalNode;
+
+    pub init(compute: fn(): str, deps: [SignalNode]) {
+        self.compute_fn = compute;
+        self.dependencies = deps;
+        self.value = compute();
+        self.subscribers = [] as [fn(str): nil];
+        self.is_dirty = 0;
+        self.node = SignalNode();
+        iter (i in 0..len(deps)) {
+            deps[i].attach(fn(): nil { self.poke(); });
+        }
+    }
+
+    pub fn subscribe(callback: fn(str): nil): nil { self.subscribers.append(callback); }
+    pub fn get(): str {
+        if (self.is_dirty == 1) {
+            self.value = self.compute_fn();
+            self.is_dirty = 0;
+        }
+        return self.value;
+    }
+
+    pub fn poke(): nil {
+        self.is_dirty = 1;
+        val nv = self.get();
+        iter (i in 0..len(self.subscribers)) {
+            val sub = self.subscribers[i];
+            sub(nv);
+        }
+        self.node.notify();
+        if (_batch_depth == 0) { mark_element_dirty_signal(); }
+    }
+}
+
+pub fn signal_bool(init_val: bool): BoolSignal { return BoolSignal(init_val); }
+pub fn signal_int(init_val: int): IntSignal { return IntSignal(init_val); }
+pub fn signal_float(init_val: float): FloatSignal { return FloatSignal(init_val); }
+pub fn signal_str(init_val: str): StrSignal { return StrSignal(init_val); }
+pub fn computed_str(compute_fn: fn(): str, deps: [SignalNode]): ComputedStr { return ComputedStr(compute_fn, deps); }
+
+pub fn bind_text(sig: StrSignal, widget_mutator: fn(str): nil): nil {
+    sig.subscribe(widget_mutator);
+}
+
+pub fn bind_bool(sig: BoolSignal, widget_mutator: fn(bool): nil): nil {
+    sig.subscribe(widget_mutator);
+}
+
+pub fn bind_float(sig: FloatSignal, widget_mutator: fn(float): nil): nil {
+    sig.subscribe(widget_mutator);
+}
+
+pub fn bind_int(sig: IntSignal, widget_mutator: fn(int): nil): nil {
+    sig.subscribe(widget_mutator);
 }

@@ -210,28 +210,20 @@ fn test_phase4_sprites_and_particles() {
     anim.update(0.12);
     assert(anim.frame_index == 1, "Animation should advance to frame 1 after 0.12s");
 
-    // Particle Emitter
+    // Particle Emitter (SoA)
     var emitter = game.ParticleEmitter(50);
-    assert(len(emitter.particles) == 50, "Emitter should preallocate 50 particles");
+    assert(emitter.max_particles == 50, "Emitter should preallocate 50 particles");
+    assert(len(emitter.alive) == 50, "Emitter SoA alive array should have length 50");
 
     emitter.position = game.Vec2(300.0, 400.0);
     emitter.burst(20);
 
-    var alive_count = 0;
-    var i = 0;
-    while (i < len(emitter.particles)) {
-        if (emitter.particles[i].alive) {
-            alive_count = alive_count + 1;
-        }
-        i = i + 1;
-    }
-    assert(alive_count == 20, "Burst of 20 should spawn 20 alive particles");
+    assert(emitter.alive_count() == 20, "Burst of 20 should spawn 20 alive particles");
 
-    // Update particles
+    // Update particles in-place
     emitter.update(0.1);
-    var p0 = emitter.particles[0];
-    assert(p0.life > 0.0, "Particle life should progress");
-    assert(p0.pos.y != 400.0 or p0.pos.x != 300.0, "Particle should move over time");
+    assert(emitter.life[0] > 0.0, "Particle life should progress");
+    assert(emitter.py[0] != 400.0 or emitter.px[0] != 300.0, "Particle should move over time");
 
     print("[OK] Phase 4 Sprites, Animation & Particles passed");
 }

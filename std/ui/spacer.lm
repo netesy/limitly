@@ -1,7 +1,6 @@
 // std/ui/spacer - Flexible spacer widget
-import std.ui.types as ui_types;
-pub import std.ui.components show Spacer;
+import std.ui.components as comp;
 
-pub fn spacer(flex: float = 1.0): ui_types.Widget {
-    return ui_types.spacer(flex);
+pub fn spacer(flex: float = 1.0): comp.Spacer {
+    return comp.Spacer(flex);
 }

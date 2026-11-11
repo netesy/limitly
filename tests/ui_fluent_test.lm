@@ -24,11 +24,11 @@ fn test_fluent_text_styling(): int {
     .font_size(24.0)
     .bold();
 
-    assert(t.kind == ui.KIND_TEXT, "text kind mismatch");
-    assert(t.text_val == "Hello Lymar", "text content mismatch");
-    assert(t.foreground_color.r > 0.8, "text color R mismatch");
+    assert(t.widget_kind() == ui.WidgetKind.Text, "text kind mismatch");
+    assert(t.text == "Hello Lymar", "text content mismatch");
+    assert(t.fg.r > 0.8, "text color R mismatch");
     assert(t.font_size_val == 24.0, "text font size mismatch");
-    assert(t.font_weight_val == 700, "text weight mismatch");
+    assert(t.weight_val == ui.Weight.Bold, "text weight mismatch");
     print("[PASS] 1. Fluent text styling");
     return 1;
 }
@@ -41,10 +41,10 @@ fn test_fluent_button_styling(): int {
     .corner_radius(8.0)
     .size(160.0, 44.0);
 
-    assert(btn.kind == ui.KIND_BUTTON, "button kind mismatch");
-    assert(btn.text_val == "Save", "button label mismatch");
-    assert(btn.padding_left == 14.0, "button padding mismatch");
-    assert(btn.corner_radius_val == 8.0, "button corner radius mismatch");
+    assert(btn.widget_kind() == ui.WidgetKind.Button, "button kind mismatch");
+    assert(btn.label == "Save", "button label mismatch");
+    assert(btn.pad_l == 14.0, "button padding mismatch");
+    assert(btn.radius == 8.0, "button corner radius mismatch");
     assert(btn.width_val == 160.0, "button width mismatch");
     assert(btn.height_val == 44.0, "button height mismatch");
     assert(btn.on_click_action != nil, "button callback missing");
@@ -59,15 +59,15 @@ fn test_layout_modifiers(): int {
     .spacing(12.0)
     .padding_xy(16.0, 20.0);
 
-    assert(col.kind == ui.KIND_CONTAINER, "column kind mismatch");
-    assert(col.is_vertical == 1, "column vertical axis mismatch");
+    assert(col.widget_kind() == ui.WidgetKind.Container, "column kind mismatch");
+    assert(col.is_vertical(), "column vertical axis mismatch");
     assert(len(col.children) == 2, "column child count mismatch");
     assert(col.spacing_val == 12.0, "column spacing mismatch");
-    assert(col.padding_left == 16.0, "column padding_x mismatch");
-    assert(col.padding_top == 20.0, "column padding_y mismatch");
+    assert(col.pad_l == 16.0, "column padding_x mismatch");
+    assert(col.pad_t == 20.0, "column padding_y mismatch");
 
     var r = ui.row([item1, item2]).spacing(8.0);
-    assert(r.is_vertical == 0, "row axis mismatch");
+    assert(not r.is_vertical(), "row axis mismatch");
     assert(r.spacing_val == 8.0, "row spacing mismatch");
 
     print("[PASS] 3. Layout modifiers (column, row, spacing, padding)");
@@ -87,19 +87,19 @@ fn test_style_reuse_and_precedence(): int {
     var btn1 = ui.button("B1").style(base_style);
     var btn2 = ui.button("B2").style(base_style);
 
-    assert(btn1.background_color.b > 0.9, "btn1 base background mismatch");
-    assert(btn2.background_color.b > 0.9, "btn2 base background mismatch");
-    assert(btn1.padding_left == 10.0, "btn1 base padding mismatch");
-    assert(btn2.padding_left == 10.0, "btn2 base padding mismatch");
+    assert(btn1.bg.b > 0.9, "btn1 base background mismatch");
+    assert(btn2.bg.b > 0.9, "btn2 base background mismatch");
+    assert(btn1.pad_l == 10.0, "btn1 base padding mismatch");
+    assert(btn2.pad_l == 10.0, "btn2 base padding mismatch");
 
     // Test modifier override ordering: local modifier overrides style property (later wins)
     btn2.background(color.red).padding(18.0);
-    assert(btn2.background_color.r > 0.8, "btn2 overridden background mismatch");
-    assert(btn2.padding_left == 18.0, "btn2 overridden padding mismatch");
+    assert(btn2.bg.r > 0.8, "btn2 overridden background mismatch");
+    assert(btn2.pad_l == 18.0, "btn2 overridden padding mismatch");
 
     // Test direct modifier override ordering: later direct modifier overrides earlier direct modifier
     var t = ui.text("Test").color(color.red).color(color.green);
-    assert(t.foreground_color.g > 0.7, "later modifier precedence failed");
+    assert(t.fg.g > 0.7, "later modifier precedence failed");
 
     print("[PASS] 4. Reusable Style value and modifier precedence");
     return 1;
@@ -109,7 +109,7 @@ fn test_state_styling(): int {
     var pressed_style = ui.style().background(color.dark_gray).foreground(color.yellow);
     var btn = ui.button("Stateful")
     .background(color.blue)
-    .pressed(pressed_style);
+    .pressed_style(pressed_style);
 
     var ps = btn.pressed_style_val as ui.Style;
     assert(ps.has_bg, "pressed style missing bg");
@@ -134,7 +134,7 @@ fn test_retained_lifecycle_and_callback(): int {
     var p1 = gg.readback_pixel(50, 50);
     assert(p1 != nil, "frame 1 readback failed");
     assert(btn.click_count == 0, "initial click count must be 0");
-    assert(btn.is_pressed == 0, "initial is_pressed must be 0");
+    assert(not btn.is_pressed, "initial is_pressed must be false");
 
     // Frame 2: Mouse down on button at (x=50, y=50) -> pressed visual
     app.push_event(app.Event(event_type=app.EventType.MouseDown, x=50, y=50));
@@ -142,13 +142,13 @@ fn test_retained_lifecycle_and_callback(): int {
     var p2 = gg.readback_pixel(50, 50);
     assert(p2 != nil, "frame 2 readback failed");
     assert(p1 != p2, "pixel should change to pressed color on mouse down");
-    assert(btn.is_pressed == 1, "button is_pressed must be 1 on mouse down");
+    assert(btn.is_pressed, "button is_pressed must be true on mouse down");
 
     // Frame 3: Mouse up on button -> fires callback and resets pressed state
     app.push_event(app.Event(event_type=app.EventType.MouseUp, x=50, y=50));
     app.run_frame_step();
     assert(btn.click_count == 1, "button click_count was not incremented");
-    assert(btn.is_pressed == 0, "button is_pressed must be 0 after mouse up");
+    assert(not btn.is_pressed, "button is_pressed must be false after mouse up");
 
     // Frame 4: Verify retained state persistence across frames
     app.run_frame_step();

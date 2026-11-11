@@ -1,0 +1,265 @@
+// std/d3/sculpt.lm
+// Procedural sculpting and cross-section modeling engine for Lymar 3D graphics (std.d3).
+// Provides profile extrusions, lathe/revolve operations, multi-station lofts, and symmetry mirroring.
+
+import std.d3.geometry as geom;
+import std.math.trigonometry as trig;
+
+/// Extrudes a 2D profile polygon along the Z axis with optional taper scale and twist rotation.
+/// @param profile Flat list of 2D coordinates [x0, y0, x1, y1, ...] forming a closed polygon.
+/// @param depth Extrusion length along the -Z direction.
+/// @param taper Scale multiplier applied to the back cap (default 1.0).
+/// @param twist Rotation angle in radians applied to the back cap (default 0.0).
+pub fn extrude(profile: [float], depth: float = 1.0, taper: float = 1.0, twist: float = 0.0): geom.Geometry {
+    var g = geom.Geometry();
+    val num_points = len(profile) / 2;
+    if (num_points < 3) {
+        return g;
+    }
+
+    var cx = 0.0;
+    var cy = 0.0;
+
+    // 1. Add Front Cap Vertices (z = 0.0)
+    var i = 0;
+    while (i < num_points) {
+        val px = profile[i * 2];
+        val py = profile[i * 2 + 1];
+        cx = cx + px;
+        cy = cy + py;
+        g.add_vertex(px, py, 0.0);
+        i = i + 1;
+    }
+    cx = cx / (num_points as float);
+    cy = cy / (num_points as float);
+
+    // 2. Add Back Cap Vertices (z = -depth, scaled and twisted)
+    val cos_tw = trig.cos(twist);
+    val sin_tw = trig.sin(twist);
+    var j = 0;
+    while (j < num_points) {
+        val px = profile[j * 2] * taper;
+        val py = profile[j * 2 + 1] * taper;
+        val rx = px * cos_tw - py * sin_tw;
+        val ry = px * sin_tw + py * cos_tw;
+        g.add_vertex(rx, ry, 0.0 - depth);
+        j = j + 1;
+    }
+
+    // 3. Connect Side Walls with Quads
+    var e = 0;
+    while (e < num_points) {
+        var next = e + 1;
+        if (next == num_points) { next = 0; }
+
+        val f0 = e;
+        val f1 = next;
+        val b0 = num_points + e;
+        val b1 = num_points + next;
+
+        // Quad CCW from outside: front0 -> back0 -> back1 -> front1
+        g.add_face(f0, b0, b1);
+        g.add_face(f0, b1, f1);
+        e = e + 1;
+    }
+
+    // 4. Front Cap (Fan from front centroid, facing +Z)
+    val front_center = g.add_vertex(cx, cy, 0.0);
+    var fc = 0;
+    while (fc < num_points) {
+        var fc_next = fc + 1;
+        if (fc_next == num_points) { fc_next = 0; }
+        g.add_face(front_center, fc, fc_next);
+        fc = fc + 1;
+    }
+
+    // 5. Back Cap (Fan from back centroid, facing -Z)
+    val bc_x = (cx * taper) * cos_tw - (cy * taper) * sin_tw;
+    val bc_y = (cx * taper) * sin_tw + (cy * taper) * cos_tw;
+    val back_center = g.add_vertex(bc_x, bc_y, 0.0 - depth);
+    var bc = 0;
+    while (bc < num_points) {
+        var bc_next = bc + 1;
+        if (bc_next == num_points) { bc_next = 0; }
+        g.add_face(back_center, num_points + bc_next, num_points + bc);
+        bc = bc + 1;
+    }
+
+    g.compute_vertex_normals();
+    return g;
+}
+
+/// Revolves a 2D profile silhouette [radius, y] around the Y axis into a rotational 3D mesh.
+/// @param profile Flat list of (r, y) coordinates [r0, y0, r1, y1, ...] representing half-silhouette.
+/// @param segments Number of radial slices around 360 degrees (default 16).
+/// @param sweep_angle Total revolution angle in radians (default 2*PI).
+pub fn revolve(profile: [float], segments: int = 16, sweep_angle: float = 6.2831853): geom.Geometry {
+    var g = geom.Geometry();
+    val num_points = len(profile) / 2;
+    if (num_points < 2 or segments < 3) {
+        return g;
+    }
+
+    val step_angle = sweep_angle / (segments as float);
+
+    // Generate grid of vertices: (segments + 1) rings of num_points
+    var s = 0;
+    while (s <= segments) {
+        val angle = (s as float) * step_angle;
+        val ca = trig.cos(angle);
+        val sa = trig.sin(angle);
+
+        var p = 0;
+        while (p < num_points) {
+            val r = profile[p * 2];
+            val y = profile[p * 2 + 1];
+            val x = r * ca;
+            val z = (0.0 - r) * sa;
+            g.add_vertex(x, y, z);
+            p = p + 1;
+        }
+        s = s + 1;
+    }
+
+    // Generate Quad Mesh between adjacent rings
+    var seg = 0;
+    while (seg < segments) {
+        val ring0 = seg * num_points;
+        val ring1 = (seg + 1) * num_points;
+
+        var pt = 0;
+        while (pt < num_points - 1) {
+            val v00 = ring0 + pt;
+            val v01 = ring0 + pt + 1;
+            val v10 = ring1 + pt;
+            val v11 = ring1 + pt + 1;
+
+            g.add_face(v00, v10, v11);
+            g.add_face(v00, v11, v01);
+            pt = pt + 1;
+        }
+        seg = seg + 1;
+    }
+
+    g.compute_vertex_normals();
+    return g;
+}
+
+/// Skins a 3D geometry across multiple 2D cross-sections positioned along the Z axis.
+/// @param sections List of 2D profile coordinates, all having the exact same point count N.
+/// @param z_positions Array of Z positions for each respective cross section.
+/// @param cap_start Whether to generate a cap on the first cross-section.
+/// @param cap_end Whether to generate a cap on the last cross-section.
+pub fn loft(sections: [[float]], z_positions: [float], cap_start: bool = true, cap_end: bool = true): geom.Geometry {
+    var g = geom.Geometry();
+    val num_sections = len(sections);
+    if (num_sections < 2 or len(z_positions) != num_sections) {
+        return g;
+    }
+
+    val pts_per_sec = len(sections[0]) / 2;
+    if (pts_per_sec < 3) {
+        return g;
+    }
+
+    // 1. Add vertices for each section
+    var sec_idx = 0;
+    while (sec_idx < num_sections) {
+        val cur_sec = sections[sec_idx];
+        val cur_z = z_positions[sec_idx];
+        var pt_idx = 0;
+        while (pt_idx < pts_per_sec) {
+            val x = cur_sec[pt_idx * 2];
+            val y = cur_sec[pt_idx * 2 + 1];
+            g.add_vertex(x, y, cur_z);
+            pt_idx = pt_idx + 1;
+        }
+        sec_idx = sec_idx + 1;
+    }
+
+    // 2. Stitch quad strips between consecutive sections
+    var s = 0;
+    while (s < num_sections - 1) {
+        val base0 = s * pts_per_sec;
+        val base1 = (s + 1) * pts_per_sec;
+
+        var i = 0;
+        while (i < pts_per_sec) {
+            var next = i + 1;
+            if (next == pts_per_sec) { next = 0; }
+
+            val v00 = base0 + i;
+            val v01 = base0 + next;
+            val v10 = base1 + i;
+            val v11 = base1 + next;
+
+            g.add_face(v00, v01, v11);
+            g.add_face(v00, v11, v10);
+            i = i + 1;
+        }
+        s = s + 1;
+    }
+
+    // 3. Cap Start (first section)
+    if (cap_start) {
+        var start_cx = 0.0;
+        var start_cy = 0.0;
+        val s0 = sections[0];
+        var ci = 0;
+        while (ci < pts_per_sec) {
+            start_cx = start_cx + s0[ci * 2];
+            start_cy = start_cy + s0[ci * 2 + 1];
+            ci = ci + 1;
+        }
+        start_cx = start_cx / (pts_per_sec as float);
+        start_cy = start_cy / (pts_per_sec as float);
+        val c_start = g.add_vertex(start_cx, start_cy, z_positions[0]);
+
+        var p = 0;
+        while (p < pts_per_sec) {
+            var p_next = p + 1;
+            if (p_next == pts_per_sec) { p_next = 0; }
+            g.add_face(c_start, p_next, p);
+            p = p + 1;
+        }
+    }
+
+    // 4. Cap End (last section)
+    if (cap_end) {
+        var end_cx = 0.0;
+        var end_cy = 0.0;
+        val last_sec = sections[num_sections - 1];
+        var cj = 0;
+        while (cj < pts_per_sec) {
+            end_cx = end_cx + last_sec[cj * 2];
+            end_cy = end_cy + last_sec[cj * 2 + 1];
+            cj = cj + 1;
+        }
+        end_cx = end_cx / (pts_per_sec as float);
+        end_cy = end_cy / (pts_per_sec as float);
+        val c_end = g.add_vertex(end_cx, end_cy, z_positions[num_sections - 1]);
+
+        val last_base = (num_sections - 1) * pts_per_sec;
+        var q = 0;
+        while (q < pts_per_sec) {
+            var q_next = q + 1;
+            if (q_next == pts_per_sec) { q_next = 0; }
+            g.add_face(c_end, last_base + q, last_base + q_next);
+            q = q + 1;
+        }
+    }
+
+    g.compute_vertex_normals();
+    return g;
+}
+
+/// Takes a half-model geometry, mirrors it across the chosen axis, and merges both into a single watertight mesh.
+/// @param half_geom The source half-model (e.g. left side of a spaceship or character).
+/// @param axis 0 = X axis (bilateral symmetry), 1 = Y axis, 2 = Z axis.
+pub fn mirror_compound(half_geom: geom.Geometry, axis: int = 0): geom.Geometry {
+    var result = half_geom.clone();
+    var mirrored = half_geom.mirror(axis);
+    result.merge(mirrored);
+    return result;
+}
+

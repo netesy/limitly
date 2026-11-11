@@ -1,49 +1,93 @@
 // std/ui/components.lm
 // Zero-Cost Component Embedding Architecture for Lymar Retained UI.
 //
-// Replaces monolithic 60-field God objects with fine-grained, composable
+// Replaces the legacy 65-field `Widget` monolith with fine-grained, composable
 // component frames utilizing Lymar's `embed` mechanism.
 // Flattened fields have zero pointer overhead; promoted methods provide
 // fluent builder ergonomics without wrapper allocations.
 //
-// Interaction slots are typed optional functions -- `(fn(): nil)?` -- never
-// raw `any`, and every invocation routes through a fallible `EventResult?`
-// pipeline so call sites carry no nil-check ladders.
+// Interaction slots are typed optional functions -- `(fn(): nil) | nil` --
+// never raw `any`, and actionable events route through `EventResult?`.
 
 import std.color as color;
 import std.math as math;
+import std.graphics.shadow as shadow;
+import std.animation as animation;
+import std.widget show Alignment;
+import std.ui.types show WidgetKind, LifecycleState, Align, Weight, Semantic, AlertKind, DotState, ConstraintMode, Role, Style, align_start, alert_kind_of, dot_state_of;
+import std.ui.state as state;
 pub import std.color show Color;
 pub import std.ui.event show EventResult;
 
 // ── Structural Contract ───────────────────────────────────────────────────────
-// Typed children: containers hold `[Fluent]`, not `[any]`. Every concrete
-// component declares conformance, so the compiler checks composition shapes.
+// Typed children: containers hold `[Fluent]`, not `[any]`.
+// Methods below are satisfied automatically when a frame embeds `LayoutMetrics`.
 
 trait Fluent {
     fn kind_name(): str;
+    fn widget_kind(): WidgetKind;
+    fn get_width(): float;
+    fn get_height(): float;
+    fn get_flex(): float;
+    fn get_grow(): float;
+    fn get_spacing(): float;
+    fn get_pad_l(): float;
+    fn get_pad_t(): float;
+    fn get_pad_r(): float;
+    fn get_pad_b(): float;
+    fn get_min_width(): float;
+    fn get_max_width(): float;
+    fn get_min_height(): float;
+    fn get_max_height(): float;
+    fn get_aspect_ratio(): float;
+    fn set_aspect_ratio_val(r: float): nil;
+    fn set_dimensions(w: float, h: float): nil;
+    fn set_padding(p: float): nil;
 }
 
-// ── Reusable Component Primitives ─────────────────────────────────────────────
+// ── Reusable Embeddable Component Primitives ──────────────────────────────────
+
+// Embed primitives declare their defaults on the fields themselves: `embed`
+// flattens fields into the host, so the host's constructor applies these
+// declared values directly (an embedded frame's `init` is never invoked).
 
 frame LayoutMetrics {
-    pub var width_val: float;
-    pub var height_val: float;
-    pub var pad_l: float;
-    pub var pad_t: float;
-    pub var pad_r: float;
-    pub var pad_b: float;
-    pub var spacing_val: float;
-    pub var flex_val: float;
+    pub var width_val: float = 0.0;
+    pub var height_val: float = 0.0;
+    pub var min_width: float = 0.0;
+    pub var max_width: float = 0.0;
+    pub var min_height: float = 0.0;
+    pub var max_height: float = 0.0;
+    pub var aspect_ratio: float = 0.0;
+    pub var pad_l: float = 0.0;
+    pub var pad_t: float = 0.0;
+    pub var pad_r: float = 0.0;
+    pub var pad_b: float = 0.0;
+    pub var spacing_val: float = 0.0;
+    pub var flex_val: float = 0.0;
+    pub var grow_val: float = 0.0;
+    pub var align_self_val: Align = align_start;
+    pub var role_val: Role = Role.Text;
+    pub var constraint_mode: ConstraintMode = ConstraintMode.Fixed;
+    pub var lifecycle_state: LifecycleState = LifecycleState.Active;
 
-    pub init() {
-        self.width_val = 0.0;
-        self.height_val = 0.0;
-        self.pad_l = 0.0;
-        self.pad_t = 0.0;
-        self.pad_r = 0.0;
-        self.pad_b = 0.0;
-        self.spacing_val = 0.0;
-        self.flex_val = 0.0;
+    pub fn get_width(): float { return self.width_val; }
+    pub fn get_height(): float { return self.height_val; }
+    pub fn get_flex(): float { return self.flex_val; }
+    pub fn get_grow(): float { return self.grow_val; }
+    pub fn get_spacing(): float { return self.spacing_val; }
+    pub fn get_pad_l(): float { return self.pad_l; }
+    pub fn get_pad_t(): float { return self.pad_t; }
+    pub fn get_pad_r(): float { return self.pad_r; }
+    pub fn get_pad_b(): float { return self.pad_b; }
+    pub fn get_min_width(): float { return self.min_width; }
+    pub fn get_max_width(): float { return self.max_width; }
+    pub fn get_min_height(): float { return self.min_height; }
+    pub fn get_max_height(): float { return self.max_height; }
+    pub fn get_aspect_ratio(): float { return self.aspect_ratio; }
+
+    pub fn set_aspect_ratio_val(r: float): nil {
+        self.aspect_ratio = r;
     }
 
     pub fn set_dimensions(w: float, h: float): nil {
@@ -59,20 +103,16 @@ frame LayoutMetrics {
     }
 }
 
-type LayoutBox = LayoutMetrics;
-
 frame VisualStyle {
-    pub var bg: Color;
-    pub var fg: Color;
-    pub var radius: float;
-    pub var opacity_val: float;
-
-    pub init() {
-        self.bg = color.transparent;
-        self.fg = color.white;
-        self.radius = 0.0;
-        self.opacity_val = 1.0;
-    }
+    pub var bg: Color = Color(0.0, 0.0, 0.0, 0.0);
+    pub var fg: Color = Color(1.0, 1.0, 1.0, 1.0);
+    pub var radius: float = 0.0;
+    pub var opacity_val: float = 1.0;
+    pub var border_width: float = 0.0;
+    pub var border_color: Color = Color(0.0, 0.0, 0.0, 0.0);
+    pub var shadow_val: shadow.Shadow | nil = nil;
+    pub var hover_style_val: Style | nil = nil;
+    pub var pressed_style_val: Style | nil = nil;
 
     pub fn set_colors(background: Color, foreground: Color): nil {
         self.bg = background;
@@ -85,31 +125,27 @@ frame VisualStyle {
 }
 
 frame Clickable {
-    pub var is_pressed: bool;
-    pub var is_hovered: bool;
-    pub var on_click_action: (fn(): nil)?;
-    pub var click_count: int;
+    pub var is_pressed: bool = false;
+    pub var is_hovered: bool = false;
+    pub var is_disabled: bool = false;
+    pub var on_click_action: (fn(): nil) | nil = nil;
+    pub var click_count: int = 0;
 
-    pub init() {
-        self.is_pressed = false;
-        self.is_hovered = false;
-        self.on_click_action = nil;
-        self.click_count = 0;
+    pub fn set_on_click(action: (fn(): nil) | nil): nil {
+        self.on_click_action = action;
     }
 
-    pub fn set_on_click(action: fn(): nil): nil {
-        self.on_click_action = action as (fn(): nil)?;
-    }
-
-    // Fallible invocation: an absent handler is `Unhandled`, not a crash.
     pub fn click(): EventResult? {
-        var slot = self.on_click_action;
+        if (self.is_disabled) {
+            return ok(EventResult.Ignored);
+        }
+        self.click_count = self.click_count + 1;
+        val slot = self.on_click_action;
         if (slot == nil) {
             return ok(EventResult.Unhandled);
         }
-        var f: fn(): nil = slot as fn(): nil;
+        val f: fn(): nil = slot as fn(): nil;
         f();
-        self.click_count = self.click_count + 1;
         return ok(EventResult.Handled);
     }
 
@@ -119,24 +155,19 @@ frame Clickable {
 }
 
 frame Changeable {
-    pub var on_change_action: (fn(): nil)?;
-    pub var change_count: int;
+    pub var on_change_action: (fn(): nil) | nil = nil;
+    pub var change_count: int = 0;
 
-    pub init() {
-        self.on_change_action = nil;
-        self.change_count = 0;
-    }
-
-    pub fn set_on_change(action: fn(): nil): nil {
-        self.on_change_action = action as (fn(): nil)?;
+    pub fn set_on_change(action: (fn(): nil) | nil): nil {
+        self.on_change_action = action;
     }
 
     pub fn notify_change(): EventResult? {
-        var slot = self.on_change_action;
+        val slot = self.on_change_action;
         if (slot == nil) {
             return ok(EventResult.Unhandled);
         }
-        var f: fn(): nil = slot as fn(): nil;
+        val f: fn(): nil = slot as fn(): nil;
         f();
         self.change_count = self.change_count + 1;
         return ok(EventResult.Handled);
@@ -144,13 +175,9 @@ frame Changeable {
 }
 
 frame Focusable {
-    pub var is_focused: bool;
-    pub var cursor_pos: int;
-
-    pub init() {
-        self.is_focused = false;
-        self.cursor_pos = 0;
-    }
+    pub var is_focused: bool = false;
+    pub var cursor_pos: int = 0;
+    pub var focus_key_val: str = "";
 
     pub fn focus(): nil {
         self.is_focused = true;
@@ -162,24 +189,66 @@ frame Focusable {
     }
 }
 
+frame MetaInfo {
+    pub var semantic: Semantic = Semantic.Generic;
+    pub var a11y_label: str = "";
+    pub var a11y_role: str = "";
+    pub var a11y_hint: str = "";
+    pub var a11y_live: str = "";
+    pub var anim_x: animation.Spring | nil = nil;
+    pub var anim_y: animation.Spring | nil = nil;
+    pub var anim_property: animation.PropertyAnimation | nil = nil;
+}
+
+frame ScrollState {
+    pub var scroll_x: float = 0.0;
+    pub var scroll_y: float = 0.0;
+    pub var max_scroll_y: float = 0.0;
+    pub var content_w: float = 0.0;
+    pub var content_h: float = 0.0;
+}
+
+frame SelectionState {
+    pub var options: [str] = [] as [str];
+    pub var selected_idx: int = 0;
+    pub var selected_indices: [int] = [] as [int];
+}
+
+frame TabState {
+    pub var tab_titles: [str] = [] as [str];
+    pub var active_tab: int = 0;
+}
+
+frame OverlayGeometry {
+    pub var overlay_x: float = 0.0;
+    pub var overlay_y: float = 0.0;
+    pub var overlay_w: float = 0.0;
+    pub var overlay_h: float = 0.0;
+}
+
 // ── Nominal Flow Direction ────────────────────────────────────────────────────
 
 enum Flow {
     Vertical,
-    Horizontal
+    Horizontal,
+    Stacked
 }
 
-// ── Specialized Embedded UI Components ────────────────────────────────────────
+// ── Core Embedded UI Widgets ──────────────────────────────────────────────────
 
 frame Button: Fluent {
     embed LayoutMetrics;
     embed VisualStyle;
     embed Clickable;
+    embed Focusable;
+    embed MetaInfo;
 
     pub var label: str;
+    pub var font_size_val: float;
 
-    pub init(text: str, on_click: (fn(): nil)? = nil) {
+    pub init(text: str, on_click: (fn(): nil) | nil = nil) {
         self.label = text;
+        self.font_size_val = 14.0;
         self.on_click_action = on_click;
         self.bg = color.slate(700);
         self.fg = color.white;
@@ -188,9 +257,11 @@ frame Button: Fluent {
         self.pad_t = 8.0;
         self.pad_r = 16.0;
         self.pad_b = 8.0;
+        self.semantic = Semantic.Button;
     }
 
     pub fn kind_name(): str { return "Button"; }
+    pub fn widget_kind(): WidgetKind { return WidgetKind.Button; }
 
     pub fn background(c: Color): Button {
         self.bg = c;
@@ -204,6 +275,20 @@ frame Button: Fluent {
 
     pub fn padding(p: float): Button {
         self.set_padding(p);
+        return self;
+    }
+
+    pub fn padding_xy(x: float, y: float): Button {
+        self.pad_l = x;
+        self.pad_r = x;
+        self.pad_t = y;
+        self.pad_b = y;
+        return self;
+    }
+
+    pub fn size(w: float, h: float): Button {
+        self.width_val = w;
+        self.height_val = h;
         return self;
     }
 
@@ -221,27 +306,193 @@ frame Button: Fluent {
         self.height_val = h;
         return self;
     }
+
+    pub fn font_size(sz: float): Button {
+        self.font_size_val = sz;
+        return self;
+    }
+
+    pub fn on_click(action: (fn(): nil) | nil): Button {
+        self.on_click_action = action;
+        return self;
+    }
+
+    pub fn disabled(d: bool = true): Button {
+        self.is_disabled = d;
+        return self;
+    }
+
+    pub fn border(w: float, c: Color): Button {
+        self.border_width = w;
+        self.border_color = c;
+        return self;
+    }
+
+    pub fn shadow(s: shadow.Shadow | nil): Button {
+        self.shadow_val = s;
+        return self;
+    }
+
+    pub fn animate(dur: float = 0.25, easing: animation.Easing = animation.Easing.Linear): Button {
+        self.anim_property = animation.PropertyAnimation(0.0, 1.0, dur, easing);
+        return self;
+    }
+
+    pub fn spring(stiffness: float = 180.0, damping: float = 12.0): Button {
+        if (self.anim_property == nil) {
+            self.anim_property = animation.PropertyAnimation(0.0, 1.0, 0.25, animation.Easing.Linear);
+        }
+        val ap = self.anim_property as animation.PropertyAnimation;
+        ap.spring_model = animation.Spring(stiffness, damping);
+        ap.is_spring = true;
+        return self;
+    }
+
+    pub fn style(s: Style): Button {
+        if (s.has_bg) { self.bg = s.bg; }
+        if (s.has_fg) { self.fg = s.fg; }
+        if (s.has_padding) {
+            self.pad_l = s.pad_l;
+            self.pad_t = s.pad_t;
+            self.pad_r = s.pad_r;
+            self.pad_b = s.pad_b;
+        }
+        if (s.has_radius) { self.radius = s.radius; }
+        if (s.has_font_size) { self.font_size_val = s.font_size_val; }
+        if (s.has_spacing) { self.spacing_val = s.spacing_val; }
+        return self;
+    }
+
+    pub fn hover_style(s: Style): Button {
+        self.hover_style_val = s;
+        return self;
+    }
+
+    pub fn pressed_style(s: Style): Button {
+        self.pressed_style_val = s;
+        return self;
+    }
+
+    pub fn focus_key(k: str): Button {
+        self.focus_key_val = k;
+        return self;
+    }
+
+    pub fn opacity(o: float): Button {
+        self.opacity_val = o;
+        return self;
+    }
+
+    pub fn aria_label(lbl: str): Button {
+        self.a11y_label = lbl;
+        return self;
+    }
+
+    pub fn role(r: Semantic): Button {
+        self.semantic = r;
+        return self;
+    }
+}
+
+frame Link: Fluent {
+    embed LayoutMetrics;
+    embed VisualStyle;
+    embed Clickable;
+
+    pub var text: str;
+    pub var url: str;
+    pub var font_size_val: float;
+
+    pub init(text_val: str, target_url: str = "", on_click: (fn(): nil) | nil = nil) {
+        self.text = text_val;
+        self.url = target_url;
+        self.font_size_val = 14.0;
+        self.on_click_action = on_click;
+        self.fg = color.rgb(100, 180, 255);
+    }
+
+    pub fn kind_name(): str { return "Link"; }
+    pub fn widget_kind(): WidgetKind { return WidgetKind.Link; }
+
+    pub fn on_click(action: (fn(): nil) | nil): Link {
+        self.on_click_action = action;
+        return self;
+    }
 }
 
 frame Label: Fluent {
     embed LayoutMetrics;
     embed VisualStyle;
+    embed Clickable;
+    embed MetaInfo;
 
     pub var text: str;
     pub var font_size_val: float;
     pub var is_bold: bool;
+    pub var text_align: Align;
+    pub var weight_val: Weight;
+    pub var text_signal: state.StrSignal | nil;
 
     pub init(txt: str) {
         self.text = txt;
         self.font_size_val = 14.0;
         self.is_bold = false;
+        self.text_align = align_start;
+        self.weight_val = Weight.Normal;
+        self.text_signal = nil;
         self.fg = color.slate(100);
+        self.semantic = Semantic.Label;
     }
 
     pub fn kind_name(): str { return "Label"; }
+    pub fn widget_kind(): WidgetKind { return WidgetKind.Text; }
+
+    pub fn resolved_text(): str {
+        val sig = self.text_signal;
+        if (sig != nil) {
+            return (sig as state.StrSignal).get();
+        }
+        return self.text;
+    }
+
+    pub fn bind_text(sig: state.StrSignal): Label {
+        self.text_signal = sig;
+        self.text = sig.get();
+        return self;
+    }
 
     pub fn color(c: Color): Label {
         self.fg = c;
+        return self;
+    }
+
+    pub fn foreground(c: Color): Label {
+        self.fg = c;
+        return self;
+    }
+
+    pub fn background(c: Color): Label {
+        self.bg = c;
+        return self;
+    }
+
+    pub fn padding(p: float): Label {
+        self.set_padding(p);
+        return self;
+    }
+
+    pub fn corner_radius(r: float): Label {
+        self.set_radius(r);
+        return self;
+    }
+
+    pub fn width(w: float): Label {
+        self.width_val = w;
+        return self;
+    }
+
+    pub fn height(h: float): Label {
+        self.height_val = h;
         return self;
     }
 
@@ -252,6 +503,50 @@ frame Label: Fluent {
 
     pub fn bold(): Label {
         self.is_bold = true;
+        self.weight_val = Weight.Bold;
+        return self;
+    }
+
+    pub fn style(s: Style): Label {
+        if (s.has_bg) { self.bg = s.bg; }
+        if (s.has_fg) { self.fg = s.fg; }
+        if (s.has_padding) {
+            self.pad_l = s.pad_l;
+            self.pad_t = s.pad_t;
+            self.pad_r = s.pad_r;
+            self.pad_b = s.pad_b;
+        }
+        if (s.has_radius) { self.radius = s.radius; }
+        if (s.has_font_size) { self.font_size_val = s.font_size_val; }
+        if (s.has_weight) {
+            self.is_bold = s.weight_val >= 600;
+            if (self.is_bold) {
+                self.weight_val = Weight.Bold;
+            } else {
+                self.weight_val = Weight.Normal;
+            }
+        }
+        if (s.has_spacing) { self.spacing_val = s.spacing_val; }
+        return self;
+    }
+
+    pub fn on_click(action: (fn(): nil) | nil): Label {
+        self.on_click_action = action;
+        return self;
+    }
+
+    pub fn opacity(o: float): Label {
+        self.opacity_val = o;
+        return self;
+    }
+
+    pub fn aria_label(lbl: str): Label {
+        self.a11y_label = lbl;
+        return self;
+    }
+
+    pub fn role(r: Semantic): Label {
+        self.semantic = r;
         return self;
     }
 }
@@ -259,22 +554,42 @@ frame Label: Fluent {
 frame Slider: Fluent {
     embed LayoutMetrics;
     embed VisualStyle;
+    embed Clickable;
     embed Changeable;
+    embed Focusable;
 
     pub var value: float;
     pub var min_val: float;
     pub var max_val: float;
+    pub var value_signal: state.FloatSignal | nil;
 
-    pub init(v: float = 0.0, min_v: float = 0.0, max_v: float = 1.0) {
+    pub init(v: float = 0.0, min_v: float = 0.0, max_v: float = 1.0, on_change: (fn(): nil) | nil = nil) {
         self.value = v;
         self.min_val = min_v;
         self.max_val = max_v;
+        self.value_signal = nil;
+        self.on_change_action = on_change;
         self.height_val = 20.0;
         self.bg = color.slate(800);
         self.fg = color.shade("indigo", 600);
     }
 
     pub fn kind_name(): str { return "Slider"; }
+    pub fn widget_kind(): WidgetKind { return WidgetKind.Slider; }
+
+    pub fn bind_value(sig: state.FloatSignal): Slider {
+        self.value_signal = sig;
+        self.value = sig.get();
+        return self;
+    }
+
+    pub fn resolved_value(): float {
+        val sig = self.value_signal;
+        if (sig != nil) {
+            return (sig as state.FloatSignal).get();
+        }
+        return self.value;
+    }
 
     pub fn set_range(min_v: float, max_v: float): Slider {
         self.min_val = min_v;
@@ -282,26 +597,29 @@ frame Slider: Fluent {
         return self;
     }
 
-    // Host-side slot write: paired with the host-side invocation in
-    // `value_of`, the callback is stored and read from the same frame
-    // context. Prefer this over the promoted `set_on_change`.
-    pub fn on_change(action: fn(): nil): Slider {
-        self.on_change_action = action as (fn(): nil)?;
+    pub fn width(w: float): Slider {
+        self.width_val = w;
         return self;
     }
 
-    // Clamped write + change notification in one fluent step. The invoke
-    // logic is inlined here: nested fallible (`?`) calls of promoted methods
-    // would propagate through the host frame, so the slot is fired directly.
+    pub fn on_change(action: (fn(): nil) | nil): Slider {
+        self.on_change_action = action;
+        return self;
+    }
+
     pub fn set_value(v: float): Slider {
         return self.value_of(v);
     }
 
     pub fn value_of(v: float): Slider {
         self.value = math.clamp(v, self.min_val, self.max_val);
-        var slot = self.on_change_action;
+        val sig = self.value_signal;
+        if (sig != nil) {
+            (sig as state.FloatSignal).set(self.value);
+        }
+        val slot = self.on_change_action;
         if (slot != nil) {
-            var f: fn(): nil = slot as fn(): nil;
+            val f: fn(): nil = slot as fn(): nil;
             f();
             self.change_count = self.change_count + 1;
         }
@@ -309,10 +627,41 @@ frame Slider: Fluent {
     }
 
     pub fn ratio(): float {
+        val v = self.resolved_value();
         if (self.max_val <= self.min_val) {
             return 0.0;
         }
-        return (self.value - self.min_val) / (self.max_val - self.min_val);
+        return math.clamp((v - self.min_val) / (self.max_val - self.min_val), 0.0, 1.0);
+    }
+}
+
+frame RangeSlider: Fluent {
+    embed LayoutMetrics;
+    embed VisualStyle;
+    embed Changeable;
+
+    pub var low_val: float;
+    pub var high_val: float;
+    pub var min_val: float;
+    pub var max_val: float;
+
+    pub init(low: float = 20.0, high: float = 80.0, min_v: float = 0.0, max_v: float = 100.0) {
+        self.low_val = low;
+        self.high_val = high;
+        self.min_val = min_v;
+        self.max_val = max_v;
+        self.height_val = 28.0;
+        self.width_val = 220.0;
+        self.bg = color.slate(800);
+        self.fg = color.rgb(100, 180, 255);
+    }
+
+    pub fn kind_name(): str { return "RangeSlider"; }
+    pub fn widget_kind(): WidgetKind { return WidgetKind.RangeSlider; }
+
+    pub fn width(w: float): RangeSlider {
+        self.width_val = w;
+        return self;
     }
 }
 
@@ -321,32 +670,112 @@ frame Checkbox: Fluent {
     embed VisualStyle;
     embed Clickable;
     embed Changeable;
+    embed Focusable;
 
     pub var label: str;
     pub var is_checked: bool;
+    pub var is_radio: bool;
+    pub var checked_signal: state.BoolSignal | nil;
 
-    pub init(text: str, on_change: (fn(): nil)? = nil) {
+    pub init(text: str = "", checked: bool = false, on_change: (fn(): nil) | nil = nil) {
         self.label = text;
-        self.is_checked = false;
+        self.is_checked = checked;
+        self.is_radio = false;
+        self.checked_signal = nil;
         self.on_change_action = on_change;
         self.fg = color.slate(100);
     }
 
     pub fn kind_name(): str { return "Checkbox"; }
+    pub fn widget_kind(): WidgetKind { return WidgetKind.Checkbox; }
 
-    pub fn on_change(action: fn(): nil): Checkbox {
-        self.on_change_action = action as (fn(): nil)?;
+    pub fn bind_checked(sig: state.BoolSignal): Checkbox {
+        self.checked_signal = sig;
+        self.is_checked = sig.get();
+        return self;
+    }
+
+    pub fn resolved_checked(): bool {
+        val sig = self.checked_signal;
+        if (sig != nil) {
+            return (sig as state.BoolSignal).get();
+        }
+        return self.is_checked;
+    }
+
+    pub fn on_change(action: (fn(): nil) | nil): Checkbox {
+        self.on_change_action = action;
         return self;
     }
 
     pub fn toggle(): EventResult? {
-        self.is_checked = not self.is_checked;
+        self.is_checked = not self.resolved_checked();
+        val sig = self.checked_signal;
+        if (sig != nil) {
+            (sig as state.BoolSignal).set(self.is_checked);
+        }
         self.click_count = self.click_count + 1;
-        var slot = self.on_change_action;
+        val slot = self.on_change_action;
         if (slot == nil) {
             return ok(EventResult.Unhandled);
         }
-        var f: fn(): nil = slot as fn(): nil;
+        val f: fn(): nil = slot as fn(): nil;
+        f();
+        self.change_count = self.change_count + 1;
+        return ok(EventResult.Handled);
+    }
+}
+
+frame Toggle: Fluent {
+    embed LayoutMetrics;
+    embed VisualStyle;
+    embed Clickable;
+    embed Changeable;
+    embed Focusable;
+
+    pub var label: str;
+    pub var is_checked: bool;
+    pub var checked_signal: state.BoolSignal | nil;
+
+    pub init(enabled: bool = false, on_change: (fn(): nil) | nil = nil) {
+        self.label = "";
+        self.is_checked = enabled;
+        self.checked_signal = nil;
+        self.on_change_action = on_change;
+        self.width_val = 48.0;
+        self.height_val = 24.0;
+        self.bg = color.slate(700);
+        self.fg = color.emerald(400);
+    }
+
+    pub fn kind_name(): str { return "Toggle"; }
+    pub fn widget_kind(): WidgetKind { return WidgetKind.Toggle; }
+
+    pub fn resolved_checked(): bool {
+        val sig = self.checked_signal;
+        if (sig != nil) {
+            return (sig as state.BoolSignal).get();
+        }
+        return self.is_checked;
+    }
+
+    pub fn on_change(action: (fn(): nil) | nil): Toggle {
+        self.on_change_action = action;
+        return self;
+    }
+
+    pub fn toggle(): EventResult? {
+        self.is_checked = not self.resolved_checked();
+        val sig = self.checked_signal;
+        if (sig != nil) {
+            (sig as state.BoolSignal).set(self.is_checked);
+        }
+        self.click_count = self.click_count + 1;
+        val slot = self.on_change_action;
+        if (slot == nil) {
+            return ok(EventResult.Unhandled);
+        }
+        val f: fn(): nil = slot as fn(): nil;
         f();
         self.change_count = self.change_count + 1;
         return ok(EventResult.Handled);
@@ -356,15 +785,24 @@ frame Checkbox: Fluent {
 frame TextInput: Fluent {
     embed LayoutMetrics;
     embed VisualStyle;
+    embed Clickable;
     embed Focusable;
     embed Changeable;
+    embed MetaInfo;
 
     pub var text: str;
     pub var placeholder: str;
+    pub var multiline: bool;
+    pub var font_size_val: float;
+    pub var text_signal: state.StrSignal | nil;
 
-    pub init(txt: str = "", hint: str = "") {
+    pub init(txt: str = "", hint: str = "", on_change: (fn(): nil) | nil = nil, is_multiline: bool = false) {
         self.text = txt;
         self.placeholder = hint;
+        self.multiline = is_multiline;
+        self.font_size_val = 14.0;
+        self.text_signal = nil;
+        self.on_change_action = on_change;
         self.bg = color.slate(900);
         self.fg = color.white;
         self.radius = 4.0;
@@ -372,20 +810,71 @@ frame TextInput: Fluent {
         self.pad_t = 6.0;
         self.pad_r = 8.0;
         self.pad_b = 6.0;
+        self.semantic = Semantic.Input;
     }
 
-    pub fn kind_name(): str { return "TextInput"; }
+    pub fn kind_name(): str {
+        if (self.multiline) { return "Textarea"; }
+        return "TextInput";
+    }
 
-    pub fn on_change(action: fn(): nil): TextInput {
-        self.on_change_action = action as (fn(): nil)?;
+    pub fn widget_kind(): WidgetKind {
+        if (self.multiline) { return WidgetKind.Textarea; }
+        return WidgetKind.Input;
+    }
+
+    pub fn bind_text(sig: state.StrSignal): TextInput {
+        self.text_signal = sig;
+        self.text = sig.get();
+        return self;
+    }
+
+    pub fn resolved_text(): str {
+        val sig = self.text_signal;
+        if (sig != nil) {
+            return (sig as state.StrSignal).get();
+        }
+        return self.text;
+    }
+
+    pub fn width(w: float): TextInput {
+        self.width_val = w;
+        return self;
+    }
+
+    pub fn height(h: float): TextInput {
+        self.height_val = h;
+        return self;
+    }
+
+    pub fn style(s: Style): TextInput {
+        if (s.has_bg) { self.bg = s.bg; }
+        if (s.has_fg) { self.fg = s.fg; }
+        if (s.has_padding) {
+            self.pad_l = s.pad_l;
+            self.pad_t = s.pad_t;
+            self.pad_r = s.pad_r;
+            self.pad_b = s.pad_b;
+        }
+        if (s.has_radius) { self.radius = s.radius; }
+        if (s.has_font_size) { self.font_size_val = s.font_size_val; }
+        return self;
+    }
+
+    pub fn on_change(action: (fn(): nil) | nil): TextInput {
+        self.on_change_action = action;
         return self;
     }
 
     pub fn set_text(next: str): TextInput {
         self.text = next;
-        var slot = self.on_change_action;
+        val sig = self.text_signal;
+        if (sig != nil) {
+            (sig as state.StrSignal).set(next);
+        }
+        val slot = self.on_change_action;
         if (slot != nil) {
-            var f: fn(): nil = slot as fn(): nil;
+            val f: fn(): nil = slot as fn(): nil;
             f();
             self.change_count = self.change_count + 1;
         }
@@ -393,10 +882,11 @@ frame TextInput: Fluent {
     }
 
     pub fn display_text(): str {
-        if (self.text == "") {
+        val current = self.resolved_text();
+        if (current == "") {
             return self.placeholder;
         }
-        return self.text;
+        return current;
     }
 }
 
@@ -406,10 +896,12 @@ frame ProgressBar: Fluent {
 
     pub var value: float;
     pub var max_val: float;
+    pub var value_signal: state.FloatSignal | nil;
 
     pub init(v: float = 0.0, max_v: float = 1.0) {
         self.value = v;
         self.max_val = max_v;
+        self.value_signal = nil;
         self.height_val = 8.0;
         self.radius = 4.0;
         self.bg = color.slate(800);
@@ -417,29 +909,55 @@ frame ProgressBar: Fluent {
     }
 
     pub fn kind_name(): str { return "ProgressBar"; }
+    pub fn widget_kind(): WidgetKind { return WidgetKind.Progress; }
+
+    pub fn width(w: float): ProgressBar {
+        self.width_val = w;
+        return self;
+    }
+
+    pub fn bind_value(sig: state.FloatSignal): ProgressBar {
+        self.value_signal = sig;
+        self.value = sig.get();
+        return self;
+    }
 
     pub fn set_progress(v: float): ProgressBar {
         self.value = math.clamp(v, 0.0, self.max_val);
+        val sig = self.value_signal;
+        if (sig != nil) {
+            (sig as state.FloatSignal).set(self.value);
+        }
         return self;
     }
 
     pub fn ratio(): float {
+        var v = self.value;
+        val sig = self.value_signal;
+        if (sig != nil) {
+            v = (sig as state.FloatSignal).get();
+        }
         if (self.max_val <= 0.0) {
             return 0.0;
         }
-        return self.value / self.max_val;
+        return math.clamp(v / self.max_val, 0.0, 1.0);
     }
 }
 
 frame Container: Fluent {
     embed LayoutMetrics;
     embed VisualStyle;
+    embed Clickable;
+    embed MetaInfo;
+    embed OverlayGeometry;
 
     pub var children: [Fluent];
     pub var flow: Flow;
+    pub var kind_tag: WidgetKind;
 
     pub init(vertical: bool = true) {
         self.children = [];
+        self.kind_tag = WidgetKind.Container;
         if (vertical) {
             self.flow = Flow.Vertical;
         } else {
@@ -448,6 +966,7 @@ frame Container: Fluent {
     }
 
     pub fn kind_name(): str { return "Container"; }
+    pub fn widget_kind(): WidgetKind { return self.kind_tag; }
 
     pub fn add(c: Fluent): Container {
         self.children.append(c);
@@ -468,13 +987,80 @@ frame Container: Fluent {
         return self;
     }
 
+    pub fn foreground(c: Color): Container {
+        self.fg = c;
+        return self;
+    }
+
     pub fn padding(p: float): Container {
         self.set_padding(p);
         return self;
     }
 
+    pub fn corner_radius(r: float): Container {
+        self.set_radius(r);
+        return self;
+    }
+
+    pub fn width(w: float): Container {
+        self.width_val = w;
+        return self;
+    }
+
+    pub fn height(h: float): Container {
+        self.height_val = h;
+        return self;
+    }
+
     pub fn spacing(s: float): Container {
         self.spacing_val = s;
+        return self;
+    }
+
+    pub fn grow(g: float): Container {
+        self.grow_val = g;
+        return self;
+    }
+
+    pub fn opacity(o: float): Container {
+        self.opacity_val = o;
+        return self;
+    }
+
+    pub fn aria_label(lbl: str): Container {
+        self.a11y_label = lbl;
+        return self;
+    }
+
+    pub fn role(r: Semantic): Container {
+        self.semantic = r;
+        return self;
+    }
+
+    pub fn align(a: Align): Container {
+        self.align_self_val = a;
+        return self;
+    }
+
+    pub fn padding_xy(x: float, y: float): Container {
+        self.pad_l = x;
+        self.pad_r = x;
+        self.pad_t = y;
+        self.pad_b = y;
+        return self;
+    }
+
+    pub fn style(s: Style): Container {
+        if (s.has_bg) { self.bg = s.bg; }
+        if (s.has_fg) { self.fg = s.fg; }
+        if (s.has_padding) {
+            self.pad_l = s.pad_l;
+            self.pad_t = s.pad_t;
+            self.pad_r = s.pad_r;
+            self.pad_b = s.pad_b;
+        }
+        if (s.has_radius) { self.radius = s.radius; }
+        if (s.has_spacing) { self.spacing_val = s.spacing_val; }
         return self;
     }
 }
@@ -487,26 +1073,630 @@ frame Spacer: Fluent {
     }
 
     pub fn kind_name(): str { return "Spacer"; }
+    pub fn widget_kind(): WidgetKind { return WidgetKind.Spacer; }
 
     pub fn flex(f: float): Spacer {
         self.flex_val = f;
         return self;
     }
+
+    pub fn width(w: float): Spacer {
+        self.width_val = w;
+        return self;
+    }
+
+    pub fn height(h: float): Spacer {
+        self.height_val = h;
+        return self;
+    }
 }
 
-pub fn column(children: [any] = []): Container {
-    var c = Container(true);
+// ── Specialized Retained Widgets ──────────────────────────────────────────────
+
+frame Badge: Fluent {
+    embed LayoutMetrics;
+    embed VisualStyle;
+
+    pub var label: str;
+    pub var font_size_val: float;
+
+    pub init(txt: str) {
+        self.label = txt;
+        self.font_size_val = 12.0;
+        self.bg = color.rgb(65, 95, 160);
+        self.fg = color.white;
+        self.radius = 10.0;
+        self.pad_l = 8.0;
+        self.pad_t = 3.0;
+        self.pad_r = 8.0;
+        self.pad_b = 3.0;
+    }
+
+    pub fn kind_name(): str { return "Badge"; }
+    pub fn widget_kind(): WidgetKind { return WidgetKind.Badge; }
+
+    pub fn background(c: Color): Badge {
+        self.bg = c;
+        return self;
+    }
+
+    pub fn foreground(c: Color): Badge {
+        self.fg = c;
+        return self;
+    }
+}
+
+frame Card: Fluent {
+    embed LayoutMetrics;
+    embed VisualStyle;
+    embed MetaInfo;
+
+    pub var title: str;
+    pub var children: [Fluent];
+
+    pub init(t: str, content: Fluent) {
+        self.title = t;
+        self.children = [content];
+        self.bg = color.rgb(28, 30, 40);
+        self.fg = color.white;
+        self.radius = 8.0;
+        self.pad_l = 12.0;
+        self.pad_t = 12.0;
+        self.pad_r = 12.0;
+        self.pad_b = 12.0;
+    }
+
+    pub fn kind_name(): str { return "Card"; }
+    pub fn widget_kind(): WidgetKind { return WidgetKind.Card; }
+
+    pub fn width(w: float): Card {
+        self.width_val = w;
+        return self;
+    }
+}
+
+frame Alert: Fluent {
+    embed LayoutMetrics;
+    embed VisualStyle;
+
+    pub var message: str;
+    pub var alert_kind: AlertKind;
+    pub var kind_tag: WidgetKind;
+
+    pub init(msg: str, type_str: str = "info") {
+        self.message = msg;
+        self.alert_kind = alert_kind_of(type_str);
+        self.kind_tag = WidgetKind.Alert;
+        match (self.alert_kind) {
+            AlertKind.Success => { self.bg = color.rgb(30, 120, 70); },
+            AlertKind.Warning => { self.bg = color.rgb(160, 110, 20); },
+            AlertKind.Danger => { self.bg = color.rgb(160, 45, 55); },
+            _ => { self.bg = color.rgb(40, 85, 160); }
+        }
+        self.fg = color.white;
+        self.radius = 6.0;
+        self.pad_l = 12.0;
+        self.pad_t = 10.0;
+        self.pad_r = 12.0;
+        self.pad_b = 10.0;
+    }
+
+    pub fn kind_name(): str { return "Alert"; }
+    pub fn widget_kind(): WidgetKind { return self.kind_tag; }
+}
+
+frame ScrollView: Fluent {
+    embed LayoutMetrics;
+    embed VisualStyle;
+    embed ScrollState;
+
+    pub var children: [Fluent];
+
+    pub init(content: Fluent, h: float = 200.0) {
+        self.children = [content];
+        self.height_val = h;
+    }
+
+    pub fn kind_name(): str { return "ScrollView"; }
+    pub fn widget_kind(): WidgetKind { return WidgetKind.Scroll; }
+
+    pub fn height(h: float): ScrollView {
+        self.height_val = h;
+        return self;
+    }
+}
+
+frame Tabs: Fluent {
+    embed LayoutMetrics;
+    embed VisualStyle;
+    embed Changeable;
+    embed TabState;
+
+    pub var children: [Fluent];
+
+    pub init(titles: [str], pages: [Fluent], active: int = 0, on_change: (fn(): nil) | nil = nil) {
+        self.tab_titles = titles;
+        self.children = pages;
+        self.active_tab = active;
+        self.on_change_action = on_change;
+    }
+
+    pub fn kind_name(): str { return "Tabs"; }
+    pub fn widget_kind(): WidgetKind { return self.kind_tag_tabs(); }
+    fn kind_tag_tabs(): WidgetKind { return WidgetKind.Tabs; }
+
+    pub fn height(h: float): Tabs {
+        self.height_val = h;
+        return self;
+    }
+}
+
+frame Select: Fluent {
+    embed LayoutMetrics;
+    embed VisualStyle;
+    embed Clickable;
+    embed Changeable;
+    embed SelectionState;
+
+    pub var is_open: bool;
+    pub var is_multi: bool;
+
+    pub init(opts: [str], idx: int = 0, on_change: (fn(): nil) | nil = nil, multi: bool = false) {
+        self.options = opts;
+        self.selected_idx = idx;
+        self.is_open = false;
+        self.is_multi = multi;
+        self.on_change_action = on_change;
+        self.width_val = 200.0;
+        self.height_val = 34.0;
+        self.bg = color.slate(800);
+        self.fg = color.white;
+        self.radius = 4.0;
+    }
+
+    pub fn kind_name(): str { return "Select"; }
+    pub fn widget_kind(): WidgetKind {
+        if (self.is_multi) { return WidgetKind.MultiSelect; }
+        return WidgetKind.Select;
+    }
+
+    pub fn width(w: float): Select {
+        self.width_val = w;
+        return self;
+    }
+}
+
+frame Stepper: Fluent {
+    embed LayoutMetrics;
+    embed VisualStyle;
+    embed Clickable;
+    embed Changeable;
+
+    pub var value: int;
+    pub var step_size: int;
+    pub var min_int: int;
+    pub var max_int: int;
+
+    pub init(v: int = 0, step: int = 1, min_v: int = 0, max_v: int = 100, on_change: (fn(): nil) | nil = nil) {
+        self.value = v;
+        self.step_size = step;
+        self.min_int = min_v;
+        self.max_int = max_v;
+        self.on_change_action = on_change;
+        self.width_val = 120.0;
+        self.height_val = 32.0;
+        self.bg = color.slate(800);
+        self.fg = color.white;
+        self.radius = 4.0;
+    }
+
+    pub fn kind_name(): str { return "Stepper"; }
+    pub fn widget_kind(): WidgetKind { return WidgetKind.Stepper; }
+}
+
+frame Accordion: Fluent {
+    embed LayoutMetrics;
+    embed VisualStyle;
+    embed Clickable;
+
+    pub var title: str;
+    pub var is_open: bool;
+    pub var children: [Fluent];
+
+    pub init(t: str, content: Fluent, default_open: bool = false) {
+        self.title = t;
+        self.children = [content];
+        self.is_open = default_open;
+        self.bg = color.rgb(28, 30, 40);
+        self.fg = color.white;
+        self.radius = 4.0;
+    }
+
+    pub fn kind_name(): str { return "Accordion"; }
+    pub fn widget_kind(): WidgetKind { return WidgetKind.Accordion; }
+}
+
+frame Stat: Fluent {
+    embed LayoutMetrics;
+    embed VisualStyle;
+
+    pub var title: str;
+    pub var value_text: str;
+    pub var desc: str;
+
+    pub init(t: str, v: str, d: str = "") {
+        self.title = t;
+        self.value_text = v;
+        self.desc = d;
+        self.bg = color.rgb(26, 28, 38);
+        self.fg = color.white;
+        self.radius = 6.0;
+        self.pad_l = 12.0;
+        self.pad_t = 10.0;
+        self.pad_r = 12.0;
+        self.pad_b = 10.0;
+    }
+
+    pub fn kind_name(): str { return "Stat"; }
+    pub fn widget_kind(): WidgetKind { return WidgetKind.Stat; }
+}
+
+frame Indicator: Fluent {
+    embed LayoutMetrics;
+    embed VisualStyle;
+
+    pub var dot_state: DotState;
+    pub var label: str;
+
+    pub init(status: str = "online", lbl: str = "") {
+        self.dot_state = dot_state_of(status);
+        self.label = lbl;
+        match (self.dot_state) {
+            DotState.Online => { self.fg = color.rgb(60, 210, 120); },
+            DotState.Busy => { self.fg = color.rgb(240, 170, 50); },
+            _ => { self.fg = color.rgb(120, 125, 135); }
+        }
+    }
+
+    pub fn kind_name(): str { return "Indicator"; }
+    pub fn widget_kind(): WidgetKind { return WidgetKind.Indicator; }
+}
+
+frame Steps: Fluent {
+    embed LayoutMetrics;
+    embed VisualStyle;
+
+    pub var step_titles: [str];
+    pub var active_step: int;
+    pub var is_vertical: bool;
+
+    pub init(titles: [str], active: int = 0, vertical: bool = false) {
+        self.step_titles = titles;
+        self.active_step = active;
+        self.is_vertical = vertical;
+        self.fg = color.white;
+        self.bg = color.rgb(80, 140, 255);
+    }
+
+    pub fn kind_name(): str { return "Steps"; }
+    pub fn widget_kind(): WidgetKind { return WidgetKind.Steps; }
+}
+
+frame Timeline: Fluent {
+    embed LayoutMetrics;
+    embed VisualStyle;
+
+    pub var children: [Fluent];
+
+    pub init(events: [Fluent]) {
+        self.children = events;
+        self.fg = color.white;
+    }
+
+    pub fn kind_name(): str { return "Timeline"; }
+    pub fn widget_kind(): WidgetKind { return WidgetKind.Timeline; }
+}
+
+frame TreeNode: Fluent {
+    embed LayoutMetrics;
+    embed VisualStyle;
+    embed Clickable;
+
+    pub var label: str;
+    pub var is_open: bool;
+    pub var children: [Fluent];
+
+    pub init(lbl: str, ch: [Fluent], default_open: bool = false) {
+        self.label = lbl;
+        self.children = ch;
+        self.is_open = default_open;
+        self.fg = color.white;
+    }
+
+    pub fn kind_name(): str { return "TreeNode"; }
+    pub fn widget_kind(): WidgetKind { return WidgetKind.TreeNode; }
+}
+
+frame FormField: Fluent {
+    embed LayoutMetrics;
+    embed VisualStyle;
+
+    pub var label_text: str;
+    pub var help_text: str;
+    pub var error_text: str;
+    pub var children: [Fluent];
+
+    pub init(lbl: str, control: Fluent, help: str = "", err_txt: str = "") {
+        self.label_text = lbl;
+        self.help_text = help;
+        self.error_text = err_txt;
+        self.children = [control];
+        self.fg = color.white;
+    }
+
+    pub fn kind_name(): str { return "FormField"; }
+    pub fn widget_kind(): WidgetKind { return WidgetKind.FormField; }
+}
+
+frame Diff: Fluent {
+    embed LayoutMetrics;
+    embed VisualStyle;
+
+    pub var old_text: str;
+    pub var new_text: str;
+
+    pub init(old_t: str, new_t: str) {
+        self.old_text = old_t;
+        self.new_text = new_t;
+        self.bg = color.rgb(24, 26, 34);
+        self.fg = color.white;
+    }
+
+    pub fn kind_name(): str { return "Diff"; }
+    pub fn widget_kind(): WidgetKind { return WidgetKind.Diff; }
+}
+
+frame FileInput: Fluent {
+    embed LayoutMetrics;
+    embed VisualStyle;
+    embed Clickable;
+    embed Changeable;
+
+    pub var label: str;
+    pub var selected_path: str;
+
+    pub init(lbl: str = "Choose File...", on_select: (fn(): nil) | nil = nil) {
+        self.label = lbl;
+        self.selected_path = "";
+        self.on_click_action = on_select;
+        self.width_val = 220.0;
+        self.height_val = 34.0;
+        self.bg = color.slate(800);
+        self.fg = color.white;
+        self.radius = 4.0;
+    }
+
+    pub fn kind_name(): str { return "FileInput"; }
+    pub fn widget_kind(): WidgetKind { return WidgetKind.FileInput; }
+
+    pub fn width(w: float): FileInput {
+        self.width_val = w;
+        return self;
+    }
+}
+
+frame Filter: Fluent {
+    embed LayoutMetrics;
+    embed VisualStyle;
+    embed Clickable;
+    embed Focusable;
+    embed Changeable;
+
+    pub var query: str;
+    pub var placeholder: str;
+
+    pub init(q: str = "", hint: str = "Filter...", on_change: (fn(): nil) | nil = nil) {
+        self.query = q;
+        self.placeholder = hint;
+        self.on_change_action = on_change;
+        self.width_val = 220.0;
+        self.height_val = 32.0;
+        self.bg = color.slate(900);
+        self.fg = color.white;
+        self.radius = 4.0;
+    }
+
+    pub fn kind_name(): str { return "Filter"; }
+    pub fn widget_kind(): WidgetKind { return WidgetKind.Filter; }
+
+    pub fn width(w: float): Filter {
+        self.width_val = w;
+        return self;
+    }
+}
+
+frame Calendar: Fluent {
+    embed LayoutMetrics;
+    embed VisualStyle;
+    embed Clickable;
+    embed Changeable;
+
+    pub var selected_date: str;
+    pub var selected_day: int;
+
+    pub init(date_str: str = "2025-01-01") {
+        self.selected_date = date_str;
+        self.selected_day = 1;
+        self.width_val = 240.0;
+        self.height_val = 220.0;
+        self.bg = color.rgb(24, 26, 36);
+        self.fg = color.white;
+        self.radius = 6.0;
+    }
+
+    pub fn kind_name(): str { return "Calendar"; }
+    pub fn widget_kind(): WidgetKind { return WidgetKind.Calendar; }
+}
+
+frame Image: Fluent {
+    embed LayoutMetrics;
+    embed VisualStyle;
+
+    pub var source: str;
+    pub var texture_id: int;
+
+    pub init(src: str = "") {
+        self.source = src;
+        self.texture_id = 0;
+        self.width_val = 120.0;
+        self.height_val = 90.0;
+    }
+
+    pub fn kind_name(): str { return "Image"; }
+    pub fn widget_kind(): WidgetKind { return WidgetKind.Image; }
+}
+
+frame ColorPicker: Fluent {
+    embed LayoutMetrics;
+    embed VisualStyle;
+    embed Clickable;
+    embed Changeable;
+
+    pub var label: str;
+    pub var picked_color: Color;
+
+    pub init(lbl: str, c: Color, on_change: (fn(): nil) | nil = nil) {
+        self.label = lbl;
+        self.picked_color = c;
+        self.bg = c;
+        self.fg = color.white;
+        self.on_change_action = on_change;
+        self.height_val = 32.0;
+    }
+
+    pub fn kind_name(): str { return "ColorPicker"; }
+    pub fn widget_kind(): WidgetKind { return WidgetKind.ColorPicker; }
+}
+
+frame Table: Fluent {
+    embed LayoutMetrics;
+    embed VisualStyle;
+
+    pub var headers: [str];
+    pub var rows: [[Fluent]];
+
+    pub init(hdrs: [str], row_data: [[Fluent]]) {
+        self.headers = hdrs;
+        self.rows = row_data;
+        self.bg = color.rgb(22, 24, 32);
+        self.fg = color.white;
+    }
+
+    pub fn kind_name(): str { return "Table"; }
+    pub fn widget_kind(): WidgetKind { return WidgetKind.Table; }
+}
+
+frame Chart: Fluent {
+    embed LayoutMetrics;
+    embed VisualStyle;
+
+    pub var chart_kind: WidgetKind;
+    pub var label: str;
+    pub var values: [float];
+    pub var labels: [str];
+    pub var min_val: float;
+    pub var max_val: float;
+
+    pub init(
+        kind: WidgetKind,
+        lbl: str,
+        vals: [float],
+        lbls: [str] = [] as [str],
+        min_v: float = 0.0,
+        max_v: float = 1.0
+    ) {
+        self.chart_kind = kind;
+        self.label = lbl;
+        self.values = vals;
+        self.labels = lbls;
+        self.min_val = min_v;
+        self.max_val = max_v;
+        self.width_val = 200.0;
+        self.height_val = 100.0;
+        self.bg = color.rgb(24, 26, 34);
+        self.fg = color.rgb(80, 180, 255);
+    }
+
+    pub fn kind_name(): str { return "Chart"; }
+    pub fn widget_kind(): WidgetKind { return self.chart_kind; }
+}
+
+// ── Composition Helpers ───────────────────────────────────────────────────────
+
+pub fn empty(): Container {
+    return Container(true);
+}
+
+pub fn column(children: [any] = [] as [any]): Container {
+    val c = Container(true);
     iter (child in children) {
         c.add(child as Fluent);
     }
     return c;
 }
 
-pub fn row(children: [any] = []): Container {
-    var c = Container(false);
+pub fn row(children: [any] = [] as [any]): Container {
+    val c = Container(false);
     iter (child in children) {
         c.add(child as Fluent);
     }
     return c;
 }
 
+pub fn stack(children: [any] = [] as [any]): Container {
+    val c = Container(true);
+    c.flow = Flow.Stacked;
+    iter (child in children) {
+        c.add(child as Fluent);
+    }
+    return c;
+}
+
+pub fn overlay(content: Fluent, x: float = 0.0, y: float = 0.0, w: float = 0.0, h: float = 0.0): Container {
+    val c = Container(true);
+    c.kind_tag = WidgetKind.Overlay;
+    c.overlay_x = x;
+    c.overlay_y = y;
+    c.overlay_w = w;
+    c.overlay_h = h;
+    c.children = [content];
+    return c;
+}
+
+pub fn mask(shape_name: str, child: Fluent): Container {
+    val c = Container(true);
+    c.kind_tag = WidgetKind.Mask;
+    c.a11y_role = shape_name;
+    c.children = [child];
+    return c;
+}
+
+pub fn tooltip(label: str, content: Fluent): Container {
+    val c = Container(true);
+    c.kind_tag = WidgetKind.Tooltip;
+    c.a11y_label = label;
+    c.children = [content];
+    return c;
+}
+
+pub fn container_of(kind: WidgetKind, vertical: bool = true): Container {
+    val c = Container(vertical);
+    c.kind_tag = kind;
+    return c;
+}
+
+pub fn toast(msg: str, type_str: str = "info"): Alert {
+    val a = Alert(msg, type_str);
+    a.kind_tag = WidgetKind.Toast;
+    return a;
+}

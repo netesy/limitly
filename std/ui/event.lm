@@ -79,15 +79,11 @@ pub fn make_key_event(k: EventKind, key: int): UIEvent {
 // Invoke a widget's `fn(): nil` action slot fallibly. A nil action is not an
 // error condition -- it is simply `Unhandled`, which removes the
 // `if (w.on_click_action != nil)` guard from every dispatch site.
-pub fn fire_action(action): EventResult? {
+pub fn fire_action(action: (fn(): nil) | nil): EventResult? {
     if (action == nil) {
         return ok(EventResult.Ignored);
     }
     var act: fn(): nil = action as fn(): nil;
-    if (act == nil) {
-        // Slot holds a value that is not callable -- reject fallibly.
-        return err();
-    }
     act();
     return ok(EventResult.Handled);
 }
@@ -95,7 +91,7 @@ pub fn fire_action(action): EventResult? {
 // Route an actionable event: fire the handler if one is bound (best-effort),
 // then report the event as consumed. A nil handler is not a failure of routing
 // -- the event was still handled by reaching a target.
-fn route(handler): EventResult? {
+fn route(handler: (fn(): nil) | nil): EventResult? {
     fire_action(handler)? else { };
     return ok(EventResult.Handled);
 }
@@ -103,7 +99,7 @@ fn route(handler): EventResult? {
 // Full fallible pipeline: resolve the target, dispatch on the nominal kind via
 // `match`, then invoke the handler. Returns `err()` when the event carries no
 // target so callers can propagate with `?` instead of inspecting fields.
-pub fn dispatch_event(evt: UIEvent, handler: any = nil): EventResult? {
+pub fn dispatch_event(evt: UIEvent, handler: (fn(): nil) | nil = nil): EventResult? {
     if (evt.target_id == "") {
         return err();
     }

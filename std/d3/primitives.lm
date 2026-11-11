@@ -5,9 +5,15 @@ import std.d3.geometry as geom;
 import std.math.constants as const;
 import std.math.trigonometry as trig;
 
+staged fn _staged_box_face_count(): int {
+    return 12;
+}
+
+pub const BOX_FACE_COUNT: int = _staged_box_face_count();
+
 /// Returns the number of triangular faces in a box geometry.
 pub fn box_face_count(): int {
-    return 12;
+    return BOX_FACE_COUNT;
 }
 
 /// Computes the face count of a UV sphere based on segments.

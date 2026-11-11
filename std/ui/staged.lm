@@ -2,66 +2,25 @@
 // Compile-Time Staged Evaluation for Lymar UI
 //
 // Folds static layouts, bounding boxes, and theme tokens into read-only
-// constants at compile time; only dynamic signal bindings evaluate at runtime.
-// Provides type-safe compile-time generic state bindings via staged frame templates.
-//
-// Stage-0 note: `staged fn` calls fold when their arguments are literals.
-// Keep folded call sites written with literal geometry (grid counts, paddings,
-// palette roles) so the compile-time path engages.
+// constants at stage 0 using `staged fn`, and provides type-safe
+// compile-time generic bindings via `staged frame Binding(T: type)`.
 
-// ── Compile-Time Layout Folding Functions ─────────────────────────────────────
-// These three stay runtime-callable: existing qualified call sites
-// (`staged_ui.compute_item_width(...)`) evaluate them on demand. Fold your
-// static geometry through the `staged fn` family below with literal arguments.
+// ── Intra-Module Stage-0 Folding Primitives ──────────────────────────────────
+// Note: In Lymar, `staged fn` executes strictly at stage 0 (no runtime LIR body),
+// so module constants pre-fold here while exported runtime helpers remain callable
+// across module boundaries.
 
-pub fn compute_item_width(char_count: int, font_scale: int, pad_x: int): int {
-    var base_w = char_count * 8 * font_scale;
-    return base_w + pad_x * 2;
+staged fn _staged_item_width(char_count: int, font_scale: int, pad_x: int): int {
+    return (char_count * 8 * font_scale) + pad_x * 2;
 }
 
-pub fn compute_grid_column_width(container_w: int, num_cols: int, gap: int): int {
-    if (num_cols <= 1) { return container_w; }
-    var total_gaps = (num_cols - 1) * gap;
-    return (container_w - total_gaps) / num_cols;
-}
-
-pub fn compute_constrained_size(desired: int, min_bound: int, max_bound: int): int {
-    if (desired < min_bound) { return min_bound; }
-    if (max_bound > 0 and desired > max_bound) { return max_bound; }
-    return desired;
-}
-
-// ── Static Bounding-Box Algebra ───────────────────────────────────────────────
-// Leaf frames of a static hierarchy ask these at their definition site; with
-// literal inputs the arithmetic never reaches the binary.
-//
-// Staged call sites must import these symbols directly
-// (`import std.ui.staged { fold_box_width, ... };`) -- qualified `mod.fn`
-// spelling does not fold. See tests/staged/staged_fn_test.lm for the model.
-
-pub fn fold_box_width(content_w: int, pad_x: int, border: int): int {
+staged fn _staged_box_width(content_w: int, pad_x: int, border: int): int {
     return content_w + pad_x * 2 + border * 2;
 }
 
-pub fn fold_box_height(content_h: int, pad_y: int, border: int): int {
+staged fn _staged_box_height(content_h: int, pad_y: int, border: int): int {
     return content_h + pad_y * 2 + border * 2;
 }
-
-// Cumulative cross-axis extent of `count` stacked children.
-pub fn fold_stack_extent(count: int, child_size: int, gap: int): int {
-    if (count <= 0) { return 0; }
-    return count * child_size + (count - 1) * gap;
-}
-
-// Origin of child `index` inside an evenly packed track.
-pub fn fold_child_offset(index: int, origin: int, child_size: int, gap: int): int {
-    return origin + index * (child_size + gap);
-}
-
-// ── Theme Token Folding ───────────────────────────────────────────────────────
-// Packed ARGB palette roles fold to integer constants; the runtime renderer
-// unpacks them once per draw, never re-resolving the ladder. Stage-0 enum
-// equality folds, so `theme_argb(ThemeRole.Accent)` yields a raw constant.
 
 enum ThemeRole {
     WindowBg,
@@ -72,13 +31,69 @@ enum ThemeRole {
     Success
 }
 
-pub fn theme_argb(role: ThemeRole): int {
+staged fn _staged_theme_argb(role: ThemeRole): int {
     if (role == ThemeRole.WindowBg) { return 0xff1e2127; }
     if (role == ThemeRole.Text) { return 0xfff1f5f9; }
     if (role == ThemeRole.Accent) { return 0xff6366f1; }
     if (role == ThemeRole.Muted) { return 0xff94a3b8; }
     if (role == ThemeRole.Danger) { return 0xef4444ff; }
     return 0x22c55eff;
+}
+
+// Pre-folded read-only theme constants computed at compile time via staged fn
+pub const THEME_WINDOW_BG_ARGB: int = _staged_theme_argb(ThemeRole.WindowBg);
+pub const THEME_TEXT_ARGB: int      = _staged_theme_argb(ThemeRole.Text);
+pub const THEME_ACCENT_ARGB: int    = _staged_theme_argb(ThemeRole.Accent);
+pub const THEME_MUTED_ARGB: int     = _staged_theme_argb(ThemeRole.Muted);
+pub const THEME_DANGER_ARGB: int    = _staged_theme_argb(ThemeRole.Danger);
+pub const THEME_SUCCESS_ARGB: int   = _staged_theme_argb(ThemeRole.Success);
+
+// ── Exported Layout & Theme Helpers ──────────────────────────────────────────
+
+pub fn compute_item_width(char_count: int, font_scale: int, pad_x: int): int {
+    val base_w = char_count * 8 * font_scale;
+    return base_w + pad_x * 2;
+}
+
+pub fn compute_grid_column_width(container_w: int, num_cols: int, gap: int): int {
+    if (num_cols <= 1) { return container_w; }
+    val total_gaps = (num_cols - 1) * gap;
+    return (container_w - total_gaps) / num_cols;
+}
+
+pub fn compute_constrained_size(desired: int, min_bound: int, max_bound: int): int {
+    if (desired < min_bound) { return min_bound; }
+    if (max_bound > 0 and desired > max_bound) { return max_bound; }
+    return desired;
+}
+
+pub fn fold_box_width(content_w: int, pad_x: int, border: int): int {
+    return content_w + pad_x * 2 + border * 2;
+}
+
+pub fn fold_box_height(content_h: int, pad_y: int, border: int): int {
+    return content_h + pad_y * 2 + border * 2;
+}
+
+pub fn fold_stack_extent(count: int, child_size: int, gap: int): int {
+    if (count <= 0) { return 0; }
+    return count * child_size + (count - 1) * gap;
+}
+
+pub fn fold_child_offset(index: int, origin: int, child_size: int, gap: int): int {
+    return origin + index * (child_size + gap);
+}
+
+pub fn theme_argb(role: ThemeRole): int {
+    match (role) {
+        ThemeRole.WindowBg => { return THEME_WINDOW_BG_ARGB; },
+        ThemeRole.Text => { return THEME_TEXT_ARGB; },
+        ThemeRole.Accent => { return THEME_ACCENT_ARGB; },
+        ThemeRole.Muted => { return THEME_MUTED_ARGB; },
+        ThemeRole.Danger => { return THEME_DANGER_ARGB; },
+        ThemeRole.Success => { return THEME_SUCCESS_ARGB; }
+    }
+    return THEME_SUCCESS_ARGB;
 }
 
 // ── Type-Safe Compile-Time State Binding ──────────────────────────────────────

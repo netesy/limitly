@@ -222,155 +222,64 @@ fn build_starfighter_canopy(): d3.Geometry {
 }
 
 // ── 3. Integrated Chine Autocannons & Dorsal Spine Blade Fairing ──
+// Uses procedural polygon extrusion (d3.extrude) and bilateral symmetry mirroring (d3.mirror_compound).
 fn build_starfighter_trim(): d3.Geometry {
-    var g = d3.Geometry();
+    // 1. Procedural Extruded Port Autocannon Pod
+    val gun_profile: [float] = [
+        -0.08, -0.05,
+         0.08, -0.05,
+         0.09,  0.03,
+         0.00,  0.09,
+        -0.09,  0.03
+    ];
+    // Extrude 1.6m along Z, tapering down to 0.35x at the muzzle
+    var gun = d3.extrude(gun_profile, 1.6, 0.35, 0.0);
+    gun.rotate_x(3.14159265); // Flip Z to face forward (+Z)
+    gun.translate(-0.72, 0.05, 1.35);
 
-    // Port Chine Autocannon (x = -0.72)
-    var p_gun_f  = g.add_vertex(-0.72, 0.05, 1.35);
-    var p_gun_t  = g.add_vertex(-0.72, 0.12, 0.3);
-    var p_gun_b  = g.add_vertex(-0.72, -0.04, 0.3);
-    var p_gun_l  = g.add_vertex(-0.80, 0.04, 0.3);
-    var p_gun_r  = g.add_vertex(-0.64, 0.04, 0.3);
-    var p_gun_bk = g.add_vertex(-0.72, 0.04, -0.3);
+    // Bilateral Symmetry: mirror port gun across X to create starboard gun
+    var g = d3.mirror_compound(gun, 0);
 
-    add_tri(g, p_gun_f, p_gun_t, p_gun_l);
-    add_tri(g, p_gun_f, p_gun_l, p_gun_b);
-    add_tri(g, p_gun_f, p_gun_b, p_gun_r);
-    add_tri(g, p_gun_f, p_gun_r, p_gun_t);
-    add_tri(g, p_gun_t, p_gun_bk, p_gun_l);
-    add_tri(g, p_gun_l, p_gun_bk, p_gun_b);
-    add_tri(g, p_gun_b, p_gun_bk, p_gun_r);
-    add_tri(g, p_gun_r, p_gun_bk, p_gun_t);
+    // 2. Aerodynamic Dorsal Spine Blade Fairing
+    var spine = d3.Geometry();
+    var sp_blade_f = spine.add_vertex(0.0, 0.52, -0.6);
+    var sp_blade_t = spine.add_vertex(0.0, 0.58, -1.6);
+    var sp_blade_b = spine.add_vertex(0.0, 0.44, -2.4);
+    var sp_side_l  = spine.add_vertex(-0.06, 0.48, -1.6);
+    var sp_side_r  = spine.add_vertex(0.06, 0.48, -1.6);
 
-    // Starboard Chine Autocannon (x = 0.72)
-    var s_gun_f  = g.add_vertex(0.72, 0.05, 1.35);
-    var s_gun_t  = g.add_vertex(0.72, 0.12, 0.3);
-    var s_gun_b  = g.add_vertex(0.72, -0.04, 0.3);
-    var s_gun_l  = g.add_vertex(0.64, 0.04, 0.3);
-    var s_gun_r  = g.add_vertex(0.80, 0.04, 0.3);
-    var s_gun_bk = g.add_vertex(0.72, 0.04, -0.3);
+    add_tri(spine, sp_blade_f, sp_blade_t, sp_side_l);
+    add_tri(spine, sp_blade_f, sp_side_r, sp_blade_t);
+    add_tri(spine, sp_blade_t, sp_blade_b, sp_side_l);
+    add_tri(spine, sp_blade_t, sp_side_r, sp_blade_b);
+    spine.compute_vertex_normals();
 
-    add_tri(g, s_gun_f, s_gun_l, s_gun_t);
-    add_tri(g, s_gun_f, s_gun_b, s_gun_l);
-    add_tri(g, s_gun_f, s_gun_r, s_gun_b);
-    add_tri(g, s_gun_f, s_gun_t, s_gun_r);
-    add_tri(g, s_gun_t, s_gun_l, s_gun_bk);
-    add_tri(g, s_gun_l, s_gun_b, s_gun_bk);
-    add_tri(g, s_gun_b, s_gun_r, s_gun_bk);
-    add_tri(g, s_gun_r, s_gun_t, s_gun_bk);
-
-    // Dorsal Spine Blade Fairing
-    var sp_blade_f = g.add_vertex(0.0, 0.52, -0.6);
-    var sp_blade_t = g.add_vertex(0.0, 0.58, -1.6);
-    var sp_blade_b = g.add_vertex(0.0, 0.44, -2.4);
-    var sp_side_l  = g.add_vertex(-0.06, 0.48, -1.6);
-    var sp_side_r  = g.add_vertex(0.06, 0.48, -1.6);
-
-    add_tri(g, sp_blade_f, sp_blade_t, sp_side_l);
-    add_tri(g, sp_blade_f, sp_side_r, sp_blade_t);
-    add_tri(g, sp_blade_t, sp_blade_b, sp_side_l);
-    add_tri(g, sp_blade_t, sp_side_r, sp_blade_b);
-
-    g.compute_vertex_normals();
+    g.merge(spine);
     return g;
 }
 
-// ── 4. Twin Recessed Afterburner Thrust Nozzles ──
+// ── 4. Twin Convergent-Divergent Ion Thruster Nozzles ──
+// Uses rotational lathe sculpting (d3.revolve), axial rotation, and geometry merging.
 fn build_starfighter_thrusters(): d3.Geometry {
-    var g = d3.Geometry();
+    // Revolve silhouette representing an aerospace rocket nozzle
+    val nozzle_profile: [float] = [
+        0.06, -0.42,
+        0.22, -0.15,
+        0.18,  0.00,
+        0.15,  0.18,
+        0.24,  0.32
+    ];
+    var bell = d3.revolve(nozzle_profile, 12);
+    bell.rotate_x(1.5707963); // Rotate 90 deg to face rearward (-Z)
 
-    // Port Nozzle (Facing -Z)
-    var pn0 = g.add_vertex(-0.60, 0.18, -2.52);
-    var pn1 = g.add_vertex(-0.46, 0.08, -2.52);
-    var pn2 = g.add_vertex(-0.46, -0.08, -2.52);
-    var pn3 = g.add_vertex(-0.60, -0.18, -2.52);
-    var pn4 = g.add_vertex(-0.74, -0.08, -2.52);
-    var pn5 = g.add_vertex(-0.74, 0.08, -2.52);
-    var pnc = g.add_vertex(-0.60, 0.0, -2.78);
+    var port = bell.clone();
+    port.translate(-0.60, 0.05, -2.55);
 
-    add_tri(g, pnc, pn1, pn0);
-    add_tri(g, pnc, pn2, pn1);
-    add_tri(g, pnc, pn3, pn2);
-    add_tri(g, pnc, pn4, pn3);
-    add_tri(g, pnc, pn5, pn4);
-    add_tri(g, pnc, pn0, pn5);
+    var stbd = bell.clone();
+    stbd.translate(0.60, 0.05, -2.55);
 
-    // Starboard Nozzle (Facing -Z)
-    var sn0 = g.add_vertex(0.60, 0.18, -2.52);
-    var sn1 = g.add_vertex(0.74, 0.08, -2.52);
-    var sn2 = g.add_vertex(0.74, -0.08, -2.52);
-    var sn3 = g.add_vertex(0.60, -0.18, -2.52);
-    var sn4 = g.add_vertex(0.46, -0.08, -2.52);
-    var sn5 = g.add_vertex(0.46, 0.08, -2.52);
-    var snc = g.add_vertex(0.60, 0.0, -2.78);
-
-    add_tri(g, snc, sn1, sn0);
-    add_tri(g, snc, sn2, sn1);
-    add_tri(g, snc, sn3, sn2);
-    add_tri(g, snc, sn4, sn3);
-    add_tri(g, snc, sn5, sn4);
-    add_tri(g, snc, sn0, sn5);
-
-    g.compute_vertex_normals();
-    return g;
-}
-
-// ── 5. Procedural Faceted Celestial Asteroid (Cratered Polyhedron) ──
-fn build_asteroid_mesh(scale: float): d3.Geometry {
-    var g = d3.Geometry();
-    var s = scale;
-
-    var v0  = g.add_vertex( 0.0,       s * 1.15,   0.0);
-    var v1  = g.add_vertex(-s * 0.72,  s * 0.75,   s * 0.65);
-    var v2  = g.add_vertex( s * 0.68,  s * 0.82,   s * 0.58);
-    var v3  = g.add_vertex( s * 0.85,  s * 0.65,  -s * 0.62);
-    var v4  = g.add_vertex(-s * 0.65,  s * 0.70,  -s * 0.75);
-
-    var v5  = g.add_vertex(-s * 1.10, -s * 0.10,   s * 0.75);
-    var v6  = g.add_vertex( s * 1.15,  s * 0.05,   s * 0.70);
-    var v7  = g.add_vertex( s * 1.05, -s * 0.15,  -s * 0.85);
-    var v8  = g.add_vertex(-s * 0.95,  s * 0.08,  -s * 0.90);
-
-    var v9  = g.add_vertex(-s * 0.65, -s * 0.85,   s * 0.55);
-    var v10 = g.add_vertex( s * 0.72, -s * 0.78,   s * 0.62);
-    var v11 = g.add_vertex( s * 0.60, -s * 0.88,  -s * 0.68);
-    var v12 = g.add_vertex(-s * 0.75, -s * 0.80,  -s * 0.60);
-    var v13 = g.add_vertex( 0.0,      -s * 1.12,   0.0);
-
-    // Top cap facets
-    add_tri(g, v0, v1, v2);
-    add_tri(g, v0, v2, v3);
-    add_tri(g, v0, v3, v4);
-    add_tri(g, v0, v4, v1);
-
-    // Upper equator facets
-    add_tri(g, v1, v5, v6);
-    add_tri(g, v1, v6, v2);
-    add_tri(g, v2, v6, v7);
-    add_tri(g, v2, v7, v3);
-    add_tri(g, v3, v7, v8);
-    add_tri(g, v3, v8, v4);
-    add_tri(g, v4, v8, v5);
-    add_tri(g, v4, v5, v1);
-
-    // Lower equator facets
-    add_tri(g, v5, v9, v10);
-    add_tri(g, v5, v10, v6);
-    add_tri(g, v6, v10, v11);
-    add_tri(g, v6, v11, v7);
-    add_tri(g, v7, v11, v12);
-    add_tri(g, v7, v12, v8);
-    add_tri(g, v8, v12, v9);
-    add_tri(g, v8, v9, v5);
-
-    // Bottom cap facets
-    add_tri(g, v13, v10, v9);
-    add_tri(g, v13, v11, v10);
-    add_tri(g, v13, v12, v11);
-    add_tri(g, v13, v9, v12);
-
-    g.compute_vertex_normals();
-    return g;
+    port.merge(stbd);
+    return port;
 }
 
 fn main(): int {
@@ -407,14 +316,14 @@ fn main(): int {
     scene.add_light(rim_light);
 
     // ── Starfighter Subsystem Meshes ───────────────────────────────────────
-    // 1. Titanium Hull: Sleek metallic plating
+    // 1. Titanium Hull: Aerodynamic fuselage and swept wings
     var hull_geo = build_starfighter_hull();
     var hull_mat = d3.phong_material(0.88, 0.92, 0.98, 64.0);
     hull_mat.specular = 0.9;
     var hull_mesh = d3.Mesh(hull_geo, hull_mat, "StarfighterHull");
     scene.add(hull_mesh);
 
-    // 2. Canopy: Tinted Solar Cyan Crystal Cockpit Glass
+    // 2. Canopy: Tinted Solar Cyan Crystal Visor
     var canopy_geo = build_starfighter_canopy();
     var canopy_mat = d3.phong_material(0.10, 0.85, 0.98, 128.0);
     canopy_mat.specular = 0.95;
@@ -422,23 +331,23 @@ fn main(): int {
     var canopy_mesh = d3.Mesh(canopy_geo, canopy_mat, "StarfighterCanopy");
     scene.add(canopy_mesh);
 
-    // 3. Trim: Integrated Chine Autocannons & Spine Fairing
+    // 3. Trim: Procedurally Extruded & Mirrored Chine Autocannons + Spine Fairing
     var trim_geo = build_starfighter_trim();
     var trim_mat = d3.phong_material(0.20, 0.22, 0.28, 48.0);
     var trim_mesh = d3.Mesh(trim_geo, trim_mat, "StarfighterTrim");
     scene.add(trim_mesh);
 
-    // 4. Thrusters: Glowing Neon Cyan Ion Plasma
+    // 4. Thrusters: Rotational Lathe (Revolved) Twin Convergent-Divergent Nozzles
     var thruster_geo = build_starfighter_thrusters();
     var thruster_mat = d3.basic_material(0.0, 0.95, 1.0);
     thruster_mat.cull_mode = types.CullMode.None;
     var thruster_mesh = d3.Mesh(thruster_geo, thruster_mat, "StarfighterThrusters");
     scene.add(thruster_mesh);
 
-    // ── Procedural Asteroid Field ──────────────────────────────────────────
-    var rock1_geo = build_asteroid_mesh(1.15);
-    var rock2_geo = build_asteroid_mesh(0.85);
-    var rock3_geo = build_asteroid_mesh(1.45);
+    // ── Procedural Asteroid Field (d3.asteroid) ────────────────────────────
+    var rock1_geo = d3.asteroid(1.15, 0.35, 10, 8, 101);
+    var rock2_geo = d3.asteroid(0.85, 0.40, 8, 6, 202);
+    var rock3_geo = d3.asteroid(1.45, 0.28, 12, 8, 303);
     var rock_mat  = d3.phong_material(0.62, 0.58, 0.52, 16.0);
 
     var rock1 = d3.Mesh(rock1_geo, rock_mat, "AsteroidAlpha");
@@ -453,6 +362,21 @@ fn main(): int {
     rock3.set_position(2.8, 2.4, -4.5);
     scene.add(rock3);
 
+    // ── Procedural Celestial Moon (d3.icosphere) ───────────────────────────
+    var moon_geo = d3.icosphere(2.2, 1);
+    var moon_mat = d3.phong_material(0.72, 0.75, 0.82, 32.0);
+    moon_mat.specular = 0.4;
+    var moon = d3.Mesh(moon_geo, moon_mat, "CelestialMoon");
+    moon.set_position(6.2, 3.8, -8.0);
+    scene.add(moon);
+
+    // ── Procedural Planetary Canyon (d3.terrain) ──────────────────────────
+    var canyon_geo = d3.terrain(36.0, 36.0, 10, 10, 2.8, 77);
+    var canyon_mat = d3.lambert_material(0.85, 0.85, 0.85);
+    var canyon = d3.Mesh(canyon_geo, canyon_mat, "PlanetaryCanyon");
+    canyon.set_position(-1.2, -5.4, -2.0);
+    scene.add(canyon);
+
     // ── 3D Camera & Renderer ───────────────────────────────────────────────
     var camera = d3.perspective_camera(50.0, 1000.0 / 700.0, 0.1, 100.0);
     camera.set_position(-1.2, 1.6, 6.8);
@@ -462,6 +386,10 @@ fn main(): int {
 
     var auto_rotate: bool = true;
     var wireframe_mode: bool = false;
+    var show_terrain: bool = true;
+    var show_asteroids: bool = true;
+    var show_moon: bool = true;
+    var terrain_alt: float = -5.4;
     var ship_yaw: float = 0.55;
     var ship_pitch: float = 0.28;
     var ship_roll: float = -0.05;
@@ -587,6 +515,10 @@ fn main(): int {
         rock3.rotation_x = rock3.rotation_x - 0.008;
         rock3.rotation_y = rock3.rotation_y + 0.010;
 
+        // Slow axial rotation for icosphere moon and terrain drifting
+        moon.rotation_y = moon.rotation_y + 0.003;
+        canyon.rotation_y = canyon.rotation_y + 0.001;
+
         // Synchronize all starfighter subsystem orientations
         hull_mesh.set_rotation(ship_pitch, ship_yaw, ship_roll);
         canopy_mesh.set_rotation(ship_pitch, ship_yaw, ship_roll);
@@ -631,6 +563,8 @@ fn main(): int {
                 trim_mat.wireframe = wireframe_mode;
                 thruster_mat.wireframe = wireframe_mode;
                 rock_mat.wireframe = wireframe_mode;
+                moon_mat.wireframe = wireframe_mode;
+                canyon_mat.wireframe = wireframe_mode;
             }
 
             app.gui.separator();
@@ -655,7 +589,50 @@ fn main(): int {
             }
 
             app.gui.separator();
-            app.gui.label("Optics & Environment:");
+            app.gui.label("Procedural Environment (std.d3):");
+
+            var new_show_ter = app.gui.toggle("Planetary Canyon", show_terrain);
+            if (new_show_ter != show_terrain) {
+                show_terrain = new_show_ter;
+                if (show_terrain) {
+                    canyon.position_y = terrain_alt;
+                } else {
+                    canyon.position_y = -999.0;
+                }
+            }
+
+            var prev_alt = terrain_alt;
+            terrain_alt = app.gui.slider("Altitude", terrain_alt, -8.0, -3.0, 185.0);
+            if (terrain_alt != prev_alt and show_terrain) {
+                canyon.position_y = terrain_alt;
+            }
+
+            var new_show_ast = app.gui.toggle("Asteroid Field", show_asteroids);
+            if (new_show_ast != show_asteroids) {
+                show_asteroids = new_show_ast;
+                if (show_asteroids) {
+                    rock1.position_y = 1.8;
+                    rock2.position_y = -1.6;
+                    rock3.position_y = 2.4;
+                } else {
+                    rock1.position_y = -999.0;
+                    rock2.position_y = -999.0;
+                    rock3.position_y = -999.0;
+                }
+            }
+
+            var new_show_moon = app.gui.toggle("Icosphere Moon", show_moon);
+            if (new_show_moon != show_moon) {
+                show_moon = new_show_moon;
+                if (show_moon) {
+                    moon.position_y = 3.8;
+                } else {
+                    moon.position_y = -999.0;
+                }
+            }
+
+            app.gui.separator();
+            app.gui.label("Optics & Illumination:");
 
             cam_distance = app.gui.slider("Zoom", cam_distance, 4.0, 14.0, 185.0);
 
@@ -714,13 +691,14 @@ fn main(): int {
             }
 
             app.gui.separator();
-            app.gui.label("Telemetry & Controls:");
+            app.gui.label("Telemetry & Procedural Stats:");
             app.gui.label("Performance: {app.fps as int} FPS");
             var ship_polys = hull_geo.get_face_count() + canopy_geo.get_face_count() + trim_geo.get_face_count() + thruster_geo.get_face_count();
-            var total_polys = ship_polys + rock1_geo.get_face_count() * 3;
-            app.gui.label("Ship Polys: {ship_polys} | Scene: {total_polys}");
-            app.gui.label("Navigation: Drag on 3D View or Sliders");
-            app.gui.label("Hotkeys: 1-4 Liveries | WASD/QE Move | R Reset");
+            var env_polys = rock1_geo.get_face_count() + rock2_geo.get_face_count() + rock3_geo.get_face_count() + moon_geo.get_face_count() + canyon_geo.get_face_count();
+            var total_polys = ship_polys + env_polys;
+            app.gui.label("Ship Polys: {ship_polys} | Env: {env_polys}");
+            app.gui.label("Total Polys: {total_polys}");
+            app.gui.label("Features: Extrude, Revolve, Terrain, Asteroids, Icosphere");
 
             if (app.gui.button("Reset Ship & Camera")) {
                 ship_yaw = 0.55;
@@ -730,6 +708,15 @@ fn main(): int {
                 sun_angle = 0.85;
                 thruster_glow = 1.0;
                 orbit_speed = 1.0;
+                terrain_alt = -5.4;
+                show_terrain = true;
+                show_asteroids = true;
+                show_moon = true;
+                canyon.position_y = -5.4;
+                rock1.position_y = 1.8;
+                rock2.position_y = -1.6;
+                rock3.position_y = 2.4;
+                moon.position_y = 3.8;
                 sun.direction_x = math.cos(0.85) * 0.8;
                 sun.direction_z = math.sin(0.85) * 0.8;
                 auto_rotate = true;

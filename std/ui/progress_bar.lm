@@ -1,6 +1,8 @@
 // std/ui/progress_bar - Progress bar widget
-import std.ui.types as ui_types;
+import std.ui.components as comp;
 
-pub fn progress_bar(fraction: float = 0.0, width_val: float = 160.0): ui_types.Widget {
-    return ui_types.progress(fraction, width_val);
+pub fn progress_bar(fraction: float = 0.0, width_val: float = 160.0): comp.ProgressBar {
+    val pb = comp.ProgressBar(fraction, 1.0);
+    pb.width_val = width_val;
+    return pb;
 }

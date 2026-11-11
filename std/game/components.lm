@@ -5,6 +5,8 @@
 // geometry primitives directly into widget state representations.
 
 import std.math as math;
+import std.math.arithmetic as arith;
+import std.math.trigonometry as trig;
 import std.game.types as types;
 
 frame WidgetState {
@@ -37,7 +39,7 @@ frame WidgetState {
 }
 
 frame Transform2D {
-    embed types.Vec2;
+    embed types.Vector2;
 
     pub var scale_x: float;
     pub var scale_y: float;
@@ -56,4 +58,3 @@ frame Transform2D {
         self.y = self.y + dy;
     }
 }
-

@@ -121,7 +121,7 @@ fn main() {
 
     // Form 1: Simple label + button
     var s1 = snippet_1_simple();
-    assert(s1.kind == ui.KIND_CONTAINER, "snippet 1 structural check failed");
+    assert(s1.widget_kind() == ui.WidgetKind.Container, "snippet 1 structural check failed");
     app.ui(s1);
     app.run_frame_step();
     var p1 = gg.readback_pixel(40, 40);
@@ -130,7 +130,7 @@ fn main() {
 
     // Form 2: Styled login form
     var s2 = snippet_2_login();
-    assert(len(s2.children) == 6, "snippet 2 structural check failed");
+    assert(len((s2 as ui.Container).children) == 6, "snippet 2 structural check failed");
     app.ui(s2);
     app.run_frame_step();
     var p2 = gg.readback_pixel(40, 40);
@@ -139,7 +139,7 @@ fn main() {
 
     // Form 3: Counter
     var s3 = snippet_3_counter();
-    assert(len(s3.children) == 3, "snippet 3 structural check failed");
+    assert(len((s3 as ui.Container).children) == 3, "snippet 3 structural check failed");
     app.ui(s3);
     app.run_frame_step();
     var p3 = gg.readback_pixel(40, 40);
@@ -148,7 +148,7 @@ fn main() {
 
     // Form 4: Toolbar / card layout
     var s4 = snippet_4_card();
-    assert(len(s4.children) == 2, "snippet 4 structural check failed");
+    assert(len((s4 as ui.Container).children) == 2, "snippet 4 structural check failed");
     app.ui(s4);
     app.run_frame_step();
     var p4 = gg.readback_pixel(40, 40);
@@ -157,7 +157,7 @@ fn main() {
 
     // Form 5: Settings form
     var s5 = snippet_5_settings();
-    assert(len(s5.children) == 5, "snippet 5 structural check failed");
+    assert(len((s5 as ui.Container).children) == 5, "snippet 5 structural check failed");
     app.ui(s5);
     app.run_frame_step();
     var p5 = gg.readback_pixel(40, 40);

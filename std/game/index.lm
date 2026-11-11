@@ -5,35 +5,35 @@ import std.game.types as types;
 import std.game.input as input_mod;
 
 pub import std.game.types show
-Vec2, vec2,
-Rect, rect,
-ColorRole, StyleVar,
-GUITheme, default_theme, dark_theme, light_theme, cyberpunk_theme, retro_theme, nord_theme;
+    Vec2, vec2,
+    Rect, rect,
+    ColorRole, StyleVar,
+    GUITheme, default_theme, dark_theme, light_theme, cyberpunk_theme, retro_theme, nord_theme;
 
 pub import std.game.math show
-Circle, circle,
-Ray2D, ray2d,
-Contact2D, RayHit2D,
-test_aabb_aabb, test_circle_circle, test_circle_aabb,
-raycast_aabb, raycast_circle;
+    Circle, circle,
+    Ray2D, ray2d,
+    Contact2D, RayHit2D,
+    test_aabb_aabb, test_circle_circle, test_circle_aabb,
+    raycast_aabb, raycast_circle;
 
 pub import std.game.camera show
-Camera2D, Camera;
+    Camera2D, Camera, draw_world_rect, draw_world_circle, draw_world_line;
 
 pub import std.game.sprite show
-Texture2D, texture2d,
-Sprite, sprite,
-SpriteSheet, AnimationClip, AnimatedSprite;
+    Texture2D, texture2d,
+    Sprite, sprite,
+    SpriteSheet, AnimationClip, AnimatedSprite;
 
 pub fn Texture(id: int = -1, width: int = 0, height: int = 0): Texture2D {
     return Texture2D(id=id, width=width, height=height);
 }
 
 pub import std.game.particles show
-Particle, ParticleEmitter2D, ParticleEmitter;
+    Particle, ParticleEmitter2D, ParticleEmitter;
 
 pub import std.game.input show
-InputManager;
+    InputManager;
 
 pub const KEY_SPACE: int         = input_mod.KEY_SPACE;
 pub const KEY_ENTER: int         = input_mod.KEY_ENTER;
@@ -80,38 +80,8 @@ pub const KEY_MOD_SUPER: int     = input_mod.MOD_SUPER;
 
 pub import std.game.gui show GUI, default_gui;
 pub import std.game.components show WidgetState, Transform2D;
-pub import std.game.scene show Scene, scene, SceneManager, default_scene_manager, TRANSITION_NONE, TRANSITION_FADE;
+pub import std.game.scene show Scene, scene, SceneManager, default_scene_manager, Transition;
 pub import std.game.app show Config, default_config, Game;
-pub import std.graphics.shadow show Shadow, shadow;
-
-// Style Color Indices
-pub const COLOR_WINDOW_BG: int       = types.COLOR_WINDOW_BG;
-pub const COLOR_WINDOW_TITLE: int    = types.COLOR_WINDOW_TITLE;
-pub const COLOR_PANEL_BG: int        = types.COLOR_PANEL_BG;
-pub const COLOR_TEXT: int            = types.COLOR_TEXT;
-pub const COLOR_TEXT_MUTED: int      = types.COLOR_TEXT_MUTED;
-pub const COLOR_ACCENT: int          = types.COLOR_ACCENT;
-pub const COLOR_BUTTON: int          = types.COLOR_BUTTON;
-pub const COLOR_BUTTON_HOVER: int    = types.COLOR_BUTTON_HOVER;
-pub const COLOR_BUTTON_ACTIVE: int   = types.COLOR_BUTTON_ACTIVE;
-pub const COLOR_SLIDER_TRACK: int    = types.COLOR_SLIDER_TRACK;
-pub const COLOR_SLIDER_THUMB: int    = types.COLOR_SLIDER_THUMB;
-pub const COLOR_CHECKBOX_BORDER: int = types.COLOR_CHECKBOX_BORDER;
-pub const COLOR_CHECKBOX_CHECK: int  = types.COLOR_CHECKBOX_CHECK;
-pub const COLOR_SEPARATOR: int       = types.COLOR_SEPARATOR;
-pub const COLOR_FRAME_BG: int        = types.COLOR_FRAME_BG;
-pub const COLOR_FRAME_BG_HOVER: int  = types.COLOR_FRAME_BG_HOVER;
-pub const COLOR_FRAME_BG_ACTIVE: int = types.COLOR_FRAME_BG_ACTIVE;
-pub const COLOR_TAB: int             = types.COLOR_TAB;
-pub const COLOR_TAB_ACTIVE: int      = types.COLOR_TAB_ACTIVE;
-pub const COLOR_PLOT_LINES: int      = types.COLOR_PLOT_LINES;
-pub const COLOR_PLOT_HISTOGRAM: int  = types.COLOR_PLOT_HISTOGRAM;
-
-// Style Var Indices
-pub const VAR_PADDING: int           = types.VAR_PADDING;
-pub const VAR_SPACING: int           = types.VAR_SPACING;
-pub const VAR_ITEM_HEIGHT: int       = types.VAR_ITEM_HEIGHT;
-pub const VAR_ROUNDING: int          = types.VAR_ROUNDING;
 
 // Default Singletons
 pub var input: input_mod.InputManager = input_mod.default_input;

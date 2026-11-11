@@ -1,7 +1,8 @@
-// std/ui/row - Horizontal flex layout container
-import std.ui.types as ui_types;
-pub import std.ui.components show Container;
+// std/ui/row - Horizontal layout container
+import std.ui.components as comp;
 
-pub fn row(children: [ui_types.Widget]): ui_types.Widget {
-    return ui_types.row(children);
+pub fn row(children: [comp.Fluent]): comp.Container {
+    val c = comp.Container(false);
+    c.children = children;
+    return c;
 }

@@ -1,10 +1,9 @@
-// std/ui/widget - Re-export canonical Widget type
-import std.ui.types as ui_types;
+// std/ui/widget - Re-export canonical Widget interface
+import std.ui.components as comp;
 
-// Re-export the canonical Widget type from types
-pub import std.ui.types show Widget;
+pub import std.ui.components show Fluent;
+pub type Widget = comp.Fluent;
 
-pub fn empty_widget(): ui_types.Widget {
-    return ui_types.empty();
+pub fn empty_widget(): comp.Container {
+    return comp.empty();
 }
-

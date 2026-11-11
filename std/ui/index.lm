@@ -1,238 +1,147 @@
-// std.ui - Public Fluent & Composable UI Framework for Lymar
-// Canonical entry point for Lymar Retained UI System
+// std.ui - Canonical Retained & Component-Embedded UI Framework for Lymar
+// Unified entry point backed directly by `std.ui.components` (`embed`),
+// `std.ui.event` (`EventResult?`), `std.ui.state` (`staged frame Signal(T: type)`),
+// and `std.ui.builder` + `std.ui.replay` (pooled DrawList).
 
 import std.ui.types as ui_types;
-pub import std.ui.types show Widget, Style, WidgetKind, LifecycleState;
-// Nominal dispatch enums (Alignment/Axis magic ints are gone).
-pub import std.ui.types show Align, Axis, Weight, Semantic, AlertKind, DotState, MaskShape, BlueprintVariant, ConstraintMode, Role;
+pub import std.ui.types show Style, WidgetKind, LifecycleState;
+pub import std.ui.types show Align, Axis, Weight, Semantic, AlertKind, DotState, MaskShape, ConstraintMode, Role;
 pub import std.ui.types show align_start, align_center, align_end, AXIS_HORIZONTAL, AXIS_VERTICAL, AXIS_STACKED;
 
-// Import Color directly from std.color - no transitive re-exports
-pub import std.color show Color;
+import std.color as color;
+import std.ui.components as comp;
+pub import std.graphics.shadow show Shadow, shadow;
+pub import std.ui.components show Fluent, Flow, LayoutMetrics, VisualStyle, Clickable, Changeable, Focusable, Button, Label, Slider, RangeSlider, Checkbox, Toggle, TextInput, ProgressBar, Container, Spacer, Badge, Card, Alert, ScrollView, Tabs, Select, Stepper, Accordion, Stat, Indicator, Steps, Timeline, TreeNode, FormField, Diff, FileInput, Filter, Calendar, Image, ColorPicker, Table, Chart, Link;
 
-import std.ui.state as state;
-pub import std.ui.state show Signal, ComputedSignal, Effect;
+pub type Widget = comp.Fluent;
+
+pub import std.ui.state show SignalNode, Signal, ComputedSignal, Effect, BoolSignal, IntSignal, FloatSignal, StrSignal, ComputedStr, signal_bool, signal_int, signal_float, signal_str, computed_str, effect, effect_with_cleanup, batch_updates, dispose_all_effects;
 
 pub import std.ui.viewport show Viewport, MediaQuery;
 
-import std.ui.layout as layout;
-pub import std.ui.layout show LayoutBox, GridSpec, Breakpoint;
+pub import std.ui.layout show LayoutBox, GridSpec, Breakpoint, compute_layout, compute_layout_enhanced, flatten_layout, hit_test_boxes, compute_grid_layout, responsive_layout, responsive, breakpoint;
 
-import std.ui.navigation as nav;
-pub import std.ui.navigation show Router, RouterParams, Route;
+import std.ui.grid as grid_mod;
+pub import std.ui.grid show GridLayout, grid_two_column, grid_three_column, grid_with_aspect, grid_enhanced;
 
-pub import std.ui.charts show plot_lines, plot_histogram;
+pub import std.ui.navigation show Router, RouterParams, Route, make_router, make_router_with_base, router_link, tab_bar, breadcrumbs;
+
+pub import std.ui.charts show plot_lines, plot_histogram, bar_chart, bubble_chart, doughnut_chart, line_chart, pie_chart, polar_area_chart, radar_chart, scatter_chart;
+
+pub import std.ui.dialog show dialog, alert_dialog, confirm, confirm_dialog, modal_backdrop;
 
 pub import std.ui.application show Application;
-
 pub import std.ui.window show Window;
 
-import std.ui.dialog as dialog;
+pub import std.ui.builder show build, build_into;
+pub import std.ui.draw_list show DrawList, HitZone, dl_hit_test;
+pub import std.ui.replay show replay;
 
-import std.ui.grid as grid;
-pub import std.ui.grid show GridLayout;
+pub import std.ui.staged show compute_item_width, compute_grid_column_width, compute_constrained_size, fold_box_width, fold_box_height, fold_stack_extent, fold_child_offset, theme_argb, ThemeRole, Binding;
+pub import std.ui.event show EventKind, EventResult, UIEvent, make_click_event, make_hover_event, make_key_event, dispatch_event, fire_action;
 
-pub import std.animation as animation;
-
-import std.graphics.shadow as shadow;
-pub import std.graphics.shadow show Shadow;
-import std.ui.builder as builder;
-
-import std.ui.draw_list as dlist;
-pub import std.ui.draw_list show DrawList, HitZone;
-
-import std.ui.replay as replay;
-import std.color as color;
-
-// ── Styles & Layout Constants ─────────────────────────────────────────────────
-// align_start/center/end and AXIS_* are re-exported via `pub import show` above
-// (type-safe; the old `var` aliases were invisible in type position).
+// ── Styles & Lifecycle Constants ──────────────────────────────────────────────
 pub fn style(): Style { return ui_types.style(); }
 
-// ── Kind Constants ────────────────────────────────────────────────────────────
-pub const KIND_CONTAINER: WidgetKind = ui_types.KIND_CONTAINER;
-pub const KIND_TEXT: WidgetKind = ui_types.KIND_TEXT;
-pub const KIND_BUTTON: WidgetKind = ui_types.KIND_BUTTON;
-pub const KIND_SPACER: WidgetKind = ui_types.KIND_SPACER;
-pub const KIND_IMAGE: WidgetKind = ui_types.KIND_IMAGE;
-pub const KIND_INPUT: WidgetKind = ui_types.KIND_INPUT;
-pub const KIND_CHECKBOX: WidgetKind = ui_types.KIND_CHECKBOX;
-pub const KIND_SLIDER: WidgetKind = ui_types.KIND_SLIDER;
-pub const KIND_TABS: WidgetKind = ui_types.KIND_TABS;
-pub const KIND_SCROLL: WidgetKind = ui_types.KIND_SCROLL;
-pub const KIND_BADGE: WidgetKind = ui_types.KIND_BADGE;
-pub const KIND_SELECT: WidgetKind = ui_types.KIND_SELECT;
-pub const KIND_TEXTAREA: WidgetKind = ui_types.KIND_TEXTAREA;
-pub const KIND_TOGGLE: WidgetKind = ui_types.KIND_TOGGLE;
-pub const KIND_STEPPER: WidgetKind = ui_types.KIND_STEPPER;
-pub const KIND_PLOT_LINES: WidgetKind = ui_types.KIND_PLOT_LINES;
-pub const KIND_PLOT_HISTOGRAM: WidgetKind = ui_types.KIND_PLOT_HISTOGRAM;
-pub const KIND_TREE_NODE: WidgetKind = ui_types.KIND_TREE_NODE;
-pub const KIND_COLOR_PICKER: WidgetKind = ui_types.KIND_COLOR_PICKER;
-pub const KIND_TABLE: WidgetKind = ui_types.KIND_TABLE;
-pub const KIND_ACCORDION: WidgetKind = ui_types.KIND_ACCORDION;
-pub const KIND_ALERT: WidgetKind = ui_types.KIND_ALERT;
-pub const KIND_CALENDAR: WidgetKind = ui_types.KIND_CALENDAR;
-pub const KIND_CARD: WidgetKind = ui_types.KIND_CARD;
-pub const KIND_DIFF: WidgetKind = ui_types.KIND_DIFF;
-pub const KIND_DOCK: WidgetKind = ui_types.KIND_DOCK;
-pub const KIND_FILE_INPUT: WidgetKind = ui_types.KIND_FILE_INPUT;
-pub const KIND_FILTER: WidgetKind = ui_types.KIND_FILTER;
-pub const KIND_INDICATOR: WidgetKind = ui_types.KIND_INDICATOR;
-pub const KIND_JOIN: WidgetKind = ui_types.KIND_JOIN;
-pub const KIND_LINK: WidgetKind = ui_types.KIND_LINK;
-pub const KIND_LIST: WidgetKind = ui_types.KIND_LIST;
-pub const KIND_PROGRESS: WidgetKind = ui_types.KIND_PROGRESS;
-pub const KIND_RANGE_SLIDER: WidgetKind = ui_types.KIND_RANGE_SLIDER;
-pub const KIND_STAT: WidgetKind = ui_types.KIND_STAT;
-pub const KIND_TIMELINE: WidgetKind = ui_types.KIND_TIMELINE;
-pub const KIND_TOOLTIP: WidgetKind = ui_types.KIND_TOOLTIP;
-pub const KIND_TOAST: WidgetKind = ui_types.KIND_TOAST;
-pub const KIND_STEPS: WidgetKind = ui_types.KIND_STEPS;
-pub const KIND_MASK: WidgetKind = ui_types.KIND_MASK;
-pub const KIND_BAR_CHART: WidgetKind = ui_types.KIND_BAR_CHART;
-pub const KIND_BUBBLE_CHART: WidgetKind = ui_types.KIND_BUBBLE_CHART;
-pub const KIND_DOUGHNUT_CHART: WidgetKind = ui_types.KIND_DOUGHNUT_CHART;
-pub const KIND_LINE_CHART: WidgetKind = ui_types.KIND_LINE_CHART;
-pub const KIND_POLAR_AREA_CHART: WidgetKind = ui_types.KIND_POLAR_AREA_CHART;
-pub const KIND_RADAR_CHART: WidgetKind = ui_types.KIND_RADAR_CHART;
-pub const KIND_SCATTER_CHART: WidgetKind = ui_types.KIND_SCATTER_CHART;
-pub const KIND_PIE_CHART: WidgetKind = ui_types.KIND_PIE_CHART;
-pub const KIND_OVERLAY: WidgetKind = ui_types.KIND_OVERLAY;
-pub const KIND_FORM_FIELD: WidgetKind = ui_types.KIND_FORM_FIELD;
-pub const KIND_MULTI_SELECT: WidgetKind = ui_types.KIND_MULTI_SELECT;
-
-// ── Lifecycle Constants ───────────────────────────────────────────────────────
 pub const LIFECYCLE_ENTERING: LifecycleState = ui_types.LIFECYCLE_ENTERING;
 pub const LIFECYCLE_ACTIVE: LifecycleState = ui_types.LIFECYCLE_ACTIVE;
 pub const LIFECYCLE_EXITING: LifecycleState = ui_types.LIFECYCLE_EXITING;
 pub const LIFECYCLE_REMOVED: LifecycleState = ui_types.LIFECYCLE_REMOVED;
 
-// ── Application & Window ──────────────────────────────────────────────────────
-pub fn shadow(
-    r: float = 0.0,
-    g: float = 0.0,
-    b: float = 0.0,
-    a: float = 0.25,
-    off_x: float = 0.0,
-    off_y: float = 4.0,
-    blur: float = 8.0,
-    spread: float = 0.0
-): Shadow {
-    return shadow.shadow(r=r, g=g, b=b, a=a, off_x=off_x, off_y=off_y, blur=blur, spread=spread);
+// ── Embedded Widget Constructors ──────────────────────────────────────────────
+pub fn accordion(title: str, content: Widget, default_open: bool = false): Accordion { return comp.Accordion(title, content, default_open); }
+pub fn alert(message: str, type_val: str = "info"): Alert { return comp.Alert(message, type_val); }
+pub fn badge(label: str): Badge { return comp.Badge(label); }
+pub fn button(label: str, on_click: (fn(): nil) | nil = nil): Button { return comp.Button(label, on_click); }
+pub fn calendar(selected_date: str = "2025-01-01"): Calendar { return comp.Calendar(selected_date); }
+pub fn card(title: str, content: Widget): Card { return comp.Card(title, content); }
+pub fn checkbox(checked: bool = false, on_change: (fn(): nil) | nil = nil): Checkbox { return comp.Checkbox("", checked, on_change); }
+pub fn color_picker(label: str, col: color.Color, on_change: (fn(): nil) | nil = nil): ColorPicker { return comp.ColorPicker(label, col, on_change); }
+pub fn column(children: [any] = [] as [any]): Container { return comp.column(children); }
+pub fn diff(old_text: str, new_text: str): Diff { return comp.Diff(old_text, new_text); }
+pub fn dock(items: [any] = [] as [any]): Container { val c = comp.container_of(WidgetKind.Dock, false); iter (x in items) { c.add(x as Fluent); } return c; }
+pub fn empty(): Container { return comp.empty(); }
+pub fn file_input(label: str = "Choose File...", on_select: (fn(): nil) | nil = nil): FileInput { return comp.FileInput(label, on_select); }
+pub fn filter(query: str = "", placeholder: str = "Filter...", on_change: (fn(): nil) | nil = nil): Filter { return comp.Filter(query, placeholder, on_change); }
+pub fn form_field(label_text: str, control: Widget, help_text: str = "", error_text: str = ""): FormField { return comp.FormField(label_text, control, help_text, error_text); }
+pub fn grid(columns_count: int, children: [any], spacing_val: float = 8.0): Container {
+    val c = comp.Container(true);
+    val tc = comp.Container(true);
+    if (columns_count <= 0) {
+        iter (ch in children) { c.add(ch as Fluent); }
+        return c.spacing(spacing_val);
+    }
+    iter (ch in children) { tc.add(ch as Fluent); }
+    val rows: [comp.Fluent] = [];
+    var cur_row: [comp.Fluent] = [];
+    iter (ch in tc.children) {
+        cur_row.append(ch);
+        if (len(cur_row) == columns_count) {
+            val rw = comp.Container(false);
+            iter (rch in cur_row) { rw.add(rch); }
+            rw.spacing_val = spacing_val;
+            rows.append(rw);
+            cur_row = [] as [comp.Fluent];
+        }
+    }
+    if (len(cur_row) > 0) {
+        while (len(cur_row) < columns_count) {
+            cur_row.append(comp.Spacer(1.0));
+        }
+        val rw = comp.Container(false);
+        iter (rch in cur_row) { rw.add(rch); }
+        rw.spacing_val = spacing_val;
+        rows.append(rw);
+    }
+    iter (r in rows) { c.add(r); }
+    return c.spacing(spacing_val);
 }
-
-// ── State Management ───────────────────────────────────────────────────────────
-pub fn signal(init_val): Signal { return state.signal(init_val); }
-pub fn signal_bool(init_val: bool): Signal { return state.signal_bool(init_val); }
-pub fn signal_int(init_val: int): Signal { return state.signal_int(init_val); }
-pub fn signal_float(init_val: float): Signal { return state.signal_float(init_val); }
-pub fn signal_str(init_val: str): Signal { return state.signal_str(init_val); }
-pub fn computed(compute_fn: fn(): any, deps: [Signal]): ComputedSignal { return state.computed(compute_fn, deps); }
-pub fn effect(effect_fn: fn(): nil, deps: [Signal]): Effect { return state.effect(effect_fn, deps); }
-pub fn effect_with_cleanup(effect_fn: fn(): nil, cleanup_fn: fn(): nil, deps: [Signal]): Effect { return state.effect_with_cleanup(effect_fn, cleanup_fn, deps); }
-pub fn batch_updates(updates: fn(): nil): nil { return state.batch_updates(updates); }
-pub fn dispose_all_effects(): nil { return state.dispose_all_effects(); }
-
-// ── Layout Operations ─────────────────────────────────────────────────────────
-pub fn compute_layout(widget: Widget, x: float, y: float, available_w: float, available_h: float): LayoutBox { return layout.compute_layout(widget, x, y, available_w, available_h); }
-pub fn compute_layout_enhanced(widget: Widget, x: float, y: float, available_w: float, available_h: float): LayoutBox { return layout.compute_layout_enhanced(widget, x, y, available_w, available_h); }
-pub fn flatten_layout(box: LayoutBox): [LayoutBox] { return layout.flatten_layout(box); }
-pub fn hit_test_boxes(boxes: [LayoutBox], px: float, py: float): LayoutBox { return layout.hit_test_boxes(boxes, px, py); }
-pub fn compute_grid_layout(spec: GridSpec, children: [Widget], x: float, y: float, available_w: float, available_h: float): [LayoutBox] { return layout.compute_grid_layout(spec, children, x, y, available_w, available_h); }
-pub fn responsive_layout(breakpoints: [Breakpoint], viewport_w: float, default_widget: Widget): Widget { return layout.responsive_layout(breakpoints, viewport_w, default_widget); }
-pub fn responsive(mobile: Widget, tablet: Widget, desktop: Widget, viewport_w: float): Widget { return layout.responsive(mobile, tablet, desktop, viewport_w); }
-pub fn breakpoint(small: Widget, large: Widget, threshold: float = 768.0, viewport_w: float): Widget { return layout.breakpoint(small, large, threshold, viewport_w); }
-
-// ── Grid Layout ─────────────────────────────────────────────────────────────
-pub fn grid_two_column(left: Widget, right: Widget, gap: float = 16.0): Widget { return grid.grid_two_column(left, right, gap); }
-pub fn grid_three_column(a: Widget, b: Widget, c: Widget, gap: float = 12.0): Widget { return grid.grid_three_column(a, b, c, gap); }
-pub fn grid_with_aspect(columns_count: int, children: [Widget], aspect_ratio: float, spacing_val: float = 8.0): Widget { return grid.grid_with_aspect(columns_count, children, aspect_ratio, spacing_val); }
-pub fn grid_enhanced(spec: GridSpec, children: [Widget]): Widget { return grid.grid_enhanced(spec, children); }
-
-// ── Navigation & Routing ─────────────────────────────────────────────────────
-pub fn make_router(): Router { return nav.make_router(); }
-pub fn make_router_with_base(base: str): Router { return nav.make_router_with_base(base); }
-pub fn router_link(label: str, path: str, router: Router): Widget { return nav.router_link(label, path, router); }
-pub fn tab_bar(routes: [(str, str)], router: Router): Widget { return nav.tab_bar(routes, router); }
-pub fn breadcrumbs(router: Router): Widget { return nav.breadcrumbs(router); }
-
-// ── Semantic Widget Constructors ──────────────────────────────────────────────
-pub fn accordion(title: str, content: Widget, default_open: bool = false): Widget { return ui_types.accordion(title, content, default_open); }
-pub fn alert(message: str, type_val: str = "info"): Widget { return ui_types.alert(message, type_val); }
-pub fn badge(label: str): Widget { return ui_types.badge(label); }
-pub fn bar_chart(label: str, values: [float], labels: [str] = [] as [str]): Widget { return ui_types.bar_chart(label, values, labels); }
-pub fn bubble_chart(label: str, values: [float]): Widget { return ui_types.bubble_chart(label, values); }
-pub fn button(label: str, on_click: any = nil): Widget { return ui_types.button(label, on_click); }
-pub fn calendar(selected_date: str = "2025-01-01"): Widget { return ui_types.calendar(selected_date); }
-pub fn card(title: str, content: Widget): Widget { return ui_types.card(title, content); }
-pub fn checkbox(checked: bool = false, on_change: any = nil): Widget { return ui_types.checkbox(checked, on_change); }
-pub fn color_picker(label: str, color: Color, on_change: any = nil): Widget { return ui_types.color_picker(label, color, on_change); }
-pub fn column(children: [Widget]): Widget { return ui_types.column(children); }
-pub fn dialog(title: str, content: Widget, is_open: bool = true, width: float = 400.0, height: float = 300.0, on_close: any = nil): Widget { return dialog.dialog(title, content, is_open, width, height, on_close); }
-pub fn alert_dialog(title: str, message: str, on_ok: any = nil): Widget { return dialog.alert_dialog(title, message, on_ok); }
-pub fn confirm(title: str, message: str, on_yes: any = nil, on_no: any = nil): Widget { return dialog.confirm(title, message, on_yes, on_no); }
-pub fn confirm_dialog(title: str, message: str, on_yes: any = nil, on_no: any = nil): Widget { return dialog.confirm(title, message, on_yes, on_no); }
-pub fn modal_backdrop(alpha: float = 0.6): Widget { return dialog.modal_backdrop(alpha); }
-pub fn diff(old_text: str, new_text: str): Widget { return ui_types.diff(old_text, new_text); }
-pub fn dock(items: [Widget]): Widget { return ui_types.dock(items); }
-pub fn doughnut_chart(label: str, values: [float], labels: [str] = [] as [str]): Widget { return ui_types.doughnut_chart(label, values, labels); }
-pub fn empty(): Widget { return ui_types.empty(); }
-pub fn file_input(label: str = "Choose File...", on_select: any = nil): Widget { return ui_types.file_input(label, on_select); }
-pub fn filter(query: str = "", placeholder: str = "Filter...", on_change: any = nil): Widget { return ui_types.filter(query, placeholder, on_change); }
-pub fn form_field(label_text: str, control: Widget, help_text: str = "", error_text: str = ""): Widget { return ui_types.form_field(label_text, control, help_text, error_text); }
-pub fn grid(columns_count: int, children: [Widget], spacing_val: float = 8.0): Widget { return ui_types.grid(columns_count, children, spacing_val); }
-pub fn image(source: str = ""): Widget { return ui_types.image(source); }
-pub fn indicator(status: str = "online", label: str = ""): Widget { return ui_types.indicator(status, label); }
-pub fn input(value: str = "", placeholder: str = "Type here...", on_change: any = nil): Widget { return ui_types.input(value, placeholder, on_change); }
-pub fn join(items: [Widget]): Widget { return ui_types.join(items); }
-pub fn line_chart(label: str, values: [float]): Widget { return ui_types.line_chart(label, values); }
-pub fn link(text_val: str, url: str = "", on_click: any = nil): Widget { return ui_types.link(text_val, url, on_click); }
-pub fn list(items: [Widget]): Widget { return ui_types.list(items); }
-pub fn mask(shape: str = "circle", child: Widget = empty()): Widget { return ui_types.mask(shape, child); }
-pub fn overlay(content: Widget, x: float = 0.0, y: float = 0.0, width_val: float = 0.0, height_val: float = 0.0): Widget { return ui_types.overlay(content, x, y, width_val, height_val); }
-pub fn pie_chart(label: str, values: [float], labels: [str] = [] as [str]): Widget { return ui_types.pie_chart(label, values, labels); }
-pub fn plot_histogram(label: str, values: [float], min_val: float = 0.0, max_val: float = 1.0): Widget { return ui_types.plot_histogram(label, values, min_val, max_val); }
-pub fn plot_lines(label: str, values: [float], min_val: float = 0.0, max_val: float = 1.0): Widget { return ui_types.plot_lines(label, values, min_val, max_val); }
-pub fn polar_area_chart(label: str, values: [float], labels: [str] = [] as [str]): Widget { return ui_types.polar_area_chart(label, values, labels); }
-pub fn progress(fraction: float = 0.0, width_val: float = 160.0): Widget { return ui_types.progress(fraction, width_val); }
-pub fn radar_chart(label: str, values: [float], labels: [str] = [] as [str]): Widget { return ui_types.radar_chart(label, values, labels); }
-pub fn range_slider(low: float = 20.0, high: float = 80.0, min_val: float = 0.0, max_val: float = 100.0): Widget { return ui_types.range_slider(low, high, min_val, max_val); }
-pub fn row(children: [Widget]): Widget { return ui_types.row(children); }
-pub fn scatter_chart(label: str, values: [float]): Widget { return ui_types.scatter_chart(label, values); }
-pub fn scroll(content: Widget): Widget { return ui_types.scroll(content); }
-pub fn select(options: [str], selected_idx: int = 0, on_change: any = nil): Widget { return ui_types.select(options, selected_idx, on_change); }
-pub fn multi_select(options: [str], selected_indices: [int] = [] as [int], on_change: any = nil): Widget { return ui_types.multi_select(options, selected_indices, on_change); }
-pub fn slider(value: float = 50.0, min_val: float = 0.0, max_val: float = 100.0, on_change: any = nil): Widget { return ui_types.slider(value, min_val, max_val, on_change); }
-pub fn spacer(flex: float = 1.0): Widget { return ui_types.spacer(flex); }
-pub fn stack(children: [Widget]): Widget { return ui_types.stack(children); }
-pub fn stat(title: str, value: str, desc: str = ""): Widget { return ui_types.stat(title, value, desc); }
-pub fn stepper(value: int = 0, step: int = 1, min_val: int = 0, max_val: int = 100, on_change: any = nil): Widget { return ui_types.stepper(value, step, min_val, max_val, on_change); }
-pub fn steps(step_titles: [str], active_step: int = 0): Widget { return ui_types.steps(step_titles, active_step); }
-pub fn steps_vertical(step_titles: [str], active_step: int = 0): Widget { return ui_types.steps_vertical(step_titles, active_step); }
-pub fn table(headers: [str], rows: [[Widget]]): Widget { return ui_types.table(headers, rows); }
-pub fn tabs(titles: [str], pages: [Widget], active: int = 0, on_change: any = nil): Widget { return ui_types.tabs(titles, pages, active, on_change); }
-pub fn text(content: str): Widget { return ui_types.text(content); }
-pub fn text_area(value: str = "", placeholder: str = "Type here...", on_change: any = nil): Widget { return ui_types.text_area(value, placeholder, on_change); }
-pub fn textarea(content: str): Widget { return ui_types.textarea(content); }
-pub fn timeline(events: [Widget]): Widget { return ui_types.timeline(events); }
-pub fn toast(message: str, type_val: str = "info"): Widget { return ui_types.toast(message, type_val); }
-pub fn toggle(enabled: bool = false, on_change: any = nil): Widget { return ui_types.toggle(enabled, on_change); }
-pub fn tooltip(label: str, content: Widget): Widget { return ui_types.tooltip(label, content); }
-pub fn tree_node(label: str, children: [Widget], default_open: bool = false): Widget { return ui_types.tree_node(label, children, default_open); }
-
-// ── Hybrid UI Execution Engine ────────────────────────────────────────────────
-pub fn build(root: Widget, vw: float, vh: float, ts: any = nil, x: float = 0.0, y: float = 0.0): DrawList {
-    return builder.build(root, vw, vh, ts, x, y);
+pub fn image(source: str = ""): Image { return comp.Image(source); }
+pub fn indicator(status: str = "online", label: str = ""): Indicator { return comp.Indicator(status, label); }
+pub fn input(value: str = "", placeholder: str = "Type here...", on_change: (fn(): nil) | nil = nil): TextInput { return comp.TextInput(value, placeholder, on_change, false); }
+pub fn join(items: [any] = [] as [any]): Container { val c = comp.container_of(WidgetKind.Join, false); iter (x in items) { c.add(x as Fluent); } return c; }
+pub fn link(text_val: str, url: str = "", on_click: (fn(): nil) | nil = nil): Link { return comp.Link(text_val, url, on_click); }
+pub fn list(items: [any] = [] as [any]): Container { val c = comp.container_of(WidgetKind.List, true); iter (x in items) { c.add(x as Fluent); } return c; }
+pub fn mask(shape: str = "circle", child: Widget = empty()): Container { return comp.mask(shape, child); }
+pub fn overlay(content: Widget, x: float = 0.0, y: float = 0.0, width_val: float = 0.0, height_val: float = 0.0): Container { return comp.overlay(content, x, y, width_val, height_val); }
+pub fn progress(fraction: float = 0.0, width_val: float = 160.0): ProgressBar { val pb = comp.ProgressBar(fraction, 1.0); pb.width_val = width_val; return pb; }
+pub fn range_slider(low: float = 20.0, high: float = 80.0, min_val: float = 0.0, max_val: float = 100.0): RangeSlider { return comp.RangeSlider(low, high, min_val, max_val); }
+pub fn row(children: [any] = [] as [any]): Container { return comp.row(children); }
+pub fn scroll(content: Widget): ScrollView { return comp.ScrollView(content); }
+pub fn select(options: [str], selected_idx: int = 0, on_change: (fn(): nil) | nil = nil): Select { return comp.Select(options, selected_idx, on_change, false); }
+pub fn multi_select(options: [str], selected_indices: [int] = [] as [int], on_change: (fn(): nil) | nil = nil): Select { val s = comp.Select(options, 0, on_change, true); s.selected_indices = selected_indices; return s; }
+pub fn slider(value: float = 50.0, min_val: float = 0.0, max_val: float = 100.0, on_change: (fn(): nil) | nil = nil): Slider { return comp.Slider(value, min_val, max_val, on_change); }
+pub fn spacer(flex: float = 1.0): Spacer { return comp.Spacer(flex); }
+pub fn stack(children: [any] = [] as [any]): Container { return comp.stack(children); }
+pub fn stat(title: str, value: str, desc: str = ""): Stat { return comp.Stat(title, value, desc); }
+pub fn stepper(value: int = 0, step: int = 1, min_val: int = 0, max_val: int = 100, on_change: (fn(): nil) | nil = nil): Stepper { return comp.Stepper(value, step, min_val, max_val, on_change); }
+pub fn steps(step_titles: [str], active_step: int = 0): Steps { return comp.Steps(step_titles, active_step, false); }
+pub fn steps_vertical(step_titles: [str], active_step: int = 0): Steps { return comp.Steps(step_titles, active_step, true); }
+pub fn table(headers: [str], rows: [[Widget]]): Table { return comp.Table(headers, rows); }
+pub fn tabs(titles: [str], pages: [any], active: int = 0, on_change: (fn(): nil) | nil = nil): Tabs {
+    val typed_pages: [Fluent] = [];
+    iter (p in pages) {
+        typed_pages.append(p as Fluent);
+    }
+    return comp.Tabs(titles, typed_pages, active, on_change);
 }
-pub fn replay(dlist_obj: DrawList): nil {
-    replay.replay(dlist_obj);
+pub fn text(content: str): Label { return comp.Label(content); }
+pub fn text_area(value: str = "", placeholder: str = "Type here...", on_change: (fn(): nil) | nil = nil): TextInput { return comp.TextInput(value, placeholder, on_change, true); }
+pub fn textarea(content: str): TextInput { return comp.TextInput(content, "", nil, true); }
+pub fn timeline(events: [any]): Timeline {
+    val typed_events: [Fluent] = [];
+    iter (ev in events) {
+        typed_events.append(ev as Fluent);
+    }
+    return comp.Timeline(typed_events);
 }
-pub fn dl_hit_test(dlist_obj: DrawList, px: float, py: float): HitZone {
-    return dlist.dl_hit_test(dlist_obj, px, py);
+pub fn toast(message: str, type_val: str = "info"): Alert { return comp.toast(message, type_val); }
+pub fn toggle(enabled: bool = false, on_change: (fn(): nil) | nil = nil): Toggle { return comp.Toggle(enabled, on_change); }
+pub fn tooltip(label: str, content: Widget): Container { return comp.tooltip(label, content); }
+pub fn tree_node(label: str, children: [any], default_open: bool = false): TreeNode {
+    val typed_children: [Fluent] = [];
+    iter (ch in children) {
+        typed_children.append(ch as Fluent);
+    }
+    return comp.TreeNode(label, typed_children, default_open);
 }
-
-// ── Modern Idiomatic Component Primitives (Embedding & Staged) ───────────────
-pub import std.ui.components show Fluent, Flow, LayoutMetrics, LayoutBox, VisualStyle, Clickable, Changeable, Focusable, Button, Label, Slider, Checkbox, TextInput, ProgressBar, Container, Spacer;
-pub import std.ui.staged show compute_item_width, compute_grid_column_width, compute_constrained_size, fold_box_width, fold_box_height, fold_stack_extent, fold_child_offset, theme_argb, ThemeRole, Binding;
-pub import std.ui.event show EventKind, EventResult, UIEvent, make_click_event, make_hover_event, make_key_event, dispatch_event, fire_action;

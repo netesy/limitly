@@ -1,6 +1,9 @@
-// std/ui/stack - Absolute/overlay positioned container
-import std.ui.types as ui_types;
+// std/ui/stack - Stacked layout container
+import std.ui.components as comp;
 
-pub fn stack(children: [ui_types.Widget]): ui_types.Widget {
-    return ui_types.stack(children);
+pub fn stack(children: [comp.Fluent]): comp.Container {
+    val c = comp.Container(true);
+    c.flow = comp.Flow.Stacked;
+    c.children = children;
+    return c;
 }

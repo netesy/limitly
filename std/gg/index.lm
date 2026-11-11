@@ -3,6 +3,29 @@
 import std.internal.runtime as rt;
 import std.math as math;
 
+enum PrimitiveType {
+    Rect,
+    Triangle,
+    VertexStream
+}
+
+enum BatchOp {
+    Rect,
+    Triangle,
+    Text,
+    ClipPush,
+    ClipPop
+}
+
+fn primitive_type_code(p: PrimitiveType): int {
+    match (p) {
+        PrimitiveType.Rect => { return 0; },
+        PrimitiveType.Triangle => { return 1; },
+        PrimitiveType.VertexStream => { return 2; }
+    }
+    return 0;
+}
+
 trait ResourceTrait {
     fn is_valid(): bool;
 }
@@ -43,7 +66,8 @@ frame Pipeline : ResourceTrait {
     pub var primitive_type: int;
 }
 
-frame Bindings {
+frame Bindings : ResourceTrait {
+    mixin ResourceHandle;
     pub var vertex_buffer_id: int;
     pub var index_buffer_id: int;
     pub var image_id: int;
@@ -64,13 +88,186 @@ frame Pass {
     pub var action: PassAction;
 }
 
+/// Reusable flat command & float buffer to batch draw calls with zero per-call list allocations.
+frame DrawBatch {
+    pub var ops: [BatchOp];
+    pub var op_count: int;
+    pub var data: [float];
+    pub var data_len: int;
+    pub var texts: [str];
+    pub var text_count: int;
+
+    pub init() {
+        self.ops = [];
+        self.op_count = 0;
+        self.data = [];
+        self.data_len = 0;
+        self.texts = [];
+        self.text_count = 0;
+    }
+
+    pub fn clear(): nil {
+        self.op_count = 0;
+        self.data_len = 0;
+        self.text_count = 0;
+    }
+
+    fn push_op(op: BatchOp): nil {
+        if (self.op_count < len(self.ops)) {
+            self.ops[self.op_count] = op;
+        } else {
+            self.ops.append(op);
+        }
+        self.op_count = self.op_count + 1;
+    }
+
+    fn push_f(v: float): nil {
+        if (self.data_len < len(self.data)) {
+            self.data[self.data_len] = v;
+        } else {
+            self.data.append(v);
+        }
+        self.data_len = self.data_len + 1;
+    }
+
+    fn push_text(s: str): nil {
+        if (self.text_count < len(self.texts)) {
+            self.texts[self.text_count] = s;
+        } else {
+            self.texts.append(s);
+        }
+        self.text_count = self.text_count + 1;
+    }
+
+    pub fn add_rect(x: float, y: float, w: float, h: float, r: float, g: float, b: float, a: float, rad: float = 0.0, border_w: float = 0.0): nil {
+        self.push_op(BatchOp.Rect);
+        self.push_f(x); self.push_f(y); self.push_f(w); self.push_f(h);
+        self.push_f(r); self.push_f(g); self.push_f(b); self.push_f(a);
+        self.push_f(rad); self.push_f(border_w);
+    }
+
+    pub fn add_triangle(x1: float, y1: float, x2: float, y2: float, x3: float, y3: float, r: float, g: float, b: float, a: float): nil {
+        self.push_op(BatchOp.Triangle);
+        self.push_f(x1); self.push_f(y1);
+        self.push_f(x2); self.push_f(y2);
+        self.push_f(x3); self.push_f(y3);
+        self.push_f(r); self.push_f(g); self.push_f(b); self.push_f(a);
+    }
+
+    pub fn add_text(text_str: str, x: float, y: float, r: float, g: float, b: float, a: float, scale: int = 1): nil {
+        self.push_op(BatchOp.Text);
+        self.push_text(text_str);
+        self.push_f(x); self.push_f(y);
+        self.push_f(r); self.push_f(g); self.push_f(b); self.push_f(a);
+        self.push_f(scale as float);
+    }
+
+    pub fn add_clip_push(x: float, y: float, w: float, h: float): nil {
+        self.push_op(BatchOp.ClipPush);
+        self.push_f(x); self.push_f(y); self.push_f(w); self.push_f(h);
+    }
+
+    pub fn add_clip_pop(): nil {
+        self.push_op(BatchOp.ClipPop);
+    }
+}
+
 frame GraphicsContext {
     pub var handle: int;
     pub var next_resource_id: int;
+    pub var batching: bool;
+    pub var batch: DrawBatch;
+
+    // Reusable fixed-arity argument slots so primitive calls do zero list allocations.
+    pub var _args0: [int];
+    pub var _args1i: [int];
+    pub var _args2i: [int];
+    pub var _args3i: [int];
+    pub var _args4f: [float];
+    pub var _args10f: [float];
 
     pub init() {
         self.handle = -1;
         self.next_resource_id = 1;
+        self.batching = false;
+        self.batch = DrawBatch();
+        self._args0 = [];
+        self._args1i = [0];
+        self._args2i = [0, 0];
+        self._args3i = [0, 0, 0];
+        self._args4f = [0.0, 0.0, 0.0, 0.0];
+        self._args10f = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+    }
+
+    pub fn flush_draw_batch(b: DrawBatch): nil {
+        if (self.handle == -1 or b.op_count == 0) {
+            b.clear();
+            return;
+        }
+        val was_batching = self.batching;
+        self.batching = false;
+
+        var di = 0;
+        var ti = 0;
+        iter (oi in 0..b.op_count) {
+            val op = b.ops[oi];
+            match (op) {
+                BatchOp.Rect => {
+                    self._args10f[0] = b.data[di];
+                    self._args10f[1] = b.data[di + 1];
+                    self._args10f[2] = b.data[di + 2];
+                    self._args10f[3] = b.data[di + 3];
+                    self._args10f[4] = b.data[di + 4];
+                    self._args10f[5] = b.data[di + 5];
+                    self._args10f[6] = b.data[di + 6];
+                    self._args10f[7] = b.data[di + 7];
+                    self._args10f[8] = b.data[di + 8];
+                    self._args10f[9] = b.data[di + 9];
+                    rt.call(self.handle, rt.OP_DRAW_RECT, self._args10f);
+                    di = di + 10;
+                },
+                BatchOp.Triangle => {
+                    self._args10f[0] = b.data[di];
+                    self._args10f[1] = b.data[di + 1];
+                    self._args10f[2] = b.data[di + 2];
+                    self._args10f[3] = b.data[di + 3];
+                    self._args10f[4] = b.data[di + 4];
+                    self._args10f[5] = b.data[di + 5];
+                    self._args10f[6] = b.data[di + 6];
+                    self._args10f[7] = b.data[di + 7];
+                    self._args10f[8] = b.data[di + 8];
+                    self._args10f[9] = b.data[di + 9];
+                    rt.call(self.handle, rt.OP_DRAW_TRIANGLE, self._args10f);
+                    di = di + 10;
+                },
+                BatchOp.Text => {
+                    val txt = b.texts[ti];
+                    ti = ti + 1;
+                    val tx = b.data[di];
+                    val ty = b.data[di + 1];
+                    val tr = b.data[di + 2];
+                    val tg = b.data[di + 3];
+                    val tb = b.data[di + 4];
+                    val ta = b.data[di + 5];
+                    val ts = b.data[di + 6] as int;
+                    rt.call(self.handle, rt.OP_DRAW_TEXT, [txt, tx, ty, tr, tg, tb, ta, ts]);
+                    di = di + 7;
+                },
+                BatchOp.ClipPush => {
+                    self._args4f[0] = b.data[di];
+                    self._args4f[1] = b.data[di + 1];
+                    self._args4f[2] = b.data[di + 2];
+                    self._args4f[3] = b.data[di + 3];
+                    rt.call(self.handle, rt.OP_PUSH_CLIP, self._args4f);
+                    di = di + 4;
+                },
+                BatchOp.ClipPop => {
+                    rt.call(self.handle, rt.OP_POP_CLIP, self._args0);
+                }
+            }
+        }
+        b.clear();
+        self.batching = was_batching;
     }
 }
 
@@ -80,17 +277,27 @@ pub fn setup(): bool {
     if (global_graphics_context.handle != -1) {
         return true;
     }
-    global_graphics_context.handle = rt.create(17, []);
+    global_graphics_context.handle = rt.create_resource(rt.ResourceKind.Graphics, global_graphics_context._args0);
     if (global_graphics_context.handle != -1) {
-        rt.call(global_graphics_context.handle, rt.OP_OPEN, [800, 600]);
+        global_graphics_context._args2i[0] = 800;
+        global_graphics_context._args2i[1] = 600;
+        rt.call(global_graphics_context.handle, rt.OP_OPEN, global_graphics_context._args2i);
         return true;
     }
     return false;
 }
 
+pub fn setup_checked(): nil?GraphicsInitError {
+    if (not setup()) {
+        return err(GraphicsInitError);
+    }
+    return ok(nil);
+}
+
 pub fn shutdown(): nil {
     if (global_graphics_context.handle != -1) {
-        rt.call(global_graphics_context.handle, rt.OP_CLOSE, []);
+        flush_batch();
+        rt.call(global_graphics_context.handle, rt.OP_CLOSE, global_graphics_context._args0);
         rt.destroy(global_graphics_context.handle);
         global_graphics_context.handle = -1;
     }
@@ -98,6 +305,24 @@ pub fn shutdown(): nil {
 
 pub fn is_valid(): bool {
     return global_graphics_context.handle != -1;
+}
+
+pub fn begin_batch(): nil {
+    global_graphics_context.batch.clear();
+    global_graphics_context.batching = true;
+}
+
+pub fn flush_batch(): nil {
+    global_graphics_context.flush_draw_batch(global_graphics_context.batch);
+}
+
+pub fn end_batch(): nil {
+    flush_batch();
+    global_graphics_context.batching = false;
+}
+
+pub fn submit_batch(b: DrawBatch): nil {
+    global_graphics_context.flush_draw_batch(b);
 }
 
 pub fn spawn_window(width: int, height: int, title: str, resizable: int = 1): nil {
@@ -108,19 +333,34 @@ pub fn spawn_window(width: int, height: int, title: str, resizable: int = 1): ni
 
 pub fn push_clip(x: float, y: float, w: float, h: float): nil {
     if (global_graphics_context.handle != -1) {
-        rt.call(global_graphics_context.handle, rt.OP_PUSH_CLIP, [x, y, w, h]);
+        if (global_graphics_context.batching) {
+            global_graphics_context.batch.add_clip_push(x, y, w, h);
+            return;
+        }
+        global_graphics_context._args4f[0] = x;
+        global_graphics_context._args4f[1] = y;
+        global_graphics_context._args4f[2] = w;
+        global_graphics_context._args4f[3] = h;
+        rt.call(global_graphics_context.handle, rt.OP_PUSH_CLIP, global_graphics_context._args4f);
     }
 }
 
 pub fn pop_clip(): nil {
     if (global_graphics_context.handle != -1) {
-        rt.call(global_graphics_context.handle, rt.OP_POP_CLIP, []);
+        if (global_graphics_context.batching) {
+            global_graphics_context.batch.add_clip_pop();
+            return;
+        }
+        rt.call(global_graphics_context.handle, rt.OP_POP_CLIP, global_graphics_context._args0);
     }
 }
 
-pub fn poll_events(): any {
+pub fn poll_events(): [int] | nil {
     if (global_graphics_context.handle != -1) {
-        return rt.call(global_graphics_context.handle, rt.OP_POLL, []);
+        val res = rt.call(global_graphics_context.handle, rt.OP_POLL, global_graphics_context._args0);
+        if (res != nil) {
+            return res as [int];
+        }
     }
     return nil;
 }
@@ -134,17 +374,17 @@ pub fn make_pass_action(r: float, g: float, b: float, a: float, clear: bool): Pa
 }
 
 pub fn make_buffer(size: int, is_index: bool): Buffer {
-    var id = global_graphics_context.next_resource_id;
-    global_graphics_context.next_resource_id = global_graphics_context.next_resource_id + 1;
+    val id = global_graphics_context.next_resource_id;
+    global_graphics_context.next_resource_id = id + 1;
     if (global_graphics_context.handle != -1) {
-        rt.call(global_graphics_context.handle, rt.OP_MAKE_BUFFER, [id, []]);
+        rt.call(global_graphics_context.handle, rt.OP_MAKE_BUFFER, [id, global_graphics_context._args0]);
     }
     return Buffer(id=id, size=size, is_index=is_index);
 }
 
-pub fn make_buffer_data(size: int, is_index: bool, data: any): Buffer {
-    var id = global_graphics_context.next_resource_id;
-    global_graphics_context.next_resource_id = global_graphics_context.next_resource_id + 1;
+pub fn make_buffer_data(size: int, is_index: bool, data: [float]): Buffer {
+    val id = global_graphics_context.next_resource_id;
+    global_graphics_context.next_resource_id = id + 1;
     if (global_graphics_context.handle != -1) {
         rt.call(global_graphics_context.handle, rt.OP_MAKE_BUFFER, [id, data]);
     }
@@ -152,42 +392,56 @@ pub fn make_buffer_data(size: int, is_index: bool, data: any): Buffer {
 }
 
 pub fn make_image(width: int, height: int): Image {
-    var id = global_graphics_context.next_resource_id;
-    global_graphics_context.next_resource_id = global_graphics_context.next_resource_id + 1;
+    val id = global_graphics_context.next_resource_id;
+    global_graphics_context.next_resource_id = id + 1;
     if (global_graphics_context.handle != -1) {
-        rt.call(global_graphics_context.handle, rt.OP_MAKE_IMAGE, [id, width, height]);
+        global_graphics_context._args3i[0] = id;
+        global_graphics_context._args3i[1] = width;
+        global_graphics_context._args3i[2] = height;
+        rt.call(global_graphics_context.handle, rt.OP_MAKE_IMAGE, global_graphics_context._args3i);
     }
     return Image(id=id, width=width, height=height);
 }
 
 pub fn make_sampler(): Sampler {
-    var id = global_graphics_context.next_resource_id;
-    global_graphics_context.next_resource_id = global_graphics_context.next_resource_id + 1;
+    val id = global_graphics_context.next_resource_id;
+    global_graphics_context.next_resource_id = id + 1;
     return Sampler(id=id);
 }
 
 pub fn make_shader(vs: str, fs: str): Shader {
-    var id = global_graphics_context.next_resource_id;
-    global_graphics_context.next_resource_id = global_graphics_context.next_resource_id + 1;
+    val id = global_graphics_context.next_resource_id;
+    global_graphics_context.next_resource_id = id + 1;
     return Shader(id=id, vs_src=vs, fs_src=fs);
 }
 
 pub fn make_pipeline(shader_id: int, primitive_type: int): Pipeline {
-    var id = global_graphics_context.next_resource_id;
-    global_graphics_context.next_resource_id = global_graphics_context.next_resource_id + 1;
+    val id = global_graphics_context.next_resource_id;
+    global_graphics_context.next_resource_id = id + 1;
     if (global_graphics_context.handle != -1) {
-        rt.call(global_graphics_context.handle, rt.OP_MAKE_PIPELINE, [id, shader_id, primitive_type]);
+        global_graphics_context._args3i[0] = id;
+        global_graphics_context._args3i[1] = shader_id;
+        global_graphics_context._args3i[2] = primitive_type;
+        rt.call(global_graphics_context.handle, rt.OP_MAKE_PIPELINE, global_graphics_context._args3i);
     }
     return Pipeline(id=id, shader_id=shader_id, primitive_type=primitive_type);
 }
 
+pub fn make_pipeline_typed(shader: Shader, primitive: PrimitiveType): Pipeline {
+    return make_pipeline(shader.id, primitive_type_code(primitive));
+}
+
 pub fn make_bindings(vbuf_id: int, ibuf_id: int, img_id: int, sampler_id: int): Bindings {
-    var id = global_graphics_context.next_resource_id;
-    global_graphics_context.next_resource_id = global_graphics_context.next_resource_id + 1;
+    val id = global_graphics_context.next_resource_id;
+    global_graphics_context.next_resource_id = id + 1;
     if (global_graphics_context.handle != -1) {
-        rt.call(global_graphics_context.handle, rt.OP_MAKE_BINDINGS, [id, vbuf_id, ibuf_id]);
+        global_graphics_context._args3i[0] = id;
+        global_graphics_context._args3i[1] = vbuf_id;
+        global_graphics_context._args3i[2] = ibuf_id;
+        rt.call(global_graphics_context.handle, rt.OP_MAKE_BINDINGS, global_graphics_context._args3i);
     }
     return Bindings(
+        id=id,
         vertex_buffer_id=vbuf_id,
         index_buffer_id=ibuf_id,
         image_id=img_id,
@@ -197,55 +451,72 @@ pub fn make_bindings(vbuf_id: int, ibuf_id: int, img_id: int, sampler_id: int): 
 
 pub fn begin_pass(w: int, h: int, r: float, g: float, b: float, a: float): nil {
     if (global_graphics_context.handle != -1) {
+        global_graphics_context.batch.clear();
         rt.call(global_graphics_context.handle, rt.OP_FILL, [w, h, r, g, b, a]);
     }
 }
 
 pub fn set_window_size(width: int, height: int): nil {
     if (global_graphics_context.handle != -1) {
-        rt.call(global_graphics_context.handle, rt.OP_SET_STATE, [width, height]);
+        global_graphics_context._args2i[0] = width;
+        global_graphics_context._args2i[1] = height;
+        rt.call(global_graphics_context.handle, rt.OP_SET_STATE, global_graphics_context._args2i);
     }
 }
 
 pub fn draw_rect_primitive(x: float, y: float, w: float, h: float, r: float, g: float, b: float, a: float): nil {
     if (global_graphics_context.handle != -1) {
-        rt.call(global_graphics_context.handle, rt.OP_DRAW_RECT, [x, y, w, h, r, g, b, a, 0.0, 0.0]);
+        if (global_graphics_context.batching) {
+            global_graphics_context.batch.add_rect(x, y, w, h, r, g, b, a, 0.0, 0.0);
+            return;
+        }
+        global_graphics_context._args10f[0] = x; global_graphics_context._args10f[1] = y;
+        global_graphics_context._args10f[2] = w; global_graphics_context._args10f[3] = h;
+        global_graphics_context._args10f[4] = r; global_graphics_context._args10f[5] = g;
+        global_graphics_context._args10f[6] = b; global_graphics_context._args10f[7] = a;
+        global_graphics_context._args10f[8] = 0.0; global_graphics_context._args10f[9] = 0.0;
+        rt.call(global_graphics_context.handle, rt.OP_DRAW_RECT, global_graphics_context._args10f);
     }
 }
 
 pub fn draw_rect_rounded_primitive(x: float, y: float, w: float, h: float, rad: float, r: float, g: float, b: float, a: float): nil {
     if (global_graphics_context.handle != -1) {
-        rt.call(global_graphics_context.handle, rt.OP_DRAW_RECT, [x, y, w, h, r, g, b, a, rad, 0.0]);
+        if (global_graphics_context.batching) {
+            global_graphics_context.batch.add_rect(x, y, w, h, r, g, b, a, rad, 0.0);
+            return;
+        }
+        global_graphics_context._args10f[0] = x; global_graphics_context._args10f[1] = y;
+        global_graphics_context._args10f[2] = w; global_graphics_context._args10f[3] = h;
+        global_graphics_context._args10f[4] = r; global_graphics_context._args10f[5] = g;
+        global_graphics_context._args10f[6] = b; global_graphics_context._args10f[7] = a;
+        global_graphics_context._args10f[8] = rad; global_graphics_context._args10f[9] = 0.0;
+        rt.call(global_graphics_context.handle, rt.OP_DRAW_RECT, global_graphics_context._args10f);
     }
 }
 
 pub fn draw_rect_border_primitive(x: float, y: float, w: float, h: float, rad: float, border_w: float, r: float, g: float, b: float, a: float): nil {
     if (global_graphics_context.handle != -1) {
-        rt.call(global_graphics_context.handle, rt.OP_DRAW_RECT, [x, y, w, h, r, g, b, a, rad, border_w]);
+        if (global_graphics_context.batching) {
+            global_graphics_context.batch.add_rect(x, y, w, h, r, g, b, a, rad, border_w);
+            return;
+        }
+        global_graphics_context._args10f[0] = x; global_graphics_context._args10f[1] = y;
+        global_graphics_context._args10f[2] = w; global_graphics_context._args10f[3] = h;
+        global_graphics_context._args10f[4] = r; global_graphics_context._args10f[5] = g;
+        global_graphics_context._args10f[6] = b; global_graphics_context._args10f[7] = a;
+        global_graphics_context._args10f[8] = rad; global_graphics_context._args10f[9] = border_w;
+        rt.call(global_graphics_context.handle, rt.OP_DRAW_RECT, global_graphics_context._args10f);
     }
-}
-
-fn _sqrt(v: float): float {
-    if (v <= 0.0) { return 0.0; }
-    var x = v;
-    var y = 1.0;
-    var i = 0;
-    while (i < 20) {
-        x = (x + y) * 0.5;
-        y = v / x;
-        i = i + 1;
-    }
-    return x;
 }
 
 pub fn draw_line_primitive(x1: float, y1: float, x2: float, y2: float, r: float, g: float, b: float, a: float, thickness: float = 1.5): nil {
-    var dx = x2 - x1;
-    var dy = y2 - y1;
-    var len_val = _sqrt(dx * dx + dy * dy);
+    val dx = x2 - x1;
+    val dy = y2 - y1;
+    val len_val = math.sqrt(dx * dx + dy * dy);
     if (len_val > 0.001) {
-        var half_t = thickness * 0.5;
-        var nx = (-dy / len_val) * half_t;
-        var ny = (dx / len_val) * half_t;
+        val half_t = thickness * 0.5;
+        val nx = (-dy / len_val) * half_t;
+        val ny = (dx / len_val) * half_t;
         draw_triangle_primitive(x1 + nx, y1 + ny, x1 - nx, y1 - ny, x2 + nx, y2 + ny, r, g, b, a);
         draw_triangle_primitive(x1 - nx, y1 - ny, x2 - nx, y2 - ny, x2 + nx, y2 + ny, r, g, b, a);
     }
@@ -253,20 +524,20 @@ pub fn draw_line_primitive(x1: float, y1: float, x2: float, y2: float, r: float,
 
 pub fn draw_shadow_primitive(x: float, y: float, w: float, h: float, r: float, g: float, b: float, a: float, off_x: float, off_y: float, blur: float, spread: float): nil {
     if (global_graphics_context.handle != -1) {
-        var sx = x + off_x - spread;
-        var sy = y + off_y - spread;
-        var sw = w + spread * 2.0;
-        var sh = h + spread * 2.0;
+        val sx = x + off_x - spread;
+        val sy = y + off_y - spread;
+        val sw = w + spread * 2.0;
+        val sh = h + spread * 2.0;
 
         if (blur <= 0.0) {
-            rt.call(global_graphics_context.handle, rt.OP_DRAW_RECT, [sx, sy, sw, sh, r, g, b, a]);
+            draw_rect_primitive(sx, sy, sw, sh, r, g, b, a);
         } else {
-            var steps = 3;
+            val steps = 3;
             var i = steps;
             while (i > 0) {
-                var expand = (i as float) * (blur / 3.0);
-                var layer_a = a * (0.2 + 0.25 * ((steps - i + 1) as float) / (steps as float));
-                rt.call(global_graphics_context.handle, rt.OP_DRAW_RECT, [sx - expand, sy - expand, sw + expand * 2.0, sh + expand * 2.0, r, g, b, layer_a]);
+                val expand = (i as float) * (blur / 3.0);
+                val layer_a = a * (0.2 + 0.25 * ((steps - i + 1) as float) / (steps as float));
+                draw_rect_primitive(sx - expand, sy - expand, sw + expand * 2.0, sh + expand * 2.0, r, g, b, layer_a);
                 i = i - 1;
             }
         }
@@ -275,19 +546,32 @@ pub fn draw_shadow_primitive(x: float, y: float, w: float, h: float, r: float, g
 
 pub fn draw_triangle_primitive(x1: float, y1: float, x2: float, y2: float, x3: float, y3: float, r: float, g: float, b: float, a: float): nil {
     if (global_graphics_context.handle != -1) {
-        rt.call(global_graphics_context.handle, rt.OP_DRAW_TRIANGLE, [x1, y1, x2, y2, x3, y3, r, g, b, a]);
+        if (global_graphics_context.batching) {
+            global_graphics_context.batch.add_triangle(x1, y1, x2, y2, x3, y3, r, g, b, a);
+            return;
+        }
+        global_graphics_context._args10f[0] = x1; global_graphics_context._args10f[1] = y1;
+        global_graphics_context._args10f[2] = x2; global_graphics_context._args10f[3] = y2;
+        global_graphics_context._args10f[4] = x3; global_graphics_context._args10f[5] = y3;
+        global_graphics_context._args10f[6] = r; global_graphics_context._args10f[7] = g;
+        global_graphics_context._args10f[8] = b; global_graphics_context._args10f[9] = a;
+        rt.call(global_graphics_context.handle, rt.OP_DRAW_TRIANGLE, global_graphics_context._args10f);
     }
 }
 
 pub fn draw_text(text_str: str, x: float, y: float, r: float, g: float, b: float, a: float, scale: int = 1): nil {
     if (global_graphics_context.handle != -1) {
+        if (global_graphics_context.batching) {
+            global_graphics_context.batch.add_text(text_str, x, y, r, g, b, a, scale);
+            return;
+        }
         rt.call(global_graphics_context.handle, rt.OP_DRAW_TEXT, [text_str, x, y, r, g, b, a, scale]);
     }
 }
 
 pub fn measure_text(text_str: str, scale: int = 1): float {
     if (global_graphics_context.handle != -1) {
-        var res = rt.call(global_graphics_context.handle, rt.OP_MEASURE_TEXT, [text_str, scale]);
+        val res = rt.call(global_graphics_context.handle, rt.OP_MEASURE_TEXT, [text_str, scale]);
         if (res != nil) {
             return res as float;
         }
@@ -297,7 +581,8 @@ pub fn measure_text(text_str: str, scale: int = 1): float {
 
 pub fn get_line_height(scale: int = 1): float {
     if (global_graphics_context.handle != -1) {
-        var res = rt.call(global_graphics_context.handle, rt.OP_GET_FONT_METRICS, [scale]);
+        global_graphics_context._args1i[0] = scale;
+        val res = rt.call(global_graphics_context.handle, rt.OP_GET_FONT_METRICS, global_graphics_context._args1i);
         if (res != nil) {
             return res as float;
         }
@@ -307,38 +592,51 @@ pub fn get_line_height(scale: int = 1): float {
 
 pub fn end_pass(): nil {
     if (global_graphics_context.handle != -1) {
-        rt.call(global_graphics_context.handle, rt.OP_END_PASS, []);
+        flush_batch();
+        rt.call(global_graphics_context.handle, rt.OP_END_PASS, global_graphics_context._args0);
     }
 }
 
 pub fn apply_pipeline(pip_id: int): nil {
     if (global_graphics_context.handle != -1) {
-        rt.call(global_graphics_context.handle, rt.OP_APPLY_PIPELINE, [pip_id]);
+        global_graphics_context._args1i[0] = pip_id;
+        rt.call(global_graphics_context.handle, rt.OP_APPLY_PIPELINE, global_graphics_context._args1i);
     }
 }
 
 pub fn apply_bindings(v_id: int, i_id: int): nil {
     if (global_graphics_context.handle != -1) {
-        rt.call(global_graphics_context.handle, rt.OP_APPLY_BINDINGS, [v_id, i_id]);
+        global_graphics_context._args2i[0] = v_id;
+        global_graphics_context._args2i[1] = i_id;
+        rt.call(global_graphics_context.handle, rt.OP_APPLY_BINDINGS, global_graphics_context._args2i);
     }
 }
 
 pub fn draw(base: int, count: int, instances: int): nil {
     if (global_graphics_context.handle != -1) {
-        rt.call(global_graphics_context.handle, rt.OP_DRAW, [base, count, instances]);
+        global_graphics_context._args3i[0] = base;
+        global_graphics_context._args3i[1] = count;
+        global_graphics_context._args3i[2] = instances;
+        rt.call(global_graphics_context.handle, rt.OP_DRAW, global_graphics_context._args3i);
     }
 }
 
 pub fn commit(): nil {
     if (global_graphics_context.handle != -1) {
-        rt.call(global_graphics_context.handle, rt.OP_FLUSH, []);
+        flush_batch();
+        rt.call(global_graphics_context.handle, rt.OP_FLUSH, global_graphics_context._args0);
     }
 }
 
-pub fn readback_pixel(x: int, y: int): any {
+pub fn readback_pixel(x: int, y: int): int | nil {
     if (global_graphics_context.handle != -1) {
-        var res = rt.call(global_graphics_context.handle, rt.OP_READ, [x, y]);
-        return res;
+        flush_batch();
+        global_graphics_context._args2i[0] = x;
+        global_graphics_context._args2i[1] = y;
+        val res = rt.call(global_graphics_context.handle, rt.OP_READ, global_graphics_context._args2i);
+        if (res != nil) {
+            return res as int;
+        }
     }
     return nil;
 }

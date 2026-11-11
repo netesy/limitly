@@ -2,7 +2,7 @@
 // Portable window application lifecycle, event loop, and timing driver
 
 import std.ui.context as ui_context;
-import std.ui.types as ui_types;
+import std.ui.components as ui_comp;
 import std.gg as gg;
 import std.os as os;
 
@@ -225,14 +225,14 @@ pub fn app_is_running(): int {
     return global_app_state.is_running;
 }
 
-pub fn ui(root: ui_types.Widget): nil {
+pub fn ui(root: ui_comp.Fluent): nil {
     ui_context.ui_init();
     ui_context.set_root(root);
 }
 
-pub fn set_ui(root): nil {
+pub fn set_ui(root: ui_comp.Fluent): nil {
     ui_context.ui_init();
-    ui_context.set_root_any(root);
+    ui_context.set_root(root);
 }
 
 pub fn run_frame_step(): nil {
@@ -260,9 +260,9 @@ pub fn app_run(): nil {
     }
 }
 
-pub fn run(root: any = nil): nil {
+pub fn run(root: ui_comp.Fluent | nil = nil): nil {
     if (root != nil) {
-        set_ui(root);
+        set_ui(root as ui_comp.Fluent);
     }
     app_run();
 }

@@ -1,88 +1,83 @@
 // std/ui/grid - Grid layout container (CSS-grid like layout)
-import std.ui.types as ui_types;
+import std.ui.components as comp;
 import std.ui.layout as layout;
 
-// Create a grid layout with columns × rows
-pub fn grid(columns_count: int, children: [ui_types.Widget], spacing_val: float = 8.0): ui_types.Widget {
+// Create a grid layout with columns x rows
+pub fn grid(columns_count: int, children: [comp.Fluent], spacing_val: float = 8.0): comp.Container {
     if (columns_count <= 0) {
-        return ui_types.column(children).spacing(spacing_val);
+        val c = comp.Container(true);
+        iter (ch in children) { c.add(ch); }
+        return c.spacing(spacing_val);
     }
 
-    // Create rows from children
-    var rows: [ui_types.Widget] = [];
-    var cur_row: [ui_types.Widget] = [];
-    var i = 0;
-    while (i < len(children)) {
-        cur_row.append(children[i]);
+    val rows: [comp.Fluent] = [];
+    var cur_row: [comp.Fluent] = [];
+    iter (child in children) {
+        cur_row.append(child);
         if (len(cur_row) == columns_count) {
-            // Create row with spacing
-            var row_widget = ui_types.row(cur_row);
-            row_widget.spacing_val = spacing_val;
-            rows.append(row_widget);
-            cur_row = [] as [ui_types.Widget];
+            val row_w = comp.Container(false);
+            iter (r_ch in cur_row) { row_w.add(r_ch); }
+            row_w.spacing_val = spacing_val;
+            rows.append(row_w);
+            cur_row = [] as [comp.Fluent];
         }
-        i = i + 1;
     }
 
-    // Handle remaining items (fill with spacers)
     if (len(cur_row) > 0) {
         while (len(cur_row) < columns_count) {
-            cur_row.append(ui_types.spacer(1.0));
+            cur_row.append(comp.Spacer(1.0));
         }
-        var row_widget = ui_types.row(cur_row);
-        row_widget.spacing_val = spacing_val;
-        rows.append(row_widget);
+        val row_w = comp.Container(false);
+        iter (r_ch in cur_row) { row_w.add(r_ch); }
+        row_w.spacing_val = spacing_val;
+        rows.append(row_w);
     }
 
-    // Return column of rows
-    var result = ui_types.column(rows);
+    val result = comp.Container(true);
+    iter (r in rows) { result.add(r); }
     result.spacing_val = spacing_val;
     return result;
 }
 
-// Grid widget with auto layout
 frame GridLayout {
     pub var columns: int;
     pub var gap: float;
-    pub var children: [ui_types.Widget];
+    pub var children: [comp.Fluent];
 
     pub init(cols: int = 2, gap_size: float = 8.0) {
         self.columns = cols;
         self.gap = gap_size;
-        self.children = [] as [ui_types.Widget];
+        self.children = [] as [comp.Fluent];
     }
 }
 
-// Two-column grid (common pattern)
-pub fn grid_two_column(left: ui_types.Widget, right: ui_types.Widget, gap: float = 16.0): ui_types.Widget {
-    var row = ui_types.row([left, right]);
+pub fn grid_two_column(left: comp.Fluent, right: comp.Fluent, gap: float = 16.0): comp.Container {
+    val row = comp.Container(false);
+    row.add(left);
+    row.add(right);
     row.spacing_val = gap;
     return row;
 }
 
-// Three-column grid (common pattern)
-pub fn grid_three_column(a: ui_types.Widget, b: ui_types.Widget, c: ui_types.Widget, gap: float = 12.0): ui_types.Widget {
-    var row = ui_types.row([a, b, c]);
+pub fn grid_three_column(a: comp.Fluent, b: comp.Fluent, c: comp.Fluent, gap: float = 12.0): comp.Container {
+    val row = comp.Container(false);
+    row.add(a);
+    row.add(b);
+    row.add(c);
     row.spacing_val = gap;
     return row;
 }
 
-// Grid with aspect ratio constraint on cells
-pub fn grid_with_aspect(columns_count: int, children: [ui_types.Widget], aspect_ratio: float, spacing_val: float = 8.0): ui_types.Widget {
-    var i = 0;
-    while (i < len(children)) {
-        children[i].aspect_ratio = aspect_ratio;
-        i = i + 1;
+pub fn grid_with_aspect(columns_count: int, children: [comp.Fluent], aspect_ratio: float, spacing_val: float = 8.0): comp.Container {
+    iter (child in children) {
+        child.set_aspect_ratio_val(aspect_ratio);
     }
     return grid(columns_count, children, spacing_val);
 }
 
-// Grid using enhanced layout system
-pub fn grid_enhanced(spec: layout.GridSpec, children: [ui_types.Widget]): ui_types.Widget {
-    var w = ui_types.Widget(ui_types.KIND_CONTAINER);
-    w.is_vertical = 0;
-    w.active_tab = spec.columns;
-    w.children = children;
+pub fn grid_enhanced(spec: layout.GridSpec, children: [comp.Fluent]): comp.Container {
+    val w = comp.Container(false);
+    iter (ch in children) { w.add(ch); }
     w.spacing_val = spec.column_gap;
     return w;
 }

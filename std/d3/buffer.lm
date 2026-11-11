@@ -36,3 +36,14 @@ staged frame Uniform(T: type) {
     }
 }
 
+type FloatAttribute = BufferAttribute(float);
+type IntAttribute = BufferAttribute(int);
+
+pub fn float_attribute(data: [float], item_size: int = 3): FloatAttribute {
+    return BufferAttribute(data, item_size);
+}
+
+pub fn int_attribute(data: [int], item_size: int = 3): IntAttribute {
+    return BufferAttribute(data, item_size);
+}
+

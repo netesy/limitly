@@ -31,7 +31,7 @@ frame Scene: gtraits.Updatable {
     pub var fixed_update_cb: (fn(float): nil)?;
     pub var draw_cb: (fn(): nil)?;
     pub var draw_gui_cb: (fn(): nil)?;
-    pub var on_event_cb: (fn(int, any, any): bool)?;
+    pub var on_event_cb: (fn(int, int, int): bool)?;
 
     pub init(name: str = "Scene") {
         self.name = name;
@@ -107,7 +107,7 @@ frame Scene: gtraits.Updatable {
         }
     }
 
-    pub fn draw_gui(gui: any): nil {
+    pub fn draw_gui(): nil {
         if (not self.is_visible) return;
         if (self.draw_gui_cb != nil) {
             var cb = self.draw_gui_cb as fn(): nil;
@@ -115,10 +115,10 @@ frame Scene: gtraits.Updatable {
         }
     }
 
-    pub fn on_event(event_type: int, p1: any, p2: any): bool {
+    pub fn on_event(event_type: int, p1: int = 0, p2: int = 0): bool {
         if (not self.is_active or self.is_paused) return false;
         if (self.on_event_cb != nil) {
-            var cb = self.on_event_cb as fn(int, any, any): bool;
+            var cb = self.on_event_cb as fn(int, int, int): bool;
             return cb(event_type, p1, p2);
         }
         return false;
@@ -337,18 +337,18 @@ pub fn draw(): nil {
     }
 }
 
-pub fn draw_gui(gui: any): nil {
+pub fn draw_gui(): nil {
     var i = 0;
     while (i < len(self.stack)) {
         var sc = self.stack[i];
         if (sc.is_visible) {
-            sc.draw_gui(gui);
+            sc.draw_gui();
         }
         i = i + 1;
     }
 }
 
-pub fn on_event(event_type: int, p1: any, p2: any): bool {
+pub fn on_event(event_type: int, p1: int = 0, p2: int = 0): bool {
     // Events route from top of stack down until handled
     var i = len(self.stack) - 1;
     while (i >= 0) {

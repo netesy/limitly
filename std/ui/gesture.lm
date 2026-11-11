@@ -1,7 +1,6 @@
 // std/ui/gesture - Gesture recognition and handling
-import std.ui.types as ui_types;
+import std.ui.components as comp;
 
-// Gesture state tracking
 frame GestureState {
     pub var pointer_down_time: float;
     pub var pointer_down_x: float;
@@ -20,112 +19,80 @@ frame GestureState {
     }
 }
 
-// Global gesture state per widget (using focus_key as identifier)
 pub var gesture_states: {str: GestureState} = {};
 
-// Detect and handle tap gesture
-pub fn detect_tap(child: ui_types.Widget, on_tap): ui_types.Widget {
+pub fn detect_tap(child: comp.Button, on_tap: (fn(): nil) | nil): comp.Button {
     child.on_click_action = on_tap;
     return child;
 }
 
-// Detect and handle long press (hold for 500ms)
-pub fn detect_long_press(child: ui_types.Widget, on_long_press): ui_types.Widget {
-    child.on_change_action = on_long_press;
+pub fn detect_long_press(child: comp.Button, on_long_press: (fn(): nil) | nil): comp.Button {
+    child.a11y_hint = "long_press";
+    child.on_click_action = on_long_press;
     return child;
 }
 
-// Detect double tap (two taps within 300ms)
-pub fn detect_double_tap(child: ui_types.Widget, on_double_tap): ui_types.Widget {
-    child.placeholder_val = "double_tap";
+pub fn detect_double_tap(child: comp.Button, on_double_tap: (fn(): nil) | nil): comp.Button {
+    child.a11y_hint = "double_tap";
     child.on_click_action = on_double_tap;
     return child;
 }
 
-// Detect swipe gesture (fast drag in one direction)
-pub fn detect_swipe(child: ui_types.Widget, on_swipe): ui_types.Widget {
+pub fn detect_swipe(child: comp.Container, on_swipe: (fn(): nil) | nil): comp.Container {
     child.a11y_hint = "swipe_gesture";
+    child.on_click_action = on_swipe;
     return child;
 }
 
-// Detect pan/drag gesture (continuous movement)
-pub fn detect_pan(child: ui_types.Widget, on_pan): ui_types.Widget {
+pub fn detect_pan(child: comp.Container, on_pan: (fn(): nil) | nil): comp.Container {
     child.a11y_live = "pan_gesture";
+    child.on_click_action = on_pan;
     return child;
 }
 
-// Update gesture state based on pointer down event.
-//
-// `key in dict` is not an operator in Lymar - `in` only appears in `iter` and
-// `for` clauses. A missing key reads back as nil, so presence is a nil check.
 pub fn update_gesture_on_pointer_down(gesture_key: str, x: float, y: float, current_time: float): nil {
-    var state = GestureState();
+    var st = GestureState();
     if (gesture_states[gesture_key] != nil) {
-        state = gesture_states[gesture_key];
+        st = gesture_states[gesture_key];
     }
-
-    // Check for double tap
-    var time_since_last = current_time - state.last_tap_time;
+    val time_since_last = current_time - st.last_tap_time;
     if (time_since_last < 0.3) {
-        state.tap_count = state.tap_count + 1;
+        st.tap_count = st.tap_count + 1;
     } else {
-        state.tap_count = 1;
+        st.tap_count = 1;
     }
-
-    state.pointer_down_time = current_time;
-    state.pointer_down_x = x;
-    state.pointer_down_y = y;
-    state.is_long_press_active = 0;
-
-    gesture_states[gesture_key] = state;
+    st.pointer_down_time = current_time;
+    st.pointer_down_x = x;
+    st.pointer_down_y = y;
+    st.is_long_press_active = 0;
+    gesture_states[gesture_key] = st;
 }
 
-// Update gesture state based on pointer move (for swipe/pan detection)
 pub fn update_gesture_on_pointer_move(gesture_key: str, x: float, y: float): float {
     if (gesture_states[gesture_key] != nil) {
-        var state = gesture_states[gesture_key];
-        var dx = x - state.pointer_down_x;
-        var dy = y - state.pointer_down_y;
-
-        // Return distance moved (can be used to detect swipe threshold)
-        var distance = (dx * dx + dy * dy) as float;
-        return distance;
+        val st = gesture_states[gesture_key];
+        val dx = x - st.pointer_down_x;
+        val dy = y - st.pointer_down_y;
+        return dx * dx + dy * dy;
     }
     return 0.0;
 }
 
-// Update gesture state based on pointer up (for long press and tap)
 pub fn update_gesture_on_pointer_up(gesture_key: str, current_time: float): int {
     if (gesture_states[gesture_key] != nil) {
-        var state = gesture_states[gesture_key];
-        var hold_time = current_time - state.pointer_down_time;
-
-        // Long press detected (held for 500ms)
-        if (hold_time >= 0.5) {
-            state.is_long_press_active = 1;
+        val st = gesture_states[gesture_key];
+        val hold_duration = current_time - st.pointer_down_time;
+        st.last_tap_time = current_time;
+        if (hold_duration >= 0.5) {
+            st.is_long_press_active = 1;
+            gesture_states[gesture_key] = st;
+            return 2;
+        } elif (st.tap_count >= 2) {
+            gesture_states[gesture_key] = st;
+            return 3;
         }
-
-        state.last_tap_time = current_time;
-        gesture_states[gesture_key] = state;
-        return state.tap_count;
+        gesture_states[gesture_key] = st;
+        return 1;
     }
     return 0;
 }
-
-// Get last detected gesture type
-pub fn get_last_gesture(gesture_key: str): str {
-    if (gesture_states[gesture_key] != nil) {
-        var state = gesture_states[gesture_key];
-        if (state.is_long_press_active == 1) {
-            return "long_press";
-        }
-        if (state.tap_count == 2) {
-            return "double_tap";
-        }
-        if (state.tap_count == 1) {
-            return "tap";
-        }
-    }
-    return "none";
-}
-

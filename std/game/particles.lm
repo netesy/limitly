@@ -1,17 +1,17 @@
 // std/game/particles.lm
-// High-performance 2D particle simulation and emitter engine for game effects
+// High-performance SoA 2D particle simulation and emitter engine with zero per-particle allocations.
 
 import std.math as math;
 import std.gg as gg;
 import std.game.types as types;
 import std.color as color;
-import std.game.camera show Camera2D;
+import std.camera show Camera2D;
 import std.game.traits as gtraits;
 
 frame Particle: gtraits.Updatable {
-    pub var pos: types.Vec2;
-    pub var vel: types.Vec2;
-    pub var acc: types.Vec2;
+    pub var pos: types.Vector2;
+    pub var vel: types.Vector2;
+    pub var acc: types.Vector2;
     pub var color_start: color.Color;
     pub var color_end: color.Color;
     pub var size_start: float;
@@ -34,18 +34,18 @@ frame Particle: gtraits.Updatable {
     }
 
     pub fn spawn(
-        pos: types.Vec2,
-        vel: types.Vec2,
-        acc: types.Vec2,
+        pos: types.Vector2,
+        vel: types.Vector2,
+        acc: types.Vector2,
         c_start: color.Color,
         c_end: color.Color,
         s_start: float,
         s_end: float,
         life_span: float
     ): nil {
-        self.pos = pos;
-        self.vel = vel;
-        self.acc = acc;
+        self.pos.x = pos.x; self.pos.y = pos.y;
+        self.vel.x = vel.x; self.vel.y = vel.y;
+        self.acc.x = acc.x; self.acc.y = acc.y;
         self.color_start = c_start;
         self.color_end = c_end;
         self.size_start = s_start;
@@ -55,16 +55,18 @@ frame Particle: gtraits.Updatable {
         self.alive = true;
     }
 
+    // Mutates coordinates in-place (zero Vec2 allocations per tick)
     pub fn update(dt: float): nil {
-        if (not self.alive) return;
+        if (not self.alive) { return; }
         self.life = self.life + dt;
         if (self.life >= self.max_life) {
             self.alive = false;
             return;
         }
-
-        self.vel = self.vel.add(self.acc.scale(dt));
-        self.pos = self.pos.add(self.vel.scale(dt));
+        self.vel.x = self.vel.x + self.acc.x * dt;
+        self.vel.y = self.vel.y + self.acc.y * dt;
+        self.pos.x = self.pos.x + self.vel.x * dt;
+        self.pos.y = self.pos.y + self.vel.y * dt;
     }
 
     pub fn current_color(): color.Color {
@@ -72,7 +74,7 @@ frame Particle: gtraits.Updatable {
         if (self.max_life > 0.0) {
             t = self.life / self.max_life;
         }
-        if (t > 1.0) t = 1.0;
+        if (t > 1.0) { t = 1.0; }
         return color.Color(
             r=self.color_start.r + (self.color_end.r - self.color_start.r) * t,
             g=self.color_start.g + (self.color_end.g - self.color_start.g) * t,
@@ -86,18 +88,38 @@ frame Particle: gtraits.Updatable {
         if (self.max_life > 0.0) {
             t = self.life / self.max_life;
         }
-        if (t > 1.0) t = 1.0;
+        if (t > 1.0) { t = 1.0; }
         return self.size_start + (self.size_end - self.size_start) * t;
     }
 }
 
 frame ParticleEmitter2D: gtraits.Updatable, gtraits.Drawable {
-    pub var position: types.Vec2;
-    pub var particles: [Particle];
+    pub var position: types.Vector2;
     pub var max_particles: int;
     pub var active: bool;
 
-    pub var emission_rate: float;  // particles per second
+    // Structure-of-Arrays (SoA) storage: zero per-particle heap objects, Vec2s, or Colors
+    pub var px: [float];
+    pub var py: [float];
+    pub var vx: [float];
+    pub var vy: [float];
+    pub var ax: [float];
+    pub var ay: [float];
+    pub var life: [float];
+    pub var max_life: [float];
+    pub var s_start: [float];
+    pub var s_end: [float];
+    pub var cr0: [float];
+    pub var cg0: [float];
+    pub var cb0: [float];
+    pub var ca0: [float];
+    pub var cr1: [float];
+    pub var cg1: [float];
+    pub var cb1: [float];
+    pub var ca1: [float];
+    pub var alive: [bool];
+
+    pub var emission_rate: float;
     pub var emission_timer: float;
 
     // Configurable Particle Ranges
@@ -107,23 +129,35 @@ frame ParticleEmitter2D: gtraits.Updatable, gtraits.Drawable {
     pub var speed_max: float;
     pub var angle_min: float;
     pub var angle_max: float;
-    pub var gravity: types.Vec2;
+    pub var gravity: types.Vector2;
     pub var size_start: float;
     pub var size_end: float;
     pub var color_start: color.Color;
     pub var color_end: color.Color;
 
-    // Seed state for deterministic fast random numbers
     pub var rng_state: int;
 
     pub init(max_count: int = 150) {
         self.position = types.Vec2();
         self.max_particles = max_count;
-        self.particles = [];
-        var i = 0;
-        while (i < max_count) {
-            self.particles.append(Particle());
-            i = i + 1;
+        self.px = []; self.py = [];
+        self.vx = []; self.vy = [];
+        self.ax = []; self.ay = [];
+        self.life = []; self.max_life = [];
+        self.s_start = []; self.s_end = [];
+        self.cr0 = []; self.cg0 = []; self.cb0 = []; self.ca0 = [];
+        self.cr1 = []; self.cg1 = []; self.cb1 = []; self.ca1 = [];
+        self.alive = [];
+
+        iter (_i in 0..max_count) {
+            self.px.append(0.0); self.py.append(0.0);
+            self.vx.append(0.0); self.vy.append(0.0);
+            self.ax.append(0.0); self.ay.append(0.0);
+            self.life.append(0.0); self.max_life.append(1.0);
+            self.s_start.append(4.0); self.s_end.append(0.0);
+            self.cr0.append(1.0); self.cg0.append(1.0); self.cb0.append(1.0); self.ca0.append(1.0);
+            self.cr1.append(1.0); self.cg1.append(1.0); self.cb1.append(1.0); self.ca1.append(1.0);
+            self.alive.append(false);
         }
 
         self.active = true;
@@ -135,60 +169,69 @@ frame ParticleEmitter2D: gtraits.Updatable, gtraits.Drawable {
         self.speed_min = 40.0;
         self.speed_max = 120.0;
         self.angle_min = 0.0;
-        self.angle_max = 6.28318530718;
-        self.gravity = types.Vec2(x=0.0, y=98.0);
+        self.angle_max = math.TAU;
+        self.gravity = types.Vec2(0.0, 98.0);
         self.size_start = 6.0;
         self.size_end = 1.0;
-        self.color_start = color.hex(0xffd700, 1.0); // Gold
-        self.color_end = color.hex(0xff0044, 0.0);   // Fading red
+        self.color_start = color.hex(0xffd700, 1.0);
+        self.color_end = color.hex(0xff0044, 0.0);
 
         self.rng_state = 123456789;
     }
 
     fn next_float(): float {
-        // Linear congruential generator
         self.rng_state = (self.rng_state * 1103515245 + 12345) & 2147483647;
         return (self.rng_state as float) / 2147483647.0;
     }
 
     fn spawn_one(): nil {
-        var i = 0;
-        var n = len(self.particles);
-        while (i < n) {
-            var p = self.particles[i];
-            if (not p.alive) {
-                var angle = self.angle_min + (self.angle_max - self.angle_min) * self.next_float();
-                var speed = self.speed_min + (self.speed_max - self.speed_min) * self.next_float();
-                var vel = types.Vec2(x=math.cos(angle) * speed, y=math.sin(angle) * speed);
-                var life = self.life_min + (self.life_max - self.life_min) * self.next_float();
+        iter (i in 0..self.max_particles) {
+            if (not self.alive[i]) {
+                val angle = self.angle_min + (self.angle_max - self.angle_min) * self.next_float();
+                val speed = self.speed_min + (self.speed_max - self.speed_min) * self.next_float();
+                val p_life = self.life_min + (self.life_max - self.life_min) * self.next_float();
 
-                p.spawn(
-                    self.position,
-                    vel,
-                    self.gravity,
-                    self.color_start,
-                    self.color_end,
-                    self.size_start,
-                    self.size_end,
-                    life
-                );
+                self.px[i] = self.position.x;
+                self.py[i] = self.position.y;
+                self.vx[i] = math.cos(angle) * speed;
+                self.vy[i] = math.sin(angle) * speed;
+                self.ax[i] = self.gravity.x;
+                self.ay[i] = self.gravity.y;
+                self.s_start[i] = self.size_start;
+                self.s_end[i] = self.size_end;
+                self.cr0[i] = self.color_start.r;
+                self.cg0[i] = self.color_start.g;
+                self.cb0[i] = self.color_start.b;
+                self.ca0[i] = self.color_start.a;
+                self.cr1[i] = self.color_end.r;
+                self.cg1[i] = self.color_end.g;
+                self.cb1[i] = self.color_end.b;
+                self.ca1[i] = self.color_end.a;
+                self.life[i] = 0.0;
+                self.max_life[i] = p_life;
+                self.alive[i] = true;
                 return;
             }
-            i = i + 1;
         }
     }
 
     pub fn burst(count: int): nil {
-        var k = 0;
-        while (k < count) {
+        iter (_k in 0..count) {
             self.spawn_one();
-            k = k + 1;
         }
+    }
+
+    pub fn alive_count(): int {
+        var c = 0;
+        iter (i in 0..self.max_particles) {
+            if (self.alive[i]) { c = c + 1; }
+        }
+        return c;
     }
 
     pub fn update(dt: float): nil {
         if (self.active and self.emission_rate > 0.0) {
-            var interval = 1.0 / self.emission_rate;
+            val interval = 1.0 / self.emission_rate;
             self.emission_timer = self.emission_timer + dt;
             while (self.emission_timer >= interval) {
                 self.emission_timer = self.emission_timer - interval;
@@ -196,37 +239,85 @@ frame ParticleEmitter2D: gtraits.Updatable, gtraits.Drawable {
             }
         }
 
-        var i = 0;
-        var n = len(self.particles);
-        while (i < n) {
-            self.particles[i].update(dt);
-            i = i + 1;
+        iter (i in 0..self.max_particles) {
+            if (self.alive[i]) {
+                val nl = self.life[i] + dt;
+                if (nl >= self.max_life[i]) {
+                    self.alive[i] = false;
+                } else {
+                    self.life[i] = nl;
+                    val nvx = self.vx[i] + self.ax[i] * dt;
+                    val nvy = self.vy[i] + self.ay[i] * dt;
+                    self.vx[i] = nvx;
+                    self.vy[i] = nvy;
+                    self.px[i] = self.px[i] + nvx * dt;
+                    self.py[i] = self.py[i] + nvy * dt;
+                }
+            }
         }
     }
 
-    pub fn draw(camera: any = nil): nil {
-        var i = 0;
-        var n = len(self.particles);
-        while (i < n) {
-            var p = self.particles[i];
-            if (p.alive) {
-                var screen_pos = p.pos;
-                var zoom = 1.0;
-                if (camera != nil) {
-                    var cam = camera as Camera2D;
-                    screen_pos = cam.world_to_screen(p.pos);
-                    zoom = cam.zoom;
-                }
+    pub fn draw(camera: Camera2D | nil = nil): nil {
+        val has_cam = camera != nil;
+        var zoom = 1.0;
+        var cam_tx = 0.0;
+        var cam_ty = 0.0;
+        var cam_ox = 0.0;
+        var cam_oy = 0.0;
+        var cam_cos = 1.0;
+        var cam_sin = 0.0;
+        var has_rot = false;
 
-                var col = p.current_color();
-                var sz = p.current_size() * zoom;
+        if (has_cam) {
+            val cam = camera as Camera2D;
+            zoom = cam.zoom;
+            cam_tx = cam.target.x;
+            cam_ty = cam.target.y;
+            cam_ox = cam.offset.x + cam.shake_offset.x;
+            cam_oy = cam.offset.y + cam.shake_offset.y;
+            val rot = cam.rotation + cam.shake_rotation;
+            if (rot != 0.0) {
+                has_rot = true;
+                cam_cos = math.cos(rot);
+                cam_sin = math.sin(rot);
+            }
+        }
+
+        gg.begin_batch();
+        iter (i in 0..self.max_particles) {
+            if (self.alive[i]) {
+                val ml = self.max_life[i];
+                var t = 0.0;
+                if (ml > 0.0) { t = self.life[i] / ml; }
+                if (t > 1.0) { t = 1.0; }
+
+                val sz = (self.s_start[i] + (self.s_end[i] - self.s_start[i]) * t) * zoom;
                 if (sz > 0.0) {
-                    var half_sz = sz * 0.5;
-                    gg.draw_rect_primitive(screen_pos.x - half_sz, screen_pos.y - half_sz, sz, sz, col.r, col.g, col.b, col.a);
+                    var sx = self.px[i];
+                    var sy = self.py[i];
+                    if (has_cam) {
+                        var rx = sx - cam_tx;
+                        var ry = sy - cam_ty;
+                        if (has_rot) {
+                            val rrx = rx * cam_cos - ry * cam_sin;
+                            val rry = rx * cam_sin + ry * cam_cos;
+                            rx = rrx;
+                            ry = rry;
+                        }
+                        sx = rx * zoom + cam_ox;
+                        sy = ry * zoom + cam_oy;
+                    }
+
+                    val r = self.cr0[i] + (self.cr1[i] - self.cr0[i]) * t;
+                    val g = self.cg0[i] + (self.cg1[i] - self.cg0[i]) * t;
+                    val b = self.cb0[i] + (self.cb1[i] - self.cb0[i]) * t;
+                    val a = self.ca0[i] + (self.ca1[i] - self.ca0[i]) * t;
+                    val half_sz = sz * 0.5;
+                    gg.draw_rect_primitive(sx - half_sz, sy - half_sz, sz, sz, r, g, b, a);
                 }
             }
-            i = i + 1;
         }
+        gg.end_batch();
     }
 }
 

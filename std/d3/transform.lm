@@ -1,5 +1,5 @@
 // std/d3/transform.lm
-// Zero-cost spatial transformation component embedding TRS and matrix calculations.
+// Zero-cost spatial transformation component embedding TRS and dirty-flagged matrix caching.
 
 import std.math.matrix as mat;
 pub import std.math.matrix show Matrix;
@@ -20,6 +20,18 @@ frame Transform3D {
     pub local_matrix: Matrix;
     pub world_matrix: Matrix;
     pub matrix_auto_update: bool;
+    pub dirty: bool;
+
+    // Cached snapshot of last built TRS values to skip redundant trig & matrix work
+    var _c_px: float;
+    var _c_py: float;
+    var _c_pz: float;
+    var _c_rx: float;
+    var _c_ry: float;
+    var _c_rz: float;
+    var _c_sx: float;
+    var _c_sy: float;
+    var _c_sz: float;
 
     pub init() {
         self.init_transform();
@@ -41,12 +53,22 @@ frame Transform3D {
         self.local_matrix = mat.Matrix();
         self.world_matrix = mat.Matrix();
         self.matrix_auto_update = true;
+        self.dirty = false;
+
+        self._c_px = 0.0; self._c_py = 0.0; self._c_pz = 0.0;
+        self._c_rx = 0.0; self._c_ry = 0.0; self._c_rz = 0.0;
+        self._c_sx = 1.0; self._c_sy = 1.0; self._c_sz = 1.0;
+    }
+
+    pub fn mark_dirty() {
+        self.dirty = true;
     }
 
     pub fn set_position(x: float, y: float, z: float) {
         self.position_x = x;
         self.position_y = y;
         self.position_z = z;
+        self.dirty = true;
         if (self.matrix_auto_update) {
             self.update_matrix();
         }
@@ -56,6 +78,7 @@ frame Transform3D {
         self.rotation_x = rx;
         self.rotation_y = ry;
         self.rotation_z = rz;
+        self.dirty = true;
         if (self.matrix_auto_update) {
             self.update_matrix();
         }
@@ -65,6 +88,7 @@ frame Transform3D {
         self.scale_x = sx;
         self.scale_y = sy;
         self.scale_z = sz;
+        self.dirty = true;
         if (self.matrix_auto_update) {
             self.update_matrix();
         }
@@ -74,6 +98,7 @@ frame Transform3D {
         self.position_x = self.position_x + dx;
         self.position_y = self.position_y + dy;
         self.position_z = self.position_z + dz;
+        self.dirty = true;
         if (self.matrix_auto_update) {
             self.update_matrix();
         }
@@ -81,6 +106,7 @@ frame Transform3D {
 
     pub fn rotate_x(angle: float) {
         self.rotation_x = self.rotation_x + angle;
+        self.dirty = true;
         if (self.matrix_auto_update) {
             self.update_matrix();
         }
@@ -88,6 +114,7 @@ frame Transform3D {
 
     pub fn rotate_y(angle: float) {
         self.rotation_y = self.rotation_y + angle;
+        self.dirty = true;
         if (self.matrix_auto_update) {
             self.update_matrix();
         }
@@ -95,17 +122,31 @@ frame Transform3D {
 
     pub fn rotate_z(angle: float) {
         self.rotation_z = self.rotation_z + angle;
+        self.dirty = true;
         if (self.matrix_auto_update) {
             self.update_matrix();
         }
     }
 
     pub fn update_matrix() {
+        if (not self.dirty and
+            self._c_px == self.position_x and self._c_py == self.position_y and self._c_pz == self.position_z and
+            self._c_rx == self.rotation_x and self._c_ry == self.rotation_y and self._c_rz == self.rotation_z and
+            self._c_sx == self.scale_x and self._c_sy == self.scale_y and self._c_sz == self.scale_z) {
+            return;
+        }
         self.local_matrix.make_trs(
             self.position_x, self.position_y, self.position_z,
             self.rotation_x, self.rotation_y, self.rotation_z,
             self.scale_x, self.scale_y, self.scale_z
         );
-        self.world_matrix = self.local_matrix.clone();
+        // Copy into world_matrix in-place (avoids Matrix.clone() heap allocation)
+        iter (i in 0..16) {
+            self.world_matrix.data[i] = self.local_matrix.data[i];
+        }
+        self._c_px = self.position_x; self._c_py = self.position_y; self._c_pz = self.position_z;
+        self._c_rx = self.rotation_x; self._c_ry = self.rotation_y; self._c_rz = self.rotation_z;
+        self._c_sx = self.scale_x; self._c_sy = self.scale_y; self._c_sz = self.scale_z;
+        self.dirty = false;
     }
 }
