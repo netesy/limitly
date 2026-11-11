@@ -1142,6 +1142,7 @@ void Generator::emit_iter_stmt(LM::Frontend::AST::IterStatement& stmt) {
         add_block_edge(header_block, exit_block);
 
         set_current_block(body_block);
+        emit_iter_binding_event(stmt);
         if (stmt.body) {
             emit_stmt(*stmt.body);
         }
@@ -1301,6 +1302,7 @@ void Generator::emit_iter_over_value(LM::Frontend::AST::IterStatement& stmt, Reg
             set_register_type(loop_var_reg, std::make_shared<::Type>(::TypeTag::Any));
             
             // Execute loop body
+            emit_iter_binding_event(stmt);
             if (stmt.body) {
                 emit_stmt(*stmt.body);
             }
@@ -1389,6 +1391,7 @@ void Generator::emit_dict_iter_stmt(LM::Frontend::AST::IterStatement& stmt, LM::
     set_register_type(loop_var_reg, key_type);
     
     // Execute loop body
+    emit_iter_binding_event(stmt);
     if (stmt.body) {
         emit_stmt(*stmt.body);
     }
@@ -1479,6 +1482,7 @@ void Generator::emit_list_iter_stmt(LM::Frontend::AST::IterStatement& stmt, LM::
     set_register_type(loop_var_reg, raw_elem ? raw_elem : std::make_shared<::Type>(::TypeTag::Any));
     
     // Execute loop body
+    emit_iter_binding_event(stmt);
     if (stmt.body) {
         emit_stmt(*stmt.body);
     }
@@ -1572,6 +1576,7 @@ void Generator::emit_tuple_iter_stmt(LM::Frontend::AST::IterStatement& stmt, LM:
     set_register_type(loop_var_reg, std::make_shared<::Type>(::TypeTag::Any));
     
     // Execute loop body
+    emit_iter_binding_event(stmt);
     if (stmt.body) {
         emit_stmt(*stmt.body);
     }
@@ -1668,6 +1673,7 @@ void Generator::emit_dict_var_iter_stmt(LM::Frontend::AST::IterStatement& stmt, 
         set_register_type(val_reg, raw_val ? raw_val : std::make_shared<::Type>(::TypeTag::Any));
 
         // Body
+        emit_iter_binding_event(stmt);
         if (stmt.body) {
             emit_stmt(*stmt.body);
         }
@@ -1742,6 +1748,7 @@ void Generator::emit_dict_var_iter_stmt(LM::Frontend::AST::IterStatement& stmt, 
         set_register_type(key_reg, raw_key ? raw_key : std::make_shared<::Type>(::TypeTag::Any));
 
         // Body
+        emit_iter_binding_event(stmt);
         if (stmt.body) {
             emit_stmt(*stmt.body);
         }
@@ -1837,6 +1844,7 @@ void Generator::emit_list_var_iter_stmt(LM::Frontend::AST::IterStatement& stmt, 
     set_register_type(loop_var_reg, raw_elem ? raw_elem : std::make_shared<::Type>(::TypeTag::Any));
     
     // Execute loop body
+    emit_iter_binding_event(stmt);
     if (stmt.body) {
         emit_stmt(*stmt.body);
     }
@@ -1926,6 +1934,7 @@ void Generator::emit_string_var_iter_stmt(LM::Frontend::AST::IterStatement& stmt
     emit_instruction(LIR_Inst(LIR_Op::Mov, offset_reg, next_offset, 0));
 
     // Execute loop body statements
+    emit_iter_binding_event(stmt);
     if (stmt.body) {
         emit_stmt(*stmt.body);
     }
@@ -2006,6 +2015,7 @@ void Generator::emit_tuple_var_iter_stmt(LM::Frontend::AST::IterStatement& stmt,
     set_register_type(loop_var_reg, std::make_shared<::Type>(::TypeTag::Any));
     
     // Execute loop body
+    emit_iter_binding_event(stmt);
     if (stmt.body) {
         emit_stmt(*stmt.body);
     }
@@ -2071,6 +2081,7 @@ void Generator::emit_linear_iter_loop(LM::Frontend::AST::IterStatement& stmt,
     emit_instruction(LIR_Inst(exit_jump, Type::Void, 0, cond_reg, 0, 0));  // placeholder target
 
     body_pre();
+    emit_iter_binding_event(stmt);
     if (stmt.body) {
         emit_stmt(*stmt.body);
     }

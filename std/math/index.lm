@@ -139,6 +139,9 @@ pub fn pow(base: float, exponent: float): float { return arithmetic.pow(base, ex
 /// Computes the square root of a non-negative float.
 pub fn sqrt(x: float): float { return arithmetic.sqrt(x); }
 
+/// Computes an approximate square root via Newton-Raphson iteration.
+pub fn sqrt_approx(x: float): float { return arithmetic.sqrt_approx(x); }
+
 /// Computes the cube root of a float.
 pub fn cbrt(x: float): float { return arithmetic.cbrt(x); }
 

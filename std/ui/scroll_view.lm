@@ -1,6 +1,0 @@
-// std/ui/scroll_view - Scrollable container widget
-import std.ui.components as comp;
-
-pub fn scroll_view(child: comp.Fluent, height_val: float = 200.0): comp.ScrollView {
-    return comp.ScrollView(child, height_val);
-}

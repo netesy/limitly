@@ -1,0 +1,46 @@
+// =============================================================================
+// staged frame alias construction: `type StrRule = Rule(str)` registers the
+// generated frame's FrameInfo under the alias name, but function_signatures
+// and the LIR generator only know the generated (mangled) frame name. The
+// checker must rewrite the callee to the generated frame's real name or the
+// emitted call resolves to nothing and produces a malformed object
+// ("Invalid memory reference" / "Invalid frame receiver" at runtime).
+// =============================================================================
+
+staged frame Rule(T: type) {
+    pub var name: str;
+    pub var validator: fn(T): int;
+
+    pub init(n: str, v: fn(T): int) {
+        self.name = n;
+        self.validator = v;
+    }
+}
+
+type StrRule = Rule(str);
+type IntRule = Rule(int);
+
+fn main() {
+    // Direct alias construction (previously produced a malformed object).
+    val r = StrRule(n="len", v=fn(v: str): int { return len(v); });
+    assert(r.name == "len");
+    assert(r.validator("abc") == 3);
+
+    // Alias-typed list + iter binding (exercises LIR ownership of loop vars).
+    val rules: [StrRule] = [];
+    rules.append(StrRule(n="nonempty", v=fn(v: str): int { return len(v); }));
+    rules.append(StrRule(n="double_len", v=fn(v: str): int { return len(v) * 2; }));
+
+    var seen = 0;
+    iter (rule in rules) {
+        assert(rule.name != "");
+        seen = seen + rule.validator("a1b2");
+    }
+    assert(seen == 12);
+
+    // A second instantiation through a different alias stays nominal.
+    val ri = IntRule(n="double", v=fn(v: int): int { return v * 2; });
+    assert(ri.validator(21) == 42);
+
+    print("staged alias construction OK");
+}

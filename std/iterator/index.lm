@@ -14,7 +14,7 @@ import std.iterator.flat_map as flat_map;
 
 // Types
 pub import std.iterator.iterator show Iterator, PeekableIterator;
-pub import std.iterator.iterable show Iterable;
+pub import std.traits.index show Iterable;
 pub import std.iterator.flat_map show FlatMapIterator;
 
 // Common iterator helpers

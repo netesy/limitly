@@ -25,7 +25,7 @@ pub import std.d3.primitives show box, sphere, cylinder, plane, cone, torus, box
 pub import std.d3.material show Material, basic_material, lambert_material, phong_material, wireframe_material;
 pub import std.d3.mesh show Mesh;
 pub import std.d3.light show Light, ambient_light, directional_light, point_light;
-pub import std.d3.camera show Camera3D, perspective_camera, orthographic_camera;
+pub import std.camera show Camera3D, perspective_camera, orthographic_camera;
 pub import std.d3.scene show Scene3D;
 pub import std.d3.renderer show Renderer3D;
 pub import std.d3.sculpt show extrude, revolve, loft, mirror_compound;

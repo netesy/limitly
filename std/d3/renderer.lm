@@ -3,7 +3,7 @@
 // exhaustive shading/light dispatch, depth sorting, and face culling.
 
 import std.d3.scene as sc;
-import std.d3.camera as cam;
+import std.camera as cam;
 import std.d3.mesh as msh;
 import std.d3.light as lgt;
 import std.d3.geometry as geom;

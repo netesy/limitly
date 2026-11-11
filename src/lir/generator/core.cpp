@@ -573,6 +573,14 @@ void Generator::emit_ownership_event(const Memory::OwnershipEvent& event) {
     emit_instruction(marker);
 }
 
+void Generator::emit_iter_binding_event(LM::Frontend::AST::IterStatement& stmt) {
+    if (!ownership_facts_) return;
+    auto found = ownership_facts_->nodes.find(stmt.memory_info.semantic_id);
+    if (found != ownership_facts_->nodes.end()) {
+        emit_ownership_event(found->second.event);
+    }
+}
+
 void Generator::emit_instruction(const LIR_Inst& inst) {
     if (m_is_terminated) {
         return;

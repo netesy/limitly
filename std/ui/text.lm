@@ -1,6 +1,0 @@
-// std/ui/text - Text display widget
-import std.ui.components as comp;
-
-pub fn text(content: str): comp.Label {
-    return comp.Label(content);
-}

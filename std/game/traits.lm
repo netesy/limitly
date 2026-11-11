@@ -8,5 +8,5 @@ trait Updatable {
 }
 
 trait Drawable {
-    fn draw(camera: Camera2D | nil): nil;
+    fn draw(camera: Camera2D?): nil;
 }

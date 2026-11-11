@@ -7,8 +7,7 @@ import std.game.input as input_mod;
 pub import std.game.types show
     Vec2, vec2,
     Rect, rect,
-    ColorRole, StyleVar,
-    GUITheme, default_theme, dark_theme, light_theme, cyberpunk_theme, retro_theme, nord_theme;
+    GUITheme;
 
 pub import std.game.math show
     Circle, circle,

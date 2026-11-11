@@ -1025,6 +1025,28 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
                 return type_system.ANY_TYPE;
             }
         }
+        // Construction through a `type` alias of a staged-frame instantiation:
+        // `type StrRule = ValidationRule(str); ... StrRule(...)`. check_type_declaration
+        // propagates the generated frame's FrameInfo under the alias name, so the
+        // frame lookup below succeeds — but function_signatures and the LIR generator
+        // only know the generated frame's real (mangled) name, and the emitted call
+        // resolves to nothing, producing a malformed object. Rewrite the callee to
+        // the generated frame's real name, the same rewrite the template-name
+        // steering above performs.
+        if (staged_frame_templates_.find(target_name) == staged_frame_templates_.end()) {
+            if (TypePtr aliased = type_system.resolveTypeAlias(target_name)) {
+                if (aliased->tag == TypeTag::Frame) {
+                    if (const auto* afd = std::get_if<FrameType>(&aliased->extra)) {
+                        auto gen_it = frame_declarations.find(afd->name);
+                        if (afd->name != target_name && gen_it != frame_declarations.end() &&
+                            gen_it->second.declaration && gen_it->second.declaration->isGenerated) {
+                            var_expr->name = afd->name;
+                            target_name = afd->name;
+                        }
+                    }
+                }
+            }
+        }
         auto frame_it = frame_declarations.find(target_name);
         if (frame_it != frame_declarations.end()) {
             target_name = target_name + ".init";

@@ -86,7 +86,7 @@ frame Sprite: gtraits.Drawable {
         self.flip_y = false;
     }
 
-    pub fn draw(camera: Camera2D | nil = nil): nil {
+    pub fn draw(camera: Camera2D? = nil): nil {
         var screen_pos = self.position;
         var zoom = 1.0;
         var cam_rot = 0.0;
@@ -299,7 +299,7 @@ frame AnimatedSprite: gtraits.Updatable, gtraits.Drawable {
         }
     }
 
-    pub fn draw(camera: Camera2D | nil = nil): nil {
+    pub fn draw(camera: Camera2D? = nil): nil {
         val clip = self.clips[self.current_clip];
         var src = types.Rect(x=0.0, y=0.0, w=self.texture.width as float, h=self.texture.height as float);
         if (clip != nil and self.frame_index < len(clip.frames)) {

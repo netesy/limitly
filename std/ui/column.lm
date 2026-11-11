@@ -1,8 +1,0 @@
-// std/ui/column - Vertical layout container
-import std.ui.components as comp;
-
-pub fn column(children: [comp.Fluent]): comp.Container {
-    val c = comp.Container(true);
-    c.children = children;
-    return c;
-}

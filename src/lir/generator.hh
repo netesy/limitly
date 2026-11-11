@@ -203,6 +203,10 @@ private:
     std::shared_ptr<Memory::SemanticFacts> ownership_facts_;
     std::unordered_map<Memory::Identity, Reg> checked_references_;
     void emit_ownership_event(const Memory::OwnershipEvent& event);
+    // Re-emits the iter statement's loop-binding ownership event inside the
+    // loop body so managed (frame-typed) loop variables are live on every
+    // iteration, including after a consume on the back-edge.
+    void emit_iter_binding_event(LM::Frontend::AST::IterStatement& stmt);
     Reg emit_expr(LM::Frontend::AST::Expression& expr);
     Reg emit_expr_impl(LM::Frontend::AST::Expression& expr);
     

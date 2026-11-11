@@ -462,6 +462,28 @@ pub fn sqrt(x: float): float {
     return Float(x).sqrt();
 }
 
+/// Computes an approximate square root via Newton-Raphson iteration.
+/// Faster than `sqrt` but less precise; intended for hot loops where
+/// exact IEEE-754 results are not required (e.g. glyph rasterization).
+///
+/// @param x Input float. Non-positive values return 0.0.
+/// @return Approximate square root.
+pub fn sqrt_approx(x: float): float {
+    if (x <= 0.0) { return 0.0; }
+    if (x == 1.0) { return 1.0; }
+
+    var guess = x;
+    if (x < 1.0) { guess = 1.0; }
+
+    var idx: int = 0;
+    while (idx < 10) {
+        guess = 0.5 * (guess + x / guess);
+        idx = idx + 1;
+    }
+
+    return guess;
+}
+
 /// Computes the cube root of a floating-point number.
 ///
 /// @param x Input float.

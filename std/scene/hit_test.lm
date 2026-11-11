@@ -2,7 +2,7 @@
 // Hit Test submodule for std.scene. Scene graph nodes, 2D/3D scene trees, and transformation hierarchies.
 
 import std.scene.node as node;
-import std.graphics.vector2 as vector2;
+import std.math.vector2 as vector2;
 
 frame HitTest {
     pub init() {}

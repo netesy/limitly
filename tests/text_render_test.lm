@@ -1,7 +1,7 @@
 import std.gg as gg;
 import std.graphics.canvas as canvas;
 import std.graphics.paint as paint;
-import std.graphics.color as color;
+import std.color as color;
 
 fn main() {
     print("=== Text Glyph Rendering Verification ===");

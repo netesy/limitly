@@ -58,9 +58,9 @@ fn test_theme_system() {
 fn test_widget_system() {
     print("[Test 2] Testing std.widget...");
 
-    // Point & Insets
-    var pt1 = widget.Point(x=10.0, y=20.0);
-    var pt2 = widget.Point(x=30.0, y=40.0);
+    // Vector2 & Insets
+    var pt1 = widget.Vector2(x=10.0, y=20.0);
+    var pt2 = widget.Vector2(x=30.0, y=40.0);
     var pt_sum = pt1.add(pt2);
     assert(pt_sum.x == 40.0 and pt_sum.y == 60.0, "Point add failed");
     var pt_sub = pt2.sub(pt1);
@@ -76,7 +76,7 @@ fn test_widget_system() {
     var r1 = widget.Rect(x=10.0, y=10.0, w=100.0, h=50.0);
     assert(r1.contains(20.0, 30.0), "Rect should contain (20, 30)");
     assert(not r1.contains(5.0, 5.0), "Rect should not contain (5, 5)");
-    assert(r1.contains_point(pt1), "Rect should contain Point(10, 20)");
+    assert(r1.contains_vec(pt1), "Rect should contain Vector2(10, 20)");
 
     var r1_center = r1.center();
     assert(r1_center.x == 60.0 and r1_center.y == 35.0, "Rect center failed");

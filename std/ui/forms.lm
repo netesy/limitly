@@ -46,7 +46,7 @@ type FloatRule = ValidationRule(float);
 
 // ── Common Validators ────────────────────────────────────────────────────────
 pub fn required_validator(field_name: str): StrRule {
-    return StrRule(
+    return ValidationRule(
         field=field_name,
         validator_fn=fn(value: str): ValidationResult {
             if (len(value) == 0) {
@@ -59,7 +59,7 @@ pub fn required_validator(field_name: str): StrRule {
 }
 
 pub fn min_length_validator(field_name: str, min_len: int): StrRule {
-    return StrRule(
+    return ValidationRule(
         field=field_name,
         validator_fn=fn(value: str): ValidationResult {
             if (len(value) < min_len) {
@@ -72,7 +72,7 @@ pub fn min_length_validator(field_name: str, min_len: int): StrRule {
 }
 
 pub fn max_length_validator(field_name: str, max_len: int): StrRule {
-    return StrRule(
+    return ValidationRule(
         field=field_name,
         validator_fn=fn(value: str): ValidationResult {
             if (len(value) > max_len) {
@@ -85,7 +85,7 @@ pub fn max_length_validator(field_name: str, max_len: int): StrRule {
 }
 
 pub fn email_validator(field_name: str): StrRule {
-    return StrRule(
+    return ValidationRule(
         field=field_name,
         validator_fn=fn(value: str): ValidationResult {
             if (not contains(value, "@")) {
@@ -98,7 +98,7 @@ pub fn email_validator(field_name: str): StrRule {
 }
 
 pub fn min_value_validator(field_name: str, min_val: float): FloatRule {
-    return FloatRule(
+    return ValidationRule(
         field=field_name,
         validator_fn=fn(value: float): ValidationResult {
             if (value < min_val) {
@@ -111,7 +111,7 @@ pub fn min_value_validator(field_name: str, min_val: float): FloatRule {
 }
 
 pub fn max_value_validator(field_name: str, max_val: float): FloatRule {
-    return FloatRule(
+    return ValidationRule(
         field=field_name,
         validator_fn=fn(value: float): ValidationResult {
             if (value > max_val) {
@@ -124,7 +124,7 @@ pub fn max_value_validator(field_name: str, max_val: float): FloatRule {
 }
 
 pub fn pattern_validator(field_name: str, pattern: str): StrRule {
-    return StrRule(
+    return ValidationRule(
         field=field_name,
         validator_fn=fn(value: str): ValidationResult {
             if (len(value) == 0 or len(pattern) == 0) {
@@ -150,9 +150,9 @@ frame FormState {
     pub var float_rules: [FloatRule];
     pub var is_valid: state.BoolSignal;
     pub var is_submitting: state.BoolSignal;
-    pub var on_submit: ({str: str}) -> nil;
-    pub var on_success: ({str: str}) -> nil;
-    pub var on_error: ([ValidationResult]) -> nil;
+    pub var on_submit: fn({str: str}): nil;
+    pub var on_success: fn({str: str}): nil;
+    pub var on_error: fn([ValidationResult]): nil;
     pub var initial_str: {str: str};
     pub var initial_bool: {str: bool};
     pub var initial_float: {str: float};
@@ -464,17 +464,17 @@ frame FormBuilder {
         return self;
     }
 
-    pub fn submit_handler(handler: ({str: str}) -> nil): FormBuilder {
+    pub fn submit_handler(handler: fn({str: str}): nil): FormBuilder {
         self.form_state.on_submit = handler;
         return self;
     }
 
-    pub fn success_handler(handler: ({str: str}) -> nil): FormBuilder {
+    pub fn success_handler(handler: fn({str: str}): nil): FormBuilder {
         self.form_state.on_success = handler;
         return self;
     }
 
-    pub fn error_handler(handler: ([ValidationResult]) -> nil): FormBuilder {
+    pub fn error_handler(handler: fn([ValidationResult]): nil): FormBuilder {
         self.form_state.on_error = handler;
         return self;
     }

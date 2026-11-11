@@ -187,9 +187,21 @@ The FFI module provides typed wrappers around the libffi-based native call infra
 
 ## 9. Other Modules
 
-The standard library also includes: `math`, `random`, `time`, `collections` (with submodules `vector`, `list`, `stack`, `queue`, `hashmap`, `set`, `tree`), `data_structures`, `parsers` (`json`, `toml`, `yaml`), `net` (`tcp`, `udp`, `dns`), `http` (`client`, `server`), `crypto` (`hash`, `hmac`, `random`), `fs`, `log`, `path`, `format`, `regex`, `bytes`, `color`, `cli`, `env`, `process`, `validation`, `statistics`, `linear_algebra`, `geometry`, `sort`, `search`, `algorithm`, `functional`, `iter`, `debug`, `url`, `serialization`, `app`, `archive`, `image`, `config`.
+The standard library also includes: `math`, `random`, `time`, `collections` (with submodules `vector`, `list`, `stack`, `queue`, `hashmap`, `set`, `tree`), `data_structures`, `parsers` (`json`, `toml`, `yaml`), `net` (`tcp`, `udp`, `dns`), `http` (`client`, `server`), `crypto` (`hash`, `hmac`, `random`), `fs`, `log`, `path`, `format`, `regex`, `bytes`, `color`, `cli`, `env`, `process`, `validation`, `statistics`, `geometry`, `sort`, `search`, `algorithm`, `functional`, `iter`, `debug`, `url`, `serialization`, `app`, `archive`, `image`, `config`.
 
 Each subsystem exposes an `index.lm` facade (e.g. `std/collections/index.lm`, `std/net/index.lm`) that re-exports its public types; import the subsystem directly. There is no umbrella `std/std.lm` — it was an early-period convenience that has been removed, since the module system resolves `std.<subsystem>` paths on its own. Note that some modules are stubs (process, env, archive, net/dns, http/*) — they return real errors rather than silently succeeding.
+
+### Canonical Primitive Types
+
+Shared geometric and graphics primitives have a single canonical home; other modules re-export or consume them rather than redefine them:
+
+- `Vector2` / `Vector3` / `Vector4` / `Matrix` / `Quaternion` → `std.math` (`std.math.vector2`, `vector3`, `vector4`, `matrix`, `quaternion`)
+- `Rect`, `Circle` → `std.geometry`
+- `Color` and all color constructors/constants → `std.color` (implementation in `std.color.core`; `std.color.index` is a facade)
+- `Camera2D` / `Camera3D` → `std.camera`
+- `sqrt`, `sin`, `cos`, `clamp`, `min`, `max` → `std.math`
+
+`std.widget.geometry` re-exports `Rect` and `Vector2` and adds only the widget-local `Insets` frame — the old duplicate `Point` frame was removed (use `Vector2`). `std.graphics` consumes `Rect`, `Vector2`/`Vector3`, and `Matrix` directly from `std.geometry`/`std.math` — its duplicate primitive modules were removed. `std.linear_algebra` is now a thin facade over `std.math` vector/matrix types. Thin re-export shims were removed where a canonical module already exists: `std.d3.camera` (use `std.camera`), `std.graphics.color` (use `std.color`), and `std.iterator.iterable` (use `std.traits`). Client libraries (`std.ui`, `std.game`) intentionally do not re-export these primitives — import them from their canonical modules.
 
 ## 10. Group 2 Standard Library Modules
 

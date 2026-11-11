@@ -257,7 +257,7 @@ frame ParticleEmitter2D: gtraits.Updatable, gtraits.Drawable {
         }
     }
 
-    pub fn draw(camera: Camera2D | nil = nil): nil {
+    pub fn draw(camera: Camera2D? = nil): nil {
         val has_cam = camera != nil;
         var zoom = 1.0;
         var cam_tx = 0.0;

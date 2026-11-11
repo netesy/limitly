@@ -1,6 +1,0 @@
-// std/ui/button - Interactive button widget
-import std.ui.components as comp;
-
-pub fn button(label: str, on_click: (fn(): nil) | nil = nil): comp.Button {
-    return comp.Button(label, on_click);
-}

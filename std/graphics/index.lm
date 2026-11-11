@@ -5,7 +5,7 @@ pub import std.graphics.renderer show Renderer;
 pub import std.graphics.surface show Surface;
 pub import std.graphics.paint show Paint;
 pub import std.graphics.brush show Brush;
-pub import std.graphics.color show Color;
+pub import std.color.core show Color;
 pub import std.graphics.gradient show Gradient;
 pub import std.graphics.image show Image;
 pub import std.graphics.texture show Texture;
@@ -13,20 +13,15 @@ pub import std.graphics.font show Font;
 pub import std.graphics.text_layout show TextLayout;
 pub import std.graphics.path show Path;
 pub import std.graphics.shape show Shape;
-pub import std.graphics.rect show Rect;
-pub import std.graphics.circle show Circle;
 pub import std.graphics.ellipse show Ellipse;
 pub import std.graphics.polygon show Polygon;
 pub import std.graphics.transform show Transform;
-pub import std.graphics.matrix show Matrix;
-pub import std.graphics.vector2 show Vector2;
-pub import std.graphics.vector3 show Vector3;
 pub import std.graphics.animation show Animation;
 pub import std.graphics.shader show Shader;
 pub import std.graphics.backend show Backend;
 pub import std.graphics.shadow show Shadow;
 
-import std.graphics.color as color;
+import std.color as color;
 import std.graphics.image as image;
 
 fn rgb(r: int, g: int, b: int): Color {

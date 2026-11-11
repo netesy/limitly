@@ -1,7 +1,0 @@
-// std/ui/grid_view - Grid-based item list widget
-import std.ui.components as comp;
-import std.ui.grid as ui_grid;
-
-pub fn grid_view(columns_count: int, items: [comp.Fluent], spacing_val: float = 8.0): comp.Container {
-    return ui_grid.grid(columns_count, items, spacing_val);
-}

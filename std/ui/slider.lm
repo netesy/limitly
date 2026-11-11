@@ -1,6 +1,0 @@
-// std/ui/slider - Range slider widget
-import std.ui.components as comp;
-
-pub fn slider(value: float = 50.0, min_val: float = 0.0, max_val: float = 100.0, on_change: (fn(): nil) | nil = nil): comp.Slider {
-    return comp.Slider(value, min_val, max_val, on_change);
-}

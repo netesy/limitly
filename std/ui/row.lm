@@ -1,8 +1,0 @@
-// std/ui/row - Horizontal layout container
-import std.ui.components as comp;
-
-pub fn row(children: [comp.Fluent]): comp.Container {
-    val c = comp.Container(false);
-    c.children = children;
-    return c;
-}

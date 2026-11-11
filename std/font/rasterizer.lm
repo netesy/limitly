@@ -3,6 +3,7 @@
 // Produces 8-bit alpha coverage bitmaps (0..255) using standard non-zero winding rule.
 
 import std.font.glyph as g;
+import std.math as math;
 
 frame GlyphBitmap {
     pub var width: int;
@@ -198,23 +199,6 @@ pub fn rasterize_glyph_subpixel(outline: g.GlyphOutline, scale: float, oversampl
     return GlyphBitmap(width, height, i_min_x, i_min_y, pixels);
 }
 
-// Helper: Square root using Newton-Raphson approximation
-fn sqrt_approx(x: float): float {
-    if (x <= 0.0) { return 0.0; }
-    if (x == 1.0) { return 1.0; }
-
-    var guess = x;
-    if (x < 1.0) { guess = 1.0; }
-
-    var idx: int = 0;
-    while (idx < 10) {
-        guess = 0.5 * (guess + x / guess);
-        idx = idx + 1;
-    }
-
-    return guess;
-}
-
 // Helper: Calculate squared distance from point to line segment
 fn dist_to_segment_squared(px: float, py: float, x1: float, y1: float, x2: float, y2: float): float {
     var l2 = ((x2 - x1) * (x2 - x1)) + ((y2 - y1) * (y2 - y1));
@@ -324,7 +308,7 @@ pub fn rasterize_glyph_sdf(outline: g.GlyphOutline, scale: float, padding: int =
                 }
             }
 
-            var min_dist = sqrt_approx(min_dist_sq);
+            var min_dist = math.sqrt_approx(min_dist_sq);
 
             // Check if point is inside glyph
             var inside = point_inside_outline(screen_x, screen_y, segments);

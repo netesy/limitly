@@ -1,6 +1,0 @@
-// std/ui/table_view - Table data grid widget
-import std.ui.components as comp;
-
-pub fn table_view(headers: [str], rows: [[comp.Fluent]]): comp.Table {
-    return comp.Table(headers, rows);
-}

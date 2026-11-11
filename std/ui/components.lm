@@ -13,7 +13,7 @@ import std.color as color;
 import std.math as math;
 import std.graphics.shadow as shadow;
 import std.animation as animation;
-import std.widget show Alignment;
+import std.widget.state show Alignment;
 import std.ui.types show WidgetKind, LifecycleState, Align, Weight, Semantic, AlertKind, DotState, ConstraintMode, Role, Style, align_start, alert_kind_of, dot_state_of;
 import std.ui.state as state;
 pub import std.color show Color;

@@ -2,8 +2,7 @@
 // Headless mathematical normalization, snapping, and layout computations for widgets.
 
 import std.math as math;
-import std.widget.geometry as geom;
-import std.widget.geometry show Rect;
+import std.geometry show Rect;
 
 pub fn clamp_value(v: float, min_val: float, max_val: float): float {
     if (v < min_val) { return min_val; }

@@ -1,6 +1,0 @@
-// std/ui/tree_view - Hierarchical tree widget
-import std.ui.components as comp;
-
-pub fn tree_view(label: str, children: [comp.Fluent], default_open: bool = false): comp.TreeNode {
-    return comp.TreeNode(label, children, default_open);
-}

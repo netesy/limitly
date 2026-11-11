@@ -1,7 +1,7 @@
 // std/scene/camera.lm
 // Camera submodule for std.scene. Scene graph nodes, 2D/3D scene trees, and transformation hierarchies.
 
-import std.graphics.matrix as matrix;
+import std.math.matrix as matrix;
 
 frame Camera {
     pub var projection: matrix.Matrix;

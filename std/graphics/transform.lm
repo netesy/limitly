@@ -1,7 +1,7 @@
 // std/graphics/transform.lm
 // Transform submodule for std.graphics. 2D/3D graphics abstractions, canvases, shaders, and rendering pipelines.
 
-import std.graphics.matrix as matrix;
+import std.math.matrix as matrix;
 
 frame Transform {
     pub var matrix_val: matrix.Matrix;

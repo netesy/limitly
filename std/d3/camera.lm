@@ -1,4 +1,0 @@
-// std/d3/camera.lm
-// Virtual camera defining viewport projections and eye view transforms.
-
-pub import std.camera show Camera3D, perspective_camera, orthographic_camera;

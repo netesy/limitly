@@ -40,6 +40,9 @@ pub import std.ui.replay show replay;
 pub import std.ui.staged show compute_item_width, compute_grid_column_width, compute_constrained_size, fold_box_width, fold_box_height, fold_stack_extent, fold_child_offset, theme_argb, ThemeRole, Binding;
 pub import std.ui.event show EventKind, EventResult, UIEvent, make_click_event, make_hover_event, make_key_event, dispatch_event, fire_action;
 
+pub import std.ui.forms show ValidationResult, ValidationRule, StrRule, FloatRule, FormState, FormBuilder;
+pub import std.ui.forms show required_validator, min_length_validator, max_length_validator, email_validator, min_value_validator, max_value_validator, pattern_validator, form_builder, create_form, bind_text_field, bind_checkbox_field, bind_slider_field, field_error_widget;
+
 // ── Styles & Lifecycle Constants ──────────────────────────────────────────────
 pub fn style(): Style { return ui_types.style(); }
 
