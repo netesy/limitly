@@ -114,3 +114,8 @@ frame Vector2 {
         return Vector2(self.x, self.y);
     }
 }
+
+/// Convenience constructor for a 2D vector.
+pub fn vec2(x: float = 0.0, y: float = 0.0): Vector2 {
+    return Vector2(x, y);
+}

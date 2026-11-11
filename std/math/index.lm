@@ -16,7 +16,7 @@ import std.math.trigonometry as trigonometry;
 import std.math.statistics as statistics;
 import std.math.random as random;
 
-pub import std.math.vector2 show Vector2;
+pub import std.math.vector2 show Vector2, vec2;
 pub import std.math.vector3 show Vector3;
 pub import std.math.vector4 show Vector4;
 pub import std.math.matrix show Matrix;

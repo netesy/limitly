@@ -3,8 +3,8 @@
 // moddable style stack, and preset themes.
 
 import std.gg as gg;
-import std.game.types as types;
-import std.game.gui as gui;
+import std.gui.types as types;
+import std.gui as gui;
 import std.color as color;
 
 fn test_style_stack(): int {

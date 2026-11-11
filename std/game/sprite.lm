@@ -3,7 +3,8 @@
 
 import std.math as math;
 import std.gg as gg;
-import std.game.types as types;
+import std.math.vector2 show Vector2;
+import std.geometry show Rect;
 import std.color as color;
 import std.camera show Camera2D;
 import std.game.traits as gtraits;
@@ -26,10 +27,10 @@ pub fn texture2d(id: int, w: int, h: int): Texture2D {
 
 frame Sprite: gtraits.Drawable {
     pub var texture: Texture2D;
-    pub var position: types.Vector2;
-    pub var src_rect: types.Rect;
-    pub var origin: types.Vector2;     // 0.0,0.0 = top-left; 0.5,0.5 = center
-    pub var scale: types.Vector2;
+    pub var position: Vector2;
+    pub var src_rect: Rect;
+    pub var origin: Vector2;     // 0.0,0.0 = top-left; 0.5,0.5 = center
+    pub var scale: Vector2;
     pub var rotation: float;        // in radians
     pub var tint: color.Color;
     pub var flip_x: bool;
@@ -37,10 +38,10 @@ frame Sprite: gtraits.Drawable {
 
     pub init(
         texture: Texture2D | nil = nil,
-        position: types.Vector2 | nil = nil,
-        src_rect: types.Rect | nil = nil,
-        origin: types.Vector2 | nil = nil,
-        scale: types.Vector2 | nil = nil,
+        position: Vector2 | nil = nil,
+        src_rect: Rect | nil = nil,
+        origin: Vector2 | nil = nil,
+        scale: Vector2 | nil = nil,
         rotation: float = 0.0,
         tint: color.Color | nil = nil
     ) {
@@ -51,27 +52,27 @@ frame Sprite: gtraits.Drawable {
         }
 
         if (position == nil) {
-            self.position = types.Vec2();
+            self.position = Vector2();
         } else {
-            self.position = position as types.Vector2;
+            self.position = position as Vector2;
         }
 
         if (src_rect == nil) {
-            self.src_rect = types.Rect(x=0.0, y=0.0, w=self.texture.width as float, h=self.texture.height as float);
+            self.src_rect = Rect(x=0.0, y=0.0, w=self.texture.width as float, h=self.texture.height as float);
         } else {
-            self.src_rect = src_rect as types.Rect;
+            self.src_rect = src_rect as Rect;
         }
 
         if (origin == nil) {
-            self.origin = types.Vec2(0.5, 0.5);
+            self.origin = Vector2(0.5, 0.5);
         } else {
-            self.origin = origin as types.Vector2;
+            self.origin = origin as Vector2;
         }
 
         if (scale == nil) {
-            self.scale = types.Vec2(1.0, 1.0);
+            self.scale = Vector2(1.0, 1.0);
         } else {
-            self.scale = scale as types.Vector2;
+            self.scale = scale as Vector2;
         }
 
         self.rotation = rotation;
@@ -132,7 +133,7 @@ frame Sprite: gtraits.Drawable {
     }
 }
 
-pub fn sprite(texture: Texture2D | nil = nil, position: types.Vector2 | nil = nil): Sprite {
+pub fn sprite(texture: Texture2D | nil = nil, position: Vector2 | nil = nil): Sprite {
     return Sprite(texture=texture, position=position);
 }
 
@@ -167,15 +168,15 @@ frame SpriteSheet {
         }
     }
 
-    pub fn get_frame(col: int, row: int): types.Rect {
+    pub fn get_frame(col: int, row: int): Rect {
         val x = (col * self.cell_width) as float;
         val y = (row * self.cell_height) as float;
-        return types.Rect(x=x, y=y, w=self.cell_width as float, h=self.cell_height as float);
+        return Rect(x=x, y=y, w=self.cell_width as float, h=self.cell_height as float);
     }
 
-    pub fn get_frame_index(index: int): types.Rect {
+    pub fn get_frame_index(index: int): Rect {
         if (self.columns <= 0) {
-            return types.Rect(x=0.0, y=0.0, w=self.cell_width as float, h=self.cell_height as float);
+            return Rect(x=0.0, y=0.0, w=self.cell_width as float, h=self.cell_height as float);
         }
         val col = index % self.columns;
         val row = index / self.columns;
@@ -187,16 +188,16 @@ frame SpriteSheet {
 
 frame AnimationClip {
     pub var name: str;
-    pub var frames: [types.Rect];
+    pub var frames: [Rect];
     pub var fps: float;
     pub var loop: bool;
 
-    pub init(name: str = "", frames: [types.Rect] | nil = nil, fps: float = 10.0, loop: bool = true) {
+    pub init(name: str = "", frames: [Rect] | nil = nil, fps: float = 10.0, loop: bool = true) {
         self.name = name;
         if (frames == nil) {
-            self.frames = [] as [types.Rect];
+            self.frames = [] as [Rect];
         } else {
-            self.frames = frames as [types.Rect];
+            self.frames = frames as [Rect];
         }
         self.fps = fps;
         self.loop = loop;
@@ -214,7 +215,7 @@ frame AnimatedSprite: gtraits.Updatable, gtraits.Drawable {
     pub var frame_timer: float;
     pub var is_playing: bool;
 
-    pub init(texture: Texture2D | nil = nil, position: types.Vector2 | nil = nil) {
+    pub init(texture: Texture2D | nil = nil, position: Vector2 | nil = nil) {
         if (texture == nil) {
             self.texture = Texture2D();
         } else {
@@ -222,13 +223,13 @@ frame AnimatedSprite: gtraits.Updatable, gtraits.Drawable {
         }
 
         if (position == nil) {
-            self.position = types.Vec2();
+            self.position = Vector2();
         } else {
-            self.position = position as types.Vector2;
+            self.position = position as Vector2;
         }
 
-        self.origin = types.Vec2(0.5, 0.5);
-        self.scale = types.Vec2(1.0, 1.0);
+        self.origin = Vector2(0.5, 0.5);
+        self.scale = Vector2(1.0, 1.0);
         self.rotation = 0.0;
         self.tint = color.white;
         self.flip_x = false;
@@ -301,7 +302,7 @@ frame AnimatedSprite: gtraits.Updatable, gtraits.Drawable {
 
     pub fn draw(camera: Camera2D? = nil): nil {
         val clip = self.clips[self.current_clip];
-        var src = types.Rect(x=0.0, y=0.0, w=self.texture.width as float, h=self.texture.height as float);
+        var src = Rect(x=0.0, y=0.0, w=self.texture.width as float, h=self.texture.height as float);
         if (clip != nil and self.frame_index < len(clip.frames)) {
             src = clip.frames[self.frame_index];
         }

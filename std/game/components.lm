@@ -7,10 +7,11 @@
 import std.math as math;
 import std.math.arithmetic as arith;
 import std.math.trigonometry as trig;
-import std.game.types as types;
+import std.math.vector2 show Vector2;
+import std.geometry show Rect;
 
 frame WidgetState {
-    embed types.Rect;
+    embed Rect;
 
     pub var id: str;
     pub var is_hot: bool;
@@ -39,7 +40,7 @@ frame WidgetState {
 }
 
 frame Transform2D {
-    embed types.Vector2;
+    embed Vector2;
 
     pub var scale_x: float;
     pub var scale_y: float;

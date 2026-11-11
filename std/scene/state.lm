@@ -1,5 +1,7 @@
-// std/game/scene.lm
-// State machine, scene graph lifecycle hooks, scene stack, and transition engine
+// std/scene/state.lm
+// Scene state machine: lifecycle hooks, scene stack, and transition engine. Lives in
+// std.scene alongside the node-graph SceneGraph; `Scene` here is the switchable
+// game/app scene, managed by SceneManager.
 
 import std.gg as gg;
 import std.color as color;

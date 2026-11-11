@@ -3,15 +3,15 @@
 
 import std.math as math;
 import std.gg as gg;
-import std.game.types as types;
+import std.math.vector2 show Vector2;
 import std.color as color;
 import std.camera show Camera2D;
 import std.game.traits as gtraits;
 
 frame Particle: gtraits.Updatable {
-    pub var pos: types.Vector2;
-    pub var vel: types.Vector2;
-    pub var acc: types.Vector2;
+    pub var pos: Vector2;
+    pub var vel: Vector2;
+    pub var acc: Vector2;
     pub var color_start: color.Color;
     pub var color_end: color.Color;
     pub var size_start: float;
@@ -21,9 +21,9 @@ frame Particle: gtraits.Updatable {
     pub var alive: bool;
 
     pub init() {
-        self.pos = types.Vec2();
-        self.vel = types.Vec2();
-        self.acc = types.Vec2();
+        self.pos = Vector2();
+        self.vel = Vector2();
+        self.acc = Vector2();
         self.color_start = color.white;
         self.color_end = color.white;
         self.size_start = 4.0;
@@ -34,9 +34,9 @@ frame Particle: gtraits.Updatable {
     }
 
     pub fn spawn(
-        pos: types.Vector2,
-        vel: types.Vector2,
-        acc: types.Vector2,
+        pos: Vector2,
+        vel: Vector2,
+        acc: Vector2,
         c_start: color.Color,
         c_end: color.Color,
         s_start: float,
@@ -94,7 +94,7 @@ frame Particle: gtraits.Updatable {
 }
 
 frame ParticleEmitter2D: gtraits.Updatable, gtraits.Drawable {
-    pub var position: types.Vector2;
+    pub var position: Vector2;
     pub var max_particles: int;
     pub var active: bool;
 
@@ -129,7 +129,7 @@ frame ParticleEmitter2D: gtraits.Updatable, gtraits.Drawable {
     pub var speed_max: float;
     pub var angle_min: float;
     pub var angle_max: float;
-    pub var gravity: types.Vector2;
+    pub var gravity: Vector2;
     pub var size_start: float;
     pub var size_end: float;
     pub var color_start: color.Color;
@@ -138,7 +138,7 @@ frame ParticleEmitter2D: gtraits.Updatable, gtraits.Drawable {
     pub var rng_state: int;
 
     pub init(max_count: int = 150) {
-        self.position = types.Vec2();
+        self.position = Vector2();
         self.max_particles = max_count;
         self.px = []; self.py = [];
         self.vx = []; self.vy = [];
@@ -170,7 +170,7 @@ frame ParticleEmitter2D: gtraits.Updatable, gtraits.Drawable {
         self.speed_max = 120.0;
         self.angle_min = 0.0;
         self.angle_max = math.TAU;
-        self.gravity = types.Vec2(0.0, 98.0);
+        self.gravity = Vector2(0.0, 98.0);
         self.size_start = 6.0;
         self.size_end = 1.0;
         self.color_start = color.hex(0xffd700, 1.0);

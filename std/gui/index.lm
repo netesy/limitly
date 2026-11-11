@@ -1,10 +1,10 @@
-// std/game/gui.lm
-// High-performance, zero-DOM Immediate-Mode GUI (IMGUI) engine for game developers.
+// std/gui/index.lm
+// High-performance, zero-DOM Immediate-Mode GUI (IMGUI) engine.
 // Features comprehensive widget library, moddable style stack, and customizable themes.
 
 import std.gg as gg;
 import std.math as math;
-import std.game.types as types;
+import std.gui.types as types;
 import std.color as color;
 import std.string as std_string;
 import std.text.controller as text_ctrl;

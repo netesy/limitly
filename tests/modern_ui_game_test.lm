@@ -14,7 +14,8 @@ import std.ui.staged as staged_ui;
 import std.ui.event as event;
 import std.game as game;
 import std.game.components as gcomp;
-import std.game.types as gtypes;
+import std.gui.types as gtypes;
+import std.gui as imgui;
 import std.color as color;
 import std.color.palette as palette;
 
@@ -156,7 +157,7 @@ fn test_game_embedded_geometry() {
 
 fn test_game_color_role_matching() {
     print("=== Testing ColorRole Native Match ===");
-    var gui = game.GUI();
+    var gui = imgui.GUI();
     var btn_c = gui.get_color_role(gtypes.ColorRole.Button);
     assert(btn_c.r > 0.0, "Button role color should be initialized");
     var win_c = gui.get_color_role(gtypes.ColorRole.WindowBg);

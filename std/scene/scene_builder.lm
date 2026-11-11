@@ -11,16 +11,16 @@ import std.scene.scene as scene;
 /// var s = b.build();
 /// ```
 frame Builder {
-    pub var active_scene: scene.Scene;
+    pub var active_scene: scene.SceneGraph;
 
-    pub init(s: scene.Scene = scene.Scene()) {
+    pub init(s: scene.SceneGraph = scene.SceneGraph()) {
         self.active_scene = s;
     }
 
     /// Finalizes construction and returns the built scene instance.
     ///
     /// @return Built Scene instance.
-    pub fn build(): scene.Scene {
+    pub fn build(): scene.SceneGraph {
         return self.active_scene;
     }
 }

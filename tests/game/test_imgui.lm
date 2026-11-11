@@ -1,16 +1,18 @@
 // tests/game/test_imgui.lm
 // Comprehensive test suite for std.game Immediate-Mode GUI library
 
-import std.game as game;
+import std.math.vector2 show Vector2;
+import std.geometry show Rect;
+import std.gui show GUI;
 import std.gg as gg;
 import std.color as color;
 
 fn test_primitives() {
     print("=== Testing std.game Types & Primitives ===");
-    var v = game.Vec2(10.0, 20.0);
+    var v = Vector2(10.0, 20.0);
     assert(v.x == 10.0 and v.y == 20.0, "Vec2 init mismatch");
 
-    var r = game.Rect(100.0, 100.0, 200.0, 50.0);
+    var r = Rect(100.0, 100.0, 200.0, 50.0);
     assert(r.contains(150.0, 120.0), "Rect should contain point inside");
     assert(not r.contains(50.0, 50.0), "Rect should not contain point outside");
 
@@ -21,61 +23,61 @@ fn test_primitives() {
 
 fn test_button_interaction() {
     print("=== Testing IMGUI Button Click Cycle ===");
-    var gui = game.GUI();
+    var imgui = GUI();
 
     // Frame 1: Mouse not hovering button
-    gui.begin(0.0, 0.0, false);
-    gui.set_cursor(50.0, 50.0);
-    var clicked1 = gui.button("Click Me", 100.0, 30.0);
-    gui.end();
+    imgui.begin(0.0, 0.0, false);
+    imgui.set_cursor(50.0, 50.0);
+    var clicked1 = imgui.button("Click Me", 100.0, 30.0);
+    imgui.end();
     assert(not clicked1, "Button should not click when unhovered");
 
     // Frame 2: Mouse presses down on button (x=60, y=60)
-    gui.begin(60.0, 60.0, true);
-    gui.set_cursor(50.0, 50.0);
-    var clicked2 = gui.button("Click Me", 100.0, 30.0);
-    gui.end();
+    imgui.begin(60.0, 60.0, true);
+    imgui.set_cursor(50.0, 50.0);
+    var clicked2 = imgui.button("Click Me", 100.0, 30.0);
+    imgui.end();
     assert(not clicked2, "Button should not register click until release");
 
     // Frame 3: Mouse released over button
-    gui.begin(60.0, 60.0, false);
-    gui.set_cursor(50.0, 50.0);
-    var clicked3 = gui.button("Click Me", 100.0, 30.0);
-    gui.end();
+    imgui.begin(60.0, 60.0, false);
+    imgui.set_cursor(50.0, 50.0);
+    var clicked3 = imgui.button("Click Me", 100.0, 30.0);
+    imgui.end();
     assert(clicked3, "Button should register click upon release while hovered");
     print("[OK] Button interaction passed");
 }
 
 fn test_checkbox_toggle() {
     print("=== Testing IMGUI Checkbox & Toggle ===");
-    var gui = game.GUI();
+    var imgui = GUI();
     var is_sound_on = false;
 
     // Frame 1: Press checkbox
-    gui.begin(15.0, 15.0, true);
-    gui.set_cursor(10.0, 10.0);
-    is_sound_on = gui.checkbox("Sound FX", is_sound_on);
-    gui.end();
+    imgui.begin(15.0, 15.0, true);
+    imgui.set_cursor(10.0, 10.0);
+    is_sound_on = imgui.checkbox("Sound FX", is_sound_on);
+    imgui.end();
 
     // Frame 2: Release over checkbox -> state should toggle to true
-    gui.begin(15.0, 15.0, false);
-    gui.set_cursor(10.0, 10.0);
-    is_sound_on = gui.checkbox("Sound FX", is_sound_on);
-    gui.end();
+    imgui.begin(15.0, 15.0, false);
+    imgui.set_cursor(10.0, 10.0);
+    is_sound_on = imgui.checkbox("Sound FX", is_sound_on);
+    imgui.end();
     assert(is_sound_on, "Checkbox should toggle to true on click");
     print("[OK] Checkbox passed");
 }
 
 fn test_slider_drag() {
     print("=== Testing IMGUI Slider Value Drag ===");
-    var gui = game.GUI();
+    var imgui = GUI();
     var volume = 0.0;
 
     // Press down at 50% along the 200px track (track starts at x=10, width=200 -> middle is x=110)
-    gui.begin(110.0, 15.0, true);
-    gui.set_cursor(10.0, 10.0);
-    volume = gui.slider("Volume", volume, 0.0, 100.0, 200.0);
-    gui.end();
+    imgui.begin(110.0, 15.0, true);
+    imgui.set_cursor(10.0, 10.0);
+    volume = imgui.slider("Volume", volume, 0.0, 100.0, 200.0);
+    imgui.end();
 
     assert(volume >= 48.0 and volume <= 52.0, "Slider value should be approximately 50.0 after midpoint click");
     print("[OK] Slider drag passed");
@@ -83,20 +85,20 @@ fn test_slider_drag() {
 
 fn test_collapsible_header() {
     print("=== Testing IMGUI Collapsible Header ===");
-    var gui = game.GUI();
+    var imgui = GUI();
 
     // Initially open
-    gui.begin(0.0, 0.0, false);
-    gui.set_cursor(10.0, 10.0);
-    var open1 = gui.header("Inventory", true);
-    gui.end();
+    imgui.begin(0.0, 0.0, false);
+    imgui.set_cursor(10.0, 10.0);
+    var open1 = imgui.header("Inventory", true);
+    imgui.end();
     assert(open1, "Header should be open initially");
 
     // Click header bar
-    gui.begin(50.0, 15.0, true);
-    gui.set_cursor(10.0, 10.0);
-    var open2 = gui.header("Inventory", true);
-    gui.end();
+    imgui.begin(50.0, 15.0, true);
+    imgui.set_cursor(10.0, 10.0);
+    var open2 = imgui.header("Inventory", true);
+    imgui.end();
     assert(not open2, "Header should collapse upon click");
     print("[OK] Collapsible header passed");
 }
@@ -107,19 +109,19 @@ fn test_window_and_rasterization() {
 
     gg.begin_pass(800, 600, 0.1, 0.1, 0.1, 1.0);
 
-    var gui = game.GUI();
-    gui.begin(0.0, 0.0, false);
+    var imgui = GUI();
+    imgui.begin(0.0, 0.0, false);
 
-    if (gui.begin_window("Character Sheet", 50.0, 50.0, 300.0, 250.0)) {
-        gui.label("Warrior - Level 42");
-        gui.separator();
-        gui.progress_bar(0.75, 200.0, 18.0, "HP: 75/100");
-        gui.spacing(10.0);
-        gui.button("Equip Shield");
-        gui.end_window();
+    if (imgui.begin_window("Character Sheet", 50.0, 50.0, 300.0, 250.0)) {
+        imgui.label("Warrior - Level 42");
+        imgui.separator();
+        imgui.progress_bar(0.75, 200.0, 18.0, "HP: 75/100");
+        imgui.spacing(10.0);
+        imgui.button("Equip Shield");
+        imgui.end_window();
     }
 
-    gui.end();
+    imgui.end();
 
     gg.end_pass();
     gg.commit();

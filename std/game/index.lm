@@ -1,88 +1,31 @@
 // std/game/index.lm
 // Clean unified standard library facade for std.game
-
-import std.game.types as types;
-import std.game.input as input_mod;
-
-pub import std.game.types show
-    Vec2, vec2,
-    Rect, rect,
-    GUITheme;
-
-pub import std.game.math show
-    Circle, circle,
-    Ray2D, ray2d,
-    Contact2D, RayHit2D,
-    test_aabb_aabb, test_circle_circle, test_circle_aabb,
-    raycast_aabb, raycast_circle;
+//
+// Game runtime: application shell, input, 2D sprites, particles, camera helpers,
+// and component state. Immediate-mode debug UI lives in std.gui; the scene state
+// machine lives in std.scene; collision/raycast queries live in std.geometry;
+// Camera2D lives in std.camera.
 
 pub import std.game.camera show
-    Camera2D, Camera, draw_world_rect, draw_world_circle, draw_world_line;
+    draw_world_rect, draw_world_circle, draw_world_line;
 
 pub import std.game.sprite show
     Texture2D, texture2d,
     Sprite, sprite,
     SpriteSheet, AnimationClip, AnimatedSprite;
 
-pub fn Texture(id: int = -1, width: int = 0, height: int = 0): Texture2D {
-    return Texture2D(id=id, width=width, height=height);
-}
-
 pub import std.game.particles show
     Particle, ParticleEmitter2D, ParticleEmitter;
 
 pub import std.game.input show
-    InputManager;
+    InputManager,
+    KEY_SPACE, KEY_ENTER, KEY_ESCAPE,
+    KEY_LEFT, KEY_RIGHT, KEY_UP, KEY_DOWN,
+    KEY_W, KEY_A, KEY_S, KEY_D, KEY_Q, KEY_E, KEY_R,
+    KEY_1, KEY_2, KEY_3, KEY_4,
+    KEY_F, KEY_H, KEY_F3, KEY_TAB, KEY_BACKSPACE,
+    MOUSE_LEFT, MOUSE_RIGHT, MOUSE_MIDDLE,
+    MOD_SHIFT, MOD_CONTROL, MOD_ALT, MOD_SUPER;
 
-pub const KEY_SPACE: int         = input_mod.KEY_SPACE;
-pub const KEY_ENTER: int         = input_mod.KEY_ENTER;
-pub const KEY_ESCAPE: int        = input_mod.KEY_ESCAPE;
-pub const KEY_LEFT: int          = input_mod.KEY_LEFT;
-pub const KEY_RIGHT: int         = input_mod.KEY_RIGHT;
-pub const KEY_UP: int            = input_mod.KEY_UP;
-pub const KEY_DOWN: int          = input_mod.KEY_DOWN;
-pub const KEY_W: int             = input_mod.KEY_W;
-pub const KEY_A: int             = input_mod.KEY_A;
-pub const KEY_S: int             = input_mod.KEY_S;
-pub const KEY_D: int             = input_mod.KEY_D;
-pub const KEY_Q: int             = input_mod.KEY_Q;
-pub const KEY_E: int             = input_mod.KEY_E;
-pub const KEY_R: int             = input_mod.KEY_R;
-pub const KEY_1: int             = input_mod.KEY_1;
-pub const KEY_2: int             = input_mod.KEY_2;
-pub const KEY_3: int             = input_mod.KEY_3;
-pub const KEY_4: int             = input_mod.KEY_4;
-pub const KEY_F: int             = input_mod.KEY_F;
-pub const KEY_H: int             = input_mod.KEY_H;
-pub const KEY_F3: int            = input_mod.KEY_F3;
-pub const KEY_TAB: int           = input_mod.KEY_TAB;
-pub const KEY_BACKSPACE: int     = input_mod.KEY_BACKSPACE;
-
-pub const MOUSE_LEFT: int        = input_mod.MOUSE_LEFT;
-pub const MOUSE_RIGHT: int       = input_mod.MOUSE_RIGHT;
-pub const MOUSE_MIDDLE: int      = input_mod.MOUSE_MIDDLE;
-
-pub const MOD_SHIFT: int         = input_mod.MOD_SHIFT;
-pub const MOD_CONTROL: int       = input_mod.MOD_CONTROL;
-pub const MOD_ALT: int           = input_mod.MOD_ALT;
-pub const MOD_SUPER: int         = input_mod.MOD_SUPER;
-
-pub const MOD_NONE: int          = 0;
-pub const MOD_CTRL: int          = input_mod.MOD_CONTROL;
-
-pub const KEY_MOD_NONE: int      = 0;
-pub const KEY_MOD_SHIFT: int     = input_mod.MOD_SHIFT;
-pub const KEY_MOD_CTRL: int      = input_mod.MOD_CONTROL;
-pub const KEY_MOD_CONTROL: int   = input_mod.MOD_CONTROL;
-pub const KEY_MOD_ALT: int       = input_mod.MOD_ALT;
-pub const KEY_MOD_SUPER: int     = input_mod.MOD_SUPER;
-
-pub import std.game.gui show GUI, default_gui;
 pub import std.game.components show WidgetState, Transform2D;
-pub import std.game.scene show Scene, scene, SceneManager, default_scene_manager, Transition;
 pub import std.game.app show Config, default_config, Game;
-
-// Default Singletons
-pub var input: input_mod.InputManager = input_mod.default_input;
-pub var gui: GUI = default_gui;
-pub var scenes: SceneManager = default_scene_manager;

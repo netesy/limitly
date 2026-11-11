@@ -1,101 +1,10 @@
 // std/geometry/index.lm
-// Public entrypoint and facade for std.geometry. Geometric shapes, intersections, bounding boxes, and containment.
+// Public entrypoint and facade for std.geometry. Geometric shapes, intersections,
+// bounding boxes, containment, and 2D collision/raycast queries.
 
-import std.math as math;
-import std.math.vector2 show Vector2;
-
-/// Axis-aligned 2D rectangle defined by position (x, y) and dimensions (width, height).
-frame Rect {
-    pub var x: float = 0.0;
-    pub var y: float = 0.0;
-    pub var w: float = 0.0;
-    pub var h: float = 0.0;
-
-    pub init(x: float = 0.0, y: float = 0.0, w: float = 0.0, h: float = 0.0) {
-        self.x = x;
-        self.y = y;
-        self.w = w;
-        self.h = h;
-    }
-
-    pub fn contains(px: float, py: float): bool {
-        return px >= self.x and px <= self.x + self.w and py >= self.y and py <= self.y + self.h;
-    }
-
-    pub fn contains_vec(p: Vector2): bool {
-        return self.contains(p.x, p.y);
-    }
-
-    pub fn intersects(other: Rect): bool {
-        return not (other.x > self.x + self.w or
-            other.x + other.w < self.x or
-            other.y > self.y + self.h or
-            other.y + other.h < self.y);
-    }
-
-    pub fn intersection(other: Rect): Rect {
-        val ix = math.max(self.x, other.x);
-        val iy = math.max(self.y, other.y);
-        val rx = math.min(self.x + self.w, other.x + other.w);
-        val by = math.min(self.y + self.h, other.y + other.h);
-        if (rx > ix and by > iy) {
-            return Rect(x=ix, y=iy, w=rx - ix, h=by - iy);
-        }
-        return Rect();
-    }
-
-    pub fn union_rect(other: Rect): Rect {
-        val min_x = math.min(self.x, other.x);
-        val min_y = math.min(self.y, other.y);
-        val max_x = math.max(self.x + self.w, other.x + other.w);
-        val max_y = math.max(self.y + self.h, other.y + other.h);
-        return Rect(x=min_x, y=min_y, w=max_x - min_x, h=max_y - min_y);
-    }
-
-    pub fn center(): Vector2 {
-        return Vector2(self.x + self.w * 0.5, self.y + self.h * 0.5);
-    }
-
-    pub fn expand(amount: float): Rect {
-        return Rect(
-            x=self.x - amount,
-            y=self.y - amount,
-            w=self.w + amount * 2.0,
-            h=self.h + amount * 2.0
-        );
-    }
-
-    pub fn clamp_point(p: Vector2): Vector2 {
-        val cx = math.clamp(p.x, self.x, self.x + self.w);
-        val cy = math.clamp(p.y, self.y, self.y + self.h);
-        return Vector2(cx, cy);
-    }
-
-    pub fn area(): float {
-        return self.w * self.h;
-    }
-}
-
-/// 2D circle defined by center (x, y) and radius r.
-frame Circle {
-    pub var x: float;
-    pub var y: float;
-    pub var r: float;
-
-    pub init(x: float = 0.0, y: float = 0.0, r: float = 0.0) {
-        contract(r >= 0.0, "radius must be non-negative");
-        self.x = x;
-        self.y = y;
-        self.r = r;
-    }
-
-    pub fn contains(px: float, py: float): bool {
-        val dx = px - self.x;
-        val dy = py - self.y;
-        return dx * dx + dy * dy <= self.r * self.r;
-    }
-
-    pub fn area(): float {
-        return math.PI * self.r * self.r;
-    }
-}
+pub import std.geometry.shapes show Rect, Circle, rect;
+pub import std.geometry.collision show
+    Ray2D, ray2d,
+    Contact2D, RayHit2D,
+    test_aabb_aabb, test_circle_circle, test_circle_aabb,
+    raycast_aabb, raycast_circle;

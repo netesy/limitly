@@ -1,0 +1,25 @@
+// std/gui/types.lm
+// Types and theme/style constants consumed by the std.gui immediate-mode engine.
+// Re-exports canonical primitives — no local duplicates.
+
+pub import std.geometry show Rect, rect;
+
+pub import std.theme show
+    ThemeMode, ColorRole, StyleVar,
+    COLOR_WINDOW_BG, COLOR_WINDOW_TITLE, COLOR_PANEL_BG, COLOR_TEXT, COLOR_TEXT_MUTED,
+    COLOR_ACCENT, COLOR_BUTTON, COLOR_BUTTON_HOVER, COLOR_BUTTON_ACTIVE, COLOR_SLIDER_TRACK,
+    COLOR_SLIDER_THUMB, COLOR_CHECKBOX_BORDER, COLOR_CHECKBOX_CHECK, COLOR_SEPARATOR,
+    COLOR_FRAME_BG, COLOR_FRAME_BG_HOVER, COLOR_FRAME_BG_ACTIVE, COLOR_TAB, COLOR_TAB_ACTIVE,
+    COLOR_PLOT_LINES, COLOR_PLOT_HISTOGRAM,
+    VAR_PADDING, VAR_SPACING, VAR_ITEM_HEIGHT, VAR_ROUNDING,
+    color_role_from_index, style_var_from_index,
+    SpacingTokens, TypographyTokens, ShapeTokens, Theme,
+    default_theme, dark_theme, light_theme, cyberpunk_theme, retro_theme, nord_theme;
+
+/// GUI-facing alias for the canonical theme type.
+pub type GUITheme = Theme;
+
+/// Constructs a default GUI theme.
+pub fn GUITheme(): Theme {
+    return Theme();
+}

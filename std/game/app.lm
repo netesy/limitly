@@ -6,11 +6,12 @@ import std.gg as gg;
 
 
 import std.time.timer show Timer, Duration;
-import std.game.gui show GUI;
-import std.game.types as types;
+import std.gui show GUI;
+import std.theme show Theme;
+import std.math.vector2 show Vector2;
 import std.game.input show InputManager;
 import std.color as color;
-import std.game.scene show Scene, SceneManager;
+import std.scene show Scene, SceneManager;
 
 frame Config {
     pub var title: str;
@@ -225,8 +226,8 @@ frame Game {
     pub fn is_mouse_down(button: int = 0): bool { return self.input.is_mouse_down(button); }
     pub fn is_mouse_pressed(button: int = 0): bool { return self.input.is_mouse_pressed(button); }
     pub fn is_mouse_released(button: int = 0): bool { return self.input.is_mouse_released(button); }
-    pub fn mouse_pos(): types.Vector2 { return self.input.mouse_pos(); }
-    pub fn mouse_delta(): types.Vector2 { return self.input.mouse_delta(); }
+    pub fn mouse_pos(): Vector2 { return self.input.mouse_pos(); }
+    pub fn mouse_delta(): Vector2 { return self.input.mouse_delta(); }
 
     pub fn bind_action(action: str, keys: [int]): nil { self.input.bind_action(action, keys); }
     pub fn is_action_down(action: str): bool { return self.input.is_action_down(action); }

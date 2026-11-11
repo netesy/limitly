@@ -159,6 +159,28 @@ void Generator::lower_function_bodies(const LM::Frontend::TypeCheckResult& type_
             emit_stmt(*stmt);
         }
 
+        // Re-exported variables (`pub import ... show SomeConst`) have no statement in
+        // this module's AST, so without an alias copy their `<module>.<name>` global is
+        // never initialized and readers observe garbage. Copy the defining module's
+        // global into this module's namespace; module init order is topological, so the
+        // source global is already initialized.
+        for (const auto& stmt : module->reexports) {
+            auto var_stmt = dynamic_cast<LM::Frontend::AST::VarDeclaration*>(stmt.get());
+            if (!var_stmt) continue;
+            auto src_it = module->reexport_sources.find(var_stmt->name);
+            if (src_it == module->reexport_sources.end()) continue;
+            std::string alias_name = path + "." + var_stmt->name;
+            Reg alias_reg = allocate_register();
+            LIR_Inst load_inst(LIR_Op::LoadGlobal, Type::Ptr, alias_reg, 0, 0);
+            load_inst.func_name = src_it->second + "." + var_stmt->name;
+            emit_instruction(load_inst);
+            LIR_Inst store_inst(LIR_Op::StoreGlobal, Type::Void, 0, alias_reg, 0);
+            store_inst.func_name = alias_name;
+            emit_instruction(store_inst);
+            global_variables_.insert(alias_name);
+            global_variables_.insert(var_stmt->name);
+        }
+
         if (get_current_block() && !get_current_block()->has_terminator()) {
             emit_instruction(LIR_Inst(LIR_Op::Return, Type::Void, 0, 0, 0));
         }

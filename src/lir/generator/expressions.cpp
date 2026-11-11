@@ -2943,20 +2943,39 @@ Reg Generator::emit_member_access_with_obj(LM::Frontend::AST::MemberExpr& expr, 
         auto frame_type_info = std::get_if<FrameType>(&resolved_object_type->extra);
         if (frame_type_info) {
             std::string resolved_name = resolve_qualified_frame_name(frame_type_info->name);
-            auto it = frame_table_.find(resolved_name);
-            if (it != frame_table_.end()) {
+            // Short frame names (e.g. "Theme") can collide across modules. resolved_name
+            // is only a hint — try every same-named frame and use the one that actually
+            // declares the accessed field, mirroring resolve_frame_name_for_method.
+            std::vector<std::string> candidates;
+            candidates.push_back(resolved_name);
+            std::string suffix = frame_type_info->name;
+            size_t suffix_dot = suffix.rfind('.');
+            if (suffix_dot != std::string::npos) suffix = suffix.substr(suffix_dot + 1);
+            for (const auto& [frame_key, frame_info] : frame_table_) {
+                if (frame_key == resolved_name || frame_key == suffix) continue;
+                if (frame_key.length() > suffix.length() &&
+                    frame_key.substr(frame_key.length() - suffix.length() - 1) == "." + suffix) {
+                    candidates.push_back(frame_key);
+                }
+            }
+            for (const auto& cand_name : candidates) {
+            auto it = frame_table_.find(cand_name);
+            if (it == frame_table_.end()) continue;
+            {
+                auto offset_it = it->second.field_offsets.find(expr.name);
+                if (offset_it == it->second.field_offsets.end()) continue;
+
                 // Check visibility
                 auto vis_it = it->second.field_visibilities.find(expr.name);
                 if (vis_it != it->second.field_visibilities.end()) {
-                    if (!is_visible(vis_it->second, resolved_name)) {
+                    if (!is_visible(vis_it->second, cand_name)) {
                         report_error("Cannot access " + LM::Frontend::AST::visibilityToString(vis_it->second) +
-                                   " field '" + expr.name + "' of frame '" + resolved_name + "'");
+                                   " field '" + expr.name + "' of frame '" + cand_name + "'");
                         return 0;
                     }
                 }
 
-                auto offset_it = it->second.field_offsets.find(expr.name);
-                if (offset_it != it->second.field_offsets.end()) {
+                {
                     // Found the field - emit FrameGetField
                     Reg dst = allocate_register();
 
@@ -2981,6 +3000,9 @@ Reg Generator::emit_member_access_with_obj(LM::Frontend::AST::MemberExpr& expr, 
                     return dst;
                 }
             }
+            }
+            report_error("Unknown field or method: " + expr.name);
+            return 0;
         }
     } else {
         // Fallback: search all frames

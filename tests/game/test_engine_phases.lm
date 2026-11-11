@@ -6,6 +6,9 @@
 // - Phase 4: Sprites, SpriteSheets, Frame Animation, and Particle Emitter
 
 import std.game as game;
+import std.math.vector2 show Vector2;
+import std.geometry show Rect, Circle, Ray2D, test_aabb_aabb, test_circle_circle, test_circle_aabb, raycast_aabb, raycast_circle;
+import std.camera show Camera2D;
 import std.math as math;
 
 fn test_phase1_timing_and_app() {
@@ -42,12 +45,12 @@ fn test_phase1_timing_and_app() {
 fn test_phase2_vector_math() {
     print("=== Testing Phase 2A: Vec2 Algebra ===");
 
-    var v1 = game.Vec2(3.0, 4.0);
+    var v1 = Vector2(3.0, 4.0);
     assert(v1.x == 3.0 and v1.y == 4.0, "Vec2 init failed");
     assert(v1.mag_sq() == 25.0, "Vec2 mag_sq failed");
     assert(v1.mag() == 5.0, "Vec2 mag failed");
 
-    var v2 = game.Vec2(1.0, 2.0);
+    var v2 = Vector2(1.0, 2.0);
     var v_add = v1.add(v2);
     assert(v_add.x == 4.0 and v_add.y == 6.0, "Vec2 add failed");
 
@@ -65,13 +68,13 @@ fn test_phase2_vector_math() {
     assert(math.abs(v_norm.x - 0.6) < 0.0001, "Normalized x failed");
     assert(math.abs(v_norm.y - 0.8) < 0.0001, "Normalized y failed");
 
-    var v_lerp = game.Vec2(0.0, 0.0).lerp(game.Vec2(10.0, 20.0), 0.5);
+    var v_lerp = Vector2(0.0, 0.0).lerp(Vector2(10.0, 20.0), 0.5);
     assert(v_lerp.x == 5.0 and v_lerp.y == 10.0, "Vec2 lerp failed");
 
-    var v_perp = game.Vec2(1.0, 0.0).perpendicular();
+    var v_perp = Vector2(1.0, 0.0).perpendicular();
     assert(v_perp.x == 0.0 and v_perp.y == 1.0, "Vec2 perpendicular failed");
 
-    var v_clamp = game.Vec2(30.0, 40.0).clamp_length(10.0);
+    var v_clamp = Vector2(30.0, 40.0).clamp_length(10.0);
     assert(math.abs(v_clamp.mag() - 10.0) < 0.0001, "Vec2 clamp_length failed");
 
     print("[OK] Phase 2A Vec2 Algebra passed");
@@ -80,9 +83,9 @@ fn test_phase2_vector_math() {
 fn test_phase2_geometry_and_collisions() {
     print("=== Testing Phase 2B: Geometry & Collisions ===");
 
-    var r1 = game.Rect(0.0, 0.0, 100.0, 100.0);
-    var r2 = game.Rect(50.0, 50.0, 100.0, 100.0);
-    var r3 = game.Rect(200.0, 200.0, 50.0, 50.0);
+    var r1 = Rect(0.0, 0.0, 100.0, 100.0);
+    var r2 = Rect(50.0, 50.0, 100.0, 100.0);
+    var r3 = Rect(200.0, 200.0, 50.0, 50.0);
 
     assert(r1.intersects(r2), "r1 and r2 should intersect");
     assert(not r1.intersects(r3), "r1 and r3 should not intersect");
@@ -95,39 +98,39 @@ fn test_phase2_geometry_and_collisions() {
     assert(center.x == 50.0 and center.y == 50.0, "Rect center mismatch");
 
     // AABB vs AABB Collision Manifold
-    var contact_aabb = game.test_aabb_aabb(r1, r2);
+    var contact_aabb = test_aabb_aabb(r1, r2);
     assert(contact_aabb.collided, "AABB contact should be true");
     assert(contact_aabb.penetration > 0.0, "AABB penetration should be positive");
 
     // Circle vs Circle
-    var c1 = game.Circle(center=game.Vec2(0.0, 0.0), radius=10.0);
-    var c2 = game.Circle(center=game.Vec2(15.0, 0.0), radius=10.0);
-    var c3 = game.Circle(center=game.Vec2(50.0, 50.0), radius=5.0);
+    var c1 = Circle(center=Vector2(0.0, 0.0), radius=10.0);
+    var c2 = Circle(center=Vector2(15.0, 0.0), radius=10.0);
+    var c3 = Circle(center=Vector2(50.0, 50.0), radius=5.0);
 
     assert(c1.intersects_circle(c2), "c1 and c2 should overlap");
     assert(not c1.intersects_circle(c3), "c1 and c3 should not overlap");
 
-    var contact_cc = game.test_circle_circle(c1, c2);
+    var contact_cc = test_circle_circle(c1, c2);
     assert(contact_cc.collided, "Circle contact should be true");
     assert(math.abs(contact_cc.penetration - 5.0) < 0.0001, "Circle penetration should be 5.0");
     assert(contact_cc.normal.x == 1.0 and contact_cc.normal.y == 0.0, "Circle collision normal mismatch");
 
     // Circle vs AABB
-    var c_box = game.Circle(center=game.Vec2(95.0, 50.0), radius=10.0);
-    var contact_ca = game.test_circle_aabb(c_box, r1);
+    var c_box = Circle(center=Vector2(95.0, 50.0), radius=10.0);
+    var contact_ca = test_circle_aabb(c_box, r1);
     assert(contact_ca.collided, "Circle vs AABB should collide");
     assert(contact_ca.penetration > 0.0, "Circle vs AABB penetration should be > 0");
 
     // Raycasting AABB
-    var ray_box = game.Ray2D(origin=game.Vec2(-50.0, 50.0), direction=game.Vec2(1.0, 0.0));
-    var hit_box = game.raycast_aabb(ray_box, r1);
+    var ray_box = Ray2D(origin=Vector2(-50.0, 50.0), direction=Vector2(1.0, 0.0));
+    var hit_box = raycast_aabb(ray_box, r1);
     assert(hit_box.hit, "Ray should hit box");
     assert(math.abs(hit_box.distance - 50.0) < 0.001, "Ray hit distance should be 50.0");
     assert(hit_box.normal.x == -1.0, "Ray hit normal should point left");
 
     // Raycasting Circle
-    var ray_c = game.Ray2D(origin=game.Vec2(0.0, -50.0), direction=game.Vec2(0.0, 1.0));
-    var hit_c = game.raycast_circle(ray_c, c1);
+    var ray_c = Ray2D(origin=Vector2(0.0, -50.0), direction=Vector2(0.0, 1.0));
+    var hit_c = raycast_circle(ray_c, c1);
     assert(hit_c.hit, "Ray should hit circle");
     assert(math.abs(hit_c.distance - 40.0) < 0.001, "Ray hit distance should be 40.0");
 
@@ -138,18 +141,18 @@ fn test_phase3_camera_and_input() {
     print("=== Testing Phase 3: 2D Camera & Input System ===");
 
     // Camera 2D
-    var cam = game.Camera2D(
-        target=game.Vec2(100.0, 100.0),
-        offset=game.Vec2(400.0, 300.0),
+    var cam = Camera2D(
+        target=Vector2(100.0, 100.0),
+        offset=Vector2(400.0, 300.0),
         zoom=2.0
     );
 
     // World to Screen: (100, 100) target should map exactly to screen offset (400, 300)
-    var screen_p = cam.world_to_screen(game.Vec2(100.0, 100.0));
+    var screen_p = cam.world_to_screen(Vector2(100.0, 100.0));
     assert(screen_p.x == 400.0 and screen_p.y == 300.0, "Camera world_to_screen target mismatch");
 
     // Screen to World: screen offset (400, 300) should map back to target (100, 100)
-    var world_p = cam.screen_to_world(game.Vec2(400.0, 300.0));
+    var world_p = cam.screen_to_world(Vector2(400.0, 300.0));
     assert(math.abs(world_p.x - 100.0) < 0.001 and math.abs(world_p.y - 100.0) < 0.001, "Camera screen_to_world roundtrip failed");
 
     // Camera trauma & shake
@@ -187,7 +190,7 @@ fn test_phase4_sprites_and_particles() {
     print("=== Testing Phase 4: Sprites, Animation & Particles ===");
 
     // Sprite & SpriteSheet
-    var tex = game.Texture(1, 256, 256);
+    var tex = game.Texture2D(1, 256, 256);
     var sheet = game.SpriteSheet(tex, 32, 32);
     assert(sheet.columns == 8, "256/32 columns should be 8");
     assert(sheet.rows == 8, "256/32 rows should be 8");
@@ -198,7 +201,7 @@ fn test_phase4_sprites_and_particles() {
     assert(frame9.x == 32.0 and frame9.y == 32.0, "Frame 9 mismatch");
 
     // Animated Sprite
-    var anim = game.AnimatedSprite(tex, game.Vec2(100.0, 200.0));
+    var anim = game.AnimatedSprite(tex, Vector2(100.0, 200.0));
     var run_clip = game.AnimationClip("run", [frame0, frame9], 10.0, true);
     anim.add_clip(run_clip);
     anim.play("run");
@@ -215,7 +218,7 @@ fn test_phase4_sprites_and_particles() {
     assert(emitter.max_particles == 50, "Emitter should preallocate 50 particles");
     assert(len(emitter.alive) == 50, "Emitter SoA alive array should have length 50");
 
-    emitter.position = game.Vec2(300.0, 400.0);
+    emitter.position = Vector2(300.0, 400.0);
     emitter.burst(20);
 
     assert(emitter.alive_count() == 20, "Burst of 20 should spawn 20 alive particles");

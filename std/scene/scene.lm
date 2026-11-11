@@ -5,7 +5,7 @@ import std.scene.node as node;
 import std.scene.camera as camera;
 import std.scene.viewport as viewport;
 
-frame Scene {
+frame SceneGraph {
     pub var root: node.Node;
     pub var active_camera: camera.Camera;
     pub var vp: viewport.Viewport;

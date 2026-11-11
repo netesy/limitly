@@ -3,23 +3,18 @@
 
 import std.math as math;
 import std.gg as gg;
-import std.game.types as types;
+import std.math.vector2 show Vector2;
+import std.geometry show Rect;
 pub import std.camera show Camera2D;
 
-type Camera = Camera2D;
-
-pub fn Camera(target: types.Vector2 = types.Vec2(), offset: types.Vector2 = types.Vec2(), zoom: float = 1.0): Camera2D {
-    return Camera2D(target=target, offset=offset, zoom=zoom);
-}
-
-pub fn draw_world_rect(cam: Camera2D, world_rect: types.Rect, r: float, g: float, b: float, a: float): nil {
-    val screen_pos = cam.world_to_screen(types.Vec2(world_rect.x, world_rect.y));
+pub fn draw_world_rect(cam: Camera2D, world_rect: Rect, r: float, g: float, b: float, a: float): nil {
+    val screen_pos = cam.world_to_screen(Vector2(world_rect.x, world_rect.y));
     val sw = world_rect.w * cam.zoom;
     val sh = world_rect.h * cam.zoom;
     gg.draw_rect_primitive(screen_pos.x, screen_pos.y, sw, sh, r, g, b, a);
 }
 
-pub fn draw_world_circle(cam: Camera2D, world_center: types.Vector2, radius: float, r: float, g: float, b: float, a: float, segments: int = 16): nil {
+pub fn draw_world_circle(cam: Camera2D, world_center: Vector2, radius: float, r: float, g: float, b: float, a: float, segments: int = 16): nil {
     val screen_center = cam.world_to_screen(world_center);
     val sr = radius * cam.zoom;
     var segs = segments;
@@ -36,7 +31,7 @@ pub fn draw_world_circle(cam: Camera2D, world_center: types.Vector2, radius: flo
     }
 }
 
-pub fn draw_world_line(cam: Camera2D, p1: types.Vector2, p2: types.Vector2, thickness: float, r: float, g: float, b: float, a: float): nil {
+pub fn draw_world_line(cam: Camera2D, p1: Vector2, p2: Vector2, thickness: float, r: float, g: float, b: float, a: float): nil {
     val sp1 = cam.world_to_screen(p1);
     val sp2 = cam.world_to_screen(p2);
     gg.draw_line_primitive(sp1.x, sp1.y, sp2.x, sp2.y, r, g, b, a, thickness * cam.zoom);

@@ -1,7 +1,8 @@
 // std/scene/index.lm
-// Public entrypoint and facade for std.scene. Scene graph nodes, 2D/3D scene trees, and transformation hierarchies.
+// Public entrypoint and facade for std.scene. Scene graph nodes, 2D/3D scene trees,
+// transformation hierarchies, and the Scene/SceneManager state machine.
 
-pub import std.scene.scene show Scene;
+pub import std.scene.scene show SceneGraph;
 pub import std.scene.node show Node;
 pub import std.scene.layer show Layer;
 pub import std.scene.group show Group;
@@ -13,3 +14,7 @@ pub import std.scene.effect_node show EffectNode;
 pub import std.scene.animation_node show AnimationNode;
 pub import std.scene.hit_test show HitTest;
 pub import std.scene.scene_builder show Builder;
+pub import std.scene.state show
+    Scene, SceneManager, Transition,
+    scene, default_scene_manager,
+    TRANSITION_NONE, TRANSITION_FADE;

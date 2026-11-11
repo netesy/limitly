@@ -16,7 +16,7 @@ enum KeyModifier {
 // std/game/input.lm
 // Comprehensive input management, event capture, and action mapping for std.game
 
-import std.game.types as types;
+import std.math.vector2 show Vector2;
 
 // Common Key Code Constants
 pub const KEY_SPACE: int         = 32;
@@ -321,12 +321,12 @@ frame InputManager {
         return false;
     }
 
-    pub fn mouse_pos(): types.Vector2 {
-        return types.Vec2(x=self.mouse_x, y=self.mouse_y);
+    pub fn mouse_pos(): Vector2 {
+        return Vector2(x=self.mouse_x, y=self.mouse_y);
     }
 
-    pub fn mouse_delta(): types.Vector2 {
-        return types.Vec2(x=self.mouse_delta_x, y=self.mouse_delta_y);
+    pub fn mouse_delta(): Vector2 {
+        return Vector2(x=self.mouse_delta_x, y=self.mouse_delta_y);
     }
 
     // ── Semantic Action & Axis Mapping ─────────────────────────────────────────
