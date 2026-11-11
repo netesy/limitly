@@ -180,3 +180,7 @@ tests/staged/staged_alias_construction_test.lm
 
 # Modern Idiomatic UI & Game Architecture
 tests/modern_ui_game_test.lm
+
+# GPU compute emulation (gpu task/threads/intrinsics on the register VM)
+tests/gpu/particle_sim.lm
+tests/gpu/stages.lm

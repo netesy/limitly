@@ -408,6 +408,9 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
                         opaque_runtime_pointers.insert(reinterpret_cast<uintptr_t>(channels.back().get()));
                     }
                     handled = true;
+                } else if (fname.rfind("gpu_", 0) == 0) {
+                    execute_gpu(pc);
+                    handled = true;
                 }
 
                 if (!handled) {

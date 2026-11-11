@@ -1,0 +1,11 @@
+// std/gpu/index.lm
+// Public entrypoint and facade for std.gpu: GPU device, queue/command model,
+// pipeline descriptors, thread-space intrinsics, and shared GPU types.
+
+pub import std.gpu.types show
+    Scope, Stage, Access, CullMode, Topology, TextureFormat, MemoryUsage,
+    UVec3, uvec3, Extent2D, Extent3D, extent2d, extent3d,
+    Error, ComputePipeline, MeshPipeline, Triangle;
+pub import std.gpu.device show Limits, Info, Device, device;
+pub import std.gpu.queue show CommandBuffer, Encoder, Fence, Queue;
+pub import std.gpu.intrinsics show thread_id, local_id, group_id, num_groups, sync, set_mesh_counts;

@@ -393,3 +393,12 @@ These guidelines apply when working on the `std/ui` and `std/game` libraries, fo
 When modifying Fyra, treat it as an independent repository. Commit and push the Fyra changes to the Fyra repository first, then update the Lymar superproject's Fyra gitlink and commit/push that change. Do not merely commit the modified submodule state in Lymar. Verify git status in both repositories before finishing.
  
 Run `git submodule update --init` in Lymar after updating the Fyra gitlink and before building/testing. Verify that the Fyra version in Lymar's git status matches the intended version.
+### GPU Stage Syntax
+
+- `gpu task name(params) threads(x, y, z) { ... }` — compute kernel; `threads` is required.
+- `gpu vertex name(in pos: Type, ...) : Ret { ... }` and `gpu pixel name(in input: Type, ...) : Ret { ... }` — require a return type; params may be prefixed with `in`.
+- `gpu mesh name(params) threads(x, y, z) limits(vertices = n, primitives = m) { ... }` — both clauses required.
+- `gpu.shared var name: Type;` — workgroup-local binding inside a GPU body (`gpu`/`shared` are contextual, not reserved keywords; `import std.gpu as gpu` remains valid).
+- `gpu`, `task`-stage names `vertex`/`pixel`/`mesh`, `threads`, `limits`, and `shared` are contextual identifiers — do not use them as reserved keywords, but they may still collide with ordinary identifiers in non-GPU positions.
+- Thread intrinsics live in `std.gpu` (`thread_id`, `local_id`, `group_id`, `num_groups`, `sync`, `set_mesh_counts`) and wrap the `gpu_*` builtins executed by the register VM; dispatch goes through `std.gpu` `Device`/`Queue`/`Encoder`.
+- The register VM executes GPU dispatches as emulation; do not claim hardware GPU support until the Fyra lowering path is verified.

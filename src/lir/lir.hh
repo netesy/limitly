@@ -440,6 +440,13 @@ public:
     std::unordered_map<Reg, Type> register_types;
     std::unordered_map<Reg, TypePtr> register_language_types;
 
+    // GPU stage metadata for `gpu task|vertex|pixel|mesh` declarations.
+    // gpu_stage: 0 = ordinary function, 1 = task (compute), 2 = vertex, 3 = pixel, 4 = mesh.
+    uint8_t gpu_stage = 0;
+    int64_t gpu_threads[3] = {1, 1, 1};
+    int64_t gpu_max_vertices = 0;
+    int64_t gpu_max_primitives = 0;
+
     LIR_Function(const std::string& name, uint32_t param_count = 0)
         : name(name), cfg(std::make_unique<LIR_CFG>()), param_count(param_count), register_count(0) {}
     
@@ -450,7 +457,9 @@ public:
           ownership_parameters(other.ownership_parameters), ownership_captures(other.ownership_captures),
           ownership_provenance(other.ownership_provenance), optimizations(other.optimizations),
           variable_to_reg(other.variable_to_reg), register_types(other.register_types),
-          register_language_types(other.register_language_types) {}
+          register_language_types(other.register_language_types),
+          gpu_stage(other.gpu_stage), gpu_threads{other.gpu_threads[0], other.gpu_threads[1], other.gpu_threads[2]},
+          gpu_max_vertices(other.gpu_max_vertices), gpu_max_primitives(other.gpu_max_primitives) {}
           
     LIR_Function& operator=(const LIR_Function& other) {
         if (this != &other) {
@@ -461,6 +470,9 @@ public:
             ownership_provenance = other.ownership_provenance; optimizations = other.optimizations;
             variable_to_reg = other.variable_to_reg; register_types = other.register_types;
             register_language_types = other.register_language_types;
+            gpu_stage = other.gpu_stage;
+            gpu_threads[0] = other.gpu_threads[0]; gpu_threads[1] = other.gpu_threads[1]; gpu_threads[2] = other.gpu_threads[2];
+            gpu_max_vertices = other.gpu_max_vertices; gpu_max_primitives = other.gpu_max_primitives;
         }
         return *this;
     }

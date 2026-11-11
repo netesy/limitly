@@ -1,0 +1,42 @@
+// std/gpu/intrinsics.lm
+// Thread-space intrinsics and workgroup operations. These wrap the gpu_*
+// builtins that the register VM executes as emulation and GPU backends lower
+// to hardware instructions. Only meaningful inside `gpu task` bodies (and
+// `gpu mesh`/`gpu vertex`/`gpu pixel` stages once those dispatch paths exist).
+
+import std.gpu.types as types;
+import std.gpu.types show UVec3, Scope;
+
+// Global invocation id across the whole dispatched grid (group * local_size + local).
+pub fn thread_id(): UVec3 {
+    val v = gpu_thread_id();
+    return UVec3(v[0], v[1], v[2]);
+}
+
+// Index of this thread within its workgroup.
+pub fn local_id(): UVec3 {
+    val v = gpu_local_id();
+    return UVec3(v[0], v[1], v[2]);
+}
+
+// Workgroup (thread-block) index of this thread.
+pub fn group_id(): UVec3 {
+    val v = gpu_group_id();
+    return UVec3(v[0], v[1], v[2]);
+}
+
+// Number of workgroups along each grid axis.
+pub fn num_groups(): UVec3 {
+    val v = gpu_num_groups();
+    return UVec3(v[0], v[1], v[2]);
+}
+
+// Workgroup / subgroup / invocation memory and execution barrier.
+pub fn sync(scope: Scope): nil {
+    gpu_sync(scope);
+}
+
+// Allocate mesh output topology for the current mesh shader invocation.
+pub fn set_mesh_counts(vertices: int, primitives: int): nil {
+    gpu_set_mesh_counts(vertices, primitives);
+}

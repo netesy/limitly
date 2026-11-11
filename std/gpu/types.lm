@@ -1,0 +1,147 @@
+// std/gpu/types.lm
+// Core GPU types: execution scopes, shader stages, resource enums, and
+// small nominal frames shared by device, queue, and shader-facing code.
+
+enum Scope {
+    Workgroup,
+    Subgroup,
+    Invocation
+}
+
+enum Stage {
+    Task,
+    Vertex,
+    Pixel,
+    Mesh
+}
+
+enum Access {
+    Read,
+    Write,
+    ReadWrite
+}
+
+enum CullMode {
+    None,
+    Front,
+    Back
+}
+
+enum Topology {
+    TriangleList,
+    TriangleStrip
+}
+
+enum TextureFormat {
+    Rgba8Unorm,
+    Rgba16Float,
+    Rgba32Float,
+    Depth32Float
+}
+
+enum MemoryUsage {
+    Upload,
+    Download,
+    Storage
+}
+
+// Unsigned 3-component integer vector used for thread-space coordinates
+// (gpu.thread_id / local_id / group_id / num_groups).
+frame UVec3 {
+    pub x: int;
+    pub y: int;
+    pub z: int;
+
+    pub init(x: int = 0, y: int = 0, z: int = 0) {
+        self.x = x;
+        self.y = y;
+        self.z = z;
+    }
+}
+
+pub fn uvec3(x: int = 0, y: int = 0, z: int = 0): UVec3 {
+    return UVec3(x, y, z);
+}
+
+frame Extent2D {
+    pub width: int;
+    pub height: int;
+
+    pub init(width: int = 0, height: int = 0) {
+        self.width = width;
+        self.height = height;
+    }
+}
+
+frame Extent3D {
+    pub x: int;
+    pub y: int;
+    pub z: int;
+
+    pub init(x: int = 1, y: int = 1, z: int = 1) {
+        self.x = x;
+        self.y = y;
+        self.z = z;
+    }
+}
+
+pub fn extent2d(width: int, height: int): Extent2D {
+    return Extent2D(width, height);
+}
+
+pub fn extent3d(x: int = 1, y: int = 1, z: int = 1): Extent3D {
+    return Extent3D(x, y, z);
+}
+
+frame Error {
+    pub code: str;
+    pub message: str;
+
+    pub init(code: str = "GpuError", message: str = "") {
+        self.code = code;
+        self.message = message;
+    }
+}
+
+// Pipeline descriptors. On the register VM these are plain data records;
+// GPU backends lower them to immutable shader bytecode at pipeline creation.
+frame ComputePipeline {
+    pub kernel: any;
+    pub threads: Extent3D;
+
+    pub init(kernel: any = nil, threads: Extent3D? = nil) {
+        self.kernel = kernel;
+        if (threads != nil) {
+            self.threads = threads as Extent3D;
+        } else {
+            self.threads = Extent3D(1, 1, 1);
+        }
+    }
+}
+
+frame MeshPipeline {
+    pub mesh_fn: any;
+    pub pixel_fn: any;
+    pub max_vertices: int;
+    pub max_primitives: int;
+
+    pub init(mesh_fn: any = nil, pixel_fn: any = nil, max_vertices: int = 0, max_primitives: int = 0) {
+        self.mesh_fn = mesh_fn;
+        self.pixel_fn = pixel_fn;
+        self.max_vertices = max_vertices;
+        self.max_primitives = max_primitives;
+    }
+}
+
+// A single vertex emitted by a mesh shader (or produced by the vertex stage).
+frame Triangle {
+    pub v0: any;
+    pub v1: any;
+    pub v2: any;
+
+    pub init(v0: any = nil, v1: any = nil, v2: any = nil) {
+        self.v0 = v0;
+        self.v1 = v1;
+        self.v2 = v2;
+    }
+}

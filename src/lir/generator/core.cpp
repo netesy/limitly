@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <map>
 #include <limits>
+#include <string>
 
 using namespace LM::LIR;
 
@@ -20,6 +21,53 @@ namespace LIR {
 // Static member initialization
 bool Generator::optimization_enabled_ = true;
 bool Generator::show_optimization_debug_ = false;
+
+namespace {
+
+// Evaluate a compile-time integer expression for GPU thread dims / mesh limits.
+// Supports int literals and + - * / % unary/binary arithmetic. Returns 0 when
+// the expression is not a compile-time integer.
+int64_t eval_gpu_const_int(const LM::Frontend::AST::Expression* expr) {
+    using namespace LM::Frontend;
+    if (!expr) return 0;
+    if (auto lit = dynamic_cast<const AST::LiteralExpr*>(expr)) {
+        if (auto* s = std::get_if<std::string>(&lit->value)) {
+            try {
+                std::string text = *s;
+                text.erase(std::remove(text.begin(), text.end(), '_'), text.end());
+                int base = 10;
+                if (text.size() > 2 && text[0] == '0' && (text[1] == 'x' || text[1] == 'X')) base = 16;
+                return std::stoll(text, nullptr, base);
+            } catch (...) { return 0; }
+        }
+        return 0;
+    }
+    if (auto un = dynamic_cast<const AST::UnaryExpr*>(expr)) {
+        int64_t v = eval_gpu_const_int(un->right.get());
+        if (v == 0 && un->right.get()) {
+            // distinguish literal 0 from failure is unnecessary: dims must be > 0 anyway
+        }
+        if (un->op == TokenType::MINUS) return -v;
+        if (un->op == TokenType::TILDE) return ~v;
+        return v;
+    }
+    if (auto bin = dynamic_cast<const AST::BinaryExpr*>(expr)) {
+        int64_t l = eval_gpu_const_int(bin->left.get());
+        int64_t r = eval_gpu_const_int(bin->right.get());
+        switch (bin->op) {
+            case TokenType::PLUS: return l + r;
+            case TokenType::MINUS: return l - r;
+            case TokenType::STAR: return l * r;
+            case TokenType::SLASH: return r != 0 ? l / r : 0;
+            case TokenType::MODULUS: return r != 0 ? l % r : 0;
+            case TokenType::POWER: { int64_t res = 1; for (int64_t i = 0; i < r; ++i) res *= l; return res; }
+            default: return 0;
+        }
+    }
+    return 0;
+}
+
+} // namespace
 
 Generator::Generator() : current_function_(nullptr), next_register_(0), next_label_(0) {
     // Initialize LIR function system
@@ -296,6 +344,21 @@ void Generator::generate_function(LM::Frontend::AST::FunctionDeclaration& fn) {
     }
 
     auto lir_func = std::make_shared<LIRFunction>(fn.name, params, return_abi_type, nullptr);
+
+    // GPU stage metadata: evaluate compile-time thread dims and mesh limits.
+    if (fn.gpuStage != LM::Frontend::AST::GpuStage::None) {
+        lir_func->gpu_stage = static_cast<uint8_t>(fn.gpuStage);
+        for (size_t i = 0; i < fn.gpuThreads.size() && i < 3; ++i) {
+            int64_t dim = eval_gpu_const_int(fn.gpuThreads[i].get());
+            if (dim <= 0) {
+                throw std::runtime_error("gpu " + fn.name + ": thread dimensions must be positive compile-time integers");
+            }
+            lir_func->gpu_threads[i] = dim;
+        }
+        if (fn.gpuMaxVertices) lir_func->gpu_max_vertices = eval_gpu_const_int(fn.gpuMaxVertices.get());
+        if (fn.gpuMaxPrimitives) lir_func->gpu_max_primitives = eval_gpu_const_int(fn.gpuMaxPrimitives.get());
+    }
+
     lir_func->memory_effects_ = result->memory_effects;
     lir_func->inferred_effects_ = result->inferred_effects;
     lir_func->ownership_parameters_ = result->ownership_parameters;

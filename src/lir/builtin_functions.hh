@@ -72,6 +72,7 @@ private:
     // Only VM Intrinsics are built-in
     void registerIOFunctions();      // print, input
     void registerUtilityFunctions(); // typeof, clock, sleep, time, assert
+    void registerGpuFunctions();     // gpu_thread_id, gpu_local_id, gpu_group_id, gpu_num_groups, gpu_sync, gpu_set_mesh_counts, gpu_dispatch
 };
 
 namespace BuiltinUtils {

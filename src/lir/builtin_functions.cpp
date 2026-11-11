@@ -128,7 +128,8 @@ void LIRBuiltinFunctions::initialize() {
     
     registerIOFunctions();      // print, input
     registerUtilityFunctions(); // typeof, clock, sleep, time, assert, channel
-    
+    registerGpuFunctions();     // gpu_* emulation intrinsics
+
     initialized_ = true;
 }
 
@@ -804,6 +805,26 @@ void LIRBuiltinFunctions::registerUtilityFunctions() {
             return std::make_shared<Value>(list_type, list_val);
         }
     ));
+}
+
+void LIRBuiltinFunctions::registerGpuFunctions() {
+    // GPU intrinsics are executed natively by the register VM (ops/gpu.cpp).
+    // These registrations exist so the names resolve as builtins; the ValuePtr
+    // fallbacks only run on backends without GPU emulation support.
+    auto gpu_unsupported = [](const std::vector<ValuePtr>&) -> ValuePtr {
+        throw std::runtime_error("gpu intrinsics require the register VM backend");
+    };
+    const std::vector<TypeTag> no_params;
+    const std::vector<TypeTag> sync_params{TypeTag::Any};
+    const std::vector<TypeTag> counts_params{TypeTag::Int64, TypeTag::Int64};
+    const std::vector<TypeTag> dispatch_params{TypeTag::Any, TypeTag::Int64, TypeTag::Int64, TypeTag::Int64, TypeTag::List};
+
+    for (const char* name : {"gpu_thread_id", "gpu_local_id", "gpu_group_id", "gpu_num_groups"}) {
+        registerFunction(std::make_shared<LIRBuiltinFunction>(name, no_params, TypeTag::List, gpu_unsupported));
+    }
+    registerFunction(std::make_shared<LIRBuiltinFunction>("gpu_sync", sync_params, TypeTag::Nil, gpu_unsupported));
+    registerFunction(std::make_shared<LIRBuiltinFunction>("gpu_set_mesh_counts", counts_params, TypeTag::Nil, gpu_unsupported));
+    registerFunction(std::make_shared<LIRBuiltinFunction>("gpu_dispatch", dispatch_params, TypeTag::Nil, gpu_unsupported));
 }
 
 void LIRBuiltinFunctions::registerFunction(std::shared_ptr<LIRBuiltinFunction> function) {

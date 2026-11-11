@@ -138,6 +138,12 @@ void LIRFunctionManager::registerFunction(std::shared_ptr<LIRFunction> function)
     // Copy instructions if available
     lir_func->instructions = function->getInstructions();
     lir_func->register_language_types = function->getRegisterLanguageTypes();
+    lir_func->gpu_stage = function->gpu_stage;
+    lir_func->gpu_threads[0] = function->gpu_threads[0];
+    lir_func->gpu_threads[1] = function->gpu_threads[1];
+    lir_func->gpu_threads[2] = function->gpu_threads[2];
+    lir_func->gpu_max_vertices = function->gpu_max_vertices;
+    lir_func->gpu_max_primitives = function->gpu_max_primitives;
     
     registry.registerFunction(name, std::move(lir_func));
     // Both registered representations must expose the same verified contract.

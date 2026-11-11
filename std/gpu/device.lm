@@ -1,0 +1,87 @@
+// std/gpu/device.lm
+// GPU device abstraction: capability limits, device info, and pipeline
+// construction. On the register VM this is a lightweight descriptor layer;
+// real backends bind it to a native GPU device.
+
+import std.gpu.types as types;
+import std.gpu.types show ComputePipeline, MeshPipeline, Error, Extent3D;
+import std.gpu.queue show Queue;
+
+frame Limits {
+    pub max_texture_dimension_2d: int;
+    pub max_texture_dimension_3d: int;
+    pub max_buffer_size: int;
+    pub max_compute_workgroup_size: types.UVec3;
+    pub max_compute_workgroups_per_dimension: int;
+
+    pub init() {
+        self.max_texture_dimension_2d = 16384;
+        self.max_texture_dimension_3d = 2048;
+        self.max_buffer_size = 2147483647;
+        self.max_compute_workgroup_size = types.UVec3(256, 256, 64);
+        self.max_compute_workgroups_per_dimension = 65535;
+    }
+}
+
+frame Info {
+    embed Limits;
+
+    pub name: str;
+    pub backend: str;
+
+    pub init() {
+        // embed does not run Limits.init(); assign promoted fields directly.
+        self.max_texture_dimension_2d = 16384;
+        self.max_texture_dimension_3d = 2048;
+        self.max_buffer_size = 2147483647;
+        self.max_compute_workgroup_size = types.UVec3(256, 256, 64);
+        self.max_compute_workgroups_per_dimension = 65535;
+        self.name = "lymar-vm";
+        self.backend = "register-vm-emulation";
+    }
+}
+
+frame Device {
+    pub info_: Info;
+
+    pub init() {
+        self.info_ = Info();
+    }
+
+    pub fn info(): Info {
+        return self.info_;
+    }
+
+    pub fn is_valid(): bool {
+        return true;
+    }
+
+    pub fn default_queue(): Queue {
+        return Queue();
+    }
+
+    // Pipeline constructors. These are intentionally plain functions on the
+    // VM path: they produce immutable descriptor records that a GPU backend
+    // lowers to shader bytecode. Marked `staged` once bytecode constants are
+    // emitted at compile time.
+    pub fn create_compute_pipeline(kernel: any, threads: Extent3D? = nil): ComputePipeline?Error {
+        if (kernel == nil) {
+            return err(Error("InvalidArgument", "compute pipeline requires a gpu task"));
+        }
+        return ok(ComputePipeline(kernel, threads));
+    }
+
+    pub fn create_mesh_pipeline(mesh: any, pixel: any, max_vertices: int, max_primitives: int): MeshPipeline?Error {
+        if (mesh == nil or pixel == nil) {
+            return err(Error("InvalidArgument", "mesh pipeline requires gpu mesh and gpu pixel stages"));
+        }
+        if (max_vertices <= 0 or max_primitives <= 0) {
+            return err(Error("InvalidArgument", "mesh pipeline limits must be positive"));
+        }
+        return ok(MeshPipeline(mesh, pixel, max_vertices, max_primitives));
+    }
+}
+
+pub fn device(): Device {
+    return Device();
+}

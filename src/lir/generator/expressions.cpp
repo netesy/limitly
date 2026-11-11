@@ -771,9 +771,15 @@ Reg Generator::emit_variable_expr(LM::Frontend::AST::VariableExpr& expr) {
         
         Reg func_reg = allocate_register();
         auto func_type = std::make_shared<::Type>(::TypeTag::Function);
-        // In our LIR/VM, functions are referred to by name strings
+        // In our LIR/VM, functions are referred to by name strings. Module-level
+        // functions are registered under their qualified name, so qualify the
+        // reference the same way call sites do.
+        std::string value_name = expr.name;
+        if (!current_module_.empty() && current_module_ != "root" && value_name.find('.') == std::string::npos) {
+            value_name = current_module_ + "." + value_name;
+        }
         auto string_type = std::make_shared<::Type>(::TypeTag::String);
-        Backend::Value name_val = BOX_PTR(lm_str_from_cstr(expr.name.c_str()));
+        Backend::Value name_val = BOX_PTR(lm_str_from_cstr(value_name.c_str()));
         emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, func_reg, name_val));
         set_register_language_type(func_reg, func_type);
         set_register_abi_type(func_reg, Type::Ptr);

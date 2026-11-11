@@ -468,6 +468,7 @@ namespace AST {
         VisibilityLevel visibility = VisibilityLevel::Private;  // Default to private
         bool isStatic = false;                                  // For static variables
         bool isConst = false;                                   // True for const/val bindings (immutable after init)
+        bool gpuShared = false;                                 // True for `gpu.shared` workgroup-local bindings
     };
 
     // Destructuring assignment (e.g., var (x, y, z) = tuple)
@@ -476,6 +477,9 @@ namespace AST {
         std::shared_ptr<Expression> initializer;  // The tuple/array expression to destructure
         bool isTuple = true;  // Whether destructuring a tuple (true) or array (false)
     };
+
+    // GPU shader stage for `gpu task|vertex|pixel|mesh` declarations.
+    enum class GpuStage : uint8_t { None, Task, Vertex, Pixel, Mesh };
 
     // Function declaration
     struct FunctionDeclaration : public Statement {
@@ -486,6 +490,12 @@ namespace AST {
         std::shared_ptr<BlockStatement> body;
         std::vector<std::string> genericParams;
         bool throws = false;
+        
+        // GPU stage metadata (GpuStage::None for ordinary functions).
+        GpuStage gpuStage = GpuStage::None;
+        std::vector<std::shared_ptr<Expression>> gpuThreads;      // threads(x, y, z)
+        std::shared_ptr<Expression> gpuMaxVertices;               // limits(vertices = n)
+        std::shared_ptr<Expression> gpuMaxPrimitives;             // limits(primitives = m)
         
         // Error type annotations for function signature
         bool canFail = false;                                    // Whether function can return errors

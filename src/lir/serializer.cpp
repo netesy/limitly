@@ -75,7 +75,7 @@ namespace LIR {
 namespace {
 
 constexpr char kMagic[4] = {'L', 'I', 'R', '1'};
-constexpr uint8_t kVersion = 1;
+constexpr uint8_t kVersion = 2;
 
 enum class ConstTag : uint8_t {
     None         = 0,
@@ -432,6 +432,11 @@ std::vector<uint8_t> Serializer::serialize(const LIR_Function& func) {
         w.u32(reg); w.u64(fact.binding); w.u64(fact.allocation); w.u64(fact.region);
         w.flag(fact.managed); w.flag(fact.unknown_origin); identities(fact.origins);
     }
+
+    // GPU stage metadata (version 2+)
+    w.u8(func.gpu_stage);
+    w.u64(static_cast<uint64_t>(func.gpu_threads[0])); w.u64(static_cast<uint64_t>(func.gpu_threads[1])); w.u64(static_cast<uint64_t>(func.gpu_threads[2]));
+    w.u64(static_cast<uint64_t>(func.gpu_max_vertices)); w.u64(static_cast<uint64_t>(func.gpu_max_primitives));
     return w.buf;
 }
 
@@ -580,6 +585,13 @@ LIR_Function Serializer::deserialize(const std::vector<uint8_t>& buffer) {
         if (!func.ownership_provenance.emplace(reg, std::move(fact)).second)
             throw std::runtime_error("LIR deserialize: duplicate provenance register");
     }
+
+    // GPU stage metadata (version 2+)
+    func.gpu_stage = r.u8();
+    if (func.gpu_stage > 4) throw std::runtime_error("LIR deserialize: invalid gpu stage");
+    func.gpu_threads[0] = static_cast<int64_t>(r.u64()); func.gpu_threads[1] = static_cast<int64_t>(r.u64()); func.gpu_threads[2] = static_cast<int64_t>(r.u64());
+    func.gpu_max_vertices = static_cast<int64_t>(r.u64()); func.gpu_max_primitives = static_cast<int64_t>(r.u64());
+
     if (r.pos != buffer.size()) throw std::runtime_error("LIR deserialize: trailing data");
     std::vector<std::string> ownership_errors;
     if (!Verifier::verify_memory_regions(func, ownership_errors) || !Verifier::verify_ownership(func, ownership_errors)) throw std::runtime_error("LIR deserialize: invalid ownership dataflow");

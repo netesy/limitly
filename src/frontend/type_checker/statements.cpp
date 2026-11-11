@@ -149,7 +149,46 @@ TypePtr TypeChecker::check_function_declaration(std::shared_ptr<LM::Frontend::AS
     }
     
     function_signatures[func->name] = signature;
-    
+
+    // GPU stage validation (`gpu task|vertex|pixel|mesh`).
+    if (func->gpuStage != LM::Frontend::AST::GpuStage::None) {
+        const char* stage_name =
+            func->gpuStage == LM::Frontend::AST::GpuStage::Task ? "task" :
+            func->gpuStage == LM::Frontend::AST::GpuStage::Vertex ? "vertex" :
+            func->gpuStage == LM::Frontend::AST::GpuStage::Pixel ? "pixel" : "mesh";
+        if (func->gpuStage == LM::Frontend::AST::GpuStage::Vertex ||
+            func->gpuStage == LM::Frontend::AST::GpuStage::Pixel) {
+            if (!func->returnType) {
+                add_error(std::string("gpu ") + stage_name + " '" + func->name + "' requires a return type annotation", func->line);
+            }
+        }
+        if (func->gpuStage == LM::Frontend::AST::GpuStage::Task ||
+            func->gpuStage == LM::Frontend::AST::GpuStage::Mesh) {
+            if (func->gpuThreads.size() != 3) {
+                add_error(std::string("gpu ") + stage_name + " '" + func->name + "' requires threads(x, y, z)", func->line);
+            } else {
+                for (auto& dim : func->gpuThreads) {
+                    TypePtr dt = check_expression(dim);
+                    if (dt && !is_integer_type(dt) && dt->tag != TypeTag::Any) {
+                        add_error("gpu thread dimensions must be integers", func->line);
+                    }
+                }
+            }
+        }
+        if (func->gpuStage == LM::Frontend::AST::GpuStage::Mesh) {
+            if (!func->gpuMaxVertices || !func->gpuMaxPrimitives) {
+                add_error("gpu mesh '" + func->name + "' requires limits(vertices = n, primitives = m)", func->line);
+            } else {
+                for (auto& lim : {func->gpuMaxVertices, func->gpuMaxPrimitives}) {
+                    TypePtr lt = check_expression(lim);
+                    if (lt && !is_integer_type(lt) && lt->tag != TypeTag::Any) {
+                        add_error("gpu mesh limits must be integers", func->line);
+                    }
+                }
+            }
+        }
+    }
+
     // Validate error type annotations
     validate_function_error_types(func);
     

@@ -1,0 +1,48 @@
+// tests/gpu/stages.lm
+// Parser/type-checker fixture for all GPU stage declarations and gpu.shared.
+// The stages are never dispatched here — this verifies the frontend accepts
+// the full grammar and that LIR generation carries stage metadata without
+// breaking ordinary execution.
+
+import std.gpu as gpu;
+import std.math.vector3 show Vector3;
+
+frame GpuVertexOut {
+    pub position: Vector3;
+    pub uv: Vector3;
+
+    pub init() {
+        self.position = Vector3();
+        self.uv = Vector3();
+    }
+}
+
+gpu task clear_counter(counter: [int], group_size: int) threads(8, 8, 1) {
+    gpu.shared var tile: [int];
+    val tid = gpu.thread_id();
+    val i = tid.x + tid.y * group_size;
+    if (i < len(counter)) {
+        counter[i] = 0;
+    }
+}
+
+gpu vertex transform_vertex(in position: Vector3, in uv: Vector3) : GpuVertexOut {
+    val out = GpuVertexOut();
+    out.position = position;
+    out.uv = uv;
+    return out;
+}
+
+gpu pixel shade_pixel(in input: GpuVertexOut) : Vector3 {
+    return input.position;
+}
+
+gpu mesh emit_quad(vertices: [Vector3]) threads(1, 1, 1) limits(vertices = 4, primitives = 2) {
+    gpu.set_mesh_counts(4, 2);
+}
+
+fn main() {
+    // Stages compile and carry metadata; ordinary code paths are unaffected.
+    val counters: [int] = [1, 2, 3];
+    print("gpu stages fixture OK");
+}

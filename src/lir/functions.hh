@@ -71,6 +71,13 @@ public:
     const std::vector<LIR::LIR_Inst>& getInstructions() const { return instructions_; }
     void setInstructions(const std::vector<LIR::LIR_Inst>& instructions) { instructions_ = instructions; }
 
+    // GPU stage metadata for `gpu task|vertex|pixel|mesh` declarations.
+    // gpu_stage: 0 = ordinary function, 1 = task (compute), 2 = vertex, 3 = pixel, 4 = mesh.
+    uint8_t gpu_stage = 0;
+    int64_t gpu_threads[3] = {1, 1, 1};
+    int64_t gpu_max_vertices = 0;
+    int64_t gpu_max_primitives = 0;
+
     Memory::FunctionEffects memory_effects_;
     Memory::SemanticEffects inferred_effects_;
     std::vector<Memory::Identity> ownership_parameters_, ownership_captures_;

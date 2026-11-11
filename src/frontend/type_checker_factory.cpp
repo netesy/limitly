@@ -255,6 +255,14 @@ void register_builtin_functions(TypeChecker& checker) {
     // File I/O intrinsics
     checker.register_builtin_function("file_exists", {ts.STRING_TYPE}, ts.BOOL_TYPE);
     checker.register_builtin_function("file_delete", {ts.STRING_TYPE}, ts.BOOL_TYPE);
+    // GPU emulation intrinsics (register VM; lowered to real GPU ops by GPU backends)
+    checker.register_builtin_function("gpu_thread_id", {}, ts.createTypedListType(ts.INT_TYPE));
+    checker.register_builtin_function("gpu_local_id", {}, ts.createTypedListType(ts.INT_TYPE));
+    checker.register_builtin_function("gpu_group_id", {}, ts.createTypedListType(ts.INT_TYPE));
+    checker.register_builtin_function("gpu_num_groups", {}, ts.createTypedListType(ts.INT_TYPE));
+    checker.register_builtin_function("gpu_sync", {ts.ANY_TYPE}, ts.NIL_TYPE);
+    checker.register_builtin_function("gpu_set_mesh_counts", {ts.INT_TYPE, ts.INT_TYPE}, ts.NIL_TYPE);
+    checker.register_builtin_function("gpu_dispatch", {ts.ANY_TYPE, ts.INT_TYPE, ts.INT_TYPE, ts.INT_TYPE, ts.createTypedListType(ts.ANY_TYPE)}, ts.NIL_TYPE);
 }
 
 } // namespace TypeCheckerFactory

@@ -274,6 +274,18 @@ private:
     void execute_extern_calc_struct_layout(const LIR::LIR_Inst* pc);
     void execute_extern_get_abi_info(const LIR::LIR_Inst* pc);
 
+    // GPU emulation builtins (gpu_thread_id, gpu_local_id, gpu_group_id,
+    // gpu_num_groups, gpu_sync, gpu_set_mesh_counts, gpu_dispatch).
+    void execute_gpu(const LIR::LIR_Inst* pc);
+    // Emulated thread-space coordinates, set by gpu_dispatch while invoking a
+    // `gpu task` body. Indexed [x, y, z].
+    int64_t gpu_local_id_[3] = {0, 0, 0};
+    int64_t gpu_group_id_[3] = {0, 0, 0};
+    int64_t gpu_num_groups_[3] = {1, 1, 1};
+    int64_t gpu_thread_dims_[3] = {1, 1, 1};
+    int64_t gpu_mesh_vertices_ = 0;
+    int64_t gpu_mesh_primitives_ = 0;
+
     std::vector<RegisterValue> register_stack_;
     size_t frame_pointer_ = 0;
     RegisterSpan registers;

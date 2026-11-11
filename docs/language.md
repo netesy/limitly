@@ -354,7 +354,35 @@ Concurrency is bound to the lifetime of the block.
 - `.poll(): T?`: Non-blocking receive.
 - `.offer(value): bool`: Non-blocking send.
 
-## 7. Self
+## 7. GPU Stages
+
+GPU work is declared with stage-specific function syntax. The shared LIR carries
+the stage metadata to every backend; the register VM executes dispatches as
+single-pass emulation, and hardware backends lower the same functions later.
+
+```lymar
+gpu task integrate(particles: [Particle], dt: float) threads(64, 1, 1) {
+    val tid = gpu.thread_id();
+    // ... per-thread work ...
+}
+
+gpu vertex transform(in position: Vector3) : VertexOut { ... }
+gpu pixel shade(in input: VertexOut) : Vector4 { ... }
+gpu mesh emit(vertices: [Vector3]) threads(1, 1, 1)
+    limits(vertices = 4, primitives = 2) { ... }
+```
+
+- `gpu task` — compute kernel; requires `threads(x, y, z)` workgroup size.
+- `gpu vertex` / `gpu pixel` — vertex and fragment stages; require a return type.
+- `gpu mesh` — mesh stage; requires `threads(...)` and `limits(vertices = n, primitives = m)`.
+- `gpu.shared var name: Type;` — workgroup-local storage declaration inside a GPU body.
+
+Thread-space intrinsics (via `std.gpu`): `thread_id()`, `local_id()`,
+`group_id()`, `num_groups()`, `sync(scope)`, `set_mesh_counts(v, p)`.
+Host code drives execution through `std.gpu`: `Device` → `default_queue()` →
+`encoder()` → `dispatch(kernel, extent, args)` → `finish()` → `queue.submit(cmd)`.
+
+## 8. Self
 
 `self` is the canonical keyword for the current instance inside a frame method. `this` is no longer a keyword.
 

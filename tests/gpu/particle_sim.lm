@@ -1,0 +1,59 @@
+// tests/gpu/particle_sim.lm
+// End-to-end GPU compute test: a particle integration `gpu task` dispatched
+// through std.gpu's device/queue/encoder model. On the register VM this runs
+// as single-pass emulation across the dispatch grid.
+
+import std.gpu as gpu;
+import std.math.vector3 as v3;
+import std.math.vector3 show Vector3;
+
+const PARTICLE_COUNT: int = 128;
+const DT: float = 0.5;
+
+frame Particle {
+    pub pos: Vector3;
+    pub vel: Vector3;
+
+    pub init(px: float = 0.0, py: float = 0.0, pz: float = 0.0,
+             vx: float = 0.0, vy: float = 0.0, vz: float = 0.0) {
+        self.pos = Vector3(px, py, pz);
+        self.vel = Vector3(vx, vy, vz);
+    }
+}
+
+// Each thread advances the particle at its global index by vel * dt.
+gpu task step_particles(particles: [Particle], dt: float, count: int) threads(64, 1, 1) {
+    val tid = gpu.thread_id();
+    val i = tid.x;
+    if (i < count) {
+        var p = particles[i];
+        p.pos = p.pos.add(p.vel.scale(dt));
+        particles[i] = p;
+    }
+}
+
+fn main() {
+    var parts: [Particle] = [];
+    iter (i in 0..PARTICLE_COUNT) {
+        parts.append(Particle(i as float, 0.0, 0.0, 1.0, 2.0, 0.0));
+    }
+
+    val dev = gpu.Device();
+    val queue = dev.default_queue();
+    val enc = queue.encoder();
+    // 128 particles / 64 threads per group = 2 workgroups along x.
+    enc.dispatch(step_particles, gpu.extent3d(2, 1, 1), [parts, DT, len(parts)]);
+    val cmd = enc.finish();
+    queue.submit(cmd);
+
+    // Particle i started at (i, 0, 0) with vel (1, 2, 0); after one step of
+    // dt=0.5 it must be at (i + 0.5, 1.0, 0.0).
+    iter (i in 0..PARTICLE_COUNT) {
+        val p = parts[i];
+        assert(p.pos.x == (i as float) + 0.5, "particle x position mismatch");
+        assert(p.pos.y == 1.0, "particle y position mismatch");
+        assert(p.pos.z == 0.0, "particle z position mismatch");
+    }
+
+    print("particle_sim: {PARTICLE_COUNT} particles integrated OK");
+}

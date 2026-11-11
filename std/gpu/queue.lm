@@ -1,0 +1,97 @@
+// std/gpu/queue.lm
+// GPU command submission model: CommandBuffer records work, Encoder builds
+// command buffers, Queue submits them, Fence tracks completion.
+//
+// On the register VM, Encoder.dispatch records (task, grid, args) tuples and
+// CommandBuffer.execute replays them through the gpu_dispatch emulation
+// builtin. GPU backends replace the replay with real command encoding.
+
+import std.gpu.types as types;
+
+// A finished, submittable command buffer. `dispatches` holds recorded work
+// items of the shape [task_ref, gx, gy, gz, args_list].
+frame CommandBuffer {
+    pub dispatches: [[any]];
+
+    pub init() {
+        self.dispatches = [];
+    }
+
+    pub fn is_empty(): bool {
+        return len(self.dispatches) == 0;
+    }
+
+    // Execute (or, on a real backend, submit) the recorded work.
+    pub fn execute(): nil {
+        iter (record in self.dispatches) {
+            gpu_dispatch(record[0], record[1], record[2], record[3], record[4]);
+        }
+    }
+}
+
+// Records commands for later submission via finish() + Queue.submit().
+frame Encoder {
+    pub commands: CommandBuffer;
+
+    pub init() {
+        self.commands = CommandBuffer();
+    }
+
+    // Enqueue a compute dispatch of `task` over `grid` workgroups with `args`.
+    pub fn dispatch(kernel: any, grid: types.Extent3D, args: [any]): nil {
+        self.commands.dispatches.append([kernel, grid.x, grid.y, grid.z, args]);
+    }
+
+    // Convenience overload taking explicit grid dimensions.
+    pub fn dispatch_dims(kernel: any, gx: int, gy: int, gz: int, args: [any]): nil {
+        self.commands.dispatches.append([kernel, gx, gy, gz, args]);
+    }
+
+    pub fn barrier(): nil {
+        // Execution barrier between dispatches; implicit in emulation.
+    }
+
+    pub fn finish(): CommandBuffer {
+        val result = self.commands;
+        self.commands = CommandBuffer();
+        return result;
+    }
+}
+
+// Completion signal for submitted command buffers.
+frame Fence {
+    pub signaled: bool;
+
+    pub init() {
+        self.signaled = false;
+    }
+
+    pub fn wait(): nil {
+        // Emulation completes synchronously; real backends block here.
+        self.signaled = true;
+    }
+
+    pub fn is_signaled(): bool {
+        return self.signaled;
+    }
+}
+
+// Submission queue owning command-buffer execution.
+frame Queue {
+    pub fn encoder(): Encoder {
+        return Encoder();
+    }
+
+    pub fn submit(cmd: CommandBuffer): Fence {
+        cmd.execute();
+        // Emulation completes synchronously, so the fence is already signaled.
+        val fence = Fence();
+        fence.signaled = true;
+        return fence;
+    }
+
+    pub fn submit_and_wait(cmd: CommandBuffer): nil {
+        val fence = self.submit(cmd);
+        fence.wait();
+    }
+}

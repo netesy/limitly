@@ -143,7 +143,8 @@ public:
     std::shared_ptr<LM::Frontend::AST::Statement> whileStatement();
     std::shared_ptr<LM::Frontend::AST::Statement> breakStatement();
     std::shared_ptr<LM::Frontend::AST::Statement> continueStatement();
-    std::shared_ptr<LM::Frontend::AST::FunctionDeclaration> function(const std::string &kind);
+    std::shared_ptr<LM::Frontend::AST::FunctionDeclaration> function(const std::string &kind, LM::Frontend::AST::GpuStage gpuStage = LM::Frontend::AST::GpuStage::None);
+    std::shared_ptr<LM::Frontend::AST::Statement> gpuSharedDeclaration();
     std::shared_ptr<LM::Frontend::AST::Statement> returnStatement();
     std::shared_ptr<LM::Frontend::AST::FrameDeclaration> frameDeclaration(bool staged = false);
     std::shared_ptr<LM::Frontend::AST::MixinDeclaration> mixinDeclaration();

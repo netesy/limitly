@@ -111,6 +111,59 @@ std::shared_ptr<LM::Frontend::AST::Statement> Parser::declaration() {
             }
             return decl;
         }
+        // `gpu task|vertex|pixel|mesh` declarations and `gpu.shared` workgroup-local bindings.
+        // `gpu` is contextual: it stays a plain identifier so `import std.gpu as gpu` keeps working.
+        if (check(TokenType::IDENTIFIER) && peek().lexeme == "gpu") {
+            const auto& toks = scanner.getTokens();
+            auto tokAt = [&](size_t off) -> Token {
+                size_t idx = current + off;
+                if (idx < toks.size()) return toks[idx];
+                return Token{TokenType::EOF_TOKEN, "", 0, 0, 0, {}, {}};
+            };
+            Token t1 = tokAt(1);
+            if (t1.type == TokenType::DOT && tokAt(2).type == TokenType::IDENTIFIER &&
+                tokAt(2).lexeme == "shared" &&
+                (tokAt(3).type == TokenType::VAR || tokAt(3).type == TokenType::CONST || tokAt(3).type == TokenType::VAL)) {
+                advance(); advance(); advance(); // consume `gpu`, `.`, `shared`
+                bool isConst = false;
+                if (match({TokenType::CONST}) || match({TokenType::VAL})) {
+                    isConst = true;
+                } else {
+                    match({TokenType::VAR});
+                }
+                auto decl = varDeclaration();
+                if (decl) {
+                    decl->annotations = annotations;
+                    if (auto varDecl = std::dynamic_pointer_cast<LM::Frontend::AST::VarDeclaration>(decl)) {
+                        varDecl->visibility = visibility;
+                        varDecl->isStatic = isStatic;
+                        varDecl->isConst = isConst;
+                        varDecl->gpuShared = true;
+                        if (isConst && !varDecl->initializer) error("const/val declaration requires an initializer");
+                    }
+                }
+                return decl;
+            }
+            LM::Frontend::AST::GpuStage stage = LM::Frontend::AST::GpuStage::None;
+            std::string stageName;
+            if (t1.type == TokenType::TASK) { stage = LM::Frontend::AST::GpuStage::Task; stageName = "task"; }
+            else if (t1.type == TokenType::IDENTIFIER) {
+                if (t1.lexeme == "vertex") { stage = LM::Frontend::AST::GpuStage::Vertex; stageName = "vertex"; }
+                else if (t1.lexeme == "pixel") { stage = LM::Frontend::AST::GpuStage::Pixel; stageName = "pixel"; }
+                else if (t1.lexeme == "mesh") { stage = LM::Frontend::AST::GpuStage::Mesh; stageName = "mesh"; }
+            }
+            if (stage != LM::Frontend::AST::GpuStage::None) {
+                advance(); // consume `gpu`
+                advance(); // consume stage token
+                auto decl = function("gpu " + stageName, stage);
+                if (decl) {
+                    decl->annotations = annotations;
+                    decl->visibility = visibility;
+                    decl->isStatic = isStatic;
+                }
+                return decl;
+            }
+        }
         // const, val, and var all produce a VarDeclaration; const/val set isConst=true.
         if (match({TokenType::VAR}) || match({TokenType::CONST}) || match({TokenType::VAL})) {
             bool isConst = (previous().type == TokenType::CONST || previous().type == TokenType::VAL);
@@ -569,10 +622,12 @@ std::shared_ptr<LM::Frontend::AST::Statement> Parser::whileStatement() {
     return stmt;
 }
 
-std::shared_ptr<LM::Frontend::AST::FunctionDeclaration> Parser::function(const std::string& kind) {
+std::shared_ptr<LM::Frontend::AST::FunctionDeclaration> Parser::function(const std::string& kind, LM::Frontend::AST::GpuStage gpuStage) {
     auto func = createNodeWithContext<LM::Frontend::AST::FunctionDeclaration>();
     func->line = previous().line;
     attachTriviaFromToken(previous());
+    func->gpuStage = gpuStage;
+    const bool isGpu = (gpuStage != LM::Frontend::AST::GpuStage::None);
 
     Token name = consume(TokenType::IDENTIFIER, "Expected " + kind + " name.");
     func->name = name.lexeme;
@@ -589,6 +644,8 @@ std::shared_ptr<LM::Frontend::AST::FunctionDeclaration> Parser::function(const s
     if (!check(TokenType::RIGHT_PAREN)) {
         do {
             bool isStagedParam = match({TokenType::STAGED});
+            // Shader inputs may be prefixed with `in` (e.g. `gpu pixel name(in pos: Vec3)`).
+            if (isGpu) match({TokenType::IN});
             auto paramName = consume(TokenType::IDENTIFIER, "Expected parameter name.").lexeme;
             std::shared_ptr<LM::Frontend::AST::TypeAnnotation> paramType = nullptr;
             if (match({TokenType::COLON})) paramType = parseTypeAnnotation();
@@ -612,6 +669,40 @@ std::shared_ptr<LM::Frontend::AST::FunctionDeclaration> Parser::function(const s
         if (func->returnType && (*func->returnType)->isFallible) {
             func->canFail = true;
             func->declaredErrorTypes = (*func->returnType)->errorTypes;
+        }
+    }
+
+    // GPU launch geometry: `threads(x, y, z)` for task/mesh stages and
+    // `limits(vertices = n, primitives = m)` for the mesh stage.
+    if (isGpu && (gpuStage == LM::Frontend::AST::GpuStage::Task || gpuStage == LM::Frontend::AST::GpuStage::Mesh)) {
+        if (check(TokenType::IDENTIFIER) && peek().lexeme == "threads") {
+            advance();
+            consume(TokenType::LEFT_PAREN, "Expected '(' after 'threads'.");
+            for (int i = 0; i < 3; i++) {
+                func->gpuThreads.push_back(expression());
+                if (i < 2) consume(TokenType::COMMA, "Expected ',' between thread dimensions.");
+            }
+            consume(TokenType::RIGHT_PAREN, "Expected ')' after thread dimensions.");
+        } else {
+            error("gpu " + kind + " requires a threads(x, y, z) clause.");
+        }
+    }
+    if (isGpu && gpuStage == LM::Frontend::AST::GpuStage::Mesh) {
+        if (check(TokenType::IDENTIFIER) && peek().lexeme == "limits") {
+            advance();
+            consume(TokenType::LEFT_PAREN, "Expected '(' after 'limits'.");
+            while (!check(TokenType::RIGHT_PAREN) && !isAtEnd()) {
+                std::string key = consume(TokenType::IDENTIFIER, "Expected limit name.").lexeme;
+                consume(TokenType::EQUAL, "Expected '=' after limit name.");
+                auto val = expression();
+                if (key == "vertices") func->gpuMaxVertices = val;
+                else if (key == "primitives") func->gpuMaxPrimitives = val;
+                else error("Unknown mesh limit: " + key);
+                if (!match({TokenType::COMMA})) break;
+            }
+            consume(TokenType::RIGHT_PAREN, "Expected ')' after limits.");
+        } else {
+            error("gpu mesh requires a limits(vertices = n, primitives = m) clause.");
         }
     }
 
