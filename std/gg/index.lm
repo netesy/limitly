@@ -403,6 +403,17 @@ pub fn make_image(width: int, height: int): Image {
     return Image(id=id, width=width, height=height);
 }
 
+// Creates an image with initial RGBA8 pixel data and returns its id.
+// `pixels` is a flat byte list in row-major order, length == width*height*4.
+pub fn make_image_data(width: int, height: int, pixels: [int]): int {
+    val id = global_graphics_context.next_resource_id;
+    global_graphics_context.next_resource_id = id + 1;
+    if (global_graphics_context.handle != -1) {
+        rt.call(global_graphics_context.handle, rt.OP_MAKE_IMAGE, [id, width, height, pixels]);
+    }
+    return id;
+}
+
 pub fn make_sampler(): Sampler {
     val id = global_graphics_context.next_resource_id;
     global_graphics_context.next_resource_id = id + 1;
@@ -604,11 +615,17 @@ pub fn apply_pipeline(pip_id: int): nil {
     }
 }
 
-pub fn apply_bindings(v_id: int, i_id: int): nil {
+// img_id/sampler_id bind a texture for shaders that sample one (e.g. the
+// d3 vertex-stream pipeline). Pass 0 to leave the texture slot unbound.
+pub fn apply_bindings(v_id: int, i_id: int, uniforms: [float]? = nil, img_id: int = 0, sampler_id: int = 0): nil {
     if (global_graphics_context.handle != -1) {
-        global_graphics_context._args2i[0] = v_id;
-        global_graphics_context._args2i[1] = i_id;
-        rt.call(global_graphics_context.handle, rt.OP_APPLY_BINDINGS, global_graphics_context._args2i);
+        if (img_id != 0 or sampler_id != 0 or uniforms != nil) {
+            rt.call(global_graphics_context.handle, rt.OP_APPLY_BINDINGS, [v_id, i_id, uniforms, img_id, sampler_id]);
+        } else {
+            global_graphics_context._args2i[0] = v_id;
+            global_graphics_context._args2i[1] = i_id;
+            rt.call(global_graphics_context.handle, rt.OP_APPLY_BINDINGS, global_graphics_context._args2i);
+        }
     }
 }
 

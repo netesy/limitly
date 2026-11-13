@@ -1,11 +1,26 @@
 // std/d3/scene.lm
-// Scene container holding 3D meshes, illumination sources, and environment settings.
+// Scene container holding 3D meshes, instanced draws, illumination sources,
+// and environment settings.
 
 import std.d3.mesh as mesh_mod;
 import std.d3.light as light_mod;
+import std.math.matrix show Matrix;
+
+// One geometry drawn many times with different local transforms.
+// Each entry in `transforms` is multiplied after the mesh's own world matrix.
+frame InstanceGroup {
+    pub mesh: mesh_mod.Mesh;
+    pub transforms: [Matrix];
+
+    pub init(m: mesh_mod.Mesh, instance_transforms: [Matrix]) {
+        self.mesh = m;
+        self.transforms = instance_transforms;
+    }
+}
 
 frame Scene3D {
     pub meshes: [mesh_mod.Mesh];
+    pub instance_groups: [InstanceGroup];
     pub lights: [light_mod.Light];
 
     pub background_r: float;
@@ -15,6 +30,7 @@ frame Scene3D {
 
     pub init() {
         self.meshes = [];
+        self.instance_groups = [];
         self.lights = [];
         self.background_r = 0.05;
         self.background_g = 0.05;
@@ -26,12 +42,18 @@ frame Scene3D {
         self.meshes.append(m);
     }
 
+    // Draw `m` once per transform in `transforms` without duplicating geometry.
+    pub fn add_instanced(m: mesh_mod.Mesh, transforms: [Matrix]) {
+        self.instance_groups.append(InstanceGroup(m, transforms));
+    }
+
     pub fn add_light(l: light_mod.Light) {
         self.lights.append(l);
     }
 
     pub fn clear() {
         self.meshes = [];
+        self.instance_groups = [];
         self.lights = [];
     }
 }

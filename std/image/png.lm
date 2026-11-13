@@ -19,6 +19,53 @@ pub fn save(img: image.Image, path: str): bool? {
     return image.save_png(img, path);
 }
 
+// Loads an image as RGBA8 and returns (width, height, pixels) where pixels
+// is a flat [int] byte list (row-major, length == width*height*4).
+// Implemented without the Image frame: frame field access is unreliable when
+// unrelated modules declare same-named frames (bare-name registry collision).
+pub fn load_rgba(path: str): (int, int, [int])? {
+    unsafe {
+        var lib: int = image._open_lib();
+        if (lib == nil) { return err(); }
+
+        var fn_load: int = ffi.library_get_symbol(lib, "load_image_forced");
+        if (fn_load == nil) { ffi.library_unload(lib); return err(); }
+
+        var w_p: int = ffi.alloc(4);
+        var h_p: int = ffi.alloc(4);
+        var c_p: int = ffi.alloc(4);
+        var cs:  ffi.CString = ffi.string_to_cstring(path);
+
+        var data_ptr: int = ffi.foreign_call(
+            fn_load,
+            [ffi.cstring_as_ptr(cs), w_p, h_p, c_p, 4],
+            ffi.TYPE_PTR,
+            [ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_I32]
+        ) as int;
+        ffi.cstring_free(cs);
+
+        var w: int = ffi.load_i32(w_p);
+        var h: int = ffi.load_i32(h_p);
+        ffi.free(w_p); ffi.free(h_p); ffi.free(c_p);
+
+        if (data_ptr == nil) { ffi.library_unload(lib); return err(); }
+
+        var px: [int] = [];
+        val n = w * h * 4;
+        var i = 0;
+        while (i < n) {
+            px.append(ffi.load_u8(ffi.ptr_add(data_ptr, i)));
+            i = i + 1;
+        }
+
+        var fn_free: int = ffi.library_get_symbol(lib, "free_image");
+        if (fn_free != nil) { ffi.call_void_1(fn_free, data_ptr); }
+        ffi.library_unload(lib);
+
+        return ok((w, h, px));
+    }
+}
+
 pub fn save_with_stride(img: image.Image, path: str, stride: int): bool? {
     if (not img.is_valid() or stride < img.width * img.channels) { return err(); }
     unsafe {

@@ -1,6 +1,6 @@
 // tests/game/test_showcase_headless.lm
 import std.game as game;
-import std.game.types as types;
+import std.theme as theme;
 
 fn test_game_showcase_run() {
     var cfg = game.Config(
@@ -12,7 +12,7 @@ fn test_game_showcase_run() {
     var app = game.Game(cfg);
     assert(app.setup(), "Setup failed");
 
-    app.gui.set_theme(types.cyberpunk_theme());
+    app.gui.set_theme(theme.cyberpunk_theme());
 
     // Run 3 simulation frames
     var frame_idx = 0;

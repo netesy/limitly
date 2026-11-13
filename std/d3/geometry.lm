@@ -5,6 +5,49 @@ import std.d3.buffer as buf;
 import std.math.arithmetic as arith;
 import std.math.trigonometry as trig;
 
+// Result of Geometry.validate(): counts of structural problems plus human-readable
+// issue strings. A clean mesh has all counts at zero and is_watertight == true.
+frame ValidationReport {
+    pub vertex_count: int;
+    pub face_count: int;
+    pub invalid_indices: int;
+    pub degenerate_faces: int;
+    pub boundary_edges: int;
+    pub non_manifold_edges: int;
+    pub inconsistent_winding: bool;
+    pub issues: [str];
+
+    pub init() {
+        self.vertex_count = 0;
+        self.face_count = 0;
+        self.invalid_indices = 0;
+        self.degenerate_faces = 0;
+        self.boundary_edges = 0;
+        self.non_manifold_edges = 0;
+        self.inconsistent_winding = false;
+        self.issues = [];
+    }
+
+    pub fn is_clean(): bool {
+        return self.invalid_indices == 0 and self.degenerate_faces == 0
+            and self.boundary_edges == 0 and self.non_manifold_edges == 0
+            and not self.inconsistent_winding;
+    }
+
+    pub fn summary(): str {
+        if (self.is_clean()) {
+            return "clean ({self.face_count} faces, {self.vertex_count} verts)";
+        }
+        var s = "";
+        if (self.invalid_indices > 0) { s = s + "{self.invalid_indices} invalid indices, "; }
+        if (self.degenerate_faces > 0) { s = s + "{self.degenerate_faces} degenerate faces, "; }
+        if (self.boundary_edges > 0) { s = s + "{self.boundary_edges} boundary edges (open mesh), "; }
+        if (self.non_manifold_edges > 0) { s = s + "{self.non_manifold_edges} non-manifold edges, "; }
+        if (self.inconsistent_winding) { s = s + "inconsistent winding, "; }
+        return s;
+    }
+}
+
 frame Geometry {
     pub pos_attr: buf.FloatAttribute;
     pub normal_attr: buf.FloatAttribute;
@@ -19,12 +62,18 @@ frame Geometry {
     pub colors: [float];
     pub indices: [int];
 
+    // Cached GPU buffer handles (vertex/index streams) built lazily by the renderer.
+    pub gpu_vbuf: int;
+    pub gpu_ibuf: int;
+
     pub init() {
         self.vertices = [];
         self.normals = [];
         self.uvs = [];
         self.colors = [];
         self.indices = [];
+        self.gpu_vbuf = -1;
+        self.gpu_ibuf = -1;
 
         self.pos_attr = buf.float_attribute(self.vertices, 3);
         self.normal_attr = buf.float_attribute(self.normals, 3);
@@ -34,6 +83,8 @@ frame Geometry {
     }
 
     pub fn add_vertex(x: float, y: float, z: float): int {
+        self.gpu_vbuf = -1;
+        self.gpu_ibuf = -1;
         val idx = len(self.vertices) / 3;
         self.vertices.append(x);
         self.vertices.append(y);
@@ -42,6 +93,8 @@ frame Geometry {
     }
 
     pub fn add_normal(nx: float, ny: float, nz: float) {
+        self.gpu_vbuf = -1;
+        self.gpu_ibuf = -1;
         self.normals.append(nx);
         self.normals.append(ny);
         self.normals.append(nz);
@@ -59,6 +112,8 @@ frame Geometry {
     }
 
     pub fn add_face(i0: int, i1: int, i2: int) {
+        self.gpu_vbuf = -1;
+        self.gpu_ibuf = -1;
         self.indices.append(i0);
         self.indices.append(i1);
         self.indices.append(i2);
@@ -85,6 +140,8 @@ frame Geometry {
     }
 
     pub fn compute_vertex_normals() {
+        self.gpu_vbuf = -1;
+        self.gpu_ibuf = -1;
         val v_count = self.get_vertex_count();
         val total_floats = v_count * 3;
         var normal_accum: [float] = [];
@@ -228,6 +285,8 @@ frame Geometry {
     }
 
     pub fn scale(sx: float, sy: float, sz: float) {
+        self.gpu_vbuf = -1;
+        self.gpu_ibuf = -1;
         val v_count = self.get_vertex_count();
         iter (i in 0..v_count) {
             self.vertices[i * 3] = self.vertices[i * 3] * sx;
@@ -237,6 +296,8 @@ frame Geometry {
     }
 
     pub fn translate(dx: float, dy: float, dz: float) {
+        self.gpu_vbuf = -1;
+        self.gpu_ibuf = -1;
         val v_count = self.get_vertex_count();
         iter (i in 0..v_count) {
             self.vertices[i * 3] = self.vertices[i * 3] + dx;
@@ -261,6 +322,8 @@ frame Geometry {
     }
 
     pub fn merge(other: Geometry, dx: float = 0.0, dy: float = 0.0, dz: float = 0.0) {
+        self.gpu_vbuf = -1;
+        self.gpu_ibuf = -1;
         val base_idx = self.get_vertex_count();
         val other_vcount = other.get_vertex_count();
         iter (vi in 0..other_vcount) {
@@ -279,6 +342,8 @@ frame Geometry {
     }
 
     pub fn mirror(axis: int = 0): Geometry {
+        self.gpu_vbuf = -1;
+        self.gpu_ibuf = -1;
         val g = Geometry();
         val v_count = self.get_vertex_count();
         iter (vi in 0..v_count) {
@@ -304,6 +369,8 @@ frame Geometry {
     }
 
     pub fn rotate_x(angle: float) {
+        self.gpu_vbuf = -1;
+        self.gpu_ibuf = -1;
         val ca = trig.cos(angle);
         val sa = trig.sin(angle);
         val v_count = self.get_vertex_count();
@@ -316,6 +383,8 @@ frame Geometry {
     }
 
     pub fn rotate_y(angle: float) {
+        self.gpu_vbuf = -1;
+        self.gpu_ibuf = -1;
         val ca = trig.cos(angle);
         val sa = trig.sin(angle);
         val v_count = self.get_vertex_count();
@@ -328,6 +397,8 @@ frame Geometry {
     }
 
     pub fn rotate_z(angle: float) {
+        self.gpu_vbuf = -1;
+        self.gpu_ibuf = -1;
         val ca = trig.cos(angle);
         val sa = trig.sin(angle);
         val v_count = self.get_vertex_count();
@@ -337,5 +408,138 @@ frame Geometry {
             self.vertices[i * 3] = x * ca - y * sa;
             self.vertices[i * 3 + 1] = x * sa + y * ca;
         }
+    }
+
+    // Checks mesh structure: out-of-range indices, degenerate faces, open
+    // (boundary) edges, edges shared by >2 faces, and inconsistent winding.
+    // Vertices are welded by position first, because primitives emit
+    // polygon-soup topology (duplicated corner vertices per face) where
+    // index-based edge analysis would report every edge as a boundary.
+    // Diagnostic path -- not a per-frame hot path, so dict-based bookkeeping
+    // is acceptable here.
+    pub fn validate(): ValidationReport {
+        val rep = ValidationReport();
+        rep.vertex_count = self.get_vertex_count();
+        rep.face_count = self.get_face_count();
+        rep.issues = [];
+
+        // Weld pass: position key -> canonical vertex id
+        var weld: {str: int} = {};
+        var wid_of: [int] = [];
+        val v_count = self.get_vertex_count();
+        iter (vi in 0..v_count) {
+            val qx = (self.vertices[vi * 3] * 10000.0) as int;
+            val qy = (self.vertices[vi * 3 + 1] * 10000.0) as int;
+            val qz = (self.vertices[vi * 3 + 2] * 10000.0) as int;
+            val pkey = "{qx}_{qy}_{qz}";
+            var wid = weld[pkey];
+            if (wid == nil) {
+                wid = len(wid_of);
+                weld[pkey] = wid;
+            }
+            wid_of.append(wid);
+        }
+
+        var edge_use: {str: int} = {};
+        var edge_dir: {str: int} = {};
+
+        val f_count = self.get_face_count();
+        iter (fi in 0..f_count) {
+            val i0 = self.indices[fi * 3];
+            val i1 = self.indices[fi * 3 + 1];
+            val i2 = self.indices[fi * 3 + 2];
+
+            var face_ok = true;
+            if (i0 < 0 or i0 >= rep.vertex_count or i1 < 0 or i1 >= rep.vertex_count
+                or i2 < 0 or i2 >= rep.vertex_count) {
+                rep.invalid_indices = rep.invalid_indices + 1;
+                rep.issues.append("face {fi}: index out of range");
+                face_ok = false;
+            } elif (i0 == i1 or i1 == i2 or i0 == i2
+                or wid_of[i0] == wid_of[i1] or wid_of[i1] == wid_of[i2]
+                or wid_of[i0] == wid_of[i2]) {
+                rep.degenerate_faces = rep.degenerate_faces + 1;
+                rep.issues.append("face {fi}: repeated/coincident vertex");
+                face_ok = false;
+            } else {
+                val ax = self.vertices[i1 * 3] - self.vertices[i0 * 3];
+                val ay = self.vertices[i1 * 3 + 1] - self.vertices[i0 * 3 + 1];
+                val az = self.vertices[i1 * 3 + 2] - self.vertices[i0 * 3 + 2];
+                val bx = self.vertices[i2 * 3] - self.vertices[i0 * 3];
+                val by = self.vertices[i2 * 3 + 1] - self.vertices[i0 * 3 + 1];
+                val bz = self.vertices[i2 * 3 + 2] - self.vertices[i0 * 3 + 2];
+                val nx = ay * bz - az * by;
+                val ny = az * bx - ax * bz;
+                val nz = ax * by - ay * bx;
+                if (nx * nx + ny * ny + nz * nz < 1e-12) {
+                    rep.degenerate_faces = rep.degenerate_faces + 1;
+                    rep.issues.append("face {fi}: zero-area triangle");
+                    face_ok = false;
+                }
+            }
+
+            if (face_ok) {
+                // Three directed edges on welded ids; undirected key is the
+                // sorted id pair.
+                val edges_i = [wid_of[i0], wid_of[i1], wid_of[i1], wid_of[i2], wid_of[i2], wid_of[i0]];
+                iter (e in 0..3) {
+                    val ea = edges_i[e * 2];
+                    val eb = edges_i[e * 2 + 1];
+                    var lo = ea;
+                    var hi = eb;
+                    if (eb < ea) { lo = eb; hi = ea; }
+                    val ukey = "{lo}_{hi}";
+                    var uc = edge_use[ukey];
+                    if (uc == nil) { uc = 0; }
+                    edge_use[ukey] = uc + 1;
+
+                    val dkey = "{ea}_{eb}";
+                    var dc = edge_dir[dkey];
+                    if (dc == nil) { dc = 0; }
+                    edge_dir[dkey] = dc + 1;
+                }
+            }
+        }
+
+        // Classify edges: undirected count 1 = boundary, >2 = non-manifold;
+        // directed count >1 = two faces wound the same way across the edge.
+        iter (key in edge_use) {
+            val c = edge_use[key];
+            if (c == 1) { rep.boundary_edges = rep.boundary_edges + 1; }
+            elif (c > 2) { rep.non_manifold_edges = rep.non_manifold_edges + 1; }
+        }
+        iter (key in edge_dir) {
+            val c = edge_dir[key];
+            if (c > 1) { rep.inconsistent_winding = true; }
+        }
+        if (rep.boundary_edges > 0) {
+            rep.issues.append("{rep.boundary_edges} edges belong to only one face (mesh is not closed)");
+        }
+        if (rep.non_manifold_edges > 0) {
+            rep.issues.append("{rep.non_manifold_edges} edges shared by more than two faces");
+        }
+        if (rep.inconsistent_winding) {
+            rep.issues.append("adjacent faces wound inconsistently (check face ordering)");
+        }
+        return rep;
+    }
+
+    // Returns a copy with every face duplicated in reverse winding, so the mesh
+    // renders correctly under backface culling from both sides. Vertex normals
+    // are preserved (the renderer flips them for back-facing fragments); this is
+    // geometry-level duplication, not a material flag.
+    pub fn make_double_sided(): Geometry {
+        val g = self.clone();
+        val f_count = self.get_face_count();
+        iter (fi in 0..f_count) {
+            val i0 = self.indices[fi * 3];
+            val i1 = self.indices[fi * 3 + 1];
+            val i2 = self.indices[fi * 3 + 2];
+            g.add_face(i0, i2, i1);
+        }
+        if (len(g.normals) == 0) {
+            g.compute_vertex_normals();
+        }
+        return g;
     }
 }

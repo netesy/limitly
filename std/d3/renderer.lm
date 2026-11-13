@@ -9,7 +9,12 @@ import std.d3.light as lgt;
 import std.d3.geometry as geom;
 import std.d3.material as mtrl;
 import std.d3.types as types;
+import std.d3.culling as cull;
+import std.d3.uniforms as uni;
 import std.gg as gg;
+import std.image.png as png;
+import std.image.index as simg;
+import std.ffi as ffi;
 import std.math.arithmetic as arith;
 import std.math.matrix show Matrix;
 
@@ -100,66 +105,34 @@ fn _project_vertices_parallel(
     }
 }
 
-pub fn render_scene(renderer: Renderer3D, target_scene: sc.Scene3D, target_camera: cam.Camera3D, viewport_x: float, viewport_y: float, viewport_w: float, viewport_h: float) {
-    var vw = viewport_w;
-    var vh = viewport_h;
-    if (vw <= 0.0) { vw = renderer.width as float; }
-    if (vh <= 0.0) { vh = renderer.height as float; }
-
-    gg.begin_batch();
-
-    if (renderer.clear_color) {
-        gg.draw_rect_primitive(viewport_x, viewport_y, vw, vh, target_scene.background_r, target_scene.background_g, target_scene.background_b, target_scene.background_a);
-    }
-
-    val vp = target_camera.view_projection_matrix;
-    val s_lights = target_scene.lights;
-    val n_lights = len(s_lights);
-
-    // Pre-accumulate ambient lights once per frame
-    var amb_r: float = 0.0;
-    var amb_g: float = 0.0;
-    var amb_b: float = 0.0;
-    iter (li in 0..n_lights) {
-        val cl = s_lights[li];
-        match (cl.light_type) {
-            types.LightType.Ambient => {
-                amb_r = amb_r + cl.color_r * cl.intensity;
-                amb_g = amb_g + cl.color_g * cl.intensity;
-                amb_b = amb_b + cl.color_b * cl.intensity;
-            },
-            _ => { }
-        }
-    }
-
-    val half_vw = 0.5 * vw;
-    val half_vh = 0.5 * vh;
-    val bound_w = vw * 2.5;
-    val bound_h = vh * 2.5;
-    val bound_min_x = -vw * 0.5;
-    val bound_max_x = vw * 1.5;
-    val bound_min_y = -vh * 0.5;
-    val bound_max_y = vh * 1.5;
-
-    // Reset pooled SoA triangle buffer without reallocating backing lists
-    renderer.tri_count = 0;
-
-    val s_meshes = target_scene.meshes;
-    val n_meshes = len(s_meshes);
-    iter (m_idx in 0..n_meshes) {
-        val cur_mesh = s_meshes[m_idx];
-        if (cur_mesh.visible) {
-            cur_mesh.update_matrix();
-            val mvp = vp.multiply(cur_mesh.world_matrix);
-
-            val rot_m: Matrix = cur_mesh.world_matrix;
+fn _render_mesh_item(
+    renderer: Renderer3D,
+    geo: geom.Geometry,
+    material: mtrl.Material,
+    world: Matrix,
+    mvp: Matrix,
+    lights: [lgt.Light],
+    n_lights: int,
+    amb_r: float,
+    amb_g: float,
+    amb_b: float,
+    viewport_x: float,
+    viewport_y: float,
+    half_vw: float,
+    half_vh: float,
+    bound_w: float,
+    bound_h: float,
+    bound_min_x: float,
+    bound_max_x: float,
+    bound_min_y: float,
+    bound_max_y: float
+): nil {
+            val rot_m: Matrix = world;
             val rm = rot_m.data;
             val rm0 = rm[0]; val rm1 = rm[1]; val rm2 = rm[2]; val rm3 = rm[3];
             val rm4 = rm[4]; val rm5 = rm[5]; val rm6 = rm[6]; val rm7 = rm[7];
             val rm8 = rm[8]; val rm9 = rm[9]; val rm10 = rm[10]; val rm11 = rm[11];
 
-            val geo: geom.Geometry = cur_mesh.geometry;
-            val cur_mat: mtrl.Material = cur_mesh.material;
             val v_count = geo.get_vertex_count();
             val f_count = geo.get_face_count();
 
@@ -168,18 +141,18 @@ pub fn render_scene(renderer: Renderer3D, target_scene: sc.Scene3D, target_camer
             val g_norms = geo.normals;
             val has_norms = len(g_norms) >= v_count * 3;
 
-            val mat_amb = cur_mat.ambient;
-            val mat_diff = cur_mat.diffuse;
-            val mat_spec = cur_mat.specular;
-            val mat_shin = cur_mat.shininess;
-            val mat_col_r = cur_mat.color_r;
-            val mat_col_g = cur_mat.color_g;
-            val mat_col_b = cur_mat.color_b;
-            val mat_col_a = cur_mat.color_a;
-            val mat_wire = cur_mat.wireframe;
-            val mat_wire_w = cur_mat.wireframe_thickness;
-            val mat_cull = cur_mat.cull_mode;
-            val mat_shading = cur_mat.shading;
+            val mat_amb = material.ambient;
+            val mat_diff = material.diffuse;
+            val mat_spec = material.specular;
+            val mat_shin = material.shininess;
+            val mat_col_r = material.color_r;
+            val mat_col_g = material.color_g;
+            val mat_col_b = material.color_b;
+            val mat_col_a = material.color_a;
+            val mat_wire = material.wireframe;
+            val mat_wire_w = material.wireframe_thickness;
+            val mat_cull = material.cull_mode;
+            val mat_shading = material.shading;
 
             val base_ill_r = mat_amb + amb_r;
             val base_ill_g = mat_amb + amb_g;
@@ -338,7 +311,7 @@ pub fn render_scene(renderer: Renderer3D, target_scene: sc.Scene3D, target_camer
                                     val wcx = rm0 * g_verts[i0 * 3] + rm1 * g_verts[i0 * 3 + 1] + rm2 * g_verts[i0 * 3 + 2] + rm3;
                                     val wcy = rm4 * g_verts[i0 * 3] + rm5 * g_verts[i0 * 3 + 1] + rm6 * g_verts[i0 * 3 + 2] + rm7;
                                     val wcz = rm8 * g_verts[i0 * 3] + rm9 * g_verts[i0 * 3 + 1] + rm10 * g_verts[i0 * 3 + 2] + rm11;
-                                    val ill = _accumulate_lights(s_lights, n_lights, base_ill_r, base_ill_g, base_ill_b, fnx, fny, fnz, wcx, wcy, wcz, mat_diff, mat_spec, mat_shin);
+                                    val ill = _accumulate_lights(lights, n_lights, base_ill_r, base_ill_g, base_ill_b, fnx, fny, fnz, wcx, wcy, wcz, mat_diff, mat_spec, mat_shin);
                                     out_r = mat_col_r * ill.0;
                                     out_g = mat_col_g * ill.1;
                                     out_b = mat_col_b * ill.2;
@@ -367,7 +340,7 @@ pub fn render_scene(renderer: Renderer3D, target_scene: sc.Scene3D, target_camer
                                     val wcx = rm0 * lcx + rm1 * lcy + rm2 * lcz + rm3;
                                     val wcy = rm4 * lcx + rm5 * lcy + rm6 * lcz + rm7;
                                     val wcz = rm8 * lcx + rm9 * lcy + rm10 * lcz + rm11;
-                                    val ill = _accumulate_lights(s_lights, n_lights, base_ill_r, base_ill_g, base_ill_b, fnx, fny, fnz, wcx, wcy, wcz, mat_diff, mat_spec, mat_shin);
+                                    val ill = _accumulate_lights(lights, n_lights, base_ill_r, base_ill_g, base_ill_b, fnx, fny, fnz, wcx, wcy, wcz, mat_diff, mat_spec, mat_shin);
                                     out_r = mat_col_r * ill.0;
                                     out_g = mat_col_g * ill.1;
                                     out_b = mat_col_b * ill.2;
@@ -378,6 +351,425 @@ pub fn render_scene(renderer: Renderer3D, target_scene: sc.Scene3D, target_camer
                             renderer.push_triangle(p0_x, p0_y, p1_x, p1_y, p2_x, p2_y, avg_z, out_r, out_g, out_b, mat_col_a, is_wire, mat_wire_w);
                         }
                     }
+                }
+            }
+}
+
+
+// Builds (once) the interleaved pos+normal+uv vertex stream and index stream
+// for a Geometry and uploads them as gg buffers. Local-space data is
+// transformed by the MVP uniform at draw time, so one buffer serves every
+// mesh/instance that shares the geometry. Vertex record: 8 floats
+// (pos3, normal3, uv2); missing UVs default to (0,0).
+fn _ensure_gpu_buffers(geo: geom.Geometry): nil {
+    if (geo.gpu_vbuf > 0 and geo.gpu_ibuf > 0) {
+        return;
+    }
+    val nv = geo.get_vertex_count();
+    if (nv <= 0) {
+        return;
+    }
+    val has_normals = len(geo.normals) >= nv * 3;
+    val has_uvs = len(geo.uvs) >= nv * 2;
+
+    var vd: [float] = [];
+    var vi: int = 0;
+    while (vi < nv) {
+        val b = vi * 3;
+        vd.append(geo.vertices[b]);
+        vd.append(geo.vertices[b + 1]);
+        vd.append(geo.vertices[b + 2]);
+        if (has_normals) {
+            vd.append(geo.normals[b]);
+            vd.append(geo.normals[b + 1]);
+            vd.append(geo.normals[b + 2]);
+        } else {
+            vd.append(0.0);
+            vd.append(1.0);
+            vd.append(0.0);
+        }
+        if (has_uvs) {
+            vd.append(geo.uvs[vi * 2]);
+            vd.append(geo.uvs[vi * 2 + 1]);
+        } else {
+            vd.append(0.0);
+            vd.append(0.0);
+        }
+        vi = vi + 1;
+    }
+
+    var idf: [float] = [];
+    iter (iv in geo.indices) {
+        idf.append(iv as float);
+    }
+    if (len(idf) == 0) {
+        var si: int = 0;
+        while (si < nv) {
+            idf.append(si as float);
+            si = si + 1;
+        }
+    }
+
+    geo.gpu_vbuf = gg.make_buffer_data(len(vd), false, vd).id;
+    geo.gpu_ibuf = gg.make_buffer_data(len(idf), true, idf).id;
+}
+
+// Loads material.base_color_texture once and uploads it as a gg image.
+// material.texture_state: 0 = not tried, 1 = ready (texture_id valid),
+// -1 = failed (renderer falls back to flat material color).
+fn _ensure_material_texture(material: mtrl.Material): nil {
+    if (material.texture_state != 0) {
+        return;
+    }
+    material.texture_state = -1;
+    if (material.base_color_texture == "") {
+        return;
+    }
+    // load_rgba returns (w, h, px) as a tuple — deliberately avoids the
+    // Image frame, whose field layout is corrupted when another module
+    // declares a same-named frame (bare-name registry collision).
+    val rgba = png.load_rgba(material.base_color_texture);
+    val t = rgba? else {
+        return;
+    };
+    val w = t.0;
+    val h = t.1;
+    val px = t.2;
+    if (w <= 0 or h <= 0 or len(px) != w * h * 4) {
+        return;
+    }
+    material.texture_id = gg.make_image_data(w, h, px);
+    material.texture_state = 1;
+}
+
+// Uniform blob layout consumed by the runtime vertex-stream pipeline.
+// See src/runtime/software_graphics.hh draw_vertex_stream.
+fn _uniform_shading_int(shading: types.ShadingModel, wireframe: bool): int {
+    if (wireframe) {
+        return uni.SHADING_WIREFRAME;
+    }
+    match (shading) {
+        types.ShadingModel.Flat => { return uni.SHADING_FLAT; },
+        types.ShadingModel.Smooth => { return uni.SHADING_SMOOTH; },
+        types.ShadingModel.Unlit => { return uni.SHADING_UNLIT; },
+        types.ShadingModel.Wireframe => { return uni.SHADING_WIREFRAME; },
+        types.ShadingModel.NormalVisualizer => { return uni.SHADING_NORMAL_VIZ; }
+    }
+    return uni.SHADING_FLAT;
+}
+
+fn _uniform_cull_int(material: mtrl.Material): int {
+    if (material.double_sided) {
+        return uni.CULL_NONE;
+    }
+    match (material.cull_mode) {
+        types.CullMode.None => { return uni.CULL_NONE; },
+        types.CullMode.Back => { return uni.CULL_BACK; },
+        types.CullMode.Front => { return uni.CULL_FRONT; }
+    }
+    return uni.CULL_NONE;
+}
+
+fn _uniform_light_type_int(light: lgt.Light): int {
+    match (light.light_type) {
+        types.LightType.Ambient => { return uni.LIGHT_AMBIENT; },
+        types.LightType.Directional => { return uni.LIGHT_DIRECTIONAL; },
+        types.LightType.Point => { return uni.LIGHT_POINT; }
+    }
+    return uni.LIGHT_AMBIENT;
+}
+
+// Fills renderer.uniform_scratch with the per-draw uniform blob. The scratch
+// list is grown once and overwritten in place — no per-frame allocation.
+fn _pack_mesh_uniforms(
+    renderer: Renderer3D,
+    geo: geom.Geometry,
+    material: mtrl.Material,
+    world: Matrix,
+    mvp: Matrix,
+    lights: [lgt.Light],
+    n_lights: int,
+    amb_r: float,
+    amb_g: float,
+    amb_b: float,
+    viewport_x: float,
+    viewport_y: float,
+    viewport_w: float,
+    viewport_h: float
+): nil {
+    // Header + MAX_LIGHTS light records (indices from std.d3.uniforms)
+    val needed = uni.BLOB_FLOATS;
+    while (len(renderer.uniform_scratch) < needed) {
+        renderer.uniform_scratch.append(0.0);
+    }
+    val u = renderer.uniform_scratch;
+
+    val md = mvp.data;
+    val wd = world.data;
+    var i = 0;
+    while (i < 16) {
+        u[uni.U_MVP + i] = md[i];
+        u[uni.U_WORLD + i] = wd[i];
+        i = i + 1;
+    }
+    u[uni.U_COLOR] = material.color_r;
+    u[uni.U_COLOR + 1] = material.color_g;
+    u[uni.U_COLOR + 2] = material.color_b;
+    u[uni.U_COLOR + 3] = material.color_a;
+    u[uni.U_AMBIENT] = material.ambient + amb_r;
+    u[uni.U_AMBIENT + 1] = material.ambient + amb_g;
+    u[uni.U_AMBIENT + 2] = material.ambient + amb_b;
+    u[uni.U_MATERIAL] = material.diffuse;
+    u[uni.U_MATERIAL + 1] = material.specular;
+    u[uni.U_MATERIAL + 2] = material.shininess;
+    u[uni.U_SHADING] = _uniform_shading_int(material.shading, material.wireframe) as float;
+    u[uni.U_CULL] = _uniform_cull_int(material) as float;
+    u[uni.U_WIRE_WIDTH] = material.wireframe_thickness;
+    if (len(geo.normals) >= geo.get_vertex_count() * 3) {
+        u[uni.U_HAS_NORMALS] = 1.0;
+    } else {
+        u[uni.U_HAS_NORMALS] = 0.0;
+    }
+    u[uni.U_VIEWPORT] = viewport_x;
+    u[uni.U_VIEWPORT + 1] = viewport_y;
+    u[uni.U_VIEWPORT + 2] = viewport_w;
+    u[uni.U_VIEWPORT + 3] = viewport_h;
+    if (material.texture_id > 0) {
+        u[uni.U_HAS_TEXTURE] = 1.0;
+    } else {
+        u[uni.U_HAS_TEXTURE] = 0.0;
+    }
+
+    var n_cap = n_lights;
+    if (n_cap > uni.MAX_LIGHTS) { n_cap = uni.MAX_LIGHTS; }
+    if (n_cap < 0) { n_cap = 0; }
+    u[uni.U_LIGHT_COUNT] = n_cap as float;
+    var li = 0;
+    while (li < n_cap) {
+        val cl = lights[li];
+        val lb = uni.U_LIGHT_BASE + li * uni.U_LIGHT_STRIDE;
+        u[lb + uni.U_LIGHT_TYPE] = _uniform_light_type_int(cl) as float;
+        if (cl.light_type == types.LightType.Point) {
+            u[lb + uni.U_LIGHT_DIR] = cl.position_x;
+            u[lb + uni.U_LIGHT_DIR + 1] = cl.position_y;
+            u[lb + uni.U_LIGHT_DIR + 2] = cl.position_z;
+        } else {
+            u[lb + uni.U_LIGHT_DIR] = cl.direction_x;
+            u[lb + uni.U_LIGHT_DIR + 1] = cl.direction_y;
+            u[lb + uni.U_LIGHT_DIR + 2] = cl.direction_z;
+        }
+        u[lb + uni.U_LIGHT_COLOR] = cl.color_r;
+        u[lb + uni.U_LIGHT_COLOR + 1] = cl.color_g;
+        u[lb + uni.U_LIGHT_COLOR + 2] = cl.color_b;
+        u[lb + uni.U_LIGHT_INT] = cl.intensity;
+        li = li + 1;
+    }
+}
+
+// GPU path: one vertex-stream draw call per visible mesh/instance through the
+// gg buffer/pipeline/bindings handles. The runtime performs vertex transform,
+// lighting, and z-buffered rasterization.
+fn _draw_mesh_gpu(
+    renderer: Renderer3D,
+    geo: geom.Geometry,
+    material: mtrl.Material,
+    world: Matrix,
+    mvp: Matrix,
+    lights: [lgt.Light],
+    n_lights: int,
+    amb_r: float,
+    amb_g: float,
+    amb_b: float,
+    viewport_x: float,
+    viewport_y: float,
+    viewport_w: float,
+    viewport_h: float,
+    frustum: [float]
+): nil {
+    _ensure_gpu_buffers(geo);
+    if (geo.gpu_vbuf <= 0 or geo.gpu_ibuf <= 0) {
+        return;
+    }
+    if (not cull.sphere_visible(frustum, geo, world)) {
+        return;
+    }
+    _ensure_material_texture(material);
+    _pack_mesh_uniforms(renderer, geo, material, world, mvp, lights, n_lights,
+                        amb_r, amb_g, amb_b, viewport_x, viewport_y, viewport_w, viewport_h);
+    gg.apply_bindings(geo.gpu_vbuf, geo.gpu_ibuf, renderer.uniform_scratch,
+                      material.texture_id, 0);
+    gg.draw(0, geo.get_face_count(), 1);
+}
+
+fn _render_scene_gpu(
+    renderer: Renderer3D,
+    target_scene: sc.Scene3D,
+    target_camera: cam.Camera3D,
+    viewport_x: float,
+    viewport_y: float,
+    viewport_w: float,
+    viewport_h: float
+) {
+    var vw = viewport_w;
+    var vh = viewport_h;
+    if (vw <= 0.0) { vw = renderer.width as float; }
+    if (vh <= 0.0) { vh = renderer.height as float; }
+
+    if (renderer.pipeline_id < 0) {
+        val shd = gg.make_shader("lymar_d3_vertex", "lymar_d3_pixel");
+        // primitive_type 2 = VertexStream (see gg.PrimitiveType)
+        renderer.pipeline_id = gg.make_pipeline(shd.id, 2).id;
+    }
+    gg.apply_pipeline(renderer.pipeline_id);
+
+    if (renderer.clear_color) {
+        gg.draw_rect_primitive(viewport_x, viewport_y, vw, vh,
+                               target_scene.background_r, target_scene.background_g,
+                               target_scene.background_b, target_scene.background_a);
+    }
+
+    val vp = target_camera.view_projection_matrix;
+    val s_lights = target_scene.lights;
+    val n_lights = len(s_lights);
+
+    var amb_r: float = 0.0;
+    var amb_g: float = 0.0;
+    var amb_b: float = 0.0;
+    iter (li in 0..n_lights) {
+        val cl = s_lights[li];
+        if (cl.light_type == types.LightType.Ambient) {
+            amb_r = amb_r + cl.color_r * cl.intensity;
+            amb_g = amb_g + cl.color_g * cl.intensity;
+            amb_b = amb_b + cl.color_b * cl.intensity;
+        }
+    }
+
+    val frustum = cull.frustum_planes(vp);
+
+    val s_meshes = target_scene.meshes;
+    iter (m_idx in 0..len(s_meshes)) {
+        val cur_mesh = s_meshes[m_idx];
+        if (cur_mesh.visible) {
+            cur_mesh.update_world();
+            val world_m = cur_mesh.world_matrix;
+            _draw_mesh_gpu(renderer, cur_mesh.geometry, cur_mesh.material, world_m,
+                           vp.multiply(world_m), s_lights, n_lights, amb_r, amb_g, amb_b,
+                           viewport_x, viewport_y, vw, vh, frustum);
+        }
+    }
+
+    iter (gi in 0..len(target_scene.instance_groups)) {
+        val grp = target_scene.instance_groups[gi];
+        val im = grp.mesh;
+        if (im.visible) {
+            im.update_world();
+            iter (t in grp.transforms) {
+                val eff_world = im.world_matrix.multiply(t);
+                _draw_mesh_gpu(renderer, im.geometry, im.material, eff_world,
+                               vp.multiply(eff_world), s_lights, n_lights, amb_r, amb_g, amb_b,
+                               viewport_x, viewport_y, vw, vh, frustum);
+            }
+        }
+    }
+}
+
+pub fn render_scene(renderer: Renderer3D, target_scene: sc.Scene3D, target_camera: cam.Camera3D, viewport_x: float, viewport_y: float, viewport_w: float, viewport_h: float) {
+    if (gg.is_valid()) {
+        _render_scene_gpu(renderer, target_scene, target_camera, viewport_x, viewport_y, viewport_w, viewport_h);
+        return;
+    }
+    _render_scene_cpu(renderer, target_scene, target_camera, viewport_x, viewport_y, viewport_w, viewport_h);
+}
+
+fn _render_scene_cpu(
+    renderer: Renderer3D,
+    target_scene: sc.Scene3D,
+    target_camera: cam.Camera3D,
+    viewport_x: float,
+    viewport_y: float,
+    viewport_w: float,
+    viewport_h: float
+) {
+    var vw = viewport_w;
+    var vh = viewport_h;
+    if (vw <= 0.0) { vw = renderer.width as float; }
+    if (vh <= 0.0) { vh = renderer.height as float; }
+
+    gg.begin_batch();
+
+    if (renderer.clear_color) {
+        gg.draw_rect_primitive(viewport_x, viewport_y, vw, vh, target_scene.background_r, target_scene.background_g, target_scene.background_b, target_scene.background_a);
+    }
+
+    val vp = target_camera.view_projection_matrix;
+    val s_lights = target_scene.lights;
+    val n_lights = len(s_lights);
+
+    // Pre-accumulate ambient lights once per frame
+    var amb_r: float = 0.0;
+    var amb_g: float = 0.0;
+    var amb_b: float = 0.0;
+    iter (li in 0..n_lights) {
+        val cl = s_lights[li];
+        match (cl.light_type) {
+            types.LightType.Ambient => {
+                amb_r = amb_r + cl.color_r * cl.intensity;
+                amb_g = amb_g + cl.color_g * cl.intensity;
+                amb_b = amb_b + cl.color_b * cl.intensity;
+            },
+            _ => { }
+        }
+    }
+
+    val half_vw = 0.5 * vw;
+    val half_vh = 0.5 * vh;
+    val bound_w = vw * 2.5;
+    val bound_h = vh * 2.5;
+    val bound_min_x = -vw * 0.5;
+    val bound_max_x = vw * 1.5;
+    val bound_min_y = -vh * 0.5;
+    val bound_max_y = vh * 1.5;
+
+    // Reset pooled SoA triangle buffer without reallocating backing lists
+    renderer.tri_count = 0;
+
+    val s_meshes = target_scene.meshes;
+    val n_meshes = len(s_meshes);
+
+    // Frustum planes from the view-projection for whole-mesh sphere culling.
+    val frustum = cull.frustum_planes(vp);
+
+    // Regular meshes
+    iter (m_idx in 0..n_meshes) {
+        val cur_mesh = s_meshes[m_idx];
+        if (cur_mesh.visible) {
+            cur_mesh.update_world();
+            val world_m = cur_mesh.world_matrix;
+            val geo: geom.Geometry = cur_mesh.geometry;
+            if (cull.sphere_visible(frustum, geo, world_m)) {
+                _render_mesh_item(renderer, geo, cur_mesh.material, world_m, vp.multiply(world_m),
+                                  s_lights, n_lights, amb_r, amb_g, amb_b,
+                                  viewport_x, viewport_y, half_vw, half_vh,
+                                  bound_w, bound_h, bound_min_x, bound_max_x, bound_min_y, bound_max_y);
+            }
+        }
+    }
+
+    // Instanced groups: one draw per transform, geometry shared.
+    val n_groups = len(target_scene.instance_groups);
+    iter (gi in 0..n_groups) {
+        val grp = target_scene.instance_groups[gi];
+        val im = grp.mesh;
+        if (im.visible) {
+            im.update_world();
+            iter (t in grp.transforms) {
+                val eff_world = im.world_matrix.multiply(t);
+                val geo: geom.Geometry = im.geometry;
+                if (cull.sphere_visible(frustum, geo, eff_world)) {
+                    _render_mesh_item(renderer, geo, im.material, eff_world, vp.multiply(eff_world),
+                                      s_lights, n_lights, amb_r, amb_g, amb_b,
+                                      viewport_x, viewport_y, half_vw, half_vh,
+                                      bound_w, bound_h, bound_min_x, bound_max_x, bound_min_y, bound_max_y);
                 }
             }
         }
@@ -513,6 +905,10 @@ frame Renderer3D {
     pub tri_order: [int];
     pub tri_count: int;
 
+    // GPU path state: vertex-stream pipeline id and pooled uniform scratch.
+    pub pipeline_id: int;
+    pub uniform_scratch: [float];
+
     pub init(w: int = 800, h: int = 600) {
         self.width = w;
         self.height = h;
@@ -524,6 +920,8 @@ frame Renderer3D {
         self.tri_wire_w = [];
         self.tri_order = [];
         self.tri_count = 0;
+        self.pipeline_id = -1;
+        self.uniform_scratch = [];
     }
 
     pub fn push_triangle(

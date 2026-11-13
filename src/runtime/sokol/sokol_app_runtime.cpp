@@ -1,6 +1,8 @@
 #include "sokol_app_runtime.hh"
+#include "sokol_gfx_runtime.hh"
 
 #include <atomic>
+#include <chrono>
 #include <condition_variable>
 #include <cstring>
 #include <mutex>
@@ -8,7 +10,7 @@
 
 #if defined(_WIN32)
 #define SOKOL_NO_ENTRY
-#define SOKOL_NOAPI
+#define SOKOL_D3D11
 #define SOKOL_APP_IMPL
 #include "sokol_app.h"
 #include <windows.h>
@@ -21,11 +23,8 @@ struct SokolAppRuntime::Impl {
     std::condition_variable ready_cv;
     std::condition_variable frame_cv;
     std::vector<RuntimeAppEvent> events;
-    std::vector<std::uint8_t> bgra;
     std::thread app_thread;
     std::string title;
-    int frame_width = 0;
-    int frame_height = 0;
     std::uint64_t frame_generation = 0;
     std::uint64_t consumed_generation = 0;
     std::atomic<bool> started{false};
@@ -56,6 +55,9 @@ static void sokol_init(void* user_data) {
     auto* state = static_cast<SokolAppRuntime::Impl*>(user_data);
     state->alive = true;
     state->started = true;
+    // D3D11 device/swapchain are valid inside this callback; bring up
+    // sokol_gfx on the same thread that owns the GPU context.
+    ::sokol_gfx_runtime().setup();
     state->ready_cv.notify_all();
 }
 
@@ -65,36 +67,25 @@ static void sokol_frame(void* user_data) {
         sapp_request_quit();
     }
 
-    std::lock_guard<std::mutex> lock(state->mutex);
-    if (!state->bgra.empty() && state->frame_width > 0 && state->frame_height > 0) {
-        HWND hwnd = static_cast<HWND>(const_cast<void*>(sapp_win32_get_hwnd()));
-        if (hwnd) {
-            HDC hdc = GetDC(hwnd);
-            if (hdc) {
-                RECT rc{};
-                GetClientRect(hwnd, &rc);
-                int dst_w = rc.right - rc.left;
-                int dst_h = rc.bottom - rc.top;
-                BITMAPINFO bmi{};
-                bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-                bmi.bmiHeader.biWidth = state->frame_width;
-                bmi.bmiHeader.biHeight = -state->frame_height;
-                bmi.bmiHeader.biPlanes = 1;
-                bmi.bmiHeader.biBitCount = 32;
-                bmi.bmiHeader.biCompression = BI_RGB;
-                StretchDIBits(hdc, 0, 0, dst_w, dst_h, 0, 0,
-                              state->frame_width, state->frame_height, state->bgra.data(),
-                              &bmi, DIB_RGB_COLORS, SRCCOPY);
-                ReleaseDC(hwnd, hdc);
-            }
-        }
-    }
+    // Drain queued graphics commands and present through the D3D11
+    // swapchain. GDI presentation is intentionally absent: mixing
+    // StretchDIBits with a swapchain on the same HWND fights DWM.
+    const bool presented = ::sokol_gfx_runtime().render_frame();
     ++state->frame_generation;
     state->frame_cv.notify_all();
+
+    if (!presented) {
+        // No present means no vsync throttle — without this the sapp loop
+        // would spin at thousands of Hz while the VM produces frames far
+        // more slowly. Idle pacing keeps wakeups bounded (~500 Hz) so the
+        // VM's wait_for_frame still responds promptly to commits.
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
 }
 
 static void sokol_cleanup(void* user_data) {
     auto* state = static_cast<SokolAppRuntime::Impl*>(user_data);
+    ::sokol_gfx_runtime().shutdown();
     state->alive = false;
     state->push(0); // EVENT_QUIT
     state->frame_cv.notify_all();
@@ -206,18 +197,16 @@ void SokolAppRuntime::poll_events(std::vector<RuntimeAppEvent>& events) {
 }
 
 void SokolAppRuntime::submit_frame(const std::uint8_t* rgba, int width, int height) {
+    // Software-fallback presentation path: upload the CPU framebuffer as a
+    // streaming RGBA8 image and blit it through sokol_gfx (never GDI).
     if (!running() || !rgba || width <= 0 || height <= 0) return;
-    std::lock_guard<std::mutex> lock(impl_->mutex);
+    GfxCommand cmd;
+    cmd.type = GfxCommand::Type::BlitFramebuffer;
+    cmd.w = width;
+    cmd.h = height;
     const std::size_t size = static_cast<std::size_t>(width) * height * 4;
-    impl_->bgra.resize(size);
-    for (std::size_t i = 0; i < size; i += 4) {
-        impl_->bgra[i] = rgba[i + 2];
-        impl_->bgra[i + 1] = rgba[i + 1];
-        impl_->bgra[i + 2] = rgba[i];
-        impl_->bgra[i + 3] = rgba[i + 3];
-    }
-    impl_->frame_width = width;
-    impl_->frame_height = height;
+    cmd.pixels.assign(rgba, rgba + size);
+    ::sokol_gfx_runtime().submit(cmd);
 }
 
 void SokolAppRuntime::wait_for_frame() {

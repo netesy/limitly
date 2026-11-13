@@ -1,0 +1,110 @@
+// tests/d3_gpu_test.lm
+// Headless verification of the std.d3 GPU vertex-stream path: geometry is
+// uploaded once as interleaved pos+normal vertex/index buffers, and each mesh
+// draws through gg pipeline/bindings/uniforms with runtime lighting + z-buffer.
+
+import std.d3 as d3;
+import std.gg as gg;
+
+fn main() {
+    print("=== d3 GPU vertex-stream pipeline ===");
+    assert(gg.setup(), "gg setup failed");
+    gg.begin_pass(200, 200, 0.0, 0.0, 0.0, 1.0);
+
+    // Large unlit red triangle covering the screen center.
+    var tri = d3.Geometry();
+    var a = tri.add_vertex(-2.0, -2.0, 0.0);
+    var b = tri.add_vertex(4.0, -2.0, 0.0);
+    var c = tri.add_vertex(-2.0, 4.0, 0.0);
+    tri.add_face(a, b, c);
+    tri.compute_vertex_normals();
+
+    var mat = d3.basic_material(1.0, 0.0, 0.0);
+    mat.shading = d3.ShadingModel.Unlit;
+    mat.cull_mode = d3.CullMode.None;
+
+    var mesh = d3.Mesh(tri, mat);
+    var scene = d3.Scene3D();
+    scene.add(mesh);
+    var cam = d3.perspective_camera(60.0, 1.0, 0.1, 100.0);
+
+    var renderer = d3.Renderer3D(200, 200);
+    renderer.render(scene, cam, 0.0, 0.0, 200.0, 200.0);
+    gg.end_pass();
+    gg.commit();
+
+    // READ packs pixels as (r<<24)|(g<<16)|(b<<8)|a
+    var px = gg.readback_pixel(100, 100);
+    assert(px != nil, "center pixel readback");
+    val pxi = px as int;
+    val r = (pxi >> 24) & 255;
+    val g = (pxi >> 16) & 255;
+    val b = (pxi >> 8) & 255;
+    assert(r > 200, "center pixel is red");
+    assert(g < 60, "center pixel has no green");
+    assert(b < 60, "center pixel has no blue");
+
+    // Corner outside the triangle stays black.
+    var corner = gg.readback_pixel(2, 2);
+    assert(corner != nil, "corner pixel readback");
+    val cr = ((corner as int) >> 24) & 255;
+    assert(cr < 60, "corner pixel stays background");
+
+    // Second render must reuse cached buffers (no re-upload, no crash).
+    gg.begin_pass(200, 200, 0.0, 0.0, 0.0, 1.0);
+    renderer.render(scene, cam, 0.0, 0.0, 200.0, 200.0);
+    gg.end_pass();
+    gg.commit();
+    var px2 = gg.readback_pixel(100, 100);
+    assert(px2 == px, "second frame renders identically");
+
+    // Lit path: lambert material + directional light exercises the fragment
+    // lighting stage and the depth buffer.
+    var lit_mat = d3.lambert_material(0.9, 0.2, 0.1);
+    lit_mat.cull_mode = d3.CullMode.None;
+    var lit_mesh = d3.Mesh(tri, lit_mat);
+    var lit_scene = d3.Scene3D();
+    lit_scene.add(lit_mesh);
+    lit_scene.add_light(d3.directional_light(0.0, 0.0, -1.0, 1.0, 1.0, 1.0, 1.0));
+    lit_scene.add_light(d3.ambient_light(1.0, 1.0, 1.0, 0.4));
+
+    gg.begin_pass(200, 200, 0.0, 0.0, 0.0, 1.0);
+    renderer.render(lit_scene, cam, 0.0, 0.0, 200.0, 200.0);
+    gg.end_pass();
+    gg.commit();
+    var lp = gg.readback_pixel(100, 100);
+    assert(lp != nil, "lit center pixel readback");
+    val lpi = lp as int;
+    val lr = (lpi >> 24) & 255;
+    val lg = (lpi >> 16) & 255;
+    assert(lr > 60, "lit pixel has red contribution");
+    assert(lg < lr, "lit pixel red-dominant");
+
+    // Depth test: a second mesh behind the first must not overwrite it.
+    var back_tri = d3.Geometry();
+    var d = back_tri.add_vertex(-2.0, -2.0, -5.0);
+    var e = back_tri.add_vertex(4.0, -2.0, -5.0);
+    var f = back_tri.add_vertex(-2.0, 4.0, -5.0);
+    back_tri.add_face(d, e, f);
+    back_tri.compute_vertex_normals();
+    var back_mat = d3.basic_material(0.0, 0.0, 1.0);
+    back_mat.shading = d3.ShadingModel.Unlit;
+    back_mat.cull_mode = d3.CullMode.None;
+    var depth_scene = d3.Scene3D();
+    depth_scene.add(d3.Mesh(tri, mat));       // red, z=0 (near)
+    depth_scene.add(d3.Mesh(back_tri, back_mat)); // blue, z=-5 (far)
+
+    gg.begin_pass(200, 200, 0.0, 0.0, 0.0, 1.0);
+    renderer.render(depth_scene, cam, 0.0, 0.0, 200.0, 200.0);
+    gg.end_pass();
+    gg.commit();
+    var dp = gg.readback_pixel(100, 100);
+    assert(dp != nil, "depth center pixel readback");
+    val dpi = dp as int;
+    val dr = (dpi >> 24) & 255;
+    val db = (dpi >> 8) & 255;
+    assert(dr > 200 and db < 60, "near red triangle wins over far blue (z-buffer)");
+
+    gg.shutdown();
+    print("d3 GPU pipeline test passed!");
+}

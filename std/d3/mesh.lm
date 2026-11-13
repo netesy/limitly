@@ -15,11 +15,79 @@ frame Mesh {
     pub name: str;
     pub visible: bool;
 
+    // Optional scene-graph parent. When set, this mesh's world_matrix is
+    // composed as parent.world_matrix * local_matrix by update_world().
+    // The mesh must still be added to the scene's flat mesh list — parenting
+    // affects transforms only, not scene membership.
+    pub parent: Mesh?;
+
     pub init(geo: geom.Geometry, m: mtrl.Material, name: str = "") {
         self.init_transform();
         self.geometry = geo;
         self.material = m;
         self.name = name;
         self.visible = true;
+        self.parent = nil;
+    }
+
+    // Attach this mesh under `p`: its local TRS is now interpreted in the
+    // parent's space. Call scene.add() on every mesh regardless — the scene
+    // stays a flat list; parenting only composes transforms.
+    pub fn attach_to(p: Mesh) {
+        self.parent = p;
+    }
+
+    pub fn detach() {
+        self.parent = nil;
+    }
+
+    // Refresh local TRS and compose world_matrix through the parent chain.
+    // Every ancestor's world_matrix is also updated, so ancestors that are
+    // themselves rendered stay correct. Iterative with a depth cap so a
+    // parent cycle degrades to a truncated chain instead of hanging.
+    pub fn update_world() {
+        self.update_matrix();
+        if (self.parent == nil) {
+            // world == local. Re-sync unconditionally: update_matrix() skips
+            // work when the TRS is unchanged, which would leave a stale
+            // composed matrix behind after detach() or reparenting.
+            iter (k in 0..16) {
+                self.world_matrix.data[k] = self.local_matrix.data[k];
+            }
+            return;
+        }
+
+        var chain: [Mesh] = [];
+        var p = self.parent;
+        var depth = 0;
+        while (p != nil and depth < 64) {
+            val pn = p as Mesh;
+            chain.append(pn);
+            p = pn.parent;
+            depth = depth + 1;
+        }
+
+        val n = len(chain);
+        var idx = n - 1;
+        // Root ancestor: world = local (its chain ended at a nil parent or
+        // the depth cap).
+        chain[idx].update_matrix();
+        var cur = chain[idx].local_matrix.clone();
+        iter (k in 0..16) {
+            chain[idx].world_matrix.data[k] = cur.data[k];
+        }
+        idx = idx - 1;
+        while (idx >= 0) {
+            chain[idx].update_matrix();
+            cur = cur.multiply(chain[idx].local_matrix);
+            iter (k in 0..16) {
+                chain[idx].world_matrix.data[k] = cur.data[k];
+            }
+            idx = idx - 1;
+        }
+        cur = cur.multiply(self.local_matrix);
+        iter (k in 0..16) {
+            self.world_matrix.data[k] = cur.data[k];
+        }
     }
 }

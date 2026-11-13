@@ -21,6 +21,26 @@ frame Material {
     pub shading: types.ShadingModel;
     pub cull_mode: types.CullMode;
 
+    // Texture bindings (asset paths or gpu texture handles; consumed by the
+    // GPU pipeline — the software rasterizer ignores them).
+    pub base_color_texture: str;
+    // Runtime texture state managed by the renderer: 0 = not loaded,
+    // 1 = uploaded (texture_id valid), -1 = load failed (fall back to color).
+    pub texture_state: int;
+    pub texture_id: int;
+    pub normal_map: str;
+    pub metallic_roughness_map: str;
+    pub occlusion_map: str;
+    pub emissive_map: str;
+
+    // PBR-lite parameters layered on top of the Blinn-Phong fields above.
+    pub emissive_r: float;
+    pub emissive_g: float;
+    pub emissive_b: float;
+    pub ao: float;
+    pub alpha_cutoff: float;
+    pub double_sided: bool;
+
     pub init(r: float = 0.8, g: float = 0.8, b: float = 0.8, a: float = 1.0) {
         self.color_r = r;
         self.color_g = g;
@@ -38,6 +58,21 @@ frame Material {
         self.wireframe_thickness = 1.5;
         self.shading = types.ShadingModel.Flat;
         self.cull_mode = types.CullMode.Back;
+
+        self.base_color_texture = "";
+        self.texture_state = 0;
+        self.texture_id = 0;
+        self.normal_map = "";
+        self.metallic_roughness_map = "";
+        self.occlusion_map = "";
+        self.emissive_map = "";
+
+        self.emissive_r = 0.0;
+        self.emissive_g = 0.0;
+        self.emissive_b = 0.0;
+        self.ao = 1.0;
+        self.alpha_cutoff = 0.5;
+        self.double_sided = false;
     }
 
     pub fn set_color(r: float, g: float, b: float, a: float = 1.0) {
@@ -75,6 +110,17 @@ pub fn phong_material(r: float = 0.8, g: float = 0.8, b: float = 0.8, shininess:
     m.diffuse = 0.75;
     m.specular = 0.6;
     m.shininess = shininess;
+    m.shading = types.ShadingModel.Smooth;
+    return m;
+}
+
+/// Creates a PBR-lite material carrying metallic/roughness and optional
+/// texture-map bindings for the GPU pipeline.
+pub fn pbr_material(r: float = 0.8, g: float = 0.8, b: float = 0.8,
+                    metallic: float = 0.0, roughness: float = 0.5): Material {
+    var m = Material(r=r, g=g, b=b, a=1.0);
+    m.metallic = metallic;
+    m.roughness = roughness;
     m.shading = types.ShadingModel.Smooth;
     return m;
 }

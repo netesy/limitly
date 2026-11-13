@@ -525,15 +525,18 @@ bool TypeChecker::is_visible(const std::string& frame_name, LM::Frontend::AST::V
         return false;
     }
 
-    // Check if we are inside the same frame
-    if (current_frame->name == frame_name) {
+    // Check if we are inside the same frame. frame_name arrives module-qualified
+    // for module-declared frames, so compare canonical identities.
+    std::string current_canon = qualify_declared_name(current_frame->name);
+    if (current_frame->name == frame_name || current_canon == frame_name) {
         return true;
     }
 
     // Protected allows access from related frames (those sharing traits)
     if (visibility == LM::Frontend::AST::VisibilityLevel::Protected) {
         auto target_info = type_system.getFrameInfo(frame_name);
-        auto current_info = type_system.getFrameInfo(current_frame->name);
+        auto current_info = type_system.getFrameInfo(current_canon);
+        if (!current_info) current_info = type_system.getFrameInfo(current_frame->name);
 
         if (target_info && current_info) {
             // Check if current frame inherits from target frame
@@ -549,7 +552,33 @@ bool TypeChecker::is_visible(const std::string& frame_name, LM::Frontend::AST::V
     return false;
 }
 
+std::string TypeChecker::qualify_declared_name(const std::string& name) const {
+    if (name.find('.') != std::string::npos) return name;
+    if (current_module_name.empty() || current_module_name == "root") return name;
+    return current_module_name + "." + name;
+}
+
+std::string TypeChecker::canonical_symbol_name(const std::string& name,
+                                               const std::shared_ptr<LM::Frontend::AST::Statement>& stmt) const {
+    if (name.find('.') != std::string::npos) return name;
+    if (current_program_) {
+        for (const auto& [k, s] : current_program_->imported_symbols) {
+            if (k.find('.') != std::string::npos && s == stmt) return k;
+        }
+    }
+    return qualify_declared_name(name);
+}
+
 const TypeChecker::FrameInfo* TypeChecker::lookup_frame_info(const std::string& name) const {
+    // A bare name inside a module refers to that module's own declaration first;
+    // this keeps same-named frames in other modules from shadowing it.
+    if (name.find('.') == std::string::npos && !current_module_name.empty() &&
+        current_module_name != "root") {
+        auto qit = frame_declarations.find(current_module_name + "." + name);
+        if (qit != frame_declarations.end() && qit->second.declaration != nullptr) {
+            return &qit->second;
+        }
+    }
     auto it = frame_declarations.find(name);
     if (it != frame_declarations.end() && it->second.declaration != nullptr) {
         return &it->second;

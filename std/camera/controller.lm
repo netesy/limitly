@@ -1,0 +1,205 @@
+// std/camera/controller.lm
+// Interactive camera controllers: orbit (turntable around a target) and fly
+// (first-person look + move). Both wrap Camera3D and recompute its view
+// matrix from yaw/pitch state, so they compose with any projection type.
+
+import std.camera.camera3d as cam3d;
+import std.camera.camera3d show Camera3D;
+import std.math.trigonometry as trig;
+import std.math.arithmetic as arith;
+import std.math.constants as const;
+
+// Turntable controller: orbits `camera` around `target` at `distance`.
+// Angles are radians; pitch is clamped to avoid gimbal flip at the poles.
+frame OrbitController {
+    pub camera: Camera3D;
+    pub target_x: float;
+    pub target_y: float;
+    pub target_z: float;
+    pub yaw: float;
+    pub pitch: float;
+    pub distance: float;
+    pub min_distance: float;
+    pub max_distance: float;
+    pub min_pitch: float;
+    pub max_pitch: float;
+    pub rotate_speed: float;
+    pub zoom_speed: float;
+
+    pub init(target_camera: Camera3D, tx: float = 0.0, ty: float = 0.0, tz: float = 0.0,
+             distance_val: float = 5.0, yaw_val: float = 0.0, pitch_val: float = 0.3) {
+        self.camera = target_camera;
+        self.target_x = tx;
+        self.target_y = ty;
+        self.target_z = tz;
+        self.yaw = yaw_val;
+        self.pitch = arith.clamp(pitch_val, -1.55, 1.55);
+        self.distance = distance_val;
+        self.min_distance = 0.1;
+        self.max_distance = 1000.0;
+        self.min_pitch = -1.55;
+        self.max_pitch = 1.55;
+        self.rotate_speed = 1.0;
+        self.zoom_speed = 1.0;
+        self.update();
+    }
+
+    // Orbit by angular deltas in radians (typically mouse dx/dy scaled).
+    pub fn orbit(dx: float, dy: float) {
+        self.yaw = self.yaw + dx * self.rotate_speed;
+        self.pitch = arith.clamp(self.pitch + dy * self.rotate_speed, self.min_pitch, self.max_pitch);
+        self.update();
+    }
+
+    // Dolly along the view axis; positive delta zooms out.
+    pub fn zoom(delta: float) {
+        self.distance = arith.clamp(self.distance + delta * self.zoom_speed, self.min_distance, self.max_distance);
+        self.update();
+    }
+
+    // Pan the target parallel to the camera's image plane.
+    pub fn pan(dx: float, dy: float) {
+        var cy = trig.cos(self.yaw);
+        var sy = trig.sin(self.yaw);
+        var cp = trig.cos(self.pitch);
+        var sp = trig.sin(self.pitch);
+        // Image-plane basis derived from the orbit spherical frame:
+        // right = (cy, 0, -sy), up = (-sy*sp, cp, -cy*sp).
+        var rx = cy;
+        var ry = 0.0;
+        var rz = 0.0 - sy;
+        var ux = 0.0 - sy * sp;
+        var uy = cp;
+        var uz = 0.0 - cy * sp;
+        self.target_x = self.target_x - rx * dx + ux * dy;
+        self.target_y = self.target_y + ry * dx + uy * dy;
+        self.target_z = self.target_z - rz * dx + uz * dy;
+        self.update();
+    }
+
+    pub fn set_target(tx: float, ty: float, tz: float) {
+        self.target_x = tx;
+        self.target_y = ty;
+        self.target_z = tz;
+        self.update();
+    }
+
+    pub fn snap_behind(tx: float, ty: float, tz: float) {
+        self.target_x = tx;
+        self.target_y = ty;
+        self.target_z = tz;
+        self.yaw = 0.0;
+        self.pitch = 0.2;
+        self.update();
+    }
+
+    // Recompute camera position from spherical coords and aim at the target.
+    pub fn update() {
+        var cp = trig.cos(self.pitch);
+        var sp = trig.sin(self.pitch);
+        var cy = trig.cos(self.yaw);
+        var sy = trig.sin(self.yaw);
+        var ox = self.distance * cp * sy;
+        var oy = self.distance * sp;
+        var oz = self.distance * cp * cy;
+        self.camera.set_position(
+            self.target_x + ox,
+            self.target_y + oy,
+            self.target_z + oz
+        );
+        self.camera.look_at(self.target_x, self.target_y, self.target_z, 0.0, 1.0, 0.0);
+    }
+}
+
+pub fn orbit_camera(target_camera: Camera3D, tx: float = 0.0, ty: float = 0.0, tz: float = 0.0,
+                    distance_val: float = 5.0): OrbitController {
+    return OrbitController(target_camera, tx, ty, tz, distance_val);
+}
+
+// First-person fly controller: yaw/pitch look with WASD-style translation.
+// Forward is -Z at yaw=pitch=0, matching Camera3D's default view direction.
+frame FlyController {
+    pub camera: Camera3D;
+    pub yaw: float;
+    pub pitch: float;
+    pub speed: float;
+    pub sprint_multiplier: float;
+
+    pub init(target_camera: Camera3D, yaw_val: float = 0.0, pitch_val: float = 0.0, speed_val: float = 5.0) {
+        self.camera = target_camera;
+        self.yaw = yaw_val;
+        self.pitch = arith.clamp(pitch_val, -1.55, 1.55);
+        self.speed = speed_val;
+        self.sprint_multiplier = 3.0;
+        self.update();
+    }
+
+    // Look by angular deltas in radians (mouse dx/dy scaled by sensitivity).
+    pub fn look(dx: float, dy: float) {
+        self.yaw = self.yaw - dx;
+        self.pitch = arith.clamp(self.pitch - dy, -1.55, 1.55);
+        self.update();
+    }
+
+    // Move along camera axes. Amounts are world-unit distances (already scaled
+    // by speed * dt by the caller).
+    pub fn move(forward_amt: float, right_amt: float, up_amt: float) {
+        var cp = trig.cos(self.pitch);
+        var sp = trig.sin(self.pitch);
+        var cy = trig.cos(self.yaw);
+        var sy = trig.sin(self.yaw);
+
+        // Forward = (-sin(yaw)*cos(pitch), sin(pitch), -cos(yaw)*cos(pitch))
+        var fx = 0.0 - sy * cp;
+        var fy = sp;
+        var fz = 0.0 - cy * cp;
+        // Right = (cos(yaw), 0, -sin(yaw)); world up projected perpendicular
+        // to forward via the cross product.
+        var rx = cy;
+        var ry = 0.0;
+        var rz = 0.0 - sy;
+        // World up projected perpendicular to forward.
+        var ux = fz * ry - fy * rz;
+        var uy = fx * rz - fz * rx;
+        var uz = fy * rx - fx * ry;
+
+        self.camera.translate(
+            fx * forward_amt + rx * right_amt + ux * up_amt,
+            fy * forward_amt + ry * right_amt + uy * up_amt,
+            fz * forward_amt + rz * right_amt + uz * up_amt
+        );
+        self.update();
+    }
+
+    pub fn move_forward(dist: float) {
+        self.move(dist, 0.0, 0.0);
+    }
+
+    pub fn move_right(dist: float) {
+        self.move(0.0, dist, 0.0);
+    }
+
+    pub fn move_up(dist: float) {
+        self.move(0.0, 0.0, dist);
+    }
+
+    // Recompute view direction from yaw/pitch and refresh the view matrix.
+    pub fn update() {
+        var cp = trig.cos(self.pitch);
+        var sp = trig.sin(self.pitch);
+        var cy = trig.cos(self.yaw);
+        var sy = trig.sin(self.yaw);
+        var fx = 0.0 - sy * cp;
+        var fy = sp;
+        var fz = 0.0 - cy * cp;
+        var px = self.camera.position_x;
+        var py = self.camera.position_y;
+        var pz = self.camera.position_z;
+        self.camera.look_at(px + fx, py + fy, pz + fz, 0.0, 1.0, 0.0);
+    }
+}
+
+pub fn fly_controller(target_camera: Camera3D, yaw_val: float = 0.0, pitch_val: float = 0.0,
+                     speed_val: float = 5.0): FlyController {
+    return FlyController(target_camera, yaw_val, pitch_val, speed_val);
+}

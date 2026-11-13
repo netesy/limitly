@@ -2970,6 +2970,9 @@ Reg Generator::emit_member_access_with_obj(LM::Frontend::AST::MemberExpr& expr, 
             {
                 auto offset_it = it->second.field_offsets.find(expr.name);
                 if (offset_it == it->second.field_offsets.end()) continue;
+                if (getenv("LYMAR_DBG_FRAME") && frame_type_info->name.find("Image") != std::string::npos)
+                    fprintf(stderr, "[framedbg] field '%s' on type '%s' -> frame '%s' off=%zu\n",
+                        expr.name.c_str(), frame_type_info->name.c_str(), cand_name.c_str(), offset_it->second);
 
                 // Check visibility
                 auto vis_it = it->second.field_visibilities.find(expr.name);

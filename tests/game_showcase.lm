@@ -14,7 +14,7 @@
 //   * Modal popups and tooltips
 
 import std.game as game;
-import std.game.types as types;
+import std.theme as theme;
 import std.color as color;
 import std.gg as gg;
 import std.math as math;
@@ -72,7 +72,7 @@ fn main(): int {
         return 1;
     }
 
-    app.gui.set_theme(types.cyberpunk_theme());
+    app.gui.set_theme(theme.cyberpunk_theme());
 
     // ── Game State ─────────────────────────────────────────────────────────────
     var ship_x = 400.0;
@@ -415,23 +415,23 @@ fn main(): int {
                 app.gui.label("PRESET UI THEMES");
                 if (app.gui.radio_button("Cyberpunk Neon", active_theme_idx == 0)) {
                     active_theme_idx = 0;
-                    app.gui.set_theme(types.cyberpunk_theme());
+                    app.gui.set_theme(theme.cyberpunk_theme());
                 }
                 if (app.gui.radio_button("Dark Obsidian", active_theme_idx == 1)) {
                     active_theme_idx = 1;
-                    app.gui.set_theme(types.dark_theme());
+                    app.gui.set_theme(theme.dark_theme());
                 }
                 if (app.gui.radio_button("Clean Studio (Light)", active_theme_idx == 2)) {
                     active_theme_idx = 2;
-                    app.gui.set_theme(types.light_theme());
+                    app.gui.set_theme(theme.light_theme());
                 }
                 if (app.gui.radio_button("Classic 90s Retro", active_theme_idx == 3)) {
                     active_theme_idx = 3;
-                    app.gui.set_theme(types.retro_theme());
+                    app.gui.set_theme(theme.retro_theme());
                 }
                 if (app.gui.radio_button("Nord Frost", active_theme_idx == 4)) {
                     active_theme_idx = 4;
-                    app.gui.set_theme(types.nord_theme());
+                    app.gui.set_theme(theme.nord_theme());
                 }
 
                 app.gui.separator();

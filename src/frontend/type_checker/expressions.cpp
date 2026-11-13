@@ -29,7 +29,8 @@ TypePtr TypeChecker::check_expression(std::shared_ptr<LM::Frontend::AST::Express
     } else if (auto this_expr = std::dynamic_pointer_cast<LM::Frontend::AST::ThisExpr>(expr)) {
         // Handle 'this' reference in frame methods
         if (current_frame) {
-            type = type_system.createFrameType(current_frame->name);
+            const FrameInfo* sfi = lookup_frame_info(current_frame->name);
+            type = type_system.createFrameType(sfi ? sfi->name : current_frame->name);
             for (auto& captures : lambda_captures_stack) {
                 if (std::find(captures.begin(), captures.end(), "self") == captures.end()) {
                     captures.push_back("self");
@@ -276,7 +277,7 @@ TypePtr TypeChecker::check_variable_expr(std::shared_ptr<LM::Frontend::AST::Vari
     auto it = current_program_->imported_symbols.find(expr->name);
     if (it != current_program_->imported_symbols.end() && !is_local_shadow) {
         if (auto frame = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(it->second)) {
-            TypePtr type = type_system.createFrameType(expr->name);
+            TypePtr type = type_system.createFrameType(canonical_symbol_name(expr->name, it->second));
             expr->inferred_type = type;
             return type;
         }
@@ -354,6 +355,15 @@ TypePtr TypeChecker::check_variable_expr(std::shared_ptr<LM::Frontend::AST::Vari
         // Check if it's a type name or a qualified name
         type = type_system.getType(expr->name);
         if (type && (type->tag == TypeTag::Nil)) type = nullptr;
+        // A bare frame name resolves to its canonical module-qualified identity
+        // so the type cannot be confused with same-named frames elsewhere.
+        if (type && type->tag == TypeTag::Frame) {
+            if (const FrameInfo* fi = lookup_frame_info(expr->name)) {
+                if (fi->name != expr->name) {
+                    type = type_system.createFrameType(fi->name);
+                }
+            }
+        }
     }
 
     // Fallback to global variable lookup (which includes qualified names like Status.Pending)
@@ -1432,7 +1442,7 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
                 }
             }
 
-            TypePtr frame_type = type_system.createFrameType(var_expr->name);
+            TypePtr frame_type = type_system.createFrameType(frame_info.name.empty() ? var_expr->name : frame_info.name);
             expr->inferred_type = frame_type;
             return frame_type;
         }

@@ -184,3 +184,9 @@ tests/modern_ui_game_test.lm
 # GPU compute emulation (gpu task/threads/intrinsics on the register VM)
 tests/gpu/particle_sim.lm
 tests/gpu/stages.lm
+
+# d3 Phase 2: culling, camera controllers, instancing, PBR material fields
+tests/d3_phase2_test.lm
+
+# d3 GPU vertex-stream pipeline (headless buffer/shader/draw path)
+tests/d3_gpu_test.lm

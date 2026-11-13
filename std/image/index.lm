@@ -104,12 +104,6 @@ pub fn _open_lib(): int {
         // 2. Candidate paths beside the Lymar executable in bin/ and standard paths
         //    across all OS targets (Windows: .dll, Linux / Android: .so, macOS: .dylib)
         var candidates: [str] = [
-        "bin/liblymar_ssl.dll",
-        "bin/liblymar_ssl.so",
-        "bin/liblymar_ssl.dylib",
-        "./bin/liblymar_ssl.dll",
-        "./bin/liblymar_ssl.so",
-        "./bin/liblymar_ssl.dylib",
         "bin/libstb_image.dll",
         "bin/libstb_image.so",
         "bin/libstb_image.dylib",
@@ -124,7 +118,13 @@ pub fn _open_lib(): int {
         "std/image/libstb_image.dylib",
         "tests/ffi/libstb_image.dll",
         "tests/ffi/libstb_image.so",
-        "tests/ffi/libstb_image.dylib"
+        "tests/ffi/libstb_image.dylib",
+        "bin/liblymar_ssl.dll",
+        "bin/liblymar_ssl.so",
+        "bin/liblymar_ssl.dylib",
+        "./bin/liblymar_ssl.dll",
+        "./bin/liblymar_ssl.so",
+        "./bin/liblymar_ssl.dylib"
         ];
 
         iter (c in candidates) {

@@ -6,7 +6,7 @@
 import std.d3 as d3;
 import std.gg as gg;
 import std.game as game;
-import std.game.types as types;
+import std.theme as theme;
 import std.color as color;
 import std.math as math;
 
@@ -118,6 +118,15 @@ fn build_starfighter_hull(): d3.Geometry {
     add_quad(g, k_aft, en_s_bot, en_s_out, c_aft_r);
     add_tri(g, k_aft, v_mid, en_s_bot);
 
+    // Nacelle inner walls: without these the channel between the engines is
+    // a see-through V opening into the hull.
+    add_tri(g, en_p_top, en_p_bot, st_p_bot);
+    add_tri(g, en_p_top, st_p_bot, st_p_in);
+    add_tri(g, en_p_top, st_p_in, st_p_top);
+    add_tri(g, en_s_top, st_s_top, st_s_in);
+    add_tri(g, en_s_top, st_s_in, st_s_bot);
+    add_tri(g, en_s_top, st_s_bot, en_s_bot);
+
     add_quad(g, v_mid, en_p_bot, st_p_bot, v_aft);
     add_quad(g, v_mid, v_aft, st_s_bot, en_s_bot);
 
@@ -125,6 +134,12 @@ fn build_starfighter_hull(): d3.Geometry {
     add_quad(g, sp_aft, st_p_in, v_aft, st_s_in);
     add_tri(g, sp_aft, st_p_top, st_p_in);
     add_tri(g, sp_aft, st_s_in, st_s_top);
+
+    // Nacelle stern caps: the engine tubes were open at z=-2.5, leaving a
+    // see-through opening into the hull. Cap both with outward (-Z) faces;
+    // the thruster bells protrude through them as exhaust nozzles.
+    add_quad(g, st_p_top, st_p_in, st_p_bot, st_p_out);
+    add_quad(g, st_s_top, st_s_out, st_s_bot, st_s_in);
 
     // ── 4. 3D Swept Delta Wings with True Airfoil & Canted Winglets ──
     var pw_le_tip = g.add_vertex(-2.45, 0.04, -0.9);     // 38
@@ -170,7 +185,9 @@ fn build_starfighter_hull(): d3.Geometry {
     add_tri(g, sw_le_tip, sw_wlet_t, sw_te_tip);
 
     // ── 5. Twin Canted V-Tail Vertical Stabilizers (28 deg cant) ──
-    var pf_b_le  = g.add_vertex(-0.62, 0.38, -1.1);      // 48
+    // Root leading edge sits on the nacelle top ridge (en_p_top/en_s_top);
+    // rooting at z=-1.1 left a ~0.4 gap between fin and fuselage.
+    var pf_b_le  = g.add_vertex(-0.62, 0.38, -1.6);      // 48
     var pf_b_te  = g.add_vertex(-0.60, 0.32, -2.4);      // 49
     var pf_t_le  = g.add_vertex(-1.12, 1.32, -1.7);      // 50
     var pf_t_te  = g.add_vertex(-1.18, 1.25, -2.3);      // 51
@@ -180,7 +197,7 @@ fn build_starfighter_hull(): d3.Geometry {
     add_tri(g, pf_b_le, pf_t_te, pf_t_le);
     add_tri(g, pf_b_le, pf_b_te, pf_t_te);
 
-    var sf_b_le  = g.add_vertex(0.62, 0.38, -1.1);       // 52
+    var sf_b_le  = g.add_vertex(0.62, 0.38, -1.6);       // 52
     var sf_b_te  = g.add_vertex(0.60, 0.32, -2.4);       // 53
     var sf_t_le  = g.add_vertex(1.12, 1.32, -1.7);       // 54
     var sf_t_te  = g.add_vertex(1.18, 1.25, -2.3);       // 55
@@ -189,6 +206,21 @@ fn build_starfighter_hull(): d3.Geometry {
     add_tri(g, sf_b_le, sf_b_te, sf_t_te);
     add_tri(g, sf_b_le, sf_t_le, sf_t_te);
     add_tri(g, sf_b_le, sf_t_te, sf_b_te);
+
+    // ── 6. Horizontal Tailplane Stabilizers ──
+    // The aircraft had delta wings and V-tails but no horizontal tail
+    // surfaces; these small swept stabs complete the tail silhouette.
+    var hp_le  = g.add_vertex(-0.60, 0.00, -2.0);        // 56
+    var hp_tip = g.add_vertex(-1.50, 0.04, -2.4);        // 57
+    var hp_te  = g.add_vertex(-1.45, 0.00, -2.65);       // 58
+    var hp_re  = g.add_vertex(-0.60, -0.05, -2.3);       // 59
+    add_quad(g, hp_le, hp_tip, hp_te, hp_re);
+
+    var hq_le  = g.add_vertex(0.60, 0.00, -2.0);         // 60
+    var hq_tip = g.add_vertex(1.50, 0.04, -2.4);         // 61
+    var hq_te  = g.add_vertex(1.45, 0.00, -2.65);        // 62
+    var hq_re  = g.add_vertex(0.60, -0.05, -2.3);        // 63
+    add_quad(g, hq_le, hq_tip, hq_te, hq_re);
 
     g.compute_vertex_normals();
     return g;
@@ -232,21 +264,25 @@ fn build_starfighter_trim(): d3.Geometry {
          0.00,  0.09,
         -0.09,  0.03
     ];
-    // Extrude 1.6m along Z, tapering down to 0.35x at the muzzle
-    var gun = d3.extrude(gun_profile, 1.6, 0.35, 0.0);
+    // Extrude 0.6m along Z, tapering down to 0.35x at the muzzle. Mounted on
+    // the wing panels (x~+-1.7, chord z -0.9..-1.5) so the pods emerge from
+    // the wing surface instead of floating beside the fuselage.
+    var gun = d3.extrude(gun_profile, 0.6, 0.35, 0.0);
     gun.rotate_x(3.14159265); // Flip Z to face forward (+Z)
-    gun.translate(-0.72, 0.05, 1.35);
+    gun.translate(-1.7, 0.0, -1.5);
 
     // Bilateral Symmetry: mirror port gun across X to create starboard gun
     var g = d3.mirror_compound(gun, 0);
 
     // 2. Aerodynamic Dorsal Spine Blade Fairing
     var spine = d3.Geometry();
-    var sp_blade_f = spine.add_vertex(0.0, 0.52, -0.6);
-    var sp_blade_t = spine.add_vertex(0.0, 0.58, -1.6);
-    var sp_blade_b = spine.add_vertex(0.0, 0.44, -2.4);
-    var sp_side_l  = spine.add_vertex(-0.06, 0.48, -1.6);
-    var sp_side_r  = spine.add_vertex(0.06, 0.48, -1.6);
+    // Lowered so the blade base intersects the dorsal spine ridge
+    // (sp_mid/sp_aft at y~0.40-0.50) instead of floating above it.
+    var sp_blade_f = spine.add_vertex(0.0, 0.47, -0.6);
+    var sp_blade_t = spine.add_vertex(0.0, 0.56, -1.6);
+    var sp_blade_b = spine.add_vertex(0.0, 0.40, -2.4);
+    var sp_side_l  = spine.add_vertex(-0.07, 0.45, -1.6);
+    var sp_side_r  = spine.add_vertex(0.07, 0.45, -1.6);
 
     add_tri(spine, sp_blade_f, sp_blade_t, sp_side_l);
     add_tri(spine, sp_blade_f, sp_side_r, sp_blade_t);
@@ -299,7 +335,7 @@ fn main(): int {
         return 1;
     }
 
-    app.gui.set_theme(types.cyberpunk_theme());
+    app.gui.set_theme(theme.cyberpunk_theme());
 
     // ── Build 3D Scene & Lighting ──────────────────────────────────────────
     var scene = d3.Scene3D();
@@ -320,6 +356,9 @@ fn main(): int {
     var hull_geo = build_starfighter_hull();
     var hull_mat = d3.phong_material(0.88, 0.92, 0.98, 64.0);
     hull_mat.specular = 0.9;
+    // The hand-built hull shell has open sections and mixed winding; render
+    // both sides so the fuselage never shows see-through holes.
+    hull_mat.cull_mode = d3.CullMode.None;
     var hull_mesh = d3.Mesh(hull_geo, hull_mat, "StarfighterHull");
     scene.add(hull_mesh);
 
@@ -327,7 +366,7 @@ fn main(): int {
     var canopy_geo = build_starfighter_canopy();
     var canopy_mat = d3.phong_material(0.10, 0.85, 0.98, 128.0);
     canopy_mat.specular = 0.95;
-    canopy_mat.cull_mode = types.CullMode.None;
+    canopy_mat.cull_mode = d3.CullMode.None;
     var canopy_mesh = d3.Mesh(canopy_geo, canopy_mat, "StarfighterCanopy");
     scene.add(canopy_mesh);
 
@@ -340,7 +379,7 @@ fn main(): int {
     // 4. Thrusters: Rotational Lathe (Revolved) Twin Convergent-Divergent Nozzles
     var thruster_geo = build_starfighter_thrusters();
     var thruster_mat = d3.basic_material(0.0, 0.95, 1.0);
-    thruster_mat.cull_mode = types.CullMode.None;
+    thruster_mat.cull_mode = d3.CullMode.None;
     var thruster_mesh = d3.Mesh(thruster_geo, thruster_mat, "StarfighterThrusters");
     scene.add(thruster_mesh);
 
@@ -348,7 +387,7 @@ fn main(): int {
     var rock1_geo = d3.asteroid(1.15, 0.35, 10, 8, 101);
     var rock2_geo = d3.asteroid(0.85, 0.40, 8, 6, 202);
     var rock3_geo = d3.asteroid(1.45, 0.28, 12, 8, 303);
-    var rock_mat  = d3.phong_material(0.62, 0.58, 0.52, 16.0);
+    var rock_mat  = d3.lambert_material(0.62, 0.58, 0.52);
 
     var rock1 = d3.Mesh(rock1_geo, rock_mat, "AsteroidAlpha");
     rock1.set_position(-3.6, 1.8, -2.2);

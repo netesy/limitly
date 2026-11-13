@@ -1,0 +1,44 @@
+import std.d3 as d3;
+import std.game as game;
+import std.color as color;
+
+fn main() {
+    var cfg = game.Config(title = "Texture Test", width = 640, height = 480);
+    cfg.bg_color = color.hex(0x101018, 1.0);
+    var app = game.Game(cfg);
+    if (not app.setup()) { print("no ctx"); return 1; }
+
+    var scene = d3.Scene3D();
+    scene.add_light(d3.ambient_light(1.0, 1.0, 1.0, 0.5));
+    scene.add_light(d3.directional_light(0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0));
+
+    // plane() lies in the X-Z plane; rotate it to face the camera (+Z).
+    var tex_geo = d3.plane(3.0, 2.0);
+    tex_geo.rotate_x(1.5707963);
+    var mat = d3.lambert_material(1.0, 1.0, 1.0);
+    mat.base_color_texture = "tests/ffi/test_out.png";
+    mat.cull_mode = d3.CullMode.None;
+    var m = d3.Mesh(tex_geo, mat, "texquad");
+    scene.add(m);
+
+    var ref_geo = d3.plane(1.0, 1.0);
+    ref_geo.rotate_x(1.5707963);
+    var m2 = d3.Mesh(ref_geo, d3.basic_material(1.0, 0.0, 0.0), "ref");
+    m2.set_position(2.5, 0.0, 0.0);
+    scene.add(m2);
+
+    var cam = d3.perspective_camera(50.0, 640.0/480.0, 0.1, 100.0);
+    cam.set_position(0.0, 0.0, 4.0);
+    cam.look_at(0.0, 0.0, 0.0);
+    var renderer = d3.Renderer3D(640, 480);
+
+    var ticks = 0;
+    while (app.is_running and ticks < 600) {
+        app.begin_frame();
+        ticks = ticks + 1;
+        renderer.render(scene, cam, 0.0, 0.0, app.width as float, app.height as float);
+        app.end_frame();
+    }
+    print("tex state={mat.texture_state} id={mat.texture_id}");
+    return 0;
+}

@@ -4,4 +4,5 @@
 pub import std.camera.types show CameraType, Vec2;
 pub import std.camera.camera2d show Camera2D;
 pub import std.camera.camera3d show Camera3D, perspective_camera, orthographic_camera;
+pub import std.camera.controller show OrbitController, FlyController, orbit_camera, fly_controller;
 

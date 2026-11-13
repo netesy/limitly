@@ -1,0 +1,114 @@
+// std/d3/culling.lm
+// Bounding volumes and frustum culling. Pure math over Geometry + Matrix so it
+// can be unit-tested without a renderer or window.
+//
+// Convention: matrices are row-major `data[row*4+col]`, column-vector
+// multiplication (clip = M * v), translation in m[3], m[7], m[11].
+
+import std.d3.geometry as geom;
+import std.math.matrix show Matrix;
+import std.math.arithmetic as arith;
+
+// Local-space bounding sphere of a geometry's vertices:
+// returns (center_x, center_y, center_z, radius).
+pub fn geometry_bounds(geo: geom.Geometry): (float, float, float, float) {
+    val verts = geo.vertices;
+    val n = len(verts) / 3;
+    if (n == 0) {
+        return (0.0, 0.0, 0.0, 0.0);
+    }
+    var min_x = verts[0];
+    var min_y = verts[1];
+    var min_z = verts[2];
+    var max_x = verts[0];
+    var max_y = verts[1];
+    var max_z = verts[2];
+    iter (vi in 1..n) {
+        val b = vi * 3;
+        val vx = verts[b];
+        val vy = verts[b + 1];
+        val vz = verts[b + 2];
+        if (vx < min_x) { min_x = vx; }
+        if (vy < min_y) { min_y = vy; }
+        if (vz < min_z) { min_z = vz; }
+        if (vx > max_x) { max_x = vx; }
+        if (vy > max_y) { max_y = vy; }
+        if (vz > max_z) { max_z = vz; }
+    }
+    val cx = (min_x + max_x) * 0.5;
+    val cy = (min_y + max_y) * 0.5;
+    val cz = (min_z + max_z) * 0.5;
+    var r = 0.0;
+    iter (vi in 0..n) {
+        val b = vi * 3;
+        val dx = verts[b] - cx;
+        val dy = verts[b + 1] - cy;
+        val dz = verts[b + 2] - cz;
+        val dist_sq = dx * dx + dy * dy + dz * dz;
+        if (dist_sq > r) { r = dist_sq; }
+    }
+    return (cx, cy, cz, arith.sqrt(r));
+}
+
+// Transform a local-space bounding sphere into world space.
+// Returns (center_x, center_y, center_z, radius).
+pub fn world_sphere(geo: geom.Geometry, world: Matrix): (float, float, float, float) {
+    val b = geometry_bounds(geo);
+    val m = world.data;
+    var cx = m[0] * b.0 + m[1] * b.1 + m[2] * b.2 + m[3];
+    var cy = m[4] * b.0 + m[5] * b.1 + m[6] * b.2 + m[7];
+    var cz = m[8] * b.0 + m[9] * b.1 + m[10] * b.2 + m[11];
+    // Uniform-ish scale estimate: longest transformed basis column.
+    var sx = arith.sqrt(m[0] * m[0] + m[4] * m[4] + m[8] * m[8]);
+    var sy = arith.sqrt(m[1] * m[1] + m[5] * m[5] + m[9] * m[9]);
+    var sz = arith.sqrt(m[2] * m[2] + m[6] * m[6] + m[10] * m[10]);
+    var s = sx;
+    if (sy > s) { s = sy; }
+    if (sz > s) { s = sz; }
+    return (cx, cy, cz, b.3 * s);
+}
+
+// Extract the six view-frustum planes from a view-projection matrix.
+// Returns 24 floats: 6 planes x (a, b, c, d) with the plane equation
+// a*x + b*y + c*z + d >= 0 meaning "inside" for world-space points.
+// Order: left, right, bottom, top, near, far.
+pub fn frustum_planes(vp: Matrix): [float] {
+    val m = vp.data;
+    var planes: [float] = [];
+    // clip row i coefficients: row0 = m[0..3], row1 = m[4..7],
+    // row2 = m[8..11], row3 = m[12..15]. w = row3 . (x,y,z,1).
+    // Lower bounds (x >= -w etc.) use row_i + row3; upper bounds row3 - row_i.
+    // left = row0 + row3, right = row3 - row0
+    planes.append(m[0] + m[12]); planes.append(m[1] + m[13]); planes.append(m[2] + m[14]); planes.append(m[3] + m[15]);
+    planes.append(m[12] - m[0]); planes.append(m[13] - m[1]); planes.append(m[14] - m[2]); planes.append(m[15] - m[3]);
+    // bottom = row1 + row3, top = row3 - row1
+    planes.append(m[4] + m[12]); planes.append(m[5] + m[13]); planes.append(m[6] + m[14]); planes.append(m[7] + m[15]);
+    planes.append(m[12] - m[4]); planes.append(m[13] - m[5]); planes.append(m[14] - m[6]); planes.append(m[15] - m[7]);
+    // near = row2 + row3, far = row3 - row2
+    planes.append(m[8] + m[12]); planes.append(m[9] + m[13]); planes.append(m[10] + m[14]); planes.append(m[11] + m[15]);
+    planes.append(m[12] - m[8]); planes.append(m[13] - m[9]); planes.append(m[14] - m[10]); planes.append(m[15] - m[11]);
+    return planes;
+}
+
+// True if the world-space sphere may intersect the frustum (conservative).
+pub fn sphere_in_frustum(planes: [float], cx: float, cy: float, cz: float, radius: float): bool {
+    iter (p in 0..6) {
+        val b = p * 4;
+        val a = planes[b];
+        val bb = planes[b + 1];
+        val c = planes[b + 2];
+        val d = planes[b + 3];
+        val dist = a * cx + bb * cy + c * cz + d;
+        val nlen = arith.sqrt(a * a + bb * bb + c * c);
+        if (nlen > 0.000001 and dist < 0.0 - radius * nlen) {
+            return false;
+        }
+    }
+    return true;
+}
+
+// Convenience: bounds + frustum test in one call.
+pub fn sphere_visible(planes: [float], geo: geom.Geometry, world: Matrix): bool {
+    val s = world_sphere(geo, world);
+    return sphere_in_frustum(planes, s.0, s.1, s.2, s.3);
+}

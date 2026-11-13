@@ -87,6 +87,41 @@ void TypeChecker::register_frame_signature(const std::string& name,
     frame_declarations[name].name = info.name;
     frame_declarations[name].declaration = frame_decl;
     frame_declarations[name].fields = info.fields;
+
+    // When this frame belongs to the module currently being checked, mirror the
+    // signature under its bare name so unqualified in-module lookups keep working.
+    // FrameInfo.name stays canonical (module-qualified) so types built from it do
+    // not collide with same-named frames in other modules.
+    size_t last_dot = name.find_last_of('.');
+    if (last_dot != std::string::npos && !current_module_name.empty() &&
+        current_module_name != "root" && name.substr(0, last_dot) == current_module_name) {
+        std::string bare = name.substr(last_dot + 1);
+        if (!bare.empty() && frame_declarations.find(bare) == frame_declarations.end()) {
+            auto& bfd = frame_declarations[bare];
+            bfd.name = name;
+            bfd.declaration = frame_decl;
+            bfd.fields = info.fields;
+            bfd.field_has_default = fd.field_has_default;
+            if (frame_decl->init) {
+                FunctionSignature bsig = function_signatures[name + ".init"];
+                bsig.name = bare + ".init";
+                function_signatures[bare + ".init"] = bsig;
+            }
+            for (const auto& m : frame_decl->methods) {
+                FunctionSignature msig = function_signatures[name + "." + m->name];
+                msig.name = bare + "." + m->name;
+                function_signatures[bare + "." + m->name] = msig;
+            }
+            if (frame_decl->deinit) {
+                FunctionSignature dsig = function_signatures[name + ".deinit"];
+                dsig.name = bare + ".deinit";
+                function_signatures[bare + ".deinit"] = dsig;
+            }
+            TypeSystem::FrameInfo binfo = info;
+            binfo.name = name;
+            type_system.registerFrame(bare, binfo);
+        }
+    }
 }
 
 bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> program) {
@@ -217,6 +252,7 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
                 checker.is_root = false; // Submodules are not root checkers
                 TypeCheckerFactory::register_builtin_functions(checker);
                 checker.set_source_context(module->source, module->path);
+                checker.current_module_name = path;
                 if (!checker.check_program(module->ast)) {
                     add_error("Failed to type check module: " + path);
                     failed_modules.insert(path);
@@ -360,14 +396,23 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
     }
 
     // PASS 1: Name Registration (including inlined symbols)
-    auto register_name = [&](const std::string& name, const std::shared_ptr<LM::Frontend::AST::Statement>& stmt) {
+    auto register_name = [&](std::string name, const std::shared_ptr<LM::Frontend::AST::Statement>& stmt) {
         if (auto frame_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) {
+            name = canonical_symbol_name(name, stmt);
             if (frame_decl->isStaged) {
                 // Imported templates become requestable under their qualified name too.
                 register_staged_frame_template(name, frame_decl);
                 return;
             }
-            type_system.addUserDefinedType(name, type_system.createFrameType(name));
+            TypePtr ft = type_system.createFrameType(name);
+            type_system.addUserDefinedType(name, ft);
+            // Keep a bare-name alias pointing at the canonical type for the
+            // module's own frames so unqualified lookups stay unambiguous.
+            size_t ld = name.find_last_of('.');
+            if (ld != std::string::npos && !current_module_name.empty() &&
+                current_module_name != "root" && name.substr(0, ld) == current_module_name) {
+                type_system.addUserDefinedType(name.substr(ld + 1), ft);
+            }
         } else if (auto trait_decl = std::dynamic_pointer_cast<LM::Frontend::AST::TraitDeclaration>(stmt)) {
             TypePtr trait_type = std::make_shared<::Type>(TypeTag::Trait, TraitType{name, {}, {}});
             type_system.addUserDefinedType(name, trait_type);
@@ -390,7 +435,7 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
         if (auto frame_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) {
             // Templates carry unbound meta-parameters: there is no signature to resolve.
             if (frame_decl->isStaged) return;
-            register_frame_signature(name, frame_decl);
+            register_frame_signature(canonical_symbol_name(name, stmt), frame_decl);
 
         } else if (auto trait_decl = std::dynamic_pointer_cast<LM::Frontend::AST::TraitDeclaration>(stmt)) {
             TypeSystem::TraitInfo info;

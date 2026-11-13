@@ -20,13 +20,14 @@
 pub import std.d3.types show ShadingModel, LightType, CameraType, CullMode;
 pub import std.d3.buffer show BufferAttribute, Uniform;
 pub import std.d3.transform show Transform3D;
-pub import std.d3.geometry show Geometry;
+pub import std.d3.geometry show Geometry, ValidationReport;
 pub import std.d3.primitives show box, sphere, cylinder, plane, cone, torus, box_face_count, sphere_face_count, sphere_vertex_count, cylinder_face_count, plane_face_count;
-pub import std.d3.material show Material, basic_material, lambert_material, phong_material, wireframe_material;
+pub import std.d3.material show Material, basic_material, lambert_material, phong_material, pbr_material, wireframe_material;
 pub import std.d3.mesh show Mesh;
 pub import std.d3.light show Light, ambient_light, directional_light, point_light;
-pub import std.camera show Camera3D, perspective_camera, orthographic_camera;
-pub import std.d3.scene show Scene3D;
+pub import std.camera show Camera3D, perspective_camera, orthographic_camera, OrbitController, FlyController, orbit_camera, fly_controller;
+pub import std.d3.scene show Scene3D, InstanceGroup;
+pub import std.d3.culling show geometry_bounds, world_sphere, frustum_planes, sphere_in_frustum, sphere_visible;
 pub import std.d3.renderer show Renderer3D;
 pub import std.d3.sculpt show extrude, revolve, loft, mirror_compound;
 pub import std.d3.environment show terrain, asteroid, icosphere;

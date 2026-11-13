@@ -144,8 +144,17 @@ TypePtr TypeChecker::resolve_type_annotation(std::shared_ptr<LM::Frontend::AST::
             return type_system.ANY_TYPE;
         }
 
+        // A bare name inside a module resolves to that module's own declaration
+        // first, so same-named types in other modules cannot shadow it.
+        if (type_name.find('.') == std::string::npos && !current_module_name.empty() &&
+            current_module_name != "root") {
+            base_type = type_system.getType(current_module_name + "." + type_name);
+        }
+
         // First try to get the base type from the type system (handles built-in types and aliases)
-        base_type = type_system.getType(type_name);
+        if (!base_type || base_type->tag == TypeTag::Nil) {
+            base_type = type_system.getType(type_name);
+        }
 
         // If not found with the expanded name, try the original name
         if (!base_type || base_type->tag == TypeTag::Nil) {
@@ -662,6 +671,10 @@ void TypeChecker::validate_function_body_error_types(const std::shared_ptr<LM::F
                         if (cleanName.rfind("Frame<", 0) == 0 && cleanName.back() == '>') {
                             cleanName = cleanName.substr(6, cleanName.size() - 7);
                         }
+                        // Variant names carry module-qualified frame identities;
+                        // error-type matching uses the source-level spelling.
+                        size_t vdot = cleanName.find_last_of('.');
+                        if (vdot != std::string::npos) cleanName = cleanName.substr(vdot + 1);
                         if (can_function_produce_error_type(stmt->body, cleanName)) {
                             can_produce = true;
                             break;
@@ -702,6 +715,8 @@ void TypeChecker::validate_function_body_error_types(const std::shared_ptr<LM::F
                             if (cleanName.rfind("Frame<", 0) == 0 && cleanName.back() == '>') {
                                 cleanName = cleanName.substr(6, cleanName.size() - 7);
                             }
+                            size_t vdot = cleanName.find_last_of('.');
+                            if (vdot != std::string::npos) cleanName = cleanName.substr(vdot + 1);
                             if (cleanName == inferredError) {
                                 found_in_union = true;
                                 break;

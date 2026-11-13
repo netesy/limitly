@@ -171,8 +171,8 @@ pub fn cylinder(radius_top: float = 1.0, radius_bottom: float = 1.0, height: flo
         var v2 = (f + 1) * 2 + 1;
         var v3 = (f + 1) * 2;
 
-        g.add_face(v0, v1, v2);
-        g.add_face(v0, v2, v3);
+        g.add_face(v0, v2, v1);
+        g.add_face(v0, v3, v2);
         f = f + 1;
     }
 

@@ -433,10 +433,14 @@ TypePtr TypeChecker::check_frame_declaration(std::shared_ptr<LM::Frontend::AST::
 TypePtr TypeChecker::check_frame_declaration_with_name(const std::string& name, std::shared_ptr<LM::Frontend::AST::FrameDeclaration> frame) {
     if (!frame) return nullptr;
 
+    // Canonical module-qualified identity: types built from this frame must not
+    // collide with same-named frames declared in other modules.
+    const std::string canon = qualify_declared_name(name);
+
     if (frame->isStaged) {
         // Template declaration: registered, never body-checked as written (the member
         // annotations mention unbound meta-parameters). Instances are checked on adoption.
-        register_staged_frame_template(name, frame);
+        register_staged_frame_template(canon, frame);
         return nullptr;
     }
 
@@ -474,7 +478,7 @@ TypePtr TypeChecker::check_frame_declaration_with_name(const std::string& name, 
     
     // Create frame info for tracking
     FrameInfo frame_info;
-    frame_info.name = name;
+    frame_info.name = canon;
     frame_info.declaration = frame;
 
     // Process anonymous field embedding (`embed TypeName;`)
@@ -685,9 +689,12 @@ TypePtr TypeChecker::check_frame_declaration_with_name(const std::string& name, 
     
     // Store frame info BEFORE checking methods so they can reference the frame
     frame_declarations[name] = frame_info;
+    if (canon != name) {
+        frame_declarations[canon] = frame_info;
+    }
     
     // Create a frame type
-    TypePtr frame_type = type_system.createFrameType(name);
+    TypePtr frame_type = type_system.createFrameType(canon);
     frame->inferred_type = frame_type;
     
     // Declare the frame name as a type in the current scope

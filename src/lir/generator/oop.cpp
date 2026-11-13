@@ -567,6 +567,8 @@ void Generator::emit_frame_stmt(LM::Frontend::AST::FrameDeclaration& stmt) {
 
 
 std::string Generator::resolve_qualified_frame_name(const std::string& name) {
+    if (getenv("LYMAR_DBG_FRAME") && name.find("Image") != std::string::npos)
+        fprintf(stderr, "[framedbg] resolve '%s' module='%s'\n", name.c_str(), current_module_.c_str());
     auto canonical_if_known = [&](const std::string& n) {
         std::string c = LM::Frontend::ModuleManager::getInstance().canonical_symbol(n);
         return (c != n && frame_table_.count(c)) ? c : n;
@@ -604,6 +606,8 @@ std::string Generator::resolve_qualified_frame_name(const std::string& name) {
     }
 
     resolved = LM::Frontend::ModuleManager::getInstance().canonical_symbol(resolved);
+    if (getenv("LYMAR_DBG_FRAME") && name.find("Image") != std::string::npos)
+        fprintf(stderr, "[framedbg]   -> '%s' (hit=%d)\n", resolved.c_str(), (int)frame_table_.count(resolved));
     if (frame_table_.count(resolved)) {
         return resolved;
     }

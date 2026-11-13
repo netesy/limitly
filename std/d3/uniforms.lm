@@ -1,0 +1,58 @@
+// std/d3/uniforms.lm
+// Canonical indices of the 3D vertex-stream uniform blob (180 floats).
+//
+// This is the PRODUCER side of the ABI shared with the native backends.
+// The C++ consumers read the same layout from src/runtime/gfx_uniform_layout.hh
+// (single source of truth on that side; the Sokol HLSL shaders are generated
+// from it). Keep the two files in sync — element j of the blob is
+// u_data[j>>2][j&3] inside the 48-float4 cbuffer.
+//
+// Blob layout (all floats):
+//   [0..15]    MVP matrix (row-major)
+//   [16..31]   world matrix (upper 3x3 transforms normals)
+//   [32..35]   material color rgba
+//   [36..38]   illumination base rgb (material ambient + scene ambient)
+//   [39..41]   diffuse, specular, shininess
+//   [42]       shading model, [43] cull mode, [44] wireframe thickness px,
+//   [45]       has_normals flag, [46..49] viewport x/y/w/h
+//   [50]       light count, then per light 8 floats starting at 51
+//   [179]      has_texture flag (1.0 = sample the texture bound with the draw)
+
+pub const U_MVP = 0;
+pub const U_WORLD = 16;
+pub const U_COLOR = 32;
+pub const U_AMBIENT = 36;
+pub const U_MATERIAL = 39;
+pub const U_SHADING = 42;
+pub const U_CULL = 43;
+pub const U_WIRE_WIDTH = 44;
+pub const U_HAS_NORMALS = 45;
+pub const U_VIEWPORT = 46;
+pub const U_LIGHT_COUNT = 50;
+pub const U_LIGHT_BASE = 51;
+pub const U_LIGHT_STRIDE = 8;
+pub const U_LIGHT_TYPE = 0;
+pub const U_LIGHT_DIR = 1;
+pub const U_LIGHT_COLOR = 4;
+pub const U_LIGHT_INT = 7;
+
+pub const MAX_LIGHTS = 16;
+pub const U_HAS_TEXTURE = 179;
+pub const BLOB_FLOATS = 180;
+
+// Shading model values written into U_SHADING (match types.ShadingModel).
+pub const SHADING_FLAT = 0;
+pub const SHADING_SMOOTH = 1;
+pub const SHADING_UNLIT = 2;
+pub const SHADING_WIREFRAME = 3;
+pub const SHADING_NORMAL_VIZ = 4;
+
+// Cull mode values written into U_CULL (match types.CullMode).
+pub const CULL_NONE = 0;
+pub const CULL_BACK = 1;
+pub const CULL_FRONT = 2;
+
+// Light type values written into each light record (match types.LightType).
+pub const LIGHT_AMBIENT = 0;
+pub const LIGHT_DIRECTIONAL = 1;
+pub const LIGHT_POINT = 2;

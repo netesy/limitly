@@ -1,0 +1,124 @@
+// tests/d3_phase2_test.lm
+// Headless tests for Phase 2 d3 features: bounding volumes, frustum culling,
+// camera controllers, instancing data model, and PBR material fields.
+
+import std.d3 as d3;
+import std.math.matrix show Matrix;
+import std.math.arithmetic as arith;
+
+fn approx(a: float, b: float, eps: float): bool {
+    var d = a - b;
+    if (d < 0.0) { d = 0.0 - d; }
+    return d < eps;
+}
+
+fn main() {
+    print("=== d3 Phase 2: culling, controllers, instancing, materials ===");
+
+    // ---- 1. Geometry bounding sphere ----
+    print("[1] geometry_bounds / world_sphere");
+    var tri = d3.Geometry();
+    var a = tri.add_vertex(0.0, 0.0, 0.0);
+    var b = tri.add_vertex(2.0, 0.0, 0.0);
+    var c = tri.add_vertex(0.0, 2.0, 0.0);
+    tri.add_face(a, b, c);
+
+    val lb = d3.geometry_bounds(tri);
+    // AABB: min(0,0,0) max(2,2,0) -> center (1,1,0); farthest vertex dist = sqrt(2)
+    assert(approx(lb.0, 1.0, 0.001), "bounds center x");
+    assert(approx(lb.1, 1.0, 0.001), "bounds center y");
+    assert(approx(lb.2, 0.0, 0.001), "bounds center z");
+    assert(approx(lb.3, 1.41421356, 0.001), "bounds radius");
+
+    var shift = Matrix();
+    shift.make_translation(10.0, 0.0, 0.0);
+    val ws = d3.world_sphere(tri, shift);
+    assert(approx(ws.0, 11.0, 0.001), "world sphere center x");
+    assert(approx(ws.3, 1.41421356, 0.001), "world sphere radius unchanged");
+
+    // ---- 2. Frustum planes + sphere test ----
+    print("[2] frustum_planes / sphere_in_frustum");
+    var cam = d3.perspective_camera(60.0, 1.33333, 0.1, 50.0);
+    // Default view: eye at (0,0,5) looking down -Z at origin.
+    val planes = d3.frustum_planes(cam.view_projection_matrix);
+    assert(len(planes) == 24, "6 planes x 4 coeffs");
+
+    // Origin sphere (the triangle above, centered near origin) is in view.
+    assert(d3.sphere_in_frustum(planes, 0.0, 0.0, 0.0, 2.0), "origin sphere visible");
+    // Behind the camera (camera looks -Z from z=5): z=+10 is behind.
+    assert(not d3.sphere_in_frustum(planes, 0.0, 0.0, 10.0, 1.0), "behind-camera sphere culled");
+    // Beyond far plane (far=50, eye z=5 -> visible z < -45): z=-100 culled.
+    assert(not d3.sphere_in_frustum(planes, 0.0, 0.0, -100.0, 1.0), "beyond-far sphere culled");
+    // Way off to the side: x=500 culled.
+    assert(not d3.sphere_in_frustum(planes, 500.0, 0.0, 0.0, 1.0), "off-axis sphere culled");
+    // Large sphere encompassing the frustum edge still visible (conservative).
+    assert(d3.sphere_in_frustum(planes, 0.0, 0.0, 0.0, 500.0), "huge sphere visible");
+
+    // sphere_visible end-to-end with geometry + world matrix
+    var ident = Matrix();
+    ident.identity();
+    assert(d3.sphere_visible(planes, tri, ident), "sphere_visible origin");
+    var far_shift = Matrix();
+    far_shift.make_translation(0.0, 0.0, -100.0);
+    assert(not d3.sphere_visible(planes, tri, far_shift), "sphere_visible far culled");
+
+    // ---- 3. OrbitController ----
+    print("[3] OrbitController");
+    var ocam = d3.perspective_camera();
+    var orbit = d3.OrbitController(ocam, 0.0, 0.0, 0.0, 5.0, 0.0, 0.0);
+    // pitch=0,yaw=0,dist=5 -> position (0,0,5), looking at origin
+    assert(approx(ocam.position_x, 0.0, 0.001), "orbit pos x");
+    assert(approx(ocam.position_y, 0.0, 0.001), "orbit pos y");
+    assert(approx(ocam.position_z, 5.0, 0.001), "orbit pos z");
+
+    orbit.orbit(1.5707963, 0.0); // yaw += ~90 deg -> offset now along +X
+    assert(approx(ocam.position_x, 5.0, 0.01), "orbit yaw90 pos x");
+    assert(approx(ocam.position_z, 0.0, 0.01), "orbit yaw90 pos z");
+
+    orbit.zoom(2.0); // distance 5 -> 7
+    var d = arith.sqrt(ocam.position_x * ocam.position_x + ocam.position_z * ocam.position_z);
+    assert(approx(d, 7.0, 0.01), "orbit zoom distance");
+
+    orbit.zoom(-100.0); // clamps to min_distance 0.1
+    assert(orbit.distance == 0.1, "orbit zoom clamp min");
+
+    // ---- 4. FlyController ----
+    print("[4] FlyController");
+    var fcam = d3.perspective_camera();
+    var fly = d3.FlyController(fcam, 0.0, 0.0, 4.0);
+    fly.move_forward(2.0); // forward is -Z
+    assert(approx(fcam.position_z, -2.0, 0.001), "fly forward -Z");
+    fly.move_right(1.0);   // right is +X at yaw=0
+    assert(approx(fcam.position_x, 1.0, 0.001), "fly right +X");
+    fly.look(0.0, 0.0);
+    assert(approx(fly.yaw, 0.0, 0.0001), "fly yaw unchanged");
+
+    // ---- 5. Instancing data model ----
+    print("[5] Scene3D instancing");
+    var shared = d3.Mesh(d3.box(1.0, 1.0, 1.0), d3.basic_material());
+    var m_a = Matrix(); m_a.make_translation(3.0, 0.0, 0.0);
+    var m_b = Matrix(); m_b.make_translation(-3.0, 0.0, 0.0);
+    var m_c = Matrix(); m_c.make_translation(0.0, 3.0, 0.0);
+    var scene = d3.Scene3D();
+    scene.add_instanced(shared, [m_a, m_b, m_c]);
+    assert(len(scene.instance_groups) == 1, "one instance group");
+    assert(len(scene.instance_groups[0].transforms) == 3, "three instance transforms");
+    assert(scene.instance_groups[0].mesh == shared, "group references shared mesh");
+    scene.clear();
+    assert(len(scene.instance_groups) == 0, "clear empties groups");
+
+    // ---- 6. PBR material fields ----
+    print("[6] Material PBR prep fields");
+    var pm = d3.pbr_material(0.5, 0.4, 0.3, 0.9, 0.25);
+    assert(approx(pm.metallic, 0.9, 0.0001), "pbr metallic");
+    assert(approx(pm.roughness, 0.25, 0.0001), "pbr roughness");
+    assert(pm.base_color_texture == "", "texture defaults empty");
+    assert(approx(pm.ao, 1.0, 0.0001), "ao default");
+    pm.base_color_texture = "assets/albedo.png";
+    pm.normal_map = "assets/normal.png";
+    pm.emissive_r = 0.2;
+    assert(pm.emissive_r == 0.2, "emissive set");
+    assert(pm.double_sided == false, "double_sided default");
+
+    print("All d3 Phase 2 tests passed!");
+}
