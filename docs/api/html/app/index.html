@@ -80,15 +80,9 @@ function filterNav() {
 <h2>index.lm</h2>
 <input type="text" id="search-input" placeholder="Filter symbols..." oninput="filterNav()">
 <div id="nav-list">
-<a class="nav-link" href="#event_type_from_int">event_type_from_int <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
-<a class="nav-link" href="#Event">Event <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
-<a class="nav-link" href="#KeyEvent">KeyEvent <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
-<a class="nav-link" href="#MouseEvent">MouseEvent <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
-<a class="nav-link" href="#ResizeEvent">ResizeEvent <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
 <a class="nav-link" href="#WindowConfig">WindowConfig <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
 <a class="nav-link" href="#default_window_config">default_window_config <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 <a class="nav-link" href="#State">State <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
-<a class="nav-link" href="#make_default_event">make_default_event <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 <a class="nav-link" href="#app_init">app_init <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 <a class="nav-link" href="#init">init <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 <a class="nav-link" href="#app_shutdown">app_shutdown <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
@@ -97,17 +91,13 @@ function filterNav() {
 <a class="nav-link" href="#app_is_running">app_is_running <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 <a class="nav-link" href="#ui">ui <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 <a class="nav-link" href="#set_ui">set_ui <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#dispatch_ui_events">dispatch_ui_events <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#process_events">process_events <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 <a class="nav-link" href="#run_frame_step">run_frame_step <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 <a class="nav-link" href="#app_run">app_run <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 <a class="nav-link" href="#run">run <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 <a class="nav-link" href="#app_quit">app_quit <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 <a class="nav-link" href="#quit">quit <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
-<a class="nav-link" href="#process_events">process_events <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
-<a class="nav-link" href="#push_mouse_click">push_mouse_click <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
-<a class="nav-link" href="#push_quit_event">push_quit_event <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
-<a class="nav-link" href="#push_event">push_event <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
-<a class="nav-link" href="#poll_event">poll_event <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
-<a class="nav-link" href="#has_pending_events">has_pending_events <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 <a class="nav-link" href="#present_frame">present_frame <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 <a class="nav-link" href="#set_window_size">set_window_size <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 <a class="nav-link" href="#get_window_width">get_window_width <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
@@ -142,60 +132,11 @@ function filterNav() {
 <h1>index.lm API Reference</h1>
 <h2>Module Overview</h2>
 <div class="summary"><p>Application Module
-Portable window application lifecycle, event loop, and timing driver</p></div>
-<div id="event_type_from_int">
-<h3>event_type_from_int <span class="badge badge-private">Function</span></h3>
-<pre class="code-sig"><code>fn event_type_from_int(code: int): EventType</code></pre>
-</div><hr>
-<div id="Event">
-<h3>Event <span class="badge badge-pub">Frame</span></h3>
-<pre class="code-sig"><code>frame Event</code></pre>
-<div class="summary"><p>Event frame</p></div>
-<h4>Members</h4>
-<ul>
-<li><code>var pub event_type: EventType</code> <em>(field)</em></li>
-<li><code>var pub timestamp: int</code> <em>(field)</em></li>
-<li><code>var pub window_id: int</code> <em>(field)</em></li>
-<li><code>var pub x: int</code> <em>(field)</em></li>
-<li><code>var pub y: int</code> <em>(field)</em></li>
-<li><code>var pub key_code: int</code> <em>(field)</em></li>
-<li><code>var pub xdest: int</code> <em>(field)</em></li>
-<li><code>var pub ydest: int</code> <em>(field)</em></li>
-<li><code>pub init()</code> <em>(constructor)</em></li>
-</ul>
-</div><hr>
-<div id="KeyEvent">
-<h3>KeyEvent <span class="badge badge-pub">Frame</span></h3>
-<pre class="code-sig"><code>frame KeyEvent</code></pre>
-<div class="summary"><p>Key event frame</p></div>
-<h4>Members</h4>
-<ul>
-<li><code>var pub modifiers: int</code> <em>(field)</em></li>
-<li><code>var pub repeat: int</code> <em>(field)</em></li>
-</ul>
-</div><hr>
-<div id="MouseEvent">
-<h3>MouseEvent <span class="badge badge-pub">Frame</span></h3>
-<pre class="code-sig"><code>frame MouseEvent</code></pre>
-<div class="summary"><p>Mouse event frame</p></div>
-<h4>Members</h4>
-<ul>
-<li><code>var pub button: int</code> <em>(field)</em></li>
-<li><code>var pub modifiers: int</code> <em>(field)</em></li>
-</ul>
-</div><hr>
-<div id="ResizeEvent">
-<h3>ResizeEvent <span class="badge badge-pub">Frame</span></h3>
-<pre class="code-sig"><code>frame ResizeEvent</code></pre>
-<div class="summary"><p>Resize event frame</p></div>
-<h4>Members</h4>
-<ul>
-<li><code>var pub width: int</code> <em>(field)</em></li>
-<li><code>var pub height: int</code> <em>(field)</em></li>
-<li><code>var pub framebuffer_width: int</code> <em>(field)</em></li>
-<li><code>var pub framebuffer_height: int</code> <em>(field)</em></li>
-</ul>
-</div><hr>
+Portable window application lifecycle, event loop, and timing driver
+
+Windowing and the Fluent UI loop live here. OS event pumping and the typed
+event queue live in std.events — this module only *dispatches* queued
+events into the Fluent ui_context.</p></div>
 <div id="WindowConfig">
 <h3>WindowConfig <span class="badge badge-pub">Frame</span></h3>
 <pre class="code-sig"><code>frame WindowConfig</code></pre>
@@ -232,16 +173,10 @@ Portable window application lifecycle, event loop, and timing driver</p></div>
 <li><code>var pub framebuffer_width: int</code> <em>(field)</em></li>
 <li><code>var pub framebuffer_height: int</code> <em>(field)</em></li>
 <li><code>var pub dpi_scale: float</code> <em>(field)</em></li>
-<li><code>var pub event_queue: list</code> <em>(field)</em></li>
-<li><code>var pub event_queue_head: int</code> <em>(field)</em></li>
 <li><code>var pub frame_count: int</code> <em>(field)</em></li>
 <li><code>var pub last_frame_time: int</code> <em>(field)</em></li>
 <li><code>var pub delta_time: float</code> <em>(field)</em></li>
 </ul>
-</div><hr>
-<div id="make_default_event">
-<h3>make_default_event <span class="badge badge-private">Function</span></h3>
-<pre class="code-sig"><code>fn make_default_event(): Event</code></pre>
 </div><hr>
 <div id="app_init">
 <h3>app_init <span class="badge badge-pub">Function</span></h3>
@@ -271,11 +206,26 @@ Portable window application lifecycle, event loop, and timing driver</p></div>
 </div><hr>
 <div id="ui">
 <h3>ui <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn ui(root: ui_types.Widget): nil</code></pre>
+<pre class="code-sig"><code>pub fn ui(root: ui_comp.Fluent): nil</code></pre>
 </div><hr>
 <div id="set_ui">
 <h3>set_ui <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn set_ui(root): nil</code></pre>
+<pre class="code-sig"><code>pub fn set_ui(root: ui_comp.Fluent): nil</code></pre>
+</div><hr>
+<div id="dispatch_ui_events">
+<h3>dispatch_ui_events <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn dispatch_ui_events(): nil</code></pre>
+<div class="summary"><p>dispatch_ui_events drains the std.events queue into the Fluent
+ui_context. This is the Fluent/framework consumer — std.game.Game drains
+the same queue itself for its InputManager/IMGUI instead. Do not call both
+in one frame or the stream is split.</p></div>
+</div><hr>
+<div id="process_events">
+<h3>process_events <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn process_events(): nil</code></pre>
+<div class="summary"><p>process_events = pump + Fluent dispatch: the per-frame event step for the
+std.app/Fluent run loop. std.game.Game calls events.pump_events() and
+drains the queue itself instead.</p></div>
 </div><hr>
 <div id="run_frame_step">
 <h3>run_frame_step <span class="badge badge-pub">Function</span></h3>
@@ -287,7 +237,7 @@ Portable window application lifecycle, event loop, and timing driver</p></div>
 </div><hr>
 <div id="run">
 <h3>run <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn run(root: any = ...): nil</code></pre>
+<pre class="code-sig"><code>pub fn run(root: union = ...): nil</code></pre>
 </div><hr>
 <div id="app_quit">
 <h3>app_quit <span class="badge badge-pub">Function</span></h3>
@@ -296,30 +246,6 @@ Portable window application lifecycle, event loop, and timing driver</p></div>
 <div id="quit">
 <h3>quit <span class="badge badge-pub">Function</span></h3>
 <pre class="code-sig"><code>pub fn quit(): nil</code></pre>
-</div><hr>
-<div id="process_events">
-<h3>process_events <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn process_events(): nil</code></pre>
-</div><hr>
-<div id="push_mouse_click">
-<h3>push_mouse_click <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn push_mouse_click(x: int, y: int): nil</code></pre>
-</div><hr>
-<div id="push_quit_event">
-<h3>push_quit_event <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn push_quit_event(): nil</code></pre>
-</div><hr>
-<div id="push_event">
-<h3>push_event <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn push_event(event: Event): nil</code></pre>
-</div><hr>
-<div id="poll_event">
-<h3>poll_event <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn poll_event(): Event</code></pre>
-</div><hr>
-<div id="has_pending_events">
-<h3>has_pending_events <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn has_pending_events(): int</code></pre>
 </div><hr>
 <div id="present_frame">
 <h3>present_frame <span class="badge badge-pub">Function</span></h3>

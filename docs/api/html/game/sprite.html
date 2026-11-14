@@ -115,10 +115,10 @@ function filterNav() {
 <h4>Members</h4>
 <ul>
 <li><code>var pub texture: Texture2D</code> <em>(field)</em></li>
-<li><code>var pub position: types.Vec2</code> <em>(field)</em></li>
-<li><code>var pub src_rect: types.Rect</code> <em>(field)</em></li>
-<li><code>var pub origin: types.Vec2</code> <em>(field)</em></li>
-<li><code>var pub scale: types.Vec2</code> <em>(field)</em></li>
+<li><code>var pub position: Vector2</code> <em>(field)</em></li>
+<li><code>var pub src_rect: Rect</code> <em>(field)</em></li>
+<li><code>var pub origin: Vector2</code> <em>(field)</em></li>
+<li><code>var pub scale: Vector2</code> <em>(field)</em></li>
 <li><code>var pub rotation: float</code> <em>(field)</em></li>
 <li><code>var pub tint: color.Color</code> <em>(field)</em></li>
 <li><code>var pub flip_x: bool</code> <em>(field)</em></li>
@@ -129,7 +129,7 @@ function filterNav() {
 </div><hr>
 <div id="sprite">
 <h3>sprite <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn sprite(texture: any = ..., position: any = ...): Sprite</code></pre>
+<pre class="code-sig"><code>pub fn sprite(texture: union = ..., position: union = ...): Sprite</code></pre>
 </div><hr>
 <div id="SpriteSheet">
 <h3>SpriteSheet <span class="badge badge-pub">Frame</span></h3>
@@ -142,8 +142,8 @@ function filterNav() {
 <li><code>var pub columns: int</code> <em>(field)</em></li>
 <li><code>var pub rows: int</code> <em>(field)</em></li>
 <li><code>pub init()</code> <em>(constructor)</em></li>
-<li><code>pub fn get_frame(col: int, row: int): types.Rect</code> <em>(method)</em></li>
-<li><code>pub fn get_frame_index(index: int): types.Rect</code> <em>(method)</em></li>
+<li><code>pub fn get_frame(col: int, row: int): Rect</code> <em>(method)</em></li>
+<li><code>pub fn get_frame_index(index: int): Rect</code> <em>(method)</em></li>
 </ul>
 </div><hr>
 <div id="AnimationClip">
@@ -161,11 +161,6 @@ function filterNav() {
 <div id="AnimatedSprite">
 <h3>AnimatedSprite <span class="badge badge-pub">Frame</span></h3>
 <pre class="code-sig"><code>frame AnimatedSprite: gtraits.Updatable, gtraits.Drawable</code></pre>
-<div class="summary"><p>AnimatedSprite composes Sprite via `embed`: the sprite fields (texture,
-position, origin, scale, rotation, tint, flip_x, flip_y) are promoted from
-Sprite rather than duplicated, and `src_rect` comes along for free. Sprite's
-`draw` is promoted too but immediately shadowed by the own `draw` below
-(name-based dedupe), so animation-aware painting wins.</p></div>
 <h4>Members</h4>
 <ul>
 <li><code>var pub clips: dict</code> <em>(field)</em></li>

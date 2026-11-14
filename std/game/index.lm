@@ -24,7 +24,12 @@ pub import std.game.input show
     KEY_W, KEY_A, KEY_S, KEY_D, KEY_Q, KEY_E, KEY_R,
     KEY_1, KEY_2, KEY_3, KEY_4,
     KEY_F, KEY_H, KEY_F3, KEY_TAB, KEY_BACKSPACE,
-    MOUSE_LEFT, MOUSE_RIGHT, MOUSE_MIDDLE,
+    MOUSE_LEFT, MOUSE_RIGHT, MOUSE_MIDDLE;
+
+// Typed OS events: canonical home is std.events; re-exported here so game
+// code can reach Event/EventType/MOD_* through the game facade.
+pub import std.events show
+    Event, EventType, KeyEvent, MouseEvent, ResizeEvent,
     MOD_SHIFT, MOD_CONTROL, MOD_ALT, MOD_SUPER;
 
 pub import std.game.components show WidgetState, Transform2D;

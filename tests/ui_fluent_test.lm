@@ -13,6 +13,7 @@ import std.app as app;
 import std.ui as ui;
 import std.gg as gg;
 import std.color as color;
+import std.events as events;
 
 fn test_button_callback() {
     print("Action callback executed successfully!");
@@ -137,7 +138,7 @@ fn test_retained_lifecycle_and_callback(): int {
     assert(not btn.is_pressed, "initial is_pressed must be false");
 
     // Frame 2: Mouse down on button at (x=50, y=50) -> pressed visual
-    app.push_event(app.Event(event_type=app.EventType.MouseDown, x=50, y=50));
+    events.push_event(events.Event(event_type=events.EventType.MouseDown, x=50, y=50));
     app.run_frame_step();
     var p2 = gg.readback_pixel(50, 50);
     assert(p2 != nil, "frame 2 readback failed");
@@ -145,7 +146,7 @@ fn test_retained_lifecycle_and_callback(): int {
     assert(btn.is_pressed, "button is_pressed must be true on mouse down");
 
     // Frame 3: Mouse up on button -> fires callback and resets pressed state
-    app.push_event(app.Event(event_type=app.EventType.MouseUp, x=50, y=50));
+    events.push_event(events.Event(event_type=events.EventType.MouseUp, x=50, y=50));
     app.run_frame_step();
     assert(btn.click_count == 1, "button click_count was not incremented");
     assert(not btn.is_pressed, "button is_pressed must be false after mouse up");

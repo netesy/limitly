@@ -2,6 +2,7 @@
 // High-level game loop, event polling, timing driver, and application runner for std.game
 
 import std.app as app;
+import std.events as events;
 import std.gg as gg;
 
 
@@ -26,6 +27,9 @@ frame Config {
         self.width = width;
         self.height = height;
         self.resizable = resizable;
+        // Scene/renderer clear color (e.g. d3.Scene3D.background or a custom
+        // 2D backdrop). Does not affect the GUI chrome clear, which always
+        // comes from the active theme's bg_window.
         self.bg_color = color.hex(0x1e1e24, 1.0);
         self.fixed_dt = 1.0 / 60.0;
     }
@@ -102,6 +106,22 @@ frame Game {
             app.show_window();
             self.is_running = true;
             self.timer.reset();
+
+            // Warm-up present: the window is already visible but nothing has
+            // been committed yet, so it would show a black framebuffer until
+            // the first loop frame finishes (shader/pipeline creation makes
+            // that gap noticeable). On the GPU backend frames are only
+            // published by poll_events -> commit_frame, so present the clear
+            // explicitly instead of relying on gg.commit() (a no-op there).
+            var bg = color.hex(0x1e1e24, 1.0);
+            if (self.gui != nil and self.gui.theme != nil) {
+                bg = self.gui.theme.bg_window;
+            }
+            gg.begin_pass(self.width, self.height, bg.r, bg.g, bg.b, bg.a);
+            gg.end_pass();
+            // events.pump_events (not gg.poll_events) so any events arriving
+            // during startup land in the typed queue for the first drain.
+            events.pump_events();
         } else {
             self.is_running = false;
         }
@@ -132,35 +152,28 @@ frame Game {
         // Reset per-frame input transients
         self.input.begin_frame();
 
-        // Process all events
-        var raw_events = gg.poll_events();
-        if (raw_events != nil) {
-            var native_events: [int] = raw_events as [int];
-            var i: int = 0;
-            var num_events = len(native_events);
-            while (i + 3 < num_events) {
-                var ev_type: int = native_events[i];
-                var ev_x: int = native_events[i + 1];
-                var ev_y: int = native_events[i + 2];
-                var ev_k: int = native_events[i + 3];
-
-                match (ev_type) {
-                    0 => { self.is_running = false; },
-                    1 => { self.width = ev_x; self.height = ev_y; },
-                    6 => { self.input.on_mouse_move(ev_x as float, ev_y as float); },
-                    4 => {
-                        self.input.on_mouse_down(ev_k, ev_x as float, ev_y as float);
-                    },
-                    5 => {
-                        self.input.on_mouse_up(ev_k, ev_x as float, ev_y as float);
-                    },
-                    8 => { self.input.on_mouse_wheel(ev_y as float); },
-                    2 => { self.input.on_key_down(ev_k); },
-                    3 => { self.input.on_key_up(ev_k); },
-                    7 => { self.input.on_char(ev_k); },
-                    _ => {}
-                }
-                i = i + 4;
+        // Events: std.events owns the single raw->typed pump (pump_events
+        // calls gg.poll_events, the frame-publish boundary on the GPU
+        // backend). We drain the typed queue here — the Fluent path drains
+        // the same queue via app.dispatch_ui_events instead.
+        events.pump_events();
+        while (events.has_pending_events() != 0) {
+            var ev = events.poll_event();
+            match (ev.event_type) {
+                events.EventType.Quit => { self.is_running = false; },
+                events.EventType.Resize => { self.width = ev.x; self.height = ev.y; },
+                events.EventType.MouseMove => { self.input.on_mouse_move(ev.x as float, ev.y as float); },
+                events.EventType.MouseDown => {
+                    self.input.on_mouse_down(ev.key_code, ev.x as float, ev.y as float);
+                },
+                events.EventType.MouseUp => {
+                    self.input.on_mouse_up(ev.key_code, ev.x as float, ev.y as float);
+                },
+                events.EventType.MouseWheel => { self.input.on_mouse_wheel(ev.y as float); },
+                events.EventType.KeyDown => { self.input.on_key_down(ev.key_code); },
+                events.EventType.KeyUp => { self.input.on_key_up(ev.key_code); },
+                events.EventType.Char => { self.input.on_char(ev.key_code); },
+                _ => {}
             }
         }
 
@@ -170,8 +183,11 @@ frame Game {
         self.gui.typed_chars = self.input.typed_chars;
         self.gui.active_modifiers = self.input.active_modifiers;
 
-        // Clear pass
-        var bg = self.config.bg_color;
+        // Clear pass: the GUI theme window background always drives the chrome
+        // clear. config.bg_color is the scene/renderer clear color — apps feed
+        // it to their renderer (e.g. d3.Scene3D.background) rather than
+        // overriding the window clear here.
+        var bg = color.hex(0x1e1e24, 1.0);
         if (self.gui != nil and self.gui.theme != nil) {
             bg = self.gui.theme.bg_window;
         }
@@ -240,7 +256,11 @@ frame Game {
     pub fn set_resolution(w: int, h: int): nil {
         self.width = w;
         self.height = h;
-        gg.set_window_size(w, h);
+        self.config.width = w;
+        self.config.height = h;
+        // Route through std.app so window state, framebuffer size and the
+        // Fluent viewport all stay in sync — single windowing owner.
+        app.set_window_size(w, h);
     }
 
     pub fn set_size(w: int, h: int): nil {
@@ -253,6 +273,10 @@ frame Game {
 
     pub fn shutdown(): nil {
         self.is_running = false;
-        gg.shutdown();
+        // app.app_shutdown() stops the sokol runtime AND resets std.app's
+        // global state (is_initialized, event queue, ui context) — calling
+        // gg.shutdown() alone would leave app_init permanently latched and
+        // break any subsequent Game.setup() in the same process.
+        app.app_shutdown();
     }
 }

@@ -89,8 +89,8 @@ frame Game
 - `pub fn is_mouse_down(): bool` *(method)*
 - `pub fn is_mouse_pressed(): bool` *(method)*
 - `pub fn is_mouse_released(): bool` *(method)*
-- `pub fn mouse_pos(): types.Vec2` *(method)*
-- `pub fn mouse_delta(): types.Vec2` *(method)*
+- `pub fn mouse_pos(): Vector2` *(method)*
+- `pub fn mouse_delta(): Vector2` *(method)*
 - `pub fn bind_action(action: str, keys: list): nil` *(method)*
 - `pub fn is_action_down(action: str): bool` *(method)*
 - `pub fn is_action_pressed(action: str): bool` *(method)*

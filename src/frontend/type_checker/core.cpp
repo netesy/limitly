@@ -303,12 +303,27 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
                         this->type_system.addUserDefinedType(name, ft);
                     }
                     if (decl) {
+                        // `path.name` may be a facade spelling for a re-exported
+                        // symbol; the canonical identity lives in the defining
+                        // module. Keep the facade key for lookups but store the
+                        // canonical FrameInfo/FrameType so all spellings share one
+                        // type identity.
+                        const std::string facade_name = path + "." + name;
+                        const std::string canon_name = manager.canonical_symbol(facade_name);
                         FrameInfo info_copy = info;
-                        info_copy.name = path + "." + name;
-                        this->frame_declarations[path + "." + name] = info_copy;
-                        TypePtr existing_path_t = checker.type_system.getType(path + "." + name);
-                        TypePtr ft_path = (existing_path_t && existing_path_t->tag == TypeTag::Frame) ? existing_path_t : this->type_system.createFrameType(path + "." + name);
-                        this->type_system.addUserDefinedType(path + "." + name, ft_path);
+                        info_copy.name = canon_name;
+                        this->frame_declarations[facade_name] = info_copy;
+                        if (canon_name != facade_name) {
+                            this->frame_declarations[canon_name] = info_copy;
+                        }
+                        TypePtr canon_t = this->type_system.getType(canon_name);
+                        if (!canon_t || canon_t->tag != TypeTag::Frame) {
+                            canon_t = this->type_system.createFrameType(canon_name);
+                        }
+                        this->type_system.addUserDefinedType(canon_name, canon_t);
+                        if (canon_name != facade_name) {
+                            this->type_system.addUserDefinedType(facade_name, canon_t);
+                        }
                     }
                 }
                 for (const auto& [name, info] : checker.trait_declarations) {
@@ -319,11 +334,19 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
                         this->type_system.addUserDefinedType(name, trait_type);
                     }
                     if (decl) {
+                        const std::string facade_name = path + "." + name;
+                        const std::string canon_name = manager.canonical_symbol(facade_name);
                         TraitInfo info_copy = info;
-                        info_copy.name = path + "." + name;
-                        this->trait_declarations[path + "." + name] = info_copy;
-                        TypePtr trait_path = std::make_shared<::Type>(TypeTag::Trait, TraitType{path + "." + name, {}, {}});
-                        this->type_system.addUserDefinedType(path + "." + name, trait_path);
+                        info_copy.name = canon_name;
+                        this->trait_declarations[facade_name] = info_copy;
+                        if (canon_name != facade_name) {
+                            this->trait_declarations[canon_name] = info_copy;
+                        }
+                        TypePtr trait_path = std::make_shared<::Type>(TypeTag::Trait, TraitType{canon_name, {}, {}});
+                        this->type_system.addUserDefinedType(canon_name, trait_path);
+                        if (canon_name != facade_name) {
+                            this->type_system.addUserDefinedType(facade_name, trait_path);
+                        }
                     }
                 }
                 for (const auto& [name, sig] : checker.function_signatures) {
@@ -332,9 +355,14 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
                         this->function_signatures[name] = sig;
                     }
                     if (decl) {
+                        const std::string facade_name = path + "." + name;
+                        const std::string canon_name = manager.canonical_symbol(facade_name);
                         FunctionSignature sig_copy = sig;
-                        sig_copy.name = path + "." + name;
-                        this->function_signatures[path + "." + name] = sig_copy;
+                        sig_copy.name = canon_name;
+                        this->function_signatures[facade_name] = sig_copy;
+                        if (canon_name != facade_name) {
+                            this->function_signatures[canon_name] = sig_copy;
+                        }
                     }
                 }
                 for (const auto& [name, type] : checker.variable_types) {
@@ -344,7 +372,12 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
                             this->variable_types[name] = type;
                         }
                         if (decl) {
-                            this->variable_types[path + "." + name] = type;
+                            const std::string facade_name = path + "." + name;
+                            const std::string canon_name = manager.canonical_symbol(facade_name);
+                            this->variable_types[facade_name] = type;
+                            if (canon_name != facade_name) {
+                                this->variable_types[canon_name] = type;
+                            }
                         }
                     }
                 }
@@ -360,10 +393,14 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
                             // same-named symbol (two modules may each export a `Writer`). The
                             // frame/trait loops above already register `path.name` with this
                             // module's own kind; re-keying a foreign entry here would clobber it.
-                            const std::string qname = path + "." + name;
+                            const std::string qname = manager.canonical_symbol(path + "." + name);
                             const auto& defined = this->type_system.getUserDefinedTypes();
                             if (defined.find(qname) == defined.end()) {
                                 this->type_system.addUserDefinedType(qname, type);
+                            }
+                            const std::string facade_qname = path + "." + name;
+                            if (facade_qname != qname && defined.find(facade_qname) == defined.end()) {
+                                this->type_system.addUserDefinedType(facade_qname, type);
                             }
                         }
                     }
@@ -375,7 +412,12 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
                             this->type_system.registerTypeAlias(name, type);
                         }
                         if (decl) {
-                            this->type_system.registerTypeAlias(path + "." + name, type);
+                            const std::string facade_name = path + "." + name;
+                            const std::string canon_name = manager.canonical_symbol(facade_name);
+                            this->type_system.registerTypeAlias(facade_name, type);
+                            if (canon_name != facade_name) {
+                                this->type_system.registerTypeAlias(canon_name, type);
+                            }
                         }
                     }
                 }

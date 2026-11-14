@@ -44,7 +44,7 @@ frame Buffer : ResourceTrait {
     pub var is_index: bool;
 }
 
-frame Image : ResourceTrait {
+frame Texture : ResourceTrait {
     mixin ResourceHandle;
     pub var width: int;
     pub var height: int;
@@ -70,7 +70,7 @@ frame Bindings : ResourceTrait {
     mixin ResourceHandle;
     pub var vertex_buffer_id: int;
     pub var index_buffer_id: int;
-    pub var image_id: int;
+    pub var texture_id: int;
     pub var sampler_id: int;
 }
 
@@ -391,7 +391,7 @@ pub fn make_buffer_data(size: int, is_index: bool, data: [float]): Buffer {
     return Buffer(id=id, size=size, is_index=is_index);
 }
 
-pub fn make_image(width: int, height: int): Image {
+pub fn make_texture(width: int, height: int): Texture {
     val id = global_graphics_context.next_resource_id;
     global_graphics_context.next_resource_id = id + 1;
     if (global_graphics_context.handle != -1) {
@@ -400,12 +400,12 @@ pub fn make_image(width: int, height: int): Image {
         global_graphics_context._args3i[2] = height;
         rt.call(global_graphics_context.handle, rt.OP_MAKE_IMAGE, global_graphics_context._args3i);
     }
-    return Image(id=id, width=width, height=height);
+    return Texture(id=id, width=width, height=height);
 }
 
-// Creates an image with initial RGBA8 pixel data and returns its id.
+// Creates a texture with initial RGBA8 pixel data and returns its id.
 // `pixels` is a flat byte list in row-major order, length == width*height*4.
-pub fn make_image_data(width: int, height: int, pixels: [int]): int {
+pub fn make_texture_data(width: int, height: int, pixels: [int]): int {
     val id = global_graphics_context.next_resource_id;
     global_graphics_context.next_resource_id = id + 1;
     if (global_graphics_context.handle != -1) {
@@ -442,7 +442,7 @@ pub fn make_pipeline_typed(shader: Shader, primitive: PrimitiveType): Pipeline {
     return make_pipeline(shader.id, primitive_type_code(primitive));
 }
 
-pub fn make_bindings(vbuf_id: int, ibuf_id: int, img_id: int, sampler_id: int): Bindings {
+pub fn make_bindings(vbuf_id: int, ibuf_id: int, tex_id: int, sampler_id: int): Bindings {
     val id = global_graphics_context.next_resource_id;
     global_graphics_context.next_resource_id = id + 1;
     if (global_graphics_context.handle != -1) {
@@ -455,7 +455,7 @@ pub fn make_bindings(vbuf_id: int, ibuf_id: int, img_id: int, sampler_id: int): 
         id=id,
         vertex_buffer_id=vbuf_id,
         index_buffer_id=ibuf_id,
-        image_id=img_id,
+        texture_id=tex_id,
         sampler_id=sampler_id
     );
 }

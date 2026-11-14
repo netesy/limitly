@@ -425,20 +425,28 @@ fn _ensure_material_texture(material: mtrl.Material): nil {
     if (material.base_color_texture == "") {
         return;
     }
-    // load_rgba returns (w, h, px) as a tuple — deliberately avoids the
-    // Image frame, whose field layout is corrupted when another module
-    // declares a same-named frame (bare-name registry collision).
-    val rgba = png.load_rgba(material.base_color_texture);
-    val t = rgba? else {
+    val img_opt: simg.Image? = png.load_as(material.base_color_texture, 4);
+    val img: simg.Image = img_opt? else {
         return;
     };
-    val w = t.0;
-    val h = t.1;
-    val px = t.2;
-    if (w <= 0 or h <= 0 or len(px) != w * h * 4) {
+    val w = img.width;
+    val h = img.height;
+    val px: [int] = [];
+    unsafe {
+        if (w > 0 and h > 0 and img.pixels != nil) {
+            val n = w * h * 4;
+            var i = 0;
+            while (i < n) {
+                px.append(ffi.load_u8(ffi.ptr_add(img.pixels, i)));
+                i = i + 1;
+            }
+        }
+    }
+    img.release();
+    if (len(px) != w * h * 4) {
         return;
     }
-    material.texture_id = gg.make_image_data(w, h, px);
+    material.texture_id = gg.make_texture_data(w, h, px);
     material.texture_state = 1;
 }
 

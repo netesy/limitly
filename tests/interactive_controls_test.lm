@@ -4,6 +4,7 @@
 import std.app as app;
 import std.ui as ui;
 import std.color as color;
+import std.events as events;
 
 fn test_click_action() {
     print("Button clicked callback executed");
@@ -62,52 +63,52 @@ fn run_tests() {
     app.present_frame();
     // 1. Verify Single Click (Mouse Down + Mouse Up should invoke callback ONCE)
     assert(btn.click_count == 0, "Initial button click count should be 0");
-    app.push_event(app.Event(event_type=app.EventType.MouseDown, xdest=50, ydest=70, x=50, y=70));
-    app.push_event(app.Event(event_type=app.EventType.MouseUp, xdest=50, ydest=70, x=50, y=70));
+    events.push_event(events.Event(event_type=events.EventType.MouseDown, xdest=50, ydest=70, x=50, y=70));
+    events.push_event(events.Event(event_type=events.EventType.MouseUp, xdest=50, ydest=70, x=50, y=70));
     app.process_events();
     assert(btn.click_count == 1, "Button click should be invoked exactly once");
     print("Pass: Single click verified (invoked exactly once)");
 
     // 2. Verify Checkbox Toggle
     assert(not chk.is_checked, "Initial checkbox unchecked");
-    app.push_event(app.Event(event_type=app.EventType.MouseDown, x=35, y=125));
-    app.push_event(app.Event(event_type=app.EventType.MouseUp, x=35, y=125));
+    events.push_event(events.Event(event_type=events.EventType.MouseDown, x=35, y=125));
+    events.push_event(events.Event(event_type=events.EventType.MouseUp, x=35, y=125));
     app.process_events();
     assert(chk.is_checked, "Checkbox should toggle to checked");
     assert(chk.label != "[X]", "Checkbox text should not use hack text");
     print("Pass: Checkbox toggle verified");
 
     // 3. Verify Text Input Typing, Unicode, and Backspace
-    app.push_event(app.Event(event_type=app.EventType.MouseDown, x=50, y=195));
-    app.push_event(app.Event(event_type=app.EventType.MouseUp, x=50, y=195));
+    events.push_event(events.Event(event_type=events.EventType.MouseDown, x=50, y=195));
+    events.push_event(events.Event(event_type=events.EventType.MouseUp, x=50, y=195));
     app.process_events();
     assert(inp.is_focused, "Input field should be focused");
 
     // Send char '1' (49)
-    app.push_event(app.Event(event_type=app.EventType.Char, key_code=49));
+    events.push_event(events.Event(event_type=events.EventType.Char, key_code=49));
     app.process_events();
     assert(inp.text == "test1", "Input text should have '1' appended");
 
     // Send Unicode character codepoint 0x00E9 (Latin small letter e with acute: é, 233)
-    app.push_event(app.Event(event_type=app.EventType.Char, key_code=233));
+    events.push_event(events.Event(event_type=events.EventType.Char, key_code=233));
     app.process_events();
     assert(len(inp.text) > 5, "Input text should contain Unicode character");
 
     // Send Backspace (8) via KEY_DOWN
-    app.push_event(app.Event(event_type=app.EventType.KeyDown, key_code=8));
+    events.push_event(events.Event(event_type=events.EventType.KeyDown, key_code=8));
     app.process_events();
     assert(inp.text == "test1", "Backspace should remove Unicode character cleanly");
 
     // Send Backspace again
-    app.push_event(app.Event(event_type=app.EventType.KeyDown, key_code=8));
+    events.push_event(events.Event(event_type=events.EventType.KeyDown, key_code=8));
     app.process_events();
     assert(inp.text == "test", "Backspace should remove '1'");
     print("Pass: Text input typing, Unicode, and backspace verified");
 
     // 4. Verify Tabs Switching
     assert(tab_bar.active_tab == 0, "Initial tab should be 0");
-    app.push_event(app.Event(event_type=app.EventType.MouseDown, x=110, y=30));
-    app.push_event(app.Event(event_type=app.EventType.MouseUp, x=110, y=30));
+    events.push_event(events.Event(event_type=events.EventType.MouseDown, x=110, y=30));
+    events.push_event(events.Event(event_type=events.EventType.MouseUp, x=110, y=30));
     app.process_events();
     assert(tab_bar.active_tab == 1, "Active tab should be switched to 1");
     print("Pass: Tab switching verified");
@@ -115,67 +116,67 @@ fn run_tests() {
     // 5. Verify Mouse Wheel Scroll
     app.present_frame();
     assert(scr.scroll_y == 0.0, "Initial scroll should be 0");
-    app.push_event(app.Event(event_type=app.EventType.MouseMove, x=50, y=250));
-    app.push_event(app.Event(event_type=app.EventType.MouseWheel, y=-120));
+    events.push_event(events.Event(event_type=events.EventType.MouseMove, x=50, y=250));
+    events.push_event(events.Event(event_type=events.EventType.MouseWheel, y=-120));
     app.process_events();
     assert(scr.scroll_y > 0.0, "Scroll offset should increase on wheel scroll down");
     print("Pass: ScrollView mouse wheel verified");
 
     // 6. Verify Hover State
-    app.push_event(app.Event(event_type=app.EventType.MouseMove, x=50, y=70));
+    events.push_event(events.Event(event_type=events.EventType.MouseMove, x=50, y=70));
     app.process_events();
     assert(btn.is_hovered, "Button should be hovered when cursor is inside");
 
-    app.push_event(app.Event(event_type=app.EventType.MouseMove, x=500, y=500));
+    events.push_event(events.Event(event_type=events.EventType.MouseMove, x=500, y=500));
     app.process_events();
     assert(not btn.is_hovered, "Button hover should clear when cursor leaves");
     print("Pass: Hover state verified");
 
     // 7. Verify Button Pointer State Machine: Drag-out cancellation & re-entry restore
     var init_clicks = btn.click_count;
-    app.push_event(app.Event(event_type=app.EventType.MouseDown, x=50, y=70));
+    events.push_event(events.Event(event_type=events.EventType.MouseDown, x=50, y=70));
     app.process_events();
     assert(btn.is_pressed, "Button should be pressed on mouse down");
 
     // Cursor leaves button area while held -> pressed visual resets
-    app.push_event(app.Event(event_type=app.EventType.MouseMove, x=500, y=500));
+    events.push_event(events.Event(event_type=events.EventType.MouseMove, x=500, y=500));
     app.process_events();
     assert(not btn.is_pressed, "Pressed visual must reset when cursor leaves button area");
 
     // Release outside -> CANCELLED click (callback must NOT fire)
-    app.push_event(app.Event(event_type=app.EventType.MouseUp, x=500, y=500));
+    events.push_event(events.Event(event_type=events.EventType.MouseUp, x=500, y=500));
     app.process_events();
     assert(btn.click_count == init_clicks, "Click count must not increment on release outside");
 
     // Down inside, move outside, move BACK inside, release inside -> FIRED
-    app.push_event(app.Event(event_type=app.EventType.MouseDown, x=50, y=70));
+    events.push_event(events.Event(event_type=events.EventType.MouseDown, x=50, y=70));
     app.process_events();
     assert(btn.is_pressed, "Button pressed on down");
 
-    app.push_event(app.Event(event_type=app.EventType.MouseMove, x=500, y=500));
+    events.push_event(events.Event(event_type=events.EventType.MouseMove, x=500, y=500));
     app.process_events();
     assert(not btn.is_pressed, "Button pressed resets on leave");
 
-    app.push_event(app.Event(event_type=app.EventType.MouseMove, x=50, y=70));
+    events.push_event(events.Event(event_type=events.EventType.MouseMove, x=50, y=70));
     app.process_events();
     assert(btn.is_pressed, "Button pressed restores on re-entry while held");
 
-    app.push_event(app.Event(event_type=app.EventType.MouseUp, x=50, y=70));
+    events.push_event(events.Event(event_type=events.EventType.MouseUp, x=50, y=70));
     app.process_events();
     assert(btn.click_count == init_clicks + 1, "Button click should fire on release inside");
     print("Pass: Button pointer state machine (drag-out cancel & re-entry) verified");
 
     // 8. Verify Slider Drag Semantics
-    app.push_event(app.Event(event_type=app.EventType.MouseDown, x=30, y=160));
+    events.push_event(events.Event(event_type=events.EventType.MouseDown, x=30, y=160));
     app.process_events();
     var val_after_down = sld.value;
 
     // Drag while held
-    app.push_event(app.Event(event_type=app.EventType.MouseMove, x=100, y=160));
+    events.push_event(events.Event(event_type=events.EventType.MouseMove, x=100, y=160));
     app.process_events();
     assert(sld.value != val_after_down, "Slider value should update continuously during drag");
 
-    app.push_event(app.Event(event_type=app.EventType.MouseUp, x=100, y=160));
+    events.push_event(events.Event(event_type=events.EventType.MouseUp, x=100, y=160));
     app.process_events();
     print("Pass: Slider drag semantics verified");
 
@@ -197,14 +198,14 @@ fn run_tests() {
     app.present_frame();
 
     // Click 1: Click select header -> opens dropdown menu
-    app.push_event(app.Event(event_type=app.EventType.MouseDown, x=30, y=30));
-    app.push_event(app.Event(event_type=app.EventType.MouseUp, x=30, y=30));
+    events.push_event(events.Event(event_type=events.EventType.MouseDown, x=30, y=30));
+    events.push_event(events.Event(event_type=events.EventType.MouseUp, x=30, y=30));
     app.process_events();
     assert(sel.is_open, "Select menu should be open after clicking header");
 
     // Click 2: Click Option Beta in dropdown list (menu_y=58, items are 28px tall: opt1 spans y=90..118)
-    app.push_event(app.Event(event_type=app.EventType.MouseDown, x=30, y=104));
-    app.push_event(app.Event(event_type=app.EventType.MouseUp, x=30, y=104));
+    events.push_event(events.Event(event_type=events.EventType.MouseDown, x=30, y=104));
+    events.push_event(events.Event(event_type=events.EventType.MouseUp, x=30, y=104));
     app.process_events();
     assert(sel.selected_idx == 1, "Select index should update to Option Beta (1)");
     assert(sel.options[sel.selected_idx] == "Option Beta", "Select text should update to Option Beta");
@@ -223,8 +224,8 @@ fn run_tests() {
     app.present_frame();
 
     // Click tab 1 (Page B)
-    app.push_event(app.Event(event_type=app.EventType.MouseDown, x=100, y=30));
-    app.push_event(app.Event(event_type=app.EventType.MouseUp, x=100, y=30));
+    events.push_event(events.Event(event_type=events.EventType.MouseDown, x=100, y=30));
+    events.push_event(events.Event(event_type=events.EventType.MouseUp, x=100, y=30));
     app.process_events();
     assert(tv.active_tab == 1, "Tab view active tab should be switched to 1");
     print("Pass: Tab view page switching verified");

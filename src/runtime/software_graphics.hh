@@ -1226,17 +1226,6 @@ private:
             case ResourceOperation::MAKE_IMAGE: {
                 // args: [id, w, h, pixels?] — keep a CPU copy for the
                 // software rasterizer AND forward RGBA8 to the render thread.
-                if (getenv("LYMAR_DBG_TEX")) {
-                    size_t psz = 0;
-                    if (args.size() > 3) {
-                        if (auto* pl = list_at(args[3])) psz = lm_list_len(pl);
-                    }
-                    fprintf(stderr, "[texdbg-vm] MAKE_IMAGE id=%lld w=%d h=%d psz=%zu need=%d\n",
-                        (long long)register_value_to_i64(args[0]),
-                        (int)register_value_to_i64(args[1]),
-                        (int)register_value_to_i64(args[2]), psz,
-                        args.size() > 2 ? (int)(register_value_to_i64(args[1]) * register_value_to_i64(args[2]) * 4) : -1);
-                }
                 if (args.size() < 3) return value_nil;
                 GpuImage img;
                 img.id = static_cast<int>(register_value_to_i64(args[0]));

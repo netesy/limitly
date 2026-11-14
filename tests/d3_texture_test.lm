@@ -4,11 +4,14 @@ import std.color as color;
 
 fn main() {
     var cfg = game.Config(title = "Texture Test", width = 640, height = 480);
-    cfg.bg_color = color.hex(0x101018, 1.0);
+    cfg.bg_color = color.hex(0xFFC0CB, 1.0);
     var app = game.Game(cfg);
     if (not app.setup()) { print("no ctx"); return 1; }
 
     var scene = d3.Scene3D();
+    scene.background_r = 1.0;
+    scene.background_g = 0.753;
+    scene.background_b = 0.796;
     scene.add_light(d3.ambient_light(1.0, 1.0, 1.0, 0.5));
     scene.add_light(d3.directional_light(0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0));
 
@@ -31,6 +34,7 @@ fn main() {
     cam.set_position(0.0, 0.0, 4.0);
     cam.look_at(0.0, 0.0, 0.0);
     var renderer = d3.Renderer3D(640, 480);
+    renderer.clear_color = true;
 
     var ticks = 0;
     while (app.is_running and ticks < 600) {

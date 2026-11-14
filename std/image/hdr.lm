@@ -51,7 +51,7 @@ pub fn load(path: str): HdrImage? {
             [ffi.cstring_as_ptr(cs), w_p, h_p, c_p],
             ffi.TYPE_PTR,
             [ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_PTR]
-        ) as int;
+        );
         ffi.cstring_free(cs);
 
         var w: int = ffi.load_i32(w_p);

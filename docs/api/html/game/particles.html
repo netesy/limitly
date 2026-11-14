@@ -89,15 +89,15 @@ function filterNav() {
 <h1>particles.lm API Reference</h1>
 <h2>Module Overview</h2>
 <div class="summary"><p>std/game/particles.lm
-High-performance 2D particle simulation and emitter engine for game effects</p></div>
+High-performance SoA 2D particle simulation and emitter engine with zero per-particle allocations.</p></div>
 <div id="Particle">
 <h3>Particle <span class="badge badge-pub">Frame</span></h3>
 <pre class="code-sig"><code>frame Particle: gtraits.Updatable</code></pre>
 <h4>Members</h4>
 <ul>
-<li><code>var pub pos: types.Vec2</code> <em>(field)</em></li>
-<li><code>var pub vel: types.Vec2</code> <em>(field)</em></li>
-<li><code>var pub acc: types.Vec2</code> <em>(field)</em></li>
+<li><code>var pub pos: Vector2</code> <em>(field)</em></li>
+<li><code>var pub vel: Vector2</code> <em>(field)</em></li>
+<li><code>var pub acc: Vector2</code> <em>(field)</em></li>
 <li><code>var pub color_start: color.Color</code> <em>(field)</em></li>
 <li><code>var pub color_end: color.Color</code> <em>(field)</em></li>
 <li><code>var pub size_start: float</code> <em>(field)</em></li>
@@ -106,7 +106,7 @@ High-performance 2D particle simulation and emitter engine for game effects</p><
 <li><code>var pub max_life: float</code> <em>(field)</em></li>
 <li><code>var pub alive: bool</code> <em>(field)</em></li>
 <li><code>pub init()</code> <em>(constructor)</em></li>
-<li><code>pub fn spawn(pos: types.Vec2, vel: types.Vec2, acc: types.Vec2, c_start: color.Color, c_end: color.Color, s_start: float, s_end: float, life_span: float): nil</code> <em>(method)</em></li>
+<li><code>pub fn spawn(pos: Vector2, vel: Vector2, acc: Vector2, c_start: color.Color, c_end: color.Color, s_start: float, s_end: float, life_span: float): nil</code> <em>(method)</em></li>
 <li><code>pub fn update(dt: float): nil</code> <em>(method)</em></li>
 <li><code>pub fn current_color(): color.Color</code> <em>(method)</em></li>
 <li><code>pub fn current_size(): float</code> <em>(method)</em></li>
@@ -117,10 +117,28 @@ High-performance 2D particle simulation and emitter engine for game effects</p><
 <pre class="code-sig"><code>frame ParticleEmitter2D: gtraits.Updatable, gtraits.Drawable</code></pre>
 <h4>Members</h4>
 <ul>
-<li><code>var pub position: types.Vec2</code> <em>(field)</em></li>
-<li><code>var pub particles: list</code> <em>(field)</em></li>
+<li><code>var pub position: Vector2</code> <em>(field)</em></li>
 <li><code>var pub max_particles: int</code> <em>(field)</em></li>
 <li><code>var pub active: bool</code> <em>(field)</em></li>
+<li><code>var pub px: list</code> <em>(field)</em></li>
+<li><code>var pub py: list</code> <em>(field)</em></li>
+<li><code>var pub vx: list</code> <em>(field)</em></li>
+<li><code>var pub vy: list</code> <em>(field)</em></li>
+<li><code>var pub ax: list</code> <em>(field)</em></li>
+<li><code>var pub ay: list</code> <em>(field)</em></li>
+<li><code>var pub life: list</code> <em>(field)</em></li>
+<li><code>var pub max_life: list</code> <em>(field)</em></li>
+<li><code>var pub s_start: list</code> <em>(field)</em></li>
+<li><code>var pub s_end: list</code> <em>(field)</em></li>
+<li><code>var pub cr0: list</code> <em>(field)</em></li>
+<li><code>var pub cg0: list</code> <em>(field)</em></li>
+<li><code>var pub cb0: list</code> <em>(field)</em></li>
+<li><code>var pub ca0: list</code> <em>(field)</em></li>
+<li><code>var pub cr1: list</code> <em>(field)</em></li>
+<li><code>var pub cg1: list</code> <em>(field)</em></li>
+<li><code>var pub cb1: list</code> <em>(field)</em></li>
+<li><code>var pub ca1: list</code> <em>(field)</em></li>
+<li><code>var pub alive: list</code> <em>(field)</em></li>
 <li><code>var pub emission_rate: float</code> <em>(field)</em></li>
 <li><code>var pub emission_timer: float</code> <em>(field)</em></li>
 <li><code>var pub life_min: float</code> <em>(field)</em></li>
@@ -129,7 +147,7 @@ High-performance 2D particle simulation and emitter engine for game effects</p><
 <li><code>var pub speed_max: float</code> <em>(field)</em></li>
 <li><code>var pub angle_min: float</code> <em>(field)</em></li>
 <li><code>var pub angle_max: float</code> <em>(field)</em></li>
-<li><code>var pub gravity: types.Vec2</code> <em>(field)</em></li>
+<li><code>var pub gravity: Vector2</code> <em>(field)</em></li>
 <li><code>var pub size_start: float</code> <em>(field)</em></li>
 <li><code>var pub size_end: float</code> <em>(field)</em></li>
 <li><code>var pub color_start: color.Color</code> <em>(field)</em></li>
@@ -139,6 +157,7 @@ High-performance 2D particle simulation and emitter engine for game effects</p><
 <li><code>fn next_float(): float</code> <em>(method)</em></li>
 <li><code>fn spawn_one(): nil</code> <em>(method)</em></li>
 <li><code>pub fn burst(count: int): nil</code> <em>(method)</em></li>
+<li><code>pub fn alive_count(): int</code> <em>(method)</em></li>
 <li><code>pub fn update(dt: float): nil</code> <em>(method)</em></li>
 <li><code>pub fn draw(): nil</code> <em>(method)</em></li>
 </ul>

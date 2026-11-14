@@ -925,6 +925,28 @@ public:
 
     void addUserDefinedType(const std::string &name, TypePtr type)
     {
+        // Qualified keys (module.Frame) are shared across every module in this
+        // program. A bare-name lookup in a foreign module context can resolve to
+        // a same-named frame elsewhere (e.g. std.gg.Image vs
+        // std.image.index.Image) and try to overwrite the canonical entry.
+        // Protect an entry whose frame name exactly matches the key: once the
+        // canonical `module.Frame` type is registered it can only be replaced
+        // by the same canonical type, never by a foreign same-named frame.
+        // Alias spellings (light_mod.Light) carry no exact-name entry, so they
+        // remain writable — the canonical type stored under them is correct.
+        if (type && name.find('.') != std::string::npos) {
+            if (auto ft = std::get_if<FrameType>(&type->extra)) {
+                if (!ft->name.empty() && ft->name != name) {
+                    auto it = userDefinedTypes.find(name);
+                    if (it != userDefinedTypes.end() && it->second) {
+                        if (auto efd = std::get_if<FrameType>(&it->second->extra)) {
+                            if (!efd->name.empty() && efd->name == name)
+                                return;
+                        }
+                    }
+                }
+            }
+        }
         userDefinedTypes[name] = type;
     }
 

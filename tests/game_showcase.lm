@@ -17,6 +17,7 @@ import std.game as game;
 import std.theme as theme;
 import std.color as color;
 import std.gg as gg;
+import std.d3 as d3;
 import std.math as math;
 
 frame Asteroid {
@@ -64,7 +65,117 @@ fn main(): int {
         height = 600,
         resizable = true
     );
-    cfg.bg_color = color.hex(0x0b0d19, 1.0);
+
+    // Asteroid field (declared early: it sizes the mesh pool below).
+    var asteroids: [Asteroid] = [
+        Asteroid(360.0, 100.0, 0.7, 0.4, 22.0, 2),
+        Asteroid(450.0, 160.0, -0.6, 0.5, 26.0, 3),
+        Asteroid(380.0, 420.0, 0.5, -0.6, 18.0, 1),
+        Asteroid(440.0, 480.0, -0.5, -0.4, 24.0, 2)
+    ];
+
+    // ── std.d3 Scene: ship, asteroids & projectiles ──────────────────────────
+    // Built BEFORE app.setup() so the window only appears once every mesh,
+    // material and buffer exists — otherwise the visible-but-empty window
+    // shows a black framebuffer for the whole init + first shader compile.
+    // World units are screen pixels on the Z=0 plane (x right, y down); an
+    // orthographic camera maps them 1:1 onto the viewport.
+    val cfgw = cfg.width as float;
+    val cfgh = cfg.height as float;
+
+    var scene = d3.Scene3D();
+    // Initial clear; the per-frame sync below repaints it from the live
+    // GUI theme so Theme Studio switches visibly change the backdrop.
+    scene.background_r = 0.05;
+    scene.background_g = 0.05;
+    scene.background_b = 0.10;
+    scene.background_a = 1.0;
+    scene.add_light(d3.ambient_light(1.0, 1.0, 1.0, 0.55));
+    scene.add_light(d3.directional_light(0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 0.9));
+
+    var cam = d3.orthographic_camera(0.0, cfgw, 0.0, cfgh, 0.1, 100.0);
+    cam.set_position(0.0, 0.0, 10.0);
+    var renderer3d = d3.Renderer3D(cfg.width, cfg.height);
+    renderer3d.clear_color = true;
+    var cam_w = cfg.width;
+    var cam_h = cfg.height;
+
+    // Shared geometries: _ensure_gpu_buffers caches the GPU buffers on the
+    // Geometry object, so one sphere/box backs every instance — building a
+    // geometry per mesh would cost ~55 Lymar-side vertex loops before the
+    // first present (visible as a black startup gap).
+    val ast_geo = d3.sphere(1.0, 10, 8);
+    val bolt_geo = d3.sphere(0.6, 8, 6);
+
+    // Ship: invisible root carries position + heading; parts are children so
+    // the whole craft rotates as one rigid body. Nose points toward -Y
+    // (screen up) at rotation_z = 0.
+    val ship_root_geo = d3.plane(0.01, 0.01);
+    val hull_geo = d3.box(12.0, 26.0, 3.0);
+    val nose_geo = d3.box(6.0, 10.0, 3.0);
+    val wing_geo = d3.box(34.0, 9.0, 2.0);
+    val cockpit_geo = d3.box(5.0, 7.0, 4.5);
+    val thruster_geo = d3.box(7.0, 8.0, 3.0);
+    val bubble_geo = d3.sphere(1.0, 12, 8);
+
+    var ship_root = d3.Mesh(ship_root_geo, d3.basic_material(0.0, 0.0, 0.0, 0.0), "ship_root");
+    ship_root.visible = false;
+    scene.add(ship_root);
+
+    // Material colors are re-synced from ship_color every frame; the
+    // literals below are just the pre-loop defaults.
+    var hull_mat = d3.basic_material(0.0, 0.94, 1.0, 1.0);
+    var nose_mat = d3.basic_material(0.0, 0.75, 0.8, 1.0);
+    var wing_mat = d3.basic_material(0.0, 0.61, 0.65, 0.95);
+    var cockpit_mat = d3.basic_material(0.0, 0.95, 1.0, 0.95);
+    var thruster_mat = d3.basic_material(1.0, 0.45, 0.1, 0.9);
+    var bubble_mat = d3.basic_material(0.0, 0.95, 1.0, 0.22);
+    bubble_mat.cull_mode = d3.CullMode.None;
+
+    var hull = d3.Mesh(hull_geo, hull_mat, "hull");
+    hull.attach_to(ship_root);
+    scene.add(hull);
+    var nose = d3.Mesh(nose_geo, nose_mat, "nose");
+    nose.set_position(0.0, -17.0, 0.0);
+    nose.attach_to(ship_root);
+    scene.add(nose);
+    var wings = d3.Mesh(wing_geo, wing_mat, "wings");
+    wings.set_position(0.0, 9.0, 0.0);
+    wings.attach_to(ship_root);
+    scene.add(wings);
+    var cockpit = d3.Mesh(cockpit_geo, cockpit_mat, "cockpit");
+    cockpit.set_position(0.0, -4.0, 2.2);
+    cockpit.attach_to(ship_root);
+    scene.add(cockpit);
+    var thruster = d3.Mesh(thruster_geo, thruster_mat, "thruster");
+    thruster.set_position(0.0, 16.0, 0.0);
+    thruster.visible = false;
+    thruster.attach_to(ship_root);
+    scene.add(thruster);
+    var bubble = d3.Mesh(bubble_geo, bubble_mat, "bubble");
+    bubble.set_position(0.0, 0.0, -1.0);
+    bubble.set_scale(32.0, 32.0, 3.0);
+    bubble.visible = false;
+    bubble.attach_to(ship_root);
+    scene.add(bubble);
+
+    // One reusable sphere mesh per asteroid slot.
+    var ast_meshes: [d3.Mesh] = [];
+    iter (a in asteroids) {
+        var am = d3.Mesh(ast_geo, d3.lambert_material(0.42, 0.45, 0.55), "asteroid");
+        scene.add(am);
+        ast_meshes.append(am);
+    }
+
+    // Fixed pool of projectile bolts; slots toggle visible instead of
+    // allocating meshes per shot.
+    var proj_pool: [d3.Mesh] = [];
+    iter (i in 0..48) {
+        var bolt = d3.Mesh(bolt_geo, d3.basic_material(0.0, 0.0, 0.0, 1.0), "bolt");
+        bolt.visible = false;
+        scene.add(bolt);
+        proj_pool.append(bolt);
+    }
 
     var app = game.Game(cfg);
     if (not app.setup()) {
@@ -97,12 +208,6 @@ fn main(): int {
     var selected_weapon = 0;
 
     var projectiles: [Projectile] = [];
-    var asteroids: [Asteroid] = [
-        Asteroid(360.0, 100.0, 0.7, 0.4, 22.0, 2),
-        Asteroid(450.0, 160.0, -0.6, 0.5, 26.0, 3),
-        Asteroid(380.0, 420.0, 0.5, -0.6, 18.0, 1),
-        Asteroid(440.0, 480.0, -0.5, -0.4, 24.0, 2)
-    ];
 
     var fps_data = [60.0, 59.5, 60.2, 58.8, 61.1, 60.0, 59.9, 60.5, 60.1, 60.0];
     var frame_times = [16.6, 16.8, 16.4, 17.0, 16.3, 16.6, 16.7, 16.5, 16.6, 16.6];
@@ -121,6 +226,7 @@ fn main(): int {
     ];
 
     var sim_tick = 0;
+
 
     print("Running interactive game showcase loop...");
 
@@ -141,18 +247,6 @@ fn main(): int {
         if (ops_h < 480.0) { ops_h = 480.0; }
         var ops_x = sw - ops_w - 16.0;
         if (ops_x < hud_w + 32.0) { ops_x = hud_w + 32.0; }
-
-        // ── Background Ambient Space Grid (Optimized) ─────────────────────────
-        var gx = 32.0;
-        while (gx < sw) {
-            gg.draw_rect_primitive(gx, 0.0, 1.0, sh, 0.12, 0.15, 0.25, 0.25);
-            gx = gx + 96.0;
-        }
-        var gy = 32.0;
-        while (gy < sh) {
-            gg.draw_rect_primitive(0.0, gy, sw, 1.0, 0.12, 0.15, 0.25, 0.25);
-            gy = gy + 96.0;
-        }
 
         // ── Interactive Flight Controls & Physics ──────────────────────────────
         if (app.input.is_key_down(game.KEY_A) or app.input.is_key_down(game.KEY_LEFT)) {
@@ -288,12 +382,16 @@ fn main(): int {
                 ast.y = 40.0;
             }
 
-            // Render faceted asteroid
+            // Update asteroid mesh (sphere scaled to the rock's diameter)
             var rock_r = 0.42; var rock_g = 0.45; var rock_b = 0.55;
             if (ast.hp == 1) { rock_r = 0.70; rock_g = 0.30; rock_b = 0.35; }
-            gg.draw_rect_rounded_primitive(ast.x - ast.size * 0.5, ast.y - ast.size * 0.5, ast.size, ast.size, ast.size * 0.35, rock_r, rock_g, rock_b, 0.9);
-            gg.draw_rect_border_primitive(ast.x - ast.size * 0.5, ast.y - ast.size * 0.5, ast.size, ast.size, ast.size * 0.35, 1.5, rock_r * 1.35, rock_g * 1.35, rock_b * 1.35, 0.95);
-            gg.draw_rect_primitive(ast.x - ast.size * 0.2, ast.y - ast.size * 0.2, ast.size * 0.35, ast.size * 0.35, rock_r * 0.65, rock_g * 0.65, rock_b * 0.65, 0.75);
+            if (ai < len(ast_meshes)) {
+                var amesh = ast_meshes[ai];
+                amesh.set_position(ast.x, ast.y, 0.0);
+                var ascale = ast.size * 0.5;
+                amesh.set_scale(ascale, ascale, ascale);
+                amesh.material.set_color(rock_r, rock_g, rock_b, 0.95);
+            }
             ai = ai + 1;
         }
 
@@ -301,6 +399,7 @@ fn main(): int {
         var active_projectiles: [Projectile] = [];
         var p_idx = 0;
         var total_projs = len(projectiles);
+        var pvis = 0;
         while (p_idx < total_projs) {
             var p = projectiles[p_idx];
             p.life = p.life - 1;
@@ -309,63 +408,78 @@ fn main(): int {
                 p.y = p.y + p.vy;
                 active_projectiles.append(p);
 
-                if (p.kind == 0) {
-                    gg.draw_rect_rounded_primitive(p.x - 3.5, p.y - 3.5, 7.0, 7.0, 3.5, 0.0, 0.95, 1.0, 1.0);
-                } elif (p.kind == 1) {
-                    gg.draw_line_primitive(p.x, p.y, p.x - p.vx * 1.5, p.y - p.vy * 1.5, 0.2, 1.0, 0.4, 0.95, 2.5);
-                } elif (p.kind == 2) {
-                    gg.draw_rect_rounded_primitive(p.x - 5.0, p.y - 5.0, 10.0, 10.0, 5.0, 1.0, 0.45, 0.0, 1.0);
-                } else {
-                    gg.draw_line_primitive(p.x, p.y, p.x - p.vx * 2.5, p.y - p.vy * 2.5, 1.0, 0.0, 0.65, 1.0, 3.0);
+                // Drive the next pooled bolt mesh for this projectile.
+                if (pvis < len(proj_pool)) {
+                    var bolt = proj_pool[pvis];
+                    bolt.visible = true;
+                    bolt.set_position(p.x, p.y, 0.0);
+                    var br = 0.0; var bg = 0.95; var bb = 1.0; var bs = 6.0;
+                    if (p.kind == 1) { br = 0.2; bg = 1.0; bb = 0.4; bs = 5.0; }
+                    elif (p.kind == 2) { br = 1.0; bg = 0.45; bb = 0.0; bs = 8.0; }
+                    elif (p.kind == 3) { br = 1.0; bg = 0.0; bb = 0.65; bs = 5.0; }
+                    bolt.material.set_color(br, bg, bb, 1.0);
+                    bolt.set_scale(bs, bs, bs);
+                    pvis = pvis + 1;
                 }
             }
             p_idx = p_idx + 1;
         }
         projectiles = active_projectiles;
-
-        // ── Render Spaceship (Rotated with Heading Angle) ─────────────────────
-        var cos_a = math.cos(ship_angle);
-        var sin_a = math.sin(ship_angle);
-
-        // Thruster flame
-        if (is_thrusting or warp_drive) {
-            var fl = 24.0 + ((sim_tick * 4) % 9) as float;
-            var t_tip_x = ship_x - sin_a * fl;
-            var t_tip_y = ship_y + cos_a * fl;
-            var t_l_x = ship_x + (-8.0 * cos_a - 14.0 * -sin_a);
-            var t_l_y = ship_y + (-8.0 * sin_a + 14.0 * cos_a);
-            var t_r_x = ship_x + (8.0 * cos_a - 14.0 * -sin_a);
-            var t_r_y = ship_y + (8.0 * sin_a + 14.0 * cos_a);
-            gg.draw_triangle_primitive(t_l_x, t_l_y, t_r_x, t_r_y, t_tip_x, t_tip_y, 1.0, 0.2, 0.5, 0.9);
+        // Hide pooled bolts beyond the live projectile count.
+        var p_hide = pvis;
+        while (p_hide < len(proj_pool)) {
+            proj_pool[p_hide].visible = false;
+            p_hide = p_hide + 1;
         }
 
-        // Swept delta wings
-        var w_nose_x = ship_x + (-24.0 * -sin_a);
-        var w_nose_y = ship_y + (-24.0 * cos_a);
-        var w_l_x = ship_x + (-26.0 * cos_a - 16.0 * -sin_a);
-        var w_l_y = ship_y + (-26.0 * sin_a + 16.0 * cos_a);
-        var w_r_x = ship_x + (26.0 * cos_a - 16.0 * -sin_a);
-        var w_r_y = ship_y + (26.0 * sin_a + 16.0 * cos_a);
-        gg.draw_triangle_primitive(w_nose_x, w_nose_y, w_l_x, w_l_y, w_r_x, w_r_y, ship_color.r * 0.65, ship_color.g * 0.65, ship_color.b * 0.65, 0.95);
+        // ── Ship Transform & Material Update (std.d3) ──────────────────────────
+        ship_root.set_position(ship_x, ship_y, 0.0);
+        ship_root.set_rotation(0.0, 0.0, ship_angle);
 
-        // Fuselage
-        var f_nose_x = ship_x + (-32.0 * -sin_a);
-        var f_nose_y = ship_y + (-32.0 * cos_a);
-        var f_l_x = ship_x + (-14.0 * cos_a - 14.0 * -sin_a);
-        var f_l_y = ship_y + (-14.0 * sin_a + 14.0 * cos_a);
-        var f_r_x = ship_x + (14.0 * cos_a - 14.0 * -sin_a);
-        var f_r_y = ship_y + (14.0 * sin_a + 14.0 * cos_a);
-        gg.draw_triangle_primitive(f_nose_x, f_nose_y, f_l_x, f_l_y, f_r_x, f_r_y, ship_color.r, ship_color.g, ship_color.b, ship_color.a);
+        hull_mat.set_color(ship_color.r, ship_color.g, ship_color.b, ship_color.a);
+        nose_mat.set_color(ship_color.r * 0.8, ship_color.g * 0.8, ship_color.b * 0.8, ship_color.a);
+        wing_mat.set_color(ship_color.r * 0.65, ship_color.g * 0.65, ship_color.b * 0.65, 0.95);
 
-        // Cockpit canopy
-        var c_x = ship_x + (-10.0 * -sin_a);
-        var c_y = ship_y + (-10.0 * cos_a);
-        gg.draw_rect_rounded_primitive(c_x - 3.5, c_y - 4.5, 7.0, 9.0, 3.5, 0.0, 0.95, 1.0, 0.95);
+        // Thruster flame flicker
+        thruster.visible = is_thrusting or warp_drive;
+        if (thruster.visible) {
+            var fl = 24.0 + ((sim_tick * 4) % 9) as float;
+            thruster.set_scale(1.0, fl / 10.0, 1.0);
+        }
 
-        // Forcefield Bubble
-        if (god_mode) {
-            gg.draw_rect_rounded_primitive(ship_x - 32.0, ship_y - 32.0, 64.0, 64.0, 32.0, 0.0, 0.95, 1.0, 0.22);
-            gg.draw_rect_border_primitive(ship_x - 32.0, ship_y - 32.0, 64.0, 64.0, 32.0, 1.5, 0.0, 0.95, 1.0, 0.75);
+        // Forcefield bubble
+        bubble.visible = god_mode;
+
+        // Keep the 3D scene clear in sync with the active theme background
+        // so theme switches repaint the window backdrop immediately.
+        scene.background_r = app.gui.theme.bg_window.r;
+        scene.background_g = app.gui.theme.bg_window.g;
+        scene.background_b = app.gui.theme.bg_window.b;
+        scene.background_a = app.gui.theme.bg_window.a;
+
+        // ── Render 3D Scene, then 2D chrome overlays ───────────────────────────
+        if (app.width != cam_w or app.height != cam_h) {
+            cam_w = app.width;
+            cam_h = app.height;
+            cam.ortho_left = 0.0;
+            cam.ortho_right = cam_w as float;
+            cam.ortho_top = 0.0;
+            cam.ortho_bottom = cam_h as float;
+            cam.update_projection_matrix();
+            renderer3d.set_size(cam_w, cam_h);
+        }
+        renderer3d.render(scene, cam, 0.0, 0.0, app.width as float, app.height as float);
+
+        // Ambient space grid drawn over the 3D scene (2D overlay)
+        var gx = 32.0;
+        while (gx < sw) {
+            gg.draw_rect_primitive(gx, 0.0, 1.0, sh, 0.12, 0.15, 0.25, 0.25);
+            gx = gx + 96.0;
+        }
+        var gy = 32.0;
+        while (gy < sh) {
+            gg.draw_rect_primitive(0.0, gy, sw, 1.0, 0.12, 0.15, 0.25, 0.25);
+            gy = gy + 96.0;
         }
 
         // Space Status Banner

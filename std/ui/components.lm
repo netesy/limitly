@@ -108,6 +108,7 @@ frame VisualStyle {
     pub var fg: Color = Color(1.0, 1.0, 1.0, 1.0);
     pub var radius: float = 0.0;
     pub var opacity_val: float = 1.0;
+    pub var scale_val: float = 1.0;
     pub var border_width: float = 0.0;
     pub var border_color: Color = Color(0.0, 0.0, 0.0, 0.0);
     pub var shadow_val: shadow.Shadow | nil = nil;
@@ -198,6 +199,7 @@ frame MetaInfo {
     pub var anim_x: animation.Spring | nil = nil;
     pub var anim_y: animation.Spring | nil = nil;
     pub var anim_property: animation.PropertyAnimation | nil = nil;
+    pub var active_transition: animation.Transition | nil = nil;
 }
 
 frame ScrollState {
@@ -392,6 +394,33 @@ frame Button: Fluent {
         self.semantic = r;
         return self;
     }
+
+    pub fn scale(s: float): Button {
+        self.scale_val = s;
+        return self;
+    }
+
+    pub fn transition(t: animation.Transition): Button {
+        self.active_transition = t;
+        return self;
+    }
+
+    pub fn enter(t: animation.Transition): Button {
+        self.lifecycle_state = LifecycleState.Entering;
+        self.active_transition = t;
+        return self;
+    }
+
+    pub fn exit(t: animation.Transition): Button {
+        self.lifecycle_state = LifecycleState.Exiting;
+        self.active_transition = t;
+        return self;
+    }
+
+    pub fn mark_for_removal(): Button {
+        self.lifecycle_state = LifecycleState.Exiting;
+        return self;
+    }
 }
 
 frame Link: Fluent {
@@ -547,6 +576,33 @@ frame Label: Fluent {
 
     pub fn role(r: Semantic): Label {
         self.semantic = r;
+        return self;
+    }
+
+    pub fn scale(s: float): Label {
+        self.scale_val = s;
+        return self;
+    }
+
+    pub fn transition(t: animation.Transition): Label {
+        self.active_transition = t;
+        return self;
+    }
+
+    pub fn enter(t: animation.Transition): Label {
+        self.lifecycle_state = LifecycleState.Entering;
+        self.active_transition = t;
+        return self;
+    }
+
+    pub fn exit(t: animation.Transition): Label {
+        self.lifecycle_state = LifecycleState.Exiting;
+        self.active_transition = t;
+        return self;
+    }
+
+    pub fn mark_for_removal(): Label {
+        self.lifecycle_state = LifecycleState.Exiting;
         return self;
     }
 }
@@ -888,6 +944,33 @@ frame TextInput: Fluent {
         }
         return current;
     }
+
+    pub fn scale(s: float): TextInput {
+        self.scale_val = s;
+        return self;
+    }
+
+    pub fn transition(t: animation.Transition): TextInput {
+        self.active_transition = t;
+        return self;
+    }
+
+    pub fn enter(t: animation.Transition): TextInput {
+        self.lifecycle_state = LifecycleState.Entering;
+        self.active_transition = t;
+        return self;
+    }
+
+    pub fn exit(t: animation.Transition): TextInput {
+        self.lifecycle_state = LifecycleState.Exiting;
+        self.active_transition = t;
+        return self;
+    }
+
+    pub fn mark_for_removal(): TextInput {
+        self.lifecycle_state = LifecycleState.Exiting;
+        return self;
+    }
 }
 
 frame ProgressBar: Fluent {
@@ -1063,6 +1146,33 @@ frame Container: Fluent {
         if (s.has_spacing) { self.spacing_val = s.spacing_val; }
         return self;
     }
+
+    pub fn scale(s: float): Container {
+        self.scale_val = s;
+        return self;
+    }
+
+    pub fn transition(t: animation.Transition): Container {
+        self.active_transition = t;
+        return self;
+    }
+
+    pub fn enter(t: animation.Transition): Container {
+        self.lifecycle_state = LifecycleState.Entering;
+        self.active_transition = t;
+        return self;
+    }
+
+    pub fn exit(t: animation.Transition): Container {
+        self.lifecycle_state = LifecycleState.Exiting;
+        self.active_transition = t;
+        return self;
+    }
+
+    pub fn mark_for_removal(): Container {
+        self.lifecycle_state = LifecycleState.Exiting;
+        return self;
+    }
 }
 
 frame Spacer: Fluent {
@@ -1151,6 +1261,33 @@ frame Card: Fluent {
 
     pub fn width(w: float): Card {
         self.width_val = w;
+        return self;
+    }
+
+    pub fn scale(s: float): Card {
+        self.scale_val = s;
+        return self;
+    }
+
+    pub fn transition(t: animation.Transition): Card {
+        self.active_transition = t;
+        return self;
+    }
+
+    pub fn enter(t: animation.Transition): Card {
+        self.lifecycle_state = LifecycleState.Entering;
+        self.active_transition = t;
+        return self;
+    }
+
+    pub fn exit(t: animation.Transition): Card {
+        self.lifecycle_state = LifecycleState.Exiting;
+        self.active_transition = t;
+        return self;
+    }
+
+    pub fn mark_for_removal(): Card {
+        self.lifecycle_state = LifecycleState.Exiting;
         return self;
     }
 }

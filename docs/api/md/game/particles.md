@@ -3,7 +3,7 @@
 ## Overview
 
 std/game/particles.lm
-High-performance 2D particle simulation and emitter engine for game effects
+High-performance SoA 2D particle simulation and emitter engine with zero per-particle allocations.
 
 ## Symbols
 
@@ -24,9 +24,9 @@ frame Particle: gtraits.Updatable
 
 #### Members
 
-- `var pub pos: types.Vec2` *(field)*
-- `var pub vel: types.Vec2` *(field)*
-- `var pub acc: types.Vec2` *(field)*
+- `var pub pos: Vector2` *(field)*
+- `var pub vel: Vector2` *(field)*
+- `var pub acc: Vector2` *(field)*
 - `var pub color_start: color.Color` *(field)*
 - `var pub color_end: color.Color` *(field)*
 - `var pub size_start: float` *(field)*
@@ -35,7 +35,7 @@ frame Particle: gtraits.Updatable
 - `var pub max_life: float` *(field)*
 - `var pub alive: bool` *(field)*
 - `pub init()` *(constructor)*
-- `pub fn spawn(pos: types.Vec2, vel: types.Vec2, acc: types.Vec2, c_start: color.Color, c_end: color.Color, s_start: float, s_end: float, life_span: float): nil` *(method)*
+- `pub fn spawn(pos: Vector2, vel: Vector2, acc: Vector2, c_start: color.Color, c_end: color.Color, s_start: float, s_end: float, life_span: float): nil` *(method)*
 - `pub fn update(dt: float): nil` *(method)*
 - `pub fn current_color(): color.Color` *(method)*
 - `pub fn current_size(): float` *(method)*
@@ -53,10 +53,28 @@ frame ParticleEmitter2D: gtraits.Updatable, gtraits.Drawable
 
 #### Members
 
-- `var pub position: types.Vec2` *(field)*
-- `var pub particles: list` *(field)*
+- `var pub position: Vector2` *(field)*
 - `var pub max_particles: int` *(field)*
 - `var pub active: bool` *(field)*
+- `var pub px: list` *(field)*
+- `var pub py: list` *(field)*
+- `var pub vx: list` *(field)*
+- `var pub vy: list` *(field)*
+- `var pub ax: list` *(field)*
+- `var pub ay: list` *(field)*
+- `var pub life: list` *(field)*
+- `var pub max_life: list` *(field)*
+- `var pub s_start: list` *(field)*
+- `var pub s_end: list` *(field)*
+- `var pub cr0: list` *(field)*
+- `var pub cg0: list` *(field)*
+- `var pub cb0: list` *(field)*
+- `var pub ca0: list` *(field)*
+- `var pub cr1: list` *(field)*
+- `var pub cg1: list` *(field)*
+- `var pub cb1: list` *(field)*
+- `var pub ca1: list` *(field)*
+- `var pub alive: list` *(field)*
 - `var pub emission_rate: float` *(field)*
 - `var pub emission_timer: float` *(field)*
 - `var pub life_min: float` *(field)*
@@ -65,7 +83,7 @@ frame ParticleEmitter2D: gtraits.Updatable, gtraits.Drawable
 - `var pub speed_max: float` *(field)*
 - `var pub angle_min: float` *(field)*
 - `var pub angle_max: float` *(field)*
-- `var pub gravity: types.Vec2` *(field)*
+- `var pub gravity: Vector2` *(field)*
 - `var pub size_start: float` *(field)*
 - `var pub size_end: float` *(field)*
 - `var pub color_start: color.Color` *(field)*
@@ -75,6 +93,7 @@ frame ParticleEmitter2D: gtraits.Updatable, gtraits.Drawable
 - `fn next_float(): float` *(method)*
 - `fn spawn_one(): nil` *(method)*
 - `pub fn burst(count: int): nil` *(method)*
+- `pub fn alive_count(): int` *(method)*
 - `pub fn update(dt: float): nil` *(method)*
 - `pub fn draw(): nil` *(method)*
 

@@ -1,0 +1,21 @@
+import std.game as game;
+import std.color as color;
+import std.gg as gg;
+
+fn main() {
+    var cfg = game.Config(title = "BG Probe", width = 64, height = 64);
+    cfg.bg_color = color.hex(0xFF0000, 1.0);
+    var app = game.Game(cfg);
+    if (not app.setup()) { print("no ctx"); return 1; }
+    var i = 0;
+    while (i < 5) {
+        app.begin_frame();
+        app.end_frame();
+        i = i + 1;
+    }
+    var px = gg.readback_pixel(32, 32);
+    if (px == nil) { print("nil px"); return 1; }
+    val pxi = px as int;
+    print("px r={(pxi >> 24) & 255} g={(pxi >> 16) & 255} b={(pxi >> 8) & 255}");
+    return 0;
+}

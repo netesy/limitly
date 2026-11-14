@@ -95,9 +95,13 @@ fn test_retained_ui_animation_modifiers(): nil {
 
     assert(btn.opacity_val == 0.8, "opacity modifier");
     assert(btn.scale_val == 1.1, "scale modifier");
-    assert(btn.shadow_val.blur_radius == 8.0, "shadow modifier");
+    if (btn.shadow_val == nil) { print("shadow modifier missing"); return; }
+    val sv = btn.shadow_val as Shadow;
+    assert(sv.blur_radius == 8.0, "shadow modifier");
     assert(btn.anim_property != nil, "animate property created");
-    assert(btn.anim_property.is_spring, "spring model enabled");
+    if (btn.anim_property == nil) { print("anim property missing"); return; }
+    val ap = btn.anim_property as anim.PropertyAnimation;
+    assert(ap.is_spring, "spring model enabled");
     assert(btn.active_transition != nil, "active transition attached");
 
     print("Retained UI animation modifiers test passed.");
@@ -162,11 +166,12 @@ fn test_reduced_motion(): nil {
 fn test_widget_lifecycle_transitions(): nil {
     print("Testing Widget lifecycle transitions...");
 
-    var dialog = ui.card("Dialog", ui.text("Content"))
-    .enter(anim.Transition().fade(0.0, 1.0, 0.1))
-    .exit(anim.Transition().fade(1.0, 0.0, 0.1));
-
+    var dialog = ui.card("Dialog", ui.text("Content"));
+    dialog.enter(anim.Transition().fade(0.0, 1.0, 0.1));
     assert(dialog.lifecycle_state == ui.LIFECYCLE_ENTERING, "dialog entering state");
+
+    dialog.exit(anim.Transition().fade(1.0, 0.0, 0.1));
+    assert(dialog.lifecycle_state == ui.LIFECYCLE_EXITING, "dialog exiting state");
 
     dialog.mark_for_removal();
     assert(dialog.lifecycle_state == ui.LIFECYCLE_EXITING, "dialog exiting state");

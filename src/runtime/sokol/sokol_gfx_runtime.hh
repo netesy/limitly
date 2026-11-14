@@ -82,8 +82,6 @@ private:
     int cur_pipeline_ = -1;   // lymar pipeline id currently applied
     int cur_vbuf_ = -1;
     int cur_ibuf_ = -1;
-    // TEMP-DIAG pacing counters
-    int dbg_presents_ = 0, dbg_skips_ = 0, dbg_slow_ = 0, dbg_commits_ = 0, dbg_frames_ = 0, dbg_vdraw_ = 0;
 };
 
 SokolGfxRuntime& sokol_gfx_runtime();

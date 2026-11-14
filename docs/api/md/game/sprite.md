@@ -58,10 +58,10 @@ frame Sprite: gtraits.Drawable
 #### Members
 
 - `var pub texture: Texture2D` *(field)*
-- `var pub position: types.Vec2` *(field)*
-- `var pub src_rect: types.Rect` *(field)*
-- `var pub origin: types.Vec2` *(field)*
-- `var pub scale: types.Vec2` *(field)*
+- `var pub position: Vector2` *(field)*
+- `var pub src_rect: Rect` *(field)*
+- `var pub origin: Vector2` *(field)*
+- `var pub scale: Vector2` *(field)*
 - `var pub rotation: float` *(field)*
 - `var pub tint: color.Color` *(field)*
 - `var pub flip_x: bool` *(field)*
@@ -77,7 +77,7 @@ frame Sprite: gtraits.Drawable
 **Visibility**: `pub`  
 
 ```lymar
-pub fn sprite(texture: any = ..., position: any = ...): Sprite
+pub fn sprite(texture: union = ..., position: union = ...): Sprite
 ```
 
 ---
@@ -99,8 +99,8 @@ frame SpriteSheet
 - `var pub columns: int` *(field)*
 - `var pub rows: int` *(field)*
 - `pub init()` *(constructor)*
-- `pub fn get_frame(col: int, row: int): types.Rect` *(method)*
-- `pub fn get_frame_index(index: int): types.Rect` *(method)*
+- `pub fn get_frame(col: int, row: int): Rect` *(method)*
+- `pub fn get_frame_index(index: int): Rect` *(method)*
 
 ---
 
@@ -131,12 +131,6 @@ frame AnimationClip
 ```lymar
 frame AnimatedSprite: gtraits.Updatable, gtraits.Drawable
 ```
-
-AnimatedSprite composes Sprite via `embed`: the sprite fields (texture,
-position, origin, scale, rotation, tint, flip_x, flip_y) are promoted from
-Sprite rather than duplicated, and `src_rect` comes along for free. Sprite's
-`draw` is promoted too but immediately shadowed by the own `draw` below
-(name-based dedupe), so animation-aware painting wins.
 
 #### Members
 

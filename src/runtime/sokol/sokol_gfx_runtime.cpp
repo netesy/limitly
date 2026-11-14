@@ -414,7 +414,6 @@ struct SokolGfxRuntime::Impl {
 
     std::vector<std::vector<int>> clip_stack;
     int pass_w = 0, pass_h = 0;
-    uint64_t dbg_deferred_total = 0, dbg_flushed_total = 0;
     float clear_r = 0, clear_g = 0, clear_b = 0, clear_a = 1;
     std::vector<double> uniforms;          // last APPLY_BINDINGS uniform blob
 };
@@ -787,10 +786,6 @@ bool SokolGfxRuntime::setup() {
     impl_->pipe_tri = make_pipe(impl_->sh_tri, false, true, 0);
     impl_->pipe_vstream = make_vstream_pipe(impl_->sh_vstream, SG_PRIMITIVETYPE_TRIANGLES);
     impl_->pipe_vlines = make_vstream_pipe(impl_->sh_vstream, SG_PRIMITIVETYPE_LINES);
-    // TEMP-DIAG: shader/pipeline validity (SG_INVALID_ID means creation failed)
-    std::fprintf(stderr, "[lymar-dbg] shaders: rect=%d tri=%d vstream=%d blit=%d | pipes: vstream=%d vlines=%d\n",
-        impl_->sh_rect.id, impl_->sh_tri.id, impl_->sh_vstream.id, impl_->sh_blit.id,
-        impl_->pipe_vstream.id, impl_->pipe_vlines.id);
 
     sg_sampler_desc sd{};
     sd.min_filter = SG_FILTER_LINEAR;
@@ -872,9 +867,6 @@ void SokolGfxRuntime::submit(const GfxCommand& cmd) {
     // pending_ is only drained by render_frame() after setup, so early
     // commands execute in order on the first presented frame. In headless
     // mode the deque simply fills to the safety cap and is never drained.
-    if (cmd.type == GfxCommand::Type::MakeImage && getenv("LYMAR_DBG_TEX"))
-        fprintf(stderr, "[texdbg-sub] MakeImage queued ready=%d pending=%zu\n",
-            (int)ready_.load(), pending_.size());
     std::lock_guard<std::mutex> lock(mutex_);
     if (pending_.size() > 65536) pending_.pop_front(); // safety valve
     pending_.push_back(cmd);
@@ -884,7 +876,6 @@ void SokolGfxRuntime::commit_frame() {
     if (!ready_) return;
     std::lock_guard<std::mutex> lock(mutex_);
     if (pending_.empty()) return;
-    ++dbg_commits_;
     // Latest-frame-wins: drop any complete frames the render thread hasn't
     // presented yet. Concatenating them would issue multiple sg_commit
     // presents per display refresh and visibly alternate old/new content.
@@ -910,26 +901,15 @@ void SokolGfxRuntime::commit_frame() {
 bool SokolGfxRuntime::render_frame() {
     if (!ready_ || !impl_) return false;
     ++frame_id_;
-    auto t0 = std::chrono::steady_clock::now();
 
     std::deque<GfxCommand> cmds;
     {
         std::lock_guard<std::mutex> lock(mutex_);
         cmds.swap(completed_);
     }
-    // TEMP-DIAG: periodic pacing summary — evaluated on EVERY sapp frame.
-    if (++dbg_frames_ % 120 == 0) {
-        std::fprintf(stderr, "[lymar-dbg] pacing: presents=%d commits=%d skips=%d vdraws=%d last_cmds=%zu\n",
-            dbg_presents_, dbg_commits_, dbg_skips_, dbg_vdraw_, cmds.size());
-        dbg_vdraw_ = 0;
-    }
     if (cmds.empty()) {
-        // TEMP-DIAG: sapp frame fired but no complete frame was committed —
-        // the VM is producing slower than the display refresh.
-        ++dbg_skips_;
         return false; // no complete frame -> keep last presented frame
     }
-    ++dbg_presents_;
 
     // Pass state mirrors Impl::pass_open_
     for (auto& cmd : cmds) {
@@ -941,15 +921,6 @@ bool SokolGfxRuntime::render_frame() {
         sg_end_pass();
         sg_commit();
         pass_open_ = false;
-    }
-    // TEMP-DIAG: render-thread frame cost; >~12ms risks a missed vsync.
-    auto t1 = std::chrono::steady_clock::now();
-    double ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
-    if (ms > 8.0) {
-        ++dbg_slow_;
-        if (dbg_slow_ <= 20) {
-            std::fprintf(stderr, "[lymar-dbg] slow render_frame %.1fms cmds=%zu\n", ms, cmds.size());
-        }
     }
     return true; // a complete frame batch was processed (pass committed)
 }
@@ -1124,13 +1095,6 @@ void SokolGfxRuntime::execute(const GfxCommand& cmd) {
             b.vertex_buffers[0] = im->bound_vbuf;
             // texture slot: bound image or the 1x1 white fallback
             auto tit = im->textures.find(im->cur_img_);
-            if (getenv("LYMAR_DBG_TEX") && dbg_vdraw_ < 6) {
-                fprintf(stderr, "[texdbg] img=%d found=%d flag=%f view=%u uv0=(%.2f,%.2f)\n",
-                    im->cur_img_, tit != im->textures.end() ? 1 : 0,
-                    n > 179 ? ub[179] : -1.f,
-                    tit != im->textures.end() ? tit->second.view.id : im->white_view.id,
-                    0.f, 0.f);
-            }
             if (tit != im->textures.end()) {
                 b.views[0] = tit->second.view;
             } else {
@@ -1154,15 +1118,11 @@ void SokolGfxRuntime::execute(const GfxCommand& cmd) {
                 elems = (vit != im->buffers.end()) ? vit->second.count : 0;
             }
             if (elems <= 0) break;
-            ++dbg_vdraw_;
             sg_apply_bindings(&b);
             sg_draw(0, elems, 1);
             break;
         }
         case GfxCommand::Type::MakeImage: {
-            if (getenv("LYMAR_DBG_TEX"))
-                fprintf(stderr, "[texdbg-exec] MakeImage id=%lld w=%d h=%d px=%zu\n",
-                    cmd.i.empty() ? -1LL : (long long)cmd.i[0], cmd.w, cmd.h, cmd.pixels.size());
             // RGBA8: exactly w*h*4 bytes or the upload is rejected by sokol
             // validation and leaves an invalid view bound at draw time.
             if (cmd.i.empty() || cmd.w <= 0 || cmd.h <= 0 ||
@@ -1193,7 +1153,6 @@ void SokolGfxRuntime::execute(const GfxCommand& cmd) {
             GfxCommand d = cmd;
             if (!im->clip_stack.empty()) d.clip = im->clip_stack.back();
             im->deferred_text.push_back(std::move(d));
-            ++im->dbg_deferred_total;
             break;
         }
         case GfxCommand::Type::BlitFramebuffer: {
@@ -1281,9 +1240,7 @@ void SokolGfxRuntime::flush_text() {
         }
         fonsPopState(f);
     }
-    const size_t text_count = im->deferred_text.size();
     im->deferred_text.clear();
-    im->dbg_flushed_total += text_count;
     // ONE atlas upload per frame max (sokol allows a single sg_update_image
     // per image per frame); replay sgl's ordered scissor+draw commands and
     // restore the raw sg scissor afterwards

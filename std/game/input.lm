@@ -5,18 +5,11 @@ enum MouseButton {
     Middle
 }
 
-// Key Modifier Enumeration
-enum KeyModifier {
-    None,
-    Shift,
-    Control,
-    Alt,
-    Super
-}
 // std/game/input.lm
 // Comprehensive input management, event capture, and action mapping for std.game
 
 import std.math.vector2 show Vector2;
+import std.events as events;
 
 // Common Key Code Constants
 pub const KEY_SPACE: int         = 32;
@@ -115,11 +108,6 @@ pub const MOUSE_LEFT: int   = 0;
 pub const MOUSE_RIGHT: int  = 1;
 pub const MOUSE_MIDDLE: int = 2;
 
-// Modifier Bitflags
-pub const MOD_SHIFT: int   = 1;
-pub const MOD_CONTROL: int = 2;
-pub const MOD_ALT: int     = 4;
-pub const MOD_SUPER: int   = 8;
 
 frame InputManager {
     // Mouse tracking
@@ -235,13 +223,13 @@ frame InputManager {
 
         // Update modifiers
         if (key == KEY_LEFT_SHIFT or key == KEY_RIGHT_SHIFT) {
-            self.active_modifiers = self.active_modifiers | MOD_SHIFT;
+            self.active_modifiers = self.active_modifiers | events.MOD_SHIFT;
         } elif (key == KEY_LEFT_CONTROL or key == KEY_RIGHT_CONTROL) {
-            self.active_modifiers = self.active_modifiers | MOD_CONTROL;
+            self.active_modifiers = self.active_modifiers | events.MOD_CONTROL;
         } elif (key == KEY_LEFT_ALT or key == KEY_RIGHT_ALT) {
-            self.active_modifiers = self.active_modifiers | MOD_ALT;
+            self.active_modifiers = self.active_modifiers | events.MOD_ALT;
         } elif (key == KEY_LEFT_SUPER or key == KEY_RIGHT_SUPER) {
-            self.active_modifiers = self.active_modifiers | MOD_SUPER;
+            self.active_modifiers = self.active_modifiers | events.MOD_SUPER;
         }
     }
 
@@ -263,13 +251,13 @@ frame InputManager {
 
         // Update modifiers
         if (key == KEY_LEFT_SHIFT or key == KEY_RIGHT_SHIFT) {
-            self.active_modifiers = self.active_modifiers & (~MOD_SHIFT);
+            self.active_modifiers = self.active_modifiers & (~events.MOD_SHIFT);
         } elif (key == KEY_LEFT_CONTROL or key == KEY_RIGHT_CONTROL) {
-            self.active_modifiers = self.active_modifiers & (~MOD_CONTROL);
+            self.active_modifiers = self.active_modifiers & (~events.MOD_CONTROL);
         } elif (key == KEY_LEFT_ALT or key == KEY_RIGHT_ALT) {
-            self.active_modifiers = self.active_modifiers & (~MOD_ALT);
+            self.active_modifiers = self.active_modifiers & (~events.MOD_ALT);
         } elif (key == KEY_LEFT_SUPER or key == KEY_RIGHT_SUPER) {
-            self.active_modifiers = self.active_modifiers & (~MOD_SUPER);
+            self.active_modifiers = self.active_modifiers & (~events.MOD_SUPER);
         }
     }
 

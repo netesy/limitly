@@ -4,6 +4,7 @@
 import std.app as app;
 import std.ui as ui;
 import std.ui.context as ui_context;
+import std.events as events;
 
 fn test_resize() {
     print("=== Testing Window Resize Handling ===");
@@ -30,8 +31,8 @@ fn test_resize() {
     app.ui(root);
 
     // Simulate EVENT_RESIZE from native window manager (e.g., resized to 1280x720)
-    app.push_event(app.Event(
-        event_type=app.EventType.Resize,
+    events.push_event(events.Event(
+        event_type=events.EventType.Resize,
         timestamp=0,
         window_id=1,
         x=1280,

@@ -3,57 +3,45 @@
 ## Overview
 
 std/game/camera.lm
-2D Camera system with coordinate projection, tracking, zoom, rotation, and trauma-based screen shake
+Canonical 2D Camera facade routing directly to std.camera.Camera2D plus world-space drawing helpers.
 
 ## Symbols
 
-- **Frame**: [`Camera2D`](#Camera2D)
-- **Function**: [`Camera`](#Camera)
+- **Function**: [`draw_world_rect`](#draw_world_rect)
+- **Function**: [`draw_world_circle`](#draw_world_circle)
+- **Function**: [`draw_world_line`](#draw_world_line)
 
 ---
 
-### `Camera2D` <a id="Camera2D"></a>
-
-**Kind**: Frame  
-**Visibility**: `pub`  
-
-```lymar
-frame Camera2D: gtraits.Updatable
-```
-
-#### Members
-
-- `var pub target: types.Vec2` *(field)*
-- `var pub offset: types.Vec2` *(field)*
-- `var pub rotation: float` *(field)*
-- `var pub zoom: float` *(field)*
-- `var pub trauma: float` *(field)*
-- `var pub trauma_decay: float` *(field)*
-- `var pub max_shake_offset: float` *(field)*
-- `var pub max_shake_angle: float` *(field)*
-- `var pub shake_time: float` *(field)*
-- `var pub shake_offset: types.Vec2` *(field)*
-- `var pub shake_rotation: float` *(field)*
-- `pub init()` *(constructor)*
-- `pub fn set_viewport(width: float, height: float): nil` *(method)*
-- `pub fn screen_to_world(screen_pos: types.Vec2): types.Vec2` *(method)*
-- `pub fn world_to_screen(world_pos: types.Vec2): types.Vec2` *(method)*
-- `pub fn follow(target_pos: types.Vec2): nil` *(method)*
-- `pub fn add_trauma(amount: float): nil` *(method)*
-- `pub fn update(dt: float): nil` *(method)*
-- `pub fn draw_rect(world_rect: types.Rect, r: float, g: float, b: float, a: float): nil` *(method)*
-- `pub fn draw_circle(world_center: types.Vec2, radius: float, r: float, g: float, b: float, a: float): nil` *(method)*
-- `pub fn draw_line(p1: types.Vec2, p2: types.Vec2, thickness: float, r: float, g: float, b: float, a: float): nil` *(method)*
-
----
-
-### `Camera` <a id="Camera"></a>
+### `draw_world_rect` <a id="draw_world_rect"></a>
 
 **Kind**: Function  
 **Visibility**: `pub`  
 
 ```lymar
-pub fn Camera(target: types.Vec2 = ..., offset: types.Vec2 = ..., zoom: float = ...): Camera2D
+pub fn draw_world_rect(cam: Camera2D, world_rect: Rect, r: float, g: float, b: float, a: float): nil
+```
+
+---
+
+### `draw_world_circle` <a id="draw_world_circle"></a>
+
+**Kind**: Function  
+**Visibility**: `pub`  
+
+```lymar
+pub fn draw_world_circle(cam: Camera2D, world_center: Vector2, radius: float, r: float, g: float, b: float, a: float, segments: int = ...): nil
+```
+
+---
+
+### `draw_world_line` <a id="draw_world_line"></a>
+
+**Kind**: Function  
+**Visibility**: `pub`  
+
+```lymar
+pub fn draw_world_line(cam: Camera2D, p1: Vector2, p2: Vector2, thickness: float, r: float, g: float, b: float, a: float): nil
 ```
 
 ---

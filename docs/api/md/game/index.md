@@ -5,20 +5,8 @@
 std/game/index.lm
 Clean unified standard library facade for std.game
 
-## Symbols
-
-- **Function**: [`Texture`](#Texture)
-
----
-
-### `Texture` <a id="Texture"></a>
-
-**Kind**: Function  
-**Visibility**: `pub`  
-
-```lymar
-pub fn Texture(id: int = ..., width: int = ..., height: int = ...): Texture2D
-```
-
----
+Game runtime: application shell, input, 2D sprites, particles, camera helpers,
+and component state. Immediate-mode debug UI lives in std.gui; the scene state
+machine lives in std.scene; collision/raycast queries live in std.geometry;
+Camera2D lives in std.camera.
 

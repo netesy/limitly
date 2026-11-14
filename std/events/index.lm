@@ -1,0 +1,185 @@
+// std/events
+// Typed OS/window event pump and queue.
+//
+// This is the SINGLE translation point from raw gg.poll_events() records into
+// typed Event values. Both std.app (Fluent ui_context dispatch) and std.game
+// (InputManager/IMGUI) consume this queue — neither calls gg.poll_events()
+// directly, so events are never stolen between frameworks.
+//
+// Ownership model: exactly one consumer drains the queue per frame. The
+// Fluent path drains via std.app.dispatch_ui_events(); the game path drains
+// via poll_event() in Game.begin_frame(). Mixing both in one frame splits
+// the stream — pick one.
+
+import std.gg as gg;
+
+// Event type enumeration
+enum EventType {
+    Quit,
+    Resize,
+    KeyDown,
+    KeyUp,
+    MouseDown,
+    MouseUp,
+    MouseMove,
+    Char,
+    MouseWheel
+}
+
+fn event_type_from_int(code: int): EventType {
+    match (code) {
+        0 => { return EventType.Quit; },
+        1 => { return EventType.Resize; },
+        2 => { return EventType.KeyDown; },
+        3 => { return EventType.KeyUp; },
+        4 => { return EventType.MouseDown; },
+        5 => { return EventType.MouseUp; },
+        6 => { return EventType.MouseMove; },
+        7 => { return EventType.Char; },
+        8 => { return EventType.MouseWheel; },
+        _ => { return EventType.Quit; }
+    }
+}
+
+// Key Modifier Enumeration
+enum KeyModifier {
+    Shift,
+    Control,
+    Alt,
+    Super
+}
+
+// Modifier key flags
+pub const MOD_SHIFT: int = 1;
+pub const MOD_CONTROL: int = 2;
+pub const MOD_ALT: int = 4;
+pub const MOD_SUPER: int = 8;
+
+// Event frame
+frame Event {
+    pub var event_type: EventType;
+    pub var timestamp: int;
+    pub var window_id: int;
+    pub var x: int;
+    pub var y: int;
+    pub var key_code: int;
+    pub var xdest: int;
+    pub var ydest: int;
+
+    pub init(event_type: EventType = EventType.Quit, timestamp: int = 0, window_id: int = 0, x: int = 0, y: int = 0, key_code: int = 0, xdest: int = 0, ydest: int = 0) {
+        self.event_type = event_type;
+        self.timestamp = timestamp;
+        self.window_id = window_id;
+        self.x = x;
+        self.y = y;
+        self.key_code = key_code;
+        self.xdest = xdest;
+        self.ydest = ydest;
+    }
+}
+
+// Key event frame
+frame KeyEvent {
+    embed Event;
+    pub var modifiers: int;
+    pub var repeat: int;
+}
+
+// Mouse event frame
+frame MouseEvent {
+    embed Event;
+    pub var button: int;
+    pub var modifiers: int;
+}
+
+// Resize event frame
+frame ResizeEvent {
+    embed Event;
+    pub var width: int;
+    pub var height: int;
+    pub var framebuffer_width: int;
+    pub var framebuffer_height: int;
+}
+
+// Event queue state. head is a dequeue cursor: poll_event advances it instead
+// of copying the array, and compaction bounds memory once half is consumed.
+pub var event_queue: [Event] = [] as [Event];
+pub var event_queue_head: int = 0;
+
+fn make_default_event(): Event {
+    return Event(event_type=EventType.Quit, timestamp=0, window_id=0, x=0, y=0, key_code=0);
+}
+
+// Reset the queue (call on app/window init and shutdown).
+pub fn clear(): nil {
+    event_queue = [] as [Event];
+    event_queue_head = 0;
+}
+
+// pump_events drains gg.poll_events() once per frame and enqueues typed
+// Events. This is the ONLY caller of gg.poll_events() above the gg layer —
+// it is also the frame-publish boundary on the GPU backend, so it must run
+// exactly once per frame regardless of which consumer drains the queue.
+pub fn pump_events(): nil {
+    var raw_events = gg.poll_events();
+    if (raw_events != nil) {
+        var native_events: [int] = raw_events as [int];
+        var i: int = 0;
+        var num_events = len(native_events);
+        while (i + 3 < num_events) {
+            var ev_code: int = native_events[i];
+            var ev_x: int = native_events[i + 1];
+            var ev_y: int = native_events[i + 2];
+            var ev_k: int = native_events[i + 3];
+            var ev_type: EventType = event_type_from_int(ev_code);
+            push_event(Event(event_type=ev_type, timestamp=0, window_id=1, x=ev_x, y=ev_y, key_code=ev_k));
+            i = i + 4;
+        }
+    }
+}
+
+pub fn push_event(event: Event): nil {
+    event_queue.append(event);
+}
+
+pub fn push_mouse_click(x: int, y: int): nil {
+    push_event(Event(event_type=EventType.MouseDown, timestamp=0, window_id=1, x=x, y=y, key_code=0));
+    push_event(Event(event_type=EventType.MouseUp, timestamp=0, window_id=1, x=x, y=y, key_code=0));
+}
+
+pub fn push_quit_event(): nil {
+    push_event(Event(event_type=EventType.Quit, timestamp=0, window_id=1, x=0, y=0));
+}
+
+// Dequeue the next typed event. Only call when has_pending_events() != 0 —
+// on an empty queue this returns a default Quit event without advancing.
+pub fn poll_event(): Event {
+    // Compact before dequeuing: rebinding event_queue while an element alias
+    // is live is an ownership error, so shrink the buffer first.
+    if (event_queue_head > 8) {
+        var new_q: [Event] = [] as [Event];
+        var i: int = event_queue_head;
+        while (i < len(event_queue)) {
+            new_q.append(event_queue[i]);
+            i = i + 1;
+        }
+        event_queue = new_q;
+        event_queue_head = 0;
+    }
+    var head = event_queue_head;
+    if (head >= len(event_queue)) {
+        return make_default_event();
+    }
+    var event: Event = event_queue[head];
+    event_queue_head = head + 1;
+    return event;
+}
+
+// True while unconsumed events remain. Compares head against length — the
+// consumed prefix does not count as pending.
+pub fn has_pending_events(): int {
+    if (event_queue_head < len(event_queue)) {
+        return 1;
+    }
+    return 0;
+}

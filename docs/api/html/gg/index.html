@@ -80,19 +80,26 @@ function filterNav() {
 <h2>index.lm</h2>
 <input type="text" id="search-input" placeholder="Filter symbols..." oninput="filterNav()">
 <div id="nav-list">
+<a class="nav-link" href="#primitive_type_code">primitive_type_code <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 <a class="nav-link" href="#ResourceTrait">ResourceTrait <span style="font-size: 0.75rem; opacity: 0.6;">(Trait)</span></a>
 <a class="nav-link" href="#Buffer">Buffer <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
-<a class="nav-link" href="#Image">Image <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#Texture">Texture <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
 <a class="nav-link" href="#Sampler">Sampler <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
 <a class="nav-link" href="#Shader">Shader <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
 <a class="nav-link" href="#Pipeline">Pipeline <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
 <a class="nav-link" href="#Bindings">Bindings <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
 <a class="nav-link" href="#PassAction">PassAction <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
 <a class="nav-link" href="#Pass">Pass <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#DrawBatch">DrawBatch <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
 <a class="nav-link" href="#GraphicsContext">GraphicsContext <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
 <a class="nav-link" href="#setup">setup <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#setup_checked">setup_checked <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 <a class="nav-link" href="#shutdown">shutdown <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 <a class="nav-link" href="#is_valid">is_valid <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#begin_batch">begin_batch <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#flush_batch">flush_batch <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#end_batch">end_batch <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#submit_batch">submit_batch <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 <a class="nav-link" href="#spawn_window">spawn_window <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 <a class="nav-link" href="#push_clip">push_clip <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 <a class="nav-link" href="#pop_clip">pop_clip <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
@@ -101,14 +108,19 @@ function filterNav() {
 <a class="nav-link" href="#make_pass_action">make_pass_action <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 <a class="nav-link" href="#make_buffer">make_buffer <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 <a class="nav-link" href="#make_buffer_data">make_buffer_data <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
-<a class="nav-link" href="#make_image">make_image <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#make_texture">make_texture <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#make_texture_data">make_texture_data <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 <a class="nav-link" href="#make_sampler">make_sampler <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 <a class="nav-link" href="#make_shader">make_shader <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 <a class="nav-link" href="#make_pipeline">make_pipeline <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#make_pipeline_typed">make_pipeline_typed <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 <a class="nav-link" href="#make_bindings">make_bindings <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 <a class="nav-link" href="#begin_pass">begin_pass <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 <a class="nav-link" href="#set_window_size">set_window_size <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 <a class="nav-link" href="#draw_rect_primitive">draw_rect_primitive <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#draw_rect_rounded_primitive">draw_rect_rounded_primitive <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#draw_rect_border_primitive">draw_rect_border_primitive <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#draw_line_primitive">draw_line_primitive <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 <a class="nav-link" href="#draw_shadow_primitive">draw_shadow_primitive <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 <a class="nav-link" href="#draw_triangle_primitive">draw_triangle_primitive <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 <a class="nav-link" href="#draw_text">draw_text <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
@@ -126,6 +138,10 @@ function filterNav() {
 <h1>index.lm API Reference</h1>
 <h2>Module Overview</h2>
 <div class="summary"><p>std.gg - Portable Sokol-GFX Style Low-Level Graphics Abstraction Module</p></div>
+<div id="primitive_type_code">
+<h3>primitive_type_code <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn primitive_type_code(p: PrimitiveType): int</code></pre>
+</div><hr>
 <div id="ResourceTrait">
 <h3>ResourceTrait <span class="badge badge-pub">Trait</span></h3>
 <pre class="code-sig"><code>trait ResourceTrait</code></pre>
@@ -143,9 +159,9 @@ function filterNav() {
 <li><code>var pub is_index: bool</code> <em>(field)</em></li>
 </ul>
 </div><hr>
-<div id="Image">
-<h3>Image <span class="badge badge-pub">Frame</span></h3>
-<pre class="code-sig"><code>frame Image: ResourceTrait</code></pre>
+<div id="Texture">
+<h3>Texture <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame Texture: ResourceTrait</code></pre>
 <h4>Members</h4>
 <ul>
 <li><code>var pub width: int</code> <em>(field)</em></li>
@@ -176,12 +192,12 @@ function filterNav() {
 </div><hr>
 <div id="Bindings">
 <h3>Bindings <span class="badge badge-pub">Frame</span></h3>
-<pre class="code-sig"><code>frame Bindings</code></pre>
+<pre class="code-sig"><code>frame Bindings: ResourceTrait</code></pre>
 <h4>Members</h4>
 <ul>
 <li><code>var pub vertex_buffer_id: int</code> <em>(field)</em></li>
 <li><code>var pub index_buffer_id: int</code> <em>(field)</em></li>
-<li><code>var pub image_id: int</code> <em>(field)</em></li>
+<li><code>var pub texture_id: int</code> <em>(field)</em></li>
 <li><code>var pub sampler_id: int</code> <em>(field)</em></li>
 </ul>
 </div><hr>
@@ -207,6 +223,30 @@ function filterNav() {
 <li><code>var pub action: PassAction</code> <em>(field)</em></li>
 </ul>
 </div><hr>
+<div id="DrawBatch">
+<h3>DrawBatch <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame DrawBatch</code></pre>
+<div class="summary"><p>Reusable flat command & float buffer to batch draw calls with zero per-call list allocations.</p></div>
+<h4>Members</h4>
+<ul>
+<li><code>var pub ops: list</code> <em>(field)</em></li>
+<li><code>var pub op_count: int</code> <em>(field)</em></li>
+<li><code>var pub data: list</code> <em>(field)</em></li>
+<li><code>var pub data_len: int</code> <em>(field)</em></li>
+<li><code>var pub texts: list</code> <em>(field)</em></li>
+<li><code>var pub text_count: int</code> <em>(field)</em></li>
+<li><code>pub init()</code> <em>(constructor)</em></li>
+<li><code>pub fn clear(): nil</code> <em>(method)</em></li>
+<li><code>fn push_op(op: BatchOp): nil</code> <em>(method)</em></li>
+<li><code>fn push_f(v: float): nil</code> <em>(method)</em></li>
+<li><code>fn push_text(s: str): nil</code> <em>(method)</em></li>
+<li><code>pub fn add_rect(x: float, y: float, w: float, h: float, r: float, g: float, b: float, a: float): nil</code> <em>(method)</em></li>
+<li><code>pub fn add_triangle(x1: float, y1: float, x2: float, y2: float, x3: float, y3: float, r: float, g: float, b: float, a: float): nil</code> <em>(method)</em></li>
+<li><code>pub fn add_text(text_str: str, x: float, y: float, r: float, g: float, b: float, a: float): nil</code> <em>(method)</em></li>
+<li><code>pub fn add_clip_push(x: float, y: float, w: float, h: float): nil</code> <em>(method)</em></li>
+<li><code>pub fn add_clip_pop(): nil</code> <em>(method)</em></li>
+</ul>
+</div><hr>
 <div id="GraphicsContext">
 <h3>GraphicsContext <span class="badge badge-pub">Frame</span></h3>
 <pre class="code-sig"><code>frame GraphicsContext</code></pre>
@@ -214,12 +254,25 @@ function filterNav() {
 <ul>
 <li><code>var pub handle: int</code> <em>(field)</em></li>
 <li><code>var pub next_resource_id: int</code> <em>(field)</em></li>
+<li><code>var pub batching: bool</code> <em>(field)</em></li>
+<li><code>var pub batch: DrawBatch</code> <em>(field)</em></li>
+<li><code>var pub _args0: list</code> <em>(field)</em></li>
+<li><code>var pub _args1i: list</code> <em>(field)</em></li>
+<li><code>var pub _args2i: list</code> <em>(field)</em></li>
+<li><code>var pub _args3i: list</code> <em>(field)</em></li>
+<li><code>var pub _args4f: list</code> <em>(field)</em></li>
+<li><code>var pub _args10f: list</code> <em>(field)</em></li>
 <li><code>pub init()</code> <em>(constructor)</em></li>
+<li><code>pub fn flush_draw_batch(b: DrawBatch): nil</code> <em>(method)</em></li>
 </ul>
 </div><hr>
 <div id="setup">
 <h3>setup <span class="badge badge-pub">Function</span></h3>
 <pre class="code-sig"><code>pub fn setup(): bool</code></pre>
+</div><hr>
+<div id="setup_checked">
+<h3>setup_checked <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn setup_checked(): nil?</code></pre>
 </div><hr>
 <div id="shutdown">
 <h3>shutdown <span class="badge badge-pub">Function</span></h3>
@@ -228,6 +281,22 @@ function filterNav() {
 <div id="is_valid">
 <h3>is_valid <span class="badge badge-pub">Function</span></h3>
 <pre class="code-sig"><code>pub fn is_valid(): bool</code></pre>
+</div><hr>
+<div id="begin_batch">
+<h3>begin_batch <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn begin_batch(): nil</code></pre>
+</div><hr>
+<div id="flush_batch">
+<h3>flush_batch <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn flush_batch(): nil</code></pre>
+</div><hr>
+<div id="end_batch">
+<h3>end_batch <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn end_batch(): nil</code></pre>
+</div><hr>
+<div id="submit_batch">
+<h3>submit_batch <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn submit_batch(b: DrawBatch): nil</code></pre>
 </div><hr>
 <div id="spawn_window">
 <h3>spawn_window <span class="badge badge-pub">Function</span></h3>
@@ -243,7 +312,7 @@ function filterNav() {
 </div><hr>
 <div id="poll_events">
 <h3>poll_events <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn poll_events(): any</code></pre>
+<pre class="code-sig"><code>pub fn poll_events(): union</code></pre>
 </div><hr>
 <div id="rgba">
 <h3>rgba <span class="badge badge-pub">Function</span></h3>
@@ -259,11 +328,17 @@ function filterNav() {
 </div><hr>
 <div id="make_buffer_data">
 <h3>make_buffer_data <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn make_buffer_data(size: int, is_index: bool, data: any): Buffer</code></pre>
+<pre class="code-sig"><code>pub fn make_buffer_data(size: int, is_index: bool, data: list): Buffer</code></pre>
 </div><hr>
-<div id="make_image">
-<h3>make_image <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn make_image(width: int, height: int): Image</code></pre>
+<div id="make_texture">
+<h3>make_texture <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn make_texture(width: int, height: int): Texture</code></pre>
+</div><hr>
+<div id="make_texture_data">
+<h3>make_texture_data <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn make_texture_data(width: int, height: int, pixels: list): int</code></pre>
+<div class="summary"><p>Creates a texture with initial RGBA8 pixel data and returns its id.
+`pixels` is a flat byte list in row-major order, length == width*height*4.</p></div>
 </div><hr>
 <div id="make_sampler">
 <h3>make_sampler <span class="badge badge-pub">Function</span></h3>
@@ -277,9 +352,13 @@ function filterNav() {
 <h3>make_pipeline <span class="badge badge-pub">Function</span></h3>
 <pre class="code-sig"><code>pub fn make_pipeline(shader_id: int, primitive_type: int): Pipeline</code></pre>
 </div><hr>
+<div id="make_pipeline_typed">
+<h3>make_pipeline_typed <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn make_pipeline_typed(shader: Shader, primitive: PrimitiveType): Pipeline</code></pre>
+</div><hr>
 <div id="make_bindings">
 <h3>make_bindings <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn make_bindings(vbuf_id: int, ibuf_id: int, img_id: int, sampler_id: int): Bindings</code></pre>
+<pre class="code-sig"><code>pub fn make_bindings(vbuf_id: int, ibuf_id: int, tex_id: int, sampler_id: int): Bindings</code></pre>
 </div><hr>
 <div id="begin_pass">
 <h3>begin_pass <span class="badge badge-pub">Function</span></h3>
@@ -292,6 +371,18 @@ function filterNav() {
 <div id="draw_rect_primitive">
 <h3>draw_rect_primitive <span class="badge badge-pub">Function</span></h3>
 <pre class="code-sig"><code>pub fn draw_rect_primitive(x: float, y: float, w: float, h: float, r: float, g: float, b: float, a: float): nil</code></pre>
+</div><hr>
+<div id="draw_rect_rounded_primitive">
+<h3>draw_rect_rounded_primitive <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn draw_rect_rounded_primitive(x: float, y: float, w: float, h: float, rad: float, r: float, g: float, b: float, a: float): nil</code></pre>
+</div><hr>
+<div id="draw_rect_border_primitive">
+<h3>draw_rect_border_primitive <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn draw_rect_border_primitive(x: float, y: float, w: float, h: float, rad: float, border_w: float, r: float, g: float, b: float, a: float): nil</code></pre>
+</div><hr>
+<div id="draw_line_primitive">
+<h3>draw_line_primitive <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn draw_line_primitive(x1: float, y1: float, x2: float, y2: float, r: float, g: float, b: float, a: float, thickness: float = ...): nil</code></pre>
 </div><hr>
 <div id="draw_shadow_primitive">
 <h3>draw_shadow_primitive <span class="badge badge-pub">Function</span></h3>
@@ -323,7 +414,9 @@ function filterNav() {
 </div><hr>
 <div id="apply_bindings">
 <h3>apply_bindings <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn apply_bindings(v_id: int, i_id: int): nil</code></pre>
+<pre class="code-sig"><code>pub fn apply_bindings(v_id: int, i_id: int, uniforms: list? = ..., img_id: int = ..., sampler_id: int = ...): nil</code></pre>
+<div class="summary"><p>img_id/sampler_id bind a texture for shaders that sample one (e.g. the
+d3 vertex-stream pipeline). Pass 0 to leave the texture slot unbound.</p></div>
 </div><hr>
 <div id="draw">
 <h3>draw <span class="badge badge-pub">Function</span></h3>
@@ -335,7 +428,7 @@ function filterNav() {
 </div><hr>
 <div id="readback_pixel">
 <h3>readback_pixel <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn readback_pixel(x: int, y: int): any</code></pre>
+<pre class="code-sig"><code>pub fn readback_pixel(x: int, y: int): union</code></pre>
 </div><hr>
 </main>
 </body>

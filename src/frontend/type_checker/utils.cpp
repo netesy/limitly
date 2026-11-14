@@ -561,12 +561,28 @@ std::string TypeChecker::qualify_declared_name(const std::string& name) const {
 std::string TypeChecker::canonical_symbol_name(const std::string& name,
                                                const std::shared_ptr<LM::Frontend::AST::Statement>& stmt) const {
     if (name.find('.') != std::string::npos) return name;
+    const std::string own = qualify_declared_name(name);
     if (current_program_) {
+        // imported_symbols accumulates every import spelling of a symbol
+        // (alias.Name, bare Name, module.Path.Name) all pointing at the same
+        // AST node, so an arbitrary map hit can return an alias spelling like
+        // `image.Image` for a frame canonically named `std.image.index.Image`.
+        // The declaring module's own qualified name wins immediately; among
+        // remaining matches the deepest (most-dotted) spelling is the module
+        // path, never an import alias.
+        std::string best;
         for (const auto& [k, s] : current_program_->imported_symbols) {
-            if (k.find('.') != std::string::npos && s == stmt) return k;
+            if (k.find('.') == std::string::npos || s != stmt) continue;
+            if (k == own) return k;
+            auto dots = [](const std::string& v) { return std::count(v.begin(), v.end(), '.'); };
+            if (best.empty() || dots(k) > dots(best) ||
+                (dots(k) == dots(best) && k.size() > best.size())) {
+                best = k;
+            }
         }
+        if (!best.empty()) return best;
     }
-    return qualify_declared_name(name);
+    return own;
 }
 
 const TypeChecker::FrameInfo* TypeChecker::lookup_frame_info(const std::string& name) const {

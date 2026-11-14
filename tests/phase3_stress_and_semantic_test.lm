@@ -2,9 +2,10 @@
 import std.app as app;
 import std.ui as ui;
 import std.ui.context as ui_context;
-import std.game.gui as gui;
+import std.gui as gui;
 import std.text.controller as text_ctrl;
 import std.string as std_string;
+import std.events as events;
 
 fn int_to_str(n_val: int): str {
     if (n_val == 0) { return "0"; }
@@ -67,7 +68,7 @@ fn test_shared_semantics() {
     app.ui(root);
     app.run_frame_step();
 
-    app.push_event(app.Event(event_type=app.EventType.MouseDown, x=108, y=128));
+    events.push_event(events.Event(event_type=events.EventType.MouseDown, x=108, y=128));
     app.run_frame_step();
 
     var root_w = ui_context.global_ui_context.current_widget;

@@ -160,7 +160,6 @@ TypePtr TypeChecker::resolve_type_annotation(std::shared_ptr<LM::Frontend::AST::
         if (!base_type || base_type->tag == TypeTag::Nil) {
             base_type = type_system.getType(annotation->typeName);
         }
-
         // Check if getType returned NIL_TYPE (which means type not found)
         if (base_type && base_type->tag == TypeTag::Nil) {
             // Type not found, try type alias

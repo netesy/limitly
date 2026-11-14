@@ -5,17 +5,15 @@
 Application Module
 Portable window application lifecycle, event loop, and timing driver
 
+Windowing and the Fluent UI loop live here. OS event pumping and the typed
+event queue live in std.events — this module only *dispatches* queued
+events into the Fluent ui_context.
+
 ## Symbols
 
-- **Function**: [`event_type_from_int`](#event_type_from_int)
-- **Frame**: [`Event`](#Event)
-- **Frame**: [`KeyEvent`](#KeyEvent)
-- **Frame**: [`MouseEvent`](#MouseEvent)
-- **Frame**: [`ResizeEvent`](#ResizeEvent)
 - **Frame**: [`WindowConfig`](#WindowConfig)
 - **Function**: [`default_window_config`](#default_window_config)
 - **Frame**: [`State`](#State)
-- **Function**: [`make_default_event`](#make_default_event)
 - **Function**: [`app_init`](#app_init)
 - **Function**: [`init`](#init)
 - **Function**: [`app_shutdown`](#app_shutdown)
@@ -24,17 +22,13 @@ Portable window application lifecycle, event loop, and timing driver
 - **Function**: [`app_is_running`](#app_is_running)
 - **Function**: [`ui`](#ui)
 - **Function**: [`set_ui`](#set_ui)
+- **Function**: [`dispatch_ui_events`](#dispatch_ui_events)
+- **Function**: [`process_events`](#process_events)
 - **Function**: [`run_frame_step`](#run_frame_step)
 - **Function**: [`app_run`](#app_run)
 - **Function**: [`run`](#run)
 - **Function**: [`app_quit`](#app_quit)
 - **Function**: [`quit`](#quit)
-- **Function**: [`process_events`](#process_events)
-- **Function**: [`push_mouse_click`](#push_mouse_click)
-- **Function**: [`push_quit_event`](#push_quit_event)
-- **Function**: [`push_event`](#push_event)
-- **Function**: [`poll_event`](#poll_event)
-- **Function**: [`has_pending_events`](#has_pending_events)
 - **Function**: [`present_frame`](#present_frame)
 - **Function**: [`set_window_size`](#set_window_size)
 - **Function**: [`get_window_width`](#get_window_width)
@@ -63,98 +57,6 @@ Portable window application lifecycle, event loop, and timing driver
 - **Function**: [`create_app_data_directory`](#create_app_data_directory)
 - **Function**: [`get_executable_path`](#get_executable_path)
 - **Function**: [`get_home_directory`](#get_home_directory)
-
----
-
-### `event_type_from_int` <a id="event_type_from_int"></a>
-
-**Kind**: Function  
-**Visibility**: `private`  
-
-```lymar
-fn event_type_from_int(code: int): EventType
-```
-
----
-
-### `Event` <a id="Event"></a>
-
-**Kind**: Frame  
-**Visibility**: `pub`  
-
-```lymar
-frame Event
-```
-
-Event frame
-
-#### Members
-
-- `var pub event_type: EventType` *(field)*
-- `var pub timestamp: int` *(field)*
-- `var pub window_id: int` *(field)*
-- `var pub x: int` *(field)*
-- `var pub y: int` *(field)*
-- `var pub key_code: int` *(field)*
-- `var pub xdest: int` *(field)*
-- `var pub ydest: int` *(field)*
-- `pub init()` *(constructor)*
-
----
-
-### `KeyEvent` <a id="KeyEvent"></a>
-
-**Kind**: Frame  
-**Visibility**: `pub`  
-
-```lymar
-frame KeyEvent
-```
-
-Key event frame
-
-#### Members
-
-- `var pub modifiers: int` *(field)*
-- `var pub repeat: int` *(field)*
-
----
-
-### `MouseEvent` <a id="MouseEvent"></a>
-
-**Kind**: Frame  
-**Visibility**: `pub`  
-
-```lymar
-frame MouseEvent
-```
-
-Mouse event frame
-
-#### Members
-
-- `var pub button: int` *(field)*
-- `var pub modifiers: int` *(field)*
-
----
-
-### `ResizeEvent` <a id="ResizeEvent"></a>
-
-**Kind**: Frame  
-**Visibility**: `pub`  
-
-```lymar
-frame ResizeEvent
-```
-
-Resize event frame
-
-#### Members
-
-- `var pub width: int` *(field)*
-- `var pub height: int` *(field)*
-- `var pub framebuffer_width: int` *(field)*
-- `var pub framebuffer_height: int` *(field)*
 
 ---
 
@@ -217,22 +119,9 @@ Application state
 - `var pub framebuffer_width: int` *(field)*
 - `var pub framebuffer_height: int` *(field)*
 - `var pub dpi_scale: float` *(field)*
-- `var pub event_queue: list` *(field)*
-- `var pub event_queue_head: int` *(field)*
 - `var pub frame_count: int` *(field)*
 - `var pub last_frame_time: int` *(field)*
 - `var pub delta_time: float` *(field)*
-
----
-
-### `make_default_event` <a id="make_default_event"></a>
-
-**Kind**: Function  
-**Visibility**: `private`  
-
-```lymar
-fn make_default_event(): Event
-```
 
 ---
 
@@ -312,7 +201,7 @@ pub fn app_is_running(): int
 **Visibility**: `pub`  
 
 ```lymar
-pub fn ui(root: ui_types.Widget): nil
+pub fn ui(root: ui_comp.Fluent): nil
 ```
 
 ---
@@ -323,8 +212,39 @@ pub fn ui(root: ui_types.Widget): nil
 **Visibility**: `pub`  
 
 ```lymar
-pub fn set_ui(root): nil
+pub fn set_ui(root: ui_comp.Fluent): nil
 ```
+
+---
+
+### `dispatch_ui_events` <a id="dispatch_ui_events"></a>
+
+**Kind**: Function  
+**Visibility**: `pub`  
+
+```lymar
+pub fn dispatch_ui_events(): nil
+```
+
+dispatch_ui_events drains the std.events queue into the Fluent
+ui_context. This is the Fluent/framework consumer — std.game.Game drains
+the same queue itself for its InputManager/IMGUI instead. Do not call both
+in one frame or the stream is split.
+
+---
+
+### `process_events` <a id="process_events"></a>
+
+**Kind**: Function  
+**Visibility**: `pub`  
+
+```lymar
+pub fn process_events(): nil
+```
+
+process_events = pump + Fluent dispatch: the per-frame event step for the
+std.app/Fluent run loop. std.game.Game calls events.pump_events() and
+drains the queue itself instead.
 
 ---
 
@@ -356,7 +276,7 @@ pub fn app_run(): nil
 **Visibility**: `pub`  
 
 ```lymar
-pub fn run(root: any = ...): nil
+pub fn run(root: union = ...): nil
 ```
 
 ---
@@ -379,72 +299,6 @@ pub fn app_quit(): nil
 
 ```lymar
 pub fn quit(): nil
-```
-
----
-
-### `process_events` <a id="process_events"></a>
-
-**Kind**: Function  
-**Visibility**: `pub`  
-
-```lymar
-pub fn process_events(): nil
-```
-
----
-
-### `push_mouse_click` <a id="push_mouse_click"></a>
-
-**Kind**: Function  
-**Visibility**: `pub`  
-
-```lymar
-pub fn push_mouse_click(x: int, y: int): nil
-```
-
----
-
-### `push_quit_event` <a id="push_quit_event"></a>
-
-**Kind**: Function  
-**Visibility**: `pub`  
-
-```lymar
-pub fn push_quit_event(): nil
-```
-
----
-
-### `push_event` <a id="push_event"></a>
-
-**Kind**: Function  
-**Visibility**: `pub`  
-
-```lymar
-pub fn push_event(event: Event): nil
-```
-
----
-
-### `poll_event` <a id="poll_event"></a>
-
-**Kind**: Function  
-**Visibility**: `pub`  
-
-```lymar
-pub fn poll_event(): Event
-```
-
----
-
-### `has_pending_events` <a id="has_pending_events"></a>
-
-**Kind**: Function  
-**Visibility**: `pub`  
-
-```lymar
-pub fn has_pending_events(): int
 ```
 
 ---

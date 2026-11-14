@@ -2354,20 +2354,37 @@ Reg Generator::emit_assign_expr(LM::Frontend::AST::AssignExpr& expr) {
                 auto frame_type_info = std::get_if<FrameType>(&resolved_object_type->extra);
                 if (frame_type_info) {
                     std::string resolved_name = resolve_qualified_frame_name(frame_type_info->name);
-                    auto it = frame_table_.find(resolved_name);
-                    if (it != frame_table_.end()) {
+                    // Short frame names can collide across modules; try every
+                    // same-named frame and use the one that declares the field,
+                    // mirroring the member-read path below.
+                    std::vector<std::string> candidates;
+                    candidates.push_back(resolved_name);
+                    std::string wsuffix = frame_type_info->name;
+                    size_t wsd = wsuffix.rfind('.');
+                    if (wsd != std::string::npos) wsuffix = wsuffix.substr(wsd + 1);
+                    for (const auto& [frame_key, frame_info] : frame_table_) {
+                        if (frame_key == resolved_name || frame_key == wsuffix) continue;
+                        if (frame_key.length() > wsuffix.length() &&
+                            frame_key.substr(frame_key.length() - wsuffix.length() - 1) == "." + wsuffix) {
+                            candidates.push_back(frame_key);
+                        }
+                    }
+                    for (const auto& cand_name : candidates) {
+                    auto it = frame_table_.find(cand_name);
+                    if (it == frame_table_.end()) continue;
+                    auto offset_it = it->second.field_offsets.find(field_name);
+                    if (offset_it == it->second.field_offsets.end()) continue;
+                    {
                         // Check visibility
                         auto vis_it = it->second.field_visibilities.find(field_name);
                         if (vis_it != it->second.field_visibilities.end()) {
-                            if (!is_visible(vis_it->second, resolved_name)) {
+                            if (!is_visible(vis_it->second, cand_name)) {
                                 report_error("Cannot access " + LM::Frontend::AST::visibilityToString(vis_it->second) +
-                                           " field '" + field_name + "' of frame '" + resolved_name + "'");
+                                           " field '" + field_name + "' of frame '" + cand_name + "'");
                                 return 0;
                             }
                         }
 
-                        auto offset_it = it->second.field_offsets.find(field_name);
-                        if (offset_it != it->second.field_offsets.end()) {
                             // Found the field - emit FrameSetField
                             LIR_Op set_op = LIR_Op::FrameSetField;
                             if (is_in_concurrency_context()) {
@@ -2474,7 +2491,9 @@ Reg Generator::emit_assign_expr(LM::Frontend::AST::AssignExpr& expr) {
                 }
             }
             
-            report_error("Unknown field for assignment: " + field_name);
+            report_error("Unknown field for assignment: " + field_name +
+                         " (line " + std::to_string(expr.line) + ", fn " + current_function_name_ +
+                         ", module " + current_module_ + ")");
             return 0;
         } else {
             // Index assignment - handle dict/list/tuple element assignment
@@ -2970,9 +2989,6 @@ Reg Generator::emit_member_access_with_obj(LM::Frontend::AST::MemberExpr& expr, 
             {
                 auto offset_it = it->second.field_offsets.find(expr.name);
                 if (offset_it == it->second.field_offsets.end()) continue;
-                if (getenv("LYMAR_DBG_FRAME") && frame_type_info->name.find("Image") != std::string::npos)
-                    fprintf(stderr, "[framedbg] field '%s' on type '%s' -> frame '%s' off=%zu\n",
-                        expr.name.c_str(), frame_type_info->name.c_str(), cand_name.c_str(), offset_it->second);
 
                 // Check visibility
                 auto vis_it = it->second.field_visibilities.find(expr.name);

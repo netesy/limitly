@@ -38,7 +38,7 @@ trait Drawable
 
 #### Members
 
-- `fn draw(camera: any): nil` *(method requirement)*
+- `fn draw(camera: Camera2D?): nil` *(method requirement)*
 
 ---
 

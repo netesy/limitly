@@ -359,6 +359,10 @@ Concurrency is bound to the lifetime of the block.
 GPU work is declared with stage-specific function syntax. The shared LIR carries
 the stage metadata to every backend; the register VM executes dispatches as
 single-pass emulation, and hardware backends lower the same functions later.
+See **`docs/gpu.md`** for the complete programming model: stage declarations,
+`gpu.shared` workgroup-local storage, thread intrinsics, the
+`Device`/`Queue`/`Encoder`/`CommandBuffer`/`Fence` host API, pipeline
+descriptors, emulation semantics, and the current implementation status.
 
 ```lymar
 gpu task integrate(particles: [Particle], dt: float) threads(64, 1, 1) {

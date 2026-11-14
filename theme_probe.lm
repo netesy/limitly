@@ -1,0 +1,11 @@
+import std.gui show GUI;
+
+fn main() {
+    var g = GUI();
+    var t = g.theme;
+    var bw = t.bg_window;
+    print("bg_window r={bw.r} g={bw.g} b={bw.b} a={bw.a}");
+    var tx = t.text;
+    print("text r={tx.r} g={tx.g} b={tx.b} a={tx.a}");
+    return 0;
+}

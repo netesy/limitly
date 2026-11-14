@@ -10,6 +10,9 @@ fn main() {
     if (not app.setup()) { return 1; }
 
     var scene = d3.Scene3D();
+    scene.background_r = 1.0;
+    scene.background_g = 0.753;
+    scene.background_b = 0.796;
     scene.add_light(d3.ambient_light(1.0, 1.0, 1.0, 0.9));
 
     // 2x2 checker: red green / blue white — unmistakable if sampling works
@@ -22,7 +25,7 @@ fn main() {
         elif (x == 0) { px.append(0); px.append(0); px.append(255); px.append(255); }
         else { px.append(255); px.append(255); px.append(255); px.append(255); }
     }
-    val tid = gg.make_image_data(2, 2, px);
+    val tid = gg.make_texture_data(2, 2, px);
     print("tex id={tid}");
 
     var tex_geo = d3.plane(3.0, 2.0);
@@ -45,6 +48,7 @@ fn main() {
     cam.set_position(0.0, 0.0, 4.0);
     cam.look_at(0.0, 0.0, 0.0);
     var renderer = d3.Renderer3D(640, 480);
+    renderer.clear_color = true;
 
     var ticks = 0;
     while (app.is_running and ticks < 300) {

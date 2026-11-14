@@ -1111,9 +1111,21 @@ TypePtr TypeChecker::check_import_statement(std::shared_ptr<LM::Frontend::AST::I
         if (!import_stmt->filter.has_value() || (import_stmt->filter->type == LM::Frontend::AST::ImportFilterType::Show && symbols_to_import.count(name))) {
             targets.push_back(name);
         }
-        std::string full_path_base = import_stmt->modulePath + "." + name;
+        // Re-exported symbols must keep the identity of their defining module:
+        // `import std.d3 as d3` surfaces `Scene3D` whose canonical name is
+        // `std.d3.scene.Scene3D`, not the facade path `std.d3.Scene3D`.
+        // canonical_symbol() resolves through reexport_sources; direct imports
+        // pass through unchanged.
+        std::string facade_base = import_stmt->modulePath + "." + name;
+        std::string full_path_base = manager.canonical_symbol(facade_base);
         if (std::find(targets.begin(), targets.end(), full_path_base) == targets.end()) {
             targets.push_back(full_path_base);
+        }
+        // Keep the facade spelling resolvable as an alias key when it differs
+        // from the canonical origin (e.g. std.d3.Scene3D -> std.d3.scene.Scene3D).
+        if (facade_base != full_path_base &&
+            std::find(targets.begin(), targets.end(), facade_base) == targets.end()) {
+            targets.push_back(facade_base);
         }
 
         if (f) {
@@ -1414,17 +1426,22 @@ TypePtr TypeChecker::check_import_statement(std::shared_ptr<LM::Frontend::AST::I
             }
 
             auto fr_shared = std::dynamic_pointer_cast<AST::FrameDeclaration>(stmt);
+            // All import spellings (alias.Name, bare Name, module.Path.Name) refer to
+            // the same frame: share ONE FrameType whose canonical name is the module's
+            // qualified path so alias spellings cannot leak into type identity.
+            TypePtr frame_type = type_system.getType(full_path_base);
+            if (!frame_type || frame_type->tag == TypeTag::Nil ||
+                std::get_if<FrameType>(&frame_type->extra) == nullptr) {
+                frame_type = type_system.createFrameType(full_path_base);
+            }
             for (const auto& qname : targets) {
                 FrameInfo fi;
-                fi.name = qname;
+                fi.name = full_path_base;
                 fi.declaration = fr_shared;
                 fi.fields = resolved_fields;
                 frame_declarations[qname] = fi;
 
-                TypePtr frame_type = type_system.createFrameType(qname);
                 type_system.addUserDefinedType(qname, frame_type);
-                type_system.addUserDefinedType(full_path_base, frame_type);
-                type_system.addUserDefinedType(alias + "." + name, frame_type);
                 declare_variable(qname, frame_type);
 
                 current_program_->imported_symbols[qname] = stmt;

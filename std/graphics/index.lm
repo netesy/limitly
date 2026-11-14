@@ -7,7 +7,7 @@ pub import std.graphics.paint show Paint;
 pub import std.graphics.brush show Brush;
 pub import std.color.core show Color;
 pub import std.graphics.gradient show Gradient;
-pub import std.graphics.image show Image;
+pub import std.image show Image;
 pub import std.graphics.texture show Texture;
 pub import std.graphics.font show Font;
 pub import std.graphics.text_layout show TextLayout;
@@ -22,7 +22,6 @@ pub import std.graphics.backend show Backend;
 pub import std.graphics.shadow show Shadow;
 
 import std.color as color;
-import std.graphics.image as image;
 
 fn rgb(r: int, g: int, b: int): Color {
     return color.rgb(r, g, b);
@@ -34,16 +33,4 @@ fn rgba(r: int, g: int, b: int, a: float): Color {
 
 fn lerp(c1: Color, c2: Color, t: float): Color {
     return color.lerp(c1, c2, t);
-}
-
-fn load_image(filename: str): Image {
-    return image.load(filename);
-}
-
-fn save_image_png(img: Image, filename: str): bool {
-    return image.save_png(img, filename);
-}
-
-fn free_image(img: Image): nil {
-    image.free(img);
 }

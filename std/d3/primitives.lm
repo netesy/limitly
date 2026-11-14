@@ -131,10 +131,10 @@ pub fn sphere(radius: float = 1.0, width_segments: int = 16, height_segments: in
             var i3 = sy * stride + (sx + 1);
 
             if (sy != 0) {
-                g.add_face(i0, i1, i3);
+                g.add_face(i0, i3, i1);
             }
             if (sy != height_segments - 1) {
-                g.add_face(i3, i1, i2);
+                g.add_face(i3, i2, i1);
             }
             sx = sx + 1;
         }

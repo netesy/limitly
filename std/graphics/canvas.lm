@@ -5,7 +5,7 @@ import std.geometry show Rect;
 import std.graphics.paint as paint;
 import std.color as color;
 import std.graphics.path as path;
-import std.graphics.image as image;
+import std.image as image;
 import std.graphics.shadow as shadow;
 import std.gg as gg;
 
