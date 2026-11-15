@@ -100,8 +100,13 @@ std::vector<std::string> windows_runtime_libraries() {
     if (compiler.has_parent_path()) roots.push_back(compiler.parent_path());
     roots.emplace_back("C:/msys64/mingw64/lib");
     // Keep the archive order stable and independent of the caller environment.
+    // The system DLL import libraries mirror the -l flags the target driver
+    // path passes (sokol window/GDI, winsock, D3D11/DXGI shader compiler) so
+    // the self-contained image resolves the same symbols without a driver.
     const std::vector<std::string> wanted{"libstdc++.a", "libstdc++fs.a", "libwinpthread.a",
-        "libmingwex.a", "libmsvcrt.a", "libmingw32.a"};
+        "libmingwex.a", "libmsvcrt.a", "libmingw32.a",
+        "libws2_32.a", "libgdi32.a", "libuser32.a", "libshell32.a", "libopengl32.a",
+        "libd3d11.a", "libdxgi.a", "libd3dcompiler.a"};
     std::vector<std::string> found;
     std::vector<std::string> seen;
     auto consider = [&](const fs::path& candidate) {
@@ -140,6 +145,36 @@ std::vector<std::string> windows_runtime_libraries() {
     }
     return found;
 }
+// Locate a static libffi archive for the target. The standalone runtime's FFI
+// call path (lymarrt_ffi_call*/lymar_aot_foreign_call) is implemented on top of
+// libffi, so the self-contained link needs the archive the same way the target
+// driver path adds -lffi. Returns an empty path when no archive can be found;
+// the internal link then fails with the unresolved ffi_* symbol and the caller
+// falls back to the driver exactly as before.
+std::filesystem::path libffi_archive(const target::TargetDescriptor& t) {
+    namespace fs = std::filesystem;
+    std::vector<fs::path> roots;
+    if (const char* env = std::getenv("LYMAR_AOT_WINLIB"); env && *env) roots.emplace_back(env);
+    if (t.os == target::OS::Windows) {
+        const auto compiler = compiler_directory();
+        roots.push_back(compiler);
+        if (compiler.has_parent_path()) roots.push_back(compiler.parent_path());
+        roots.emplace_back("C:/msys64/mingw64/lib");
+        for (const auto& root : roots) {
+            std::error_code ec;
+            const auto candidate = root / "libffi.a";
+            if (fs::exists(candidate, ec)) return candidate;
+        }
+    } else if (t.os == target::OS::Linux || t.os == target::OS::FreeBSD || t.os == target::OS::Android) {
+        roots = {"/usr/lib/x86_64-linux-gnu", "/usr/lib64", "/usr/lib", "/usr/local/lib"};
+        for (const auto& root : roots) {
+            std::error_code ec;
+            const auto candidate = root / "libffi.a";
+            if (fs::exists(candidate, ec)) return candidate;
+        }
+    }
+    return {};
+}
 }
 
 ::fyra::BuildResult link_standalone_runtime(::fyra::BackendBuilder& backend,
@@ -173,6 +208,11 @@ std::vector<std::string> windows_runtime_libraries() {
         // Fyra image links without an external driver on Windows.
         if (target.os == target::OS::Windows)
             for (const auto& syslib : windows_runtime_libraries()) backend.addStaticLibrary(syslib);
+        // Stale runtime archives built before libffi absorption still resolve
+        // ffi_* through a located static libffi archive; new archives already
+        // satisfy those symbols internally so this contributes nothing.
+        if (const auto ffi = libffi_archive(target); !ffi.empty())
+            backend.addStaticLibrary(ffi.string());
         auto internal = backend.emitExecutable(options.output_file);
         if (internal.success || linker == "fyra") return internal;
         std::string reason;

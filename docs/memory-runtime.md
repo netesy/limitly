@@ -73,6 +73,15 @@ selects the compiler driver directly. The internal linker currently rejects the
 C++ runtime's TLS relocations, including x64 `R_X86_64_TPOFF32` and ARM64 TLSDESC;
 its archive support alone does not supply the missing TLS/CRT semantics.
 
+The runtime archive is self-contained on Windows: `liblymar_aot.a` absorbs the
+toolchain's static `libffi.a` members at build time (`scripts/merge_archive_members.py`,
+also applied by `scripts/build_aot_runtime.py`), and the internal link contributes
+the MinGW C/C++ runtime archives plus the same system DLL import libraries the
+driver path passes (`ws2_32`, `gdi32`, `user32`, `shell32`, `opengl32`, `d3d11`,
+`dxgi`, `d3dcompiler`). Programs using `std.ffi` therefore link through the
+internal linker with no `libffi` shared-library dependency; archives built before
+this change still fall back to the driver or to a located `libffi.a`.
+
 `Param` staging and `ConstructError` payload consumption now preserve ownership
 and invocation isolation. Error-union tag/payload access uses the correct offsets.
 Standalone file resources implement open/close, text and binary reads, writes,

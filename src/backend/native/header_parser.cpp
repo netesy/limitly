@@ -6,6 +6,7 @@
 #include "header_parser.hh"
 #include <algorithm>
 #include <cctype>
+#include <cstdlib>
 #include <filesystem>
 #include <optional>
 #include <sstream>
@@ -16,7 +17,7 @@ namespace LM::Backend::Native {
 namespace {
 
 // ─── Tokenizer ────────────────────────────────────────────────────────────────
-enum TokKind { IDENT, KEYWORD, PUNCT, EOF_TOK };
+enum TokKind { IDENT, KEYWORD, PUNCT, NUMBER, EOF_TOK };
 struct Token {
     TokKind kind;
     std::string text;
@@ -29,6 +30,20 @@ static const std::unordered_set<std::string> kKeywords = {
 };
 
 bool is_ident_char(char c) { return std::isalnum(c) || c == '_'; }
+
+// Heuristic for calling-convention / attribute macros (VKAPI_CALL, APIENTRY,
+// WINAPI, ...): all-caps identifier-like tokens. Only skipped when followed
+// by another identifier, so genuine ALL_CAPS function names still parse.
+bool is_macro_ident(const std::string& s) {
+    if (s.size() < 2) return false;
+    bool has_alpha = false;
+    for (char c : s) {
+        if (c >= 'a' && c <= 'z') return false;
+        if (std::isalpha(static_cast<unsigned char>(c))) has_alpha = true;
+        if (!std::isalnum(static_cast<unsigned char>(c)) && c != '_') return false;
+    }
+    return has_alpha;
+}
 
 std::vector<Token> tokenize(const std::string& src) {
     std::vector<Token> toks;
@@ -78,9 +93,12 @@ std::vector<Token> tokenize(const std::string& src) {
             toks.push_back({IDENT, src.substr(start, i - start)});
             continue;
         }
-        // Numbers (skip)
-        if (std::isdigit(static_cast<unsigned char>(src[i]))) {
+        // Numbers (kept for enum constant evaluation; suffix letters included)
+        if (std::isdigit(static_cast<unsigned char>(src[i])) ||
+            (src[i] == '.' && i + 1 < src.size() && std::isdigit(static_cast<unsigned char>(src[i+1])))) {
+            size_t start = i;
             while (i < src.size() && (std::isalnum(static_cast<unsigned char>(src[i])) || src[i] == '.')) ++i;
+            toks.push_back({NUMBER, src.substr(start, i - start)});
             continue;
         }
         // Punctuation
@@ -98,9 +116,15 @@ struct Parser {
     std::unordered_map<std::string, CType> typedefs;
     std::vector<std::string>& warnings;
     std::string filename;
+    std::vector<CConstantDecl>* constants = nullptr;
+    // Values collected so far (enum enumerators + earlier constants), used to
+    // evaluate constant expressions that reference prior names.
+    std::unordered_map<std::string, int64_t> const_values;
+    bool const_expr_failed = false;
 
-    Parser(const std::vector<Token>& t, std::vector<std::string>& w, const std::string& f)
-        : toks(t), warnings(w), filename(f) {}
+    Parser(const std::vector<Token>& t, std::vector<std::string>& w, const std::string& f,
+           std::vector<CConstantDecl>* c = nullptr)
+        : toks(t), warnings(w), filename(f), constants(c) {}
 
     const Token& cur() const { return toks[std::min(pos, toks.size()-1)]; }
     const Token& peek(size_t n = 1) const { return toks[std::min(pos+n, toks.size()-1)]; }
@@ -120,7 +144,8 @@ struct Parser {
         bool is_signed = false;
         // Qualifiers to skip
         while (cur().text == "const" || cur().text == "volatile" || cur().text == "restrict" ||
-               cur().text == "static" || cur().text == "extern" || cur().text == "inline") {
+               cur().text == "static" || cur().text == "extern" || cur().text == "inline" ||
+               (cur().kind == IDENT && is_macro_ident(cur().text) && peek().kind == IDENT)) {
             advance();
         }
         if (cur().text == "unsigned") { is_unsigned = true; advance(); }
@@ -208,6 +233,161 @@ struct Parser {
         return base;
     }
 
+    // ─── Constant-expression evaluation (enum initializers) ──────────────────
+    // Restricted C constant-expression subset: integer literals, prior
+    // constant names, char literals, unary + - ~, and the binary operators
+    // | ^ & << >> + - * / %. Comparison/logical/ternary are rejected.
+
+    static bool is_punct2(const Token& a, const Token& b, const char* op) {
+        return a.kind == PUNCT && b.kind == PUNCT && a.text + b.text == op;
+    }
+
+    int64_t eval_primary() {
+        const Token& t = cur();
+        if (t.kind == NUMBER) {
+            advance();
+            std::string s = t.text;
+            // Strip integer suffixes (u/l combinations, case-insensitive)
+            while (!s.empty() && (s.back() == 'u' || s.back() == 'U' ||
+                                  s.back() == 'l' || s.back() == 'L')) s.pop_back();
+            if (s.rfind("0x", 0) == 0 || s.rfind("0X", 0) == 0) {
+                return static_cast<int64_t>(std::strtoull(s.c_str(), nullptr, 16));
+            }
+            if (s.size() > 2 && s[0] == '0' && s[1] == 'b') {
+                return static_cast<int64_t>(std::strtoull(s.c_str() + 2, nullptr, 2));
+            }
+            if (s.size() > 1 && s[0] == '0') {
+                return static_cast<int64_t>(std::strtoull(s.c_str(), nullptr, 8));
+            }
+            return static_cast<int64_t>(std::strtoll(s.c_str(), nullptr, 10));
+        }
+        if (t.kind == IDENT) {
+            // Char literal: token text includes the quotes, e.g. 'a' or '\n'
+            if (t.text.size() >= 3 && t.text.front() == '\'') {
+                advance();
+                std::string body = t.text.substr(1, t.text.size() - 2);
+                if (body.empty()) { const_expr_failed = true; return 0; }
+                if (body[0] == '\\' && body.size() >= 2) {
+                    char c = body[1];
+                    switch (c) {
+                        case 'n': return '\n'; case 't': return '\t'; case 'r': return '\r';
+                        case '0': return '\0'; case '\\': return '\\'; case '\'': return '\'';
+                        case '"': return '"'; case 'a': return '\a'; case 'b': return '\b';
+                        case 'f': return '\f'; case 'v': return '\v';
+                        default: return static_cast<unsigned char>(c);
+                    }
+                }
+                return static_cast<unsigned char>(body[0]);
+            }
+            auto it = const_values.find(t.text);
+            if (it != const_values.end()) { advance(); return it->second; }
+            const_expr_failed = true;
+            advance();
+            return 0;
+        }
+        if (t.text == "(") {
+            advance();
+            int64_t v = eval_bitor();
+            if (cur().text == ")") advance();
+            else const_expr_failed = true;
+            return v;
+        }
+        const_expr_failed = true;
+        advance();
+        return 0;
+    }
+
+    int64_t eval_unary() {
+        if (cur().text == "-") { advance(); return -eval_unary(); }
+        if (cur().text == "~") { advance(); return ~eval_unary(); }
+        if (cur().text == "+") { advance(); return eval_unary(); }
+        return eval_primary();
+    }
+
+    int64_t eval_mul() {
+        int64_t v = eval_unary();
+        while (!const_expr_failed) {
+            if (cur().text == "*") { advance(); v *= eval_unary(); }
+            else if (cur().text == "/") { advance(); int64_t r = eval_unary(); v = r ? v / r : 0; }
+            else if (cur().text == "%") { advance(); int64_t r = eval_unary(); v = r ? v % r : 0; }
+            else break;
+        }
+        return v;
+    }
+    int64_t eval_add() {
+        int64_t v = eval_mul();
+        while (!const_expr_failed) {
+            if (cur().text == "+") { advance(); v += eval_mul(); }
+            else if (cur().text == "-") { advance(); v -= eval_mul(); }
+            else break;
+        }
+        return v;
+    }
+    int64_t eval_shift() {
+        int64_t v = eval_add();
+        while (!const_expr_failed) {
+            if (is_punct2(cur(), peek(), "<<")) { advance(); advance(); v <<= eval_add(); }
+            else if (is_punct2(cur(), peek(), ">>")) { advance(); advance(); v >>= eval_add(); }
+            else break;
+        }
+        return v;
+    }
+    int64_t eval_bitand() {
+        int64_t v = eval_shift();
+        while (!const_expr_failed && cur().text == "&") { advance(); v &= eval_shift(); }
+        return v;
+    }
+    int64_t eval_bitxor() {
+        int64_t v = eval_bitand();
+        while (!const_expr_failed && cur().text == "^") { advance(); v ^= eval_bitand(); }
+        return v;
+    }
+    int64_t eval_bitor() {
+        int64_t v = eval_bitxor();
+        while (!const_expr_failed && cur().text == "|") { advance(); v |= eval_bitxor(); }
+        return v;
+    }
+
+    // Parses `{ IDENT (= expr)? (, ...)* }` starting at the '{' token.
+    // Appends each enumerator to `constants` (when set) and const_values.
+    // Returns the number of enumerators consumed.
+    size_t parse_enum_body() {
+        size_t count = 0;
+        if (!expect("{")) return 0;
+        int64_t next_value = 0;
+        bool first = true;
+        while (cur().kind != EOF_TOK && cur().text != "}") {
+            if (!first) {
+                if (!expect(",")) break;
+                // Trailing comma before }
+                if (cur().text == "}") break;
+            }
+            first = false;
+            if (cur().kind != IDENT) { advance(); continue; }
+            std::string name = cur().text;
+            advance();
+            if (cur().text == "=") {
+                advance();
+                const_expr_failed = false;
+                size_t save = pos;
+                next_value = eval_bitor();
+                if (const_expr_failed) {
+                    warnings.push_back(filename + ": could not evaluate enum value for '" + name + "'");
+                    // Recover: skip to , or }
+                    while (cur().kind != EOF_TOK && cur().text != "," && cur().text != "}") advance();
+                    continue;
+                }
+                (void)save;
+            }
+            const_values[name] = next_value;
+            if (constants) constants->push_back({name, next_value});
+            ++count;
+            ++next_value;
+        }
+        expect("}");
+        return count;
+    }
+
     // ─── Skip balanced braces ─────────────────────────────────────────────────
     void skip_braces() {
         int depth = 0;
@@ -221,12 +401,20 @@ struct Parser {
     // ─── Declaration Handling ─────────────────────────────────────────────────
     void handle_typedef() {
         // typedef <type> <name>;  or  typedef <type> (*name)(...);
+        // or typedef enum { ... } Name;  (enum constants are collected)
         advance(); // 'typedef'
         CType base = parse_type();
+        bool was_enum = base.base_name.rfind("enum", 0) == 0;
+        if (cur().text == "{") {
+            if (was_enum) parse_enum_body();
+            else skip_braces();
+        }
         if (cur().kind == IDENT) {
             std::string name = cur().text;
             advance();
-            typedefs[name] = base;
+            // C enums are int-sized; register the typedef as i32 so enum-typed
+            // parameters/returns marshal with the correct width.
+            typedefs[name] = was_enum ? CType{CType::Int, false, 32, ""} : base;
         }
         // Skip to semicolon
         while (cur().kind != EOF_TOK && cur().text != ";" && cur().text != "{") advance();
@@ -239,9 +427,12 @@ struct Parser {
         advance();
         // Skip optional tag
         if (cur().kind == IDENT) advance();
-        // If { follows, skip the body
-        if (cur().text == "{") { skip_braces(); }
-        // After struct body, there might be variable declarations or typedef names
+        // If { follows, parse enum bodies for constants; skip struct/union
+        if (cur().text == "{") {
+            if (kw == "enum") parse_enum_body();
+            else skip_braces();
+        }
+        // After body, there might be variable declarations or typedef names
         // Just skip to ;
         while (cur().kind != EOF_TOK && cur().text != ";" && cur().text != "}") advance();
         expect(";");
@@ -252,7 +443,11 @@ struct Parser {
         size_t save = pos;
         CType ret = parse_type();
 
-        // Must be followed by an identifier (function name)
+        // Must be followed by an identifier (function name), possibly with
+        // calling-convention/attribute macro qualifiers in between
+        // (e.g. `VkResult VKAPI_CALL vkCreateInstance(`).
+        while (cur().kind == IDENT && is_macro_ident(cur().text) && peek().kind == IDENT)
+            advance();
         if (cur().kind != IDENT) { pos = save; return std::nullopt; }
         std::string name = cur().text;
         advance();
@@ -353,6 +548,22 @@ struct Parser {
             auto fn = try_parse_function();
             if (fn) { out.push_back(*fn); continue; }
 
+            // Function-like macro invocation without a trailing semicolon
+            // (e.g. `VK_DEFINE_NON_DISPATCHABLE_HANDLE(VkImageView)`).
+            // Skip the balanced argument list so recovery doesn't run away
+            // and swallow the next declaration.
+            if (cur().kind == IDENT && peek().text == "(") {
+                advance(); advance(); // IDENT (
+                int depth = 1;
+                while (cur().kind != EOF_TOK && depth > 0) {
+                    if (cur().text == "(") ++depth;
+                    else if (cur().text == ")") --depth;
+                    advance();
+                }
+                if (cur().text == ";") advance();
+                continue;
+            }
+
             // Variable declaration or something else - skip to ;
             while (cur().kind != EOF_TOK && cur().text != ";" && cur().text != "{") advance();
             if (cur().text == "{") skip_braces();
@@ -367,10 +578,11 @@ struct Parser {
 
 std::vector<CFunctionDecl> parse_header(const std::string& source,
                                         const std::string& filename,
-                                        std::vector<std::string>& warnings) {
+                                        std::vector<std::string>& warnings,
+                                        std::vector<CConstantDecl>* constants) {
     auto tokens = tokenize(source);
     std::vector<CFunctionDecl> functions;
-    Parser parser(tokens, warnings, filename);
+    Parser parser(tokens, warnings, filename, constants);
 
     // Pre-load common typedefs
     parser.typedefs["size_t"] = {CType::FixedWidth, true, 64, "size_t"};

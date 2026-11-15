@@ -1,0 +1,871 @@
+// std.native.gpu_vulkan - Pure-Lymar Vulkan compute driver.
+//
+// Implements a real GPU device layer entirely through std.ffi: the Vulkan
+// loader (vulkan-1.dll / libvulkan.so / libMoltenVK.dylib) is resolved with
+// vkGetInstanceProcAddr and every command is invoked through foreign_call.
+// All Vulkan structs are hand-marshaled into ffi.alloc'd memory - no C glue.
+//
+// This is the submission backend for Fyra's SPIR-V output:
+// gpu_shader_create_spv() accepts SPIR-V words produced by the vendor/fyra
+// spirv target and vkCreateShaderModule compiles them through the platform
+// driver.
+//
+// Scope: compute only - first compute-capable queue family, host-visible +
+// host-coherent memory (no staging copies), STORAGE_BUFFER descriptors
+// (binding index == buffer list index), synchronous dispatch with fence
+// wait. Vertex/pixel/mesh stages and device-local memory are later work.
+//
+// Struct layouts are x86-64 Vulkan 1.1 ABI (handles/pointers 8 bytes,
+// enums/u32 4 bytes) taken from vulkan_core.h.
+//
+// Record layouts (ffi.alloc'd, returned as int handles):
+//   buffer record (64B): @0 VkBuffer, @8 VkDeviceMemory, @16 mapped ptr,
+//                        @24 size, @32 VkDeviceSize allocSize
+//   pipe record (96B):   @0 VkPipeline, @8 VkPipelineLayout,
+//                        @16 VkDescriptorSetLayout, @24 VkDescriptorPool,
+//                        @32 VkDescriptorSet, @40 max_bindings
+//
+// Designed for `lymar build -shared` -> native library (gpu_vulkan.dll +
+// .meta); the VM and AOT hosts call its exports through the Lymar ABI.
+
+import std.ffi as ffi;
+
+// ---- VkStructureType values (vulkan_core.h) ----
+const VKS_APPLICATION_INFO: int = 0;
+const VKS_INSTANCE_CREATE_INFO: int = 1;
+const VKS_DEVICE_QUEUE_CREATE_INFO: int = 2;
+const VKS_DEVICE_CREATE_INFO: int = 3;
+const VKS_SUBMIT_INFO: int = 4;
+const VKS_MEMORY_ALLOCATE_INFO: int = 5;
+const VKS_FENCE_CREATE_INFO: int = 8;
+const VKS_BUFFER_CREATE_INFO: int = 12;
+const VKS_SHADER_MODULE_CREATE_INFO: int = 16;
+const VKS_SHADER_STAGE_CREATE_INFO: int = 18;
+const VKS_COMPUTE_PIPELINE_CREATE_INFO: int = 29;
+const VKS_PIPELINE_CACHE_CREATE_INFO: int = 17;
+const VKS_PIPELINE_LAYOUT_CREATE_INFO: int = 30;
+const VKS_DESCRIPTOR_SET_LAYOUT_CREATE_INFO: int = 32;
+const VKS_DESCRIPTOR_POOL_CREATE_INFO: int = 33;
+const VKS_DESCRIPTOR_SET_ALLOCATE_INFO: int = 34;
+const VKS_WRITE_DESCRIPTOR_SET: int = 35;
+const VKS_COMMAND_POOL_CREATE_INFO: int = 39;
+const VKS_COMMAND_BUFFER_ALLOCATE_INFO: int = 40;
+const VKS_COMMAND_BUFFER_BEGIN_INFO: int = 42;
+
+const VK_API_VERSION_1_1: int = 0x00401000;
+
+const QUEUE_COMPUTE_BIT: int = 0x2;
+const QUEUE_FAMILY_PROPS_SIZE: int = 24; // VkQueueFamilyProperties stride
+const MAX_QUEUE_FAMILIES: int = 16;
+
+const BUFFER_USAGE_ALL: int = 0x23; // TRANSFER_SRC|DST|STORAGE_BUFFER
+
+const MEM_HOST_VISIBLE: int = 0x2;
+const MEM_HOST_COHERENT: int = 0x4;
+
+const DESCRIPTOR_TYPE_STORAGE_BUFFER: int = 7;
+const SHADER_STAGE_COMPUTE: int = 0x20;
+const PIPELINE_BIND_COMPUTE: int = 1;
+
+const CMD_ONE_TIME_SUBMIT: int = 0x1;
+const CMD_LEVEL_PRIMARY: int = 0;
+const POOL_FREE_DESCRIPTOR_SET: int = 0x1;
+
+const VK_WHOLE_SIZE: int = -1; // ~0ULL as i64
+const FENCE_TIMEOUT_MAX: int = -1;
+
+const PHYSICAL_DEVICE_FEATURES_SIZE: int = 256;
+// VkPhysicalDeviceFeatures is VkBool32 words; shaderFloat64=bit39,
+// shaderInt64=bit40, shaderInt16=bit41 -> bits 7,8,9 of word 1.
+const FEATURES_SHADER_64_16: int = 0x380;
+
+// ---- driver state ----
+var _loader: int = 0;
+var _gipa: int = 0;            // vkGetInstanceProcAddr (fnptr stored as int)
+var _instance: int = 0;
+var _physdev: int = 0;
+var _device: int = 0;
+var _queue: int = 0;
+var _qfamily: int = 0;
+var _cmd_pool: int = 0;
+var _cmd_buf: int = 0;
+var _fence: int = 0;
+var _indirect_buf: int = 0; // buffer record holding dispatch indirect args
+var _pcache: int = 0;
+var _phys_index: int = -1;
+
+// resolved command pointers
+var _vk_create_instance: int = 0;
+var _vk_enum_phys: int = 0;
+var _vk_qf_props: int = 0;
+var _vk_mem_props: int = 0;
+var _vk_create_device: int = 0;
+var _vk_get_queue: int = 0;
+var _vk_destroy_device: int = 0;
+var _vk_destroy_instance: int = 0;
+var _vk_create_buffer: int = 0;
+var _vk_get_buf_memreq: int = 0;
+var _vk_alloc_mem: int = 0;
+var _vk_bind_buf_mem: int = 0;
+var _vk_map_mem: int = 0;
+var _vk_unmap_mem: int = 0;
+var _vk_create_shader: int = 0;
+var _vk_destroy_shader: int = 0;
+var _vk_create_dsl: int = 0;
+var _vk_destroy_dsl: int = 0;
+var _vk_create_pl: int = 0;
+var _vk_destroy_pl: int = 0;
+var _vk_create_dp: int = 0;
+var _vk_destroy_dp: int = 0;
+var _vk_alloc_sets: int = 0;
+var _vk_update_sets: int = 0;
+var _vk_create_pipelines: int = 0;
+var _vk_create_pcache: int = 0;
+var _vk_destroy_pipeline: int = 0;
+var _vk_create_cpool: int = 0;
+var _vk_destroy_cpool: int = 0;
+var _vk_alloc_cmds: int = 0;
+var _vk_begin_cmd: int = 0;
+var _vk_reset_cmd: int = 0;
+var _vk_end_cmd: int = 0;
+var _vk_cmd_bind_pipe: int = 0;
+var _vk_cmd_bind_sets: int = 0;
+var _vk_cmd_dispatch: int = 0;
+var _vk_cmd_dispatch_indirect: int = 0;
+var _vk_create_fence: int = 0;
+var _vk_reset_fences: int = 0;
+var _vk_queue_submit: int = 0;
+var _vk_wait_fences: int = 0;
+var _gdpa: int = 0; // vkGetDeviceProcAddr
+
+// vk resolves a command pointer through vkGetInstanceProcAddr. With
+// _instance == 0 only global commands resolve; after instance creation every
+// device-level command resolves through the same entry point.
+fn vk(name: str): int {
+    unsafe {
+        var c = ffi.string_to_cstring(name);
+        return ffi.foreign_call(_gipa, [_instance, c.ptr], ffi.TYPE_I64,
+                                [ffi.TYPE_U64, ffi.TYPE_CSTRING]) as int;
+    }
+}
+
+fn vk_device(name: str): int {
+    unsafe {
+        var c = ffi.string_to_cstring(name);
+        // vkGetDeviceProcAddr(VkDevice device, const char* pName)
+        return ffi.foreign_call(_gdpa, [_device, c.ptr], ffi.TYPE_I64,
+                                [ffi.TYPE_U64, ffi.TYPE_CSTRING]) as int;
+    }
+}
+
+fn vk_resolve_all(): nil {
+    _vk_create_instance = vk("vkCreateInstance");
+    _vk_enum_phys = vk("vkEnumeratePhysicalDevices");
+    _vk_qf_props = vk("vkGetPhysicalDeviceQueueFamilyProperties");
+    _vk_mem_props = vk("vkGetPhysicalDeviceMemoryProperties");
+    _vk_create_device = vk("vkCreateDevice");
+    _vk_get_queue = vk("vkGetDeviceQueue");
+    _vk_destroy_device = vk("vkDestroyDevice");
+    _vk_destroy_instance = vk("vkDestroyInstance");
+    _vk_create_buffer = vk("vkCreateBuffer");
+    _vk_get_buf_memreq = vk("vkGetBufferMemoryRequirements");
+    _vk_alloc_mem = vk("vkAllocateMemory");
+    _vk_bind_buf_mem = vk("vkBindBufferMemory");
+    _vk_map_mem = vk("vkMapMemory");
+    _vk_unmap_mem = vk("vkUnmapMemory");
+    _vk_create_shader = vk("vkCreateShaderModule");
+    _vk_destroy_shader = vk("vkDestroyShaderModule");
+    _vk_create_dsl = vk("vkCreateDescriptorSetLayout");
+    _vk_destroy_dsl = vk("vkDestroyDescriptorSetLayout");
+    _vk_create_pl = vk("vkCreatePipelineLayout");
+    _vk_destroy_pl = vk("vkDestroyPipelineLayout");
+    _vk_create_dp = vk("vkCreateDescriptorPool");
+    _vk_destroy_dp = vk("vkDestroyDescriptorPool");
+    _vk_alloc_sets = vk("vkAllocateDescriptorSets");
+    _vk_update_sets = vk("vkUpdateDescriptorSets");
+    _vk_create_pipelines = vk("vkCreateComputePipelines");
+    _vk_create_pcache = vk("vkCreatePipelineCache");
+    _vk_destroy_pipeline = vk("vkDestroyPipeline");
+    _vk_create_cpool = vk("vkCreateCommandPool");
+    _vk_destroy_cpool = vk("vkDestroyCommandPool");
+    _vk_alloc_cmds = vk("vkAllocateCommandBuffers");
+    _vk_begin_cmd = vk("vkBeginCommandBuffer");
+    _vk_reset_cmd = vk("vkResetCommandBuffer");
+    _vk_end_cmd = vk("vkEndCommandBuffer");
+    _vk_cmd_bind_pipe = vk("vkCmdBindPipeline");
+    _vk_cmd_bind_sets = vk("vkCmdBindDescriptorSets");
+    _vk_cmd_dispatch = vk("vkCmdDispatch");
+    _vk_cmd_dispatch_indirect = vk("vkCmdDispatchIndirect");
+    _vk_create_fence = vk("vkCreateFence");
+    _vk_reset_fences = vk("vkResetFences");
+    _vk_queue_submit = vk("vkQueueSubmit");
+    _vk_wait_fences = vk("vkWaitForFences");
+}
+
+fn st_u32(p: int, off: int, v: int): nil {
+    unsafe { ffi.store_u32(ffi.ptr_add(p, off), v); }
+}
+fn st_u64(p: int, off: int, v: int): nil {
+    unsafe { ffi.store_u64(ffi.ptr_add(p, off), v); }
+}
+fn st_ptr(p: int, off: int, v: int): nil {
+    unsafe { ffi.store_ptr(ffi.ptr_add(p, off), v); }
+}
+
+// gpu_init creates the Vulkan instance, picks the first physical device with
+// a compute-capable queue family, creates the device (64/16 shader features
+// enabled so Fyra SPIR-V modules using Int64/Float64 validate), queue,
+// command pool, one primary command buffer, and a fence.
+// Returns 1 on success. Idempotent.
+pub fn gpu_init(): int {
+    unsafe {
+        if (_device != 0) { return 1; }
+        if (_loader == 0) {
+            _loader = ffi.library_load("vulkan-1.dll");
+            if (_loader == 0) { _loader = ffi.library_load("libvulkan.so.1"); }
+            if (_loader == 0) { _loader = ffi.library_load("libvulkan.so"); }
+            if (_loader == 0) { _loader = ffi.library_load("libMoltenVK.dylib"); }
+        }
+        if (_loader == 0) { return 0; }
+        var gsym = ffi.library_get_symbol(_loader, "vkGetInstanceProcAddr");
+        if (gsym == 0) { return 0; }
+        _gipa = gsym as int;
+        _vk_create_instance = vk("vkCreateInstance");
+        if (_vk_create_instance == 0) { return 0; }
+
+        // VkApplicationInfo (48B) + VkInstanceCreateInfo (64B).
+        var app = ffi.alloc(48);
+        var ici = ffi.alloc(64);
+        var islot = ffi.alloc(8);
+        ffi.memset(app, 0, 48);
+        ffi.memset(ici, 0, 64);
+        st_u32(app, 0, VKS_APPLICATION_INFO);
+        st_u32(app, 44, VK_API_VERSION_1_1);
+        st_u32(ici, 0, VKS_INSTANCE_CREATE_INFO);
+        st_ptr(ici, 24, app);
+        var ires = ffi.foreign_call(_vk_create_instance,
+            [ici, 0, islot], ffi.TYPE_I32,
+            [ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_PTR]) as int;
+        ffi.free(app); ffi.free(ici);
+        if (ires != 0) { ffi.free(islot); return 0; }
+        _instance = ffi.load_i64(islot);
+        ffi.free(islot);
+
+        vk_resolve_all();
+        if (_vk_enum_phys == 0 or _vk_create_device == 0 or
+            _vk_create_cpool == 0 or _vk_create_fence == 0) {
+            return 0;
+        }
+
+        // Enumerate physical devices (two-call pattern).
+        var pcount = ffi.alloc(4);
+        ffi.store_u32(pcount, 0);
+        ffi.foreign_call(_vk_enum_phys, [_instance, pcount, 0], ffi.TYPE_I32,
+                         [ffi.TYPE_U64, ffi.TYPE_PTR, ffi.TYPE_PTR]);
+        var npdev: int = ffi.load_u32(pcount);
+        if (npdev == 0) { ffi.free(pcount); return 0; }
+        var pdevs = ffi.alloc(npdev * 8);
+        ffi.store_u32(pcount, npdev);
+        ffi.foreign_call(_vk_enum_phys, [_instance, pcount, pdevs], ffi.TYPE_I32,
+                         [ffi.TYPE_U64, ffi.TYPE_PTR, ffi.TYPE_PTR]);
+        ffi.free(pcount);
+
+        // Pick device exposing a compute-capable queue family.
+        // _phys_index >= 0 forces a specific enumerated device (debug).
+        var qprops = ffi.alloc(MAX_QUEUE_FAMILIES * QUEUE_FAMILY_PROPS_SIZE);
+        var chosen_qf = -1;
+        var pi = 0;
+        var pstart = 0;
+        if (_phys_index >= 0) { pstart = _phys_index; }
+        var pend = npdev;
+        while (pstart + pi < pend) {
+            var cand = ffi.load_i64(ffi.ptr_add(pdevs, (pstart + pi) * 8));
+            var qcount = ffi.alloc(4);
+            ffi.store_u32(qcount, MAX_QUEUE_FAMILIES);
+            ffi.memset(qprops, 0, MAX_QUEUE_FAMILIES * QUEUE_FAMILY_PROPS_SIZE);
+            ffi.foreign_call(_vk_qf_props, [cand, qcount, qprops], ffi.TYPE_VOID,
+                             [ffi.TYPE_U64, ffi.TYPE_PTR, ffi.TYPE_PTR]);
+            var nqf = ffi.load_u32(qcount);
+            var qi = 0;
+            while (qi < nqf) {
+                var flags = ffi.load_u32(
+                    ffi.ptr_add(qprops, qi * QUEUE_FAMILY_PROPS_SIZE));
+                if ((flags & QUEUE_COMPUTE_BIT) != 0) {
+                    _physdev = cand;
+                    chosen_qf = qi;
+                    break;
+                }
+                qi = qi + 1;
+            }
+            ffi.free(qcount);
+            if (chosen_qf >= 0) { break; }
+            pi = pi + 1;
+        }
+        ffi.free(pdevs);
+        ffi.free(qprops);
+        if (chosen_qf < 0) { return 0; }
+        _qfamily = chosen_qf;
+
+        // VkDeviceQueueCreateInfo (40B) + VkDeviceCreateInfo (72B).
+        var qci = ffi.alloc(40);
+        var dci = ffi.alloc(72);
+        var prio = ffi.alloc(4);
+        var features = ffi.alloc(PHYSICAL_DEVICE_FEATURES_SIZE);
+        ffi.memset(qci, 0, 40);
+        ffi.memset(dci, 0, 72);
+        ffi.memset(features, 0, PHYSICAL_DEVICE_FEATURES_SIZE);
+        ffi.store_f32(prio, 1.0);
+        ffi.store_u32(ffi.ptr_add(features, 4), FEATURES_SHADER_64_16);
+        st_u32(qci, 0, VKS_DEVICE_QUEUE_CREATE_INFO);
+        st_u32(qci, 20, _qfamily);
+        st_u32(qci, 24, 1);
+        st_ptr(qci, 32, prio);
+        st_u32(dci, 0, VKS_DEVICE_CREATE_INFO);
+        st_u32(dci, 20, 1);
+        st_ptr(dci, 24, qci);
+        st_ptr(dci, 64, 0); // pEnabledFeatures = NULL (all features off)
+
+        var devslot = ffi.alloc(8);
+        var dres = ffi.foreign_call(_vk_create_device,
+            [_physdev, dci, 0, devslot], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_PTR]) as int;
+        ffi.free(qci); ffi.free(dci); ffi.free(prio); ffi.free(features);
+        if (dres != 0) { ffi.free(devslot); return 0; }
+        _device = ffi.load_i64(devslot);
+        ffi.free(devslot);
+
+        // Re-resolve device-level commands through vkGetDeviceProcAddr -
+        // the authoritative path once a device exists.
+        _gdpa = vk("vkGetDeviceProcAddr");
+        if (_gdpa != 0) {
+            var p: int = 0;
+            p = vk_device("vkCmdDispatch");
+            if (p != 0) { _vk_cmd_dispatch = p; }
+            p = vk_device("vkCmdDispatchIndirect");
+            if (p != 0) { _vk_cmd_dispatch_indirect = p; }
+            p = vk_device("vkCmdBindPipeline");
+            if (p != 0) { _vk_cmd_bind_pipe = p; }
+            p = vk_device("vkCmdBindDescriptorSets");
+            if (p != 0) { _vk_cmd_bind_sets = p; }
+            p = vk_device("vkEndCommandBuffer");
+            if (p != 0) { _vk_end_cmd = p; }
+            p = vk_device("vkBeginCommandBuffer");
+            if (p != 0) { _vk_begin_cmd = p; }
+            p = vk_device("vkResetCommandBuffer");
+            if (p != 0) { _vk_reset_cmd = p; }
+            p = vk_device("vkQueueSubmit");
+            if (p != 0) { _vk_queue_submit = p; }
+            p = vk_device("vkWaitForFences");
+            if (p != 0) { _vk_wait_fences = p; }
+            p = vk_device("vkResetFences");
+            if (p != 0) { _vk_reset_fences = p; }
+            p = vk_device("vkUpdateDescriptorSets");
+            if (p != 0) { _vk_update_sets = p; }
+            p = vk_device("vkCreateComputePipelines");
+            if (p != 0) { _vk_create_pipelines = p; }
+            p = vk_device("vkCreateShaderModule");
+            if (p != 0) { _vk_create_shader = p; }
+            p = vk_device("vkCreateDescriptorSetLayout");
+            if (p != 0) { _vk_create_dsl = p; }
+            p = vk_device("vkCreatePipelineLayout");
+            if (p != 0) { _vk_create_pl = p; }
+            p = vk_device("vkCreateDescriptorPool");
+            if (p != 0) { _vk_create_dp = p; }
+            p = vk_device("vkAllocateDescriptorSets");
+            if (p != 0) { _vk_alloc_sets = p; }
+        }
+
+        var qslot = ffi.alloc(8);
+        ffi.foreign_call(_vk_get_queue, [_device, _qfamily, 0, qslot],
+                         ffi.TYPE_VOID,
+                         [ffi.TYPE_U64, ffi.TYPE_U32, ffi.TYPE_U32, ffi.TYPE_PTR]);
+        _queue = ffi.load_i64(qslot);
+        ffi.free(qslot);
+
+        // Command pool (32B) + one primary command buffer.
+        var cpci = ffi.alloc(32);
+        ffi.memset(cpci, 0, 32);
+        st_u32(cpci, 0, VKS_COMMAND_POOL_CREATE_INFO);
+        st_u32(cpci, 16, 0x2); // VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT
+        st_u32(cpci, 20, _qfamily); // queueFamilyIndex @20 (u32 pair)
+        var cpslot = ffi.alloc(8);
+        var cres = ffi.foreign_call(_vk_create_cpool,
+            [_device, cpci, 0, cpslot], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_PTR]) as int;
+        ffi.free(cpci);
+        if (cres != 0) { ffi.free(cpslot); return 0; }
+        _cmd_pool = ffi.load_i64(cpslot);
+        ffi.free(cpslot);
+
+        var aci = ffi.alloc(40);
+        var cbufslot = ffi.alloc(8);
+        ffi.memset(aci, 0, 40);
+        st_u32(aci, 0, VKS_COMMAND_BUFFER_ALLOCATE_INFO);
+        st_ptr(aci, 16, _cmd_pool);
+        st_u32(aci, 24, CMD_LEVEL_PRIMARY);
+        st_u32(aci, 28, 1); // commandBufferCount @28 (u32 pair)
+        var ares = ffi.foreign_call(_vk_alloc_cmds,
+            [_device, aci, cbufslot], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_PTR, ffi.TYPE_PTR]) as int;
+        ffi.free(aci);
+        if (ares != 0) { ffi.free(cbufslot); return 0; }
+        _cmd_buf = ffi.load_i64(cbufslot);
+        ffi.free(cbufslot);
+
+        // Fence (24B).
+        var fci = ffi.alloc(24);
+        ffi.memset(fci, 0, 24);
+        st_u32(fci, 0, VKS_FENCE_CREATE_INFO);
+        var fslot = ffi.alloc(8);
+        var fres = ffi.foreign_call(_vk_create_fence,
+            [_device, fci, 0, fslot], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_PTR]) as int;
+        ffi.free(fci);
+        if (fres != 0) { ffi.free(fslot); return 0; }
+        _fence = ffi.load_i64(fslot);
+        ffi.free(fslot);
+        return 1;
+    }
+}
+
+fn ensure_device(): int {
+    if (_device == 0) { return gpu_init(); }
+    return 1;
+}
+
+// gpu_buffer_create allocates a VkBuffer plus host-visible+coherent memory
+// and maps it. Returns the buffer record pointer (see header layout) or 0.
+pub fn gpu_buffer_create(bytes: int): int {
+    unsafe {
+        if (ensure_device() == 0 or bytes <= 0) { return 0; }
+
+        // VkBufferCreateInfo (56B)
+        var bci = ffi.alloc(56);
+        var bslot = ffi.alloc(8);
+        ffi.memset(bci, 0, 56);
+        st_u32(bci, 0, VKS_BUFFER_CREATE_INFO);
+        st_u64(bci, 24, bytes);
+        st_u32(bci, 32, BUFFER_USAGE_ALL);
+        st_u32(bci, 36, 0); // EXCLUSIVE sharing
+        var bres = ffi.foreign_call(_vk_create_buffer,
+            [_device, bci, 0, bslot], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_PTR]) as int;
+        ffi.free(bci);
+        if (bres != 0) { ffi.free(bslot); return 0; }
+        var buffer = ffi.load_i64(bslot);
+        ffi.free(bslot);
+
+        // VkMemoryRequirements (24B)
+        var req = ffi.alloc(24);
+        ffi.memset(req, 0, 24);
+        ffi.foreign_call(_vk_get_buf_memreq, [_device, buffer, req],
+                         ffi.TYPE_VOID,
+                         [ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_PTR]);
+        var mem_size = ffi.load_u64(req);
+        ffi.free(req);
+
+        // Find a HOST_VISIBLE|HOST_COHERENT memory type.
+        // VkPhysicalDeviceMemoryProperties: u32 count @0, VkMemoryType[32]
+        // @4 (8B stride, 4B-aligned), u32 heapCount @260, heaps @264.
+        var memprops = ffi.alloc(520);
+        ffi.memset(memprops, 0, 520);
+        ffi.foreign_call(_vk_mem_props, [_physdev, memprops], ffi.TYPE_VOID,
+                         [ffi.TYPE_U64, ffi.TYPE_PTR]);
+        var mtcount = ffi.load_u32(memprops);
+        var mtype = -1;
+        var mi = 0;
+        while (mi < mtcount) {
+            var mflags = ffi.load_u32(ffi.ptr_add(memprops, 4 + mi * 8));
+            if ((mflags & (MEM_HOST_VISIBLE | MEM_HOST_COHERENT)) ==
+                (MEM_HOST_VISIBLE | MEM_HOST_COHERENT)) {
+                mtype = mi;
+                break;
+            }
+            mi = mi + 1;
+        }
+        ffi.free(memprops);
+        if (mtype < 0) { return 0; }
+
+        // VkMemoryAllocateInfo (32B)
+        var mai = ffi.alloc(32);
+        var mslot = ffi.alloc(8);
+        ffi.memset(mai, 0, 32);
+        st_u32(mai, 0, VKS_MEMORY_ALLOCATE_INFO);
+        st_u64(mai, 16, mem_size);
+        st_u32(mai, 24, mtype);
+        var mres = ffi.foreign_call(_vk_alloc_mem,
+            [_device, mai, 0, mslot], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_PTR]) as int;
+        ffi.free(mai);
+        if (mres != 0) { ffi.free(mslot); return 0; }
+        var memory = ffi.load_i64(mslot);
+        ffi.free(mslot);
+
+        var bindres = ffi.foreign_call(_vk_bind_buf_mem,
+            [_device, buffer, memory, 0], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_U64]) as int;
+        if (bindres != 0) { return 0; }
+
+        var mapped = ffi.alloc(8);
+        var mapres = ffi.foreign_call(_vk_map_mem,
+            [_device, memory, 0, VK_WHOLE_SIZE, 0, mapped], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_U64,
+             ffi.TYPE_U32, ffi.TYPE_PTR]) as int;
+        if (mapres != 0) { ffi.free(mapped); return 0; }
+        var mapptr = ffi.load_i64(mapped);
+        ffi.free(mapped);
+
+        var rec = ffi.alloc(64);
+        ffi.memset(rec, 0, 64);
+        st_u64(rec, 0, buffer);
+        st_u64(rec, 8, memory);
+        st_u64(rec, 16, mapptr);
+        st_u64(rec, 24, bytes);
+        st_u64(rec, 32, mem_size);
+        return rec;
+    }
+}
+
+// gpu_buffer_write uploads `bytes` from raw address `src` into the mapped
+// host-visible buffer memory.
+pub fn gpu_buffer_write(buf: int, src: int, bytes: int): int {
+    unsafe {
+        if (buf == 0 or ensure_device() == 0) { return 0; }
+        var dst = ffi.load_i64(ffi.ptr_add(buf, 16));
+        ffi.memcpy(dst, src, bytes);
+        return 1;
+    }
+}
+
+// gpu_buffer_read downloads `bytes` from mapped memory to raw address `dst`.
+// gpu_dispatch is synchronous (fence wait), so reads after it are safe.
+pub fn gpu_buffer_read(buf: int, dst: int, bytes: int): int {
+    unsafe {
+        if (buf == 0 or ensure_device() == 0) { return 0; }
+        var src = ffi.load_i64(ffi.ptr_add(buf, 16));
+        ffi.memcpy(dst, src, bytes);
+        return 1;
+    }
+}
+
+fn buf_vk(bufrec: int): int {
+    unsafe { return ffi.load_i64(ffi.ptr_add(bufrec, 0)); }
+}
+
+// gpu_shader_create_spv creates a VkShaderModule from SPIR-V words.
+// `code_ptr` is a raw address holding `code_size` bytes of little-endian
+// SPIR-V (4-byte aligned, multiple of 4). This is the entry point for
+// Fyra's spirv backend output.
+pub fn gpu_shader_create_spv(code_ptr: int, code_size: int): int {
+    unsafe {
+        if (ensure_device() == 0 or code_size <= 0) { return 0; }
+        var smci = ffi.alloc(40);
+        var slot = ffi.alloc(8);
+        ffi.memset(smci, 0, 40);
+        st_u32(smci, 0, VKS_SHADER_MODULE_CREATE_INFO);
+        st_u64(smci, 24, code_size);
+        st_ptr(smci, 32, code_ptr);
+        var res = ffi.foreign_call(_vk_create_shader,
+            [_device, smci, 0, slot], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_PTR]) as int;
+        ffi.free(smci);
+        if (res != 0) { ffi.free(slot); return 0; }
+        var mod_ = ffi.load_i64(slot);
+        ffi.free(slot);
+        return mod_;
+    }
+}
+
+// gpu_pipeline_create builds the full compute pipeline for a shader module:
+// descriptor set layout with `max_bindings` STORAGE_BUFFER bindings
+// (binding i <-> buffers[i] at dispatch), pipeline layout, descriptor pool,
+// one descriptor set, and the VkComputePipeline. Returns the pipe record
+// pointer (see header layout) or 0.
+pub fn gpu_pipeline_create(shader_module: int, max_bindings: int): int {
+    unsafe {
+        if (ensure_device() == 0 or shader_module == 0) { return 0; }
+        if (max_bindings <= 0) { max_bindings = 1; }
+        if (max_bindings > 8) { max_bindings = 8; }
+
+        // VkDescriptorSetLayoutBinding array: 24B each.
+        var bindings = ffi.alloc(max_bindings * 24);
+        ffi.memset(bindings, 0, max_bindings * 24);
+        var bi = 0;
+        while (bi < max_bindings) {
+            var bp = ffi.ptr_add(bindings, bi * 24);
+            ffi.store_u32(bp, bi);                    // binding
+            ffi.store_u32(ffi.ptr_add(bp, 4), DESCRIPTOR_TYPE_STORAGE_BUFFER);
+            ffi.store_u32(ffi.ptr_add(bp, 8), 1);     // descriptorCount
+            ffi.store_u32(ffi.ptr_add(bp, 12), SHADER_STAGE_COMPUTE);
+            bi = bi + 1;
+        }
+
+        // VkDescriptorSetLayoutCreateInfo (32B): flags@16, bindingCount@20,
+        // pBindings@24.
+        var dslci = ffi.alloc(40);
+        var dsllot = ffi.alloc(8);
+        ffi.memset(dslci, 0, 40);
+        st_u32(dslci, 0, VKS_DESCRIPTOR_SET_LAYOUT_CREATE_INFO);
+        st_u32(dslci, 20, max_bindings);
+        st_ptr(dslci, 24, bindings);
+        var dres = ffi.foreign_call(_vk_create_dsl,
+            [_device, dslci, 0, dsllot], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_PTR]) as int;
+        ffi.free(dslci); ffi.free(bindings);
+        if (dres != 0) { ffi.free(dsllot); return 0; }
+        var set_layout = ffi.load_i64(dsllot);
+        ffi.free(dsllot);
+
+        // VkPipelineLayoutCreateInfo (48B): flags@16, setLayoutCount@20,
+        // pSetLayouts@24, pushConstantRangeCount@32, pPushConstantRanges@40.
+        var plci = ffi.alloc(56);
+        var plslot = ffi.alloc(8);
+        var layout_arr = ffi.alloc(8);
+        ffi.memset(plci, 0, 56);
+        ffi.memset(layout_arr, 0, 8);
+        st_u32(plci, 0, VKS_PIPELINE_LAYOUT_CREATE_INFO);
+        st_u32(plci, 20, 1);                 // setLayoutCount
+        st_u64(layout_arr, 0, set_layout);
+        st_ptr(plci, 24, layout_arr);        // pSetLayouts
+        var pres = ffi.foreign_call(_vk_create_pl,
+            [_device, plci, 0, plslot], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_PTR]) as int;
+        ffi.free(plci); ffi.free(layout_arr);
+        if (pres != 0) { ffi.free(plslot); return 0; }
+        var pipeline_layout = ffi.load_i64(plslot);
+        ffi.free(plslot);
+
+        // VkDescriptorPoolCreateInfo (40B) + VkDescriptorPoolSize (8B)
+        var dpci = ffi.alloc(40);
+        var dpslot = ffi.alloc(8);
+        var dpsize = ffi.alloc(8);
+        ffi.memset(dpci, 0, 40);
+        ffi.memset(dpsize, 0, 8);
+        st_u32(dpci, 0, VKS_DESCRIPTOR_POOL_CREATE_INFO);
+        st_u32(dpci, 16, 0);
+        st_u32(dpci, 20, 16);                // maxSets
+        st_u32(dpci, 24, 1);                 // poolSizeCount
+        st_ptr(dpci, 32, dpsize);
+        ffi.store_u32(dpsize, DESCRIPTOR_TYPE_STORAGE_BUFFER);
+        ffi.store_u32(ffi.ptr_add(dpsize, 4), max_bindings * 16);
+        var dpres = ffi.foreign_call(_vk_create_dp,
+            [_device, dpci, 0, dpslot], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_PTR]) as int;
+        ffi.free(dpci); ffi.free(dpsize);
+        if (dpres != 0) { ffi.free(dpslot); return 0; }
+        var pool = ffi.load_i64(dpslot);
+        ffi.free(dpslot);
+
+        // VkDescriptorSetAllocateInfo (40B)
+        var dsa = ffi.alloc(40);
+        var setslot = ffi.alloc(8);
+        var setlayout_arr = ffi.alloc(8);
+        ffi.memset(dsa, 0, 40);
+        ffi.memset(setlayout_arr, 0, 8);
+        st_u32(dsa, 0, VKS_DESCRIPTOR_SET_ALLOCATE_INFO);
+        st_u64(dsa, 16, pool);
+        st_u32(dsa, 24, 1);                 // descriptorSetCount
+        st_u64(setlayout_arr, 0, set_layout);
+        st_ptr(dsa, 32, setlayout_arr);     // pSetLayouts
+        var ares = ffi.foreign_call(_vk_alloc_sets,
+            [_device, dsa, setslot], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_PTR, ffi.TYPE_PTR]) as int;
+        ffi.free(dsa); ffi.free(setlayout_arr);
+        if (ares != 0) { ffi.free(setslot); return 0; }
+        var descriptor_set = ffi.load_i64(setslot);
+        ffi.free(setslot);
+
+        // VkComputePipelineCreateInfo (96B): sType@0, pNext@8, flags@16,
+        // stage@24, layout@72, basePipelineHandle@80, basePipelineIndex@88.
+        // VkPipelineShaderStageCreateInfo embedded @24: sType@24, pNext@32,
+        // flags@40, stage@44, module@48, pName@56, pSpecializationInfo@64.
+        var cpci = ffi.alloc(96);
+        var pname = ffi.alloc(8);
+        ffi.memset(pname, 0, 8);
+        ffi.memset(cpci, 0, 96);
+        // "main\0" as raw bytes.
+        ffi.store_u32(pname, 0x6E69616D);
+        st_u32(cpci, 0, VKS_COMPUTE_PIPELINE_CREATE_INFO);
+        st_u32(cpci, 24, VKS_SHADER_STAGE_CREATE_INFO);
+        st_u32(cpci, 44, SHADER_STAGE_COMPUTE);
+        st_u64(cpci, 48, shader_module);
+        st_ptr(cpci, 56, pname);
+        st_u64(cpci, 72, pipeline_layout);
+        // VkPipelineCache (lazy, shared) — some drivers misbehave with a
+        // null cache on compute pipelines.
+        if (_pcache == 0 and _vk_create_pcache != 0) {
+            var pcci = ffi.alloc(48);
+            var pcslot = ffi.alloc(8);
+            ffi.memset(pcci, 0, 48);
+            st_u32(pcci, 0, VKS_PIPELINE_CACHE_CREATE_INFO);
+            st_u64(pcci, 40, 0xFFFFFFFF); // maximumCacheSize = UINT32_MAX-ish
+            var pcres = ffi.foreign_call(_vk_create_pcache,
+                [_device, pcci, 0, pcslot], ffi.TYPE_I32,
+                [ffi.TYPE_U64, ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_PTR]) as int;
+            ffi.free(pcci);
+            if (pcres == 0) { _pcache = ffi.load_i64(pcslot); }
+            ffi.free(pcslot);
+        }
+
+        var pipeslot = ffi.alloc(64);
+        ffi.memset(pipeslot, 0, 64);
+        var cires = ffi.foreign_call(_vk_create_pipelines,
+            [_device, _pcache, 1, cpci, 0, pipeslot], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_U32, ffi.TYPE_PTR,
+             ffi.TYPE_PTR, ffi.TYPE_PTR]) as int;
+        ffi.free(cpci); ffi.free(pname);
+        if (cires != 0) { ffi.free(pipeslot); return 0; }
+        var pipeline = ffi.load_i64(pipeslot);
+        ffi.free(pipeslot);
+        if (pipeline == 0) { return 0; }
+
+        // pipe record (96B)
+        var rec = ffi.alloc(96);
+        ffi.memset(rec, 0, 96);
+        st_u64(rec, 0, pipeline);
+        st_u64(rec, 8, pipeline_layout);
+        st_u64(rec, 16, set_layout);
+        st_u64(rec, 24, pool);
+        st_u64(rec, 32, descriptor_set);
+        st_u64(rec, 40, max_bindings);
+        return rec;
+    }
+}
+
+pub fn gpu_debug_phys_index(v: int): nil { _phys_index = v; }
+
+// gpu_dispatch updates the descriptor set with `buffers` (buffer record
+// pointers; index i binds descriptor binding i), records
+// bind-pipeline + bind-set + dispatch into the shared command buffer,
+// submits with the fence, and waits. Returns 1 on success.
+pub fn gpu_dispatch(pipe: int, buffers: [int], x: int, y: int, z: int): int {
+    unsafe {
+        if (pipe == 0 or ensure_device() == 0) { return 0; }
+        var pipeline = ffi.load_i64(ffi.ptr_add(pipe, 0));
+        var layout = ffi.load_i64(ffi.ptr_add(pipe, 8));
+        var dset = ffi.load_i64(ffi.ptr_add(pipe, 32));
+        var maxb = ffi.load_i64(ffi.ptr_add(pipe, 40));
+        var nb = len(buffers);
+        if (nb > maxb) { nb = maxb; }
+
+        // VkWriteDescriptorSet array (64B each) + VkDescriptorBufferInfo (24B).
+        if (nb > 0) {
+            var writes = ffi.alloc(nb * 64);
+            var binfos = ffi.alloc(nb * 24);
+            ffi.memset(writes, 0, nb * 64);
+            ffi.memset(binfos, 0, nb * 24);
+            var wi = 0;
+            while (wi < nb) {
+                var wp = ffi.ptr_add(writes, wi * 64);
+                var bp = ffi.ptr_add(binfos, wi * 24);
+                st_u32(wp, 0, VKS_WRITE_DESCRIPTOR_SET);
+                st_u64(wp, 16, dset);
+                st_u32(wp, 24, wi);            // dstBinding
+                st_u32(wp, 32, 1);             // descriptorCount
+                st_u32(wp, 36, DESCRIPTOR_TYPE_STORAGE_BUFFER);
+                st_ptr(wp, 48, bp);            // pBufferInfo
+                st_u64(bp, 0, buf_vk(buffers[wi]));
+                st_u64(bp, 8, 0);              // offset
+                st_u64(bp, 16, VK_WHOLE_SIZE); // range
+                wi = wi + 1;
+            }
+            ffi.foreign_call(_vk_update_sets,
+                [_device, nb, writes, 0, 0], ffi.TYPE_VOID,
+                [ffi.TYPE_U64, ffi.TYPE_U32, ffi.TYPE_PTR, ffi.TYPE_U32,
+                 ffi.TYPE_PTR]);
+            ffi.free(writes); ffi.free(binfos);
+        }
+
+        // Record command buffer.
+        var cbgi = ffi.alloc(32);
+        ffi.memset(cbgi, 0, 32);
+        st_u32(cbgi, 0, VKS_COMMAND_BUFFER_BEGIN_INFO);
+        st_u32(cbgi, 16, CMD_ONE_TIME_SUBMIT);
+        var rres = ffi.foreign_call(_vk_reset_cmd, [_cmd_buf, 0], ffi.TYPE_I32,
+                         [ffi.TYPE_U64, ffi.TYPE_U32]) as int;
+        var bres = ffi.foreign_call(_vk_begin_cmd, [_cmd_buf, cbgi], ffi.TYPE_I32,
+                         [ffi.TYPE_U64, ffi.TYPE_PTR]) as int;
+        ffi.free(cbgi);
+        if (rres != 0 or bres != 0) { return 0; }
+        ffi.foreign_call(_vk_cmd_bind_pipe,
+            [_cmd_buf, PIPELINE_BIND_COMPUTE, pipeline], ffi.TYPE_VOID,
+            [ffi.TYPE_U64, ffi.TYPE_U32, ffi.TYPE_U64]);
+        var setarr = ffi.alloc(8);
+        ffi.memset(setarr, 0, 8);
+        st_u64(setarr, 0, dset);
+        ffi.foreign_call(_vk_cmd_bind_sets,
+            [_cmd_buf, PIPELINE_BIND_COMPUTE, layout, 0, 1, setarr, 0, 0],
+            ffi.TYPE_VOID,
+            [ffi.TYPE_U64, ffi.TYPE_U32, ffi.TYPE_U64, ffi.TYPE_U32,
+             ffi.TYPE_U32, ffi.TYPE_PTR, ffi.TYPE_U32, ffi.TYPE_PTR]);
+        ffi.free(setarr);
+        ffi.foreign_call(_vk_cmd_dispatch,
+            [_cmd_buf, x, y, z], ffi.TYPE_VOID,
+            [ffi.TYPE_U64, ffi.TYPE_U32, ffi.TYPE_U32, ffi.TYPE_U32]);
+        var ecres = ffi.foreign_call(_vk_end_cmd, [_cmd_buf], ffi.TYPE_I32,
+                         [ffi.TYPE_U64]) as int;
+        if (ecres != 0) { return 0; }
+
+        // VkSubmitInfo (72B): commandBufferCount @40, pCommandBuffers @48.
+        var si = ffi.alloc(72);
+        var cbs = ffi.alloc(8);
+        ffi.memset(si, 0, 72);
+        ffi.memset(cbs, 0, 8);
+        st_u32(si, 0, VKS_SUBMIT_INFO);
+        st_u32(si, 40, 1);
+        st_u64(cbs, 0, _cmd_buf);
+        st_ptr(si, 48, cbs);
+        var subres = ffi.foreign_call(_vk_queue_submit,
+            [_queue, 1, si, _fence], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_U32, ffi.TYPE_PTR, ffi.TYPE_U64]) as int;
+        ffi.free(si); ffi.free(cbs);
+        if (subres != 0) { return 0; }
+
+        // Wait + reset the fence.
+        var farr = ffi.alloc(8);
+        ffi.memset(farr, 0, 8);
+        st_u64(farr, 0, _fence);
+        var wres = ffi.foreign_call(_vk_wait_fences,
+            [_device, 1, farr, 1, FENCE_TIMEOUT_MAX], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_U32, ffi.TYPE_PTR, ffi.TYPE_U32,
+             ffi.TYPE_U64]) as int;
+        ffi.free(farr);
+        if (wres != 0) { return 0; }
+        var rarr = ffi.alloc(8);
+        ffi.memset(rarr, 0, 8);
+        st_u64(rarr, 0, _fence);
+        ffi.foreign_call(_vk_reset_fences, [_device, 1, rarr], ffi.TYPE_I32,
+                         [ffi.TYPE_U64, ffi.TYPE_U32, ffi.TYPE_PTR]);
+        ffi.free(rarr);
+        return 1;
+    }
+}
+
+// gpu_release frees only the ffi record memory. Object teardown is
+// gpu_shutdown's job.
+pub fn gpu_release(obj: int): int {
+    unsafe {
+        if (obj != 0) { ffi.free(obj); }
+        return 1;
+    }
+}
+
+// gpu_shutdown destroys device-level objects, the instance, and unloads
+// the loader. Buffer/pipe records should be gpu_release'd first.
+pub fn gpu_shutdown(): int {
+    unsafe {
+        if (_device != 0 and _vk_destroy_device != 0) {
+            ffi.foreign_call(_vk_destroy_device, [_device, 0], ffi.TYPE_VOID,
+                             [ffi.TYPE_U64, ffi.TYPE_PTR]);
+        }
+        _device = 0; _queue = 0; _physdev = 0;
+        _cmd_pool = 0; _cmd_buf = 0; _fence = 0;
+        if (_instance != 0 and _vk_destroy_instance != 0) {
+            ffi.foreign_call(_vk_destroy_instance, [_instance, 0],
+                             ffi.TYPE_VOID,
+                             [ffi.TYPE_U64, ffi.TYPE_PTR]);
+        }
+        _instance = 0;
+        return 1;
+    }
+}

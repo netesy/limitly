@@ -4,6 +4,7 @@ import argparse
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -44,6 +45,15 @@ def main():
                             str(ROOT / source), "-o", str(obj)], check=True)
             objects.append(str(obj))
         subprocess.run([args.ar, "rcs", str(archive), *objects], check=True)
+        # Absorb the toolchain's static libffi so the archive is self-contained:
+        # aot_ffi.cpp's lymarrt_ffi_call* resolve ffi_prep_cif/ffi_call from
+        # these members for both the Fyra internal linker and target drivers.
+        if system != "wasi":
+            ffi = subprocess.check_output(
+                [args.cxx, *args.cxx_arg, "-print-file-name=libffi.a"], text=True).strip()
+            if ffi.endswith(".a") and Path(ffi).is_file():
+                subprocess.run([sys.executable, str(ROOT / "scripts" / "merge_archive_members.py"),
+                                str(archive), ffi, args.ar], check=True)
         os.replace(archive, output)
     print(f"Built {target} runtime: {output}")
 

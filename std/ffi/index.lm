@@ -178,7 +178,7 @@ pub fn struct_offset(elem_types: [any], index: int): int {
 }
 // Allocate raw memory sized for the struct.
 pub fn struct_alloc(elem_types: [any]): pubptr {
-    return alloc(struct_size(elem_types));
+    return _ffi_alloc(struct_size(elem_types));
 }
 // param_types entry describing a struct-by-value argument.
 pub fn struct_param(elem_types: [any]): [any] {

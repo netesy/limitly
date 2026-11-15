@@ -10,10 +10,13 @@
 
 namespace LM::Backend::Native {
 
-// Generate a complete .lm module source string from the parsed C functions.
+// Generate a complete .lm module source string from the parsed C functions
+// and constants. `constants` may be empty; enum-derived values are emitted
+// as `pub const` declarations ahead of the function wrappers.
 // module_name: the identifier used for `import <module_name>;`
 // lib_path: the string passed to ffi.load() (shared library path or name)
 std::string generate_bindings(const std::vector<CFunctionDecl>& functions,
+                              const std::vector<CConstantDecl>& constants,
                               const std::string& module_name,
                               const std::string& lib_path);
 

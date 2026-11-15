@@ -90,7 +90,8 @@ int Compiler::executeFile(const std::string& filename, const CompileOptions& opt
                         continue;
                     }
                     std::vector<std::string> parse_warnings;
-                    auto decls = Backend::Native::parse_header(hdr_source, hdr, parse_warnings);
+                    std::vector<Backend::Native::CConstantDecl> constants;
+                    auto decls = Backend::Native::parse_header(hdr_source, hdr, parse_warnings, &constants);
                     for (const auto& w : parse_warnings) std::cerr << "[NOTE] " << w << "\n";
                     std::string ns = (bi < options.bind_namespaces.size() && !options.bind_namespaces[bi].empty())
                         ? options.bind_namespaces[bi]
@@ -98,7 +99,7 @@ int Compiler::executeFile(const std::string& filename, const CompileOptions& opt
                     std::string lib_path = (bi < options.bind_lib_paths.size())
                         ? options.bind_lib_paths[bi]
                         : std::string("./") + ns;
-                    std::string gen_source = Backend::Native::generate_bindings(decls, ns, lib_path);
+                    std::string gen_source = Backend::Native::generate_bindings(decls, constants, ns, lib_path);
                     fs::path out_path = bind_dir / (ns + ".lm");
                     std::ofstream ofs(out_path);
                     if (ofs) { ofs << gen_source; ofs.close(); }

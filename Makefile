@@ -288,9 +288,14 @@ linux: $(BIN_DIR) $(MAIN_RSP) liblymar ssl-lib $(LYRA_BIN) $(BIN_DIR)/liblymar_a
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) @$(MAIN_RSP) $(OBJ_DIR)/liblymar.a $(FYRA_LIB) $(LYRA_LIB) -o $(BIN_DIR)/lymar$(EXE_EXT) $(LIBS) -lssl -lcrypto -lz -lpthread
 	@echo "[OK] lymar built."
 
+# The toolchain's static libffi archive is absorbed into liblymar_aot.a so the
+# standalone runtime resolves ffi_prep_cif/ffi_call for both the Fyra internal
+# linker and target drivers without a separate -lffi input.
+LIBFFI_A := $(shell $(CXX) -print-file-name=libffi.a)
 $(BIN_DIR)/liblymar_aot.a: $(OBJ_DIR)/src/memory/aot_runtime.o $(OBJ_DIR)/src/memory/aot_ffi.o $(OBJ_DIR)/src/runtime/os_info.o $(OBJ_DIR)/src/runtime/lymarrt/lymarrt.o $(OBJ_DIR)/src/runtime/sokol/sokol_app_runtime.o $(OBJ_DIR)/src/runtime/sokol/sokol_gfx_runtime.o $(OBJ_DIR)/src/runtime/native_d3d11_window.o $(OBJ_DIR)/src/runtime/truetype.o Makefile | $(BIN_DIR)
 	$(RM) $@.tmp
 	$(AR) rcs $@.tmp $(filter %.o,$^)
+	$(PYTHON) scripts/merge_archive_members.py $@.tmp "$(LIBFFI_A)" $(AR)
 	mv $@.tmp $@
 
 # =============================

@@ -7,6 +7,8 @@
 #include "../backend/native/binding_generator.hh"
 
 #include <algorithm>
+#include <cstdint>
+#include <cstdio>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
@@ -130,7 +132,10 @@ std::string resolve_c_header_import(
         return "";
     }
 
-    // 2. Check cache: if the binding .lm exists and is newer than the header, reuse it
+    // 2. Check cache: if the binding .lm exists, is newer than the header, and
+    // was generated from THIS header, reuse it. The alias-only filename means
+    // two different headers imported `as vk` would otherwise share stale
+    // bindings, so the source path is stamped into the file and verified.
     fs::path bind_dir = ".cache/bindings";
     fs::path out_path = bind_dir / (namespace_alias + ".lm");
     std::error_code ec;
@@ -139,7 +144,14 @@ std::string resolve_c_header_import(
     if (fs::exists(out_path, ec)) {
         auto hdr_time = fs::last_write_time(resolved, ec);
         auto bind_time = fs::last_write_time(out_path, ec);
-        if (!ec && bind_time >= hdr_time && filter.identifiers.empty()) {
+        bool source_matches = false;
+        {
+            std::ifstream chk(out_path);
+            std::string first;
+            std::getline(chk, first);
+            source_matches = first == "// c-import-source: " + resolved;
+        }
+        if (!ec && bind_time >= hdr_time && source_matches && filter.identifiers.empty()) {
             // Cached and header hasn't changed: reuse (skip cache when filtered)
             return out_path.string();
         }
@@ -156,9 +168,10 @@ std::string resolve_c_header_import(
     std::string source = ss.str();
     hdr_file.close();
 
-    // 4. Parse function declarations
+    // 4. Parse function declarations and enum constants
     std::vector<std::string> warnings;
-    auto decls = Backend::Native::parse_header(source, resolved, warnings);
+    std::vector<Backend::Native::CConstantDecl> constants;
+    auto decls = Backend::Native::parse_header(source, resolved, warnings, &constants);
 
     // 5. Filter by symbol names if requested
     if (!filter.identifiers.empty()) {
@@ -182,7 +195,8 @@ std::string resolve_c_header_import(
     std::string lib_path = from_lib.value_or("");
 
     // 7. Generate bindings
-    std::string gen_source = Backend::Native::generate_bindings(decls, namespace_alias, lib_path);
+    std::string gen_source = Backend::Native::generate_bindings(decls, constants, namespace_alias, lib_path);
+    gen_source = "// c-import-source: " + resolved + "\n" + gen_source;
 
     // 8. Write to cache
     std::ofstream ofs(out_path);

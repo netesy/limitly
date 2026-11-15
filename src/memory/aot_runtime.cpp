@@ -2079,12 +2079,18 @@ uint64_t lymar_aot_memory_load(uint64_t pointer, uint64_t element, uint64_t poin
 // arbitrary object-header heuristics. Raw buffers may themselves begin with 9.
 static double raw_numeric_value(uint64_t value, uint64_t kind) {
     if (kind == 0) return static_cast<double>(static_cast<int64_t>(value));
-    if (kind != object_kind) return 0.0;
+    if (kind != object_kind || lymar_aot_is_nil(value, kind)) return 0.0;
     auto found = heap().allocations.find(value);
-    if (found == heap().allocations.end() || !found->second.float_box || found->second.size < 16 ||
-        (read_word(value) & 0xffffffff) != 9) return 0.0;
-    double result; std::memcpy(&result, reinterpret_cast<void*>(value + 8), sizeof(result));
-    return result;
+    if (found != heap().allocations.end() && !found->second.raw_memory && found->second.float_box &&
+        found->second.size >= 16 && (read_word(value) & 0xffffffff) == 9) {
+        double result; std::memcpy(&result, reinterpret_cast<void*>(value + 8), sizeof(result));
+        return result;
+    }
+    // Object-kind values that are not boxed floats carry raw bits: module
+    // constants and fnptr/pubptr aliases are GlobalVariables/ints reported as
+    // object kind, ffi.alloc buffers are raw_memory, and foreign pointers live
+    // outside the heap entirely. Store the address/scalar, not zero.
+    return static_cast<double>(static_cast<int64_t>(value));
 }
 static uint64_t raw_integer_value(uint64_t value, uint64_t kind) {
     return kind == 0 ? value : static_cast<Word>(static_cast<int64_t>(raw_numeric_value(value, kind)));
@@ -3045,9 +3051,28 @@ uint64_t lymar_aot_ffi_list_kind(uint64_t value,uint64_t index) {
 uint64_t lymar_aot_ffi_pointer(uint64_t value,uint64_t kind) {
     RuntimeGuard guard;
     if(lymar_aot_is_nil(value,kind) || kind==boolean_kind) return 0;
-    if(!kind) return value; // Explicit unsafe integer addresses remain supported.
+    if(!kind) {
+        // Scalar-typed registers can still carry wrapped foreign pointers:
+        // ffi.fnptr/pubptr are `type` aliases of int, so slot classification
+        // may report kind=0 for a live tag-13 wrapper object. Detect the
+        // wrapper by its heap tag rather than trusting the kind alone;
+        // anything else is a genuine raw address and passes through.
+        auto scalar_found=heap().allocations.find(value);
+        if(scalar_found!=heap().allocations.end() && !scalar_found->second.raw_memory &&
+           scalar_found->second.size>=16 && read_word(value)==13)
+            return read_word(value,8);
+        return value; // Explicit unsafe integer addresses remain supported.
+    }
     auto found=heap().containing(value);
-    if(found==heap().allocations.end()) throw std::runtime_error("Expired foreign pointer");
+    if(found==heap().allocations.end()) {
+        // Not a Lymar heap object. Foreign pointers are expected to live
+        // outside the managed heap — code addresses, malloc'd C strings,
+        // driver/library memory, stack addresses — and static kind tracking
+        // cannot reliably distinguish them from heap objects (ffi.fnptr and
+        // ffi.pubptr are `type` aliases of int). The tag-13 wrapper is the
+        // opt-in tracking mechanism; anything unwrapped is a raw address.
+        return value;
+    }
     if(found->second.raw_memory) return value;
     if(found->first!=value) throw std::runtime_error("Invalid foreign object address");
     if(found->second.size>=16 && read_word(value)==13) return read_word(value,8);

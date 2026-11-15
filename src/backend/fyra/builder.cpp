@@ -628,6 +628,27 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 break;
         }
     }
+    // A `Mov` copies the value *and* its dynamic kind (store_reg is called with
+    // preserve_kind), but the static scan above only marks the producer. Without
+    // propagation, `var r = ffi.foreign_call(...)` lands in a scalar-classified
+    // slot and every later load reports kind=0 — boxed FFI results (PTR/F64/
+    // CString) then surface as raw addresses. Propagate to a fixpoint so move
+    // chains (`var a = f(); var b = a;`) stay object-classified.
+    bool moved = true;
+    while (moved) {
+        moved = false;
+        for (const auto& inst : lir_func.instructions) {
+            if (inst.op != LIR::LIR_Op::Mov || inst.dst == UINT32_MAX) continue;
+            if (pointer_assigned_regs.count(inst.dst)) continue;
+            // Mov's source is `a` only (registers[dst] = registers[a]); `b` is
+            // an unused operand emitted as literal 0, which is a valid register
+            // number — checking it would false-positive on r0.
+            if (inst.a != UINT32_MAX && pointer_assigned_regs.count(inst.a)) {
+                pointer_assigned_regs.insert(inst.dst);
+                moved = true;
+            }
+        }
+    }
 
     std::unordered_map<uint32_t, ir::Instruction*> reg_slots;
     const bool scalar_registers = Memory::runtime_regions_proven_unnecessary(lir_func) && Memory::proven_scalar_leaf(lir_func);

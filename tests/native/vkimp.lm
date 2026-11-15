@@ -1,0 +1,11 @@
+import "c:tests/native/vulkan_core.h" as vk;
+fn main() {
+    print("succ=" + (vk.VK_SUCCESS as str));
+    print("err=" + (vk.VK_ERROR_OUT_OF_HOST_MEMORY as str));
+    print("cpci=" + (vk.VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO as str));
+    print("stage=" + (vk.VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO as str));
+    print("sbuf=" + (vk.VK_BUFFER_USAGE_STORAGE_BUFFER_BIT as str));
+    print("compute=" + (vk.VK_QUEUE_COMPUTE_BIT as str));
+    print("dev=" + (vk.VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO as str));
+    return 0;
+}

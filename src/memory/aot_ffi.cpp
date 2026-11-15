@@ -140,8 +140,7 @@ Word gpu_coords(int which) {
 void callback(void* context,const lymarrt_value* args,size_t count,lymarrt_value* out) {
     auto& state=*static_cast<Callback*>(context);
     if(count!=state.function.arguments.size()) throw std::runtime_error("Callback arity mismatch");
-    std::vector<lymarrt_value> values;values.reserve(count);
-    for(size_t index=0;index<count;++index) {
+    std::vector<lymarrt_value> values;values.reserve(count);    for(size_t index=0;index<count;++index) {
         Word kind=0;auto value=result(args[index],kind);
         values.push_back(argument(value,kind,state.function.arguments[index]));
         lymar_aot_arg_set(index,state.function.arguments[index]==LYMARRT_TYPE_F64?0:kind);
@@ -180,10 +179,13 @@ void lymar_aot_library_close(Word handle) {
     for(auto* pointer:found->second->symbols) lymar_aot_ffi_invalidate(reinterpret_cast<Word>(pointer));
     lymar_aot_ffi_invalidate(reinterpret_cast<Word>(library));libraries.erase(found);
 }
-Word lymar_aot_foreign_call(Word function,Word values,Word kinds,Word types,Word count,Word return_type,Word function_kind) {
+// Shared foreign-call implementation. `layouts`/`num_layouts` describe
+// struct-by-value arguments (packed native bytes + element type list),
+// mirroring the VM's lymarrt_ffi_call_ex path.
+static Word foreign_call_impl(Word function,Word* words,Word* flags,Word* ids,Word count,Word return_type,Word function_kind,
+                              const lymarrt_struct_layout* layouts,size_t num_layouts) {
     std::unique_lock guard(mutex);auto* pointer=reinterpret_cast<void*>(lymar_aot_ffi_pointer(function,function_kind));
     if(!pointer) {lymar_aot_ffi_result_kind(1);return lymar_aot_nil();}
-    auto* words=reinterpret_cast<Word*>(values);auto* flags=reinterpret_cast<Word*>(kinds);auto* ids=reinterpret_cast<Word*>(types);
     std::vector<lymarrt_type> signature;std::vector<lymarrt_value> arguments;
     for(Word index=0;index<count;++index) {signature.push_back(type(ids[index]));arguments.push_back(argument(words[index],flags[index],signature.back()));}
     // Opaque C may invoke any registered callback, including on another
@@ -195,19 +197,45 @@ Word lymar_aot_foreign_call(Word function,Word values,Word kinds,Word types,Word
     for(const auto& entry:libraries) library_pins.push_back(entry.second);
     guard.unlock();
     lymarrt_value returned{};
-    if(!lymarrt_ffi_call(pointer,type(return_type,true),signature.data(),arguments.data(),count,&returned)) {lymar_aot_ffi_result_kind(1);return lymar_aot_nil();}
+    if(!lymarrt_ffi_call_ex(pointer,type(return_type,true),signature.data(),arguments.data(),count,layouts,num_layouts,&returned)) {lymar_aot_ffi_result_kind(1);return lymar_aot_nil();}
     Word kind=0;auto value=result(returned,kind);lymar_aot_ffi_result_kind(kind);return value;
+}
+Word lymar_aot_foreign_call(Word function,Word values,Word kinds,Word types,Word count,Word return_type,Word function_kind) {
+    return foreign_call_impl(function,reinterpret_cast<Word*>(values),reinterpret_cast<Word*>(kinds),reinterpret_cast<Word*>(types),count,return_type,function_kind,nullptr,0);
 }
 Word lymar_aot_foreign_call_list(Word function,Word values,Word return_type,Word types,Word function_kind) {
     auto count=lymar_aot_ffi_list_size(values),type_count=lymar_aot_ffi_list_size(types);
     std::vector<Word> words,flags,ids;
+    std::vector<lymarrt_struct_layout> layouts;
     for(Word index=0;index<count;++index) {
         auto value=lymar_aot_ffi_list_item(values,index),kind=lymar_aot_ffi_list_kind(values,index);
         words.push_back(value);flags.push_back(kind);
-        if(index<type_count) ids.push_back(lymar_aot_to_integer(lymar_aot_ffi_list_item(types,index),lymar_aot_ffi_list_kind(types,index)));
+        if(index<type_count) {
+            auto titem=lymar_aot_ffi_list_item(types,index);
+            // A types entry that is itself a list is a struct-by-value
+            // descriptor: [TYPE_STRUCT, elem_type_id, ...] (VM parity with
+            // the register-VM foreign_call param-type handling).
+            Word hdr=0;
+            bool is_list=lymar_aot_heap_read(titem,0,&hdr,8) && (hdr&0xffffffff)==1;
+            if(is_list) {
+                auto n=lymar_aot_ffi_list_size(titem);
+                if(n>=2 && n-1<=LYMARRT_MAX_STRUCT_ELEMS &&
+                   lymar_aot_to_integer(lymar_aot_ffi_list_item(titem,0),lymar_aot_ffi_list_kind(titem,0))==13) {
+                    lymarrt_struct_layout lay{};lay.arg_index=(uint32_t)index;lay.count=(uint32_t)(n-1);
+                    bool ok=true;
+                    for(uint32_t e=0;e<lay.count;++e) {
+                        auto et=lymar_aot_to_integer(lymar_aot_ffi_list_item(titem,e+1),lymar_aot_ffi_list_kind(titem,e+1));
+                        if(et<0 || et>(int64_t)LYMARRT_TYPE_PTR) {ok=false;break;}
+                        lay.types[e]=static_cast<lymarrt_type>(et);
+                    }
+                    if(ok) {layouts.push_back(lay);ids.push_back(LYMARRT_TYPE_PTR);continue;}
+                }
+            }
+            ids.push_back(lymar_aot_to_integer(titem,lymar_aot_ffi_list_kind(types,index)));
+        }
         else ids.push_back(lymar_aot_ffi_infer_type(value,kind));
     }
-    return lymar_aot_foreign_call(function,reinterpret_cast<Word>(words.data()),reinterpret_cast<Word>(flags.data()),reinterpret_cast<Word>(ids.data()),count,return_type,function_kind);
+    return foreign_call_impl(function,words.data(),flags.data(),ids.data(),count,return_type,function_kind,layouts.data(),layouts.size());
 }
 Word lymar_aot_callback_create(Word name,Word arguments,Word return_type) {
     std::lock_guard guard(mutex);auto text=std::string(lymar_aot_ffi_string(name));auto found=functions.find(text);

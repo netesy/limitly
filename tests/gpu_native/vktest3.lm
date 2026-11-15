@@ -1,0 +1,20 @@
+import std.native.gpu_vulkan as vk;
+import std.ffi as ffi;
+var SPV_WORDS: [int] = [119734787,65536,0,64,0,131089,1,196622,0,1,327695,5,10,1852399981,0,393232,10,17,1,1,1,131091,1,196641,2,1,327734,1,10,0,2,131320,11,65789,65592];
+fn main() {
+    var init = vk.gpu_init();
+    if (init == 0) { return 0; }
+    unsafe {
+        var spv = ffi.alloc(35 * 4);
+        var i = 0;
+        while (i < 35) {
+            ffi.store_u32(ffi.ptr_add(spv, i * 4), SPV_WORDS[i]);
+            i = i + 1;
+        }
+        var shader = vk.gpu_shader_create_spv(spv, 35 * 4);
+        print("shader=" + (shader as str));
+        if (shader == 0) { return 0; }
+        var pipe = vk.gpu_pipeline_create(shader, 1);
+        print("pipe=" + (pipe as str));
+    }
+}

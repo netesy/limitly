@@ -4,6 +4,7 @@
 #include "binding_generator.hh"
 #include <sstream>
 #include <algorithm>
+#include <unordered_set>
 
 namespace LM::Backend::Native {
 namespace {
@@ -233,13 +234,44 @@ void emit_generic_fn(std::ostringstream& out, const CFunctionDecl& fn) {
     out << "}\n\n";
 }
 
+// Returns a safe Lymar identifier for a C constant name.
+// Reserved words are prefixed with 'c_'.
+std::string safe_const_name(const std::string& name) {
+    static const std::vector<std::string> reserved = {
+        "val","var","const","fn","if","elif","else","while","for","iter",
+        "return","frame","trait","import","match","in","type","enum",
+        "err","ok","and","or","not","as","where","self","super",
+        "true","false","nil","break","continue","parallel","concurrent",
+        "task","worker","contract","staged","unsafe","module","mixin",
+        "show","hide","from","static","pub","prot","any","bool","int",
+        "float","str","channel","atomic","embed","init","deinit","this"
+    };
+    if (std::find(reserved.begin(), reserved.end(), name) != reserved.end())
+        return "c_" + name;
+    return name;
+}
+
+void emit_constants(std::ostringstream& out, const std::vector<CConstantDecl>& constants) {
+    if (constants.empty()) return;
+    out << "// Constants extracted from C enum bodies.\n";
+    std::unordered_set<std::string> seen;
+    for (const auto& c : constants) {
+        std::string name = safe_const_name(c.name);
+        if (!seen.insert(name).second) continue; // first definition wins
+        out << "pub const " << name << ": int = " << c.value << ";\n";
+    }
+    out << "\n";
+}
+
 } // anonymous namespace
 
 std::string generate_bindings(const std::vector<CFunctionDecl>& functions,
+                              const std::vector<CConstantDecl>& constants,
                               const std::string& module_name,
                               const std::string& lib_path) {
     std::ostringstream out;
     emit_preamble(out, module_name, lib_path);
+    emit_constants(out, constants);
 
     for (const auto& fn : functions) {
         std::string helper = select_helper(fn);

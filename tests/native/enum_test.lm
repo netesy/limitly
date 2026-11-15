@@ -1,0 +1,12 @@
+import "c:tests/native/enum_fixture.h" from "./bin/enum_fixture.dll" as vk;
+fn main() {
+    print("succ=" + (vk.VK_SUCCESS as str));
+    print("err=" + (vk.VK_ERROR_OUT_OF_HOST_MEMORY as str));
+    print("cpci=" + (vk.VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO as str));
+    print("sbuf=" + (vk.VK_BUFFER_USAGE_STORAGE_BUFFER_BIT as str));
+    print("all=" + (vk.VK_BUFFER_USAGE_ALL as str));
+    print("fb=" + (vk.FLAG_B as str));
+    print("fc=" + (vk.FLAG_C as str));
+    print("answer=" + (vk.enum_answer() as str));
+    return 0;
+}

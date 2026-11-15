@@ -3,6 +3,7 @@
 // binding_generator can emit a Lymar namespace with typed FFI wrappers.
 
 #pragma once
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -29,12 +30,21 @@ struct CFunctionDecl {
     bool is_variadic = false;
 };
 
+// A named integer constant extracted from an enum body (or #define with an
+// integer literal value). `value` is the evaluated 64-bit result.
+struct CConstantDecl {
+    std::string name;
+    int64_t value = 0;
+};
+
 // Parse a C header source string and extract function declarations.
 // The filename is used for diagnostic warnings. Returns the list of
 // extracted function declarations; warnings accumulate skipped constructs.
+// When `constants` is non-null, enum enumerators are appended to it.
 std::vector<CFunctionDecl> parse_header(const std::string& source,
                                         const std::string& filename,
-                                        std::vector<std::string>& warnings);
+                                        std::vector<std::string>& warnings,
+                                        std::vector<CConstantDecl>* constants = nullptr);
 
 // Derive a Lymar module/namespace name from the header filename.
 // "path/to/mylib.h" → "mylib"

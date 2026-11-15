@@ -102,10 +102,22 @@ helpers (`call_i64_0`/`1`/`2`, `call_f64_2`, `call_void_1`) for supported signat
 and fall back to `ffi.foreign_call` for functions with >2 parameters or mixed types.
 
 The parser handles function declarations, primitive C types (`int`, `float`, `double`,
-fixed-width `stdint` types, `size_t`), pointer types, and `const`/`unsigned` qualifiers.
-Struct/union/enum definitions, function-pointer parameters, and variadic functions are
+fixed-width `stdint` types, `size_t`), pointer types, `const`/`unsigned` qualifiers,
+calling-convention/attribute macros (`VKAPI_CALL`, `APIENTRY`, `WINAPI`, and similar
+all-caps identifiers between the return type and function name), and function-like
+macro invocations without trailing semicolons (e.g. `VK_DEFINE_HANDLE(VkFoo)`).
+
+**Enum constants are extracted**: every `enum`/`typedef enum` body — named, anonymous,
+or tag-only — is evaluated and emitted as `pub const NAME: int = <value>;` declarations
+in the generated module. Values support decimal/hex literals, negative numbers,
+constant references to earlier enumerators, `|`, `&`, `^`, `<<`, `>>`, `+`, `-`, `*`,
+`/`, `%`, parentheses, and auto-increment. `typedef enum ... Name;` registers `Name`
+as an `int32` type so enum-typed parameters and return values marshal at the correct
+width. `#define` constants and function-like `#define`s are not extracted.
+
+Struct/union definitions, function-pointer parameters, and variadic functions are
 skipped with a warning. Reserved keywords used as C parameter names are auto-renamed
-with a `p_` prefix.
+with a `p_` prefix. `struct Foo*` parameters are emitted as `ffi.pubptr`.
 
 ### Declarative `c:` imports (recommended)
 
@@ -146,9 +158,12 @@ Header lookup order:
 3. Directories reported by `gcc -E -Wp,-v -x c -` (when `gcc` is available).
 4. `LYMAR_HOME/include`, plus MinGW / `/usr/local/include` / `/usr/include` fallbacks.
 
-Bindings are regenerated only when the header's mtime is newer than the cached `.lm`,
-or when a symbol filter is applied (the filter result is not cached to keep the
-namespace mapping unambiguous). Cache invalidation matches the `--bind-header` 2b
+Bindings are regenerated when the header's mtime is newer than the cached `.lm`,
+when a symbol filter is applied (the filter result is not cached to keep the
+namespace mapping unambiguous), or when the cached file's stamped source path does
+not match the resolved header — the cache filename is alias-only, so the source
+path is verified to prevent two different headers imported under the same alias
+from sharing stale bindings. Cache invalidation matches the `--bind-header` 2b
 pipeline exactly, so mixing CLI `--bind-header` with `import "c:..."` on the same
 header yields a single shared `.cache/bindings/<ns>.lm`.
 
@@ -173,6 +188,40 @@ cache-reuse guarantee.
 | `ffi.TYPE_F64` | `double` | `double` |
 | `ffi.TYPE_PTR` | `void*` / `const char*` | `void*` |
 | `ffi.TYPE_VOID` | `void` | `void` |
+| `ffi.TYPE_STRUCT` | struct-by-value marker (see below) | — |
+
+### Struct-by-value arguments
+
+C functions that take a struct **by value** are supported on both the VM and AOT
+backends. Declare the argument's element types, allocate native-layout storage, and
+pass a `[TYPE_STRUCT, ...]` descriptor as the matching `param_types` entry:
+
+```lymar
+import std.ffi as ffi;
+
+unsafe {
+    var lib = ffi.library_load("libgeom.dll");
+    var sym = ffi.library_get_symbol(lib, "pair_sum");
+
+    // struct Pair { int64_t a; int64_t b; }  (16 bytes)
+    var st = ffi.struct_alloc([ffi.TYPE_I64, ffi.TYPE_I64]);
+    ffi.store_i64(st, 100);
+    ffi.store_i64(ffi.ptr_add(st, 8), 23);
+
+    var total = ffi.foreign_call(sym, [st], ffi.TYPE_I64,
+        [ffi.struct_param([ffi.TYPE_I64, ffi.TYPE_I64])]);
+    // total == 123
+}
+```
+
+- `ffi.struct_size(elem_types)` / `ffi.struct_offset(elem_types, index)` compute
+  native size and field offsets with C alignment rules (including tail padding).
+- `ffi.struct_alloc(elem_types)` allocates raw memory of that size.
+- `ffi.struct_param(elem_types)` builds the `[TYPE_STRUCT, e1, e2, ...]` descriptor.
+- Element type ids are the `ffi.TYPE_*` constants (max 16 elements). The argument
+  value must be a pointer to bytes laid out at the computed offsets.
+- Works identically under `lymar run` (VM) and `lymar build` (AOT): both route
+  through `lymarrt_ffi_call_ex` with a `lymarrt_struct_layout` descriptor.
 
 ---
 

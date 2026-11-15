@@ -263,7 +263,7 @@ Lymar does not use generic `Result` types. Instead, it uses fallible annotations
  - Cherry-pick symbols (brace-select is sugar for `show`): `import "c:math_ops.h" from "libmath_ops" as math { add_points, sub_points };`
  - `show` filter: `import "c:math_ops.h" from "libmath_ops" as math show safe_divide;`
  - System header (empty library path — resolves CRT symbols via the process handle): `import "c:stdio.h" as cstdio;`
- The binding is cached at `.cache/bindings/<ns>.lm` and reused when the header mtime is unchanged. See [docs/ffi.md](docs/ffi.md#declarative-c-imports-recommended) for the full grammar and lookup rules.
+ The binding is cached at `.cache/bindings/<ns>.lm` and reused when the header mtime is unchanged and the stamped source path matches. Enum bodies are extracted as `pub const` declarations (literals, hex, negatives, constant refs, shifts/expressions); calling-convention macros (`VKAPI_CALL`, `APIENTRY`, …) are tolerated, and `typedef enum` names marshal as `int32`. Struct-by-value arguments use `ffi.struct_alloc`/`ffi.struct_param` (`[TYPE_STRUCT, ...]` descriptors) on both VM and AOT. See [docs/ffi.md](docs/ffi.md#declarative-c-imports-recommended) for the full grammar and lookup rules.
 
 ---
 
