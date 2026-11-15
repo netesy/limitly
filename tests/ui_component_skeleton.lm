@@ -1,0 +1,60 @@
+// M1 skeleton test: Component contract + constraint layout + paint pipeline.
+// Proves measure/arrange/paint/replay produce real pixels on the headless
+// backend. Updated for the M2 scalar-signature trait (see component.lm).
+
+import std.gg as gg;
+import std.ui.component as v2;
+import std.ui.draw_list as dl;
+import std.ui.replay as replay;
+import std.ui.event as uievent;
+import std.events as events;
+
+fn main() {
+    print("=== UI Component Skeleton (M1) ===");
+
+    // ── Measure under loose constraints ──
+    var lab = v2.Label("Hello");
+    var s = lab.measure(0.0, v2.MEASURE_LOOSE, 0.0, v2.MEASURE_LOOSE);
+    assert(s.w > 0.0 and s.h > 0.0, "label should have positive intrinsic size");
+    print("intrinsic size: w=" + (s.w as str) + " h=" + (s.h as str));
+
+    // ── Measure clamps to tight constraints ──
+    var s2 = lab.measure(0.0, 30.0, 0.0, 12.0);
+    assert(s2.w == 30.0 and s2.h == 12.0, "tight max constraints should clamp size");
+
+    // ── on_event is safe and ignored for a leaf ──
+    assert(lab.on_event(events.EventType.MouseDown, 10, 10, 0) == uievent.EventResult.Ignored, "label should ignore events");
+
+    // ── Arrange + paint into the shared paint context, replay to the GPU ──
+    lab.arrange(50.0, 40.0, s.w, s.h);
+    dl.paint_ctx.dl.clear();
+    lab.paint();
+    assert(dl.paint_ctx.dl.cmd_count == 1, "label should emit exactly one draw command");
+
+    assert(gg.setup(), "gg setup failed");
+    gg.begin_pass(200, 100, 0.05, 0.07, 0.12, 1.0);
+    replay.replay(dl.paint_ctx.dl);
+    gg.end_pass();
+    gg.commit();
+
+    // Scan the text region: at least one pixel must differ from the clear color.
+    var bg = gg.readback_pixel(0, 0);
+    var ink = 0;
+    var yy: int = 38;
+    while (yy < 70) {
+        var xx: int = 48;
+        while (xx < 140) {
+            var px = gg.readback_pixel(xx, yy);
+            if (px != nil and px != bg) {
+                ink = ink + 1;
+            }
+            xx = xx + 1;
+        }
+        yy = yy + 1;
+    }
+    gg.shutdown();
+
+    assert(ink > 0, "replayed label should produce visible pixels");
+    print("ink pixels in text region: " + (ink as str));
+    print("UI Component Skeleton PASSED.");
+}

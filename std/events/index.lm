@@ -1,15 +1,20 @@
 // std/events
-// Typed OS/window event pump and queue.
+// Typed OS/window event pump and per-frame event queue.
 //
 // This is the SINGLE translation point from raw gg.poll_events() records into
 // typed Event values. Both std.app (Fluent ui_context dispatch) and std.game
-// (InputManager/IMGUI) consume this queue — neither calls gg.poll_events()
-// directly, so events are never stolen between frameworks.
+// (InputManager/IMGUI) consume the SAME per-frame event stream — neither
+// calls gg.poll_events() directly, so events are never stolen between
+// frameworks.
 //
-// Ownership model: exactly one consumer drains the queue per frame. The
-// Fluent path drains via std.app.dispatch_ui_events(); the game path drains
-// via poll_event() in Game.begin_frame(). Mixing both in one frame splits
-// the stream — pick one.
+// Fan-out model: pump_events() builds a fresh event_queue once per frame.
+// Every consumer reads events.pending_events() non-destructively, so any
+// number of frameworks can observe the same stream. Events pushed via
+// push_event() land in injected_events and are merged into the queue at the
+// next pump — they live exactly one frame.
+//
+// pump_events() is also the frame-publish boundary on the GPU backend, so it
+// must run exactly once per frame.
 
 import std.gg as gg;
 
@@ -101,26 +106,47 @@ frame ResizeEvent {
     pub var framebuffer_height: int;
 }
 
-// Event queue state. head is a dequeue cursor: poll_event advances it instead
-// of copying the array, and compaction bounds memory once half is consumed.
+// event_queue holds the CURRENT frame's events (injected + native, merged by
+// pump_events). injected_events holds events pushed between pumps; they are
+// merged into event_queue on the next pump and then cleared.
 pub var event_queue: [Event] = [] as [Event];
-pub var event_queue_head: int = 0;
+pub var injected_events: [Event] = [] as [Event];
 
-fn make_default_event(): Event {
-    return Event(event_type=EventType.Quit, timestamp=0, window_id=0, x=0, y=0, key_code=0);
-}
-
-// Reset the queue (call on app/window init and shutdown).
+// Reset both queues (call on app/window init and shutdown).
 pub fn clear(): nil {
     event_queue = [] as [Event];
-    event_queue_head = 0;
+    injected_events = [] as [Event];
 }
 
-// pump_events drains gg.poll_events() once per frame and enqueues typed
-// Events. This is the ONLY caller of gg.poll_events() above the gg layer —
-// it is also the frame-publish boundary on the GPU backend, so it must run
-// exactly once per frame regardless of which consumer drains the queue.
+// The current frame's event list. Returns a copy — read-only for consumers,
+// safe to hold across the next pump_events() (which replaces event_queue).
+// Every consumer sees the same stream.
+pub fn pending_events(): [Event] {
+    var out: [Event] = [] as [Event];
+    var i: int = 0;
+    while (i < len(event_queue)) {
+        out.append(event_queue[i]);
+        i = i + 1;
+    }
+    return out;
+}
+
+// pump_events builds this frame's queue: it merges injected_events (synthetic
+// pushes since the last pump) with freshly decoded native events from
+// gg.poll_events(), then clears injected_events. It is the ONLY caller of
+// gg.poll_events() above the gg layer — and the frame-publish boundary on the
+// GPU backend — so it must run exactly once per frame.
 pub fn pump_events(): nil {
+    // Copy injected events into the new frame queue — never move the module
+    // bindings (the ownership checker rejects reassigning a moved binding).
+    var q: [Event] = [] as [Event];
+    var inj_i: int = 0;
+    while (inj_i < len(injected_events)) {
+        q.append(injected_events[inj_i]);
+        inj_i = inj_i + 1;
+    }
+    injected_events = [] as [Event];
+
     var raw_events = gg.poll_events();
     if (raw_events != nil) {
         var native_events: [int] = raw_events as [int];
@@ -132,14 +158,17 @@ pub fn pump_events(): nil {
             var ev_y: int = native_events[i + 2];
             var ev_k: int = native_events[i + 3];
             var ev_type: EventType = event_type_from_int(ev_code);
-            push_event(Event(event_type=ev_type, timestamp=0, window_id=1, x=ev_x, y=ev_y, key_code=ev_k));
+            q.append(Event(event_type=ev_type, timestamp=0, window_id=1, x=ev_x, y=ev_y, key_code=ev_k));
             i = i + 4;
         }
     }
+
+    event_queue = q;
 }
 
+// Queue a synthetic event for delivery at the next pump_events().
 pub fn push_event(event: Event): nil {
-    event_queue.append(event);
+    injected_events.append(event);
 }
 
 pub fn push_mouse_click(x: int, y: int): nil {
@@ -149,37 +178,4 @@ pub fn push_mouse_click(x: int, y: int): nil {
 
 pub fn push_quit_event(): nil {
     push_event(Event(event_type=EventType.Quit, timestamp=0, window_id=1, x=0, y=0));
-}
-
-// Dequeue the next typed event. Only call when has_pending_events() != 0 —
-// on an empty queue this returns a default Quit event without advancing.
-pub fn poll_event(): Event {
-    // Compact before dequeuing: rebinding event_queue while an element alias
-    // is live is an ownership error, so shrink the buffer first.
-    if (event_queue_head > 8) {
-        var new_q: [Event] = [] as [Event];
-        var i: int = event_queue_head;
-        while (i < len(event_queue)) {
-            new_q.append(event_queue[i]);
-            i = i + 1;
-        }
-        event_queue = new_q;
-        event_queue_head = 0;
-    }
-    var head = event_queue_head;
-    if (head >= len(event_queue)) {
-        return make_default_event();
-    }
-    var event: Event = event_queue[head];
-    event_queue_head = head + 1;
-    return event;
-}
-
-// True while unconsumed events remain. Compares head against length — the
-// consumed prefix does not count as pending.
-pub fn has_pending_events(): int {
-    if (event_queue_head < len(event_queue)) {
-        return 1;
-    }
-    return 0;
 }

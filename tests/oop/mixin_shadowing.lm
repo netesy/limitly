@@ -1,0 +1,24 @@
+// Regression: mixin members must not shadow host-declared members.
+// Host methods and fields win on a name collision (same rule as `embed`
+// promotion); non-colliding mixin members are still injected.
+
+mixin Base {
+    pub var base_field: int = 1;
+    pub fn who(): str { return "mixin"; }
+    pub fn extra(): int { return 42; }
+}
+
+frame Host {
+    mixin Base;
+    pub var base_field: int = 9;
+    pub fn who(): str { return "host"; }
+}
+
+fn main(): int {
+    var h = Host();
+    if (h.who() != "host") { print("FAIL: mixin method shadowed host"); return 1; }
+    if (h.extra() != 42) { print("FAIL: non-colliding mixin method missing"); return 1; }
+    if (h.base_field != 9) { print("FAIL: mixin field shadowed host field"); return 1; }
+    print("Mixin Shadowing PASSED.");
+    return 0;
+}

@@ -1,7 +1,7 @@
 // std/ui/state.lm
 // Type-Safe Reactive State Management (Zero `any` via Staged Frame Templates)
 
-pub var _dirty_notifier: (fn(): nil) | nil = nil;
+pub var _dirty_notifier: (fn(): nil)? = nil;
 pub var _batch_depth: int = 0;
 
 pub fn register_dirty_notifier(cb: fn(): nil): nil {
@@ -147,7 +147,7 @@ staged frame ComputedSignal(T: type) {
 
 frame Effect {
     pub var effect_fn: fn(): nil;
-    pub var cleanup_fn: (fn(): nil) | nil;
+    pub var cleanup_fn: (fn(): nil)?;
     pub var is_active: int;
     pub var dependencies: [SignalNode];
 

@@ -154,11 +154,11 @@ frame Game {
 
         // Events: std.events owns the single raw->typed pump (pump_events
         // calls gg.poll_events, the frame-publish boundary on the GPU
-        // backend). We drain the typed queue here — the Fluent path drains
-        // the same queue via app.dispatch_ui_events instead.
+        // backend). We read pending_events() non-destructively — the Fluent
+        // path observes the same stream via app.dispatch_ui_events, so a game
+        // can drive IMGUI and Fluent widgets from one event source.
         events.pump_events();
-        while (events.has_pending_events() != 0) {
-            var ev = events.poll_event();
+        iter (ev in events.pending_events()) {
             match (ev.event_type) {
                 events.EventType.Quit => { self.is_running = false; },
                 events.EventType.Resize => { self.width = ev.x; self.height = ev.y; },

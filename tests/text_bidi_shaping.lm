@@ -1,0 +1,99 @@
+// M6 test: explicit BiDi + shaping.
+//
+// Covers std.text.utf8 (decode/encode), std.text.bidi (classes, levels,
+// visual reorder), std.text.shaping (lam-alef ligature, Hebrew sofit),
+// and the widget paint path emitting the prepared display string.
+
+import std.text.utf8 as utf8;
+import std.text.bidi as bidi;
+import std.text.shaping as shaping;
+import std.ui.component as v2;
+import std.ui.tree as tree;
+import std.ui.draw_list as dl;
+
+fn main() {
+    print("=== Text BiDi & Shaping (M6) ===");
+
+    // ── 1. UTF-8 roundtrip ──
+    val hebrew = utf8.encode([0x05E9, 0x05DC, 0x05D5, 0x05DD]);
+    val cps = utf8.decode(hebrew);
+    assert(len(cps) == 4, "decode yields 4 codepoints");
+    assert(cps[0] == 0x05E9 and cps[3] == 0x05DD, "codepoints roundtrip");
+    assert(utf8.encode(cps) == hebrew, "encode(decode(s)) == s");
+
+    val mixed = utf8.encode([0x0061, 0x05D0, 0x00E9]); // a, alef, é
+    val mcps = utf8.decode(mixed);
+    assert(len(mcps) == 3, "multibyte decode");
+    assert(mcps[2] == 0x00E9, "2-byte sequence decodes");
+
+    // ── 2. BiDi direction + levels ──
+    assert(bidi.is_rtl(hebrew) == true, "Hebrew paragraph is RTL");
+    assert(bidi.is_rtl("hello") == false, "Latin paragraph is LTR");
+    assert(bidi.is_rtl("abc " + hebrew) == false, "first strong wins: LTR para");
+
+    val lv = bidi.levels("ab " + hebrew + " cd");
+    // a b space | 4 hebrew | space c d  -> 10 codepoints
+    assert(len(lv) == 10, "levels per codepoint");
+    assert(lv[3] == 1 and lv[6] == 1, "Hebrew run at odd level in LTR para");
+    assert(lv[0] == 0 and lv[8] == 0, "Latin stays even");
+
+    // ── 3. Visual reorder ──
+    val vis = bidi.visual_text(hebrew);
+    // "שלום" reversed for display: mem-vav-lamed-shin order.
+    val expect_rev = utf8.encode([0x05DD, 0x05D5, 0x05DC, 0x05E9]);
+    assert(vis == expect_rev, "pure RTL run reverses to visual order");
+
+    val vis_mixed = bidi.visual_text("ab " + hebrew + " cd");
+    val expect_mixed = utf8.encode([0x0061, 0x0062, 0x0020,
+        0x05DD, 0x05D5, 0x05DC, 0x05E9, 0x0020, 0x0063, 0x0064]);
+    assert(vis_mixed == expect_mixed, "embedded RTL run reverses in place");
+
+    // LTR text passes through untouched.
+    assert(bidi.visual_text("hello world") == "hello world", "LTR passthrough");
+
+    // ── 4. Shaping: lam-alef mandatory ligature ──
+    val lamalef = utf8.encode([0x0644, 0x0627]); // LAM + ALEF
+    val shaped = shaping.shape(lamalef);
+    assert(shaped == utf8.encode([0xFEFB]), "lam+alef ligates to U+FEFB");
+
+    val lamalef_madda = utf8.encode([0x0644, 0x0622]); // LAM + ALEF MADDA
+    assert(shaping.shape(lamalef_madda) == utf8.encode([0xFEF5]), "lam+alef madda -> U+FEF5");
+
+    // Non-alef after lam: no ligature.
+    val lam_beh = utf8.encode([0x0644, 0x0628]);
+    assert(shaping.shape(lam_beh) == lam_beh, "lam+beh does not ligate");
+
+    // ── 5. Shaping: Hebrew final forms ──
+    // KAF alone at word end -> KAF SOFIT.
+    val kaf_end = utf8.encode([0x05DB]);
+    assert(shaping.shape(kaf_end) == utf8.encode([0x05DA]), "final kaf -> sofit");
+    // KAF followed by another Hebrew letter -> stays medial.
+    val kaf_mid = utf8.encode([0x05DB, 0x05D0]);
+    assert(shaping.shape(kaf_mid) == utf8.encode([0x05DB, 0x05D0]), "medial kaf unchanged");
+
+    // ── 6. prepare_display pipeline + ASCII fast path ──
+    assert(shaping.prepare_display("hello") == "hello", "ASCII passthrough");
+    val disp = shaping.prepare_display(hebrew);
+    // shape() turns final MEM (05DD already final in our input? input had
+    // 05DD which IS mem sofit — shape leaves it; visual_text reverses).
+    assert(disp == expect_rev, "prepare_display shapes then reorders");
+
+    // ── 7. Widget path: Label emits the display string ──
+    val lbl = v2.label(hebrew);
+    tree.update(lbl, 300.0, 100.0);
+    var saw_display: int = 0;
+    var i: int = 0;
+    while (i < dl.paint_ctx.dl.cmd_count) {
+        val c = dl.paint_ctx.dl.cmds[i];
+        if (c.kind == dl.DrawCmdKind.Text) {
+            if (c.text == shaping.prepare_display(hebrew)) {
+                saw_display = 1;
+            }
+            assert(c.text != hebrew, "paint emits visual order, not logical");
+        }
+        i = i + 1;
+    }
+    assert(saw_display == 1, "draw cmd carries the prepared display string");
+
+    print("Text BiDi & Shaping (M6) PASSED.");
+}

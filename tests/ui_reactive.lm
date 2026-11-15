@@ -1,0 +1,91 @@
+// M3 completion test: the reactive graph end-to-end.
+//
+// Covers the pieces ui_v2_widgets.lm doesn't: subscribe callbacks,
+// Effect run/re-run/cleanup/dispose lifecycle, batch_updates dirty
+// coalescing, ComputedStr derivation, and a computed->signal->widget
+// repaint chain through the retained tree.
+
+import std.ui.component as v2;
+import std.ui.container as boxes;
+import std.ui.tree as tree;
+import std.ui.draw_list as dl;
+import std.ui.state as state;
+
+var effect_runs: int = 0;
+var effect_cleanups: int = 0;
+var batch_notifies: int = 0;
+var seen: int = 0;
+
+fn main() {
+    print("=== UI Reactivity (M3) ===");
+
+    // ── 1. subscribe callbacks receive the new value ──
+    var sig = state.signal_int(0);
+    sig.subscribe(fn(v: int) { seen = v; });
+    sig.set(7);
+    assert(seen == 7, "subscribe callback should receive the new value");
+
+    // ── 2. Effect lifecycle ──
+    var src = state.signal_int(1);
+    val eff = state.effect_with_cleanup(
+        fn(): nil { effect_runs = effect_runs + 1; },
+        fn(): nil { effect_cleanups = effect_cleanups + 1; },
+        [src.node]);
+    assert(effect_runs == 1, "effect should run once on creation");
+    src.set(2);
+    assert(effect_runs == 2, "effect should re-run when a dep changes");
+    assert(effect_cleanups == 1, "cleanup should run before re-run");
+    eff.dispose();
+    assert(effect_cleanups == 2, "dispose should run cleanup");
+    src.set(3);
+    assert(effect_runs == 2, "disposed effect must not re-run");
+
+    // ── 3. batch_updates coalesces dirty notifications ──
+    state.register_dirty_notifier(fn(): nil { batch_notifies = batch_notifies + 1; });
+    var a = state.signal_int(0);
+    var b = state.signal_int(0);
+    state.batch_updates(fn(): nil {
+        a.set(1);
+        b.set(2);
+    });
+    assert(batch_notifies == 1, "batch should notify dirty once, got " + (batch_notifies as str));
+    a.set(5);
+    assert(batch_notifies == 2, "unbatched set should notify dirty");
+
+    // ── 4. ComputedStr derives from deps; chain into a widget signal ──
+    var first = state.signal_str("Ada");
+    var last = state.signal_str("Lovelace");
+    var full = state.computed_str(fn(): str {
+        return first.get() + " " + last.get();
+    }, [first.node, last.node]);
+    assert(full.get() == "Ada Lovelace", "computed initial value, got: " + full.get());
+
+    var display = state.signal_str("");
+    display.set(full.get());
+    full.subscribe(fn(s: str) { display.set(s); });
+
+    var lbl = v2.label("");
+    lbl.bind_text(display);
+    var root = boxes.column(4.0);
+    root.add(lbl);
+    tree.update(root, 200.0, 200.0);
+
+    first.set("Grace");
+    assert(display.get() == "Grace Lovelace",
+        "computed->display chain should propagate, got: " + display.get());
+    last.set("Hopper");
+    assert(display.get() == "Grace Hopper",
+        "second dep change should propagate, got: " + display.get());
+
+    tree.update(root, 200.0, 200.0);
+    var saw: int = 0;
+    var ci = 0;
+    while (ci < dl.paint_ctx.dl.cmd_count) {
+        val cmd = dl.paint_ctx.dl.cmds[ci];
+        if (cmd.text == "Grace Hopper") { saw = 1; }
+        ci = ci + 1;
+    }
+    assert(saw == 1, "label should repaint the computed value");
+
+    print("UI Reactivity (M3) PASSED.");
+}

@@ -1,0 +1,118 @@
+// std/ui/text_metrics.lm
+// Font metric provider for the retained UI — pixel-parity with the
+// renderer when a graphics context exists, real advances otherwise.
+//
+// Parity chain (first hit wins):
+//   1. gg.measure_text / gg.get_line_height — the RENDERER's own fons
+//      metrics context: same embedded font, same gfx_font_size_for_scale
+//      size mapping the draw path uses. Pixel-exact.
+//   2. std.image.font system font at the renderer-mapped pixel size —
+//      real advances, possibly a different typeface than the embedded
+//      fons font (advances can differ slightly).
+//   3. Heuristic: FALLBACK_CHAR_W per codepoint — headless/no-font.
+//
+// font_scale maps to renderer scale EXACTLY like replay():
+//   font_scale < 1.5 -> scale 1 (13px), >= 1.5 -> scale 2 (20px).
+//
+// Callers must pass the DISPLAY string (textshape.prepare_display).
+// Results are cached per "text#scale_milli" — each uncached query is an
+// FFI call, which would break the per-frame zero-alloc budget (M5).
+
+import std.gg as gg;
+import std.image.font as imgfont;
+import std.text.layout as layout;
+
+// Nominal font size in px at font_scale == 1.0 (matches
+// gfx_font_size_for_scale(1) == 13.0).
+pub const BASE_FONT_PX: float = 13.0;
+
+// Heuristic advance per codepoint at scale 1.0 (fallback path only).
+pub const FALLBACK_CHAR_W: float = 8.0;
+
+pub var _ui_font: any = nil;
+pub var _font_state: int = 0; // 0 = untried, 1 = loaded, 2 = unavailable
+
+// Metric cache: results never stale (font is fixed per process).
+pub var _width_cache: {str: float} = {};
+pub var _height_cache: {str: float} = {};
+
+// Map widget font_scale to the renderer's integer scale, mirroring
+// std/ui/replay.lm: scale_i = font_scale >= 1.5 ? 2 : 1.
+fn render_scale(font_scale: float): int {
+    if (font_scale >= 1.5) { return 2; }
+    return 1;
+}
+
+// Pixel size the renderer will use for a widget font_scale.
+// Mirrors gfx_font_size_for_scale for the two scales replay emits.
+fn render_px(font_scale: float): float {
+    if (render_scale(font_scale) == 2) { return 20.0; }
+    return 13.0;
+}
+
+fn ensure_font(): int {
+    if (_font_state == 0) {
+        _font_state = 2;
+        var font = imgfont.load_system_font()? else {
+            return 2;
+        };
+        if (font.is_valid) {
+            _ui_font = font;
+            _font_state = 1;
+        }
+    }
+    return _font_state;
+}
+
+// Whether the live-graphics-context (pixel-exact) path is active.
+pub fn using_renderer_metrics(): bool {
+    return gg.global_graphics_context.handle != -1;
+}
+
+// Whether a fallback real font is loaded (diagnostics).
+pub fn using_real_font(): bool {
+    return ensure_font() == 1;
+}
+
+// Advance width of a display string at the given font_scale.
+pub fn text_width(text: str, font_scale: float = 1.0): float {
+    var key: str = text + "#" + (((font_scale * 1000.0) as int) as str);
+    val hit = _width_cache[key];
+    if (hit != nil) {
+        return hit as float;
+    }
+    var w: float = 0.0;
+    if (using_renderer_metrics()) {
+        // Exact: fons measures with the same font+size the draw uses.
+        w = gg.measure_text(text, render_scale(font_scale));
+    }
+    if (w <= 0.0 and ensure_font() == 1) {
+        w = (_ui_font as imgfont.Font).text_width(text, render_px(font_scale));
+    }
+    if (w <= 0.0) {
+        w = layout.measure_width(text, FALLBACK_CHAR_W * font_scale);
+    }
+    _width_cache[key] = w;
+    return w;
+}
+
+// Line height for single-line widgets at the given font_scale.
+pub fn line_height(font_scale: float = 1.0): float {
+    var key: str = "lh#" + (((font_scale * 1000.0) as int) as str);
+    val hit = _height_cache[key];
+    if (hit != nil) {
+        return hit as float;
+    }
+    var h: float = 0.0;
+    if (using_renderer_metrics()) {
+        h = gg.get_line_height(render_scale(font_scale));
+    }
+    if (h <= 0.0 and ensure_font() == 1) {
+        h = (_ui_font as imgfont.Font).text_height("Ag", render_px(font_scale));
+    }
+    if (h <= 0.0) {
+        h = FALLBACK_CHAR_W * 1.25 * font_scale;
+    }
+    _height_cache[key] = h;
+    return h;
+}

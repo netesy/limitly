@@ -1,0 +1,212 @@
+// std/ui/component.lm
+// Modern retained-UI core (docs/ui.md M1–M3).
+//
+// The Component contract: every widget implements kind/measure/arrange/
+// paint/on_event/bounds. Missing a pass is a compile error, not a runtime
+// nil. Children are [Component] trait objects — the tree level is
+// type-erased by necessity (no runtime generics).
+//
+// Compiler constraint driving the signatures: trait-object dispatch cannot
+// take managed (frame) arguments — the ownership checker cannot prove
+// contracts through dynamic calls. So measure/arrange/on_event pass scalars
+// and enums only, and paint() emits into the shared dl.paint_ctx draw list
+// instead of receiving one.
+//
+// Frame→trait coercion snapshots the top-level frame but SHARES
+// frame-typed fields (verified). Mutable/shared state therefore lives in
+// fields — signals, sub-frames — never in the widget's own scalar fields.
+// External code takes `var r = widget.rect` / `var s = widget.text_sig`
+// BEFORE add(); those aliases stay live inside the tree.
+//
+// Three passes per frame (see std/ui/tree.lm):
+//   measure — child reports intrinsic Size under min/max constraints
+//   arrange — parent assigns each child a Rect (via arrange)
+//   paint   — widget draws into paint_ctx.dl using its Rect
+//   on_event— hit-test against bounds(), reverse paint order = topmost
+
+import std.ui.types as ui_types;
+import std.ui.event as uievent;
+import std.ui.draw_list as dl;
+import std.ui.state as state;
+import std.events as events;
+import std.color as color;
+import std.text.shaping as textshape;
+import std.ui.text_metrics as tm;
+
+// ── Geometry ─────────────────────────────────────────────────────────────────
+
+frame Size {
+    pub var w: float;
+    pub var h: float;
+
+    pub init(w: float = 0.0, h: float = 0.0) {
+        self.w = w;
+        self.h = h;
+    }
+}
+
+pub const MEASURE_LOOSE: float = 1.0e9;
+
+// Placed rectangle — output of the arrange step. arrange() mutates the
+// Rect IN PLACE (never rebinds) so aliases taken before add() stay live.
+frame Rect {
+    pub var x: float;
+    pub var y: float;
+    pub var w: float;
+    pub var h: float;
+
+    pub init(x: float = 0.0, y: float = 0.0, w: float = 0.0, h: float = 0.0) {
+        self.x = x;
+        self.y = y;
+        self.w = w;
+        self.h = h;
+    }
+
+    pub fn contains(px: float, py: float): bool {
+        return px >= self.x and px < self.x + self.w and py >= self.y and py < self.y + self.h;
+    }
+}
+
+// ── Placed ───────────────────────────────────────────────────────────────────
+// Every widget needs a Rect + arrange-store + bounds. Implemented as a
+// frame used via `embed` — NOT a mixin, because mixin methods shadow the
+// host's own same-named methods (verified empirically), while embed
+// promotes members with host-wins collision semantics. embed does not run
+// init(), so all fields carry defaults.
+
+frame Placed {
+    pub var rect: Rect = Rect();
+    pub var id: int = 0;
+
+    // Stable int identity, assigned at construction. Scalar fields are
+    // copied into the trait snapshot, so the id observed through Component
+    // is the one assigned before add() — ids are immutable afterwards.
+    pub fn widget_id(): int {
+        return self.id;
+    }
+
+    pub fn arrange(x: float, y: float, w: float, h: float): nil {
+        self.rect.x = x;
+        self.rect.y = y;
+        self.rect.w = w;
+        self.rect.h = h;
+    }
+
+    pub fn bounds(): Rect {
+        return self.rect;
+    }
+
+    // Leaf defaults for the Component child-access contract. Promoted into
+    // every widget via embed; containers override with real children
+    // (host members win over promoted ones).
+    pub fn child_count(): int {
+        return 0;
+    }
+
+    pub fn child_at(i: int): any {
+        return nil;
+    }
+}
+
+// ── TextBound ────────────────────────────────────────────────────────────────
+// Bindable text state shared by Label/Button and specialized by TextInput.
+// text_sig is a shared field — the same StrSignal object is visible through
+// the trait snapshot, so external set()/get() works across add().
+
+frame TextBound {
+    pub var text: str = "";
+    pub var text_sig: state.StrSignal? = nil;
+
+    pub fn string_val(): str {
+        if (self.text_sig != nil) {
+            return (self.text_sig as state.StrSignal).get();
+        }
+        return self.text;
+    }
+
+    pub fn bind_text(sig: state.StrSignal): nil {
+        self.text_sig = sig;
+    }
+}
+
+// ── Component contract ───────────────────────────────────────────────────────
+
+trait Component {
+    fn kind(): ui_types.WidgetKind;
+    fn measure(min_w: float, max_w: float, min_h: float, max_h: float): Size;
+    fn arrange(x: float, y: float, w: float, h: float): nil;
+    fn paint(): nil;
+    fn on_event(t: events.EventType, x: int, y: int, key: int): uievent.EventResult;
+    fn bounds(): Rect;
+    fn widget_id(): int;
+    // Child access for tree walks (find_widget). Leaf widgets use the
+    // defaults; containers override with their real children.
+    fn child_count(): int { return 0; }
+    fn child_at(i: int): any;
+}
+
+// ── Widget identity ──────────────────────────────────────────────────────────
+// Every widget init calls next_widget_id() so ids are unique across the
+// process and nonzero (0 = never assigned, e.g. a hand-built Placed).
+
+pub var _next_widget_id: int = 1;
+
+pub fn next_widget_id(): int {
+    _next_widget_id = _next_widget_id + 1;
+    return _next_widget_id;
+}
+
+// ── Label ────────────────────────────────────────────────────────────────────
+// Leaf text widget. Text metrics are the honest v1 approximation: 8px advance
+// per codepoint per font_scale (matches std/ui/staged.lm's folded heuristic),
+// line height 1.25×. Real font metrics land when std.font integrates.
+
+frame Label {
+    embed Placed;
+    embed TextBound;
+    pub var fg: color.Color;
+    pub var font_scale: float;
+    pub var pad_x: float;
+    pub var pad_y: float;
+
+    pub init(txt: str = "", c: color.Color? = nil, scale: float = 1.0) {
+        self.text = txt;
+        if (c == nil) {
+            self.fg = color.white;
+        } else {
+            self.fg = c as color.Color;
+        }
+        self.font_scale = scale;
+        self.pad_x = 4.0;
+        self.pad_y = 2.0;
+        self.id = next_widget_id();
+    }
+
+    pub fn kind(): ui_types.WidgetKind { return ui_types.WidgetKind.Text; }
+
+    pub fn measure(min_w: float, max_w: float, min_h: float, max_h: float): Size {
+        // Measure the DISPLAY string (post shaping+bidi) with real font
+        // advances when available — that is what reaches the glyph atlas.
+        var disp = textshape.prepare_display(self.string_val());
+        var w: float = tm.text_width(disp, self.font_scale) + self.pad_x * 2.0;
+        var h: float = tm.line_height(self.font_scale) + self.pad_y * 2.0;
+        if (w < min_w) { w = min_w; }
+        if (w > max_w) { w = max_w; }
+        if (h < min_h) { h = min_h; }
+        if (h > max_h) { h = max_h; }
+        return Size(w=w, h=h);
+    }
+
+    pub fn paint(): nil {
+        dl.dl_emit_text(dl.paint_ctx.dl, textshape.prepare_display(self.string_val()), self.rect.x + self.pad_x, self.rect.y + self.pad_y,
+            self.fg.r, self.fg.g, self.fg.b, self.fg.a, self.font_scale);
+    }
+
+    pub fn on_event(t: events.EventType, x: int, y: int, key: int): uievent.EventResult {
+        return uievent.EventResult.Ignored;
+    }
+}
+
+pub fn label(txt: str, c: color.Color? = nil): Label {
+    return Label(txt, c);
+}

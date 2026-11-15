@@ -1,0 +1,107 @@
+// std/text/grapheme.lm
+// Codepoint/grapheme-cluster boundary helpers for byte-indexed strings.
+//
+// std.text stores columns as BYTE offsets (Document uses _builtin_substring).
+// Cursor movement and deletion must therefore snap to cluster boundaries:
+// stepping one byte left inside a multi-byte UTF-8 sequence produces
+// invalid UTF-8. A cluster here = base codepoint + trailing combining
+// marks (NSM ranges) — the honest subset of UAX #29 (no regional-
+// indicator pairs, no ZWJ emoji sequences yet; documented limit).
+
+// UTF-8 sequence length from the lead byte (1-4). Continuation bytes
+// and invalid leads return 1 so we always make progress.
+fn seq_len(b: int): int {
+    if (b < 0x80) { return 1; }
+    if (b >= 0xC2 and b < 0xE0) { return 2; }
+    if (b >= 0xE0 and b < 0xF0) { return 3; }
+    if (b >= 0xF0 and b < 0xF5) { return 4; }
+    return 1;
+}
+
+// Is cp a combining mark that glues to the preceding base char?
+// Same NSM ranges bidi.lm uses for classification.
+fn is_mark(cp: int): bool {
+    if ((cp >= 0x0300 and cp <= 0x036F) or (cp >= 0x0483 and cp <= 0x0489) or
+        (cp >= 0x0591 and cp <= 0x05BD) or cp == 0x05BF or cp == 0x05C1 or cp == 0x05C2 or
+        (cp >= 0x05C4 and cp <= 0x05C5) or cp == 0x05C7 or
+        (cp >= 0x0610 and cp <= 0x061A) or (cp >= 0x064B and cp <= 0x065F) or
+        cp == 0x0670 or (cp >= 0x06D6 and cp <= 0x06DC) or
+        (cp >= 0x06DF and cp <= 0x06E4) or (cp >= 0x06E7 and cp <= 0x06E8) or
+        (cp >= 0x06EA and cp <= 0x06ED) or (cp >= 0x20D0 and cp <= 0x20FF) or
+        (cp >= 0xFE00 and cp <= 0xFE0F) or (cp >= 0xFE20 and cp <= 0xFE2F)) {
+        return true;
+    }
+    return false;
+}
+
+// Decode the codepoint whose UTF-8 sequence STARTS at byte offset `pos`.
+// Returns (codepoint, sequence_length); on invalid input returns
+// (0xFFFD, 1) so callers always advance.
+fn decode_at(s: str, pos: int): (int, int) {
+    var n: int = len(s);
+    var b0: int = _builtin_string_byte_at(s, pos);
+    var sl: int = seq_len(b0);
+    if (pos + sl > n) { return (0xFFFD, 1); }
+    if (sl == 1) { return (b0, 1); }
+    var cp: int = b0 & (0x7F >> sl);
+    var k: int = 1;
+    while (k < sl) {
+        var bx: int = _builtin_string_byte_at(s, pos + k);
+        if ((bx & 0xC0) != 0x80) { return (0xFFFD, 1); }
+        cp = cp * 64 + (bx & 0x3F);
+        k = k + 1;
+    }
+    return (cp, sl);
+}
+
+// Previous cluster boundary at or before byte col. col<=0 -> 0.
+pub fn prev_boundary(s: str, col: int): int {
+    var n: int = len(s);
+    if (col <= 0) { return 0; }
+    if (col > n) { col = n; }
+    // Find the start of the codepoint sequence ending at col: walk back
+    // over continuation bytes.
+    var p: int = col - 1;
+    while (p > 0) {
+        var bx: int = _builtin_string_byte_at(s, p);
+        if ((bx & 0xC0) == 0x80) {
+            p = p - 1;
+        } else {
+            break;
+        }
+    }
+    // p is now the lead byte of the last codepoint before col. While that
+    // codepoint is a combining mark, the cluster extends further left.
+    while (p > 0) {
+        var dec = decode_at(s, p);
+        var cp: int = dec.0;
+        if (not is_mark(cp)) { break; }
+        // Step to the previous codepoint.
+        var q: int = p - 1;
+        while (q > 0) {
+            var bq: int = _builtin_string_byte_at(s, q);
+            if ((bq & 0xC0) == 0x80) { q = q - 1; } else { break; }
+        }
+        p = q;
+    }
+    return p;
+}
+
+// Next cluster boundary at or after byte col. col>=len -> len.
+pub fn next_boundary(s: str, col: int): int {
+    var n: int = len(s);
+    if (col < 0) { col = 0; }
+    if (col >= n) { return n; }
+    var dec = decode_at(s, col);
+    var end: int = col + dec.1;
+    // Swallow trailing combining marks into the same cluster.
+    while (end < n) {
+        var m = decode_at(s, end);
+        if (is_mark(m.0)) {
+            end = end + m.1;
+        } else {
+            break;
+        }
+    }
+    return end;
+}

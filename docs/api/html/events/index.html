@@ -85,31 +85,34 @@ function filterNav() {
 <a class="nav-link" href="#KeyEvent">KeyEvent <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
 <a class="nav-link" href="#MouseEvent">MouseEvent <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
 <a class="nav-link" href="#ResizeEvent">ResizeEvent <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
-<a class="nav-link" href="#make_default_event">make_default_event <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 <a class="nav-link" href="#clear">clear <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#pending_events">pending_events <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 <a class="nav-link" href="#pump_events">pump_events <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 <a class="nav-link" href="#push_event">push_event <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 <a class="nav-link" href="#push_mouse_click">push_mouse_click <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 <a class="nav-link" href="#push_quit_event">push_quit_event <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
-<a class="nav-link" href="#poll_event">poll_event <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
-<a class="nav-link" href="#has_pending_events">has_pending_events <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 </div>
 </nav>
 <main>
 <h1>index.lm API Reference</h1>
 <h2>Module Overview</h2>
 <div class="summary"><p>std/events
-Typed OS/window event pump and queue.
+Typed OS/window event pump and per-frame event queue.
 
 This is the SINGLE translation point from raw gg.poll_events() records into
 typed Event values. Both std.app (Fluent ui_context dispatch) and std.game
-(InputManager/IMGUI) consume this queue — neither calls gg.poll_events()
-directly, so events are never stolen between frameworks.
+(InputManager/IMGUI) consume the SAME per-frame event stream — neither
+calls gg.poll_events() directly, so events are never stolen between
+frameworks.
 
-Ownership model: exactly one consumer drains the queue per frame. The
-Fluent path drains via std.app.dispatch_ui_events(); the game path drains
-via poll_event() in Game.begin_frame(). Mixing both in one frame splits
-the stream — pick one.</p></div>
+Fan-out model: pump_events() builds a fresh event_queue once per frame.
+Every consumer reads events.pending_events() non-destructively, so any
+number of frameworks can observe the same stream. Events pushed via
+push_event() land in injected_events and are merged into the queue at the
+next pump — they live exactly one frame.
+
+pump_events() is also the frame-publish boundary on the GPU backend, so it
+must run exactly once per frame.</p></div>
 <div id="event_type_from_int">
 <h3>event_type_from_int <span class="badge badge-private">Function</span></h3>
 <pre class="code-sig"><code>fn event_type_from_int(code: int): EventType</code></pre>
@@ -163,26 +166,31 @@ the stream — pick one.</p></div>
 <li><code>var pub framebuffer_height: int</code> <em>(field)</em></li>
 </ul>
 </div><hr>
-<div id="make_default_event">
-<h3>make_default_event <span class="badge badge-private">Function</span></h3>
-<pre class="code-sig"><code>fn make_default_event(): Event</code></pre>
-</div><hr>
 <div id="clear">
 <h3>clear <span class="badge badge-pub">Function</span></h3>
 <pre class="code-sig"><code>pub fn clear(): nil</code></pre>
-<div class="summary"><p>Reset the queue (call on app/window init and shutdown).</p></div>
+<div class="summary"><p>Reset both queues (call on app/window init and shutdown).</p></div>
+</div><hr>
+<div id="pending_events">
+<h3>pending_events <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn pending_events(): list</code></pre>
+<div class="summary"><p>The current frame's event list. Returns a copy — read-only for consumers,
+safe to hold across the next pump_events() (which replaces event_queue).
+Every consumer sees the same stream.</p></div>
 </div><hr>
 <div id="pump_events">
 <h3>pump_events <span class="badge badge-pub">Function</span></h3>
 <pre class="code-sig"><code>pub fn pump_events(): nil</code></pre>
-<div class="summary"><p>pump_events drains gg.poll_events() once per frame and enqueues typed
-Events. This is the ONLY caller of gg.poll_events() above the gg layer —
-it is also the frame-publish boundary on the GPU backend, so it must run
-exactly once per frame regardless of which consumer drains the queue.</p></div>
+<div class="summary"><p>pump_events builds this frame's queue: it merges injected_events (synthetic
+pushes since the last pump) with freshly decoded native events from
+gg.poll_events(), then clears injected_events. It is the ONLY caller of
+gg.poll_events() above the gg layer — and the frame-publish boundary on the
+GPU backend — so it must run exactly once per frame.</p></div>
 </div><hr>
 <div id="push_event">
 <h3>push_event <span class="badge badge-pub">Function</span></h3>
 <pre class="code-sig"><code>pub fn push_event(event: Event): nil</code></pre>
+<div class="summary"><p>Queue a synthetic event for delivery at the next pump_events().</p></div>
 </div><hr>
 <div id="push_mouse_click">
 <h3>push_mouse_click <span class="badge badge-pub">Function</span></h3>
@@ -191,18 +199,6 @@ exactly once per frame regardless of which consumer drains the queue.</p></div>
 <div id="push_quit_event">
 <h3>push_quit_event <span class="badge badge-pub">Function</span></h3>
 <pre class="code-sig"><code>pub fn push_quit_event(): nil</code></pre>
-</div><hr>
-<div id="poll_event">
-<h3>poll_event <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn poll_event(): Event</code></pre>
-<div class="summary"><p>Dequeue the next typed event. Only call when has_pending_events() != 0 —
-on an empty queue this returns a default Quit event without advancing.</p></div>
-</div><hr>
-<div id="has_pending_events">
-<h3>has_pending_events <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn has_pending_events(): int</code></pre>
-<div class="summary"><p>True while unconsumed events remain. Compares head against length — the
-consumed prefix does not count as pending.</p></div>
 </div><hr>
 </main>
 </body>

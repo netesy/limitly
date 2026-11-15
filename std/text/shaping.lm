@@ -1,0 +1,116 @@
+// std/text/shaping.lm
+// Explicit text shaping — a documented subset, applied to the LOGICAL
+// string before bidi.visual_text() reorders it for display.
+//
+// Implemented:
+//   - Arabic lam-alef MANDATORY ligatures (U+FEF5..U+FEFC). These are
+//     required by Arabic typography — lam followed by any alef variant
+//     must ligate or the text is wrong.
+//   - Hebrew final forms (sofit): kaf/mem/nun/pe/tsadi take their final
+//     glyph at word end.
+//
+// Deliberately NOT implemented (documented limits):
+//   - Arabic contextual letter forms (isolated/initial/medial/final per
+//     joining type). The joining-type engine is here
+//     (joining_type/neighbors) but the per-letter presentation-form
+//     table is intentionally partial — see arabic_form() — because a
+//     wrong table entry renders wrong glyphs silently. Extend the table
+//     from UnicodeData.txt names ("ARABIC LETTER X INITIAL FORM").
+//   - No mark positioning, no ligatures beyond lam-alef, no GSUB/GPOS.
+//   - Whether the loaded font HAS the presentation-form glyphs is a font
+//     property; fons renders whatever the cmap provides.
+
+import std.text.utf8 as utf8;
+import std.text.bidi as bidi;
+
+// Arabic presentation-form ligatures for LAM + alef variants.
+// Returns the ligature codepoint, or -1 when the pair doesn't ligate.
+fn lam_alef_ligature(lam_next: int): int {
+    // lam_next is the codepoint AFTER lam.
+    if (lam_next == 0x0622) { return 0xFEF5; } // ALEF MADDA
+    if (lam_next == 0x0623) { return 0xFEF7; } // ALEF HAMZA ABOVE
+    if (lam_next == 0x0625) { return 0xFEF9; } // ALEF HAMZA BELOW
+    if (lam_next == 0x0627) { return 0xFEFB; } // ALEF
+    if (lam_next == 0x0671) { return 0xFEFC; } // ALEF WASLA
+    return -1;
+}
+
+// Hebrew sofit (final) forms: base -> final. Applied at word end.
+fn hebrew_final(cp: int): int {
+    if (cp == 0x05DB) { return 0x05DA; } // KAF -> KAF SOFIT
+    if (cp == 0x05DE) { return 0x05DD; } // MEM -> MEM SOFIT
+    if (cp == 0x05E0) { return 0x05DF; } // NUN -> NUN SOFIT
+    if (cp == 0x05E4) { return 0x05E3; } // PE -> PE SOFIT
+    if (cp == 0x05E6) { return 0x05E5; } // TSADI -> TSADI SOFIT
+    return -1;
+}
+
+// Is this codepoint a Hebrew letter (so sofit context applies)?
+fn is_hebrew_letter(cp: int): bool {
+    return cp >= 0x05D0 and cp <= 0x05EA;
+}
+
+// Shape a logical string: mandatory ligatures + final forms.
+// Returns a NEW string; the input is untouched (strings immutable).
+pub fn shape(text: str): str {
+    var cps = utf8.decode(text);
+    var n: int = len(cps);
+    var out: [int] = [] as [int];
+    var i: int = 0;
+    while (i < n) {
+        var cp: int = cps[i];
+
+        // Lam-alef mandatory ligature.
+        if (cp == 0x0644 and i + 1 < n) {
+            var lig: int = lam_alef_ligature(cps[i + 1]);
+            if (lig >= 0) {
+                out.append(lig);
+                i = i + 2;
+                continue;
+            }
+        }
+
+        // Hebrew final form at word end: next char is not a Hebrew letter.
+        if (is_hebrew_letter(cp)) {
+            var at_end: int = 1;
+            if (i + 1 < n and is_hebrew_letter(cps[i + 1])) {
+                at_end = 0;
+            }
+            if (at_end == 1) {
+                var fin: int = hebrew_final(cp);
+                if (fin >= 0) {
+                    out.append(fin);
+                    i = i + 1;
+                    continue;
+                }
+            }
+        }
+
+        out.append(cp);
+        i = i + 1;
+    }
+    return utf8.encode(out);
+}
+
+// Full display pipeline: shape (logical) THEN bidi visual reorder.
+// This is what widgets should emit for painting.
+//
+// Fast path: pure-ASCII text cannot contain RTL codepoints, presentation
+// forms, or marks, so it returns unchanged with a single byte scan —
+// no decode/encode allocations on the hot path.
+pub fn prepare_display(text: str): str {
+    var i: int = 0;
+    var n: int = len(text);
+    var ascii: int = 1;
+    while (i < n) {
+        if (_builtin_string_byte_at(text, i) >= 0x80) {
+            ascii = 0;
+            break;
+        }
+        i = i + 1;
+    }
+    if (ascii == 1) {
+        return text;
+    }
+    return bidi.visual_text(shape(text));
+}

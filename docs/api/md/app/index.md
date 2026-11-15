@@ -226,10 +226,10 @@ pub fn set_ui(root: ui_comp.Fluent): nil
 pub fn dispatch_ui_events(): nil
 ```
 
-dispatch_ui_events drains the std.events queue into the Fluent
-ui_context. This is the Fluent/framework consumer — std.game.Game drains
-the same queue itself for its InputManager/IMGUI instead. Do not call both
-in one frame or the stream is split.
+dispatch_ui_events delivers this frame's std.events stream into the
+Fluent ui_context. It reads events.pending_events() non-destructively, so
+std.game.Game (or any other consumer) can observe the same stream — fan-out
+is the default, not the exception.
 
 ---
 
@@ -243,8 +243,9 @@ pub fn process_events(): nil
 ```
 
 process_events = pump + Fluent dispatch: the per-frame event step for the
-std.app/Fluent run loop. std.game.Game calls events.pump_events() and
-drains the queue itself instead.
+std.app/Fluent run loop. std.game.Game calls events.pump_events() and reads
+the same pending_events() stream for its InputManager/IMGUI — both
+consumers see every event (fan-out).
 
 ---
 

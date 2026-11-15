@@ -1,0 +1,93 @@
+// std.text completion test: Unicode-safe editing + layout.
+//
+// Before this pass, EditorController moved and deleted BYTES — backspace
+// inside "héllo" would split the é sequence and corrupt the string.
+// Now movement/deletion snap to grapheme-cluster boundaries.
+
+import std.text.controller as tc;
+import std.text.grapheme as grapheme;
+import std.text.layout as layout;
+import std.text.utf8 as utf8;
+
+fn main() {
+    print("=== Text Unicode Editing & Layout ===");
+
+    // ── 1. grapheme boundaries on "héllo" (h=1B, é=2B, l,l,o=1B) ──
+    val s = "héllo";
+    assert(len(s) == 6, "héllo is 6 bytes");
+    assert(grapheme.prev_boundary(s, 6) == 5, "prev of end is before 'o'");
+    assert(grapheme.prev_boundary(s, 3) == 1, "prev skips whole é cluster");
+    assert(grapheme.next_boundary(s, 0) == 1, "next of 'h' is before é");
+    assert(grapheme.next_boundary(s, 1) == 3, "next of é jumps both bytes");
+    assert(grapheme.prev_boundary(s, 0) == 0, "prev of start stays 0");
+    assert(grapheme.next_boundary(s, 6) == 6, "next of end stays len");
+
+    // Combining mark cluster: e + U+0301 acute = one cluster.
+    val marked = utf8.encode([0x0065, 0x0301, 0x0078]); // e + mark + x
+    assert(grapheme.next_boundary(marked, 0) == 3, "mark glues to base (e+́ =3B)");
+    assert(grapheme.prev_boundary(marked, 3) == 0, "prev of x is cluster start");
+
+    // ── 2. EditorController: byte-safe movement + deletion ──
+    var ed = tc.EditorController("héllo");
+    ed.set_cursor(0, 6); // end
+    ed.move_left();      // before 'o' -> col 5
+    assert(ed.get_cursor_col() == 5, "move_left over ascii");
+    ed.move_left(); ed.move_left(); ed.move_left(); // over l,l then é
+    assert(ed.get_cursor_col() == 1, "move_left hops é as one unit");
+    ed.move_right();
+    assert(ed.get_cursor_col() == 3, "move_right hops é as one unit");
+
+    // Backspace deletes the whole é, never a byte of it.
+    ed.set_cursor(0, 3);
+    ed.backspace();
+    assert(ed.get_text() == "hllo", "backspace removes whole é");
+    var ok_utf8 = utf8.decode(ed.get_text());
+    assert(len(ok_utf8) == 4, "result still valid UTF-8");
+
+    // delete_char removes cluster under cursor.
+    ed.set_cursor(0, 0);
+    ed.delete_char();
+    assert(ed.get_text() == "llo", "delete_char removes 'h'");
+
+    // delete_char at end of line joins the next line.
+    var ed2 = tc.EditorController("ab\ncd");
+    ed2.set_cursor(0, 2);
+    ed2.delete_char();
+    assert(ed2.get_text() == "abcd", "delete_char joins lines");
+
+    // ── 3. selection_text + copy ──
+    var ed3 = tc.EditorController("one\ntwo\nthree");
+    // select "wo\nth" across the line boundary: (1,1)-(2,2)
+    ed3.cursor.set(1, 1);
+    ed3.selection.set(1, 1);
+    ed3.selection.extend_to(2, 2);
+    assert(ed3.selection_text() == "wo\nth", "cross-line selection text");
+    ed3.set_cursor(0, 0);
+    assert(ed3.selection_text() == "one\n", "no selection -> cursor line");
+
+    // ── 4. layout: codepoint measure + wrap ──
+    assert(layout.char_count("héllo") == 5, "char_count counts codepoints not bytes");
+    assert(layout.measure_width("abcd", 8.0) == 32.0, "measure_width = chars * advance");
+
+    val wrapped = layout.wrap_text("the quick brown fox", 10);
+    // 19 chars, max 10: "the quick" (9) fits, "brown fox" next line.
+    assert(len(wrapped) == 2, "wrap produces 2 lines");
+    assert(wrapped[0] == "the quick", "first line breaks at space");
+    assert(wrapped[1] == "brown fox", "second line remainder");
+
+    // Overlong word hard-breaks.
+    val hard = layout.wrap_text("abcdefghijklmnop", 5);
+    assert(len(hard) == 4, "overlong word hard-breaks");
+    assert(hard[0] == "abcde", "hard break chunk");
+
+    // Multi-paragraph preserves empty lines.
+    val paras = layout.wrap_text("a\n\nb", 10);
+    assert(len(paras) == 3, "blank line preserved");
+    assert(paras[1] == "", "empty middle line");
+
+    // wrap_width converts px to char budget.
+    val px = layout.wrap_width("aaa bbb ccc", 48.0, 8.0); // 6 chars/line
+    assert(len(px) >= 2, "pixel wrap splits");
+
+    print("Text Unicode Editing & Layout PASSED.");
+}

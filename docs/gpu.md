@@ -190,10 +190,26 @@ oracle role it serves for the lowering work.
 - Stage metadata lives on `LIR::FunctionInfo` (`gpu_stage`: 0 ordinary,
   1 task, 2 vertex, 3 pixel, 4 mesh; `gpu_threads[3]`; mesh limits), so every
   downstream backend sees the same stage information without re-parsing.
-- `gpu vertex`/`gpu pixel`/`gpu mesh` declarations parse and type-check, and
-  pipeline descriptors accept them, but the VM has **no dispatch path** for
-  them yet — only `gpu task` executes under emulation. Vertex/pixel/mesh
-  execution arrives with the graphics lowering, not before.
+- **LIR → Fyra IR lowering (implemented):** `LIRToFyraIRBuilder` seeds every
+  `gpu_stage != 0` function as a reachability root (dispatch references them
+  by name string, invisible to call-graph reachability) and emits them as
+  ordinary IR functions. `gpu_*` builtins lower to `gpu.*` extern capability
+  calls (`gpu.thread.id`, `gpu.local.id`, `gpu.group.id`,
+  `gpu.num.groups`, `gpu.sync`, `gpu.mesh.counts`, `gpu.dispatch`) — the
+  same capability channel as `io.write`/`memory.alloc`. Because
+  `ir::Function` has no attribute channel, stage kind, workgroup size, and
+  mesh limits are encoded in a `__lymar_gpu_stages` global string
+  (`name|stage|tx,ty,tz|max_vertices,max_primitives` per line) for the
+  vendor lowering to recover. Capabilities not yet in the Fyra registry
+  emit the capability-unsupported sentinel at codegen — never a silent
+  no-op.
+- **Vendor/Fyra lowering (pending):** mapping `gpu.*` capabilities and the
+  stage manifest to hardware shader/dispatch codegen (SPIR-V/native) is the
+  remaining step; `CapabilityDomain::GPU` and `emitGPUCapability` already
+  exist as the hook point.
+- `gpu vertex`/`gpu pixel`/`gpu mesh` declarations parse, type-check, and
+  now appear in Fyra IR, but no execution path exists on any backend yet —
+  only `gpu task` executes under VM emulation.
 - `gpu.shared` bindings parse and check but have no workgroup-local lowering
   (see §1).
 
@@ -209,10 +225,10 @@ oracle role it serves for the lowering work.
 | `gpu.set_mesh_counts` | Implemented as state setter; consumed by mesh path (pending) |
 | `Device`/`Queue`/`Encoder`/`CommandBuffer`/`Fence` | Implemented as synchronous emulation model |
 | `create_compute_pipeline` / `create_mesh_pipeline` | Descriptor records only; no shader bytecode yet |
-| `gpu vertex` / `gpu pixel` | Parse + type-check; no execution path yet |
-| `gpu mesh` + `limits(...)` | Parse + type-check; no execution path yet |
+| `gpu vertex` / `gpu pixel` / `gpu mesh` | Parse + type-check + Fyra IR emission; no execution path yet |
 | `gpu.shared` workgroup-local storage | Parses; treated as function-local under emulation |
-| Hardware GPU execution | Not implemented; Fyra/native lowering is the target path |
+| LIR → Fyra IR lowering | Implemented: stage fns emitted, `gpu.*` capability externs, `__lymar_gpu_stages` manifest |
+| Vendor/Fyra → hardware lowering | Not implemented; `gpu.*` capabilities emit unsupported sentinels until registered |
 | True parallelism / memory model | Not modeled by emulation (by design — oracle, not simulator) |
 
 See also: `docs/language.md` §7 (syntax summary), `AGENTS.md` "GPU Stage

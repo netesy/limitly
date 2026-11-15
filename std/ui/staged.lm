@@ -113,3 +113,41 @@ staged frame Binding(T: type) {
         self.value = new_val;
     }
 }
+
+// ── M4: staged static-tree helpers ───────────────────────────────────────────
+// Compile-time layout math for static screens. Staged fns fold ONLY inside
+// their own module (a cross-module staged call yields nil), so each helper
+// follows the d3 pattern: a private `staged fn` that pre-folds the common
+// cases into `pub const`s, plus a `pub fn` runtime twin for dynamic args.
+
+staged fn _breakpoint_cols(width_px: int): int {
+    if (width_px >= 1280) { return 4; }
+    if (width_px >= 960) { return 3; }
+    if (width_px >= 640) { return 2; }
+    return 1;
+}
+
+staged fn _folded_text_width(chars: int, scale_milli: int): int {
+    // 8px advance per char at scale 1.0; scale is fixed-point permille.
+    // NOTE: this is the FALLBACK heuristic — real layout uses
+    // std.ui.text_metrics (font advances). Kept for compile-time folds.
+    // (Left-associative chain: the stage-0 folder does not fold parens.)
+    return chars * scale_milli * 8 / 1000;
+}
+
+pub const COLS_DESKTOP: int = _breakpoint_cols(1280);
+pub const COLS_TABLET: int = _breakpoint_cols(960);
+pub const COLS_PHONE: int = _breakpoint_cols(480);
+pub const LABEL_HELLO_W: int = _folded_text_width(5, 1000);
+
+// Runtime twins — identical math, callable with any argument.
+pub fn breakpoint_cols(width_px: int): int {
+    if (width_px >= 1280) { return 4; }
+    if (width_px >= 960) { return 3; }
+    if (width_px >= 640) { return 2; }
+    return 1;
+}
+
+pub fn folded_text_width(chars: int, scale_milli: int): int {
+    return chars * scale_milli * 8 / 1000;
+}

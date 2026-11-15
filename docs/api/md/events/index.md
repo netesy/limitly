@@ -3,17 +3,22 @@
 ## Overview
 
 std/events
-Typed OS/window event pump and queue.
+Typed OS/window event pump and per-frame event queue.
 
 This is the SINGLE translation point from raw gg.poll_events() records into
 typed Event values. Both std.app (Fluent ui_context dispatch) and std.game
-(InputManager/IMGUI) consume this queue — neither calls gg.poll_events()
-directly, so events are never stolen between frameworks.
+(InputManager/IMGUI) consume the SAME per-frame event stream — neither
+calls gg.poll_events() directly, so events are never stolen between
+frameworks.
 
-Ownership model: exactly one consumer drains the queue per frame. The
-Fluent path drains via std.app.dispatch_ui_events(); the game path drains
-via poll_event() in Game.begin_frame(). Mixing both in one frame splits
-the stream — pick one.
+Fan-out model: pump_events() builds a fresh event_queue once per frame.
+Every consumer reads events.pending_events() non-destructively, so any
+number of frameworks can observe the same stream. Events pushed via
+push_event() land in injected_events and are merged into the queue at the
+next pump — they live exactly one frame.
+
+pump_events() is also the frame-publish boundary on the GPU backend, so it
+must run exactly once per frame.
 
 ## Symbols
 
@@ -22,14 +27,12 @@ the stream — pick one.
 - **Frame**: [`KeyEvent`](#KeyEvent)
 - **Frame**: [`MouseEvent`](#MouseEvent)
 - **Frame**: [`ResizeEvent`](#ResizeEvent)
-- **Function**: [`make_default_event`](#make_default_event)
 - **Function**: [`clear`](#clear)
+- **Function**: [`pending_events`](#pending_events)
 - **Function**: [`pump_events`](#pump_events)
 - **Function**: [`push_event`](#push_event)
 - **Function**: [`push_mouse_click`](#push_mouse_click)
 - **Function**: [`push_quit_event`](#push_quit_event)
-- **Function**: [`poll_event`](#poll_event)
-- **Function**: [`has_pending_events`](#has_pending_events)
 
 ---
 
@@ -125,17 +128,6 @@ Resize event frame
 
 ---
 
-### `make_default_event` <a id="make_default_event"></a>
-
-**Kind**: Function  
-**Visibility**: `private`  
-
-```lymar
-fn make_default_event(): Event
-```
-
----
-
 ### `clear` <a id="clear"></a>
 
 **Kind**: Function  
@@ -145,7 +137,22 @@ fn make_default_event(): Event
 pub fn clear(): nil
 ```
 
-Reset the queue (call on app/window init and shutdown).
+Reset both queues (call on app/window init and shutdown).
+
+---
+
+### `pending_events` <a id="pending_events"></a>
+
+**Kind**: Function  
+**Visibility**: `pub`  
+
+```lymar
+pub fn pending_events(): list
+```
+
+The current frame's event list. Returns a copy — read-only for consumers,
+safe to hold across the next pump_events() (which replaces event_queue).
+Every consumer sees the same stream.
 
 ---
 
@@ -158,10 +165,11 @@ Reset the queue (call on app/window init and shutdown).
 pub fn pump_events(): nil
 ```
 
-pump_events drains gg.poll_events() once per frame and enqueues typed
-Events. This is the ONLY caller of gg.poll_events() above the gg layer —
-it is also the frame-publish boundary on the GPU backend, so it must run
-exactly once per frame regardless of which consumer drains the queue.
+pump_events builds this frame's queue: it merges injected_events (synthetic
+pushes since the last pump) with freshly decoded native events from
+gg.poll_events(), then clears injected_events. It is the ONLY caller of
+gg.poll_events() above the gg layer — and the frame-publish boundary on the
+GPU backend — so it must run exactly once per frame.
 
 ---
 
@@ -173,6 +181,8 @@ exactly once per frame regardless of which consumer drains the queue.
 ```lymar
 pub fn push_event(event: Event): nil
 ```
+
+Queue a synthetic event for delivery at the next pump_events().
 
 ---
 
@@ -195,34 +205,6 @@ pub fn push_mouse_click(x: int, y: int): nil
 ```lymar
 pub fn push_quit_event(): nil
 ```
-
----
-
-### `poll_event` <a id="poll_event"></a>
-
-**Kind**: Function  
-**Visibility**: `pub`  
-
-```lymar
-pub fn poll_event(): Event
-```
-
-Dequeue the next typed event. Only call when has_pending_events() != 0 —
-on an empty queue this returns a default Quit event without advancing.
-
----
-
-### `has_pending_events` <a id="has_pending_events"></a>
-
-**Kind**: Function  
-**Visibility**: `pub`  
-
-```lymar
-pub fn has_pending_events(): int
-```
-
-True while unconsumed events remain. Compares head against length — the
-consumed prefix does not count as pending.
 
 ---
 

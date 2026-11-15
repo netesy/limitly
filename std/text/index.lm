@@ -4,3 +4,12 @@
 pub import std.text.controller show EditorController;
 pub import std.text.cursor show Cursor, Selection;
 pub import std.text.document show Document;
+
+// M6: explicit bidi + shaping (documented subsets — see module headers).
+pub import std.text.utf8 show decode, encode;
+pub import std.text.bidi show levels, visual_text, is_rtl;
+pub import std.text.shaping show shape, prepare_display;
+
+// M6 completion: cluster boundaries, layout, Unicode-safe editing.
+pub import std.text.grapheme show prev_boundary, next_boundary;
+pub import std.text.layout show char_count, measure_width, wrap_text, wrap_width;

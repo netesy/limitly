@@ -148,3 +148,14 @@ pub fn tree_node(label: str, children: [any], default_open: bool = false): TreeN
     }
     return comp.TreeNode(label, typed_children, default_open);
 }
+
+// ── M2 retained-component core (docs/ui.md) ─────────────────────────────────
+// Scalar-signature Component trait + Placed mixin + geometry. Widget frames
+// (Button, TextInput, Flow, Container, ScrollView) intentionally NOT
+// re-exported here — their names collide with the Fluent widgets above;
+// import std.ui.widgets / std.ui.container / std.ui.component directly.
+pub import std.ui.component show Component, Placed, TextBound, Size, Rect, MEASURE_LOOSE, label;
+pub import std.ui.widgets show text_input;
+pub import std.ui.container show scroll_view;
+pub import std.ui.text_metrics show text_width, line_height, using_real_font, BASE_FONT_PX;
+pub import std.ui.tree show set_focus, clear_focus, focused, update, submit, dispatch, enable_reactive, request_repaint, on_state_dirty, find_widget;

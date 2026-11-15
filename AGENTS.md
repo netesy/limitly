@@ -124,11 +124,12 @@ No implicit type conversions. You must explicitly cast types using `as` (e.g. `x
 
 #### **Advanced Type Constructs**
 - **Type Aliases**: `type UserId = int;`
-- **Union Types**: `int | str`
+- **Union Types**: `Type1 | Type2` (e.g., `int | str`, `(fn(): nil) | nil`). There is **no** `union(...)` staged type constructor — `union(int, str)` fails with `cannot find staged type constructor 'union'`. Use the pipe syntax.
 - **Intersection Types**: `TraitA & TraitB`
 - **Refined Types**: `int where value > 0` or `str where length(value) > 10`
-- **Optional Types**: `Type?` (syntactic sugar for `Type | nil`)
-- **Fallible Types**: `Type?Error1,Error2` (defines specific error types that can be returned)
+- **Optional Types**: `Type?` — syntactic sugar for `Type | nil`; prefer `T?` over `T | nil` for readability. Narrow with `as` (`x as T`) after a `!= nil` check.
+- **Union-held function values**: Functions (including module-qualified `mod.fn` and closures) can be stored in union/optional fn-typed bindings and called after `as` narrowing. Module-qualified fn values lower to callable name references — passing `mod.callback` to a `(fn(...): T)?` parameter or variable is supported.
+- **Fallible Types**: `Type?Error1,Error2` (defines specific error types that can be returned) — distinct from optional `Type?`; fallible unions carry `ok`/`err` payloads and propagate with `?`.
 
 ---
 
@@ -194,6 +195,7 @@ var u = User();
 u.id = 7;                 // no `u.identifiable` qualifier
 ```
 - Use a mixin for shared **state**. Use a trait for shared **behaviour**. A mixin is not an interface and never dispatches dynamically (methods are permitted only as accessors over its own fields).
+- **Collision rule — host wins**: On a name collision the frame's own declared fields and methods take precedence; mixin members only fill names the frame does not already declare (first mixin wins among multiple mixins). This matches `embed` promotion semantics exactly.
 
 #### **Frame Embedding**
 `embed` flattens a component frame into its host at compile time: the component's fields become the host's own storage and the component's methods are **promoted** onto the host. Zero overhead -- no wrapper object, no indirection, no vtable.
@@ -255,6 +257,7 @@ Lymar does not use generic `Result` types. Instead, it uses fallible annotations
 - **Import Specific Symbols**: `import std.collections { List, Map };` (utilizes show filters under the hood).
 - **Import Alias**: Imports can be aliased with `as`. Qualified names are referenced as `alias.Symbol`.
 - **Import Visibility**: `import std.collections show Iterator;`
+- **Cross-Module `pub var` Access**: Module-level `pub var` bindings are **read-only across module boundaries**. Reading `mod.state` from another module works, but assigning `mod.state = x` is a compile error (`E003`). Mutable module state must be changed through a `pub fn` setter/mutator declared in the owning module (e.g. `tree.request_repaint()` instead of `tree.dirty = 1`). This is intentional encapsulation — design module APIs around setter functions, not direct field writes.
 - **Declarative C Header Import** (`c:` scheme): triggers the header→binding pipeline at compile time, no CLI flag required.
  - Full header bound to a shared library: `import "c:math_ops.h" from "libmath_ops" as math;`
  - Cherry-pick symbols (brace-select is sugar for `show`): `import "c:math_ops.h" from "libmath_ops" as math { add_points, sub_points };`

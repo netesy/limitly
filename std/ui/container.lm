@@ -1,0 +1,328 @@
+// std/ui/container.lm
+// M2 layout containers: Flow (row/column), Container (padded box), ScrollView.
+//
+// All children are [Component] trait objects. measure asks each child for
+// its intrinsic size under loose constraints; arrange distributes the
+// parent's Rect; paint recurses in order; on_event hit-tests children in
+// reverse paint order (topmost first).
+//
+// Events arrive as scalars (trait dispatch cannot take managed args);
+// ScrollView reconstitutes a scroll offset by adjusting the y coordinate
+// before forwarding — children see content-space coordinates.
+
+import std.ui.component as v2;
+import std.ui.component show Placed;
+import std.ui.types as ui_types;
+import std.ui.event as uievent;
+import std.ui.draw_list as dl;
+import std.ui.state as state;
+import std.events as events;
+import std.color as color;
+
+// ── Flow ─────────────────────────────────────────────────────────────────────
+// Linear row or column of children with spacing.
+
+frame Flow {
+    embed Placed;
+    pub var children: [v2.Component];
+    pub var spacing: float;
+    pub var pad_x: float;
+    pub var pad_y: float;
+    pub var vertical: int;
+    pub var fg: color.Color;
+
+    pub init(v: int = 0, sp: float = 4.0) {
+        self.children = [];
+        self.spacing = sp;
+        self.pad_x = 0.0;
+        self.pad_y = 0.0;
+        self.vertical = v;
+        self.fg = color.white;
+        self.id = v2.next_widget_id();
+    }
+
+    pub fn add(c: v2.Component): nil {
+        self.children.append(c);
+    }
+
+    pub fn child_count(): int {
+        return len(self.children);
+    }
+
+    pub fn child_at(i: int): any {
+        if (i < 0 or i >= len(self.children)) {
+            return nil;
+        }
+        return self.children[i];
+    }
+
+    pub fn kind(): ui_types.WidgetKind { return ui_types.WidgetKind.Container; }
+
+    pub fn measure(min_w: float, max_w: float, min_h: float, max_h: float): v2.Size {
+        var content_w: float = 0.0;
+        var content_h: float = 0.0;
+        var i = 0;
+        while (i < len(self.children)) {
+            val c = self.children[i];
+            val s = c.measure(0.0, v2.MEASURE_LOOSE, 0.0, v2.MEASURE_LOOSE);
+            if (self.vertical != 0) {
+                if (s.w > content_w) { content_w = s.w; }
+                content_h = content_h + s.h + self.spacing;
+            } else {
+                content_w = content_w + s.w + self.spacing;
+                if (s.h > content_h) { content_h = s.h; }
+            }
+            i = i + 1;
+        }
+        if (len(self.children) > 0) {
+            content_w = content_w - self.spacing;
+            content_h = content_h - self.spacing;
+        }
+        var w: float = content_w + self.pad_x * 2.0;
+        var h: float = content_h + self.pad_y * 2.0;
+        if (w < min_w) { w = min_w; }
+        if (w > max_w) { w = max_w; }
+        if (h < min_h) { h = min_h; }
+        if (h > max_h) { h = max_h; }
+        return v2.Size(w=w, h=h);
+    }
+
+    pub fn arrange(x: float, y: float, w: float, h: float): nil {
+        self.rect.x = x;
+        self.rect.y = y;
+        self.rect.w = w;
+        self.rect.h = h;
+        var cx: float = x + self.pad_x;
+        var cy: float = y + self.pad_y;
+        var avail_w: float = w - self.pad_x * 2.0;
+        var avail_h: float = h - self.pad_y * 2.0;
+        var i = 0;
+        while (i < len(self.children)) {
+            val c = self.children[i];
+            // Propagate remaining space: each child may use at most what is
+            // left after its predecessors, so expandable children (e.g.
+            // ScrollView) clamp to the leftover instead of overflowing.
+            var remain_w: float = avail_w - (cx - (x + self.pad_x));
+            var remain_h: float = avail_h - (cy - (y + self.pad_y));
+            if (remain_w < 0.0) { remain_w = 0.0; }
+            if (remain_h < 0.0) { remain_h = 0.0; }
+            val s = c.measure(0.0, remain_w, 0.0, remain_h);
+            if (self.vertical != 0) {
+                c.arrange(cx, cy, avail_w, s.h);
+                cy = cy + s.h + self.spacing;
+            } else {
+                c.arrange(cx, cy, s.w, avail_h);
+                cx = cx + s.w + self.spacing;
+            }
+            i = i + 1;
+        }
+    }
+
+    pub fn paint(): nil {
+        var i = 0;
+        while (i < len(self.children)) {
+            self.children[i].paint();
+            i = i + 1;
+        }
+    }
+
+    pub fn on_event(t: events.EventType, x: int, y: int, key: int): uievent.EventResult {
+        // Reverse order: topmost (last painted) gets first chance.
+        var i = len(self.children) - 1;
+        while (i >= 0) {
+            val c = self.children[i];
+            val r = c.bounds();
+            if (r.contains(x as float, y as float)) {
+                val res = c.on_event(t, x, y, key);
+                if (res == uievent.EventResult.Handled) {
+                    return uievent.EventResult.Handled;
+                }
+            }
+            i = i - 1;
+        }
+        return uievent.EventResult.Ignored;
+    }
+}
+
+pub fn row(spacing: float = 4.0): Flow {
+    return Flow(0, spacing);
+}
+
+pub fn column(spacing: float = 4.0): Flow {
+    return Flow(1, spacing);
+}
+
+// ── Container ────────────────────────────────────────────────────────────────
+// Single-child padded box — the "padding" primitive.
+
+frame Container {
+    embed Placed;
+    pub var child: v2.Component;
+    pub var pad_x: float;
+    pub var pad_y: float;
+    pub var bg: color.Color;
+
+    pub init(c: v2.Component, px: float = 4.0, py: float = 4.0) {
+        self.child = c;
+        self.pad_x = px;
+        self.pad_y = py;
+        self.bg = color.Color(r=0.0, g=0.0, b=0.0, a=0.0);
+        self.id = v2.next_widget_id();
+    }
+
+    pub fn kind(): ui_types.WidgetKind { return ui_types.WidgetKind.Container; }
+
+    pub fn child_count(): int {
+        return 1;
+    }
+
+    pub fn child_at(i: int): any {
+        if (i == 0) {
+            return self.child;
+        }
+        return nil;
+    }
+
+    pub fn measure(min_w: float, max_w: float, min_h: float, max_h: float): v2.Size {
+        val s = self.child.measure(0.0, v2.MEASURE_LOOSE, 0.0, v2.MEASURE_LOOSE);
+        var w: float = s.w + self.pad_x * 2.0;
+        var h: float = s.h + self.pad_y * 2.0;
+        if (w < min_w) { w = min_w; }
+        if (w > max_w) { w = max_w; }
+        if (h < min_h) { h = min_h; }
+        if (h > max_h) { h = max_h; }
+        return v2.Size(w=w, h=h);
+    }
+
+    pub fn arrange(x: float, y: float, w: float, h: float): nil {
+        self.rect.x = x;
+        self.rect.y = y;
+        self.rect.w = w;
+        self.rect.h = h;
+        if (self.bg.a > 0.001) {
+            dl.dl_emit_rect(dl.paint_ctx.dl, x, y, w, h,
+                self.bg.r, self.bg.g, self.bg.b, self.bg.a);
+        }
+        self.child.arrange(x + self.pad_x, y + self.pad_y,
+            w - self.pad_x * 2.0, h - self.pad_y * 2.0);
+    }
+
+    pub fn paint(): nil {
+        self.child.paint();
+    }
+
+    pub fn on_event(t: events.EventType, x: int, y: int, key: int): uievent.EventResult {
+        val r = self.child.bounds();
+        if (not r.contains(x as float, y as float)) {
+            return uievent.EventResult.Ignored;
+        }
+        return self.child.on_event(t, x, y, key);
+    }
+}
+
+// ── ScrollView ───────────────────────────────────────────────────────────────
+// Clips its child to its Rect and forwards pointer events with a y offset,
+// so children hit-test in content space. Scroll via mouse wheel.
+
+frame ScrollView {
+    embed Placed;
+    pub var child: v2.Component;
+    pub var scroll_y: float;
+    pub var max_scroll: float;
+    pub var scroll_sig: state.FloatSignal?;
+
+    pub init(c: v2.Component) {
+        self.child = c;
+        self.scroll_y = 0.0;
+        self.max_scroll = 0.0;
+        self.scroll_sig = nil;
+        self.id = v2.next_widget_id();
+    }
+
+    pub fn child_count(): int {
+        return 1;
+    }
+
+    pub fn child_at(i: int): any {
+        if (i == 0) {
+            return self.child;
+        }
+        return nil;
+    }
+
+    // Bind an external FloatSignal two-way: wheel scrolling writes it,
+    // external set() is polled into scroll_y on the next arrange.
+    pub fn bind_scroll(sig: state.FloatSignal): nil {
+        self.scroll_sig = sig;
+        self.scroll_y = sig.get();
+    }
+
+    pub fn kind(): ui_types.WidgetKind { return ui_types.WidgetKind.Container; }
+
+    pub fn measure(min_w: float, max_w: float, min_h: float, max_h: float): v2.Size {
+        // Report the child's intrinsic size clamped to our constraints —
+        // under a bounded parent this caps the scrollable extent so the
+        // view itself stays inside the viewport.
+        val s = self.child.measure(0.0, v2.MEASURE_LOOSE, 0.0, v2.MEASURE_LOOSE);
+        var w: float = s.w;
+        var h: float = s.h;
+        if (w < min_w) { w = min_w; }
+        if (w > max_w) { w = max_w; }
+        if (h < min_h) { h = min_h; }
+        if (h > max_h) { h = max_h; }
+        return v2.Size(w=w, h=h);
+    }
+
+    pub fn arrange(x: float, y: float, w: float, h: float): nil {
+        self.rect.x = x;
+        self.rect.y = y;
+        self.rect.w = w;
+        self.rect.h = h;
+        // Child gets its measured height but is clipped to our height.
+        val s = self.child.measure(0.0, w, 0.0, v2.MEASURE_LOOSE);
+        if (self.scroll_sig != nil) {
+            self.scroll_y = (self.scroll_sig as state.FloatSignal).get();
+        }
+        var overflow: float = s.h - h;
+        if (overflow < 0.0) { overflow = 0.0; }
+        self.max_scroll = overflow;
+        if (self.scroll_y > self.max_scroll) { self.scroll_y = self.max_scroll; }
+        if (self.scroll_y < 0.0) { self.scroll_y = 0.0; }
+        self.child.arrange(x, y - self.scroll_y, w, s.h);
+    }
+
+    pub fn paint(): nil {
+        dl.dl_push_clip(dl.paint_ctx.dl, self.rect.x, self.rect.y, self.rect.w, self.rect.h);
+        self.child.paint();
+        dl.dl_pop_clip(dl.paint_ctx.dl);
+    }
+
+    pub fn on_event(t: events.EventType, x: int, y: int, key: int): uievent.EventResult {
+        if (t == events.EventType.MouseWheel) {
+            var inside: bool = self.rect.contains(x as float, y as float);
+            if (inside) {
+                var delta: float = (key as float) * 24.0;
+                self.scroll_y = self.scroll_y + delta;
+                if (self.scroll_y < 0.0) { self.scroll_y = 0.0; }
+                if (self.scroll_y > self.max_scroll) { self.scroll_y = self.max_scroll; }
+                if (self.scroll_y < 0.0) { self.scroll_y = 0.0; }
+                if (self.scroll_sig != nil) {
+                    (self.scroll_sig as state.FloatSignal).set(self.scroll_y);
+                }
+                return uievent.EventResult.Handled;
+            }
+        }
+        // Forward in content space: child's rect.y already includes -scroll_y,
+        // so adjust the pointer y by the same offset before hit-testing.
+        var adj_y: int = y + (self.scroll_y as int);
+        var r = self.child.bounds();
+        if (not r.contains(x as float, adj_y as float)) {
+            return uievent.EventResult.Ignored;
+        }
+        return self.child.on_event(t, x, adj_y, key);
+    }
+}
+
+pub fn scroll_view(c: v2.Component): ScrollView {
+    return ScrollView(c);
+}

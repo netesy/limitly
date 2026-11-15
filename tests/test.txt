@@ -58,6 +58,7 @@ tests/oop/traits_inheritance.lm
 tests/oop/visibility_test.lm
 tests/oop/composition_test.lm
 tests/oop/mixin_test.lm
+tests/oop/mixin_shadowing.lm
 tests/oop/embed_test.lm
 tests/oop/strict_trait_colon_test.lm
 tests/oop/prot_visibility_test.lm
@@ -73,6 +74,7 @@ tests/native/native_link_basic.lm
 # Fallible types - `? else` fallback and pattern discrimination
 # (the rest of tests/error_handling/ is not wired into this manifest)
 tests/error_handling/fallback_test.lm
+tests/core/module_fn_value.lm
 # Stdlib - Core
 tests/stdlib/core/string_test.lm
 tests/stdlib/core/math_test.lm
@@ -153,6 +155,13 @@ tests/text_render_test.lm
 tests/retained_ui_test.lm
 tests/ui_fluent_test.lm
 tests/ui_ergonomics_test.lm
+tests/ui_component_skeleton.lm
+tests/ui_v2_widgets.lm
+tests/ui_reactive.lm
+tests/ui_m4_static.lm
+tests/ui_m5_perf.lm
+tests/text_bidi_shaping.lm
+tests/text_unicode_editing.lm
 tests/window_resize_test.lm
 tests/interactive_controls_test.lm
 tests/showcase_verify_test.lm

@@ -1,0 +1,254 @@
+// std/ui/widgets.lm
+// M2/M3 core interactive widgets: Button, TextInput.
+//
+// Events arrive unpacked as scalars (trait dispatch cannot take managed
+// args). Each widget hit-tests against its arranged Rect. Focus is
+// single-owner via std/ui/tree.lm — TextInput claims it on pointer-down.
+//
+// State flows through signals, not callbacks: TextBound.text_sig is a
+// shared StrSignal visible inside the trait snapshot. TextInput keeps its
+// own StrSignal mirror of the EditorController text — edits write the
+// signal, external set() reconciles back into the controller each frame.
+
+import std.ui.component as v2;
+import std.ui.component show Placed, TextBound;
+import std.ui.types as ui_types;
+import std.ui.event as uievent;
+import std.ui.context as uictx;
+import std.ui.draw_list as dl;
+import std.ui.state as state;
+import std.ui.tree as tree;
+import std.events as events;
+import std.color as color;
+import std.text.controller as text_ctrl;
+import std.text.shaping as textshape;
+import std.ui.text_metrics as tm;
+
+// ── Button ───────────────────────────────────────────────────────────────────
+
+frame Button {
+    embed Placed;
+    embed TextBound;
+    pub var bg: color.Color;
+    pub var bg_hover: color.Color;
+    pub var fg: color.Color;
+    pub var font_scale: float;
+    pub var pad_x: float;
+    pub var pad_y: float;
+    pub var on_click: (fn(): nil)?;
+    pub var pressed: int;
+    pub var hovered: int;
+
+    pub init(txt: str = "", c: color.Color? = nil, click: (fn(): nil)? = nil) {
+        self.text = txt;
+        if (c == nil) {
+            self.bg = color.Color(r=0.2, g=0.24, b=0.32, a=1.0);
+            self.bg_hover = color.Color(r=0.28, g=0.33, b=0.42, a=1.0);
+        } else {
+            self.bg = c as color.Color;
+            self.bg_hover = self.bg;
+        }
+        self.fg = color.white;
+        self.font_scale = 1.0;
+        self.pad_x = 12.0;
+        self.pad_y = 6.0;
+        self.on_click = click;
+        self.pressed = 0;
+        self.hovered = 0;
+        self.id = v2.next_widget_id();
+    }
+
+    pub fn kind(): ui_types.WidgetKind { return ui_types.WidgetKind.Button; }
+
+    pub fn measure(min_w: float, max_w: float, min_h: float, max_h: float): v2.Size {
+        var disp = textshape.prepare_display(self.string_val());
+        var w: float = tm.text_width(disp, self.font_scale) + self.pad_x * 2.0;
+        var h: float = tm.line_height(self.font_scale) + self.pad_y * 2.0;
+        if (w < min_w) { w = min_w; }
+        if (w > max_w) { w = max_w; }
+        if (h < min_h) { h = min_h; }
+        if (h > max_h) { h = max_h; }
+        return v2.Size(w=w, h=h);
+    }
+
+    pub fn paint(): nil {
+        var bgc = self.bg;
+        if (self.hovered != 0) { bgc = self.bg_hover; }
+        dl.dl_emit_rect(dl.paint_ctx.dl, self.rect.x, self.rect.y, self.rect.w, self.rect.h,
+            bgc.r, bgc.g, bgc.b, bgc.a);
+        var label_txt = textshape.prepare_display(self.string_val());
+        var tx: float = self.rect.x + (self.rect.w - tm.text_width(label_txt, self.font_scale)) / 2.0;
+        var ty: float = self.rect.y + (self.rect.h - tm.line_height(self.font_scale)) / 2.0;
+        dl.dl_emit_text(dl.paint_ctx.dl, label_txt, tx, ty,
+            self.fg.r, self.fg.g, self.fg.b, self.fg.a, self.font_scale);
+    }
+
+    pub fn on_event(t: events.EventType, x: int, y: int, key: int): uievent.EventResult {
+        var inside: bool = self.rect.contains(x as float, y as float);
+        if (t == events.EventType.MouseMove) {
+            if (inside) {
+                self.hovered = 1;
+                return uievent.EventResult.Handled;
+            }
+            self.hovered = 0;
+        } elif (t == events.EventType.MouseDown) {
+            if (inside and key == 0) {
+                self.pressed = 1;
+                return uievent.EventResult.Handled;
+            }
+        } elif (t == events.EventType.MouseUp) {
+            if (self.pressed != 0) {
+                self.pressed = 0;
+                if (inside) {
+                    if (self.on_click != nil) {
+                        val cb = self.on_click as fn(): nil;
+                        cb();
+                    }
+                    return uievent.EventResult.Handled;
+                }
+            }
+        }
+        return uievent.EventResult.Ignored;
+    }
+}
+
+pub fn button(txt: str, c: color.Color? = nil, click: (fn(): nil)? = nil): Button {
+    return Button(txt, c, click);
+}
+
+// ── TextInput ────────────────────────────────────────────────────────────────
+// Single-line text field backed by std.text.EditorController — real cursor,
+// selection and undo semantics. text_sig is ALWAYS present (created in
+// init): edits write it, external set() reconciles into the controller.
+// Use inp.text_sig before add() to observe/bind, or bind_text() to attach
+// an external StrSignal two-way.
+
+frame TextInput {
+    embed Placed;
+    pub var ctrl: text_ctrl.EditorController;
+    pub var text_sig: state.StrSignal;
+    pub var placeholder: str;
+    pub var bg: color.Color;
+    pub var fg: color.Color;
+    pub var font_scale: float;
+    pub var pad_x: float;
+    pub var pad_y: float;
+    pub var focused: int;
+
+    pub init(initial: str = "", hint: str = "") {
+        self.ctrl = text_ctrl.EditorController(initial);
+        self.text_sig = state.signal_str(initial);
+        self.placeholder = hint;
+        self.bg = color.Color(r=0.12, g=0.14, b=0.18, a=1.0);
+        self.fg = color.white;
+        self.font_scale = 1.0;
+        self.pad_x = 6.0;
+        self.pad_y = 4.0;
+        self.focused = 0;
+        self.id = v2.next_widget_id();
+    }
+
+    pub fn kind(): ui_types.WidgetKind { return ui_types.WidgetKind.Input; }
+
+    pub fn text(): str {
+        return self.ctrl.get_text();
+    }
+
+    // Attach an external signal two-way: widget edits write it, external
+    // set() reconciles into the controller on the next paint.
+    pub fn bind_text(sig: state.StrSignal): nil {
+        self.text_sig = sig;
+        self.ctrl.set_text(sig.get());
+    }
+
+    fn sync_sig(): nil {
+        val cur = self.ctrl.get_text();
+        if (self.text_sig.get() != cur) {
+            self.text_sig.set(cur);
+        }
+    }
+
+    fn reconcile(): nil {
+        val sig_txt = self.text_sig.get();
+        if (sig_txt != self.ctrl.get_text()) {
+            self.ctrl.set_text(sig_txt);
+        }
+    }
+
+    pub fn measure(min_w: float, max_w: float, min_h: float, max_h: float): v2.Size {
+        var w: float = 120.0 * self.font_scale;
+        var h: float = tm.line_height(self.font_scale) + self.pad_y * 2.0;
+        if (w < min_w) { w = min_w; }
+        if (w > max_w) { w = max_w; }
+        if (h < min_h) { h = min_h; }
+        if (h > max_h) { h = max_h; }
+        return v2.Size(w=w, h=h);
+    }
+
+    pub fn on_event(t: events.EventType, x: int, y: int, key: int): uievent.EventResult {
+        var inside: bool = self.rect.contains(x as float, y as float);
+        if (t == events.EventType.MouseDown) {
+            if (inside) {
+                self.focused = 1;
+                tree.set_focus(self);
+                return uievent.EventResult.Handled;
+            }
+        } elif (t == events.EventType.KeyDown) {
+            if (self.focused == 0) { return uievent.EventResult.Ignored; }
+            if (key == 8 or key == 127) {
+                self.ctrl.backspace();
+                self.sync_sig();
+                return uievent.EventResult.Handled;
+            }
+            if (key == 37) {
+                self.ctrl.move_left(false);
+                return uievent.EventResult.Handled;
+            }
+            if (key == 39) {
+                self.ctrl.move_right(false);
+                return uievent.EventResult.Handled;
+            }
+            if (key == 36) {
+                self.ctrl.set_cursor(0, 0);
+                return uievent.EventResult.Handled;
+            }
+            if (key == 35) {
+                var lc = self.ctrl.get_line_count() - 1;
+                self.ctrl.set_cursor(lc, len(self.ctrl.get_line(lc)));
+                return uievent.EventResult.Handled;
+            }
+        } elif (t == events.EventType.Char) {
+            if (self.focused == 0) { return uievent.EventResult.Ignored; }
+            var ch = uictx.codepoint_to_utf8(key);
+            if (len(ch) > 0) {
+                self.ctrl.insert_text(ch);
+                self.sync_sig();
+                return uievent.EventResult.Handled;
+            }
+        }
+        return uievent.EventResult.Ignored;
+    }
+
+    pub fn paint(): nil {
+        self.reconcile();
+        dl.dl_emit_rect(dl.paint_ctx.dl, self.rect.x, self.rect.y, self.rect.w, self.rect.h,
+            self.bg.r, self.bg.g, self.bg.b, self.bg.a);
+        var txt = self.ctrl.get_text();
+        if (self.focused == 0 and len(txt) == 0 and len(self.placeholder) > 0) {
+            dl.dl_emit_text(dl.paint_ctx.dl, self.placeholder, self.rect.x + self.pad_x, self.rect.y + self.pad_y,
+                0.5, 0.55, 0.6, 0.6, self.font_scale);
+        } else {
+            dl.dl_emit_text(dl.paint_ctx.dl, textshape.prepare_display(txt), self.rect.x + self.pad_x, self.rect.y + self.pad_y,
+                self.fg.r, self.fg.g, self.fg.b, self.fg.a, self.font_scale);
+        }
+        if (self.focused != 0) {
+            // Focus ring: 1px border in accent color.
+            dl.dl_emit_rect_border(dl.paint_ctx.dl, self.rect.x, self.rect.y, self.rect.w, self.rect.h,
+                2.0, 1.0, 1.0, 0.4, 0.6, 1.0, 0.9);
+        }
+    }
+}
+
+pub fn text_input(initial: str = "", hint: str = ""): TextInput {
+    return TextInput(initial, hint);
+}

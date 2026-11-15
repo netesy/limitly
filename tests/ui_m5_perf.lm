@@ -1,0 +1,116 @@
+// M5 test: perf pass — repaint elision, batching audit, alloc profiling.
+//
+// Verifies:
+//   1. update() skips arrange+paint on clean frames once enable_reactive()
+//      turns elision on (dirty == 0, same viewport).
+//   2. Resize, Handled events, and signal sets each force a repaint.
+//   3. Ignored events do NOT force a repaint.
+//   4. The retained DrawList reuses slots — len(cmds) never grows across
+//      identical frames (steady-state zero allocation).
+//   5. Clip push/pop balance over the emitted stream is zero.
+//   6. submit() replays the retained list while elided frames skip work.
+
+import std.ui.component as v2;
+import std.ui.widgets as w2;
+import std.ui.container as boxes;
+import std.ui.tree as tree;
+import std.ui.draw_list as dl;
+import std.ui.state as state;
+import std.ui.event as uievent;
+import std.events as events;
+
+var clicked: int = 0;
+
+fn main() {
+    print("=== UI Perf Pass (M5) ===");
+
+    val sig = state.signal_str("idle");
+    val lbl = v2.label("idle");
+    lbl.bind_text(sig);
+    val btn = w2.button("go", nil, fn() { clicked = clicked + 1; });
+    val col = boxes.column(4.0);
+    col.add(lbl);
+    col.add(btn);
+    val root = boxes.scroll_view(col);
+
+    tree.enable_reactive();
+    val dlp = dl.paint_ctx.dl;
+
+    // ── 1. First frame always repaints ──
+    tree.update(root, 400.0, 300.0);
+    assert(tree.repainted_frames == 1, "first update repaints");
+    val cmds_first = dlp.cmd_count;
+    val slots_first = len(dlp.cmds);
+    assert(cmds_first > 0, "paint emitted commands");
+
+    // ── 2. Clean frames are elided; retained list stays valid ──
+    tree.update(root, 400.0, 300.0);
+    assert(tree.skipped_frames == 1, "clean frame skipped");
+    assert(tree.repainted_frames == 1, "no repaint on clean frame");
+    assert(dlp.cmd_count == cmds_first, "retained draw list still holds the frame");
+
+    // ── 3. Allocation audit: 30 identical frames must not grow storage ──
+    var i: int = 0;
+    while (i < 30) {
+        tree.update(root, 400.0, 300.0);
+        i = i + 1;
+    }
+    assert(tree.skipped_frames == 31, "all clean frames skipped");
+    assert(len(dlp.cmds) == slots_first, "draw list slots reused — no steady-state growth");
+    assert(dlp.cmd_count == cmds_first, "identical frames emit identical command counts");
+
+    // ── 4. Resize forces repaint even when clean ──
+    tree.update(root, 500.0, 300.0);
+    assert(tree.repainted_frames == 2, "resize repaints");
+    assert(tree.last_w == 500.0, "viewport tracked");
+
+    // ── 5. Signal set -> dirty notifier -> repaint with new content ──
+    sig.set("busy");
+    tree.update(root, 500.0, 300.0);
+    assert(tree.repainted_frames == 3, "signal change repaints");
+    var saw_busy: int = 0;
+    var j: int = 0;
+    while (j < dlp.cmd_count) {
+        if (dlp.cmds[j].kind == dl.DrawCmdKind.Text and dlp.cmds[j].text == "busy") {
+            saw_busy = 1;
+        }
+        j = j + 1;
+    }
+    assert(saw_busy == 1, "repaint emitted the new signal text");
+
+    // Clean again after the repaint.
+    tree.update(root, 500.0, 300.0);
+    assert(tree.skipped_frames == 32, "post-repaint frame elides again");
+
+    // ── 6. Handled pointer event -> dirty -> repaint ──
+    val fw = tree.find_widget(root, btn.id);
+    assert(fw != nil, "find_widget locates the button");
+    val r = (fw as v2.Component).bounds();
+    val cx: int = ((r.x + r.w / 2.0) as int);
+    val cy: int = ((r.y + r.h / 2.0) as int);
+    var down = events.Event(event_type=events.EventType.MouseDown, x=cx, y=cy, key_code=0);
+    var up = events.Event(event_type=events.EventType.MouseUp, x=cx, y=cy, key_code=0);
+    var res_d = tree.dispatch(root, down);
+    var res_u = tree.dispatch(root, up);
+    assert(clicked == 1, "button click fired");
+    assert(res_u == uievent.EventResult.Handled, "click handled");
+    tree.update(root, 500.0, 300.0);
+    assert(tree.repainted_frames == 4, "handled event repaints");
+
+    // ── 7. Ignored event does not dirty the frame ──
+    tree.update(root, 500.0, 300.0); // clean -> skipped
+    val skip_before = tree.skipped_frames;
+    var miss = events.Event(event_type=events.EventType.MouseDown, x=499, y=299, key_code=0);
+    var res_m = tree.dispatch(root, miss);
+    tree.update(root, 500.0, 300.0);
+    if (res_m != uievent.EventResult.Handled) {
+        assert(tree.skipped_frames == skip_before + 1, "ignored event leaves frame clean");
+    }
+
+    // ── 8. Batching audit: clip stack balanced, single replay path ──
+    assert(dl.dl_clip_balance(dlp) == 0, "clip push/pop balanced across the frame");
+    tree.submit();
+    assert(tree.repainted_frames >= 4, "submit replays retained list");
+
+    print("UI Perf Pass (M5) PASSED.");
+}

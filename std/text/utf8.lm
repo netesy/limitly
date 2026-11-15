@@ -1,0 +1,86 @@
+// std/text/utf8.lm
+// UTF-8 decode/encode over Lymar's byte-indexed strings.
+//
+// std.string works on BYTES (byte_at, _builtin_substring). BiDi and
+// shaping need CODEPOINTS, so this module is the boundary: decode a str
+// into [int] codepoints, encode a codepoint list back to str.
+// Invalid byte sequences decode as U+FFFD (replacement char), matching
+// the WHATWG/Unicode recommendation for ill-formed input.
+
+const REPLACEMENT: int = 0xFFFD;
+
+// Decode a UTF-8 string into a list of Unicode codepoints.
+pub fn decode(s: str): [int] {
+    var cps: [int] = [] as [int];
+    var n: int = len(s);
+    var i: int = 0;
+    while (i < n) {
+        var b0: int = _builtin_string_byte_at(s, i);
+        if (b0 < 0x80) {
+            cps.append(b0);
+            i = i + 1;
+        } elif (b0 >= 0xC2 and b0 < 0xE0 and i + 1 < n) {
+            var b1: int = _builtin_string_byte_at(s, i + 1);
+            if ((b1 & 0xC0) == 0x80) {
+                cps.append(((b0 & 0x1F) * 64) + (b1 & 0x3F));
+                i = i + 2;
+            } else {
+                cps.append(REPLACEMENT);
+                i = i + 1;
+            }
+        } elif (b0 >= 0xE0 and b0 < 0xF0 and i + 2 < n) {
+            var b1: int = _builtin_string_byte_at(s, i + 1);
+            var b2: int = _builtin_string_byte_at(s, i + 2);
+            if ((b1 & 0xC0) == 0x80 and (b2 & 0xC0) == 0x80) {
+                cps.append(((b0 & 0x0F) * 4096) + ((b1 & 0x3F) * 64) + (b2 & 0x3F));
+                i = i + 3;
+            } else {
+                cps.append(REPLACEMENT);
+                i = i + 1;
+            }
+        } elif (b0 >= 0xF0 and b0 < 0xF5 and i + 3 < n) {
+            var b1: int = _builtin_string_byte_at(s, i + 1);
+            var b2: int = _builtin_string_byte_at(s, i + 2);
+            var b3: int = _builtin_string_byte_at(s, i + 3);
+            if ((b1 & 0xC0) == 0x80 and (b2 & 0xC0) == 0x80 and (b3 & 0xC0) == 0x80) {
+                cps.append(((b0 & 0x07) * 262144) + ((b1 & 0x3F) * 4096) + ((b2 & 0x3F) * 64) + (b3 & 0x3F));
+                i = i + 4;
+            } else {
+                cps.append(REPLACEMENT);
+                i = i + 1;
+            }
+        } else {
+            cps.append(REPLACEMENT);
+            i = i + 1;
+        }
+    }
+    return cps;
+}
+
+// Encode a list of codepoints as a UTF-8 string. Out-of-range values
+// (> U+10FFFF) encode as U+FFFD.
+pub fn encode(cps: [int]): str {
+    var bytes: [int] = [] as [int];
+    iter (cp0 in cps) {
+        var cp: int = cp0;
+        if (cp < 0 or cp > 0x10FFFF) {
+            cp = REPLACEMENT;
+        }
+        if (cp < 0x80) {
+            bytes.append(cp);
+        } elif (cp < 0x800) {
+            bytes.append(0xC0 + (cp / 64));
+            bytes.append(0x80 + (cp & 0x3F));
+        } elif (cp < 0x10000) {
+            bytes.append(0xE0 + (cp / 4096));
+            bytes.append(0x80 + ((cp / 64) & 0x3F));
+            bytes.append(0x80 + (cp & 0x3F));
+        } else {
+            bytes.append(0xF0 + (cp / 262144));
+            bytes.append(0x80 + ((cp / 4096) & 0x3F));
+            bytes.append(0x80 + ((cp / 64) & 0x3F));
+            bytes.append(0x80 + (cp & 0x3F));
+        }
+    }
+    return _builtin_string_from_bytes(bytes);
+}

@@ -151,6 +151,15 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
         }
     }
 
+    // GPU stage functions are dispatch entry points, not call-graph callees:
+    // gpu_dispatch references them by name string, so reachability must seed
+    // them explicitly or they would be dropped from the module entirely.
+    for (const auto& fname : registry.getFunctionNames()) {
+        auto* gf = registry.getFunction(fname);
+        if (gf && gf->gpu_stage != 0 && reachable_funcs.insert(fname).second)
+            worklist.push_back(fname);
+    }
+
     auto inspect_instructions = [&](const LIR::LIR_Function& f) {
         for (const auto& inst : f.instructions) {
             if (inst.op == LIR::LIR_Op::NewFrame) {
@@ -335,6 +344,32 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
 
     // 3. Build the top-level main function body
     build_function_body(main_fn, lir_func);
+
+    // GPU stage manifest: ir::Function carries no attribute/metadata channel,
+    // so stage kind, workgroup size, and mesh limits are encoded here for the
+    // vendor/fyra lowering to recover. One line per gpu function:
+    //   "<function name>|<task|vertex|pixel|mesh>|<tx>,<ty>,<tz>|<max_vertices>,<max_primitives>"
+    {
+        std::string gpu_table;
+        for (const auto& fname : registry.getFunctionNames()) {
+            auto* gf = registry.getFunction(fname);
+            if (!gf || gf->gpu_stage == 0) continue;
+            if (reachable_funcs.find(fname) == reachable_funcs.end()) continue;
+            const char* stage = gf->gpu_stage == 1 ? "task" :
+                                gf->gpu_stage == 2 ? "vertex" :
+                                gf->gpu_stage == 3 ? "pixel" : "mesh";
+            gpu_table += fname + "|" + stage + "|" +
+                std::to_string(gf->gpu_threads[0]) + "," +
+                std::to_string(gf->gpu_threads[1]) + "," +
+                std::to_string(gf->gpu_threads[2]) + "|" +
+                std::to_string(gf->gpu_max_vertices) + "," +
+                std::to_string(gf->gpu_max_primitives) + "\n";
+        }
+        if (!gpu_table.empty()) {
+            FyraBuiltinFunctions::get_or_create_global_str(current_module_.get(), builder_.get(),
+                "__lymar_gpu_stages", gpu_table);
+        }
+    }
 
     bool callbacks_needed=false;
     for(const auto& name:reachable_funcs) {
@@ -769,6 +804,39 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 {erased_word(args[0]), erased_word(args[1]), erased_word(args[2]), zero, zero, zero},
                 context_->getIntegerType(64));
         return nullptr;
+    };
+
+    // GPU intrinsics lower to `gpu.*` extern capability calls — the same
+    // channel as io.write/memory.alloc. The register-VM emulation semantics
+    // live in ops/gpu.cpp; the vendor/fyra lowering maps these capabilities
+    // to hardware ops later. Capabilities not yet in the Fyra registry emit
+    // the capability-unsupported sentinel at codegen, never a silent no-op.
+    // Returns true when `name` is a gpu builtin (call emitted, result stored).
+    auto lower_gpu_builtin = [&](const std::string& name, const std::vector<ir::Value*>& args,
+                                 const LIR::LIR_Inst& inst) -> bool {
+        static const std::unordered_map<std::string, const char*> gpu_caps = {
+            {"gpu_thread_id",       "gpu.thread.id"},
+            {"gpu_local_id",        "gpu.local.id"},
+            {"gpu_group_id",        "gpu.group.id"},
+            {"gpu_num_groups",      "gpu.num.groups"},
+            {"gpu_sync",            "gpu.sync"},
+            {"gpu_set_mesh_counts", "gpu.mesh.counts"},
+            {"gpu_dispatch",        "gpu.dispatch"},
+        };
+        auto git = gpu_caps.find(name);
+        if (git == gpu_caps.end()) return false;
+        const bool returns_vec = name == "gpu_thread_id" || name == "gpu_local_id" ||
+                                 name == "gpu_group_id" || name == "gpu_num_groups";
+        std::vector<ir::Value*> gargs;
+        for (auto* a : args) gargs.push_back(erased_word(a));
+        ir::Value* gres = builder_->createExternCall(git->second, gargs,
+            returns_vec ? static_cast<ir::Type*>(context_->getIntegerType(64))
+                        : static_cast<ir::Type*>(context_->getVoidType()));
+        if (inst.dst != UINT32_MAX && gres->getType() &&
+            gres->getType()->getTypeID() != ir::Type::VoidTyID) {
+            store_reg(inst.dst, gres, inst.result_type);
+        }
+        return true;
     };
 
     bool terminated = false;
@@ -1436,6 +1504,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     }
                     break;
                 }
+                if (lower_gpu_builtin(name, args, inst)) break;
                 if (name == "print") {
                     for (size_t ai = 0; ai < args.size(); ++ai) {
                         if (ai > 0) {
@@ -1801,6 +1870,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     }
                     break;
                 }
+                if (lower_gpu_builtin(name, args, inst)) break;
                 if (name == "print") {
                     for (size_t ai = 0; ai < args.size(); ++ai) {
                         if (ai > 0) {

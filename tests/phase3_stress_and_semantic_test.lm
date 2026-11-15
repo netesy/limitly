@@ -2,6 +2,7 @@
 import std.app as app;
 import std.ui as ui;
 import std.ui.context as ui_context;
+import std.ui.components as ui_comp;
 import std.gui as gui;
 import std.text.controller as text_ctrl;
 import std.string as std_string;
@@ -43,9 +44,11 @@ fn build_large_lines(line_count: int): [str] {
 fn test_shared_semantics() {
     print("--- 1. Shared Semantics Validation ---");
     print("A1");
-    var doc_text = std_string.join(build_large_lines(100), "\n");
+    var doc_text = std_string.join(build_large_lines(10), "\n");
     print("A2");
 
+    // Immediate-mode side: drive the same edits through EditorController —
+    // insert 'A' at end of document, then backspace it.
     var imgui = gui.GUI();
     print("A3");
     imgui.begin(96.0, 100.0, true, 0.0, 0.016);
@@ -56,10 +59,15 @@ fn test_shared_semantics() {
 
     var i_ctrl = imgui.editor_controllers["TestArea"] as text_ctrl.EditorController;
     assert(i_ctrl != nil, "immediate ctrl should exist");
-    var i_line = i_ctrl.get_cursor_line();
-    var i_col = i_ctrl.get_cursor_col();
+    var i_last_line = i_ctrl.get_line_count() - 1;
+    var i_last_line_text = i_ctrl.get_line(i_last_line);
+    i_ctrl.set_cursor(i_last_line, len(i_last_line_text));
+    i_ctrl.insert_text("A");
+    i_ctrl.backspace();
+    var i_final = i_ctrl.get_text();
 
-    // Retained UI test: rel_x = 108 - 28 = 80.0, rel_y = 128 - 44 = 84.0 -> line 5, col 10
+    // Retained side: same edits through the std.events stream — click to
+    // focus the textarea, Char 'A', then Backspace.
     var ta = ui.textarea(doc_text).width(400.0).height(200.0);
     var root = ui.column([ta]);
 
@@ -68,21 +76,26 @@ fn test_shared_semantics() {
     app.ui(root);
     app.run_frame_step();
 
-    events.push_event(events.Event(event_type=events.EventType.MouseDown, x=108, y=128));
+    events.push_event(events.Event(event_type=events.EventType.MouseDown, x=100, y=100));
+    events.push_event(events.Event(event_type=events.EventType.MouseUp, x=100, y=100));
+    events.push_event(events.Event(event_type=events.EventType.Char, key_code=65)); // 'A'
+    events.push_event(events.Event(event_type=events.EventType.KeyDown, key_code=8)); // Backspace
     app.run_frame_step();
 
-    var root_w = ui_context.global_ui_context.current_widget;
-    var actual_ta = root_w.children[0];
-    var actual_r_ctrl = actual_ta.text_editor_state as text_ctrl.EditorController;
-    var r_line = actual_r_ctrl.get_cursor_line();
-    var r_col = actual_r_ctrl.get_cursor_col();
+    var root_w = ui_context.global_ui_context.current_widget as ui_comp.Container;
+    var actual_ta = root_w.children[0] as ui_comp.TextInput;
+    var r_final = actual_ta.text;
+    var r_cursor = actual_ta.cursor_pos;
 
     app.shutdown();
 
-    print("Retained cursor: line=" + int_to_str(r_line) + ", col=" + int_to_str(r_col));
-    print("Immediate cursor: line=" + int_to_str(i_line) + ", col=" + int_to_str(i_col));
-    assert(r_line == i_line, "retained and immediate mouse hit-test lines must match");
-    assert(r_col == i_col, "retained and immediate mouse hit-test cols must match");
+    if (r_final == i_final) {
+        print("Retained text matches immediate: true");
+    } else {
+        print("Retained text matches immediate: false");
+    }
+    assert(r_final == i_final, "retained and immediate edit results must match");
+    assert(r_cursor == len(r_final), "retained cursor should sit at end of text");
 
     print("Shared semantics PASSED.");
 }

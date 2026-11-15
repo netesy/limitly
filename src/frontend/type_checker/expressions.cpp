@@ -2851,6 +2851,14 @@ bool TypeChecker::should_capture_variable(const std::string& name) const {
         return false;
     }
 
+    // Module-level bindings live in the root scope (no parent). They are
+    // globals, not captures: capturing them snapshots the value at closure
+    // creation, so reads inside the closure see a stale copy and writes are
+    // lost. Let them resolve through the normal global path instead.
+    if (defining_scope->parent == nullptr) {
+        return false;
+    }
+
     // A capture is a symbol defined outside the current lambda lexical boundary.
     const Scope* lambda_scope = lambda_scope_markers.back();
     scope = current_scope.get();

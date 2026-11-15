@@ -1,0 +1,150 @@
+// std/ui/tree.lm
+// M2 frame driver: focus ownership + per-frame update/event dispatch.
+//
+// update() clears the shared draw list (dl.paint_ctx), arranges the root
+// to the viewport and paints the whole tree into it. submit() replays it
+// through std.ui.replay. Widgets never receive the DrawList — they emit
+// into dl.paint_ctx.dl directly (trait dispatch can't take managed args).
+//
+// dispatch() routes one std.events.Event: pointer events go through
+// recursive hit-testing (topmost child wins); keyboard/text events go to
+// the focused component first, then fall through to the root.
+//
+// Focus rule: single owner. Clicking inside a widget that claims focus
+// (TextInput) sets it; any MouseDown that lands outside the focused
+// widget's bounds clears it.
+
+import std.ui.component as v2;
+import std.ui.event as uievent;
+import std.ui.draw_list as dl;
+import std.ui.replay as replay;
+import std.ui.state as state;
+import std.events as events;
+
+pub var focused_component: v2.Component? = nil;
+
+// Dirty flag: set by signal notifications (state.register_dirty_notifier),
+// by dispatch() on Handled events, and by request_repaint(); cleared by
+// update() after a successful paint.
+pub var dirty: int = 1;
+
+// M5 repaint elision: enable_reactive() turns it on. While enabled,
+// update() skips arrange+paint entirely when nothing changed (dirty == 0)
+// and the viewport size is unchanged — submit() then replays the retained
+// draw list, which is still valid. Audit counters expose the hit rate.
+pub var repaint_elision: int = 0;
+pub var repainted_frames: int = 0;
+pub var skipped_frames: int = 0;
+pub var last_w: float = -1.0;
+pub var last_h: float = -1.0;
+
+pub fn request_repaint(): nil {
+    dirty = 1;
+}
+
+// Wire signal notifications into the dirty flag AND enable repaint
+// elision. Call once at startup:
+//   tree.enable_reactive();
+pub fn enable_reactive(): nil {
+    repaint_elision = 1;
+    state.register_dirty_notifier(on_state_dirty);
+}
+
+pub fn on_state_dirty(): nil {
+    dirty = 1;
+}
+
+pub fn set_focus(c: v2.Component): nil {
+    focused_component = c;
+}
+
+pub fn clear_focus(): nil {
+    focused_component = nil;
+}
+
+pub fn focused(): v2.Component? {
+    return focused_component;
+}
+
+// Arrange the root to the full viewport and paint the tree into the
+// shared paint-context draw list. Call submit() to replay it to gg.
+pub fn update(root: v2.Component, w: float, h: float): nil {
+    if (repaint_elision != 0 and dirty == 0 and w == last_w and h == last_h) {
+        skipped_frames = skipped_frames + 1;
+        return;
+    }
+    dl.paint_ctx.dl.clear();
+    root.arrange(0.0, 0.0, w, h);
+    root.paint();
+    dirty = 0;
+    last_w = w;
+    last_h = h;
+    repainted_frames = repainted_frames + 1;
+}
+
+// Replay the painted frame to the GPU backend.
+pub fn submit(): nil {
+    replay.replay(dl.paint_ctx.dl);
+}
+
+// Route one event through the tree. Returns the deepest handler's result.
+pub fn dispatch(root: v2.Component, ev: events.Event): uievent.EventResult {
+    var result = uievent.EventResult.Ignored;
+    var is_text_event: int = 0;
+    if (ev.event_type == events.EventType.KeyDown or ev.event_type == events.EventType.KeyUp or ev.event_type == events.EventType.Char) {
+        is_text_event = 1;
+    }
+    if (is_text_event != 0) {
+        if (focused_component != nil) {
+            var fw = focused_component as v2.Component;
+            result = fw.on_event(ev.event_type, ev.x, ev.y, ev.key_code);
+            if (result == uievent.EventResult.Handled) {
+                dirty = 1;
+                return result;
+            }
+        }
+        result = root.on_event(ev.event_type, ev.x, ev.y, ev.key_code);
+    } else {
+        result = root.on_event(ev.event_type, ev.x, ev.y, ev.key_code);
+    }
+
+    // Focus clearing: a MouseDown outside the focused widget's bounds
+    // releases focus (clicking another focusable widget re-sets it inside
+    // its own on_event before this check runs).
+    if (ev.event_type == events.EventType.MouseDown and focused_component != nil) {
+        var fw = focused_component as v2.Component;
+        if (not fw.bounds().contains(ev.x as float, ev.y as float)) {
+            clear_focus();
+        }
+    }
+    // A Handled event means some widget state changed — the next update()
+    // must repaint even under elision.
+    if (result == uievent.EventResult.Handled) {
+        dirty = 1;
+    }
+    return result;
+}
+
+// Depth-first search for a widget by its stable construction-time id
+// (component.next_widget_id). Returns the Component as `any`, or nil when
+// absent — `T?`/`Component?` returns ok-wrap the trait object and break
+// later dispatch, so `any` is the honest optional-trait channel here.
+// Walks through child_count/child_at across Flow/Container/ScrollView.
+pub fn find_widget(root: v2.Component, id: int): any {
+    if (root.widget_id() == id) {
+        return root;
+    }
+    var n: int = root.child_count();
+    var i: int = 0;
+    while (i < n) {
+        val c = root.child_at(i);
+        if (c != nil) {
+            val found = find_widget(c as v2.Component, id);
+            if (found != nil) {
+                return found;
+            }
+        }
+        i = i + 1;
+    }
+    return nil;
+}

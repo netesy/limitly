@@ -1,0 +1,37 @@
+// Regression: a module-qualified function used as a value must produce a
+// callable fn value, not nil. Previously `mod.fn` lowered to LoadGlobal,
+// but functions are never stored in globals_ (only module variables are),
+// so the value was always VAL_NIL -- `f != nil` was false and calls were
+// silent no-ops. This affected union/optional fn vars, callback
+// registration, and first-class fn passing across module boundaries.
+
+import std.events as events;
+import std.events show push_mouse_click;
+import std.ui.tree as tree;
+
+fn main(): int {
+    // Module fn -> optional (union) fn var
+    var cb: (fn(): nil) | nil = tree.on_state_dirty;
+    if (cb == nil) { print("FAIL: module fn value is nil"); return 1; }
+    var f = cb as fn(): nil;
+    f();
+
+    // Module fn -> untyped var -> indirect call
+    var g = events.clear;
+    if (g == nil) { print("FAIL: untyped module fn value is nil"); return 1; }
+    g();
+
+    // Union fn var survives being passed/stored and called later
+    var h: (fn(): nil) | nil = events.push_quit_event;
+    if (h == nil) { print("FAIL: second union fn var is nil"); return 1; }
+    var q = h as fn(): nil;
+    q();
+
+    // Show-imported fn used unqualified as a value
+    var s = push_mouse_click;
+    if (s == nil) { print("FAIL: show-imported fn value is nil"); return 1; }
+    s(1, 2);
+
+    print("Module Fn Value PASSED.");
+    return 0;
+}

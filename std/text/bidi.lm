@@ -1,0 +1,265 @@
+// std/text/bidi.lm
+// Explicit Unicode Bidirectional Algorithm (UBA) support — a documented
+// subset, not silent LTR-everything.
+//
+// What this implements (enough for real mixed-direction UI text):
+//   - Codepoint classification into UBA bidi classes (L, R, AL, EN, AN,
+//     ES, ET, CS, B, S, WS, ON, BN, NSM).
+//   - Paragraph direction from the first strong character (UBA P2/P3).
+//   - Implicit level resolution for strong types and the common weak
+//     rules (W5/W6/W7 subset): European/Arabic numbers keep their
+//     direction relative to AL text.
+//   - Reorder to visual order (UBA L2): reverse contiguous sequences
+//     level-by-level so an LTR renderer (sokol fontstash) draws the
+//     correct glyph sequence.
+//
+// What this deliberately does NOT do (documented limits):
+//   - No explicit embedding/override controls parsed (LRE/RLE/PDF/LRO/
+//     RLO are stripped as BN); add them later if needed.
+//   - No bracket mirroring — paired punctuation keeps its logical glyph;
+//     correct mirroring needs font glyph substitution.
+//   - Neutrals between different-direction strongs resolve to paragraph
+//     direction (N1/N2), which is correct for the common cases.
+//   - No multi-paragraph handling — callers split on '\n' themselves.
+
+import std.text.utf8 as utf8;
+
+// Bidi classes as ints (kept scalar — trait/enum dispatch isn't needed).
+const BC_L: int = 0;    // Left-to-Right
+const BC_R: int = 1;    // Right-to-Left
+const BC_AL: int = 2;   // Right-to-Left Arabic
+const BC_EN: int = 3;   // European Number
+const BC_AN: int = 4;   // Arabic Number
+const BC_ES: int = 5;   // European Separator
+const BC_ET: int = 6;   // European Terminator
+const BC_CS: int = 7;   // Common Separator
+const BC_B: int = 8;    // Paragraph Separator
+const BC_S: int = 9;    // Segment Separator
+const BC_WS: int = 10;  // Whitespace
+const BC_ON: int = 11;  // Other Neutral
+const BC_BN: int = 12;  // Boundary Neutral (controls, ignored)
+const BC_NSM: int = 13; // Nonspacing Mark (follows base char)
+
+// Classify one codepoint into a bidi class. Ranges follow DerivedBidiClass.
+fn bidi_class(cp: int): int {
+    // Hebrew block: strong RTL.
+    if (cp >= 0x0590 and cp <= 0x05FF) { return BC_R; }
+    // Arabic, Syriac, Thaana, NKo: AL (RTL with Arabic-number rules).
+    if (cp >= 0x0600 and cp <= 0x06FF) { return BC_AL; }
+    if (cp >= 0x0700 and cp <= 0x074F) { return BC_AL; }   // Syriac
+    if (cp >= 0x0780 and cp <= 0x07BF) { return BC_AL; }   // Thaana
+    if (cp >= 0x07C0 and cp <= 0x07FF) { return BC_R; }    // NKo
+    if (cp >= 0x0800 and cp <= 0x083F) { return BC_AL; }   // Samaritan-ish
+    if (cp >= 0x0840 and cp <= 0x085F) { return BC_AL; }   // Mandaic
+    if (cp >= 0x08A0 and cp <= 0x08FF) { return BC_AL; }   // Arabic ext-A
+    if (cp >= 0xFB1D and cp <= 0xFB4F) { return BC_R; }    // Hebrew presentation
+    if (cp >= 0xFB50 and cp <= 0xFDFF) { return BC_AL; }   // Arabic Forms-A
+    if (cp >= 0xFE70 and cp <= 0xFEFF) { return BC_AL; }   // Arabic Forms-B
+    if (cp >= 0x10800 and cp <= 0x10FFF) { return BC_R; }  // Imperial/other RTL
+    if (cp >= 0x1E800 and cp <= 0x1EFFF) { return BC_R; }  // RTL extras
+
+    // Arabic-Indic digits U+0660-0669, Extended U+06F0-06F9: AN.
+    if (cp >= 0x0660 and cp <= 0x0669) { return BC_AN; }
+    if (cp >= 0x06F0 and cp <= 0x06F9) { return BC_AN; }
+    // Arabic decimal/thousands separators.
+    if (cp == 0x066B or cp == 0x066C) { return BC_CS; }
+
+    // European digits.
+    if (cp >= 0x30 and cp <= 0x39) { return BC_EN; }
+    // European separators/terminators: + - / , : etc. in ASCII.
+    if (cp == 0x2B or cp == 0x2D or cp == 0x2F or cp == 0x3A) { return BC_CS; }
+    if (cp == 0x24 or (cp >= 0xA2 and cp <= 0xA5)) { return BC_ET; }
+
+    // Segment/paragraph breaks.
+    if (cp == 0x000A or cp == 0x000D or cp == 0x0085 or
+        (cp >= 0x2028 and cp <= 0x2029)) { return BC_B; }
+
+    // Whitespace.
+    if (cp == 0x20 or cp == 0x09 or cp == 0x0B or cp == 0x0C or
+        cp == 0xA0 or (cp >= 0x1680 and cp <= 0x200A and cp != 0x200B) or
+        (cp >= 0x202F and cp <= 0x205F) or cp == 0x3000 or cp == 0x2007) { return BC_WS; }
+
+    // Explicit bidi controls + ZWSP/ZWNJ/ZWJ: stripped (BN).
+    if (cp == 0x200B or cp == 0x200C or cp == 0x200D or
+        (cp >= 0x202A and cp <= 0x202E) or (cp >= 0x2066 and cp <= 0x2069)) { return BC_BN; }
+
+    // Combining marks: NSM (follow the base char's level).
+    if ((cp >= 0x0300 and cp <= 0x036F) or (cp >= 0x0483 and cp <= 0x0489) or
+        (cp >= 0x0591 and cp <= 0x05BD) or cp == 0x05BF or cp == 0x05C1 or cp == 0x05C2 or
+        (cp >= 0x05C4 and cp <= 0x05C5) or cp == 0x05C7 or
+        (cp >= 0x0610 and cp <= 0x061A) or (cp >= 0x064B and cp <= 0x065F) or
+        cp == 0x0670 or (cp >= 0x06D6 and cp <= 0x06DC) or
+        (cp >= 0x06DF and cp <= 0x06E4) or (cp >= 0x06E7 and cp <= 0x06E8) or
+        (cp >= 0x06EA and cp <= 0x06ED) or (cp >= 0x20D0 and cp <= 0x20FF) or
+        (cp >= 0xFE00 and cp <= 0xFE0F) or (cp >= 0xFE20 and cp <= 0xFE2F)) { return BC_NSM; }
+
+    // Default: strong L for everything else (Latin, CJK, emoji, symbols
+    // are treated L — neutral punctuation inside RTL text resolves via
+    // the N-rules below, which is the documented approximation).
+    return BC_L;
+}
+
+// First strong type wins the paragraph direction (UBA P2).
+fn first_strong(cps: [int]): int {
+    var i: int = 0;
+    while (i < len(cps)) {
+        var cls: int = bidi_class(cps[i]);
+        if (cls == BC_L) { return 0; }
+        if (cls == BC_R or cls == BC_AL) { return 1; }
+        i = i + 1;
+    }
+    return 0; // no strong char -> LTR paragraph
+}
+
+// Resolve implicit levels (UBA X10 + W5/W6/W7 subset).
+// Returns [int] of embedding levels, one per codepoint.
+pub fn levels(text: str): [int] {
+    var cps: [int] = utf8.decode(text);
+    var n: int = len(cps);
+    var lv: [int] = [] as [int];
+    var para: int = first_strong(cps);
+    var i: int = 0;
+    while (i < n) {
+        var cls: int = bidi_class(cps[i]);
+        if (cls == BC_BN) {
+            lv.append(-1); // stripped later
+        } elif (para == 0) {
+            // LTR paragraph: R/AL -> level 1, everything else level 0.
+            if (cls == BC_R or cls == BC_AL) {
+                lv.append(1);
+            } else {
+                lv.append(0);
+            }
+        } else {
+            // RTL paragraph (odd embedding level): RTL strongs ride
+            // level 1, LTR strongs and numbers ride level 2 (the double
+            // reversal in L2 keeps embedded LTR runs in logical order).
+            // Neutrals/NSM get a provisional level resolved below.
+            if (cls == BC_R or cls == BC_AL) {
+                lv.append(1);
+            } elif (cls == BC_L or cls == BC_EN or cls == BC_AN) {
+                lv.append(2);
+            } else {
+                lv.append(1);
+            }
+        }
+        i = i + 1;
+    }
+
+    // Neutrals (WS, ON, ES, ET, CS, S) take the surrounding level:
+    // scan for runs of neutrals and resolve to the higher of the
+    // surrounding strong levels (sor/eor approximation — UBA N1/N2).
+    i = 0;
+    while (i < n) {
+        var cls: int = bidi_class(cps[i]);
+        var is_neutral: int = 0;
+        if (cls == BC_WS or cls == BC_ON or cls == BC_ES or cls == BC_ET or
+            cls == BC_CS or cls == BC_S) { is_neutral = 1; }
+        if (is_neutral == 0) { i = i + 1; continue; }
+        var j: int = i;
+        while (j < n) {
+            var c2: int = bidi_class(cps[j]);
+            if (c2 == BC_WS or c2 == BC_ON or c2 == BC_ES or c2 == BC_ET or
+                c2 == BC_CS or c2 == BC_S or c2 == BC_BN or c2 == BC_NSM) {
+                j = j + 1;
+            } else {
+                break;
+            }
+        }
+        // Surrounding levels: previous resolved char before i, next after j.
+        var before: int = para;
+        var k: int = i - 1;
+        while (k >= 0) {
+            if (lv[k] >= 0) { before = lv[k]; break; }
+            k = k - 1;
+        }
+        var after: int = para;
+        k = j;
+        while (k < n) {
+            if (lv[k] >= 0) { after = lv[k]; break; }
+            k = k + 1;
+        }
+        var nl: int = before;
+        if (after != before) {
+            nl = para; // different directions -> paragraph direction (N2)
+        } else {
+            nl = before; // same -> that level (N1)
+        }
+        k = i;
+        while (k < j) {
+            if (lv[k] >= 0) { lv[k] = nl; }
+            k = k + 1;
+        }
+        i = j;
+    }
+    return lv;
+}
+
+// Reorder codepoints into VISUAL order (UBA L2) for an LTR renderer.
+// Strips BN-class chars. Returns the display string.
+pub fn visual_text(text: str): str {
+    var cps: [int] = utf8.decode(text);
+    var lv: [int] = levels(text);
+    var n: int = len(cps);
+
+    // Strip BN (controls) — keep alignment between cps and lv.
+    var keep: [int] = [] as [int];
+    var kept_lv: [int] = [] as [int];
+    var i: int = 0;
+    while (i < n) {
+        if (lv[i] >= 0) {
+            keep.append(cps[i]);
+            kept_lv.append(lv[i]);
+        }
+        i = i + 1;
+    }
+    cps = keep;
+    lv = kept_lv;
+    n = len(cps);
+
+    // L2: find highest level and lowest odd level.
+    var max_lv: int = 0;
+    var min_odd: int = 100;
+    i = 0;
+    while (i < n) {
+        if (lv[i] > max_lv) { max_lv = lv[i]; }
+        if ((lv[i] & 1) == 1 and lv[i] < min_odd) { min_odd = lv[i]; }
+        i = i + 1;
+    }
+    // No odd (RTL) level anywhere -> already visual order.
+    if (min_odd == 100) {
+        return utf8.encode(cps);
+    }
+
+    // Reverse contiguous sequences from max level down to lowest odd.
+    var lvl: int = max_lv;
+    while (lvl >= min_odd) {
+        i = 0;
+        while (i < n) {
+            if (lv[i] >= lvl) {
+                var j: int = i;
+                while (j < n and lv[j] >= lvl) { j = j + 1; }
+                // Reverse cps[i..j)
+                var a: int = i;
+                var b: int = j - 1;
+                while (a < b) {
+                    var tmp: int = cps[a];
+                    cps[a] = cps[b];
+                    cps[b] = tmp;
+                    a = a + 1;
+                    b = b - 1;
+                }
+                i = j;
+            } else {
+                i = i + 1;
+            }
+        }
+        lvl = lvl - 1;
+    }
+    return utf8.encode(cps);
+}
+
+// Paragraph direction for callers that need it: 0 = LTR, 1 = RTL.
+pub fn is_rtl(text: str): bool {
+    return first_strong(utf8.decode(text)) == 1;
+}

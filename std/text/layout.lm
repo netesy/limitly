@@ -1,0 +1,106 @@
+// std/text/layout.lm
+// Text measurement and line wrapping for std.text.
+//
+// Honesty note: widths are CODEPOINT counts times a per-glyph advance —
+// the same 8px/char heuristic std.ui uses until real font metrics
+// (std.font text_width) are wired through. Wide glyphs (CJK) and
+// proportional fonts will under/over-estimate; that is a documented v1
+// limit, not silent wrongness. Breaks prefer spaces, then hard-break.
+
+import std.text.utf8 as utf8;
+
+// Number of codepoints in a string (NOT bytes).
+pub fn char_count(text: str): int {
+    return len(utf8.decode(text));
+}
+
+// Estimated pixel width: codepoints * advance.
+pub fn measure_width(text: str, char_w: float = 8.0): float {
+    return (char_count(text) as float) * char_w;
+}
+
+// Greedy word wrap. max_chars is in CODEPOINTS (consistent with
+// measure_width's units). Prefers breaking at the last space that fits;
+// hard-breaks overlong words. Empty input yields one empty line.
+pub fn wrap_text(text: str, max_chars: int): [str] {
+    var out: [str] = [] as [str];
+    if (max_chars <= 0) { max_chars = 1; }
+    var paragraphs = split_lines(text);
+    iter (para in paragraphs) {
+        wrap_paragraph(para, max_chars, out);
+    }
+    if (len(out) == 0) {
+        out.append("");
+    }
+    return out;
+}
+
+fn split_lines(text: str): [str] {
+    // Split on '\n' preserving empty segments.
+    var out: [str] = [] as [str];
+    var cur: str = "";
+    var i: int = 0;
+    var n: int = len(text);
+    while (i < n) {
+        var ch = _builtin_substring(text, i, i + 1);
+        if (ch == "\n") {
+            out.append(cur);
+            cur = "";
+        } else {
+            cur = cur + ch;
+        }
+        i = i + 1;
+    }
+    out.append(cur);
+    return out;
+}
+
+fn wrap_paragraph(para: str, max_chars: int, out: [str]): nil {
+    var cps = utf8.decode(para);
+    var n: int = len(cps);
+    var start: int = 0;
+    while (start < n) {
+        var remaining: int = n - start;
+        if (remaining <= max_chars) {
+            out.append(utf8.encode(slice_cps(cps, start, n)));
+            return;
+        }
+        // Find break point: last space within the window.
+        var window_end: int = start + max_chars;
+        var break_at: int = -1;
+        var k: int = start;
+        while (k < window_end) {
+            if (cps[k] == 0x20) { break_at = k; }
+            k = k + 1;
+        }
+        var emit_end: int = window_end;
+        var next_start: int = window_end;
+        if (break_at >= 0) {
+            emit_end = break_at;
+            next_start = break_at + 1; // skip the space
+        }
+        out.append(utf8.encode(slice_cps(cps, start, emit_end)));
+        start = next_start;
+    }
+    if (n == 0) {
+        out.append("");
+    }
+}
+
+fn slice_cps(cps: [int], lo: int, hi: int): [int] {
+    var out: [int] = [] as [int];
+    var i: int = lo;
+    while (i < hi) {
+        out.append(cps[i]);
+        i = i + 1;
+    }
+    return out;
+}
+
+// Wrap by pixel width: converts max_px to a codepoint budget using
+// char_w, then delegates to wrap_text.
+pub fn wrap_width(text: str, max_px: float, char_w: float = 8.0): [str] {
+    var budget: int = (max_px / char_w) as int;
+    if (budget < 1) { budget = 1; }
+    return wrap_text(text, budget);
+}

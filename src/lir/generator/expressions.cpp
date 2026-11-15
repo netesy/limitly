@@ -818,28 +818,23 @@ Reg Generator::emit_variable_expr(LM::Frontend::AST::VariableExpr& expr) {
 
     // Check if it's a global module variable accessed directly
     std::string qualified_name = (!current_module_.empty() && current_module_ != "root") ? (current_module_ + "." + expr.name) : expr.name;
-    Reg result = allocate_register();
-    LIR_Inst load_inst(LIR_Op::LoadGlobal, Type::Ptr, result, 0, 0);
-    load_inst.func_name = qualified_name;
-    emit_instruction(load_inst);
-    if (expr.inferred_type) {
-        set_register_language_type(result, expr.inferred_type);
-        set_register_abi_type(result, language_type_to_abi_type(expr.inferred_type));
+
+    // A bare name that does not resolve to a function under its own qualified
+    // name may be a show-imported symbol (`import std.events show
+    // push_quit_event`): the callable/global only exists under the defining
+    // module's name. Resolve it so it lowers correctly instead of emitting a
+    // LoadGlobal that can only miss. Qualified names that ARE known functions
+    // keep their own-module resolution (a local fn shadows an import).
+    if (expr.name.find('.') == std::string::npos &&
+        !function_table_.count(qualified_name) &&
+        !LIRFunctionManager::getInstance().hasFunction(qualified_name)) {
+        std::string imported_name = resolve_imported_symbol_name(expr.name);
+        if (!imported_name.empty()) {
+            return emit_module_member_value(imported_name, expr.inferred_type);
+        }
     }
-    return result;
-    
-    // Set the type information for the register if available
-    if (expr.inferred_type) {
-        set_register_type(reg, expr.inferred_type);
-        set_register_language_type(reg, expr.inferred_type);
-        set_register_abi_type(reg, language_type_to_abi_type(expr.inferred_type));
-    } else {
-        // Set a default type if no inference is available
-        auto any_type = std::make_shared<::Type>(::TypeTag::Any);
-        set_register_type(reg, any_type);
-    }
-    
-    return reg;
+
+    return emit_module_member_value(qualified_name, expr.inferred_type);
 }
 
 
@@ -2717,6 +2712,94 @@ Reg Generator::emit_index_expr(LM::Frontend::AST::IndexExpr& expr) {
 }
 
 
+Reg Generator::emit_module_member_value(const std::string& qualified_name, const TypePtr& inferred_type) {
+    // Functions are not stored in globals_ -- only module variables are
+    // (global_variables_ is fully populated in Pass 0). A function used as a
+    // value must lower to its name string, the same representation
+    // emit_variable_expr uses for same-module fn names. The discriminator is
+    // "fn-typed and not a known module variable": a module `pub var` of
+    // function type must still LoadGlobal, while `mod.fn` must not.
+    ModuleSymbolInfo* symbol = resolve_module_symbol(qualified_name);
+    const bool is_known_var = global_variables_.count(qualified_name) != 0;
+    const bool looks_fn = (inferred_type && inferred_type->tag == TypeTag::Function) ||
+        function_table_.count(qualified_name) ||
+        LIRFunctionManager::getInstance().hasFunction(qualified_name) ||
+        BuiltinUtils::isBuiltinFunction(qualified_name);
+    const bool is_fn_value = !is_known_var && ((symbol && symbol->is_function) || looks_fn);
+    if (is_fn_value) {
+        Reg func_reg = allocate_register();
+        auto func_type = std::make_shared<::Type>(::TypeTag::Function);
+        Backend::Value name_val = BOX_PTR(lm_str_from_cstr(qualified_name.c_str()));
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, func_reg, name_val));
+        set_register_language_type(func_reg, func_type);
+        set_register_abi_type(func_reg, Type::Ptr);
+        return func_reg;
+    }
+
+    Reg result = allocate_register();
+    LIR_Inst load_inst(LIR_Op::LoadGlobal, Type::Ptr, result, 0, 0);
+    load_inst.func_name = qualified_name;
+    emit_instruction(load_inst);
+
+    if (inferred_type) {
+        set_register_language_type(result, inferred_type);
+        set_register_abi_type(result, language_type_to_abi_type(inferred_type));
+    } else {
+        auto any_type = std::make_shared<::Type>(::TypeTag::Any);
+        set_register_language_type(result, any_type);
+        set_register_abi_type(result, language_type_to_abi_type(any_type));
+    }
+    return result;
+}
+
+std::string Generator::resolve_imported_symbol_name(const std::string& name) {
+    // Bare names (no module qualifier) that reach the variable fallback may be
+    // show-imported symbols: `import std.events show push_quit_event` binds the
+    // name for calls, but the symbol only exists under its defining module's
+    // qualified name. Scan loaded module ASTs for module-level functions and
+    // variables whose unqualified name matches. ModuleManager is populated
+    // before generation, so this works regardless of signature pass ordering.
+    if (name.find('.') != std::string::npos) return "";
+
+    std::vector<std::string> candidates;
+    auto& manager = LM::Frontend::ModuleManager::getInstance();
+    for (const auto& [path, module] : manager.get_all_modules()) {
+        if (path == "root" || !module || !module->ast) continue;
+        for (const auto& stmt : module->ast->statements) {
+            if (!stmt) continue;
+            if (auto func = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(stmt)) {
+                if (!func->isStaged && func->name == name) {
+                    candidates.push_back(path + "." + name);
+                }
+            } else if (auto var = std::dynamic_pointer_cast<LM::Frontend::AST::VarDeclaration>(stmt)) {
+                if (var->name == name) {
+                    candidates.push_back(path + "." + name);
+                }
+            }
+        }
+    }
+    if (candidates.empty()) return "";
+    if (candidates.size() == 1) return candidates[0];
+
+    // Multiple modules export this name: prefer the current module, then any
+    // module actually imported into the current context.
+    std::unordered_set<std::string> preferred;
+    if (!current_module_.empty() && current_module_ != "root") {
+        preferred.insert(current_module_);
+    }
+    for (const auto& [alias, mod_path] : import_aliases_) {
+        preferred.insert(mod_path);
+    }
+    for (const auto& candidate : candidates) {
+        const size_t dot = candidate.find_last_of('.');
+        if (dot != std::string::npos && preferred.count(candidate.substr(0, dot))) {
+            return candidate;
+        }
+    }
+    std::sort(candidates.begin(), candidates.end());
+    return candidates[0];
+}
+
 Reg Generator::emit_member_expr(LM::Frontend::AST::MemberExpr& expr) {
     if (!current_function_) {
         report_error("Cannot emit member expression outside of a function context");
@@ -2765,21 +2848,7 @@ Reg Generator::emit_member_expr(LM::Frontend::AST::MemberExpr& expr) {
         if (alias_it != import_aliases_.end()) {
             std::string module_path = alias_it->second;
             std::string qualified_name = module_path + "." + expr.name;
-
-            Reg result = allocate_register();
-            LIR_Inst load_inst(LIR_Op::LoadGlobal, Type::Ptr, result, 0, 0);
-            load_inst.func_name = qualified_name;
-            emit_instruction(load_inst);
-
-            if (expr.inferred_type) {
-                set_register_language_type(result, expr.inferred_type);
-                set_register_abi_type(result, language_type_to_abi_type(expr.inferred_type));
-            } else {
-                auto any_type = std::make_shared<::Type>(::TypeTag::Any);
-                set_register_language_type(result, any_type);
-                set_register_abi_type(result, language_type_to_abi_type(any_type));
-            }
-            return result;
+            return emit_module_member_value(qualified_name, expr.inferred_type);
         }
     }
 
@@ -2887,21 +2956,7 @@ Reg Generator::emit_member_access_with_obj(LM::Frontend::AST::MemberExpr& expr, 
         if (alias_it != import_aliases_.end()) {
             std::string module_path = alias_it->second;
             std::string qualified_name = module_path + "." + expr.name;
-
-            Reg result = allocate_register();
-            LIR_Inst load_inst(LIR_Op::LoadGlobal, Type::Ptr, result, 0, 0);
-            load_inst.func_name = qualified_name;
-            emit_instruction(load_inst);
-
-            if (expr.inferred_type) {
-                set_register_language_type(result, expr.inferred_type);
-                set_register_abi_type(result, language_type_to_abi_type(expr.inferred_type));
-            } else {
-                auto any_type = std::make_shared<::Type>(::TypeTag::Any);
-                set_register_language_type(result, any_type);
-                set_register_abi_type(result, language_type_to_abi_type(any_type));
-            }
-            return result;
+            return emit_module_member_value(qualified_name, expr.inferred_type);
         }
     }
 
@@ -3177,7 +3232,12 @@ Reg Generator::emit_lambda_expr(LM::Frontend::AST::LambdaExpr& expr) {
             for (const auto& param : expr.params) {
                 if (param.first == used_name) { is_param = true; break; }
             }
-            bool is_available = resolve_variable(used_name) != UINT32_MAX;
+            // Module-level bindings are globals, not captures -- the type
+            // checker already excludes them, and the scan must not re-add a
+            // name that only resolves because a top-level var was bound into
+            // the wrapper scope.
+            bool is_available = resolve_variable(used_name) != UINT32_MAX &&
+                global_variables_.count(used_name) == 0;
             if (!is_available && (used_name == "self" || used_name == "this")) {
                 is_available = (this_register_ != UINT32_MAX) ||
                                (env_register_ != UINT32_MAX &&

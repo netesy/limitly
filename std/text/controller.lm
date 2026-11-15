@@ -3,6 +3,7 @@
 
 import std.text.document as doc;
 import std.text.cursor as cursor;
+import std.text.grapheme as grapheme;
 
 frame EditorController {
     pub var document: doc.Document;
@@ -90,8 +91,12 @@ frame EditorController {
             self.selection.set(r[0], r[1]);
         } else {
             if (self.cursor.col > 0) {
-                self.document.delete_range(self.cursor.line, self.cursor.col - 1, self.cursor.line, self.cursor.col);
-                self.cursor.set(self.cursor.line, self.cursor.col - 1);
+                // Cluster-aware: never split a multi-byte UTF-8 sequence
+                // or orphan a combining mark.
+                val line_txt = self.document.lines[self.cursor.line];
+                val prev_c = grapheme.prev_boundary(line_txt, self.cursor.col);
+                self.document.delete_range(self.cursor.line, prev_c, self.cursor.line, self.cursor.col);
+                self.cursor.set(self.cursor.line, prev_c);
                 self.selection.set(self.cursor.line, self.cursor.col);
             } elif (self.cursor.line > 0) {
                 var prev_line_len = len(self.document.lines[self.cursor.line - 1]);
@@ -105,7 +110,8 @@ frame EditorController {
 
     pub fn move_left(shift: bool = false): nil {
         if (self.cursor.col > 0) {
-            self.cursor.col = self.cursor.col - 1;
+            val lt = self.document.lines[self.cursor.line];
+            self.cursor.col = grapheme.prev_boundary(lt, self.cursor.col);
             self.cursor.pref_col = self.cursor.col;
         } elif (self.cursor.line > 0) {
             self.cursor.line = self.cursor.line - 1;
@@ -125,7 +131,8 @@ frame EditorController {
 
     pub fn move_right(shift: bool = false): nil {
         if (self.cursor.col < len(self.document.lines[self.cursor.line])) {
-            self.cursor.col = self.cursor.col + 1;
+            val rt = self.document.lines[self.cursor.line];
+            self.cursor.col = grapheme.next_boundary(rt, self.cursor.col);
             self.cursor.pref_col = self.cursor.col;
         } elif (self.cursor.line < len(self.document.lines) - 1) {
             self.cursor.line = self.cursor.line + 1;
@@ -146,10 +153,11 @@ frame EditorController {
     pub fn move_up(shift: bool = false): nil {
         if (self.cursor.line > 0) {
             self.cursor.line = self.cursor.line - 1;
-            if (self.cursor.pref_col > len(self.document.lines[self.cursor.line])) {
-                self.cursor.col = len(self.document.lines[self.cursor.line]);
+            val ul = self.document.lines[self.cursor.line];
+            if (self.cursor.pref_col > len(ul)) {
+                self.cursor.col = len(ul);
             } else {
-                self.cursor.col = self.cursor.pref_col;
+                self.cursor.col = grapheme.prev_boundary(ul, self.cursor.pref_col);
             }
         } else {
             self.cursor.col = 0;
@@ -165,10 +173,11 @@ frame EditorController {
     pub fn move_down(shift: bool = false): nil {
         if (self.cursor.line < len(self.document.lines) - 1) {
             self.cursor.line = self.cursor.line + 1;
-            if (self.cursor.pref_col > len(self.document.lines[self.cursor.line])) {
-                self.cursor.col = len(self.document.lines[self.cursor.line]);
+            val dl = self.document.lines[self.cursor.line];
+            if (self.cursor.pref_col > len(dl)) {
+                self.cursor.col = len(dl);
             } else {
-                self.cursor.col = self.cursor.pref_col;
+                self.cursor.col = grapheme.prev_boundary(dl, self.cursor.pref_col);
             }
         } else {
             self.cursor.col = len(self.document.lines[self.cursor.line]);
@@ -182,20 +191,54 @@ frame EditorController {
     }
 
 
+    // Text covered by the current selection, or the cursor line when
+    // nothing is selected. Byte cols are already cluster-aligned.
+    pub fn selection_text(): str {
+        if (self.selection.is_empty()) {
+            return self.document.lines[self.cursor.line] + "\n";
+        }
+        var r = self.selection.get_range();
+        if (r.0 == r.2) {
+            var l = self.document.lines[r.0];
+            return _builtin_substring(l, r.1, r.3);
+        }
+        var parts: [str] = [] as [str];
+        var i: int = r.0;
+        while (i <= r.2 and i < len(self.document.lines)) {
+            var lt = self.document.lines[i];
+            var lo: int = 0;
+            var hi: int = len(lt);
+            if (i == r.0) { lo = r.1; }
+            if (i == r.2) { hi = r.3; }
+            parts.append(_builtin_substring(lt, lo, hi));
+            i = i + 1;
+        }
+        return _builtin_string_join(parts, "\n");
+    }
+
     pub fn copy(): nil {
         if (self.set_clipboard != nil) {
             var cb: fn(str): nil = self.set_clipboard as fn(str): nil;
-            if (self.selection.is_empty()) {
-                // Copy current line if no selection
-                var txt = self.document.lines[self.cursor.line] + "\n";
-                cb(txt);
-            } else {
-                // To actually copy selection we need a substring. For now just copy all text as a fallback if no selection extraction is built.
-                // Or better, just copy all if there's no substring logic inside Document.
-                var txt = self.document.get_text();
-                cb(txt);
-            }
+            cb(self.selection_text());
         }
+    }
+
+    // Delete the cluster under the cursor (Delete key). Cluster-aware:
+    // removes base + trailing marks as one unit. At line end it joins
+    // the next line up.
+    pub fn delete_char(): nil {
+        var lt = self.document.lines[self.cursor.line];
+        if (self.cursor.col >= len(lt)) {
+            if (self.cursor.line < len(self.document.lines) - 1) {
+                // Join next line up: delete_range merges first-line prefix
+                // with last-line suffix and drops the lines between.
+                self.document.delete_range(self.cursor.line, len(lt), self.cursor.line + 1, 0);
+            }
+        } else {
+            var nxt_c = grapheme.next_boundary(lt, self.cursor.col);
+            self.document.delete_range(self.cursor.line, self.cursor.col, self.cursor.line, nxt_c);
+        }
+        self.save_history();
     }
 
     pub fn cut(): nil {

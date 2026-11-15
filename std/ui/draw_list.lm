@@ -456,3 +456,44 @@ pub fn dl_hit_test(dl: DrawList, px: float, py: float): HitZone {
 pub fn dl_clear(dl: DrawList): nil {
     dl.clear();
 }
+
+// M5 batching audit: clip push/pop must balance over the emitted command
+// stream or the GPU clip stack leaks state into the next frame. Returns
+// the net balance — 0 means every ClipPush was matched by a ClipPop.
+pub fn dl_clip_balance(d: DrawList): int {
+    var bal: int = 0;
+    var i: int = 0;
+    while (i < d.cmd_count) {
+        if (d.cmds[i].kind == DrawCmdKind.ClipPush) {
+            bal = bal + 1;
+        } elif (d.cmds[i].kind == DrawCmdKind.ClipPop) {
+            bal = bal - 1;
+        }
+        i = i + 1;
+    }
+    return bal;
+}
+
+// ── Paint context ────────────────────────────────────────────────────────────
+// Owns the frame's DrawList so widgets can emit without receiving it as a
+// trait-dispatch argument (the ownership checker rejects managed args
+// through dynamic dispatch). tree.update() clears it, widgets emit into it,
+// tree.submit() replays it.
+
+frame PaintContext {
+    pub var dl: DrawList;
+
+    pub init() {
+        self.dl = DrawList();
+    }
+}
+
+pub var paint_ctx: PaintContext = PaintContext();
+
+pub fn dl_push_clip(d: DrawList, x: float, y: float, w: float, h: float): nil {
+    dl_add(d, dcmd_clip_push(x, y, w, h));
+}
+
+pub fn dl_pop_clip(d: DrawList): nil {
+    dl_add(d, dcmd_clip_pop());
+}

@@ -453,10 +453,21 @@ TypePtr TypeChecker::check_frame_declaration_with_name(const std::string& name, 
         auto mixin_decl = lookup_mixin_declaration(mixin_name);
         if (mixin_decl) {
             for (const auto& field : mixin_decl->fields) {
-                frame->fields.push_back(field);
+                bool exists = false;
+                for (const auto& existing : frame->fields) {
+                    if (existing->name == field->name) { exists = true; break; }
+                }
+                if (!exists) frame->fields.push_back(field);
             }
             for (const auto& method : mixin_decl->methods) {
-                frame->methods.push_back(method);
+                // Host-declared methods win on a name collision, matching the
+                // `embed` promotion rule below: injected members only fill names
+                // the frame does not already declare.
+                bool exists = false;
+                for (const auto& existing : frame->methods) {
+                    if (existing->name == method->name) { exists = true; break; }
+                }
+                if (!exists) frame->methods.push_back(method);
             }
         } else {
             add_error("Unknown mixin '" + mixin_name + "' included in frame '" + frame->name + "'", frame->line);
