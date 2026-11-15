@@ -511,6 +511,65 @@ LmValue helper(void *context, uint32_t operation, LmValue a, LmValue b,
       return own(BOX_PTR(lm_str_to_upper(string(0))));
     if (name == "_builtin_string_replace")
       return own(BOX_PTR(lm_str_replace(string(0), string(1), string(2))));
+    // GPU thread-space intrinsics for `gpu task` bodies compiled into shared
+    // modules. State lives on the RegisterVM and is set per-invocation by
+    // gpu_dispatch — identical values to the interpreter's emulation.
+    if (name == "gpu_thread_id" || name == "gpu_local_id" ||
+        name == "gpu_group_id" || name == "gpu_num_groups") {
+      const int64_t* coords =
+          name == "gpu_local_id" ? vm.gpu_local_id() :
+          name == "gpu_group_id" ? vm.gpu_group_id() : vm.gpu_num_groups();
+      int64_t x, y, z;
+      if (name == "gpu_thread_id") {
+        const int64_t* dims = vm.gpu_thread_dims();
+        const int64_t* local = vm.gpu_local_id();
+        const int64_t* group = vm.gpu_group_id();
+        x = group[0] * dims[0] + local[0];
+        y = group[1] * dims[1] + local[1];
+        z = group[2] * dims[2] + local[2];
+      } else {
+        x = coords[0]; y = coords[1]; z = coords[2];
+      }
+      auto* list = lm_list_new();
+      lm_list_append(list, make_i64(x));
+      lm_list_append(list, make_i64(y));
+      lm_list_append(list, make_i64(z));
+      return own(BOX_PTR(list));
+    }
+    if (name == "gpu_sync") return VAL_NIL;
+    if (name == "gpu_set_mesh_counts") {
+      vm.gpu_set_mesh_counts(as_i64(arg(0)), as_i64(arg(1)));
+      return VAL_NIL;
+    }
+    if (name == "gpu_dispatch") {
+      // Nested dispatch from native module code: resolve the callable name,
+      // grid dims, and trailing args list, then run the shared dispatch.
+      auto name_value = helper(context, static_cast<uint32_t>(Helper::CallableName),
+                               arg(0), VAL_NIL, VAL_NIL, nullptr, nullptr, 0);
+      std::string task_name;
+      try { task_name = string_data(name_value); } catch (...) { task_name.clear(); }
+      if (task_name.empty())
+        throw std::runtime_error("gpu_dispatch: first argument must be a gpu task function");
+      std::vector<LmValue> dispatch_args;
+      if (auto* list = object<LmList>(arg(4), TYPE_LIST)) {
+        dispatch_args.reserve(list->size);
+        for (uint64_t i = 0; i < list->size; ++i) dispatch_args.push_back(list->data[i]);
+      } else if (arg(4) != VAL_NIL) {
+        dispatch_args.push_back(arg(4));
+      }
+      if (!vm.native_gpu_dispatch(task_name, as_i64(arg(1)), as_i64(arg(2)), as_i64(arg(3)), dispatch_args))
+        throw std::runtime_error("gpu_dispatch: unknown gpu task '" + task_name + "'");
+      return VAL_NIL;
+    }
+    // ffi intrinsics lowered by emit_shared_module: forwarded to the VM's
+    // shared execute_* implementations via a scratch register span.
+    if (name.size() > 5 && name.compare(0, 5, "_ffi_") == 0) {
+      std::vector<RegisterValue> ffi_args;
+      ffi_args.reserve(count);
+      for (size_t i = 0; i < count; ++i) ffi_args.push_back(args[i]);
+      const std::string ffi_op(name.substr(5));
+      return own(vm.native_ffi_call(ffi_op.c_str(), ffi_args));
+    }
     std::vector<ValuePtr> values;
     for (size_t i = 0; i < count; ++i)
       values.push_back(VM::Register::register_to_value_ptr(args[i]));

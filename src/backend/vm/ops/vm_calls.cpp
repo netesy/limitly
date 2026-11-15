@@ -392,7 +392,7 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
                             std::cout << "nil";
                         }
                     }
-                    std::cout << '\n';
+                    std::cout << std::endl;
                     registers[pc->dst] = VAL_NIL;
                     handled = true;
                 } else if (fname == "channel") {

@@ -93,6 +93,10 @@ public:
     void set_global(const std::string& name, RegisterValue value);
     // Native modules share tagged heap objects and the caller's ownership region.
     void register_native_allocation(RegisterValue value);
+    // ffi intrinsic bridge for emit_shared_module native code: runs the same
+    // execute_* implementation as the interpreter over a scratch register span.
+    RegisterValue native_ffi_call(const char* op,
+                                  const std::vector<RegisterValue>& args);
     LmFrame* checked_frame(RegisterValue value, uint32_t index);
     void update_atomic_frame(RegisterValue receiver, uint32_t index, RegisterValue value, bool subtract);
     void transfer_native_ownership(RegisterValue child, RegisterValue container) {
@@ -149,6 +153,23 @@ public:
     // throws once the budget is spent, so a runaway staged body cannot hang the compiler.
     // The default (SIZE_MAX) disables the bound, leaving runtime execution unchecked.
     void set_instruction_budget(size_t budget) { instruction_budget_ = budget; }
+
+    // GPU thread-space accessors for native shared-module helpers (abi.cpp
+    // Helper::Builtin). Indexed [x, y, z]; identical values to what the
+    // interpreter's gpu intrinsics observe during gpu_dispatch.
+    const int64_t* gpu_local_id() const { return gpu_local_id_; }
+    const int64_t* gpu_group_id() const { return gpu_group_id_; }
+    const int64_t* gpu_num_groups() const { return gpu_num_groups_; }
+    const int64_t* gpu_thread_dims() const { return gpu_thread_dims_; }
+    void gpu_set_mesh_counts(int64_t vertices, int64_t primitives) {
+        gpu_mesh_vertices_ = vertices;
+        gpu_mesh_primitives_ = primitives;
+    }
+    // Entry point used by native module code performing a nested gpu_dispatch.
+    bool native_gpu_dispatch(const std::string& task_name, int64_t gx, int64_t gy, int64_t gz,
+                             const std::vector<RegisterValue>& arg_vals) {
+        return gpu_dispatch_task(task_name, gx, gy, gz, arg_vals);
+    }
 
 private:
     size_t instruction_budget_ = std::numeric_limits<size_t>::max();
@@ -278,6 +299,13 @@ private:
     // GPU emulation builtins (gpu_thread_id, gpu_local_id, gpu_group_id,
     // gpu_num_groups, gpu_sync, gpu_set_mesh_counts, gpu_dispatch).
     void execute_gpu(const LIR::LIR_Inst* pc);
+    // Dispatch a `gpu task` by name over a workgroup grid. Per thread the
+    // native compiled entry is preferred when one is resolvable through
+    // CompiledResolver; otherwise the LIR body is interpreted. Thread-space
+    // state (local/group ids, dims, group counts) is set on this VM for both
+    // paths so intrinsics observe identical values.
+    bool gpu_dispatch_task(const std::string& task_name, int64_t gx, int64_t gy, int64_t gz,
+                           const std::vector<RegisterValue>& arg_vals);
     // Emulated thread-space coordinates, set by gpu_dispatch while invoking a
     // `gpu task` body. Indexed [x, y, z].
     int64_t gpu_local_id_[3] = {0, 0, 0};

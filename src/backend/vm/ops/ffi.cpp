@@ -531,6 +531,107 @@ void RegisterVM::execute_extern_vm_restore(const LIR::LIR_Inst* pc) {}
 void RegisterVM::execute_extern_calc_struct_layout(const LIR::LIR_Inst* pc) { registers[pc->dst] = VAL_NIL; }
 void RegisterVM::execute_extern_get_abi_info(const LIR::LIR_Inst* pc) { registers[pc->dst] = VAL_NIL; }
 
+// Entry point for native shared modules (emit_shared_module): the module's
+// generated code cannot reach the interpreter's register file, so it forwards
+// each ffi intrinsic through the host Api helper table. This reconstructs a
+// synthetic LIR_Inst over a scratch register span and runs the exact same
+// execute_* implementation the interpreter uses — identical semantics for
+// alloc/free/load/store, pointer arithmetic, dynamic linking, and foreign
+// calls, including lymarrt marshaling and struct layouts.
+//
+// Contract (emitter -> here): `op` is one of alloc, free, resize, load,
+// store, copy, fill, compare, ptr_add, ptr_sub, ptr_diff, ptr_align,
+// ptr_is_aligned, lib_load, lib_unload, lib_symbol, foreign_call,
+// foreign_direct. `args` holds operand values in LIR call_args order; load
+// and store append the type-code immediate, foreign_direct appends the LIR
+// result type as a trailing integer.
+RegisterValue RegisterVM::native_ffi_call(const char* op,
+                                          const std::vector<RegisterValue>& args) {
+    auto to_op = [](const char* name) -> LIR::LIR_Op {
+        const std::string n(name);
+        if (n == "alloc") return LIR::LIR_Op::MemoryAlloc;
+        if (n == "free") return LIR::LIR_Op::MemoryFree;
+        if (n == "resize") return LIR::LIR_Op::MemoryResize;
+        if (n == "load") return LIR::LIR_Op::MemoryLoad;
+        if (n == "store") return LIR::LIR_Op::MemoryStore;
+        if (n == "copy") return LIR::LIR_Op::MemoryCopy;
+        if (n == "fill") return LIR::LIR_Op::MemoryFill;
+        if (n == "compare") return LIR::LIR_Op::MemoryCompare;
+        if (n == "ptr_add") return LIR::LIR_Op::PtrAdd;
+        if (n == "ptr_sub") return LIR::LIR_Op::PtrSub;
+        if (n == "ptr_diff") return LIR::LIR_Op::PtrDiff;
+        if (n == "ptr_align") return LIR::LIR_Op::PtrAlign;
+        if (n == "ptr_is_aligned") return LIR::LIR_Op::PtrIsAligned;
+        if (n == "lib_load") return LIR::LIR_Op::LibraryLoad;
+        if (n == "lib_unload") return LIR::LIR_Op::LibraryUnload;
+        if (n == "lib_symbol") return LIR::LIR_Op::LibrarySymbol;
+        if (n == "foreign_call") return LIR::LIR_Op::ForeignCall;
+        if (n == "foreign_direct") return LIR::LIR_Op::ForeignCall;
+        throw std::runtime_error(std::string("native_ffi_call: unknown op '") + name);
+    };
+    const std::string name(op);
+    const bool is_load = name == "load" || name == "store";
+    const bool is_foreign = name == "foreign_call" || name == "foreign_direct";
+    const size_t meta = is_load ? 1 : (is_foreign && name == "foreign_direct" ? 1 : 0);
+    if (args.size() < meta) throw std::runtime_error("native_ffi_call: too few arguments");
+
+    std::vector<RegisterValue> buf(args.size() + 1, VAL_NIL);
+    for (size_t i = 0; i < args.size(); ++i) buf[i] = args[i];
+    const LIR::Reg RDST = static_cast<LIR::Reg>(args.size());
+
+    LIR::LIR_Inst pc;
+    pc.op = to_op(op);
+    pc.dst = RDST;
+    pc.result_type = LIR::Type::I64;
+    if (is_foreign && name == "foreign_direct" && !args.empty())
+        pc.result_type = static_cast<LIR::Type>(as_i64(args.back()));
+    if (is_foreign) pc.func_name = name == "foreign_call" ? "std.ffi.foreign_call" : "std.ffi.foreign_call_direct";
+    if (is_load) pc.imm = static_cast<LIR::Imm>(as_i64(args.back()));
+    const size_t operands = args.size() - meta;
+    if (operands > 0) { pc.a = 0; pc.call_args.push_back(0); }
+    if (operands > 1) { pc.b = 1; pc.call_args.push_back(1); }
+    for (size_t i = 2; i < operands; ++i) pc.call_args.push_back(static_cast<LIR::Reg>(i));
+
+    // Temporarily point the register span at the scratch buffer so the shared
+    // execute_* implementations read operand values exactly as the
+    // interpreter would. Single-threaded host call; always restored.
+    RegisterValue* saved_data = registers.data_;
+    size_t saved_size = registers.size_;
+    registers.data_ = buf.data();
+    registers.size_ = buf.size();
+    RegisterValue result = VAL_NIL;
+    try {
+        switch (pc.op) {
+            case LIR::LIR_Op::MemoryAlloc: execute_memory_alloc(&pc); break;
+            case LIR::LIR_Op::MemoryFree: execute_memory_free(&pc); break;
+            case LIR::LIR_Op::MemoryResize: execute_memory_realloc(&pc); break;
+            case LIR::LIR_Op::MemoryLoad: execute_memory_load(&pc); break;
+            case LIR::LIR_Op::MemoryStore: execute_memory_store(&pc); break;
+            case LIR::LIR_Op::MemoryCopy: execute_memory_copy(&pc); break;
+            case LIR::LIR_Op::MemoryFill: execute_memory_fill(&pc); break;
+            case LIR::LIR_Op::MemoryCompare: execute_memory_compare(&pc); break;
+            case LIR::LIR_Op::PtrAdd: execute_ptr_add(&pc); break;
+            case LIR::LIR_Op::PtrSub: execute_ptr_sub(&pc); break;
+            case LIR::LIR_Op::PtrDiff: execute_ptr_diff(&pc); break;
+            case LIR::LIR_Op::PtrAlign: execute_ptr_align(&pc); break;
+            case LIR::LIR_Op::PtrIsAligned: execute_ptr_is_aligned(&pc); break;
+            case LIR::LIR_Op::LibraryLoad: execute_extern_library_load(&pc); break;
+            case LIR::LIR_Op::LibraryUnload: execute_extern_library_unload(&pc); break;
+            case LIR::LIR_Op::LibrarySymbol: execute_extern_library_get_symbol(&pc); break;
+            case LIR::LIR_Op::ForeignCall: execute_extern_call_function(&pc); break;
+            default: break;
+        }
+        result = registers[RDST];
+    } catch (...) {
+        registers.data_ = saved_data;
+        registers.size_ = saved_size;
+        throw;
+    }
+    registers.data_ = saved_data;
+    registers.size_ = saved_size;
+    return result;
+}
+
 void RegisterVM::execute_ffi(const LIR::LIR_Inst* pc) {
     switch (pc->op) {
         case LIR::LIR_Op::LibraryLoad: execute_extern_library_load(pc); break;

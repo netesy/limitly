@@ -372,25 +372,56 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
     }
 
     bool callbacks_needed=false;
+    bool gpu_tasks_needed=false;
     for(const auto& name:reachable_funcs) {
         auto* function=registry.getFunction(name);
+        if(function && function->gpu_stage!=0) gpu_tasks_needed=true;
         if(function) for(const auto& instruction:function->instructions)
             if(instruction.op==LIR::LIR_Op::CallbackCreate && instruction.imm!=1) callbacks_needed=true;
     }
     for(const auto& instruction:lir_func.instructions)
         if(instruction.op==LIR::LIR_Op::CallbackCreate && instruction.imm!=1) callbacks_needed=true;
-    if(callbacks_needed) {
+    if(callbacks_needed || gpu_tasks_needed) {
         auto* entry=main_fn->getBasicBlocks().front().get();
         auto first_new=entry->getInstructions().size();
         builder_->setInsertPoint(entry);
         for(const auto& name:reachable_funcs) {
             auto* target=current_module_->getFunction(name=="main" && lir_func.name=="__top_level_wrapper__"?"__user_main":name);
             if(!target || target==main_fn || target->getBasicBlocks().empty() || target->getParameters().size()>64) continue;
+            auto* gf=registry.getFunction(name);
+            // Float-ness comes from the LIR register types: every Fyra
+            // parameter is an i64 word, so the IR type cannot distinguish
+            // float params. LIR params occupy registers 0..param_count-1.
             uint64_t floating=0;size_t index=0;
-            for(const auto& parameter:target->getParameters()) {if(parameter->getType()->isFloatingPoint()) floating|=uint64_t(1)<<index;++index;}
+            for(const auto& parameter:target->getParameters()) {
+                if(gf && index<gf->param_count) {
+                    auto rt=gf->register_types.find(index);
+                    if(rt!=gf->register_types.end() &&
+                       (rt->second==LIR::Type::F64 || rt->second==LIR::Type::F32))
+                        floating|=uint64_t(1)<<index;
+                }
+                ++index;
+            }
+            // Machine-level truth: an IR double return arrives in xmm0, so
+            // FFI callers must read F64; integer returns are tagged i64 words.
+            const bool float_return=target->getReturnType() && target->getReturnType()->isFloatingPoint();
             auto* text=FyraBuiltinFunctions::get_or_create_global_str(current_module_.get(),builder_.get(),"ffi_name_"+std::to_string(label_counter_++),name);
             auto* copy=builder_->createExternCall("lymar_aot_copy_constant",{text,context_->getConstantInt(context_->getIntegerType(64),25+name.size())},context_->getIntegerType(64));
-            builder_->createExternCall("lymar_aot_ffi_register",{copy,target,context_->getConstantInt(context_->getIntegerType(64),index),context_->getConstantInt(context_->getIntegerType(64),floating),context_->getConstantInt(context_->getIntegerType(64),target->getReturnType()->isFloatingPoint())},context_->getVoidType());
+            if(callbacks_needed)
+                builder_->createExternCall("lymar_aot_ffi_register",{copy,target,context_->getConstantInt(context_->getIntegerType(64),index),context_->getConstantInt(context_->getIntegerType(64),floating),context_->getConstantInt(context_->getIntegerType(64),float_return)},context_->getVoidType());
+            if(gf && gf->gpu_stage!=0) {
+                builder_->createExternCall("lymar_aot_gpu_register",{copy,target,
+                    context_->getConstantInt(context_->getIntegerType(64),index),
+                    context_->getConstantInt(context_->getIntegerType(64),floating),
+                    context_->getConstantInt(context_->getIntegerType(64),float_return),
+                    context_->getConstantInt(context_->getIntegerType(64),gf->gpu_stage),
+                    context_->getConstantInt(context_->getIntegerType(64),gf->gpu_threads[0]),
+                    context_->getConstantInt(context_->getIntegerType(64),gf->gpu_threads[1]),
+                    context_->getConstantInt(context_->getIntegerType(64),gf->gpu_threads[2]),
+                    context_->getConstantInt(context_->getIntegerType(64),gf->gpu_max_vertices),
+                    context_->getConstantInt(context_->getIntegerType(64),gf->gpu_max_primitives)},
+                    context_->getVoidType());
+            }
         }
         auto begin=entry->getInstructions().begin();std::advance(begin,first_new);
         entry->getInstructions().splice(entry->getInstructions().begin(),entry->getInstructions(),begin,entry->getInstructions().end());
@@ -662,7 +693,12 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     etag != ::TypeTag::Frame && etag != ::TypeTag::Dict &&
                     etag != ::TypeTag::Tuple && etag != ::TypeTag::Any &&
                     etag != ::TypeTag::Enum && etag != ::TypeTag::Trait &&
-                    etag != ::TypeTag::TraitObject) {
+                    etag != ::TypeTag::TraitObject &&
+                    // Floats/decimals box to heap objects — element stores need
+                    // ownership edges, so they are not "primitive" lists.
+                    etag != ::TypeTag::Float32 && etag != ::TypeTag::Float64 &&
+                    etag != ::TypeTag::Decimal2 && etag != ::TypeTag::Decimal4 &&
+                    etag != ::TypeTag::Decimal6) {
                     return true;
                 }
             }
@@ -806,32 +842,29 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
         return nullptr;
     };
 
-    // GPU intrinsics lower to `gpu.*` extern capability calls — the same
-    // channel as io.write/memory.alloc. The register-VM emulation semantics
-    // live in ops/gpu.cpp; the vendor/fyra lowering maps these capabilities
-    // to hardware ops later. Capabilities not yet in the Fyra registry emit
-    // the capability-unsupported sentinel at codegen, never a silent no-op.
-    // Returns true when `name` is a gpu builtin (call emitted, result stored).
+    // GPU intrinsics/dispatch lower to lymar_aot_gpu_* runtime calls in
+    // aot_ffi.cpp — the software-emulation oracle shared with the register
+    // VM (ops/gpu.cpp). Thread-space builtins return real [x,y,z] lists;
+    // gpu_dispatch resolves the task by name through the gpu_functions
+    // registry populated by lymar_aot_gpu_register below. Returns true when
+    // `name` is a gpu builtin (call emitted, result stored).
     auto lower_gpu_builtin = [&](const std::string& name, const std::vector<ir::Value*>& args,
                                  const LIR::LIR_Inst& inst) -> bool {
-        static const std::unordered_map<std::string, const char*> gpu_caps = {
-            {"gpu_thread_id",       "gpu.thread.id"},
-            {"gpu_local_id",        "gpu.local.id"},
-            {"gpu_group_id",        "gpu.group.id"},
-            {"gpu_num_groups",      "gpu.num.groups"},
-            {"gpu_sync",            "gpu.sync"},
-            {"gpu_set_mesh_counts", "gpu.mesh.counts"},
-            {"gpu_dispatch",        "gpu.dispatch"},
+        static const std::unordered_map<std::string, const char*> gpu_rt = {
+            {"gpu_thread_id",       "lymar_aot_gpu_thread_id"},
+            {"gpu_local_id",        "lymar_aot_gpu_local_id"},
+            {"gpu_group_id",        "lymar_aot_gpu_group_id"},
+            {"gpu_num_groups",      "lymar_aot_gpu_num_groups"},
+            {"gpu_sync",            "lymar_aot_gpu_sync"},
+            {"gpu_set_mesh_counts", "lymar_aot_gpu_set_mesh_counts"},
+            {"gpu_dispatch",        "lymar_aot_gpu_dispatch"},
         };
-        auto git = gpu_caps.find(name);
-        if (git == gpu_caps.end()) return false;
-        const bool returns_vec = name == "gpu_thread_id" || name == "gpu_local_id" ||
-                                 name == "gpu_group_id" || name == "gpu_num_groups";
+        auto git = gpu_rt.find(name);
+        if (git == gpu_rt.end()) return false;
         std::vector<ir::Value*> gargs;
         for (auto* a : args) gargs.push_back(erased_word(a));
         ir::Value* gres = builder_->createExternCall(git->second, gargs,
-            returns_vec ? static_cast<ir::Type*>(context_->getIntegerType(64))
-                        : static_cast<ir::Type*>(context_->getVoidType()));
+            static_cast<ir::Type*>(context_->getIntegerType(64)));
         if (inst.dst != UINT32_MAX && gres->getType() &&
             gres->getType()->getTypeID() != ir::Type::VoidTyID) {
             store_reg(inst.dst, gres, inst.result_type);
@@ -2364,10 +2397,58 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 ir::Value* offset = builder_->createMul(idx_val, context_->getConstantInt(context_->getIntegerType(64), 8));
                 ir::Value* elem_addr = builder_->createAdd(data_ptr, offset);
 
-                bool is_scalar_elem = (inst.type_b != LIR::Type::Ptr && inst.type_b != LIR::Type::Void);
+                // Scalar elements are stored as raw words needing no ownership
+                // edge. Floats/decimals box to heap objects (erased_word /
+                // box_float), so they must take the object path or the stored
+                // box dies with the enclosing region, leaving a dangling
+                // element — the [float]-param corruption.
+                auto lir_scalar = [](LIR::Type t) {
+                    return t != LIR::Type::Ptr && t != LIR::Type::Void &&
+                           t != LIR::Type::F32 && t != LIR::Type::F64;
+                };
+                // A [float]/[decimal] (or nested) element always stores a boxed
+                // heap object via erased_word — decide this from the *element*
+                // type first so value-type heuristics cannot reclassify it as a
+                // raw scalar word and skip the ownership edge.
+                auto elem_boxes_impl = [&](const auto* t, auto&& self) -> bool {
+                    if (!t) return false;
+                    switch (t->tag) {
+                        case ::TypeTag::Float32: case ::TypeTag::Float64:
+                        case ::TypeTag::Decimal2: case ::TypeTag::Decimal4:
+                        case ::TypeTag::Decimal6:
+                            return true;
+                        case ::TypeTag::List: {
+                            auto* lt = std::get_if<ListType>(&t->extra);
+                            return lt && lt->elementType && self(lt->elementType.get(), self);
+                        }
+                        default: return false;
+                    }
+                };
+                auto elem_boxes = [&](const auto* t) { return elem_boxes_impl(t, elem_boxes_impl); };
+                bool elem_may_box = false;
+                {
+                    auto it_list = lir_func.register_language_types.find(inst.dst);
+                    if (it_list != lir_func.register_language_types.end() && it_list->second &&
+                        it_list->second->tag == ::TypeTag::List) {
+                        auto* lt = std::get_if<ListType>(&it_list->second->extra);
+                        if (lt && lt->elementType) elem_may_box = elem_boxes(lt->elementType.get());
+                    }
+                }
+                if (!elem_may_box) {
+                    auto it_b = lir_func.register_language_types.find(inst.b);
+                    if (it_b != lir_func.register_language_types.end() && it_b->second)
+                        elem_may_box = elem_boxes(it_b->second.get());
+                }
+                if (!elem_may_box) {
+                    auto it_rv = lir_func.register_types.find(inst.b);
+                    if (it_rv != lir_func.register_types.end() &&
+                        (it_rv->second == LIR::Type::F32 || it_rv->second == LIR::Type::F64))
+                        elem_may_box = true;
+                }
+                bool is_scalar_elem = !elem_may_box && lir_scalar(inst.type_b);
                 if (!is_scalar_elem) {
                     auto it_b = lir_func.register_types.find(inst.b);
-                    if (it_b != lir_func.register_types.end() && it_b->second != LIR::Type::Ptr && it_b->second != LIR::Type::Void) {
+                    if (it_b != lir_func.register_types.end() && lir_scalar(it_b->second)) {
                         is_scalar_elem = true;
                     }
                 }
@@ -2381,14 +2462,28 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                                 etag != ::TypeTag::Frame && etag != ::TypeTag::Dict &&
                                 etag != ::TypeTag::Tuple && etag != ::TypeTag::Any &&
                                 etag != ::TypeTag::Enum && etag != ::TypeTag::Trait &&
-                                etag != ::TypeTag::TraitObject) {
+                                etag != ::TypeTag::TraitObject &&
+                                etag != ::TypeTag::Float32 && etag != ::TypeTag::Float64 &&
+                                etag != ::TypeTag::Decimal2 && etag != ::TypeTag::Decimal4 &&
+                                etag != ::TypeTag::Decimal6) {
                                 is_scalar_elem = true;
                             }
                         }
                     }
                 }
                 if (!is_scalar_elem && pointer_assigned_regs.count(inst.b) == 0 && !is_pointer_lang_type(inst.b)) {
-                    is_scalar_elem = true;
+                    // Boxed scalar language types (float/decimal) produce heap
+                    // objects via erased_word — they are not raw scalar words.
+                    auto it_lv = lir_func.register_language_types.find(inst.b);
+                    bool boxed_scalar = it_lv != lir_func.register_language_types.end() && it_lv->second &&
+                        (it_lv->second->tag == ::TypeTag::Float32 || it_lv->second->tag == ::TypeTag::Float64 ||
+                         it_lv->second->tag == ::TypeTag::Decimal2 || it_lv->second->tag == ::TypeTag::Decimal4 ||
+                         it_lv->second->tag == ::TypeTag::Decimal6);
+                    auto it_rv = lir_func.register_types.find(inst.b);
+                    boxed_scalar = boxed_scalar ||
+                        (it_rv != lir_func.register_types.end() &&
+                         (it_rv->second == LIR::Type::F32 || it_rv->second == LIR::Type::F64));
+                    if (!boxed_scalar) is_scalar_elem = true;
                 }
 
                 if (is_scalar_elem) {

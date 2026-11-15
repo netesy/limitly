@@ -3074,6 +3074,19 @@ void lymar_aot_ffi_invalidate(uint64_t pointer) {
 }
 void lymar_aot_ffi_result_kind(uint64_t kind) { RuntimeGuard guard;heap().return_pointer=kind; }
 
+// Bounds-checked raw read of a tracked heap allocation for the FFI adapter.
+// Returns the byte count copied (0 when ptr is not a live heap object or the
+// range exceeds the allocation), letting callers inspect object headers,
+// string payloads, and list storage without exporting the heap internals.
+uint64_t lymar_aot_heap_read(uint64_t ptr, uint64_t offset, void* out, uint64_t size) {
+    RuntimeGuard guard;
+    auto found=heap().allocations.find(ptr);
+    if(found==heap().allocations.end() || found->second.raw_memory || found->second.dictionary) return 0;
+    if(offset>found->second.size || size>found->second.size-offset) return 0;
+    std::memcpy(out,reinterpret_cast<void*>(ptr+offset),size);
+    return size;
+}
+
 uint64_t lymar_aot_ffi_kind(uint64_t, uint64_t kind) {return kind;}
 uint64_t lymar_aot_ffi_infer_type(uint64_t value,uint64_t kind) {
     RuntimeGuard guard;

@@ -19,4 +19,6 @@ uint64_t lymar_aot_ffi_wrap(uint64_t);
 void lymar_aot_ffi_invalidate(uint64_t);
 uint64_t lymar_aot_ffi_infer_type(uint64_t,uint64_t);
 void lymar_aot_ffi_result_kind(uint64_t);
+uint64_t lymar_aot_heap_read(uint64_t,uint64_t,void*,uint64_t);
+void lymar_aot_edge(uint64_t,uint64_t,uint64_t);
 }

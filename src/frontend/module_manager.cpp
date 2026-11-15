@@ -637,6 +637,7 @@ std::shared_ptr<Module> ModuleManager::load_module(const std::string& module_pat
         return has_meta;
     };
 
+    const bool trace_meta = std::getenv("LYMAR_TRACE_PRECOMPILED") != nullptr;
     for (const auto& cp : candidate_paths) {
         if (!dir_has_meta(cp)) continue;
         std::string meta_p = cp + ".meta";
@@ -647,6 +648,8 @@ std::shared_ptr<Module> ModuleManager::load_module(const std::string& module_pat
                 mbuf << mf.rdbuf();
                 CompiledModuleMeta meta;
                 if (CompiledModuleMeta::deserialize(mbuf.str(), meta)) {
+                  if (trace_meta) std::cerr << "META_FOUND: " << meta_p << " module=" << meta.module_name
+                      << " valid=" << is_artifact_valid(meta, find_module_file(meta.module_name)) << "\n";
                     // A sidecar describes the binary beside it. Bind to that
                     // candidate so moving an installation cannot retain a path
                     // to the original build machine or checkout.
@@ -695,7 +698,12 @@ std::shared_ptr<Module> ModuleManager::load_module(const std::string& module_pat
                                 break;
                             }
                         }
-                        if (signatures_match) register_compiled_module(meta);
+                        if (signatures_match) {
+                            if (trace_meta) std::cerr << "META_REGISTERED: " << meta.module_name << "\n";
+                            register_compiled_module(meta);
+                        } else if (trace_meta) {
+                            std::cerr << "META_REJECTED_SIGNATURES: " << meta.module_name << "\n";
+                        }
                     }
                 }
             }

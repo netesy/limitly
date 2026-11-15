@@ -257,6 +257,17 @@ struct Emitter {
       case Op::Mod:
         expr = arith(Helper::Mod);
         break;
+      case Op::IAdd_Unchecked:
+        expr = "api->integer(api->read_int(" + a + ") + api->read_int(" + b + "))";
+        break;
+      case Op::IXor_Unchecked:
+      case Op::IAnd_Unchecked:
+      case Op::IOr_Unchecked: {
+        const char *op = inst.op == Op::IXor_Unchecked ? "^"
+                         : inst.op == Op::IAnd_Unchecked ? "&" : "|";
+        expr = "api->integer(api->read_int(" + a + ")" + op + "api->read_int(" + b + "))";
+        break;
+      }
       case Op::Neg:
         expr = "arithmetic(api,ctx," + std::to_string(static_cast<unsigned>(Helper::Sub)) + ",N(1ULL)," + raw(inst.a) + "," + (!references && known_numeric(inst.a, inst.type_a) ? "true" : "false") + ")";
         break;
@@ -550,6 +561,79 @@ struct Emitter {
       case Op::FrameCallInit:
       case Op::FrameCallMethod:
         break;
+      // ffi intrinsics: forwarded to the host Api helper table as "_ffi_*"
+      // builtins, which RegisterVM::native_ffi_call executes through the same
+      // interpreter implementations (raw memory, pointer math, dynamic
+      // linking, lymarrt foreign calls).
+      case Op::MemoryAlloc: case Op::MemoryFree: case Op::MemoryResize:
+      case Op::MemoryLoad: case Op::MemoryStore: case Op::MemoryCopy:
+      case Op::MemoryFill: case Op::MemoryCompare:
+      case Op::PtrAdd: case Op::PtrSub: case Op::PtrDiff:
+      case Op::PtrAlign: case Op::PtrIsAligned:
+      case Op::LibraryLoad: case Op::LibraryUnload: case Op::LibrarySymbol:
+      case Op::ForeignCall: {
+        const char* ffi_name = nullptr;
+        switch (inst.op) {
+        case Op::MemoryAlloc: ffi_name = "_ffi_alloc"; break;
+        case Op::MemoryFree: ffi_name = "_ffi_free"; break;
+        case Op::MemoryResize: ffi_name = "_ffi_resize"; break;
+        case Op::MemoryLoad: ffi_name = "_ffi_load"; break;
+        case Op::MemoryStore: ffi_name = "_ffi_store"; break;
+        case Op::MemoryCopy: ffi_name = "_ffi_copy"; break;
+        case Op::MemoryFill: ffi_name = "_ffi_fill"; break;
+        case Op::MemoryCompare: ffi_name = "_ffi_compare"; break;
+        case Op::PtrAdd: ffi_name = "_ffi_ptr_add"; break;
+        case Op::PtrSub: ffi_name = "_ffi_ptr_sub"; break;
+        case Op::PtrDiff: ffi_name = "_ffi_ptr_diff"; break;
+        case Op::PtrAlign: ffi_name = "_ffi_ptr_align"; break;
+        case Op::PtrIsAligned: ffi_name = "_ffi_ptr_is_aligned"; break;
+        case Op::LibraryLoad: ffi_name = "_ffi_lib_load"; break;
+        case Op::LibraryUnload: ffi_name = "_ffi_lib_unload"; break;
+        case Op::LibrarySymbol: ffi_name = "_ffi_lib_symbol"; break;
+        case Op::ForeignCall:
+          ffi_name = inst.func_name == "std.ffi.foreign_call" ||
+                             inst.func_name == "ffi.foreign_call"
+                         ? "_ffi_foreign_call" : "_ffi_foreign_direct";
+          break;
+        default: break;
+        }
+        std::vector<uint32_t> operands;
+        if (!inst.call_args.empty()) operands = inst.call_args;
+        else {
+          if (inst.a != UINT32_MAX) operands.push_back(inst.a);
+          if (inst.b != UINT32_MAX) operands.push_back(inst.b);
+        }
+        const bool is_load_store = inst.op == Op::MemoryLoad || inst.op == Op::MemoryStore;
+        const bool is_void = inst.op == Op::MemoryFree || inst.op == Op::MemoryStore ||
+                             inst.op == Op::MemoryFill || inst.op == Op::MemoryCopy ||
+                             inst.op == Op::LibraryUnload;
+        const bool foreign_direct = inst.op == Op::ForeignCall &&
+            !(inst.func_name == "std.ffi.foreign_call" || inst.func_name == "ffi.foreign_call");
+        size_t argc = operands.size() + (is_load_store ? 1 : 0) + (foreign_direct ? 1 : 0);
+        out << "V argv[] = {";
+        for (auto r : operands) out << reg(r) << ",";
+        if (is_load_store) out << integer(inst.imm) << ",";
+        if (foreign_direct) out << integer(static_cast<unsigned>(inst.result_type)) << ",";
+        out << "2ULL}; ";
+        expr = helper(Helper::Builtin, "2ULL", "2ULL", "2ULL", quote(ffi_name), "argv", argc);
+        if (is_void) { out << expr << ";"; expr.clear(); }
+        break;
+      }
+      case Op::ForeignCallDirect: {
+        // Direct foreign calls carry the callee name in func_name; route them
+        // through the same foreign_call machinery by passing operands plus the
+        // LIR result type. The VM-side name check only distinguishes the
+        // generic foreign_call signature, so any other name takes the direct
+        // path.
+        if (inst.call_args.empty())
+          throw std::runtime_error("Native shared-module lowering: ForeignCallDirect without call_args in " + function.name);
+        size_t argc = inst.call_args.size() + 1;
+        out << "V argv[] = {";
+        for (auto r : inst.call_args) out << reg(r) << ",";
+        out << integer(static_cast<unsigned>(inst.result_type)) << ",2ULL}; ";
+        expr = helper(Helper::Builtin, "2ULL", "2ULL", "2ULL", "\"_ffi_foreign_direct\"", "argv", argc);
+        break;
+      }
       default:
         throw std::runtime_error(
             "Native shared-module lowering missing opcode " +

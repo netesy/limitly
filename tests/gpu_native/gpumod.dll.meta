@@ -1,0 +1,12 @@
+module_name=tests.gpu_native.gpumod
+abi_version=0.0.1
+runtime_semantics=lymar-0.0.1-abi1-lir1-ownership-nullable
+target_triple=x86_64-windows
+architecture=x86_64
+os=windows
+artifact_kind=shared
+artifact_path=tests/gpu_native/gpumod.dll
+source_hash=e1e93d2a98b1e43fa0a77cf2e4823ac8debcde0b2114779db877334d0bc9d933
+exports=tests.gpu_native.gpumod.gpu_ping
+dependencies=
+signatures=tests.gpu_native.gpumod.gpu_ping:fn(x: int): int

@@ -1,0 +1,5 @@
+import tests.gpu_native.gpumod as gm;
+
+fn main() {
+    print(gm.gpu_ping(1));
+}

@@ -59,6 +59,49 @@ public:
         return nullptr;
     }
 
+    // Resolve a precompiled shared-module export to an ABI-validated entry
+    // point, or nullptr when no compatible export exists. Result is cached
+    // per symbol and invalidated on module-metadata revision changes.
+    Backend::Native::Entry resolve_entry(const std::string& symbol) {
+        if (symbol.empty()) return nullptr;
+        refresh_metadata();
+        if (Frontend::ModuleManager::getInstance().get_compiled_modules().empty()) return nullptr;
+        auto [position, inserted] = dispatch_targets_.try_emplace(symbol);
+        auto& target = position->second;
+        if (inserted) {
+            for (const auto& [name, variants] : Frontend::ModuleManager::getInstance().get_compiled_modules()) {
+                for (const auto& meta : variants) {
+                    if (meta.artifact_kind == "shared" &&
+                        std::find(meta.exports.begin(), meta.exports.end(), symbol) != meta.exports.end()) {
+                        target.exported = true;
+                        break;
+                    }
+                }
+                if (target.exported) break;
+            }
+        }
+        if (!target.exported) return nullptr;
+        if (!target.entry) {
+            target.entry = reinterpret_cast<Backend::Native::Entry>(getSymbol(symbol));
+            if (target.entry) target.abi = symbol_abi_.at(symbol);
+        }
+        return (target.entry && target.abi == Backend::Native::ABI_VERSION) ? target.entry : nullptr;
+    }
+
+    // Invoke a precompiled shared-module export directly with tagged VM
+    // values, bypassing the register-file plumbing used by dispatch(). Used by
+    // gpu_dispatch to run `gpu task` bodies natively when the task lives in a
+    // compiled module. Returns false when no ABI-compatible export exists.
+    bool dispatch_values(const std::string& symbol, const LmValue* args, size_t count,
+                         void* vm_context, LmValue* out = nullptr) {
+        auto entry = resolve_entry(symbol);
+        if (!entry) return false;
+        auto value = entry(&Backend::Native::host_api(), vm_context, args, count);
+        if (out) *out = value;
+        if (std::getenv("LYMAR_TRACE_PRECOMPILED")) std::cerr << "PRECOMPILED_CALL: " << symbol << "\n";
+        return true;
+    }
+
     template <typename RegContainer>
     bool dispatch(const std::string& symbol, const LIR::LIR_Inst& call,
                   RegContainer& registers, void* vm_context,

@@ -57,6 +57,14 @@ void lower_region_ownership(ir::Module& module, const std::unordered_map<std::st
     declare("lymar_aot_callback_pointer",1,i64);
     declare("lymar_aot_callback_destroy",1,void_type);
     declare("lymar_aot_ffi_register",5,void_type);
+    declare("lymar_aot_gpu_register",11,void_type);
+    declare("lymar_aot_gpu_thread_id",0,i64);
+    declare("lymar_aot_gpu_local_id",0,i64);
+    declare("lymar_aot_gpu_group_id",0,i64);
+    declare("lymar_aot_gpu_num_groups",0,i64);
+    declare("lymar_aot_gpu_sync",1,i64);
+    declare("lymar_aot_gpu_set_mesh_counts",2,i64);
+    declare("lymar_aot_gpu_dispatch",5,i64);
     declare("lymar_aot_ffi_list_size",1,i64);
     declare("lymar_aot_ffi_list_integer",2,i64);
     declare("lymar_aot_ffi_kind",2,i64);

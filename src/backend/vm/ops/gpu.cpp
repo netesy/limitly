@@ -3,7 +3,9 @@
 #include "../vm_string.hh"
 #include "../vm_list.hh"
 #include "../vm_tuple.hh"
+#include "../compiled_resolver.hh"
 #include "../../../lir/function_registry.hh"
+#include "../../../backend/native/abi.hh"
 
 #include <string>
 #include <vector>
@@ -116,14 +118,6 @@ void RegisterVM::execute_gpu(const LIR::LIR_Inst* pc) {
             throw std::runtime_error("gpu_dispatch: grid dimensions must be positive");
         }
 
-        auto* task = LIR::FunctionRegistry::getInstance().getFunction(task_name);
-        if (!task) {
-            throw std::runtime_error("gpu_dispatch: unknown gpu task '" + task_name + "'");
-        }
-        if (task->gpu_stage != 1) {
-            throw std::runtime_error("gpu_dispatch: '" + task_name + "' is not a gpu task");
-        }
-
         // Collect call arguments from the trailing list argument.
         std::vector<RegisterValue> arg_vals;
         RegisterValue args_list = registers[pc->call_args[4]];
@@ -136,45 +130,9 @@ void RegisterVM::execute_gpu(const LIR::LIR_Inst* pc) {
             arg_vals.push_back(args_list);
         }
 
-        const int64_t tx = task->gpu_threads[0];
-        const int64_t ty = task->gpu_threads[1];
-        const int64_t tz = task->gpu_threads[2];
-
-        // Save outer thread context (nested dispatch support).
-        int64_t saved_local[3] = {gpu_local_id_[0], gpu_local_id_[1], gpu_local_id_[2]};
-        int64_t saved_group[3] = {gpu_group_id_[0], gpu_group_id_[1], gpu_group_id_[2]};
-        int64_t saved_dims[3] = {gpu_thread_dims_[0], gpu_thread_dims_[1], gpu_thread_dims_[2]};
-        int64_t saved_ngroups[3] = {gpu_num_groups_[0], gpu_num_groups_[1], gpu_num_groups_[2]};
-
-        gpu_thread_dims_[0] = tx; gpu_thread_dims_[1] = ty; gpu_thread_dims_[2] = tz;
-        gpu_num_groups_[0] = gx; gpu_num_groups_[1] = gy; gpu_num_groups_[2] = gz;
-
-        try {
-            for (int64_t gz_i = 0; gz_i < gz * tz; ++gz_i) {
-                for (int64_t gy_i = 0; gy_i < gy * ty; ++gy_i) {
-                    for (int64_t gx_i = 0; gx_i < gx * tx; ++gx_i) {
-                        gpu_local_id_[0] = gx_i % tx;
-                        gpu_local_id_[1] = gy_i % ty;
-                        gpu_local_id_[2] = gz_i % tz;
-                        gpu_group_id_[0] = gx_i / tx;
-                        gpu_group_id_[1] = gy_i / ty;
-                        gpu_group_id_[2] = gz_i / tz;
-                        call_interpreted(task, arg_vals.data(), arg_vals.size());
-                    }
-                }
-            }
-        } catch (...) {
-            gpu_local_id_[0] = saved_local[0]; gpu_local_id_[1] = saved_local[1]; gpu_local_id_[2] = saved_local[2];
-            gpu_group_id_[0] = saved_group[0]; gpu_group_id_[1] = saved_group[1]; gpu_group_id_[2] = saved_group[2];
-            gpu_thread_dims_[0] = saved_dims[0]; gpu_thread_dims_[1] = saved_dims[1]; gpu_thread_dims_[2] = saved_dims[2];
-            gpu_num_groups_[0] = saved_ngroups[0]; gpu_num_groups_[1] = saved_ngroups[1]; gpu_num_groups_[2] = saved_ngroups[2];
-            throw;
+        if (!gpu_dispatch_task(task_name, gx, gy, gz, arg_vals)) {
+            throw std::runtime_error("gpu_dispatch: unknown gpu task '" + task_name + "'");
         }
-
-        gpu_local_id_[0] = saved_local[0]; gpu_local_id_[1] = saved_local[1]; gpu_local_id_[2] = saved_local[2];
-        gpu_group_id_[0] = saved_group[0]; gpu_group_id_[1] = saved_group[1]; gpu_group_id_[2] = saved_group[2];
-        gpu_thread_dims_[0] = saved_dims[0]; gpu_thread_dims_[1] = saved_dims[1]; gpu_thread_dims_[2] = saved_dims[2];
-        gpu_num_groups_[0] = saved_ngroups[0]; gpu_num_groups_[1] = saved_ngroups[1]; gpu_num_groups_[2] = saved_ngroups[2];
 
         if (pc->dst != UINT32_MAX && pc->dst < registers.size()) {
             registers[pc->dst] = VAL_NIL;
@@ -183,6 +141,84 @@ void RegisterVM::execute_gpu(const LIR::LIR_Inst* pc) {
     }
 
     throw std::runtime_error("Unknown gpu builtin: " + fname);
+}
+
+bool RegisterVM::gpu_dispatch_task(const std::string& task_name, int64_t gx, int64_t gy, int64_t gz,
+                                   const std::vector<RegisterValue>& arg_vals) {
+    // Native path: a `gpu task` compiled into a shared module resolves through
+    // CompiledResolver and runs with VM tagged values — identical semantics to
+    // interpretation, native speed. The entry is ABI-validated once and cached
+    // by the resolver (invalidated on module-metadata changes).
+    Backend::Native::Entry native_entry =
+        CompiledResolver::getInstance().resolve_entry(task_name);
+    if (native_entry && std::getenv("LYMAR_TRACE_PRECOMPILED"))
+        std::cerr << "GPU_NATIVE_DISPATCH: " << task_name << "\n";
+
+    auto* task = LIR::FunctionRegistry::getInstance().getFunction(task_name);
+    // A known non-task function is never dispatchable, native export or not —
+    // preserves the interpreter oracle's stage check.
+    if (task && task->gpu_stage != 1) {
+        throw std::runtime_error("gpu_dispatch: '" + task_name + "' is not a gpu task");
+    }
+    const bool have_lir = task != nullptr;
+    if (!native_entry && !have_lir) return false;
+
+    int64_t tx = 1, ty = 1, tz = 1;
+    if (have_lir) { tx = task->gpu_threads[0]; ty = task->gpu_threads[1]; tz = task->gpu_threads[2]; }
+    else {
+        // Native-only task: workgroup dims are not visible to the VM registry.
+        // Compiled modules record them in the __lymar_gpu_stages manifest;
+        // until that is parsed, default to 1x1x1 (correct for tasks declared
+        // without threads(...), the common case).
+    }
+
+    // Save outer thread context (nested dispatch support).
+    int64_t saved_local[3] = {gpu_local_id_[0], gpu_local_id_[1], gpu_local_id_[2]};
+    int64_t saved_group[3] = {gpu_group_id_[0], gpu_group_id_[1], gpu_group_id_[2]};
+    int64_t saved_dims[3] = {gpu_thread_dims_[0], gpu_thread_dims_[1], gpu_thread_dims_[2]};
+    int64_t saved_ngroups[3] = {gpu_num_groups_[0], gpu_num_groups_[1], gpu_num_groups_[2]};
+
+    gpu_thread_dims_[0] = tx; gpu_thread_dims_[1] = ty; gpu_thread_dims_[2] = tz;
+    gpu_num_groups_[0] = gx; gpu_num_groups_[1] = gy; gpu_num_groups_[2] = gz;
+
+    // When a native entry exists it is authoritative for thread dims only if
+    // the LIR metadata agrees; native modules self-describe via the manifest.
+    // For now native tasks use the dims recovered above (1x1x1 default).
+
+    try {
+        for (int64_t gz_i = 0; gz_i < gz * tz; ++gz_i) {
+            for (int64_t gy_i = 0; gy_i < gy * ty; ++gy_i) {
+                for (int64_t gx_i = 0; gx_i < gx * tx; ++gx_i) {
+                    gpu_local_id_[0] = gx_i % tx;
+                    gpu_local_id_[1] = gy_i % ty;
+                    gpu_local_id_[2] = gz_i % tz;
+                    gpu_group_id_[0] = gx_i / tx;
+                    gpu_group_id_[1] = gy_i / ty;
+                    gpu_group_id_[2] = gz_i / tz;
+                    if (native_entry) {
+                        // Per-thread native invocation through the shared-module
+                        // ABI: tagged VM values in, tagged VM value out.
+                        native_entry(&Backend::Native::host_api(), this,
+                                     arg_vals.data(), arg_vals.size());
+                    } else {
+                        call_interpreted(task, arg_vals.data(), arg_vals.size());
+                    }
+                }
+            }
+        }
+    } catch (...) {
+        gpu_local_id_[0] = saved_local[0]; gpu_local_id_[1] = saved_local[1]; gpu_local_id_[2] = saved_local[2];
+        gpu_group_id_[0] = saved_group[0]; gpu_group_id_[1] = saved_group[1]; gpu_group_id_[2] = saved_group[2];
+        gpu_thread_dims_[0] = saved_dims[0]; gpu_thread_dims_[1] = saved_dims[1]; gpu_thread_dims_[2] = saved_dims[2];
+        gpu_num_groups_[0] = saved_ngroups[0]; gpu_num_groups_[1] = saved_ngroups[1]; gpu_num_groups_[2] = saved_ngroups[2];
+        throw;
+    }
+
+    gpu_local_id_[0] = saved_local[0]; gpu_local_id_[1] = saved_local[1]; gpu_local_id_[2] = saved_local[2];
+    gpu_group_id_[0] = saved_group[0]; gpu_group_id_[1] = saved_group[1]; gpu_group_id_[2] = saved_group[2];
+    gpu_thread_dims_[0] = saved_dims[0]; gpu_thread_dims_[1] = saved_dims[1]; gpu_thread_dims_[2] = saved_dims[2];
+    gpu_num_groups_[0] = saved_ngroups[0]; gpu_num_groups_[1] = saved_ngroups[1]; gpu_num_groups_[2] = saved_ngroups[2];
+    return true;
 }
 
 } // namespace Register
