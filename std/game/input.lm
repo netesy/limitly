@@ -94,6 +94,24 @@ pub const KEY_F10: int           = 299;
 pub const KEY_F11: int           = 300;
 pub const KEY_F12: int           = 301;
 
+pub const KEY_NUMPAD_0: int      = 320;
+pub const KEY_NUMPAD_1: int      = 321;
+pub const KEY_NUMPAD_2: int      = 322;
+pub const KEY_NUMPAD_3: int      = 323;
+pub const KEY_NUMPAD_4: int      = 324;
+pub const KEY_NUMPAD_5: int      = 325;
+pub const KEY_NUMPAD_6: int      = 326;
+pub const KEY_NUMPAD_7: int      = 327;
+pub const KEY_NUMPAD_8: int      = 328;
+pub const KEY_NUMPAD_9: int      = 329;
+pub const KEY_NUMPAD_DECIMAL: int  = 330;
+pub const KEY_NUMPAD_DIVIDE: int   = 331;
+pub const KEY_NUMPAD_MULTIPLY: int = 332;
+pub const KEY_NUMPAD_SUBTRACT: int = 333;
+pub const KEY_NUMPAD_ADD: int      = 334;
+pub const KEY_NUMPAD_ENTER: int    = 335;
+pub const KEY_NUMPAD_EQUAL: int    = 336;
+
 pub const KEY_LEFT_SHIFT: int    = 340;
 pub const KEY_LEFT_CONTROL: int  = 341;
 pub const KEY_LEFT_ALT: int      = 342;
@@ -107,6 +125,57 @@ pub const KEY_RIGHT_SUPER: int   = 347;
 pub const MOUSE_LEFT: int   = 0;
 pub const MOUSE_RIGHT: int  = 1;
 pub const MOUSE_MIDDLE: int = 2;
+
+// Translate a Win32 VK code (what std.native delivers on KeyDown/KeyUp)
+// into the GLFW-style game key codes used by the KEY_* constants above.
+// Printable keys (space, digits, letters) coincide between VK and ASCII so
+// they pass through; VK 33-40 are the navigation/arrow cluster which never
+// collides with ASCII punctuation in either encoding. Codes already in the
+// GLFW range (>= 256) pass through for the legacy sokol event source.
+fn vk_to_key(key: int): int {
+    if (key >= 256) { return key; }
+    if (key == 8)  { return KEY_BACKSPACE; }
+    if (key == 9)  { return KEY_TAB; }
+    if (key == 13) { return KEY_ENTER; }
+    if (key == 19) { return KEY_PAUSE; }
+    if (key == 20) { return KEY_CAPS_LOCK; }
+    if (key == 27) { return KEY_ESCAPE; }
+    if (key == 33) { return KEY_PAGE_UP; }
+    if (key == 34) { return KEY_PAGE_DOWN; }
+    if (key == 35) { return KEY_END; }
+    if (key == 36) { return KEY_HOME; }
+    if (key == 37) { return KEY_LEFT; }
+    if (key == 38) { return KEY_UP; }
+    if (key == 39) { return KEY_RIGHT; }
+    if (key == 40) { return KEY_DOWN; }
+    if (key == 44) { return KEY_PRINT_SCREEN; }
+    if (key == 45) { return KEY_INSERT; }
+    if (key == 46) { return KEY_DELETE; }
+    if (key == 144) { return KEY_NUM_LOCK; }
+    if (key == 145) { return KEY_SCROLL_LOCK; }
+    // F1-F12: VK 112-123 -> GLFW 290-301
+    if (key >= 112 and key <= 123) { return 178 + key; }
+    // OEM punctuation: VK -> ASCII/GLFW punctuation
+    if (key == 186) { return 59; }   // ;
+    if (key == 187) { return 61; }   // =
+    if (key == 188) { return 44; }   // ,
+    if (key == 189) { return 45; }   // -
+    if (key == 190) { return 46; }   // .
+    if (key == 191) { return 47; }   // /
+    if (key == 192) { return 96; }   // `
+    if (key == 219) { return 91; }   // [
+    if (key == 220) { return 92; }   // backslash
+    if (key == 221) { return 93; }   // ]
+    if (key == 222) { return 39; }   // '
+    // Modifier keys: VK -> GLFW
+    if (key == 160) { return KEY_LEFT_SHIFT; }
+    if (key == 161) { return KEY_RIGHT_SHIFT; }
+    if (key == 162) { return KEY_LEFT_CONTROL; }
+    if (key == 163) { return KEY_RIGHT_CONTROL; }
+    if (key == 164) { return KEY_LEFT_ALT; }
+    if (key == 165) { return KEY_RIGHT_ALT; }
+    return key;
+}
 
 
 frame InputManager {
@@ -208,36 +277,38 @@ frame InputManager {
     }
 
     pub fn on_key_down(key: int): nil {
+        var gkey: int = vk_to_key(key);
         var already_down = false;
         iter (k in self.keys_down) {
-            if (k == key) {
+            if (k == gkey) {
                 already_down = true;
                 break;
             }
         }
 
         if (not already_down) {
-            self.keys_down.append(key);
-            self.keys_pressed.append(key);
+            self.keys_down.append(gkey);
+            self.keys_pressed.append(gkey);
         }
 
         // Update modifiers
-        if (key == KEY_LEFT_SHIFT or key == KEY_RIGHT_SHIFT) {
+        if (gkey == KEY_LEFT_SHIFT or gkey == KEY_RIGHT_SHIFT) {
             self.active_modifiers = self.active_modifiers | events.MOD_SHIFT;
-        } elif (key == KEY_LEFT_CONTROL or key == KEY_RIGHT_CONTROL) {
+        } elif (gkey == KEY_LEFT_CONTROL or gkey == KEY_RIGHT_CONTROL) {
             self.active_modifiers = self.active_modifiers | events.MOD_CONTROL;
-        } elif (key == KEY_LEFT_ALT or key == KEY_RIGHT_ALT) {
+        } elif (gkey == KEY_LEFT_ALT or gkey == KEY_RIGHT_ALT) {
             self.active_modifiers = self.active_modifiers | events.MOD_ALT;
-        } elif (key == KEY_LEFT_SUPER or key == KEY_RIGHT_SUPER) {
+        } elif (gkey == KEY_LEFT_SUPER or gkey == KEY_RIGHT_SUPER) {
             self.active_modifiers = self.active_modifiers | events.MOD_SUPER;
         }
     }
 
     pub fn on_key_up(key: int): nil {
+        var gkey: int = vk_to_key(key);
         var new_keys: [int] = [];
         var was_down = false;
         iter (k in self.keys_down) {
-            if (k == key) {
+            if (k == gkey) {
                 was_down = true;
             } else {
                 new_keys.append(k);
@@ -246,17 +317,17 @@ frame InputManager {
         self.keys_down = new_keys;
 
         if (was_down) {
-            self.keys_released.append(key);
+            self.keys_released.append(gkey);
         }
 
         // Update modifiers
-        if (key == KEY_LEFT_SHIFT or key == KEY_RIGHT_SHIFT) {
+        if (gkey == KEY_LEFT_SHIFT or gkey == KEY_RIGHT_SHIFT) {
             self.active_modifiers = self.active_modifiers & (~events.MOD_SHIFT);
-        } elif (key == KEY_LEFT_CONTROL or key == KEY_RIGHT_CONTROL) {
+        } elif (gkey == KEY_LEFT_CONTROL or gkey == KEY_RIGHT_CONTROL) {
             self.active_modifiers = self.active_modifiers & (~events.MOD_CONTROL);
-        } elif (key == KEY_LEFT_ALT or key == KEY_RIGHT_ALT) {
+        } elif (gkey == KEY_LEFT_ALT or gkey == KEY_RIGHT_ALT) {
             self.active_modifiers = self.active_modifiers & (~events.MOD_ALT);
-        } elif (key == KEY_LEFT_SUPER or key == KEY_RIGHT_SUPER) {
+        } elif (gkey == KEY_LEFT_SUPER or gkey == KEY_RIGHT_SUPER) {
             self.active_modifiers = self.active_modifiers & (~events.MOD_SUPER);
         }
     }

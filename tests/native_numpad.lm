@@ -1,0 +1,46 @@
+import std.native.win32 as w32;
+import std.native.types as nt;
+import std.events as events;
+import std.game.input as input;
+import std.ffi as ffi;
+
+fn u32sym(name: str): int {
+    unsafe {
+        return ffi.library_get_symbol(ffi.library_load("user32.dll"), name);
+    }
+}
+
+fn main() {
+    if (not w32.available()) { print("SKIP: no win32"); return 0; }
+    var win_r: nt.Window? = w32.create_window("numpad probe", 320, 200);
+    var win: nt.Window = win_r ? else {
+        print("FAIL: create_window"); return 0;
+    };
+    events.set_window(win);
+
+    // Inject real OS messages: WM_KEYDOWN/UP for VK_NUMPAD1 (97) and
+    // VK_NUMPAD2 (98), plus 'A' (65) as a printable control.
+    val post = u32sym("PostMessageA");
+    unsafe {
+        ffi.foreign_call(post, [win.handle, 0x0100, 97, 0], ffi.TYPE_I64, []);
+        ffi.foreign_call(post, [win.handle, 0x0101, 97, 0], ffi.TYPE_I64, []);
+        ffi.foreign_call(post, [win.handle, 0x0100, 98, 0], ffi.TYPE_I64, []);
+        ffi.foreign_call(post, [win.handle, 0x0100, 65, 0], ffi.TYPE_I64, []);
+    }
+    var mgr = input.InputManager();
+    var i: int = 0;
+    while (i < 40) {
+        events.pump_events();
+        iter (ev in events.pending_events()) {
+            if (ev.event_type == events.EventType.KeyDown) {
+                mgr.on_key_down(ev.key_code);
+                print("keydown key_code={ev.key_code}");
+            }
+        }
+        i = i + 1;
+    }
+    print("numpad1={mgr.is_key_down(input.KEY_NUMPAD_1)} expect=true");
+    print("numpad2={mgr.is_key_down(input.KEY_NUMPAD_2)} expect=true");
+    print("A={mgr.is_key_down(input.KEY_A)} expect=true");
+    w32.destroy(win);
+}

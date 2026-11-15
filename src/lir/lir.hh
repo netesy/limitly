@@ -112,7 +112,9 @@ enum class ResourceOperation : uint32_t {
     ARCH = 59, HOSTNAME = 60, NUM_CPU = 61,
     // ResourceType::PROCESS (child processes use SPAWN = 9)
     PROC_ARGS = 62, PROC_EXIT = 63, PROC_ID = 64, PROC_RSS = 65,
-    PROC_PEAK_RSS = 66, PROC_COMMAND = 67
+    PROC_PEAK_RSS = 66, PROC_COMMAND = 67,
+    // Graphics: external native window attach/detach (see resource_types.hh)
+    ATTACH_WINDOW = 68, DETACH_WINDOW = 69
 };
 
 enum class LIR_Op : uint8_t {

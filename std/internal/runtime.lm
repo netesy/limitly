@@ -117,6 +117,11 @@ pub const OP_PROC_RSS: int = 65;
 pub const OP_PROC_PEAK_RSS: int = 66;
 pub const OP_PROC_COMMAND: int = 67;
 
+// External native-window attach for the graphics resource
+// (src/backend/vm/resource_types.hh ATTACH_WINDOW/DETACH_WINDOW).
+pub const OP_ATTACH_WINDOW: int = 68;
+pub const OP_DETACH_WINDOW: int = 69;
+
 pub fn create_resource(kind: ResourceKind, args: any): int {
     return create(resource_kind_id(kind), args);
 }

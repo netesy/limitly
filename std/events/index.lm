@@ -17,6 +17,7 @@
 // must run exactly once per frame.
 
 import std.gg as gg;
+import std.native as native;
 
 // Event type enumeration
 enum EventType {
@@ -112,10 +113,106 @@ frame ResizeEvent {
 pub var event_queue: [Event] = [] as [Event];
 pub var injected_events: [Event] = [] as [Event];
 
+// Native window binding: when std.app creates the window through
+// std.native (and the GPU backend attaches to it), OS events are drained
+// here via native.poll_event instead of the sokol_app event path.
+// native_win_handle == 0 means the legacy gg.spawn_window path owns the
+// window. Every backend's poll_event only reads Window.handle, so the
+// handle alone is sufficient to reconstruct a poll handle per frame.
+pub var native_win_handle: int = 0;
+
 // Reset both queues (call on app/window init and shutdown).
 pub fn clear(): nil {
     event_queue = [] as [Event];
     injected_events = [] as [Event];
+}
+
+// Bind the std.native window that owns OS input for this app. Called by
+// std.app after create_window + gg.attach_window succeed. Pass nil via
+// clear_window() on shutdown.
+pub fn set_window(win: native.Window): nil {
+    native_win_handle = win.handle;
+}
+
+pub fn clear_window(): nil {
+    native_win_handle = 0;
+}
+
+// Translate one std.native Event into the shared std.events.Event stream.
+// Returns false for kinds with no std.events counterpart (Paint, Focus,
+// Unfocus, None) so the caller can skip them.
+// Build + append a typed Event. NOTE: inside this module the named-arg
+// frame constructor Event(...) lowers to a hollow frame (the local Event
+// name collides with native.Event's re-export in LIR), so events are
+// always default-constructed and populated by field assignment.
+fn push_app_event(q: [Event], et: EventType, wid: int, x: int, y: int, key: int): nil {
+    var e = Event();
+    e.event_type = et;
+    e.window_id = wid;
+    e.x = x;
+    e.y = y;
+    e.key_code = key;
+    q.append(e);
+}
+
+// Win32 numpad VK codes (96-111) collide with ASCII/GLFW printable codes,
+// so they cannot be translated later by consumers that can't tell the
+// source encoding. The native source is always VK here, so numpad keys are
+// mapped directly to the unambiguous GLFW numpad range (320-336); the
+// >=256 passthrough in std.game's vk_to_key then delivers them intact.
+fn vk_numpad(key: int): int {
+    if (key >= 96 and key <= 105) { return 224 + key; }  // 0-9 -> 320-329
+    if (key == 106) { return 332; }   // VK_MULTIPLY  -> GLFW_MULTIPLY
+    if (key == 107) { return 334; }   // VK_ADD       -> GLFW_ADD
+    if (key == 109) { return 333; }   // VK_SUBTRACT  -> GLFW_SUBTRACT
+    if (key == 110) { return 330; }   // VK_DECIMAL   -> GLFW_DECIMAL
+    if (key == 111) { return 331; }   // VK_DIVIDE    -> GLFW_DIVIDE
+    return key;
+}
+
+fn native_event_to_event(nev: native.Event, q: [Event]): bool {
+    var k: native.EventKind = nev.kind;
+    // Copy frame fields to locals before use: passing native.Event field
+    // reads directly as frame-constructor args drops them in LIR lowering.
+    var nx: int = nev.x;
+    var ny: int = nev.y;
+    var nw: int = nev.w;
+    var nh: int = nev.h;
+    var nkey: int = nev.key;
+    var nch: int = nev.ch;
+    var nbtn: int = nev.buttons;
+    var nd: int = nev.delta;
+    var nhnd: int = nev.handle;
+    if (k == native.EventKind.Quit or k == native.EventKind.Close) {
+        push_app_event(q, EventType.Quit, nhnd, 0, 0, 0);
+    } elif (k == native.EventKind.Resize) {
+        push_app_event(q, EventType.Resize, nhnd, nw, nh, 0);
+    } elif (k == native.EventKind.KeyDown) {
+        push_app_event(q, EventType.KeyDown, nhnd, 0, 0, vk_numpad(nkey));
+    } elif (k == native.EventKind.KeyUp) {
+        push_app_event(q, EventType.KeyUp, nhnd, 0, 0, vk_numpad(nkey));
+    } elif (k == native.EventKind.Char) {
+        push_app_event(q, EventType.Char, nhnd, 0, 0, nch);
+    } elif (k == native.EventKind.MouseMove) {
+        push_app_event(q, EventType.MouseMove, nhnd, nx, ny, nbtn);
+    } elif (k == native.EventKind.MouseDown) {
+        // Match the legacy sokol contract: only the left button is
+        // forwarded, and key_code carries the button index (0 = left)
+        // that std.game's InputManager expects.
+        if (nbtn == 1) {
+            push_app_event(q, EventType.MouseDown, nhnd, nx, ny, 0);
+        }
+    } elif (k == native.EventKind.MouseUp) {
+        if (nbtn == 1) {
+            push_app_event(q, EventType.MouseUp, nhnd, nx, ny, 0);
+        }
+    } elif (k == native.EventKind.MouseWheel) {
+        // Legacy contract carries the wheel delta in y as pixel units (120/notch).
+        push_app_event(q, EventType.MouseWheel, nhnd, nx, nd * 120, 0);
+    } else {
+        return false;
+    }
+    return true;
 }
 
 // The current frame's event list. Returns a copy — read-only for consumers,
@@ -147,19 +244,47 @@ pub fn pump_events(): nil {
     }
     injected_events = [] as [Event];
 
-    var raw_events = gg.poll_events();
-    if (raw_events != nil) {
-        var native_events: [int] = raw_events as [int];
-        var i: int = 0;
-        var num_events = len(native_events);
-        while (i + 3 < num_events) {
-            var ev_code: int = native_events[i];
-            var ev_x: int = native_events[i + 1];
-            var ev_y: int = native_events[i + 2];
-            var ev_k: int = native_events[i + 3];
-            var ev_type: EventType = event_type_from_int(ev_code);
-            q.append(Event(event_type=ev_type, timestamp=0, window_id=1, x=ev_x, y=ev_y, key_code=ev_k));
-            i = i + 4;
+    if (native_win_handle != 0) {
+        // Native-window mode: drain the OS queue through std.native. The
+        // gg.poll_events() call below still runs once — it is the GPU
+        // frame-publish boundary — but its event records are ignored
+        // (external-window mode produces none).
+        var nw = native.Window(handle=native_win_handle, id=0, width=0,
+                               height=0, closed=false, backend="");
+        // A display/resolution change floods WM_SIZE messages; each Resize
+        // event is cheap, but resizing the swapchain per event means dozens
+        // of ResizeBuffers calls in one frame. Track the final size and
+        // apply it once, after the drain.
+        var rw: int = 0;
+        var rh: int = 0;
+        var nev = native.poll_event(nw);
+        while (nev.kind != native.EventKind.None) {
+            if (nev.kind == native.EventKind.Resize) {
+                rw = nev.w;
+                rh = nev.h;
+            }
+            native_event_to_event(nev, q);
+            nev = native.poll_event(nw);
+        }
+        if (rw > 0 and rh > 0) {
+            gg.set_window_size(rw, rh);
+        }
+        gg.poll_events();
+    } else {
+        var raw_events = gg.poll_events();
+        if (raw_events != nil) {
+            var raw_list: [int] = raw_events as [int];
+            var i: int = 0;
+            var num_events = len(raw_list);
+            while (i + 3 < num_events) {
+                var ev_code: int = raw_list[i];
+                var ev_x: int = raw_list[i + 1];
+                var ev_y: int = raw_list[i + 2];
+                var ev_k: int = raw_list[i + 3];
+                var ev_type: EventType = event_type_from_int(ev_code);
+                push_app_event(q, ev_type, 1, ev_x, ev_y, ev_k);
+                i = i + 4;
+            }
         }
     }
 
@@ -172,10 +297,23 @@ pub fn push_event(event: Event): nil {
 }
 
 pub fn push_mouse_click(x: int, y: int): nil {
-    push_event(Event(event_type=EventType.MouseDown, timestamp=0, window_id=1, x=x, y=y, key_code=0));
-    push_event(Event(event_type=EventType.MouseUp, timestamp=0, window_id=1, x=x, y=y, key_code=0));
+    var down = Event();
+    down.event_type = EventType.MouseDown;
+    down.window_id = 1;
+    down.x = x;
+    down.y = y;
+    var up = Event();
+    up.event_type = EventType.MouseUp;
+    up.window_id = 1;
+    up.x = x;
+    up.y = y;
+    injected_events.append(down);
+    injected_events.append(up);
 }
 
 pub fn push_quit_event(): nil {
-    push_event(Event(event_type=EventType.Quit, timestamp=0, window_id=1, x=0, y=0));
+    var e = Event();
+    e.event_type = EventType.Quit;
+    e.window_id = 1;
+    injected_events.append(e);
 }

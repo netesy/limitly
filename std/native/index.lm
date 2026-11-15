@@ -1,0 +1,132 @@
+// std.native - Platform-native windowing backend dispatch.
+//
+// Selects the concrete backend for the host OS via std.os.identity and
+// forwards the shared window/event contract. Each backend is a real
+// implementation over std.ffi - no shims:
+//
+//   win32.lm    - Win32 user32/kernel32 (WNDCLASSEXA + WndProc callback)
+//   linux.lm    - X11 via libX11.so (XOpenDisplay/XNextEvent; XWayland
+//                 covers Wayland sessions; native Wayland is separate)
+//   macos.lm    - Cocoa via libobjc + AppKit (objc_msgSend FFI, struct
+//                 NSRect args, Lymar-defined NSWindowDelegate)
+//   android.lm  - JNI + ANativeWindow + AInputQueue (libart/libandroid;
+//                 requires a Lymar host Activity supplying the Surface)
+//
+// Usage:
+//   import std.native as native;
+//   var win = native.create_window("app", 800, 600) ? else { ... };
+//   var ev = native.poll_event(win);
+
+import std.os.identity as osid;
+import std.native.types as nt;
+import std.native.win32 as w32;
+import std.native.linux as lx;
+import std.native.macos as mc;
+import std.native.android as andr;
+
+pub import std.native.types show Window, Event, EventKind, event_none;
+pub import std.native.types show MOD_SHIFT, MOD_CTRL, MOD_ALT, MOD_SUPER, MOD_CAPS, MOD_NUM;
+
+var _cached_name: str = "";
+
+/// Name of the selected backend, resolved once per process:
+/// "win32", "linux-x11", "macos", "android", or "none".
+pub fn backend_name(): str {
+    if (_cached_name != "") { return _cached_name; }
+    var os: str = osid.os_name();
+    if (os == "windows") {
+        if (w32.available()) { _cached_name = "win32"; return _cached_name; }
+    }
+    elif (os == "linux" or os == "freebsd") {
+        if (lx.available()) { _cached_name = "linux-x11"; return _cached_name; }
+    }
+    elif (os == "darwin") {
+        if (mc.available()) { _cached_name = "macos"; return _cached_name; }
+    }
+    elif (os == "android") {
+        if (andr.available()) { _cached_name = "android"; return _cached_name; }
+    }
+    _cached_name = "none";
+    return _cached_name;
+}
+
+/// True when a usable native backend exists on this host.
+pub fn available(): bool {
+    return backend_name() != "none";
+}
+
+pub fn create_window(title: str, width: int, height: int): nt.Window? {
+    var n: str = backend_name();
+    if (n == "win32") { return w32.create_window(title, width, height); }
+    if (n == "linux-x11") { return lx.create_window(title, width, height); }
+    if (n == "macos") { return mc.create_window(title, width, height); }
+    if (n == "android") { return andr.create_window(title, width, height); }
+    return err();
+}
+
+pub fn poll_event(win: nt.Window): nt.Event {
+    var n: str = backend_name();
+    if (n == "win32") { return w32.poll_event(win); }
+    if (n == "linux-x11") { return lx.poll_event(win); }
+    if (n == "macos") { return mc.poll_event(win); }
+    if (n == "android") { return andr.poll_event(win); }
+    return nt.event_none();
+}
+
+pub fn wait_event(win: nt.Window): nt.Event {
+    var n: str = backend_name();
+    if (n == "win32") { return w32.wait_event(win); }
+    if (n == "linux-x11") { return lx.wait_event(win); }
+    if (n == "macos") { return mc.wait_event(win); }
+    if (n == "android") { return andr.wait_event(win); }
+    return nt.event_none();
+}
+
+pub fn invalidate(win: nt.Window): nil {
+    var n: str = backend_name();
+    if (n == "win32") { w32.invalidate(win); return; }
+    if (n == "linux-x11") { lx.invalidate(win); return; }
+    if (n == "macos") { mc.invalidate(win); return; }
+    if (n == "android") { andr.invalidate(win); return; }
+}
+
+pub fn set_title(win: nt.Window, title: str): nil {
+    var n: str = backend_name();
+    if (n == "win32") { w32.set_title(win, title); return; }
+    if (n == "linux-x11") { lx.set_title(win, title); return; }
+    if (n == "macos") { mc.set_title(win, title); return; }
+    if (n == "android") { andr.set_title(win, title); return; }
+}
+
+pub fn set_size(win: nt.Window, width: int, height: int): nil {
+    var n: str = backend_name();
+    if (n == "win32") { w32.set_size(win, width, height); return; }
+    if (n == "linux-x11") { lx.set_size(win, width, height); return; }
+    if (n == "macos") { mc.set_size(win, width, height); return; }
+    if (n == "android") { andr.set_size(win, width, height); return; }
+}
+
+pub fn client_size(win: nt.Window): (int, int) {
+    var n: str = backend_name();
+    if (n == "win32") { return w32.client_size(win); }
+    if (n == "linux-x11") { return lx.client_size(win); }
+    if (n == "macos") { return mc.client_size(win); }
+    if (n == "android") { return andr.client_size(win); }
+    return (0, 0);
+}
+
+pub fn destroy(win: nt.Window): nil {
+    var n: str = backend_name();
+    if (n == "win32") { w32.destroy(win); return; }
+    if (n == "linux-x11") { lx.destroy(win); return; }
+    if (n == "macos") { mc.destroy(win); return; }
+    if (n == "android") { andr.destroy(win); return; }
+}
+
+pub fn run_message_loop(): nil {
+    var n: str = backend_name();
+    if (n == "win32") { w32.run_message_loop(); return; }
+    if (n == "linux-x11") { lx.run_message_loop(); return; }
+    if (n == "macos") { mc.run_message_loop(); return; }
+    if (n == "android") { andr.run_message_loop(); return; }
+}

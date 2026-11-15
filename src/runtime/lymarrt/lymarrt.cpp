@@ -202,8 +202,23 @@ bool lymarrt_ffi_call(
     size_t num_args,
     lymarrt_value* out_result)
 {
+    return lymarrt_ffi_call_ex(func_ptr, ret_type, arg_types, arg_values,
+                               num_args, nullptr, 0, out_result);
+}
+
+bool lymarrt_ffi_call_ex(
+    void* func_ptr,
+    lymarrt_type ret_type,
+    const lymarrt_type* arg_types,
+    const lymarrt_value* arg_values,
+    size_t num_args,
+    const lymarrt_struct_layout* struct_layouts,
+    size_t num_struct_layouts,
+    lymarrt_value* out_result)
+{
 #if !LYMAR_HAS_LIBFFI
-    (void)func_ptr; (void)ret_type; (void)arg_types; (void)arg_values; (void)num_args; (void)out_result;
+    (void)func_ptr; (void)ret_type; (void)arg_types; (void)arg_values; (void)num_args;
+    (void)struct_layouts; (void)num_struct_layouts; (void)out_result;
     return false;
 #else
     if (!func_ptr) return false;
@@ -211,10 +226,47 @@ bool lymarrt_ffi_call(
     std::vector<void*> ffi_arg_values(num_args);
     std::vector<uint64_t> arg_storage(num_args, 0);
 
+    // Build ffi_type structs for struct-by-value arguments. They must
+    // outlive ffi_call, so they live in this function's scope.
+    std::vector<std::vector<ffi_type*>> struct_elems(num_struct_layouts);
+    std::vector<ffi_type> struct_types(num_struct_layouts);
+    for (size_t si = 0; si < num_struct_layouts; ++si) {
+        const lymarrt_struct_layout& lay = struct_layouts[si];
+        if (lay.arg_index >= num_args || lay.count == 0 ||
+            lay.count > LYMARRT_MAX_STRUCT_ELEMS) {
+            return false;
+        }
+        struct_elems[si].resize(lay.count + 1, nullptr);
+        for (uint32_t e = 0; e < lay.count; ++e) {
+            struct_elems[si][e] = lymarrt_type_to_ffi(lay.types[e]);
+        }
+        struct_types[si].size = 0;
+        struct_types[si].alignment = 0;
+        struct_types[si].type = FFI_TYPE_STRUCT;
+        struct_types[si].elements = struct_elems[si].data();
+    }
+
+    for (size_t si = 0; si < num_struct_layouts; ++si) {
+        const lymarrt_struct_layout& lay = struct_layouts[si];
+        ffi_arg_types[lay.arg_index] = &struct_types[si];
+    }
+
     for (size_t i = 0; i < num_args; ++i) {
-        lymarrt_type t = arg_types ? arg_types[i] : LYMARRT_TYPE_I64;
-        ffi_arg_types[i] = lymarrt_type_to_ffi(t);
+        if (ffi_arg_types[i] == nullptr) {
+            lymarrt_type t = arg_types ? arg_types[i] : LYMARRT_TYPE_I64;
+            ffi_arg_types[i] = lymarrt_type_to_ffi(t);
+        }
         const lymarrt_value& val = arg_values[i];
+        // Struct args carry a data pointer; libffi copies the bytes.
+        bool is_struct_arg = false;
+        for (size_t si = 0; si < num_struct_layouts; ++si) {
+            if (struct_layouts[si].arg_index == i) { is_struct_arg = true; break; }
+        }
+        if (is_struct_arg) {
+            ffi_arg_values[i] = val.val.ptr;
+            continue;
+        }
+        lymarrt_type t = arg_types ? arg_types[i] : LYMARRT_TYPE_I64;
         switch (t) {
             case LYMARRT_TYPE_I8:  { int8_t v = val.val.i8; std::memcpy(&arg_storage[i], &v, sizeof(v)); break; }
             case LYMARRT_TYPE_U8:  { uint8_t v = val.val.u8; std::memcpy(&arg_storage[i], &v, sizeof(v)); break; }

@@ -1,0 +1,713 @@
+// std.native.win32 - Pure-Lymar Win32 windowing backend.
+//
+// Implements the std.native.types contract entirely through std.ffi:
+// dynamic symbol resolution (user32/kernel32), hand-marshaled
+// WNDCLASSEXA/MSG structs, and a Lymar WndProc exposed to Windows as a
+// native trampoline via ffi.create_callback. No C glue, no sokol.
+//
+// Callback-safety design (important):
+//   The WndProc runs inside a libffi trampoline while the VM's outer
+//   frame may hold borrows on Lymar heap objects. Touching frames/lists
+//   inside the callback raises "Conflicting memory borrow" / "Invalid
+//   frame receiver". Therefore wnd_proc ONLY performs raw memory ops
+//   (ffi.load_*/store_*/ptr_add) and foreign_call. All window state and
+//   event queues live in ffi.alloc'd control blocks; poll_event /
+//   wait_event decode raw records into nt.Event frames in normal VM
+//   context where allocation is safe.
+//
+// Control block (i64 slots, 16 slots = 128 bytes):
+//   [0] hwnd          [1] next block ptr   [2] ring head
+//   [3] ring tail     [4] ring count       [5] ring capacity
+//   [6] closed flag   [7] client width     [8] client height
+//   [9] ring ptr      [10] high surrogate  [11..15] reserved
+// Event record (16 i64 slots = 128 bytes):
+//   [0]kind [1]x [2]y [3]w [4]h [5]key [6]ch [7]mods
+//   [8]buttons [9]delta [10]handle [11..15]reserved
+//
+// x64 WNDCLASSEXA layout (80 bytes):
+//   cbSize u32@0, style u32@4, lpfnWndProc@8, cbClsExtra i16@16,
+//   cbWndExtra i32@20, hInstance@24, hIcon@32, hCursor@40,
+//   hbrBackground@48, lpszMenuName@56, lpszClassName@64, hIconSm@72
+// MSG (48 bytes): hwnd@0, message u32@8, wParam@16, lParam@24,
+//   time u32@32, pt@36
+
+import std.ffi as ffi;
+import std.native.types as nt;
+
+// ── Win32 message constants ───────────────────────────────────────────────
+const WM_DESTROY: int = 0x0002;
+const WM_SIZE: int = 0x0005;
+const WM_PAINT: int = 0x000F;
+const WM_CLOSE: int = 0x0010;
+const WM_SETFOCUS: int = 0x0007;
+const WM_KILLFOCUS: int = 0x0008;
+const WM_KEYDOWN: int = 0x0100;
+const WM_KEYUP: int = 0x0101;
+const WM_CHAR: int = 0x0102;
+const WM_MOUSEMOVE: int = 0x0200;
+const WM_LBUTTONDOWN: int = 0x0201;
+const WM_LBUTTONUP: int = 0x0202;
+const WM_RBUTTONDOWN: int = 0x0204;
+const WM_RBUTTONUP: int = 0x0205;
+const WM_MBUTTONDOWN: int = 0x0207;
+const WM_MBUTTONUP: int = 0x0208;
+const WM_MOUSEWHEEL: int = 0x020A;
+const WM_ERASEBKGND: int = 0x0014;
+const WM_DISPLAYCHANGE: int = 0x007E;
+const WM_DPICHANGED: int = 0x02E0;
+const SWP_NOZORDER_NOACTIVATE: int = 0x0014;
+
+const WS_OVERLAPPEDWINDOW: int = 0x00CF0000;
+const CS_HREDRAW: int = 0x0002;
+const CS_VREDRAW: int = 0x0001;
+const IDC_ARROW: int = 32512;
+const SW_SHOW: int = 5;
+const PM_REMOVE: int = 1;
+
+const MK_LBUTTON: int = 0x0001;
+const MK_RBUTTON: int = 0x0002;
+const MK_MBUTTON: int = 0x0010;
+
+const VK_SHIFT: int = 0x10;
+const VK_CONTROL: int = 0x11;
+const VK_MENU: int = 0x12;      // Alt
+const VK_LWIN: int = 0x5B;
+const VK_RWIN: int = 0x5C;
+const VK_CAPITAL: int = 0x14;
+const VK_NUMLOCK: int = 0x90;
+
+// EventKind ordinal mapping (must match std.native.types.EventKind).
+const EK_QUIT: int = 1;
+const EK_CLOSE: int = 2;
+const EK_RESIZE: int = 3;
+const EK_PAINT: int = 4;
+const EK_KEYDOWN: int = 5;
+const EK_KEYUP: int = 6;
+const EK_CHAR: int = 7;
+const EK_MOUSEMOVE: int = 8;
+const EK_MOUSEDOWN: int = 9;
+const EK_MOUSEUP: int = 10;
+const EK_MOUSEWHEEL: int = 11;
+const EK_FOCUS: int = 12;
+const EK_UNFOCUS: int = 13;
+
+// Raw-memory layout constants (byte offsets within control/event blocks).
+const CB_SIZE: int = 128;      // control block bytes
+const EV_SIZE: int = 128;      // event record bytes
+const RING_CAP: int = 1024;    // events per window
+
+const OFF_HWND: int = 0;
+const OFF_NEXT: int = 8;
+const OFF_HEAD: int = 16;
+const OFF_TAIL: int = 24;
+const OFF_COUNT: int = 32;
+const OFF_CAP: int = 40;
+const OFF_CLOSED: int = 48;
+const OFF_W: int = 56;
+const OFF_H: int = 64;
+const OFF_RING: int = 72;
+const OFF_SURR: int = 80;
+const OFF_DBG: int = 88;
+
+// ── Module state (raw pointers only; no Lymar heap touched by wnd_proc) ───
+var _u32: int = 0;
+var _k32: int = 0;
+var _class_atom: int = 0;
+var _win_list: int = 0;       // head of raw control-block linked list (i64 addr)
+var _next_id: int = 1;
+var _quit: bool = false;
+var _scratch_pt: int = 0;     // POINT (8B) for ScreenToClient
+var _scratch_ps: int = 0;     // PAINTSTRUCT (72B) for BeginPaint/EndPaint
+
+// ffi.alloc'd memory is region-scoped: it is released when the creating
+// function's region exits. Control blocks, rings and WndProc scratch buffers
+// must outlive their creator, so every persistent allocation's pubptr is
+// retained here — storing it in a module-global list promotes the raw
+// allocation to region 0 (permanent).
+var _keep: [pubptr] = [] as [pubptr];
+
+fn keep(p: pubptr): pubptr {
+    _keep.append(p);
+    return p;
+}
+
+// ── Symbol + call helpers ─────────────────────────────────────────────────
+fn u32sym(name: str): int {
+    unsafe {
+        if (_u32 == 0) { _u32 = ffi.library_load("user32.dll"); }
+        if (_u32 == 0) { return 0; }
+        return ffi.library_get_symbol(_u32, name);
+    }
+}
+
+fn k32sym(name: str): int {
+    unsafe {
+        if (_k32 == 0) { _k32 = ffi.library_load("kernel32.dll"); }
+        if (_k32 == 0) { return 0; }
+        return ffi.library_get_symbol(_k32, name);
+    }
+}
+
+fn call_i64(fptr: int, args: [any]): int {
+    unsafe {
+        return ffi.foreign_call(fptr, args, ffi.TYPE_I64, []);
+    }
+}
+
+fn call_i32(fptr: int, args: [any]): int {
+    unsafe {
+        return ffi.foreign_call(fptr, args, ffi.TYPE_I32, []);
+    }
+}
+
+fn call_i64_ret(fptr: int, args: [any], ret: int): int {
+    unsafe {
+        return ffi.foreign_call(fptr, args, ret, []);
+    }
+}
+
+fn call_void(fptr: int, args: [any]): nil {
+    unsafe {
+        ffi.foreign_call(fptr, args, ffi.TYPE_VOID, []);
+    }
+}
+
+fn cstr(s: str): int {
+    unsafe {
+        return _builtin_string_to_cstr(s);
+    }
+}
+
+// Convert a foreign-ptr box to its raw address as an i64. Needed because
+// ffi.store_i64/to_int cannot read ptr-boxed values; store_ptr + load_i64
+// round-trips the address bits. Cold path only (block setup).
+fn p2i(p: int): int {
+    unsafe {
+        var tmp = ffi.alloc(8);
+        ffi.store_ptr(tmp, p);
+        var v: int = ffi.load_i64(tmp);
+        ffi.free(tmp);
+        return v;
+    }
+}
+
+// Sign-extend a 16-bit field packed into a 32-bit LPARAM/WPARAM word.
+fn s16(v: int): int {
+    var x: int = v & 0xFFFF;
+    if (x >= 0x8000) { x = x - 0x10000; }
+    return x;
+}
+
+// Modifier bitmask from GetKeyState high bits (foreign calls only).
+fn modifiers(): int {
+    var m: int = 0;
+    var ks = k32sym("GetKeyState");
+    if (ks != 0) {
+        var st: int = call_i64_ret(ks, [VK_SHIFT], ffi.TYPE_I16);
+        if (st & 0x8000 != 0) { m = m | nt.MOD_SHIFT; }
+        st = call_i64_ret(ks, [VK_CONTROL], ffi.TYPE_I16);
+        if (st & 0x8000 != 0) { m = m | nt.MOD_CTRL; }
+        st = call_i64_ret(ks, [VK_MENU], ffi.TYPE_I16);
+        if (st & 0x8000 != 0) { m = m | nt.MOD_ALT; }
+        var lw: int = call_i64_ret(ks, [VK_LWIN], ffi.TYPE_I16);
+        var rw: int = call_i64_ret(ks, [VK_RWIN], ffi.TYPE_I16);
+        if (lw & 0x8000 != 0 or rw & 0x8000 != 0) { m = m | nt.MOD_SUPER; }
+        st = call_i64_ret(ks, [VK_CAPITAL], ffi.TYPE_I16);
+        if (st & 0x8000 != 0) { m = m | nt.MOD_CAPS; }
+        st = call_i64_ret(ks, [VK_NUMLOCK], ffi.TYPE_I16);
+        if (st & 0x8000 != 0) { m = m | nt.MOD_NUM; }
+    }
+    return m;
+}
+
+// ── Raw control-block helpers (unsafe; callable from wnd_proc) ────────────
+// All operate purely on ffi memory - no Lymar heap objects.
+
+fn cb_load(block: int, off: int): int {
+    unsafe { return ffi.load_i64(ffi.ptr_add(block, off)); }
+}
+
+fn cb_store(block: int, off: int, v: int): nil {
+    unsafe { ffi.store_i64(ffi.ptr_add(block, off), v); }
+}
+
+// Find control block for hwnd by walking the raw linked list.
+// Returns block pointer (int) or 0.
+fn find_block(hwnd: int): int {
+    unsafe {
+        var b: int = _win_list;
+        while (b != 0) {
+            if (ffi.load_i64(ffi.ptr_add(b, OFF_HWND)) == hwnd
+                and ffi.load_i64(ffi.ptr_add(b, OFF_CLOSED)) == 0) { return b; }
+            b = ffi.load_i64(ffi.ptr_add(b, OFF_NEXT));
+        }
+    }
+    return 0;
+}
+
+fn active_window_count(): int {
+    unsafe {
+        var n: int = 0;
+        var b: int = _win_list;
+        while (b != 0) {
+            if (ffi.load_i64(ffi.ptr_add(b, OFF_CLOSED)) == 0) { n = n + 1; }
+            b = ffi.load_i64(ffi.ptr_add(b, OFF_NEXT));
+        }
+        return n;
+    }
+}
+
+// Push a packed event record into a window's ring. Safe inside wnd_proc:
+// raw memory only. Drops oldest event when full.
+fn ring_push(block: int, kind: int, x: int, y: int, w: int, h: int,
+             key: int, ch: int, mods: int, buttons: int, delta: int): nil {
+    unsafe {
+        var count: int = cb_load(block, OFF_COUNT);
+        var cap: int = cb_load(block, OFF_CAP);
+        var ring: int = cb_load(block, OFF_RING);
+        if (count >= cap) {
+            // Full: advance head (drop oldest), keep count at cap.
+            var head: int = cb_load(block, OFF_HEAD);
+            head = (head + 1) % cap;
+            cb_store(block, OFF_HEAD, head);
+        } else {
+            cb_store(block, OFF_COUNT, count + 1);
+        }
+        var tail: int = cb_load(block, OFF_TAIL);
+        var rec: int = ffi.ptr_add(ring, tail * EV_SIZE);
+        ffi.store_i64(ffi.ptr_add(rec, 0), kind);
+        ffi.store_i64(ffi.ptr_add(rec, 8), x);
+        ffi.store_i64(ffi.ptr_add(rec, 16), y);
+        ffi.store_i64(ffi.ptr_add(rec, 24), w);
+        ffi.store_i64(ffi.ptr_add(rec, 32), h);
+        ffi.store_i64(ffi.ptr_add(rec, 40), key);
+        ffi.store_i64(ffi.ptr_add(rec, 48), ch);
+        ffi.store_i64(ffi.ptr_add(rec, 56), mods);
+        ffi.store_i64(ffi.ptr_add(rec, 64), buttons);
+        ffi.store_i64(ffi.ptr_add(rec, 72), delta);
+        ffi.store_i64(ffi.ptr_add(rec, 80), cb_load(block, OFF_HWND));
+        tail = (tail + 1) % cap;
+        cb_store(block, OFF_TAIL, tail);
+    }
+}
+
+fn mouse_buttons(wp: int): int {
+    var b: int = 0;
+    if (wp & MK_LBUTTON != 0) { b = b | 1; }
+    if (wp & MK_RBUTTON != 0) { b = b | 2; }
+    if (wp & MK_MBUTTON != 0) { b = b | 4; }
+    return b;
+}
+
+fn wndproc_cb(): ffi.Callback? {
+    var types = [ffi.TYPE_I64, ffi.TYPE_I64, ffi.TYPE_I64, ffi.TYPE_I64];
+    unsafe {
+        var c = ffi.create_callback("std.native.win32.wnd_proc", types, ffi.TYPE_I64) ? else {
+            return ffi.create_callback("wnd_proc", types, ffi.TYPE_I64);
+        };
+        return ok(c);
+    }
+}
+
+// LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM)
+// Top-level pub fn: ffi.create_callback resolves it by LIR name.
+// ONLY raw memory ops + foreign_call inside - see header comment.
+pub fn wnd_proc(hwnd: int, msg: int, wp: int, lp: int): int {
+    var block: int = find_block(hwnd);
+    if (block == 0) {
+        unsafe {
+            return call_i64(u32sym("DefWindowProcA"), [hwnd, msg, wp, lp]);
+        }
+    }
+    cb_store(block, OFF_DBG, cb_load(block, OFF_DBG) + 1);
+    var mods: int = modifiers();
+
+    if (msg == WM_MOUSEMOVE) {
+        ring_push(block, EK_MOUSEMOVE, s16(lp), s16(lp >> 16), 0, 0,
+                  0, -1, mods, mouse_buttons(wp), 0);
+    } elif (msg == WM_LBUTTONDOWN or msg == WM_RBUTTONDOWN or msg == WM_MBUTTONDOWN) {
+        var btn: int = 1;
+        if (msg == WM_RBUTTONDOWN) { btn = 2; }
+        elif (msg == WM_MBUTTONDOWN) { btn = 4; }
+        ring_push(block, EK_MOUSEDOWN, s16(lp), s16(lp >> 16), 0, 0,
+                  0, -1, mods, btn, 0);
+    } elif (msg == WM_LBUTTONUP or msg == WM_RBUTTONUP or msg == WM_MBUTTONUP) {
+        var upbtn: int = 1;
+        if (msg == WM_RBUTTONUP) { upbtn = 2; }
+        elif (msg == WM_MBUTTONUP) { upbtn = 4; }
+        ring_push(block, EK_MOUSEUP, s16(lp), s16(lp >> 16), 0, 0,
+                  0, -1, mods, upbtn, 0);
+    } elif (msg == WM_MOUSEWHEEL) {
+        // Delta in HIWORD(wParam) signed 16; coords are screen-space,
+        // converted to client via ScreenToClient on a POINT (8 bytes).
+        var delta: int = 0;
+        var d16: int = s16(wp >> 16);
+        if (d16 > 0) { delta = 1; }
+        if (d16 < 0) { delta = -1; }
+        var cx: int = s16(lp);
+        var cy: int = s16(lp >> 16);
+        unsafe {
+            ffi.store_i32(ffi.ptr_add(_scratch_pt, 0), cx);
+            ffi.store_i32(ffi.ptr_add(_scratch_pt, 4), cy);
+            call_void(u32sym("ScreenToClient"), [_scratch_pt]);
+            cx = ffi.load_i32(ffi.ptr_add(_scratch_pt, 0));
+            cy = ffi.load_i32(ffi.ptr_add(_scratch_pt, 4));
+        }
+        ring_push(block, EK_MOUSEWHEEL, cx, cy, 0, 0, 0, -1, mods, 0, delta);
+    } elif (msg == WM_KEYDOWN) {
+        ring_push(block, EK_KEYDOWN, 0, 0, 0, 0, wp, -1, mods, 0, 0);
+    } elif (msg == WM_KEYUP) {
+        ring_push(block, EK_KEYUP, 0, 0, 0, 0, wp, -1, mods, 0, 0);
+    } elif (msg == WM_CHAR) {
+        // UTF-16 code unit -> codepoint with surrogate pairing.
+        var unit: int = wp & 0xFFFF;
+        if (unit >= 0xD800 and unit <= 0xDBFF) {
+            cb_store(block, OFF_SURR, unit);
+        } else {
+            var cp: int = unit;
+            var hi: int = cb_load(block, OFF_SURR);
+            if (unit >= 0xDC00 and unit <= 0xDFFF and hi != 0) {
+                cp = 0x10000 + ((hi - 0xD800) << 10) + (unit - 0xDC00);
+            }
+            cb_store(block, OFF_SURR, 0);
+            if (cp != 0x000D) { // skip CR; Enter arrives as KeyDown
+                ring_push(block, EK_CHAR, 0, 0, 0, 0, 0, cp, mods, 0, 0);
+            }
+        }
+    } elif (msg == WM_SIZE) {
+        var w: int = s16(lp);
+        var h: int = s16(lp >> 16);
+        cb_store(block, OFF_W, w);
+        cb_store(block, OFF_H, h);
+        ring_push(block, EK_RESIZE, 0, 0, w, h, 0, -1, mods, 0, 0);
+    } elif (msg == WM_SETFOCUS) {
+        ring_push(block, EK_FOCUS, 0, 0, 0, 0, 0, -1, mods, 0, 0);
+    } elif (msg == WM_KILLFOCUS) {
+        ring_push(block, EK_UNFOCUS, 0, 0, 0, 0, 0, -1, mods, 0, 0);
+    } elif (msg == WM_PAINT) {
+        // Validate the update region so WM_PAINT stops re-posting,
+        // then surface a Paint event for the app's retained draw.
+        unsafe {
+            ffi.memset(_scratch_ps, 0, 72);
+            call_i64(u32sym("BeginPaint"), [hwnd, _scratch_ps]);
+            call_void(u32sym("EndPaint"), [hwnd, _scratch_ps]);
+        }
+        ring_push(block, EK_PAINT, 0, 0, 0, 0, 0, -1, mods, 0, 0);
+    } elif (msg == WM_ERASEBKGND) {
+        return 1; // suppress flicker; Paint events own redraws
+    } elif (msg == WM_DPICHANGED) {
+        // lParam: RECT* with the suggested window rect for the new DPI.
+        // Move/size to it per docs; the resulting WM_SIZE drives the
+        // swapchain resize through the normal Resize event path.
+        unsafe {
+            var l: int = ffi.load_i32(lp + 0);
+            var t: int = ffi.load_i32(lp + 4);
+            var r: int = ffi.load_i32(lp + 8);
+            var b: int = ffi.load_i32(lp + 12);
+            call_void(u32sym("SetWindowPos"),
+                      [hwnd, 0, l, t, r - l, b - t, SWP_NOZORDER_NOACTIVATE]);
+        }
+    } elif (msg == WM_DISPLAYCHANGE) {
+        // Informational; WM_SIZE follows if the client area changed.
+    } elif (msg == WM_CLOSE) {
+        ring_push(block, EK_CLOSE, 0, 0, 0, 0, 0, -1, mods, 0, 0);
+    } elif (msg == WM_DESTROY) {
+        cb_store(block, OFF_CLOSED, 1);
+        if (active_window_count() == 0) {
+            unsafe { call_void(u32sym("PostQuitMessage"), [0]); }
+        }
+        return 0;
+    }
+
+    unsafe {
+        return call_i64(u32sym("DefWindowProcA"), [hwnd, msg, wp, lp]);
+    }
+}
+
+// ── Public backend API (std.native.types contract) ────────────────────────
+
+pub fn available(): bool {
+    unsafe {
+        return u32sym("CreateWindowExA") != 0 and k32sym("GetModuleHandleA") != 0;
+    }
+}
+
+pub fn next_window_id(): int {
+    var id: int = _next_id;
+    _next_id = _next_id + 1;
+    return id;
+}
+
+fn ensure_class(): int {
+    if (_class_atom != 0) { return _class_atom; }
+    unsafe {
+        var hinst: int = call_i64(k32sym("GetModuleHandleA"), [0]);
+        if (hinst == 0) { return 0; }
+        var cb = wndproc_cb() ? else { return 0; };
+        var wndproc_ptr: int = cb.pointer;
+        // The trampoline must outlive every window; ffi.Callback frames
+        // are GC-managed and we never call cb.close().
+        var wc = ffi.alloc(80);
+        ffi.memset(wc, 0, 80);
+        ffi.store_u32(ffi.ptr_add(wc, 0), 80);
+        ffi.store_u32(ffi.ptr_add(wc, 4), CS_HREDRAW | CS_VREDRAW);
+        ffi.store_ptr(ffi.ptr_add(wc, 8), wndproc_ptr);
+        ffi.store_ptr(ffi.ptr_add(wc, 24), hinst);
+        val arrow: int = call_i64(u32sym("LoadCursorA"), [0, IDC_ARROW]);
+        ffi.store_ptr(ffi.ptr_add(wc, 40), arrow);
+        var cls_name: int = cstr("LymarNativeWin32");
+        ffi.store_ptr(ffi.ptr_add(wc, 64), cls_name);
+        var atom: int = call_i64(u32sym("RegisterClassExA"), [wc]);
+        ffi.free(wc);
+        if (atom == 0) { return 0; }
+        // Pre-allocate WndProc scratch buffers in VM context so the
+        // callback never allocates.
+        if (_scratch_pt == 0) { _scratch_pt = p2i(keep(ffi.alloc(8))); }
+        if (_scratch_ps == 0) { _scratch_ps = p2i(keep(ffi.alloc(72))); }
+        _class_atom = atom;
+        return atom;
+    }
+}
+
+// Allocate + link a control block and its event ring for hwnd.
+fn add_window_block(hwnd: int, width: int, height: int): int {
+    unsafe {
+        var bp = keep(ffi.alloc(CB_SIZE));
+        ffi.memset(bp, 0, CB_SIZE);
+        var rp = keep(ffi.alloc(RING_CAP * EV_SIZE));
+        ffi.memset(rp, 0, RING_CAP * EV_SIZE);
+        var block = p2i(bp);
+        var ring = p2i(rp);
+        cb_store(block, OFF_HWND, hwnd);
+        cb_store(block, OFF_RING, ring);
+        cb_store(block, OFF_CAP, RING_CAP);
+        cb_store(block, OFF_W, width);
+        cb_store(block, OFF_H, height);
+        // Push onto head of raw linked list (i64 address bits).
+        cb_store(block, OFF_NEXT, _win_list);
+        _win_list = p2i(block);
+        return p2i(block);
+    }
+}
+
+pub fn create_window(title: str, width: int, height: int): nt.Window? {
+    if (not available()) { return err(); }
+    var atom: int = ensure_class();
+    if (atom == 0) { return err(); }
+    unsafe {
+        var hinst: int = call_i64(k32sym("GetModuleHandleA"), [0]);
+        var cls_name: int = cstr("LymarNativeWin32");
+        var win_name: int = cstr(title);
+        // AdjustWindowRect so the *client* area is exactly width x height.
+        var wr = ffi.alloc(16); // RECT: left,top,right,bottom i32
+        ffi.store_i32(ffi.ptr_add(wr, 0), 0);
+        ffi.store_i32(ffi.ptr_add(wr, 4), 0);
+        ffi.store_i32(ffi.ptr_add(wr, 8), width);
+        ffi.store_i32(ffi.ptr_add(wr, 12), height);
+        call_i64(u32sym("AdjustWindowRect"), [wr, WS_OVERLAPPEDWINDOW, 0]);
+        var x0: int = ffi.load_i32(ffi.ptr_add(wr, 0));
+        var y0: int = ffi.load_i32(ffi.ptr_add(wr, 4));
+        var ww: int = ffi.load_i32(ffi.ptr_add(wr, 8)) - x0;
+        var hh: int = ffi.load_i32(ffi.ptr_add(wr, 12)) - y0;
+        var hwnd: int = call_i64(u32sym("CreateWindowExA"),
+            [0, cls_name, win_name, WS_OVERLAPPEDWINDOW, 100, 100, ww, hh, 0, 0, hinst, 0]);
+        ffi.free(wr);
+        if (hwnd == 0) { return err(); }
+
+        // Register the control block BEFORE ShowWindow so the WndProc
+        // can resolve state for creation-time messages.
+        add_window_block(hwnd, width, height);
+
+        call_void(u32sym("ShowWindow"), [hwnd, SW_SHOW]);
+        call_void(u32sym("UpdateWindow"), [hwnd]);
+        return ok(nt.Window(handle=hwnd, id=next_window_id(),
+                            width=width, height=height, closed=false,
+                            backend="win32"));
+    }
+}
+
+// Map raw kind ordinal back to the EventKind enum (explicit chain -
+// int->enum `as` casts are not guaranteed by the type checker).
+fn kind_from_int(k: int): nt.EventKind {
+    if (k == EK_QUIT) { return nt.EventKind.Quit; }
+    if (k == EK_CLOSE) { return nt.EventKind.Close; }
+    if (k == EK_RESIZE) { return nt.EventKind.Resize; }
+    if (k == EK_PAINT) { return nt.EventKind.Paint; }
+    if (k == EK_KEYDOWN) { return nt.EventKind.KeyDown; }
+    if (k == EK_KEYUP) { return nt.EventKind.KeyUp; }
+    if (k == EK_CHAR) { return nt.EventKind.Char; }
+    if (k == EK_MOUSEMOVE) { return nt.EventKind.MouseMove; }
+    if (k == EK_MOUSEDOWN) { return nt.EventKind.MouseDown; }
+    if (k == EK_MOUSEUP) { return nt.EventKind.MouseUp; }
+    if (k == EK_MOUSEWHEEL) { return nt.EventKind.MouseWheel; }
+    if (k == EK_FOCUS) { return nt.EventKind.Focus; }
+    if (k == EK_UNFOCUS) { return nt.EventKind.Unfocus; }
+    return nt.EventKind.None;
+}
+
+// Decode the head event record for `block` into an nt.Event (VM ctx).
+fn block_pop_event(block: int): any {
+    var count: int = cb_load(block, OFF_COUNT);
+    if (count == 0) { return nil; }
+    unsafe {
+        var head: int = cb_load(block, OFF_HEAD);
+        var cap: int = cb_load(block, OFF_CAP);
+        var ring: int = cb_load(block, OFF_RING);
+        var rec: int = ffi.ptr_add(ring, head * EV_SIZE);
+        var kind_i: int = ffi.load_i64(ffi.ptr_add(rec, 0));
+        var x: int = ffi.load_i64(ffi.ptr_add(rec, 8));
+        var y: int = ffi.load_i64(ffi.ptr_add(rec, 16));
+        var w: int = ffi.load_i64(ffi.ptr_add(rec, 24));
+        var h: int = ffi.load_i64(ffi.ptr_add(rec, 32));
+        var key: int = ffi.load_i64(ffi.ptr_add(rec, 40));
+        var ch: int = ffi.load_i64(ffi.ptr_add(rec, 48));
+        var mods: int = ffi.load_i64(ffi.ptr_add(rec, 56));
+        var buttons: int = ffi.load_i64(ffi.ptr_add(rec, 64));
+        var delta: int = ffi.load_i64(ffi.ptr_add(rec, 72));
+        var handle: int = ffi.load_i64(ffi.ptr_add(rec, 80));
+        head = (head + 1) % cap;
+        cb_store(block, OFF_HEAD, head);
+        cb_store(block, OFF_COUNT, count - 1);
+        var ev = nt.Event(
+            kind=kind_from_int(kind_i),
+            x=x, y=y, w=w, h=h, key=key, ch=ch,
+            mods=mods, buttons=buttons, delta=delta, handle=handle);
+        return ev;
+    }
+}
+
+// Drain pending events for `win`. Returns EventKind.None when empty.
+pub fn poll_event(win: nt.Window): nt.Event {
+    var block: int = find_block(win.handle);
+    if (block == 0) { return nt.event_none(); }
+    if (cb_load(block, OFF_COUNT) == 0) {
+        // Pump non-blocking messages so wnd_proc can enqueue events.
+        unsafe {
+            var msg = ffi.alloc(48);
+            ffi.memset(msg, 0, 48);
+            while (call_i64(u32sym("PeekMessageA"), [msg, 0, 0, 0, PM_REMOVE]) != 0) {
+                call_i64(u32sym("TranslateMessage"), [msg]);
+                call_i64(u32sym("DispatchMessageA"), [msg]);
+            }
+            ffi.free(msg);
+        }
+    }
+    var er: any = block_pop_event(block);
+    if (er == nil) { return nt.event_none(); }
+    return er as nt.Event;
+}
+
+// Blocking wait for the next event on `win` (process-wide dispatch).
+pub fn wait_event(win: nt.Window): nt.Event {
+    var block: int = find_block(win.handle);
+    if (block == 0) {
+        return nt.Event(kind=nt.EventKind.Quit, x=0, y=0, w=0, h=0,
+                        key=0, ch=-1, mods=0, buttons=0, delta=0, handle=win.handle);
+    }
+    unsafe {
+        var msg = ffi.alloc(48);
+        ffi.memset(msg, 0, 48);
+        while (cb_load(block, OFF_COUNT) == 0 and not _quit) {
+            var r: int = call_i64(u32sym("GetMessageA"), [msg, 0, 0, 0]);
+            if (r <= 0) { break; }
+            call_i64(u32sym("TranslateMessage"), [msg]);
+            call_i64(u32sym("DispatchMessageA"), [msg]);
+        }
+        ffi.free(msg);
+    }
+    var er: any = block_pop_event(block);
+    if (er == nil) {
+        return nt.Event(kind=nt.EventKind.Quit, x=0, y=0, w=0, h=0,
+                        key=0, ch=-1, mods=0, buttons=0, delta=0, handle=win.handle);
+    }
+    return er as nt.Event;
+}
+
+pub fn wnd_dbg(win: nt.Window): int {
+    var block: int = find_block(win.handle);
+    if (block == 0) { return -1; }
+    return cb_load(block, OFF_DBG);
+}
+
+pub fn pending_dbg(win: nt.Window): int {
+    var block: int = find_block(win.handle);
+    if (block == 0) { return -1; }
+    return cb_load(block, OFF_COUNT);
+}
+
+pub fn invalidate(win: nt.Window): nil {
+    unsafe {
+        call_void(u32sym("InvalidateRect"), [win.handle, 0, 0]);
+    }
+}
+
+pub fn set_title(win: nt.Window, title: str): nil {
+    unsafe {
+        var t: int = cstr(title);
+        call_i64(u32sym("SetWindowTextA"), [win.handle, t]);
+    }
+}
+
+pub fn set_size(win: nt.Window, width: int, height: int): nil {
+    unsafe {
+        // SetWindowPos takes the OUTER window rect; callers pass client
+        // dimensions. Convert via AdjustWindowRectEx with the window's real
+        // styles (same approach as the legacy sokol_app set_window_size).
+        var wr = ffi.alloc(16); // RECT
+        ffi.store_i32(ffi.ptr_add(wr, 0), 0);
+        ffi.store_i32(ffi.ptr_add(wr, 4), 0);
+        ffi.store_i32(ffi.ptr_add(wr, 8), width);
+        ffi.store_i32(ffi.ptr_add(wr, 12), height);
+        var style: int = call_i32(u32sym("GetWindowLongA"), [win.handle, -16]);
+        var ex_style: int = call_i32(u32sym("GetWindowLongA"), [win.handle, -20]);
+        call_i64(u32sym("AdjustWindowRectEx"), [wr, style, 0, ex_style]);
+        var ww: int = ffi.load_i32(ffi.ptr_add(wr, 8)) - ffi.load_i32(ffi.ptr_add(wr, 0));
+        var hh: int = ffi.load_i32(ffi.ptr_add(wr, 12)) - ffi.load_i32(ffi.ptr_add(wr, 4));
+        ffi.free(wr);
+        // SWP_NOMOVE(0x0002) | SWP_NOZORDER(0x0004) | SWP_NOACTIVATE(0x0010)
+        call_i64(u32sym("SetWindowPos"),
+            [win.handle, 0, 0, 0, ww, hh, 0x0002 | 0x0004 | 0x0010]);
+    }
+}
+
+pub fn client_size(win: nt.Window): (int, int) {
+    unsafe {
+        var block: int = find_block(win.handle);
+        if (block != 0) {
+            return (cb_load(block, OFF_W), cb_load(block, OFF_H));
+        }
+        var rc = ffi.alloc(16);
+        ffi.memset(rc, 0, 16);
+        call_i64(u32sym("GetClientRect"), [win.handle, rc]);
+        var w: int = ffi.load_i32(ffi.ptr_add(rc, 8));
+        var h: int = ffi.load_i32(ffi.ptr_add(rc, 12));
+        ffi.free(rc);
+        return (w, h);
+    }
+}
+
+pub fn destroy(win: nt.Window): nil {
+    unsafe {
+        call_void(u32sym("DestroyWindow"), [win.handle]);
+    }
+    win.closed = true;
+    // Mark the control block closed (WM_DESTROY may already have).
+    var block: int = find_block(win.handle);
+    if (block != 0) { cb_store(block, OFF_CLOSED, 1); }
+}
+
+// Standard blocking message loop; returns when the last window closes
+// (PostQuitMessage) or the queue reports WM_QUIT.
+pub fn run_message_loop(): nil {
+    _quit = false;
+    unsafe {
+        var msg = ffi.alloc(48);
+        ffi.memset(msg, 0, 48);
+        while (call_i64(u32sym("GetMessageA"), [msg, 0, 0, 0]) > 0) {
+            call_i64(u32sym("TranslateMessage"), [msg]);
+            call_i64(u32sym("DispatchMessageA"), [msg]);
+        }
+        ffi.free(msg);
+    }
+    _quit = true;
+}

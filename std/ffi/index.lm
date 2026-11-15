@@ -82,6 +82,10 @@ pub const TYPE_F64: int = 9;
 pub const TYPE_PTR: int = 10;
 pub const TYPE_CSTRING: int = 11;
 pub const TYPE_VOID: int = 12;
+// Marker used only inside a param_types entry: a nested list
+// [TYPE_STRUCT, e1, e2, ...] declares a struct-by-value argument whose
+// value is a pointer to packed native-layout bytes (see struct_alloc).
+pub const TYPE_STRUCT: int = 13;
 
 // C ABI calling conventions
 enum CallingConvention {
@@ -118,6 +122,74 @@ fn _ffi_store_i8(ptr: pubptr, value: int): nil {}
 fn _ffi_ptr_add(ptr: pubptr, offset: int): pubptr { return ptr + offset; }
 pub fn ptr_sub(ptr: pubptr, offset: int): pubptr { return ptr - offset; }
 pub fn ptr_diff(ptr1: pubptr, ptr2: pubptr): int { return ptr1 - ptr2; }
+
+// Struct-by-value support.
+//
+// A param_types entry of [TYPE_STRUCT, e1, e2, ...] declares a
+// struct-by-value argument. The corresponding arg value must be a
+// pointer to raw bytes laid out with native alignment: allocate with
+// struct_alloc(elem_types) then store each field at struct_offset(...)
+// using store_i64/store_f64/store_ptr as appropriate.
+fn _ffi_type_size(t: int): int {
+    if (t == TYPE_I8 or t == TYPE_U8) { return 1; }
+    if (t == TYPE_I16 or t == TYPE_U16) { return 2; }
+    if (t == TYPE_I32 or t == TYPE_U32 or t == TYPE_F32) { return 4; }
+    return 8;
+}
+fn _ffi_type_align(t: int): int {
+    if (t == TYPE_I8 or t == TYPE_U8) { return 1; }
+    if (t == TYPE_I16 or t == TYPE_U16) { return 2; }
+    if (t == TYPE_I32 or t == TYPE_U32 or t == TYPE_F32) { return 4; }
+    return 8;
+}
+// Byte size of a struct with the given element type ids (0..12).
+pub fn struct_size(elem_types: [any]): int {
+    var size: int = 0;
+    var i: int = 0;
+    while (i < len(elem_types)) {
+        var a: int = _ffi_type_align(elem_types[i]);
+        size = ((size + a - 1) / a) * a;
+        size = size + _ffi_type_size(elem_types[i]);
+        i = i + 1;
+    }
+    // Final tail padding to the struct's alignment (max element align).
+    var max_align: int = 1;
+    i = 0;
+    while (i < len(elem_types)) {
+        var a2: int = _ffi_type_align(elem_types[i]);
+        if (a2 > max_align) { max_align = a2; }
+        i = i + 1;
+    }
+    size = ((size + max_align - 1) / max_align) * max_align;
+    return size;
+}
+// Byte offset of element `index` within the struct layout.
+pub fn struct_offset(elem_types: [any], index: int): int {
+    var off: int = 0;
+    var i: int = 0;
+    while (i < index) {
+        var a: int = _ffi_type_align(elem_types[i]);
+        off = ((off + a - 1) / a) * a;
+        off = off + _ffi_type_size(elem_types[i]);
+        i = i + 1;
+    }
+    var a2: int = _ffi_type_align(elem_types[index]);
+    return ((off + a2 - 1) / a2) * a2;
+}
+// Allocate raw memory sized for the struct.
+pub fn struct_alloc(elem_types: [any]): pubptr {
+    return alloc(struct_size(elem_types));
+}
+// param_types entry describing a struct-by-value argument.
+pub fn struct_param(elem_types: [any]): [any] {
+    var d: [any] = [TYPE_STRUCT];
+    var i: int = 0;
+    while (i < len(elem_types)) {
+        d.append(elem_types[i]);
+        i = i + 1;
+    }
+    return d;
+}
 
 pub fn ptr_align(ptr: pubptr, alignment: int): pubptr {
     if (alignment <= 0 or (alignment & (alignment - 1)) != 0) { return 0; }

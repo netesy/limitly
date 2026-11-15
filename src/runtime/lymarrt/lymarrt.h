@@ -72,6 +72,27 @@ bool lymarrt_ffi_call(
     lymarrt_value* out_result
 );
 
+// Struct-by-value argument support. A struct argument's lymarrt_value
+// carries a pointer to packed native-layout bytes; the matching layout
+// entry describes the element types so libffi can build the ffi_type.
+#define LYMARRT_MAX_STRUCT_ELEMS 16
+typedef struct lymarrt_struct_layout {
+    uint32_t arg_index;
+    uint32_t count;
+    lymarrt_type types[LYMARRT_MAX_STRUCT_ELEMS];
+} lymarrt_struct_layout;
+
+bool lymarrt_ffi_call_ex(
+    void* func_ptr,
+    lymarrt_type ret_type,
+    const lymarrt_type* arg_types,
+    const lymarrt_value* arg_values,
+    size_t num_args,
+    const lymarrt_struct_layout* struct_layouts,
+    size_t num_struct_layouts,
+    lymarrt_value* out_result
+);
+
 // Callback / Trampoline Support
 typedef void (*lymarrt_callback_handler)(
     void* userdata,

@@ -217,7 +217,8 @@ std::vector<std::string> windows_runtime_libraries() {
     // interpreter build obtains these through the host link, but the
     // target-driver path only receives program and runtime archives.
     if (target.os == target::OS::Windows)
-        command.insert(command.end(), {"-lws2_32", "-lgdi32", "-luser32", "-lshell32", "-lopengl32"});
+        command.insert(command.end(), {"-lws2_32", "-lgdi32", "-luser32", "-lshell32", "-lopengl32",
+                                       "-ld3d11", "-ldxgi", "-ld3dcompiler"});
     command.insert(command.end(), {"-o", options.output_file});
     auto status = run_driver(command);
     result.success = status == 0;

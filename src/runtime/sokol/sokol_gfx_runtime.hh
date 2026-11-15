@@ -65,6 +65,13 @@ public:
     // the swapchain); false when the queue held no complete frame.
     bool render_frame();
 
+    // External-window mode (std.native): the HWND is owned by pure-Lymar
+    // code; this attaches a D3D11 device+swapchain to it and runs sg_*
+    // calls on the calling (VM) thread instead of the sokol_app thread.
+    bool attach_external_window(void* hwnd, int width, int height);
+    void detach_external_window();
+    bool external_window() const;
+
     struct Impl;   // public so file-local helpers can name the pimpl type
 
 private:

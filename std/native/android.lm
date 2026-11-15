@@ -1,0 +1,561 @@
+// std.native.android - Pure-Lymar Android windowing backend (NDK).
+//
+// Implements the std.native.types contract through std.ffi:
+//   - JNI via JNI_GetCreatedJavaVMs / AttachCurrentThread (libart.so)
+//   - ANativeWindow from a Surface jobject (libandroid.so)
+//   - ANativeWindow_lock/unlock for the framebuffer
+//   - ALooper/AInputQueue for the event stream (libandroid.so)
+//
+// No C glue, no sokol. The Lymar process runs inside ART; a Java host
+// Activity supplies the Surface via set_native_surface(env, surface).
+// All FFI args are scalars/pointers - no struct-by-value needed.
+//
+// Control blocks + event rings are ffi.alloc'd raw memory (same design
+// as std.native.win32/linux) so native callbacks never touch Lymar
+// heap objects.
+
+import std.ffi as ffi;
+import std.os.identity as osid;
+import std.native.types as nt;
+
+// AInputEventType
+const AIET_KEY: int = 1;
+const AIET_MOTION: int = 2;
+
+// AMotionEvent action masks / button states
+const AMEA_DOWN: int = 0;
+const AMEA_UP: int = 1;
+const AMEA_MOVE: int = 2;
+// AKeyEvent meta masks mirror MOD_*
+const AKEY_META_SHIFT: int = 1;
+const AKEY_META_CTRL: int = 1000;
+const AKEY_META_ALT: int = 2;
+const AKEY_META_META: int = 10000;
+const AKEY_META_CAPS: int = 100000;
+const AKEY_META_NUM: int = 2000000;
+
+// EventKind ordinals
+const EK_QUIT: int = 1;
+const EK_CLOSE: int = 2;
+const EK_RESIZE: int = 3;
+const EK_PAINT: int = 4;
+const EK_KEYDOWN: int = 5;
+const EK_KEYUP: int = 6;
+const EK_CHAR: int = 7;
+const EK_MOUSEMOVE: int = 8;
+const EK_MOUSEDOWN: int = 9;
+const EK_MOUSEUP: int = 10;
+const EK_MOUSEWHEEL: int = 11;
+const EK_FOCUS: int = 12;
+const EK_UNFOCUS: int = 13;
+
+const CB_SIZE: int = 128;
+const EV_SIZE: int = 128;
+const RING_CAP: int = 1024;
+const OFF_HWND: int = 0;
+const OFF_NEXT: int = 8;
+const OFF_HEAD: int = 16;
+const OFF_TAIL: int = 24;
+const OFF_COUNT: int = 32;
+const OFF_CAP: int = 40;
+const OFF_CLOSED: int = 48;
+const OFF_W: int = 56;
+const OFF_H: int = 64;
+const OFF_RING: int = 72;
+const OFF_NATIVE: int = 80;   // ANativeWindow* / AInputQueue*
+const OFF_JNIENV: int = 88;   // JNIEnv* for this thread
+const OFF_SURFACE: int = 96;  // global jobject surface (single window)
+
+var _art: int = 0;
+var _android: int = 0;
+var _vm: int = 0;             // JavaVM*
+var _jni_env: int = 0;        // JNIEnv* (attached thread)
+var _win_list: int = 0;
+var _next_id: int = 1;
+var _looper: int = 0;
+var _input_queue: int = 0;
+var _surface: int = 0;        // jobject Surface (global ref)
+var _window_ptr: int = 0;     // ANativeWindow*
+
+// ffi.alloc'd memory is region-scoped and released when the creating
+// function exits; persistent control blocks/rings are retained in this
+// module-global list so promote_graph pins them to region 0.
+var _keep: [pubptr] = [] as [pubptr];
+
+fn keep(p: pubptr): pubptr {
+    _keep.append(p);
+    return p;
+}
+
+fn asym(lib: str, name: str): int {
+    unsafe {
+        var h: int = ffi.library_load(lib);
+        if (h == 0) { return 0; }
+        return ffi.library_get_symbol(h, name);
+    }
+}
+
+fn art_sym(name: str): int {
+    unsafe {
+        if (_art == 0) { _art = ffi.library_load("libart.so"); }
+        if (_art == 0) { _art = ffi.library_load("libnativehelper.so"); }
+        if (_art == 0) { return 0; }
+        return ffi.library_get_symbol(_art, name);
+    }
+}
+
+fn and_sym(name: str): int {
+    unsafe {
+        if (_android == 0) { _android = ffi.library_load("libandroid.so"); }
+        if (_android == 0) { return 0; }
+        return ffi.library_get_symbol(_android, name);
+    }
+}
+
+fn call_i64(fptr: int, args: [any]): int {
+    unsafe { return ffi.foreign_call(fptr, args, ffi.TYPE_I64, []); }
+}
+fn call_i64_ret(fptr: int, args: [any], ret: int): int {
+    unsafe { return ffi.foreign_call(fptr, args, ret, []); }
+}
+fn call_void(fptr: int, args: [any]): nil {
+    unsafe { ffi.foreign_call(fptr, args, ffi.TYPE_VOID, []); }
+}
+fn p2i(p: int): int {
+    unsafe {
+        var tmp = ffi.alloc(8);
+        ffi.store_ptr(tmp, p);
+        var v: int = ffi.load_i64(tmp);
+        ffi.free(tmp);
+        return v;
+    }
+}
+fn cb_load(block: int, off: int): int {
+    unsafe { return ffi.load_i64(ffi.ptr_add(block, off)); }
+}
+fn cb_store(block: int, off: int, v: int): nil {
+    unsafe { ffi.store_i64(ffi.ptr_add(block, off), v); }
+}
+
+fn find_block(hwnd: int): int {
+    unsafe {
+        var b: int = _win_list;
+        while (b != 0) {
+            if (ffi.load_i64(ffi.ptr_add(b, OFF_HWND)) == hwnd
+                and ffi.load_i64(ffi.ptr_add(b, OFF_CLOSED)) == 0) { return b; }
+            b = ffi.load_i64(ffi.ptr_add(b, OFF_NEXT));
+        }
+    }
+    return 0;
+}
+
+fn ring_push(block: int, kind: int, x: int, y: int, w: int, h: int,
+             key: int, ch: int, mods: int, buttons: int, delta: int): nil {
+    unsafe {
+        var count: int = cb_load(block, OFF_COUNT);
+        var cap: int = cb_load(block, OFF_CAP);
+        var ring: int = cb_load(block, OFF_RING);
+        if (count >= cap) {
+            var head: int = cb_load(block, OFF_HEAD);
+            head = (head + 1) % cap;
+            cb_store(block, OFF_HEAD, head);
+        } else {
+            cb_store(block, OFF_COUNT, count + 1);
+        }
+        var tail: int = cb_load(block, OFF_TAIL);
+        var rec: int = ffi.ptr_add(ring, tail * EV_SIZE);
+        ffi.store_i64(ffi.ptr_add(rec, 0), kind);
+        ffi.store_i64(ffi.ptr_add(rec, 8), x);
+        ffi.store_i64(ffi.ptr_add(rec, 16), y);
+        ffi.store_i64(ffi.ptr_add(rec, 24), w);
+        ffi.store_i64(ffi.ptr_add(rec, 32), h);
+        ffi.store_i64(ffi.ptr_add(rec, 40), key);
+        ffi.store_i64(ffi.ptr_add(rec, 48), ch);
+        ffi.store_i64(ffi.ptr_add(rec, 56), mods);
+        ffi.store_i64(ffi.ptr_add(rec, 64), buttons);
+        ffi.store_i64(ffi.ptr_add(rec, 72), delta);
+        ffi.store_i64(ffi.ptr_add(rec, 80), cb_load(block, OFF_HWND));
+        tail = (tail + 1) % cap;
+        cb_store(block, OFF_TAIL, tail);
+    }
+}
+
+fn kind_from_int(k: int): nt.EventKind {
+    if (k == EK_QUIT) { return nt.EventKind.Quit; }
+    if (k == EK_CLOSE) { return nt.EventKind.Close; }
+    if (k == EK_RESIZE) { return nt.EventKind.Resize; }
+    if (k == EK_PAINT) { return nt.EventKind.Paint; }
+    if (k == EK_KEYDOWN) { return nt.EventKind.KeyDown; }
+    if (k == EK_KEYUP) { return nt.EventKind.KeyUp; }
+    if (k == EK_CHAR) { return nt.EventKind.Char; }
+    if (k == EK_MOUSEMOVE) { return nt.EventKind.MouseMove; }
+    if (k == EK_MOUSEDOWN) { return nt.EventKind.MouseDown; }
+    if (k == EK_MOUSEUP) { return nt.EventKind.MouseUp; }
+    if (k == EK_MOUSEWHEEL) { return nt.EventKind.MouseWheel; }
+    if (k == EK_FOCUS) { return nt.EventKind.Focus; }
+    if (k == EK_UNFOCUS) { return nt.EventKind.Unfocus; }
+    return nt.EventKind.None;
+}
+
+fn block_pop_event(block: int): any {
+    var count: int = cb_load(block, OFF_COUNT);
+    if (count == 0) { return nil; }
+    unsafe {
+        var head: int = cb_load(block, OFF_HEAD);
+        var cap: int = cb_load(block, OFF_CAP);
+        var ring: int = cb_load(block, OFF_RING);
+        var rec: int = ffi.ptr_add(ring, head * EV_SIZE);
+        var kind_i: int = ffi.load_i64(ffi.ptr_add(rec, 0));
+        var x: int = ffi.load_i64(ffi.ptr_add(rec, 8));
+        var y: int = ffi.load_i64(ffi.ptr_add(rec, 16));
+        var w: int = ffi.load_i64(ffi.ptr_add(rec, 24));
+        var h: int = ffi.load_i64(ffi.ptr_add(rec, 32));
+        var key: int = ffi.load_i64(ffi.ptr_add(rec, 40));
+        var ch: int = ffi.load_i64(ffi.ptr_add(rec, 48));
+        var mods: int = ffi.load_i64(ffi.ptr_add(rec, 56));
+        var buttons: int = ffi.load_i64(ffi.ptr_add(rec, 64));
+        var delta: int = ffi.load_i64(ffi.ptr_add(rec, 72));
+        var handle: int = ffi.load_i64(ffi.ptr_add(rec, 80));
+        head = (head + 1) % cap;
+        cb_store(block, OFF_HEAD, head);
+        cb_store(block, OFF_COUNT, count - 1);
+        var ev = nt.Event(
+            kind=kind_from_int(kind_i),
+            x=x, y=y, w=w, h=h, key=key, ch=ch,
+            mods=mods, buttons=buttons, delta=delta, handle=handle);
+        return ev;
+    }
+}
+
+// ── JNI plumbing ──────────────────────────────────────────────────────────
+// JNIEnv is a pointer to a function table; calls go through it via
+// foreign_call on the table's entries (all scalar args).
+
+fn jni_call(env: int, slot_index: int, args: [any], ret: int): int {
+    // JNIEnv** -> *JNIEnv -> JNINativeInterface* -> fn table
+    unsafe {
+        var table: int = ffi.load_ptr(env);       // *env = JNINativeInterface*
+        var fnptr: int = ffi.load_ptr(ffi.ptr_add(table, slot_index * 8));
+        if (fnptr == 0) { return 0; }
+        // JNIEnv functions take env as first arg.
+        var full: [any] = [env];
+        var i: int = 0;
+        while (i < len(args)) { full.append(args[i]); i = i + 1; }
+        return ffi.foreign_call(fnptr, full, ret, []);
+    }
+}
+
+// JNI slot indices (jni.h JNINativeInterface order, stable ABI)
+const JNI_FINDCLASS: int = 6;
+const JNI_GETMETHODID: int = 33;
+const JNI_CALLVOIDMETHOD: int = 61;
+const JNI_CALLINTMETHOD: int = 49;
+const JNI_CALLOBJECTMETHOD: int = 34;
+const JNI_NEWGLOBALREF: int = 21;
+const JNI_DELETELOCALREF: int = 23;
+const JNI_GETSTATICMETHODID: int = 113;
+const JNI_CALLSTATICOBJECTMETHOD: int = 114;
+
+// Attach the current thread to the JavaVM; returns JNIEnv* or 0.
+fn ensure_jni(): int {
+    if (_jni_env != 0) { return _jni_env; }
+    unsafe {
+        var getvms = art_sym("JNI_GetCreatedJavaVMs");
+        if (getvms == 0) { return 0; }
+        var vmbuf = ffi.alloc(8);
+        var nbuf = ffi.alloc(4);
+        var cnt: int = call_i64_ret(getvms, [vmbuf, 1, nbuf], ffi.TYPE_I32);
+        if (cnt <= 0) { ffi.free(vmbuf); ffi.free(nbuf); return 0; }
+        _vm = ffi.load_ptr(vmbuf);
+        ffi.free(vmbuf); ffi.free(nbuf);
+        // AttachCurrentThread(JavaVM*, void** penv, void* args)
+        var envbuf = ffi.alloc(8);
+        var attach = art_sym("JNI_AttachCurrentThread");
+        if (attach == 0) {
+            // Some runtimes only export via JNIInvoke interface; try
+            // GetEnv path instead.
+            attach = 0;
+        }
+        if (attach != 0) {
+            call_i64_ret(attach, [_vm, envbuf, 0], ffi.TYPE_I32);
+        } else {
+            // JavaVM->GetEnv via vtable slot 6
+            var vtable: int = ffi.load_ptr(_vm);
+            var getenv_fn: int = ffi.load_ptr(ffi.ptr_add(vtable, 6 * 8));
+            call_i64_ret(getenv_fn, [_vm, envbuf, 0x00010004], ffi.TYPE_I32); // JNI_VERSION_1_4
+        }
+        _jni_env = ffi.load_ptr(envbuf);
+        ffi.free(envbuf);
+        return _jni_env;
+    }
+}
+
+// Called by the Java host Activity when its Surface is created.
+// env: JNIEnv*, surface: jobject (local ref; we NewGlobalRef it).
+pub fn set_native_surface(env: int, surface: int): nil {
+    _jni_env = env;
+    if (surface != 0) {
+        unsafe {
+            _surface = jni_call(env, JNI_NEWGLOBALREF, [surface], ffi.TYPE_I64);
+        }
+    }
+}
+
+pub fn available(): bool {
+    if (osid.os_name() != "android") { return false; }
+    unsafe {
+        return art_sym("JNI_GetCreatedJavaVMs") != 0 and and_sym("ANativeWindow_fromSurface") != 0;
+    }
+}
+
+pub fn next_window_id(): int {
+    var id: int = _next_id;
+    _next_id = _next_id + 1;
+    return id;
+}
+
+pub fn create_window(title: str, width: int, height: int): nt.Window? {
+    var env: int = ensure_jni();
+    if (env == 0 or _surface == 0) { return err(); }
+    unsafe {
+        // ANativeWindow_fromSurface(JNIEnv*, jobject) -> ANativeWindow*
+        var anw: int = call_i64(and_sym("ANativeWindow_fromSurface"), [env, _surface]);
+        if (anw == 0) { return err(); }
+        _window_ptr = anw;
+        // AInputQueue from the looper for this thread.
+        var prep = and_sym("ALooper_prepare");
+        var poll = and_sym("ALooper_pollAll");
+        var getq = and_sym("ALooper_getEventQueue");
+        if (prep != 0) {
+            _looper = call_i64_ret(prep, [0], ffi.TYPE_I64); // ALOOPER_PREPARE_ALLOW_NON_CALLBACKS=1? use 0
+        }
+        if (getq != 0 and _looper != 0) {
+            _input_queue = call_i64(getq, [_looper]);
+        }
+        // Control block (single-window model; handle = anw pointer).
+        var bp = keep(ffi.alloc(CB_SIZE));
+        ffi.memset(bp, 0, CB_SIZE);
+        var rp = keep(ffi.alloc(RING_CAP * EV_SIZE));
+        ffi.memset(rp, 0, RING_CAP * EV_SIZE);
+        var block = p2i(bp);
+        var ring = p2i(rp);
+        cb_store(block, OFF_HWND, anw);
+        cb_store(block, OFF_RING, ring);
+        cb_store(block, OFF_CAP, RING_CAP);
+        cb_store(block, OFF_W, width);
+        cb_store(block, OFF_H, height);
+        cb_store(block, OFF_NATIVE, anw);
+        cb_store(block, OFF_JNIENV, env);
+        cb_store(block, OFF_NEXT, _win_list);
+        _win_list = p2i(block);
+        return ok(nt.Window(handle=anw, id=next_window_id(),
+                            width=width, height=height, closed=false,
+                            backend="android"));
+    }
+}
+
+// Decode one AInputEvent into ring_push calls. Returns true if consumed.
+fn translate_input(block: int, evt: int): bool {
+    var etype: int = call_i64_ret(and_sym("AInputEvent_getType"), [evt], ffi.TYPE_I32);
+    var x: int = 0; var y: int = 0;
+    var ptr_fns = and_sym("AMotionEvent_getX");
+    var ptr_fns_y = and_sym("AMotionEvent_getY");
+    var action: int = 0; var meta: int = 0;
+    unsafe {
+        if (etype == AIET_MOTION) {
+            action = call_i64_ret(and_sym("AMotionEvent_getAction"), [evt], ffi.TYPE_I32);
+            meta = call_i64_ret(and_sym("AMotionEvent_getMetaState"), [evt], ffi.TYPE_I32);
+            x = call_i64_ret(ptr_fns, [evt, 0], ffi.TYPE_F64) as int;
+            y = call_i64_ret(ptr_fns_y, [evt, 0], ffi.TYPE_F64) as int;
+        } elif (etype == AIET_KEY) {
+            action = call_i64_ret(and_sym("AKeyEvent_getAction"), [evt], ffi.TYPE_I32);
+            meta = call_i64_ret(and_sym("AKeyEvent_getMetaState"), [evt], ffi.TYPE_I32);
+        }
+    }
+    var mods: int = 0;
+    if (meta & AKEY_META_SHIFT != 0) { mods = mods | nt.MOD_SHIFT; }
+    if (meta & AKEY_META_CTRL != 0) { mods = mods | nt.MOD_CTRL; }
+    if (meta & AKEY_META_ALT != 0) { mods = mods | nt.MOD_ALT; }
+    if (meta & AKEY_META_META != 0) { mods = mods | nt.MOD_SUPER; }
+    if (meta & AKEY_META_CAPS != 0) { mods = mods | nt.MOD_CAPS; }
+    if (meta & AKEY_META_NUM != 0) { mods = mods | nt.MOD_NUM; }
+
+    if (etype == AIET_MOTION) {
+        var masked: int = action & 0xFF;
+        if (masked == AMEA_MOVE) {
+            ring_push(block, EK_MOUSEMOVE, x, y, 0, 0, 0, -1, mods, 0, 0);
+        } elif (masked == AMEA_DOWN) {
+            ring_push(block, EK_MOUSEDOWN, x, y, 0, 0, 0, -1, mods, 1, 0);
+        } elif (masked == AMEA_UP) {
+            ring_push(block, EK_MOUSEUP, x, y, 0, 0, 0, -1, mods, 0, 0);
+        }
+        return true;
+    }
+    if (etype == AIET_KEY) {
+        var code: int = call_i64_ret(and_sym("AKeyEvent_getKeyCode"), [evt], ffi.TYPE_I32);
+        if (action == 0) { // AKEY_EVENT_ACTION_DOWN
+            ring_push(block, EK_KEYDOWN, 0, 0, 0, 0, code, -1, mods, 0, 0);
+            // Unicode char via AKeyEvent_getUnicodeChar
+            var uch: int = call_i64_ret(and_sym("AKeyEvent_getUnicodeChar"), [evt], ffi.TYPE_I32);
+            if (uch > 0 and uch != 10) {
+                ring_push(block, EK_CHAR, 0, 0, 0, 0, 0, uch, mods, 0, 0);
+            }
+        } else {
+            ring_push(block, EK_KEYUP, 0, 0, 0, 0, code, -1, mods, 0, 0);
+        }
+        return true;
+    }
+    return false;
+}
+
+// Pump available input events into rings. blocking=1 waits on looper.
+fn pump_events(blocking: int): nil {
+    if (_input_queue == 0) { return; }
+    unsafe {
+        var buf = ffi.alloc(16); // AInputEvent** + out seq
+        var guard: int = 0;
+        while (guard < 256) {
+            var have: int = 1;
+            if (blocking == 0 and _looper != 0) {
+                var poll_fn = and_sym("ALooper_pollOnce");
+                if (poll_fn == 0) { break; }
+                // ALooper_pollOnce(timeout_ms, &outFd, &outEvents, &outData)
+                var fd = ffi.alloc(4); var evs = ffi.alloc(4); var dat = ffi.alloc(8);
+                var r: int = call_i64_ret(poll_fn, [0, fd, evs, dat], ffi.TYPE_I32);
+                ffi.free(fd); ffi.free(evs); ffi.free(dat);
+                if (r <= 0) { break; } // timeout or error
+            }
+            var evt: int = call_i64(and_sym("AInputQueue_getEvent"), [_input_queue, buf]);
+            if (evt == 0) { break; }
+            // Route to the (single) window block.
+            var b: int = _win_list;
+            while (b != 0) {
+                if (ffi.load_i64(ffi.ptr_add(b, OFF_CLOSED)) == 0) {
+                    translate_input(b, evt);
+                }
+                b = ffi.load_i64(ffi.ptr_add(b, OFF_NEXT));
+            }
+            call_void(and_sym("AInputQueue_finishEvent"), [_input_queue, evt, 1]);
+            guard = guard + 1;
+            if (blocking == 0) { break; }
+        }
+        ffi.free(buf);
+    }
+}
+
+pub fn poll_event(win: nt.Window): nt.Event {
+    var block: int = find_block(win.handle);
+    if (block == 0) { return nt.event_none(); }
+    if (cb_load(block, OFF_COUNT) == 0) { pump_events(0); }
+    var er: any = block_pop_event(block);
+    if (er == nil) { return nt.event_none(); }
+    return er as nt.Event;
+}
+
+pub fn wait_event(win: nt.Window): nt.Event {
+    var block: int = find_block(win.handle);
+    if (block == 0) {
+        return nt.Event(kind=nt.EventKind.Quit, x=0, y=0, w=0, h=0,
+                        key=0, ch=-1, mods=0, buttons=0, delta=0, handle=win.handle);
+    }
+    var guard: int = 0;
+    while (cb_load(block, OFF_COUNT) == 0 and guard < 1000000) {
+        pump_events(1);
+        guard = guard + 1;
+    }
+    var er: any = block_pop_event(block);
+    if (er == nil) {
+        return nt.Event(kind=nt.EventKind.Quit, x=0, y=0, w=0, h=0,
+                        key=0, ch=-1, mods=0, buttons=0, delta=0, handle=win.handle);
+    }
+    return er as nt.Event;
+}
+
+pub fn invalidate(win: nt.Window): nil {
+    // Android surfaces are continuously composited; request a frame via
+    // ANativeWindow_setBuffersGeometry is not needed - emit Paint so the
+    // app redraws into the next locked buffer.
+    var block: int = find_block(win.handle);
+    if (block != 0) { ring_push(block, EK_PAINT, 0, 0, 0, 0, 0, -1, 0, 0, 0); }
+}
+
+pub fn set_title(win: nt.Window, title: str): nil {
+    // Window title is owned by the Android Activity; no-op by design.
+}
+
+pub fn set_size(win: nt.Window, width: int, height: int): nil {
+    unsafe {
+        call_void(and_sym("ANativeWindow_setBuffersGeometry"),
+            [_window_ptr, width, height, 1]); // WINDOW_FORMAT_RGBA_8888=1
+    }
+}
+
+pub fn client_size(win: nt.Window): (int, int) {
+    var block: int = find_block(win.handle);
+    if (block != 0) {
+        return (cb_load(block, OFF_W), cb_load(block, OFF_H));
+    }
+    return (0, 0);
+}
+
+// Lock the framebuffer for software rendering. Returns a buffer info
+// block pointer (ffi.alloc'd, caller frees) or 0. Fields:
+//   [0] bits ptr  [1] stride(bytes)  [2] width  [3] height  [4] format
+pub fn lock_framebuffer(win: nt.Window): int {
+    var block: int = find_block(win.handle);
+    if (block == 0 or _window_ptr == 0) { return 0; }
+    unsafe {
+        var w: int = cb_load(block, OFF_W);
+        var h: int = cb_load(block, OFF_H);
+        var info = ffi.alloc(48); // ANativeWindow_Buffer (~48B on arm64)
+        ffi.memset(info, 0, 48);
+        // ANativeWindow_lock(win, buf*, NULL)
+        var r: int = call_i64(and_sym("ANativeWindow_lock"), [_window_ptr, info, 0]);
+        if (r != 0) { ffi.free(info); return 0; }
+        var bits: int = ffi.load_ptr(ffi.ptr_add(info, 0));
+        var stride: int = ffi.load_i32(ffi.ptr_add(info, 8));
+        var out = ffi.alloc(40);
+        ffi.store_ptr(ffi.ptr_add(out, 0), bits);
+        ffi.store_i64(ffi.ptr_add(out, 8), stride);
+        ffi.store_i64(ffi.ptr_add(out, 16), w);
+        ffi.store_i64(ffi.ptr_add(out, 24), h);
+        ffi.store_i64(ffi.ptr_add(out, 32), 1);
+        ffi.free(info);
+        return p2i(out);
+    }
+}
+
+pub fn unlock_framebuffer(win: nt.Window): nil {
+    unsafe {
+        call_void(and_sym("ANativeWindow_unlockAndPost"), [_window_ptr]);
+    }
+}
+
+pub fn destroy(win: nt.Window): nil {
+    win.closed = true;
+    var block: int = find_block(win.handle);
+    if (block != 0) { cb_store(block, OFF_CLOSED, 1); }
+    if (_window_ptr != 0) {
+        unsafe {
+            call_void(and_sym("ANativeWindow_release"), [_window_ptr]);
+        }
+        _window_ptr = 0;
+    }
+}
+
+pub fn run_message_loop(): nil {
+    var guard: int = 0;
+    while (guard < 10000000) {
+        var any_open: int = 0;
+        unsafe {
+            var b: int = _win_list;
+            while (b != 0) {
+                if (ffi.load_i64(ffi.ptr_add(b, OFF_CLOSED)) == 0) { any_open = 1; }
+                b = ffi.load_i64(ffi.ptr_add(b, OFF_NEXT));
+            }
+        }
+        if (any_open == 0) { break; }
+        pump_events(1);
+        guard = guard + 1;
+    }
+}

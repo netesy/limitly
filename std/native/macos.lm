@@ -1,0 +1,695 @@
+// std.native.macos - Pure-Lymar macOS windowing backend (Cocoa/ObjC).
+//
+// Implements the std.native.types contract through std.ffi:
+//   - libobjc.dylib: objc_getClass / sel_registerName / objc_msgSend
+//     / objc_msgSend_stret / class_addMethod (for a Lymar-defined
+//     NSWindowDelegate giving us windowShouldClose/windowDidResize)
+//   - AppKit.framework loaded dynamically (no link-time dependency)
+//   - NSRect-by-value arguments via ffi struct support
+//     ([ffi.TYPE_STRUCT, ffi.TYPE_F64 x4])
+//
+// No C glue, no sokol. The event pump pulls NSEvents via
+// -[NSApplication nextEventMatchingMask:untilDate:inMode:dequeue:].
+//
+// Control blocks + event rings are ffi.alloc'd raw memory so native
+// callbacks never touch Lymar heap objects (same discipline as
+// std.native.win32/linux).
+
+import std.ffi as ffi;
+import std.os.identity as osid;
+import std.native.types as nt;
+
+// NSEventType values (NSEvent.h)
+const NE_LEFTDOWN: int = 1;
+const NE_LEFTUP: int = 2;
+const NE_RIGHTDOWN: int = 3;
+const NE_RIGHTUP: int = 4;
+const NE_MOUSEMOVE: int = 5;
+const NE_LEFTDRAG: int = 6;
+const NE_RIGHTDRAG: int = 7;
+const NE_OTHERDRAG: int = 27;
+const NE_KEYDOWN: int = 10;
+const NE_KEYUP: int = 11;
+const NE_FLAGSCHANGED: int = 12;
+const NE_SCROLLWHEEL: int = 22;
+const NE_OTHERDOWN: int = 25;
+const NE_OTHERUP: int = 26;
+
+// NSEventModifierFlags (NSEvent.h)
+const NM_CAPSLOCK: int = 65536;      // 0x10000
+const NM_SHIFT: int = 131072;       // 0x20000
+const NM_CONTROL: int = 262144;     // 0x40000
+const NM_OPTION: int = 524288;      // 0x80000
+const NM_COMMAND: int = 1048576;    // 0x100000
+const NM_NUMPAD: int = 2097152;     // 0x200000
+
+// NSWindowStyleMask
+const NW_TITLED: int = 1;
+const NW_CLOSABLE: int = 2;
+const NW_MINIATURIZABLE: int = 4;
+const NW_RESIZABLE: int = 8;
+const NW_STYLE: int = NW_TITLED | NW_CLOSABLE | NW_MINIATURIZABLE | NW_RESIZABLE;
+const NW_BACKING_BUFFERED: int = 2;
+
+// NSApplicationActivationPolicyRegular
+const NAP_REGULAR: int = 0;
+
+// EventKind ordinals
+const EK_QUIT: int = 1;
+const EK_CLOSE: int = 2;
+const EK_RESIZE: int = 3;
+const EK_PAINT: int = 4;
+const EK_KEYDOWN: int = 5;
+const EK_KEYUP: int = 6;
+const EK_CHAR: int = 7;
+const EK_MOUSEMOVE: int = 8;
+const EK_MOUSEDOWN: int = 9;
+const EK_MOUSEUP: int = 10;
+const EK_MOUSEWHEEL: int = 11;
+const EK_FOCUS: int = 12;
+const EK_UNFOCUS: int = 13;
+
+const CB_SIZE: int = 128;
+const EV_SIZE: int = 128;
+const RING_CAP: int = 1024;
+const OFF_HWND: int = 0;
+const OFF_NEXT: int = 8;
+const OFF_HEAD: int = 16;
+const OFF_TAIL: int = 24;
+const OFF_COUNT: int = 32;
+const OFF_CAP: int = 40;
+const OFF_CLOSED: int = 48;
+const OFF_W: int = 56;
+const OFF_H: int = 64;
+const OFF_RING: int = 72;
+const OFF_NSRECT: int = 80;   // scratch 32B NSRect buffer
+const OFF_NSDATA: int = 88;   // scratch for stret returns
+
+var _objc: int = 0;
+var _appkit: int = 0;
+var _win_list: int = 0;
+var _next_id: int = 1;
+var _app: int = 0;
+var _delegate: int = 0;
+var _delegate_cls: int = 0;
+var _nsstring_cls: int = 0;
+var _nswindow_cls: int = 0;
+var _nsapp_cls: int = 0;
+var _nsdate_cls: int = 0;
+var _nsrunloop_mode: int = 0;
+var _active_block: int = 0;   // block for delegate callbacks (single window)
+
+// ffi.alloc'd memory is region-scoped and released when the creating
+// function exits; persistent control blocks/rings/scratch are retained in
+// this module-global list so promote_graph pins them to region 0.
+var _keep: [pubptr] = [] as [pubptr];
+
+fn keep(p: pubptr): pubptr {
+    _keep.append(p);
+    return p;
+}
+
+fn asym(lib: int, name: str): int {
+    unsafe {
+        return ffi.library_get_symbol(lib, name);
+    }
+}
+
+fn objc_sym(name: str): int {
+    unsafe {
+        if (_objc == 0) { _objc = ffi.library_load("libobjc.dylib"); }
+        if (_objc == 0) { _objc = ffi.library_load("/usr/lib/libobjc.dylib"); }
+        if (_objc == 0) { return 0; }
+        return asym(_objc, name);
+    }
+}
+
+fn appkit_sym(name: str): int {
+    unsafe {
+        if (_appkit == 0) {
+            _appkit = ffi.library_load("/System/Library/Frameworks/AppKit.framework/AppKit");
+        }
+        if (_appkit == 0) { return 0; }
+        return asym(_appkit, name);
+    }
+}
+
+fn call_i64(fptr: int, args: [any]): int {
+    unsafe { return ffi.foreign_call(fptr, args, ffi.TYPE_I64, []); }
+}
+fn call_i64_ret(fptr: int, args: [any], ret: int): int {
+    unsafe { return ffi.foreign_call(fptr, args, ret, []); }
+}
+fn call_void(fptr: int, args: [any]): nil {
+    unsafe { ffi.foreign_call(fptr, args, ffi.TYPE_VOID, []); }
+}
+fn cstr(s: str): int {
+    unsafe { return _builtin_string_to_cstr(s); }
+}
+fn p2i(p: int): int {
+    unsafe {
+        var tmp = ffi.alloc(8);
+        ffi.store_ptr(tmp, p);
+        var v: int = ffi.load_i64(tmp);
+        ffi.free(tmp);
+        return v;
+    }
+}
+fn cb_load(block: int, off: int): int {
+    unsafe { return ffi.load_i64(ffi.ptr_add(block, off)); }
+}
+fn cb_store(block: int, off: int, v: int): nil {
+    unsafe { ffi.store_i64(ffi.ptr_add(block, off), v); }
+}
+
+// ── objc_msgSend wrappers ─────────────────────────────────────────────────
+// objc_msgSend is variadic; each call site declares its exact arity.
+// fnptr values are raw symbol addresses (objc_msgSend lives in libobjc).
+
+fn msg_fn(): int { return objc_sym("objc_msgSend"); }
+fn msgstret_fn(): int { return objc_sym("objc_msgSend_stret"); }
+
+fn msg0(obj: int, sel: int): int {
+    unsafe { return call_i64(msg_fn(), [obj, sel]); }
+}
+fn msg0_ret(obj: int, sel: int, ret: int): int {
+    unsafe { return call_i64_ret(msg_fn(), [obj, sel], ret); }
+}
+fn msg1i(obj: int, sel: int, a: int): int {
+    unsafe { return call_i64(msg_fn(), [obj, sel, a]); }
+}
+fn msg1i_ret(obj: int, sel: int, a: int, ret: int): int {
+    unsafe { return call_i64_ret(msg_fn(), [obj, sel, a], ret); }
+}
+fn msg2i(obj: int, sel: int, a: int, b: int): int {
+    unsafe { return call_i64(msg_fn(), [obj, sel, a, b]); }
+}
+fn msg3i(obj: int, sel: int, a: int, b: int, c: int): int {
+    unsafe { return call_i64(msg_fn(), [obj, sel, a, b, c]); }
+}
+// stret variant: struct return written to `out` buffer.
+fn msg_stret0(out: int, obj: int, sel: int): nil {
+    unsafe { call_void(msgstret_fn(), [out, obj, sel]); }
+}
+fn msg_stret1(out: int, obj: int, sel: int, a: int): nil {
+    unsafe { call_void(msgstret_fn(), [out, obj, sel, a]); }
+}
+
+fn sel(name: str): int {
+    unsafe { return call_i64(objc_sym("sel_registerName"), [cstr(name)]); }
+}
+
+fn find_block(nswindow: int): int {
+    unsafe {
+        var b: int = _win_list;
+        while (b != 0) {
+            if (ffi.load_i64(ffi.ptr_add(b, OFF_HWND)) == nswindow
+                and ffi.load_i64(ffi.ptr_add(b, OFF_CLOSED)) == 0) { return b; }
+            b = ffi.load_i64(ffi.ptr_add(b, OFF_NEXT));
+        }
+    }
+    return 0;
+}
+
+fn active_window_count(): int {
+    unsafe {
+        var n: int = 0;
+        var b: int = _win_list;
+        while (b != 0) {
+            if (ffi.load_i64(ffi.ptr_add(b, OFF_CLOSED)) == 0) { n = n + 1; }
+            b = ffi.load_i64(ffi.ptr_add(b, OFF_NEXT));
+        }
+        return n;
+    }
+}
+
+fn ring_push(block: int, kind: int, x: int, y: int, w: int, h: int,
+             key: int, ch: int, mods: int, buttons: int, delta: int): nil {
+    unsafe {
+        var count: int = cb_load(block, OFF_COUNT);
+        var cap: int = cb_load(block, OFF_CAP);
+        var ring: int = cb_load(block, OFF_RING);
+        if (count >= cap) {
+            var head: int = cb_load(block, OFF_HEAD);
+            head = (head + 1) % cap;
+            cb_store(block, OFF_HEAD, head);
+        } else {
+            cb_store(block, OFF_COUNT, count + 1);
+        }
+        var tail: int = cb_load(block, OFF_TAIL);
+        var rec: int = ffi.ptr_add(ring, tail * EV_SIZE);
+        ffi.store_i64(ffi.ptr_add(rec, 0), kind);
+        ffi.store_i64(ffi.ptr_add(rec, 8), x);
+        ffi.store_i64(ffi.ptr_add(rec, 16), y);
+        ffi.store_i64(ffi.ptr_add(rec, 24), w);
+        ffi.store_i64(ffi.ptr_add(rec, 32), h);
+        ffi.store_i64(ffi.ptr_add(rec, 40), key);
+        ffi.store_i64(ffi.ptr_add(rec, 48), ch);
+        ffi.store_i64(ffi.ptr_add(rec, 56), mods);
+        ffi.store_i64(ffi.ptr_add(rec, 64), buttons);
+        ffi.store_i64(ffi.ptr_add(rec, 72), delta);
+        ffi.store_i64(ffi.ptr_add(rec, 80), cb_load(block, OFF_HWND));
+        tail = (tail + 1) % cap;
+        cb_store(block, OFF_TAIL, tail);
+    }
+}
+
+fn kind_from_int(k: int): nt.EventKind {
+    if (k == EK_QUIT) { return nt.EventKind.Quit; }
+    if (k == EK_CLOSE) { return nt.EventKind.Close; }
+    if (k == EK_RESIZE) { return nt.EventKind.Resize; }
+    if (k == EK_PAINT) { return nt.EventKind.Paint; }
+    if (k == EK_KEYDOWN) { return nt.EventKind.KeyDown; }
+    if (k == EK_KEYUP) { return nt.EventKind.KeyUp; }
+    if (k == EK_CHAR) { return nt.EventKind.Char; }
+    if (k == EK_MOUSEMOVE) { return nt.EventKind.MouseMove; }
+    if (k == EK_MOUSEDOWN) { return nt.EventKind.MouseDown; }
+    if (k == EK_MOUSEUP) { return nt.EventKind.MouseUp; }
+    if (k == EK_MOUSEWHEEL) { return nt.EventKind.MouseWheel; }
+    if (k == EK_FOCUS) { return nt.EventKind.Focus; }
+    if (k == EK_UNFOCUS) { return nt.EventKind.Unfocus; }
+    return nt.EventKind.None;
+}
+
+fn block_pop_event(block: int): any {
+    var count: int = cb_load(block, OFF_COUNT);
+    if (count == 0) { return nil; }
+    unsafe {
+        var head: int = cb_load(block, OFF_HEAD);
+        var cap: int = cb_load(block, OFF_CAP);
+        var ring: int = cb_load(block, OFF_RING);
+        var rec: int = ffi.ptr_add(ring, head * EV_SIZE);
+        var kind_i: int = ffi.load_i64(ffi.ptr_add(rec, 0));
+        var x: int = ffi.load_i64(ffi.ptr_add(rec, 8));
+        var y: int = ffi.load_i64(ffi.ptr_add(rec, 16));
+        var w: int = ffi.load_i64(ffi.ptr_add(rec, 24));
+        var h: int = ffi.load_i64(ffi.ptr_add(rec, 32));
+        var key: int = ffi.load_i64(ffi.ptr_add(rec, 40));
+        var ch: int = ffi.load_i64(ffi.ptr_add(rec, 48));
+        var mods: int = ffi.load_i64(ffi.ptr_add(rec, 56));
+        var buttons: int = ffi.load_i64(ffi.ptr_add(rec, 64));
+        var delta: int = ffi.load_i64(ffi.ptr_add(rec, 72));
+        var handle: int = ffi.load_i64(ffi.ptr_add(rec, 80));
+        head = (head + 1) % cap;
+        cb_store(block, OFF_HEAD, head);
+        cb_store(block, OFF_COUNT, count - 1);
+        var ev = nt.Event(
+            kind=kind_from_int(kind_i),
+            x=x, y=y, w=w, h=h, key=key, ch=ch, mods=mods, buttons=buttons,
+            delta=delta, handle=handle);
+        return ev;
+    }
+}
+
+// ── Delegate callbacks (native -> Lymar trampolines) ─────────────────────
+// These run inside ffi callback trampolines: raw memory + foreign calls
+// only, no Lymar heap objects.
+
+// windowShouldClose:(id)sender -> BOOL. Push Close, allow close.
+pub fn delegate_window_should_close(self_obj: int, _cmd: int, sender: int): int {
+    unsafe {
+        var b: int = _active_block;
+        if (b != 0) { ring_push(b, EK_CLOSE, 0, 0, 0, 0, 0, -1, 0, 0, 0); }
+        cb_store(b, OFF_CLOSED, 1);
+    }
+    return 1;
+}
+
+// windowDidResize:(id)sender -> void. Push Resize with new size.
+pub fn delegate_window_did_resize(self_obj: int, _cmd: int, sender: int): nil {
+    unsafe {
+        var b: int = _active_block;
+        if (b == 0) { return; }
+        // [sender frame] -> NSRect via stret; content size ~= frame minus
+        // titlebar, good enough for the backend contract.
+        var fr = ffi.alloc(32);
+        ffi.memset(fr, 0, 32);
+        msg_stret0(fr, sender, sel("frame"));
+        var w: int = ffi.load_f64(ffi.ptr_add(fr, 16)) as int;
+        var h: int = ffi.load_f64(ffi.ptr_add(fr, 24)) as int;
+        ffi.free(fr);
+        cb_store(b, OFF_W, w);
+        cb_store(b, OFF_H, h);
+        ring_push(b, EK_RESIZE, 0, 0, w, h, 0, -1, 0, 0, 0);
+    }
+}
+
+// ── Public contract ───────────────────────────────────────────────────────
+
+fn ensure_classes(): int {
+    if (_nswindow_cls != 0) { return 1; }
+    unsafe {
+        _nsapp_cls = call_i64(objc_sym("objc_getClass"), [cstr("NSApplication")]);
+        _nswindow_cls = call_i64(objc_sym("objc_getClass"), [cstr("NSWindow")]);
+        _nsstring_cls = call_i64(objc_sym("objc_getClass"), [cstr("NSString")]);
+        _nsdate_cls = call_i64(objc_sym("objc_getClass"), [cstr("NSDate")]);
+        if (_nsapp_cls == 0 or _nswindow_cls == 0 or _nsstring_cls == 0) { return 0; }
+        // NSDefaultRunLoopMode is the NSString @"kCFRunLoopDefaultMode";
+        // an equal-content NSString works for mode lookup.
+        _nsrunloop_mode = msg1i(_nsstring_cls, sel("stringWithUTF8String:"),
+            cstr("kCFRunLoopDefaultMode"));
+        return 1;
+    }
+}
+
+pub fn available(): bool {
+    if (osid.os_name() != "darwin") { return false; }
+    unsafe {
+        if (objc_sym("objc_msgSend") == 0) { return false; }
+        if (appkit_sym("NSApplication") == 0 and
+            objc_sym("objc_getClass") == 0) { return false; }
+        return true;
+    }
+}
+
+pub fn next_window_id(): int {
+    var id: int = _next_id;
+    _next_id = _next_id + 1;
+    return id;
+}
+
+fn make_nsstring(s: str): int {
+    unsafe {
+        return msg1i(_nsstring_cls, sel("stringWithUTF8String:"), cstr(s));
+    }
+}
+
+fn add_window_block(nswindow: int, width: int, height: int): int {
+    unsafe {
+        var bp = keep(ffi.alloc(CB_SIZE));
+        ffi.memset(bp, 0, CB_SIZE);
+        var rp = keep(ffi.alloc(RING_CAP * EV_SIZE));
+        ffi.memset(rp, 0, RING_CAP * EV_SIZE);
+        var sbp = keep(ffi.alloc(32));
+        ffi.memset(sbp, 0, 32);
+        var block = p2i(bp);
+        var ring = p2i(rp);
+        var rbuf = p2i(sbp);
+        cb_store(block, OFF_HWND, nswindow);
+        cb_store(block, OFF_RING, ring);
+        cb_store(block, OFF_CAP, RING_CAP);
+        cb_store(block, OFF_W, width);
+        cb_store(block, OFF_H, height);
+        cb_store(block, OFF_NSRECT, rbuf);
+        cb_store(block, OFF_NEXT, _win_list);
+        _win_list = p2i(block);
+        return p2i(block);
+    }
+}
+
+fn ensure_delegate(): int {
+    if (_delegate != 0) { return 1; }
+    unsafe {
+        var sup = call_i64(objc_sym("objc_getClass"), [cstr("NSObject")]);
+        if (sup == 0) { return 0; }
+        _delegate_cls = call_i64(objc_sym("objc_allocateClassPair"),
+            [sup, cstr("LymarNativeDelegate"), 0]);
+        if (_delegate_cls == 0) { return 0; }
+        // class_addMethod(cls, sel, imp, types)
+        var cam = objc_sym("class_addMethod");
+        var cbr1 = ffi.create_callback("std.native.macos.delegate_window_should_close",
+            [ffi.TYPE_I64, ffi.TYPE_I64, ffi.TYPE_I64], ffi.TYPE_I64) ? else { return 0; };
+        var cbr2 = ffi.create_callback("std.native.macos.delegate_window_did_resize",
+            [ffi.TYPE_I64, ffi.TYPE_I64, ffi.TYPE_I64], ffi.TYPE_VOID) ? else { return 0; };
+        call_i64_ret(cam, [_delegate_cls, sel("windowShouldClose:"), cbr1.pointer, cstr("B24@0:8@16")], ffi.TYPE_I32);
+        call_i64_ret(cam, [_delegate_cls, sel("windowDidResize:"), cbr2.pointer, cstr("v24@0:8@16")], ffi.TYPE_I32);
+        call_i64_ret(objc_sym("objc_registerClassPair"), [_delegate_cls], ffi.TYPE_I32);
+        _delegate = msg0(_delegate_cls, sel("alloc"));
+        _delegate = msg0(_delegate, sel("init"));
+        if (_delegate == 0) { return 0; }
+        return 1;
+    }
+}
+
+pub fn create_window(title: str, width: int, height: int): nt.Window? {
+    if (ensure_classes() == 0) { return err(); }
+    unsafe {
+        // NSApplication sharedApplication + activation policy.
+        if (_app == 0) {
+            _app = msg0(_nsapp_cls, sel("sharedApplication"));
+            if (_app == 0) { return err(); }
+            msg1i(_app, sel("setActivationPolicy:"), NAP_REGULAR);
+            msg1i(_app, sel("activateIgnoringOtherApps:"), 1);
+        }
+        if (ensure_delegate() == 0) { return err(); }
+
+        // NSRect contentRect = {0,0,w,h} as 4 f64 in raw memory.
+        var rect = ffi.alloc(32);
+        ffi.memset(rect, 0, 32);
+        ffi.store_f64(ffi.ptr_add(rect, 0), 0.0);
+        ffi.store_f64(ffi.ptr_add(rect, 8), 0.0);
+        ffi.store_f64(ffi.ptr_add(rect, 16), width as float);
+        ffi.store_f64(ffi.ptr_add(rect, 24), height as float);
+
+        // [[NSWindow alloc] initWithContentRect:styleMask:backing:defer:]
+        var win = msg0(_nswindow_cls, sel("alloc"));
+        if (win == 0) { ffi.free(rect); return err(); }
+        var nswin: int = call_i64(msg_fn(),
+            [win, sel("initWithContentRect:styleMask:backing:defer:"),
+             rect, NW_STYLE, NW_BACKING_BUFFERED, 0]);
+        ffi.free(rect);
+        if (nswin == 0) { return err(); }
+
+        // Title, delegate, show.
+        var tstr = make_nsstring(title);
+        msg1i(nswin, sel("setTitle:"), tstr);
+        msg1i(nswin, sel("setDelegate:"), _delegate);
+        _active_block = add_window_block(nswin, width, height);
+        msg1i(nswin, sel("makeKeyAndOrderFront:"), 0);
+        msg0(_app, sel("finishLaunching"));
+        return ok(nt.Window(handle=nswin, id=next_window_id(),
+                            width=width, height=height, closed=false,
+                            backend="macos"));
+    }
+}
+
+// Pump one batch of NSEvents into rings. blocking=1 uses distantFuture.
+fn pump_events(blocking: int): nil {
+    if (_app == 0) { return; }
+    unsafe {
+        var guard: int = 0;
+        while (guard < 256) {
+            var mask: int = 0xFFFFFFFFFFFFFFFF;
+            var date: int;
+            if (blocking == 1) {
+                date = msg0(_nsdate_cls, sel("distantFuture"));
+            } else {
+                date = msg0(_nsdate_cls, sel("distantPast"));
+            }
+            // nextEventMatchingMask:untilDate:inMode:dequeue:
+            var ev = call_i64(msg_fn(), [_app,
+                sel("nextEventMatchingMask:untilDate:inMode:dequeue:"),
+                mask, date, _nsrunloop_mode, 1]);
+            if (ev == 0) { break; }
+            translate_nsevent(ev);
+            guard = guard + 1;
+            if (blocking == 0) { break; }
+        }
+    }
+}
+
+fn nsevent_type(ev: int): int {
+    unsafe { return msg0_ret(ev, sel("type"), ffi.TYPE_U64); }
+}
+
+fn translate_nsevent(ev: int): bool {
+    unsafe {
+    var etype: int = nsevent_type(ev);
+    // [ev window] -> NSWindow* for routing
+    var nswin: int = msg0(ev, sel("window"));
+    var block: int = find_block(nswin);
+    if (block == 0) { return false; }
+
+    if (etype == NE_KEYDOWN or etype == NE_KEYUP or etype == NE_FLAGSCHANGED) {
+        var keycode: int = msg0_ret(ev, sel("keyCode"), ffi.TYPE_I32);
+        var flags: int = msg0_ret(ev, sel("modifierFlags"), ffi.TYPE_U64);
+        var mods: int = nmods(flags);
+        var kind: int = EK_KEYDOWN;
+        if (etype == NE_KEYUP) { kind = EK_KEYUP; }
+        elif (etype == NE_FLAGSCHANGED) { kind = EK_KEYDOWN; }
+        ring_push(block, kind, 0, 0, 0, 0, keycode, -1, mods, 0, 0);
+        if (etype == NE_KEYDOWN) {
+            // characters -> UTF8String -> first codepoint
+            var chars = msg0(ev, sel("characters"));
+            if (chars != 0) {
+                var up = msg0(chars, sel("UTF8String"));
+                if (up != 0) {
+                    var cp: int = utf8_first(up);
+                    if (cp > 0) {
+                        ring_push(block, EK_CHAR, 0, 0, 0, 0, 0, cp, mods, 0, 0);
+                    }
+                }
+            }
+        }
+    } elif (etype == NE_MOUSEMOVE or etype == NE_LEFTDRAG or
+               etype == NE_RIGHTDRAG or etype == NE_OTHERDRAG) {
+        var pt_out = ffi.alloc(16);
+        ffi.memset(pt_out, 0, 16);
+        // locationInWindow returns NSPoint {double x, double y}
+        msg_stret0(pt_out, ev, sel("locationInWindow"));
+        var x: int = ffi.load_f64(pt_out) as int;
+        var y: int = ffi.load_f64(ffi.ptr_add(pt_out, 8)) as int;
+        ffi.free(pt_out);
+        var flags: int = msg0_ret(ev, sel("modifierFlags"), ffi.TYPE_U64);
+        var btns: int = 0;
+        if (etype != NE_MOUSEMOVE) { btns = 1; }
+        ring_push(block, EK_MOUSEMOVE, x, y, 0, 0, 0, -1, nmods(flags), btns, 0);
+    } elif (etype == NE_LEFTDOWN or etype == NE_RIGHTDOWN or etype == NE_OTHERDOWN) {
+        var pt_out = ffi.alloc(16);
+        ffi.memset(pt_out, 0, 16);
+        msg_stret0(pt_out, ev, sel("locationInWindow"));
+        var x: int = ffi.load_f64(pt_out) as int;
+        var y: int = ffi.load_f64(ffi.ptr_add(pt_out, 8)) as int;
+        ffi.free(pt_out);
+        var flags: int = msg0_ret(ev, sel("modifierFlags"), ffi.TYPE_U64);
+        var mb: int = 1;
+        if (etype == NE_RIGHTDOWN) { mb = 2; }
+        elif (etype == NE_OTHERDOWN) { mb = 4; }
+        ring_push(block, EK_MOUSEDOWN, x, y, 0, 0, 0, -1, nmods(flags), mb, 0);
+    } elif (etype == NE_LEFTUP or etype == NE_RIGHTUP or etype == NE_OTHERUP) {
+        var pt_out = ffi.alloc(16);
+        ffi.memset(pt_out, 0, 16);
+        msg_stret0(pt_out, ev, sel("locationInWindow"));
+        var x: int = ffi.load_f64(pt_out) as int;
+        var y: int = ffi.load_f64(ffi.ptr_add(pt_out, 8)) as int;
+        ffi.free(pt_out);
+        var flags: int = msg0_ret(ev, sel("modifierFlags"), ffi.TYPE_U64);
+        ring_push(block, EK_MOUSEUP, x, y, 0, 0, 0, -1, nmods(flags), 0, 0);
+    } elif (etype == NE_SCROLLWHEEL) {
+        var dx: float = msg0_ret(ev, sel("scrollingDeltaX"), ffi.TYPE_F64) as float;
+        var dy: float = msg0_ret(ev, sel("scrollingDeltaY"), ffi.TYPE_F64) as float;
+        var delta: int = 0;
+        if (dy > 0.0) { delta = 1; }
+        elif (dy < 0.0) { delta = -1; }
+        ring_push(block, EK_MOUSEWHEEL, 0, 0, 0, 0, 0, -1, 0, 0, delta);
+    }
+    return true;
+    }
+}
+
+fn nmods(flags: int): int {
+    var m: int = 0;
+    if (flags & NM_SHIFT != 0) { m = m | nt.MOD_SHIFT; }
+    if (flags & NM_CONTROL != 0) { m = m | nt.MOD_CTRL; }
+    if (flags & NM_OPTION != 0) { m = m | nt.MOD_ALT; }
+    if (flags & NM_COMMAND != 0) { m = m | nt.MOD_SUPER; }
+    if (flags & NM_CAPSLOCK != 0) { m = m | nt.MOD_CAPS; }
+    if (flags & NM_NUMPAD != 0) { m = m | nt.MOD_NUM; }
+    return m;
+}
+
+fn utf8_first(buf: int): int {
+    unsafe {
+        var b0: int = ffi.load_u8(ffi.ptr_add(buf, 0));
+        if (b0 == 0) { return -1; }
+        if (b0 < 0x80) { return b0; }
+        if (b0 >= 0xC0 and b0 < 0xE0) {
+            var b1: int = ffi.load_u8(ffi.ptr_add(buf, 1));
+            return ((b0 & 0x1F) << 6) | (b1 & 0x3F);
+        }
+        if (b0 >= 0xE0 and b0 < 0xF0) {
+            var b1: int = ffi.load_u8(ffi.ptr_add(buf, 1));
+            var b2: int = ffi.load_u8(ffi.ptr_add(buf, 2));
+            return ((b0 & 0x0F) << 12) | ((b1 & 0x3F) << 6) | (b2 & 0x3F);
+        }
+        if (b0 >= 0xF0) {
+            var b1: int = ffi.load_u8(ffi.ptr_add(buf, 1));
+            var b2: int = ffi.load_u8(ffi.ptr_add(buf, 2));
+            var b3: int = ffi.load_u8(ffi.ptr_add(buf, 3));
+            return ((b0 & 0x07) << 18) | ((b1 & 0x3F) << 12)
+                 | ((b2 & 0x3F) << 6) | (b3 & 0x3F);
+        }
+        return -1;
+    }
+}
+
+pub fn poll_event(win: nt.Window): nt.Event {
+    var block: int = find_block(win.handle);
+    if (block == 0) { return nt.event_none(); }
+    if (cb_load(block, OFF_COUNT) == 0) { pump_events(0); }
+    var er: any = block_pop_event(block);
+    if (er == nil) { return nt.event_none(); }
+    return er as nt.Event;
+}
+
+pub fn wait_event(win: nt.Window): nt.Event {
+    var block: int = find_block(win.handle);
+    if (block == 0) {
+        return nt.Event(kind=nt.EventKind.Quit, x=0, y=0, w=0, h=0,
+                        key=0, ch=-1, mods=0, buttons=0, delta=0, handle=win.handle);
+    }
+    var guard: int = 0;
+    while (cb_load(block, OFF_COUNT) == 0 and guard < 100000) {
+        pump_events(1);
+        guard = guard + 1;
+        if (cb_load(block, OFF_CLOSED) != 0) { break; }
+    }
+    var er: any = block_pop_event(block);
+    if (er == nil) {
+        return nt.Event(kind=nt.EventKind.Quit, x=0, y=0, w=0, h=0,
+                        key=0, ch=-1, mods=0, buttons=0, delta=0, handle=win.handle);
+    }
+    return er as nt.Event;
+}
+
+pub fn invalidate(win: nt.Window): nil {
+    unsafe {
+        // [win.contentView setNeedsDisplay:YES]
+        var cv = msg0(win.handle, sel("contentView"));
+        if (cv != 0) {
+            msg1i(cv, sel("setNeedsDisplay:"), 1);
+        }
+    }
+}
+
+pub fn set_title(win: nt.Window, title: str): nil {
+    unsafe {
+        var tstr = make_nsstring(title);
+        msg1i(win.handle, sel("setTitle:"), tstr);
+    }
+}
+
+pub fn set_size(win: nt.Window, width: int, height: int): nil {
+    unsafe {
+        // setContentSize: takes NSSize {double,double} by value -> stret? no:
+        // it's a 16-byte struct arg -> needs struct-by-value FFI.
+        var sz = ffi.struct_alloc([ffi.TYPE_F64, ffi.TYPE_F64]);
+        ffi.store_f64(ffi.ptr_add(sz, 0), width as float);
+        ffi.store_f64(ffi.ptr_add(sz, 8), height as float);
+        var elems: [any] = [ffi.TYPE_F64, ffi.TYPE_F64];
+        var pt: [any] = [ffi.struct_param(elems)];
+        ffi.foreign_call(msg_fn(), [win.handle, sel("setContentSize:"), sz],
+            ffi.TYPE_VOID, pt);
+        ffi.free(sz);
+    }
+}
+
+pub fn client_size(win: nt.Window): (int, int) {
+    var block: int = find_block(win.handle);
+    if (block != 0) {
+        return (cb_load(block, OFF_W), cb_load(block, OFF_H));
+    }
+    return (0, 0);
+}
+
+pub fn destroy(win: nt.Window): nil {
+    win.closed = true;
+    var block: int = find_block(win.handle);
+    if (block != 0) { cb_store(block, OFF_CLOSED, 1); }
+    unsafe {
+        // orderOut + release (balances alloc/init).
+        msg1i(win.handle, sel("orderOut:"), 0);
+        msg0(win.handle, sel("release"));
+        if (active_window_count() == 0 and _app != 0) {
+            msg1i(_app, sel("terminate:"), 0);
+        }
+    }
+}
+
+pub fn run_message_loop(): nil {
+    var guard: int = 0;
+    while (active_window_count() > 0 and guard < 10000000) {
+        pump_events(1);
+        guard = guard + 1;
+    }
+}

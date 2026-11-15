@@ -15,6 +15,7 @@
 #include "resource_types.hh"
 #include <vector>
 #include <string>
+#include <thread>
 #include <unordered_map>
 #include <map>
 #include <unordered_set>
@@ -314,6 +315,13 @@ private:
     std::vector<uint64_t> invocation_parents;
     std::unordered_set<int64_t> owned_callbacks;
     std::unordered_set<int64_t> owned_resources;
+    // Native callbacks (ffi.create_callback trampolines) must run on the
+    // VM's execution thread: call_interpreted mutates shared VM state and
+    // is not thread-safe. The first callback invocation records the owner;
+    // later invocations from foreign threads (e.g. cross-thread SendMessage
+    // during display-mode changes) are rejected with a default result.
+    std::thread::id callback_owner_{};
+    bool callback_owner_set_ = false;
     void release_resources();
     struct RawOwnership { uint64_t region; uintptr_t previous = 0, next = 0; };
     std::map<uintptr_t, RawOwnership> owned_raw_memory;

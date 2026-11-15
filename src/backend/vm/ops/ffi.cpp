@@ -178,6 +178,15 @@ RegisterValue RegisterVM::invoke_for_callback(
     const std::string& func_name,
     const std::vector<RegisterValue>& args, bool propagate_errors)
 {
+    auto tid = std::this_thread::get_id();
+    if (!callback_owner_set_) {
+        callback_owner_ = tid;
+        callback_owner_set_ = true;
+    } else if (tid != callback_owner_) {
+        // Foreign-thread native call: running call_interpreted here would
+        // race the VM's shared registers/heap. Return a zeroed result.
+        return VAL_NIL;
+    }
     auto& manager = LIR::LIRFunctionManager::getInstance();
     if (!manager.hasFunction(func_name)) {
         if (propagate_errors) throw std::runtime_error("Native callback function not found: " + func_name);
@@ -238,6 +247,7 @@ void RegisterVM::execute_extern_call_function(const LIR::LIR_Inst* pc) {
     std::vector<LIR::Reg> arg_regs = pc->call_args;
     std::vector<RegisterValue> call_arg_values;
     std::vector<lymarrt_type> resolved_arg_types;
+    std::vector<lymarrt_struct_layout> struct_layouts;
 
     if (pc->func_name == "std.ffi.foreign_call" || pc->func_name == "ffi.foreign_call") {
         if (pc->call_args.size() > 2) {
@@ -262,10 +272,40 @@ void RegisterVM::execute_extern_call_function(const LIR::LIR_Inst* pc) {
                     call_arg_values.push_back(val);
                     lymarrt_type arg_t = LYMARRT_TYPE_I64;
                     bool got_type = false;
+                    bool is_struct_arg = false;
                     if (pt_list && i < pt_list->size) {
-                        int64_t tid = as_i64(pt_list->data[i]);
-                        got_type = ffi_type_id_to_lymarrt(tid, false, arg_t);
+                        RegisterValue ptv = pt_list->data[i];
+                        // A param-type entry that is itself a list is a
+                        // struct descriptor: [TYPE_STRUCT, e1, e2, ...].
+                        if (IS_PTR(ptv) &&
+                            ((ObjHeader*)UNBOX_PTR(ptv))->type_id == TYPE_LIST) {
+                            LmList* desc = (LmList*)UNBOX_PTR(ptv);
+                            if (desc->size >= 2 && desc->size - 1 <= LYMARRT_MAX_STRUCT_ELEMS &&
+                                as_i64(desc->data[0]) == 13 /* TYPE_STRUCT */) {
+                                lymarrt_struct_layout lay{};
+                                lay.arg_index = (uint32_t)i;
+                                lay.count = (uint32_t)(desc->size - 1);
+                                bool ok_layout = true;
+                                for (uint32_t e = 0; e < lay.count; ++e) {
+                                    int64_t etid = as_i64(desc->data[e + 1]);
+                                    if (!ffi_type_id_to_lymarrt(etid, false, lay.types[e])) {
+                                        ok_layout = false;
+                                        break;
+                                    }
+                                }
+                                if (ok_layout) {
+                                    struct_layouts.push_back(lay);
+                                    arg_t = LYMARRT_TYPE_PTR;
+                                    got_type = true;
+                                    is_struct_arg = true;
+                                }
+                            }
+                        } else {
+                            int64_t tid = as_i64(ptv);
+                            got_type = ffi_type_id_to_lymarrt(tid, false, arg_t);
+                        }
                     }
+                    (void)is_struct_arg;
                     if (!got_type) {
                         if (is_float(val)) arg_t = LYMARRT_TYPE_F64;
                         else if (IS_PTR(val)) arg_t = LYMARRT_TYPE_PTR;
@@ -299,7 +339,8 @@ void RegisterVM::execute_extern_call_function(const LIR::LIR_Inst* pc) {
 
     lymarrt_value out_res;
     std::memset(&out_res, 0, sizeof(out_res));
-    if (lymarrt_ffi_call(func_ptr, ret_type, resolved_arg_types.data(), lymarrt_args.data(), num_args, &out_res)) {
+    if (lymarrt_ffi_call_ex(func_ptr, ret_type, resolved_arg_types.data(), lymarrt_args.data(), num_args,
+                            struct_layouts.empty() ? nullptr : struct_layouts.data(), struct_layouts.size(), &out_res)) {
         RegisterValue val = lymarrt_val_to_vm_val(out_res, ret_type);
         registers[pc->dst] = val;
         register_native_allocation(registers[pc->dst]);

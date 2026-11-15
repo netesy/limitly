@@ -1,0 +1,99 @@
+// std.native.types - Shared windowing/event types for the pure-Lymar
+// native backend (std.native.*). Every platform module (win32, linux,
+// macos, android) produces these types so std.app / std.events can
+// consume any backend interchangeably.
+//
+// All handles are raw pointer-sized integers (ffi.pubptr-compatible).
+// No `any` in the hot path: events are a fixed-shape frame.
+
+// Event kinds produced by native backends. Order is stable across
+// platforms; platforms map their native events onto this set.
+enum EventKind {
+    None,        // poll_event found nothing
+    Quit,        // application quit requested
+    Close,       // window close requested (may precede Quit)
+    Resize,      // client area changed; w/h carry new size
+    Paint,       // window needs repaint (WM_PAINT / Expose / drawRect)
+    KeyDown,
+    KeyUp,
+    Char,        // text input; ch holds a Unicode codepoint (or -1)
+    MouseMove,
+    MouseDown,   // buttons bitmask: 1=L 2=R 4=M
+    MouseUp,
+    MouseWheel,  // key holds delta: +1 up / -1 down (lines)
+    Focus,
+    Unfocus
+}
+
+enum MouseButton {
+    None,
+    Left,
+    Right,
+    Middle
+}
+
+// Modifier bitmask shared by all backends.
+pub const MOD_SHIFT: int = 1;
+pub const MOD_CTRL: int = 2;
+pub const MOD_ALT: int = 4;
+pub const MOD_SUPER: int = 8;
+pub const MOD_CAPS: int = 16;
+pub const MOD_NUM: int = 32;
+
+// A single input/window event. Fields not meaningful for a given kind
+// are zero. `ch` is a Unicode codepoint for Char events (platforms
+// decode UTF-16 surrogate pairs / keysyms before filling it).
+frame Event {
+    pub var kind: EventKind;
+    pub var x: int;        // client-area x (pixels)
+    pub var y: int;        // client-area y (pixels)
+    pub var w: int;        // client width  (Resize)
+    pub var h: int;        // client height (Resize)
+    pub var key: int;      // virtual key code / keysym / NSEvent type aux
+    pub var ch: int;       // Unicode codepoint for Char, else -1
+    pub var mods: int;     // MOD_* bitmask at event time
+    pub var buttons: int;  // MouseButton bitmask for move/down/up
+    pub var delta: int;    // MouseWheel: +1/-1 (or pixel delta later)
+    pub var handle: int;   // originating window handle (0 = global)
+
+}
+
+// Module-level factory: qualified static calls like `Event.none()` do
+// not lower through the LIR, so callers use `event_none()`.
+pub fn event_none(): Event {
+    return Event(kind=EventKind.None, x=0, y=0, w=0, h=0,
+                 key=0, ch=-1, mods=0, buttons=0, delta=0, handle=0);
+}
+
+// Opaque native window. `handle` is the platform window object
+// (HWND / X Window / NSWindow* / ANativeWindow*). `id` is a
+// backend-assigned small integer for app-level bookkeeping.
+frame Window {
+    pub var handle: int;
+    pub var id: int;
+    pub var width: int;
+    pub var height: int;
+    pub var closed: bool;
+    pub var backend: str;
+
+    pub fn is_valid(): bool {
+        return self.handle != 0 and not self.closed;
+    }
+}
+
+// Uniform backend contract implemented by std.native.win32 / linux /
+// macos / android. Lymar traits cannot express module-level functions,
+// so the contract is the shared signature set documented here; each
+// module exports exactly these names:
+//
+//   available() -> bool
+//   create_window(title: str, width: int, height: int) -> Window?
+//   poll_event(win: Window) -> Event        // non-blocking
+//   wait_event(win: Window) -> Event        // blocking
+//   invalidate(win: Window) -> nil          // request a Paint event
+//   set_title(win: Window, title: str) -> nil
+//   set_size(win: Window, width: int, height: int) -> nil
+//   client_size(win: Window) -> (int, int)
+//   destroy(win: Window) -> nil
+//   run_message_loop() -> nil               // blocks until Quit
+//   next_window_id() -> int                 // backend-internal helper

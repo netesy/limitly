@@ -1572,7 +1572,15 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
 
                 used_builtins_.insert(name);
 
-                if (name.empty()) name = "dummy_fn";
+                if (name.empty()) {
+                    // Unresolved call target: the VM has no name to dispatch
+                    // either, so this is a frontend/LIR bug — fail loudly here
+                    // instead of emitting a call to a nonexistent `dummy_fn`.
+                    errors_.push_back("unresolved call target in function " + lir_func.name);
+                    if (inst.dst != UINT32_MAX)
+                        store_reg(inst.dst, context_->getConstantInt(context_->getIntegerType(64), 0), inst.result_type);
+                    break;
+                }
                 ir::Function* func = current_module_->getFunction(name);
                 if (!func) {
                     std::vector<ir::Type*> pts;
@@ -1939,7 +1947,12 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
 
                 used_builtins_.insert(name);
 
-                if (name.empty()) name = "dummy_fn";
+                if (name.empty()) {
+                    errors_.push_back("unresolved call target in function " + lir_func.name);
+                    if (inst.dst != UINT32_MAX)
+                        store_reg(inst.dst, context_->getConstantInt(context_->getIntegerType(64), 0), inst.result_type);
+                    break;
+                }
                 ir::Function* func = current_module_->getFunction(name);
                 if (!func) {
                     std::vector<ir::Type*> pts;

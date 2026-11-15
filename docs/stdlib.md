@@ -185,6 +185,21 @@ Static-method namespace for encoding conversions.
 
 The FFI module provides typed wrappers around the libffi-based native call infrastructure. See the module source for the full API surface (memory allocation, pointer load/store, library loading, typed ccall helpers).
 
+Struct-by-value arguments are supported: a `param_types` entry that is itself a list `[ffi.TYPE_STRUCT, e1, e2, ...]` declares a struct argument whose value is a pointer to packed native-layout bytes. Build the buffer with `ffi.struct_alloc(elem_types)`, write fields at `ffi.struct_offset(elem_types, i)`, and describe the argument with `ffi.struct_param(elem_types)`. Used by `std.native.macos` for `NSRect`/`NSSize` arguments to `objc_msgSend`.
+
+## 8a. Native Windowing (`std/native/`)
+
+`std.native` is a pure-Lymar platform windowing layer — no sokol, no C glue. It implements the shared `Window`/`Event`/`EventKind` contract from `std.native.types` over `std.ffi` on each OS:
+
+- `std.native.win32` — Win32 `user32`/`kernel32` via `WNDCLASSEXA`, a Lymar `WndProc` trampoline (`ffi.create_callback`), and raw-memory event rings. Native callbacks touch only `ffi.alloc`'d memory — never Lymar heap objects.
+- `std.native.linux` — X11 via `libX11.so` (`XOpenDisplay`/`XNextEvent`/`XLookupString`). Works under XWayland; native Wayland is a separate future backend.
+- `std.native.macos` — Cocoa via `libobjc`/`AppKit` `objc_msgSend` FFI, including struct-by-value `NSRect` args and a Lymar-defined `NSWindowDelegate` class (`windowShouldClose:`/`windowDidResize:`).
+- `std.native.android` — JNI (`JNI_GetCreatedJavaVMs`) + `ANativeWindow` + `ALooper`/`AInputQueue` from `libart`/`libandroid`. Requires a Lymar host Activity that supplies the `Surface` via `std.native.android.set_native_surface(env, surface)`.
+
+`std.native` (index) dispatches on `std.os.identity.os_name()`; use `native.backend_name()` / `native.create_window(...)` / `native.poll_event(win)` etc. Individual backends can also be imported directly (`import std.native.win32 as w32`).
+
+Tests: `tests/native_win32.lm` (Windows desktop), `tests/native_linux.lm` (needs `DISPLAY` + `libX11`; self-skips otherwise).
+
 ## 9. Other Modules
 
 The standard library also includes: `math`, `random`, `time`, `collections` (with submodules `vector`, `list`, `stack`, `queue`, `hashmap`, `set`, `tree`), `data_structures`, `parsers` (`json`, `toml`, `yaml`), `net` (`tcp`, `udp`, `dns`), `http` (`client`, `server`), `crypto` (`hash`, `hmac`, `random`), `fs`, `log`, `path`, `format`, `regex`, `bytes`, `color`, `cli`, `env`, `process`, `validation`, `statistics`, `geometry`, `sort`, `search`, `algorithm`, `functional`, `iter`, `debug`, `url`, `serialization`, `app`, `archive`, `image`, `config`.

@@ -331,6 +331,26 @@ pub fn spawn_window(width: int, height: int, title: str, resizable: int = 1): ni
     }
 }
 
+// attach_window binds the GPU backend to an externally-owned native window
+// (std.native Window.handle). Returns true when the graphics resource
+// attached a swapchain to that handle; false means the caller should fall
+// back to spawn_window (sokol_app-owned window) or run headless.
+pub fn attach_window(hwnd: int, width: int, height: int): bool {
+    if (global_graphics_context.handle != -1) {
+        val res = rt.call(global_graphics_context.handle, rt.OP_ATTACH_WINDOW, [hwnd, width, height]);
+        if (res != nil) {
+            return res as bool;
+        }
+    }
+    return false;
+}
+
+pub fn detach_window(): nil {
+    if (global_graphics_context.handle != -1) {
+        rt.call(global_graphics_context.handle, rt.OP_DETACH_WINDOW, global_graphics_context._args0);
+    }
+}
+
 pub fn push_clip(x: float, y: float, w: float, h: float): nil {
     if (global_graphics_context.handle != -1) {
         if (global_graphics_context.batching) {

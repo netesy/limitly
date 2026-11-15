@@ -1,0 +1,68 @@
+// tests/native_win32.lm
+// Exercises the std.native.win32 backend contract: window creation,
+// event polling (Paint/Resize/Focus from real OS messages), title/size
+// ops, and clean destruction. Requires a Windows desktop session.
+
+import std.native.win32 as w32;
+import std.native.types as nt;
+
+fn main() {
+    print("=== std.native.win32 backend ===");
+    assert(w32.available(), "win32 backend not available");
+
+    var win_r: nt.Window? = w32.create_window("Lymar Native Win32", 320, 200);
+    var win: nt.Window = win_r ? else {
+        print("create_window failed");
+        assert(false, "create_window failed");
+        return;
+    };
+    print("window created, handle=");
+    print(win.handle);
+    assert(win.handle != 0, "null hwnd");
+    assert(win.backend == "win32", "backend tag");
+    assert(win.width > 0 and win.height > 0, "client size");
+
+    // Collect events for a bounded spin. WM_PAINT/WM_SIZE/WM_SETFOCUS
+    // arrive during creation+show; we just need the pump to dispatch.
+    var saw_paint: int = 0;
+    var saw_resize: int = 0;
+    var saw_focus: int = 0;
+    var total: int = 0;
+    var spins: int = 0;
+    while (spins < 2000) {
+        var ev: nt.Event = w32.poll_event(win);
+        if (ev.kind == nt.EventKind.Paint) { saw_paint = saw_paint + 1; }
+        elif (ev.kind == nt.EventKind.Resize) { saw_resize = saw_resize + 1; }
+        elif (ev.kind == nt.EventKind.Focus) { saw_focus = saw_focus + 1; }
+        elif (ev.kind != nt.EventKind.None) { total = total + 1; }
+        spins = spins + 1;
+    }
+    print("events: paint=");
+    print(saw_paint);
+    print(" resize=");
+    print(saw_resize);
+    print(" focus=");
+    print(saw_focus);
+    print(" other=");
+    print(total);
+    assert(saw_paint > 0 or saw_resize > 0 or saw_focus > 0,
+           "no OS events dispatched through wnd_proc");
+
+    // API surface checks.
+    w32.set_title(win, "Lymar Native Win32 (renamed)");
+    w32.invalidate(win);
+    var sz = w32.client_size(win);
+    assert(sz.0 > 0 and sz.1 > 0, "client_size returned empty rect");
+    print("client size=");
+    print(sz.0);
+    print("x");
+    print(sz.1);
+
+    // Explicit destroy -> WM_DESTROY -> state removed -> pump reports None.
+    w32.destroy(win);
+    assert(win.closed, "closed flag not set");
+    var ev2: nt.Event = w32.poll_event(win);
+    assert(ev2.kind == nt.EventKind.None, "events after destroy");
+
+    print("std.native.win32 PASSED");
+}

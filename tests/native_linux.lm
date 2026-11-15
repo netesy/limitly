@@ -1,0 +1,66 @@
+// tests/native_linux.lm
+// Exercises the std.native.linux backend contract: X11 window creation,
+// event polling (real X events), title/size ops, and clean destruction.
+// Requires an X11 display (DISPLAY set) with libX11 available.
+
+import std.native.linux as lx;
+import std.native.types as nt;
+
+fn main() {
+    print("=== std.native.linux backend ===");
+    if (not lx.available()) {
+        print("no X11 display - skipping (set DISPLAY)");
+        return 0;
+    }
+
+    var win_r: nt.Window? = lx.create_window("Lymar Native X11", 320, 200);
+    var win: nt.Window = win_r ? else {
+        print("create_window failed");
+        assert(false, "create_window failed");
+        return 0;
+    };
+    print("window created, handle=");
+    print(win.handle);
+    assert(win.handle != 0, "null xwindow");
+    assert(win.backend == "linux-x11", "backend tag");
+    assert(win.width > 0 and win.height > 0, "client size");
+
+    var saw_expose: int = 0;
+    var saw_configure: int = 0;
+    var saw_focus: int = 0;
+    var total: int = 0;
+    var spins: int = 0;
+    while (spins < 2000) {
+        var ev: nt.Event = lx.poll_event(win);
+        if (ev.kind == nt.EventKind.Paint) { saw_expose = saw_expose + 1; }
+        elif (ev.kind == nt.EventKind.Resize) { saw_configure = saw_configure + 1; }
+        elif (ev.kind == nt.EventKind.Focus) { saw_focus = saw_focus + 1; }
+        elif (ev.kind != nt.EventKind.None) { total = total + 1; }
+        spins = spins + 1;
+    }
+    print("events: expose=");
+    print(saw_expose);
+    print(" configure=");
+    print(saw_configure);
+    print(" focus=");
+    print(saw_focus);
+    print(" other=");
+    print(total);
+    assert(saw_expose > 0 or saw_configure > 0 or saw_focus > 0,
+           "no X events dispatched");
+    lx.set_title(win, "Lymar Native X11 (renamed)");
+    lx.invalidate(win);
+    var sz = lx.client_size(win);
+    assert(sz.0 > 0 and sz.1 > 0, "client_size returned empty rect");
+    print("client size=");
+    print(sz.0);
+    print("x");
+    print(sz.1);
+
+    lx.destroy(win);
+    assert(win.closed, "closed flag not set");
+    var ev2: nt.Event = lx.poll_event(win);
+    assert(ev2.kind == nt.EventKind.None, "events after destroy");
+
+    print("std.native.linux PASSED");
+}

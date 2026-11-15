@@ -102,7 +102,11 @@ enum class ResourceOperation : uint32_t {
     PROC_ID = 64,
     PROC_RSS = 65,
     PROC_PEAK_RSS = 66,
-    PROC_COMMAND = 67
+    PROC_COMMAND = 67,
+    // Graphics resource: bind an externally-owned native window (HWND etc).
+    // args = [handle:int, width:int, height:int]; returns bool.
+    ATTACH_WINDOW = 68,
+    DETACH_WINDOW = 69
 };
 
 } // namespace VM

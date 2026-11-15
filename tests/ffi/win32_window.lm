@@ -1,0 +1,162 @@
+// tests/ffi/win32_window.lm
+// Proof-of-concept: a windowing backend written entirely in Lymar.
+// No C, no sokol, no foreign objects — only std.ffi Lymar-ABI primitives:
+//   ffi.library_load/get_symbol  -> resolve Win32 exports
+//   ffi.alloc + store_*/ptr_add   -> build WNDCLASSEXA / MSG structs
+//   ffi.create_callback           -> WndProc as a native trampoline
+//   ffi.foreign_call              -> arbitrary C calls (list args, no arity cap)
+//   _builtin_string_to_cstr       -> ANSI (*A) API strings
+//
+// x64 struct layouts (bytes):
+//   WNDCLASSEXA (80): cbSize u32@0, style u32@4, lpfnWndProc@8,
+//     cbClsExtra i32@16, cbWndExtra i32@20, hInstance@24, hIcon@32,
+//     hCursor@40, hbrBackground@48, lpszMenuName@56, lpszClassName@64, hIconSm@72
+//   MSG (48): hwnd@0, message u32@8, wParam@16, lParam@24, time u32@32, pt@36
+
+import std.ffi as ffi;
+
+// ── Win32 symbol table ────────────────────────────────────────────────────
+var _u32: int = 0;
+var _k32: int = 0;
+
+fn u32sym(name: str): int {
+    unsafe {
+        if (_u32 == 0) { _u32 = ffi.library_load("user32.dll"); }
+        if (_u32 == 0) { return 0; }
+        return ffi.library_get_symbol(_u32, name);
+    }
+}
+
+fn k32sym(name: str): int {
+    unsafe {
+        if (_k32 == 0) { _k32 = ffi.library_load("kernel32.dll"); }
+        if (_k32 == 0) { return 0; }
+        return ffi.library_get_symbol(_k32, name);
+    }
+}
+
+// ── Call helpers ──────────────────────────────────────────────────────────
+// foreign_call auto-detects arg kinds (int->i64, ptr->ptr, float->f64);
+// HWND/HINSTANCE/ATOM are pointer-sized and travel fine as i64.
+fn call_i64(fptr: int, args: [any]): int {
+    unsafe {
+        return ffi.foreign_call(fptr, args, ffi.TYPE_I64, []);
+    }
+}
+
+fn call_void(fptr: int, args: [any]): nil {
+    unsafe {
+        ffi.foreign_call(fptr, args, ffi.TYPE_VOID, []);
+    }
+}
+
+fn cstr(s: str): int {
+    unsafe {
+        return _builtin_string_to_cstr(s);
+    }
+}
+
+// ── WndProc: the only callback the OS needs ───────────────────────────────
+// LRESULT CALLBACK(HWND, UINT, WPARAM, LPARAM) — four i64s.
+var _hwnd: int = 0;
+var _msg_count: int = 0;
+
+pub fn wndproc(hwnd: int, msg: int, wp: int, lp: int): int {
+    _msg_count = _msg_count + 1;
+    if (msg == 0x0002) { // WM_DESTROY
+        call_void(u32sym("PostQuitMessage"), [0]);
+        return 0;
+    }
+    return call_i64(u32sym("DefWindowProcA"), [hwnd, msg, wp, lp]);
+}
+
+fn main() {
+    print("=== Pure-Lymar Win32 Window ===");
+
+    // Symbols we need.
+    val get_mod = k32sym("GetModuleHandleA");
+    val reg_cls = u32sym("RegisterClassExA");
+    val create_win = u32sym("CreateWindowExA");
+    val show_win = u32sym("ShowWindow");
+    val upd_win = u32sym("UpdateWindow");
+    val get_msg = u32sym("GetMessageA");
+    val trans_msg = u32sym("TranslateMessage");
+    val disp_msg = u32sym("DispatchMessageA");
+    val load_cur = u32sym("LoadCursorA");
+    val post_msg = u32sym("PostMessageA");
+    val get_err = k32sym("GetLastError");
+    assert(get_mod != 0 and reg_cls != 0 and create_win != 0, "user32/kernel32 symbols missing");
+
+    val hinst: int = call_i64(get_mod, [0]);
+    assert(hinst != 0, "GetModuleHandleA failed");
+
+    // WndProc -> native trampoline pointer.
+    unsafe {
+        var cb = ffi.create_callback("wndproc",
+            [ffi.TYPE_I64, ffi.TYPE_I64, ffi.TYPE_I64, ffi.TYPE_I64], ffi.TYPE_I64) ? else {
+            assert(false, "callback_create failed");
+            return;
+        };
+        val wndproc_ptr: int = cb.pointer;
+        var wc = ffi.alloc(80);
+        ffi.memset(wc, 0, 80);
+        ffi.store_u32(ffi.ptr_add(wc, 0), 80);          // cbSize
+        ffi.store_u32(ffi.ptr_add(wc, 4), 0x0003);      // CS_HREDRAW|CS_VREDRAW
+        ffi.store_ptr(ffi.ptr_add(wc, 8), wndproc_ptr); // lpfnWndProc
+        ffi.store_ptr(ffi.ptr_add(wc, 24), hinst);      // hInstance
+        // hCursor = LoadCursorA(NULL, IDC_ARROW=32512)
+        val arrow: int = call_i64(load_cur, [0, 32512]);
+        ffi.store_ptr(ffi.ptr_add(wc, 40), arrow);      // hCursor
+        val cls_name: int = cstr("LymarPureWin");
+        val win_name: int = cstr("pure lymar window");
+        ffi.store_ptr(ffi.ptr_add(wc, 64), cls_name);   // lpszClassName
+        val atom: int = call_i64(reg_cls, [wc]);
+        if (atom == 0) {
+            print("RegisterClassExA failed, GetLastError=");
+            print(call_i64(get_err, []));
+            print("wndproc_ptr=");
+            print(wndproc_ptr);
+            print("hinst=");
+            print(hinst);
+            print("cls_name ptr=");
+            print(cls_name);
+        }
+        assert(atom != 0, "RegisterClassExA failed");
+        print("window class registered, atom=");
+        print(atom);
+
+        // CreateWindowExA(0, cls, title, WS_OVERLAPPEDWINDOW=0x00CF0000,
+        //                  100,100, 480,320, 0,0, hinst, 0)
+        val hwnd: int = call_i64(create_win,
+            [0, cls_name, win_name, 0x00CF0000, 100, 100, 480, 320, 0, 0, hinst, 0]);
+        _hwnd = hwnd;
+        assert(hwnd != 0, "CreateWindowExA failed");
+        print("window created, hwnd=");
+        print(hwnd);
+
+        call_void(show_win, [hwnd, 5]);  // SW_SHOW
+        call_void(upd_win, [hwnd]);      // forces WM_PAINT synchronously
+
+        // Queue WM_CLOSE so the pump exits on its own — the window is
+        // visible for the synchronous UpdateWindow paint, then closes.
+        call_i64(post_msg, [hwnd, 0x0010, 0, 0]); // WM_CLOSE
+
+        // Standard message pump (48-byte MSG).
+        var msg = ffi.alloc(48);
+        ffi.memset(msg, 0, 48);
+        var spins: int = 0;
+        while (call_i64(get_msg, [msg, 0, 0, 0]) > 0) {
+            call_i64(trans_msg, [msg]);
+            call_i64(disp_msg, [msg]);
+            spins = spins + 1;
+            if (spins > 10000) { break; }
+        }
+        ffi.free(msg);
+        ffi.free(wc);
+        cb.close();
+        print("message pump drained, messages=");
+        print(_msg_count);
+    }
+
+    print("pure-Lymar Win32 window PASSED");
+}

@@ -1,0 +1,614 @@
+// std.native.linux - Pure-Lymar X11 windowing backend (Linux/BSD).
+//
+// Implements the std.native.types contract through std.ffi against
+// libX11.so: XOpenDisplay/XCreateSimpleWindow/XNextEvent/XLookupKeysym.
+// No C glue, no sokol. Wayland is a separate display protocol and is
+// NOT covered here - X11 (incl. XWayland) is the Linux backend.
+//
+// Design mirrors std.native.win32: per-window control blocks and event
+// rings live in ffi.alloc'd raw memory so no Lymar heap objects are
+// touched from native callbacks (X11 needs no callbacks - events are
+// pulled via XNextEvent/XPending in normal VM context).
+//
+// XEvent union (512-byte buffer used; LP64 layout); fields read via ffi.load_* at fixed
+// offsets (xproto.h, LP64):
+//   type i32@0, serial u64@8, send_event i32@16, display ptr@24,
+//   union@32: every member begins with Display* @32.
+//   XKeyEvent:      root@40 sub@48 time@56 x@64 y@68 x_root@72
+//                   y_root@76 state@80 keycode@84 same@88
+//   XButtonEvent:   root@40 event@48 child@56 time@64 x@72 y@76
+//                   x_root@80 y_root@84 state@88 button@92 same@96
+//   XMotionEvent:   root@40 event@48 child@56 time@64 x@72 y@76
+//                   x_root@80 y_root@84 state@88 hint@92 same@96
+//   XConfigureEvent:event@40 window@48 x@56 y@60 w@64 h@68
+//   XClientMessage: window@40 msgtype@48 format@56 data@64
+//   XExposeEvent:   event@40 window@48 x@56 y@60 w@64 h@68
+//   XFocusEvent:    event@40 window@48 mode@56 detail@60
+
+import std.ffi as ffi;
+import std.os.identity as osid;
+import std.native.types as nt;
+
+// X11 event type codes
+const XE_KEYPRESS: int = 2;
+const XE_KEYRELEASE: int = 3;
+const XE_BUTTONPRESS: int = 4;
+const XE_BUTTONRELEASE: int = 5;
+const XE_MOTION: int = 6;
+const XE_FOCUSIN: int = 9;
+const XE_FOCUSOUT: int = 10;
+const XE_EXPOSE: int = 12;
+const XE_CONFIGURE: int = 22;
+const XE_CLIENTMSG: int = 33;
+
+// XSelectInput mask bits
+const XI_KEYPRESS: int = 1;
+const XI_KEYRELEASE: int = 2;
+const XI_BUTTONPRESS: int = 4;
+const XI_BUTTONRELEASE: int = 8;
+const XI_MOTION: int = 64;
+const XI_EXPOSURE: int = 32768;
+const XI_STRUCTNOTIFY: int = 131072;
+const XI_FOCUSCHANGE: int = 2097152;
+const XI_MASK: int = XI_KEYPRESS | XI_KEYRELEASE | XI_BUTTONPRESS |
+                     XI_BUTTONRELEASE | XI_MOTION | XI_EXPOSURE |
+                     XI_STRUCTNOTIFY | XI_FOCUSCHANGE;
+
+// X11 modifier state bits (X.h)
+const XS_SHIFT: int = 1;
+const XS_LOCK: int = 2;
+const XS_CONTROL: int = 4;
+const XS_MOD1: int = 8;    // Alt
+const XS_MOD4: int = 64;   // Super/Meta
+const XS_MOD2: int = 128;  // NumLock
+
+// EventKind ordinals (must match std.native.types.EventKind)
+const EK_QUIT: int = 1;
+const EK_CLOSE: int = 2;
+const EK_RESIZE: int = 3;
+const EK_PAINT: int = 4;
+const EK_KEYDOWN: int = 5;
+const EK_KEYUP: int = 6;
+const EK_CHAR: int = 7;
+const EK_MOUSEMOVE: int = 8;
+const EK_MOUSEDOWN: int = 9;
+const EK_MOUSEUP: int = 10;
+const EK_MOUSEWHEEL: int = 11;
+const EK_FOCUS: int = 12;
+const EK_UNFOCUS: int = 13;
+
+const CB_SIZE: int = 128;
+const EV_SIZE: int = 128;
+const RING_CAP: int = 1024;
+const OFF_HWND: int = 0;
+const OFF_NEXT: int = 8;
+const OFF_HEAD: int = 16;
+const OFF_TAIL: int = 24;
+const OFF_COUNT: int = 32;
+const OFF_CAP: int = 40;
+const OFF_CLOSED: int = 48;
+const OFF_W: int = 56;
+const OFF_H: int = 64;
+const OFF_RING: int = 72;
+const OFF_XEVT: int = 80;   // scratch XEvent ptr (512B)
+
+var _x11: int = 0;
+var _dpy: int = 0;
+var _screen: int = 0;
+var _root: int = 0;
+var _win_list: int = 0;
+var _next_id: int = 1;
+var _delete_atom: int = 0;
+var _libc: int = 0;
+var _usleep_fn: int = 0;
+
+// ffi.alloc'd memory is region-scoped and released when the creating
+// function exits; persistent control blocks/rings/scratch are retained in
+// this module-global list so promote_graph pins them to region 0.
+var _keep: [pubptr] = [] as [pubptr];
+
+fn keep(p: pubptr): pubptr {
+    _keep.append(p);
+    return p;
+}
+
+
+fn xsym(name: str): int {
+    unsafe {
+        if (_x11 == 0) { _x11 = ffi.library_load("libX11.so.6"); }
+        if (_x11 == 0) { _x11 = ffi.library_load("libX11.so"); }
+        if (_x11 == 0) { return 0; }
+        return ffi.library_get_symbol(_x11, name);
+    }
+}
+
+fn call_i64(fptr: int, args: [any]): int {
+    unsafe { return ffi.foreign_call(fptr, args, ffi.TYPE_I64, []); }
+}
+fn call_i32(fptr: int, args: [any]): int {
+    unsafe { return ffi.foreign_call(fptr, args, ffi.TYPE_I32, []); }
+}
+fn call_i64_ret(fptr: int, args: [any], ret: int): int {
+    unsafe { return ffi.foreign_call(fptr, args, ret, []); }
+}
+fn call_void(fptr: int, args: [any]): nil {
+    unsafe { ffi.foreign_call(fptr, args, ffi.TYPE_VOID, []); }
+}
+fn cstr(s: str): int {
+    unsafe { return _builtin_string_to_cstr(s); }
+}
+fn p2i(p: int): int {
+    unsafe {
+        var tmp = ffi.alloc(8);
+        ffi.store_ptr(tmp, p);
+        var v: int = ffi.load_i64(tmp);
+        ffi.free(tmp);
+        return v;
+    }
+}
+
+fn cb_load(block: int, off: int): int {
+    unsafe { return ffi.load_i64(ffi.ptr_add(block, off)); }
+}
+fn cb_store(block: int, off: int, v: int): nil {
+    unsafe { ffi.store_i64(ffi.ptr_add(block, off), v); }
+}
+
+fn find_block(xwin: int): int {
+    unsafe {
+        var b: int = _win_list;
+        while (b != 0) {
+            if (ffi.load_i64(ffi.ptr_add(b, OFF_HWND)) == xwin
+                and ffi.load_i64(ffi.ptr_add(b, OFF_CLOSED)) == 0) { return b; }
+            b = ffi.load_i64(ffi.ptr_add(b, OFF_NEXT));
+        }
+    }
+    return 0;
+}
+
+fn active_window_count(): int {
+    unsafe {
+        var n: int = 0;
+        var b: int = _win_list;
+        while (b != 0) {
+            if (ffi.load_i64(ffi.ptr_add(b, OFF_CLOSED)) == 0) { n = n + 1; }
+            b = ffi.load_i64(ffi.ptr_add(b, OFF_NEXT));
+        }
+        return n;
+    }
+}
+
+fn ring_push(block: int, kind: int, x: int, y: int, w: int, h: int,
+             key: int, ch: int, mods: int, buttons: int, delta: int): nil {
+    unsafe {
+        var count: int = cb_load(block, OFF_COUNT);
+        var cap: int = cb_load(block, OFF_CAP);
+        var ring: int = cb_load(block, OFF_RING);
+        if (count >= cap) {
+            var head: int = cb_load(block, OFF_HEAD);
+            head = (head + 1) % cap;
+            cb_store(block, OFF_HEAD, head);
+        } else {
+            cb_store(block, OFF_COUNT, count + 1);
+        }
+        var tail: int = cb_load(block, OFF_TAIL);
+        var rec: int = ffi.ptr_add(ring, tail * EV_SIZE);
+        ffi.store_i64(ffi.ptr_add(rec, 0), kind);
+        ffi.store_i64(ffi.ptr_add(rec, 8), x);
+        ffi.store_i64(ffi.ptr_add(rec, 16), y);
+        ffi.store_i64(ffi.ptr_add(rec, 24), w);
+        ffi.store_i64(ffi.ptr_add(rec, 32), h);
+        ffi.store_i64(ffi.ptr_add(rec, 40), key);
+        ffi.store_i64(ffi.ptr_add(rec, 48), ch);
+        ffi.store_i64(ffi.ptr_add(rec, 56), mods);
+        ffi.store_i64(ffi.ptr_add(rec, 64), buttons);
+        ffi.store_i64(ffi.ptr_add(rec, 72), delta);
+        ffi.store_i64(ffi.ptr_add(rec, 80), cb_load(block, OFF_HWND));
+        tail = (tail + 1) % cap;
+        cb_store(block, OFF_TAIL, tail);
+    }
+}
+
+fn kind_from_int(k: int): nt.EventKind {
+    if (k == EK_QUIT) { return nt.EventKind.Quit; }
+    if (k == EK_CLOSE) { return nt.EventKind.Close; }
+    if (k == EK_RESIZE) { return nt.EventKind.Resize; }
+    if (k == EK_PAINT) { return nt.EventKind.Paint; }
+    if (k == EK_KEYDOWN) { return nt.EventKind.KeyDown; }
+    if (k == EK_KEYUP) { return nt.EventKind.KeyUp; }
+    if (k == EK_CHAR) { return nt.EventKind.Char; }
+    if (k == EK_MOUSEMOVE) { return nt.EventKind.MouseMove; }
+    if (k == EK_MOUSEDOWN) { return nt.EventKind.MouseDown; }
+    if (k == EK_MOUSEUP) { return nt.EventKind.MouseUp; }
+    if (k == EK_MOUSEWHEEL) { return nt.EventKind.MouseWheel; }
+    if (k == EK_FOCUS) { return nt.EventKind.Focus; }
+    if (k == EK_UNFOCUS) { return nt.EventKind.Unfocus; }
+    return nt.EventKind.None;
+}
+
+fn block_pop_event(block: int): any {
+    var count: int = cb_load(block, OFF_COUNT);
+    if (count == 0) { return nil; }
+    unsafe {
+        var head: int = cb_load(block, OFF_HEAD);
+        var cap: int = cb_load(block, OFF_CAP);
+        var ring: int = cb_load(block, OFF_RING);
+        var rec: int = ffi.ptr_add(ring, head * EV_SIZE);
+        var kind_i: int = ffi.load_i64(ffi.ptr_add(rec, 0));
+        var x: int = ffi.load_i64(ffi.ptr_add(rec, 8));
+        var y: int = ffi.load_i64(ffi.ptr_add(rec, 16));
+        var w: int = ffi.load_i64(ffi.ptr_add(rec, 24));
+        var h: int = ffi.load_i64(ffi.ptr_add(rec, 32));
+        var key: int = ffi.load_i64(ffi.ptr_add(rec, 40));
+        var ch: int = ffi.load_i64(ffi.ptr_add(rec, 48));
+        var mods: int = ffi.load_i64(ffi.ptr_add(rec, 56));
+        var buttons: int = ffi.load_i64(ffi.ptr_add(rec, 64));
+        var delta: int = ffi.load_i64(ffi.ptr_add(rec, 72));
+        var handle: int = ffi.load_i64(ffi.ptr_add(rec, 80));
+        head = (head + 1) % cap;
+        cb_store(block, OFF_HEAD, head);
+        cb_store(block, OFF_COUNT, count - 1);
+        var ev = nt.Event(
+            kind=kind_from_int(kind_i),
+            x=x, y=y, w=w, h=h, key=key, ch=ch,
+            mods=mods, buttons=buttons, delta=delta, handle=handle);
+        return ev;
+    }
+}
+
+fn xev_field(buf: int, off: int): int {
+    unsafe { return ffi.load_i64(ffi.ptr_add(buf, off)); }
+}
+fn xev_i32(buf: int, off: int): int {
+    unsafe { return ffi.load_i32(ffi.ptr_add(buf, off)); }
+}
+
+// Map X11 modifier state bits to MOD_*.
+fn xmods(state: int): int {
+    var m: int = 0;
+    if (state & XS_SHIFT != 0) { m = m | nt.MOD_SHIFT; }
+    if (state & XS_CONTROL != 0) { m = m | nt.MOD_CTRL; }
+    if (state & XS_MOD1 != 0) { m = m | nt.MOD_ALT; }
+    if (state & XS_MOD4 != 0) { m = m | nt.MOD_SUPER; }
+    if (state & XS_LOCK != 0) { m = m | nt.MOD_CAPS; }
+    if (state & XS_MOD2 != 0) { m = m | nt.MOD_NUM; }
+    return m;
+}
+
+// Decode the first UTF-8 codepoint from a byte buffer (XLookupString out).
+fn utf8_first(buf: int, n: int): int {
+    unsafe {
+        if (n <= 0) { return -1; }
+        var b0: int = ffi.load_u8(ffi.ptr_add(buf, 0));
+        if (b0 < 0x80) { return b0; }
+        if (b0 >= 0xC0 and b0 < 0xE0 and n >= 2) {
+            var b1: int = ffi.load_u8(ffi.ptr_add(buf, 1));
+            return ((b0 & 0x1F) << 6) | (b1 & 0x3F);
+        }
+        if (b0 >= 0xE0 and b0 < 0xF0 and n >= 3) {
+            var b1: int = ffi.load_u8(ffi.ptr_add(buf, 1));
+            var b2: int = ffi.load_u8(ffi.ptr_add(buf, 2));
+            return ((b0 & 0x0F) << 12) | ((b1 & 0x3F) << 6) | (b2 & 0x3F);
+        }
+        if (b0 >= 0xF0 and n >= 4) {
+            var b1: int = ffi.load_u8(ffi.ptr_add(buf, 1));
+            var b2: int = ffi.load_u8(ffi.ptr_add(buf, 2));
+            var b3: int = ffi.load_u8(ffi.ptr_add(buf, 3));
+            return ((b0 & 0x07) << 18) | ((b1 & 0x3F) << 12)
+                 | ((b2 & 0x3F) << 6) | (b3 & 0x3F);
+        }
+        return -1;
+    }
+}
+
+// Translate one filled XEvent (512B buffer at `buf`) into ring_push calls.
+// Returns true if the event was consumed for a known window.
+fn translate_xevent(buf: int): bool {
+    var etype: int = xev_i32(buf, 0);
+    // Event window field differs per XEvent member:
+    //   key/button/motion/clientmsg: window @32
+    //   configure/expose/focus/map/etc: event @32, window @40
+    var woff: int = 40;
+    if (etype == XE_KEYPRESS or etype == XE_KEYRELEASE or
+        etype == XE_BUTTONPRESS or etype == XE_BUTTONRELEASE or
+        etype == XE_MOTION or etype == XE_CLIENTMSG) {
+        woff = 32;
+    }
+    var xwin: int = xev_field(buf, woff);
+    var block: int = find_block(xwin);
+    if (block == 0) { return false; }
+
+    if (etype == XE_KEYPRESS or etype == XE_KEYRELEASE) {
+        var state: int = xev_i32(buf, 80);
+        var keycode: int = xev_i32(buf, 84);
+        var mods: int = xmods(state);
+        var kind: int = EK_KEYDOWN;
+        if (etype == XE_KEYRELEASE) { kind = EK_KEYUP; }
+        // keysym via XLookupKeysym(dpy, &xkey=buf+32, index=0)
+        var keysym: int = 0;
+        unsafe {
+            var ks_fn = xsym("XLookupKeysym");
+            if (ks_fn != 0) {
+                keysym = call_i64_ret(ks_fn, [_dpy, ffi.ptr_add(buf, 32), 0], ffi.TYPE_U64);
+            }
+        }
+        var key_out: int = keycode;
+        if (keysym != 0) { key_out = keysym; }
+        ring_push(block, kind, 0, 0, 0, 0, key_out, -1, mods, 0, 0);
+        // Text input: XLookupString on KeyPress only.
+        if (etype == XE_KEYPRESS) {
+            unsafe {
+                var ls_fn = xsym("XLookupString");
+                if (ls_fn != 0) {
+                    var textbuf = ffi.alloc(64);
+                    var ks_out = ffi.alloc(8);
+                    var status = ffi.alloc(4);
+                    // XLookupString(dpy, xkey*, buf, size, keysym*, status*)
+                    // XmbLookupString has same shape with extra args - use
+                    // plain XLookupString (keysym variant deprecated but
+                    // present) for the char decode.
+                    var n: int = call_i64_ret(ls_fn,
+                        [_dpy, ffi.ptr_add(buf, 32), textbuf, 64, ks_out, status],
+                        ffi.TYPE_I64);
+                    var cp: int = utf8_first(textbuf, n);
+                    ffi.free(textbuf); ffi.free(ks_out); ffi.free(status);
+                    if (cp > 0 and cp != 10) { // skip LF; Return is KeyDown
+                        ring_push(block, EK_CHAR, 0, 0, 0, 0, 0, cp, mods, 0, 0);
+                    }
+                }
+            }
+        }
+    } elif (etype == XE_BUTTONPRESS or etype == XE_BUTTONRELEASE) {
+        var state: int = xev_i32(buf, 80);
+        var button: int = xev_i32(buf, 84);
+        var x: int = xev_i32(buf, 64);
+        var y: int = xev_i32(buf, 68);
+        var mods: int = xmods(state);
+        var btn: int = 0;
+        if (button == 4) { btn = 1; }  // wheel up -> Left-ish delta below
+        if (button == 5) { btn = 2; }
+        if (etype == XE_BUTTONPRESS) {
+            if (button == 4 or button == 5) {
+                var wdelta: int = -1;
+                if (button == 4) { wdelta = 1; }
+                ring_push(block, EK_MOUSEWHEEL, x, y, 0, 0, 0, -1, mods, 0, wdelta);
+            } else {
+                var mb: int = 1;
+                if (button == 3) { mb = 2; }
+                elif (button == 2) { mb = 4; }
+                ring_push(block, EK_MOUSEDOWN, x, y, 0, 0, 0, -1, mods, mb, 0);
+            }
+        } else {
+            ring_push(block, EK_MOUSEUP, x, y, 0, 0, 0, -1, mods, 0, 0);
+        }
+    } elif (etype == XE_MOTION) {
+        var state: int = xev_i32(buf, 80);
+        var x: int = xev_i32(buf, 64);
+        var y: int = xev_i32(buf, 68);
+        var btns: int = 0;
+        if (state & 256 != 0) { btns = btns | 1; }  // Button1Mask
+        if (state & 1024 != 0) { btns = btns | 2; } // Button3Mask? approx
+        ring_push(block, EK_MOUSEMOVE, x, y, 0, 0, 0, -1, xmods(state), btns, 0);
+    } elif (etype == XE_CONFIGURE) {
+        var w: int = xev_i32(buf, 56);
+        var h: int = xev_i32(buf, 60);
+        cb_store(block, OFF_W, w);
+        cb_store(block, OFF_H, h);
+        // Filter out 0-size and non-resize configure noise minimally.
+        ring_push(block, EK_RESIZE, 0, 0, w, h, 0, -1, 0, 0, 0);
+    } elif (etype == XE_EXPOSE) {
+        ring_push(block, EK_PAINT, 0, 0, 0, 0, 0, -1, 0, 0, 0);
+    } elif (etype == XE_FOCUSIN) {
+        ring_push(block, EK_FOCUS, 0, 0, 0, 0, 0, -1, 0, 0, 0);
+    } elif (etype == XE_FOCUSOUT) {
+        ring_push(block, EK_UNFOCUS, 0, 0, 0, 0, 0, -1, 0, 0, 0);
+    } elif (etype == XE_CLIENTMSG) {
+        // WM_DELETE_WINDOW: format==32, data.l[0]==delete_atom
+        var format: int = xev_i32(buf, 48);
+        var data0: int = xev_field(buf, 56);
+        if (format == 32 and data0 == _delete_atom) {
+            ring_push(block, EK_CLOSE, 0, 0, 0, 0, 0, -1, 0, 0, 0);
+        }
+    }
+    return true;
+}
+
+// Ensure display connection + per-window event buffer.
+fn ensure_display(): int {
+    if (_dpy != 0) { return _dpy; }
+    unsafe {
+        var open_fn = xsym("XOpenDisplay");
+        if (open_fn == 0) { return 0; }
+        _dpy = call_i64_ret(open_fn, [0], ffi.TYPE_I64);
+        if (_dpy == 0) { return 0; }
+        _screen = call_i64_ret(xsym("XDefaultScreen"), [_dpy], ffi.TYPE_I64);
+        _root = call_i64_ret(xsym("XRootWindow"), [_dpy, _screen], ffi.TYPE_I64);
+        _delete_atom = call_i64_ret(xsym("XInternAtom"),
+            [_dpy, cstr("WM_DELETE_WINDOW"), 0], ffi.TYPE_U64);
+        return _dpy;
+    }
+}
+
+pub fn available(): bool {
+    var os: str = osid.os_name();
+    if (os != "linux" and os != "freebsd") { return false; }
+    unsafe { return xsym("XOpenDisplay") != 0; }
+}
+
+pub fn next_window_id(): int {
+    var id: int = _next_id;
+    _next_id = _next_id + 1;
+    return id;
+}
+
+fn add_window_block(xwin: int, width: int, height: int): int {
+    unsafe {
+        var bp = keep(ffi.alloc(CB_SIZE));
+        ffi.memset(bp, 0, CB_SIZE);
+        var rp = keep(ffi.alloc(RING_CAP * EV_SIZE));
+        ffi.memset(rp, 0, RING_CAP * EV_SIZE);
+        var xp = keep(ffi.alloc(512));
+        ffi.memset(xp, 0, 512);
+        var block = p2i(bp);
+        var ring = p2i(rp);
+        var xevt = p2i(xp);
+        cb_store(block, OFF_HWND, xwin);
+        cb_store(block, OFF_RING, ring);
+        cb_store(block, OFF_CAP, RING_CAP);
+        cb_store(block, OFF_W, width);
+        cb_store(block, OFF_H, height);
+        cb_store(block, OFF_XEVT, xevt);
+        cb_store(block, OFF_NEXT, _win_list);
+        _win_list = p2i(block);
+        return p2i(block);
+    }
+}
+
+pub fn create_window(title: str, width: int, height: int): nt.Window? {
+    var dpy: int = ensure_display();
+    if (dpy == 0) { return err(); }
+    unsafe {
+        var xwin: int = call_i64(xsym("XCreateSimpleWindow"),
+            [dpy, _root, 100, 100, width, height, 0, 0, 0]);
+        if (xwin == 0) { return err(); }
+        // Select input mask + WM_DELETE_WINDOW protocol.
+        call_void(xsym("XSelectInput"), [dpy, xwin, XI_MASK]);
+        var atoms = ffi.alloc(8);
+        ffi.store_i64(ffi.ptr_add(atoms, 0), _delete_atom);
+        call_i64(xsym("XSetWMProtocols"), [dpy, xwin, atoms, 1]);
+        ffi.free(atoms);
+        var name: int = cstr(title);
+        call_void(xsym("XStoreName"), [dpy, xwin, name]);
+        call_void(xsym("XMapWindow"), [dpy, xwin]);
+        call_void(xsym("XFlush"), [dpy]);
+        add_window_block(xwin, width, height);
+        return ok(nt.Window(handle=xwin, id=next_window_id(),
+                            width=width, height=height, closed=false,
+                            backend="linux-x11"));
+    }
+}
+
+// Poll all displays' pending events, translating into rings.
+fn pump_events(blocking: int): nil {
+    if (_dpy == 0) { return; }
+    unsafe {
+        // XNextEvent returns events for the whole display; route by the
+        // event's window field inside translate_xevent.
+        var buf = ffi.alloc(512);
+        ffi.memset(buf, 0, 512);
+        var guard: int = 0;
+        while (guard < 256) {
+            var have: int = 1;
+            if (blocking == 0) {
+                have = call_i32(xsym("XPending"), [_dpy]);
+                if (have <= 0) {
+                    // X events lag XFlush by ~ms; give the server a
+                    // brief grace period before declaring "no events".
+                    unsafe {
+                        if (_libc == 0) { _libc = ffi.library_load("libc.so.6"); }
+                        if (_usleep_fn == 0) {
+                            _usleep_fn = ffi.library_get_symbol(_libc, "usleep");
+                        }
+                        if (_usleep_fn != 0) {
+                            call_void(_usleep_fn, [1000]);
+                        }
+                    }
+                    have = call_i32(xsym("XPending"), [_dpy]);
+                }
+            }
+            if (have <= 0) { break; }
+            // XNextEvent returns nonzero on success in most libX11
+            // versions, but treat any return as "event read" - XPending
+            // already guaranteed one is queued.
+            call_i32(xsym("XNextEvent"), [_dpy, buf]);
+            translate_xevent(buf);
+            guard = guard + 1;
+            if (blocking == 0) { break; } // one batch per poll
+        }
+        ffi.free(buf);
+    }
+}
+
+pub fn poll_event(win: nt.Window): nt.Event {
+    var block: int = find_block(win.handle);
+    if (block == 0) { return nt.event_none(); }
+    if (cb_load(block, OFF_COUNT) == 0) { pump_events(0); }
+    var er: any = block_pop_event(block);
+    if (er == nil) { return nt.event_none(); }
+    return er as nt.Event;
+}
+
+pub fn wait_event(win: nt.Window): nt.Event {
+    var block: int = find_block(win.handle);
+    if (block == 0) {
+        return nt.Event(kind=nt.EventKind.Quit, x=0, y=0, w=0, h=0,
+                        key=0, ch=-1, mods=0, buttons=0, delta=0, handle=win.handle);
+    }
+    var guard: int = 0;
+    while (cb_load(block, OFF_COUNT) == 0 and guard < 100000) {
+        pump_events(1); // blocking XNextEvent
+        guard = guard + 1;
+        if (cb_load(block, OFF_CLOSED) != 0) { break; }
+    }
+    var er: any = block_pop_event(block);
+    if (er == nil) {
+        return nt.Event(kind=nt.EventKind.Quit, x=0, y=0, w=0, h=0,
+                        key=0, ch=-1, mods=0, buttons=0, delta=0, handle=win.handle);
+    }
+    return er as nt.Event;
+}
+
+pub fn invalidate(win: nt.Window): nil {
+    unsafe {
+        // X11 has no invalidate; XClearArea generates an Expose event.
+        call_void(xsym("XClearArea"), [_dpy, win.handle, 0, 0, 0, 0, 1]);
+    }
+}
+
+pub fn set_title(win: nt.Window, title: str): nil {
+    unsafe {
+        var n: int = cstr(title);
+        call_void(xsym("XStoreName"), [_dpy, win.handle, n]);
+    }
+}
+
+pub fn set_size(win: nt.Window, width: int, height: int): nil {
+    unsafe {
+        call_void(xsym("XResizeWindow"), [_dpy, win.handle, width, height]);
+        call_void(xsym("XFlush"), [_dpy]);
+    }
+}
+
+pub fn client_size(win: nt.Window): (int, int) {
+    var block: int = find_block(win.handle);
+    if (block != 0) {
+        return (cb_load(block, OFF_W), cb_load(block, OFF_H));
+    }
+    return (0, 0);
+}
+
+pub fn destroy(win: nt.Window): nil {
+    unsafe {
+        call_void(xsym("XDestroyWindow"), [_dpy, win.handle]);
+        call_void(xsym("XFlush"), [_dpy]);
+    }
+    win.closed = true;
+    var block: int = find_block(win.handle);
+    if (block != 0) { cb_store(block, OFF_CLOSED, 1); }
+    if (active_window_count() == 0) {
+        // Last window gone: close display so wait_event can exit.
+        unsafe { call_void(xsym("XCloseDisplay"), [_dpy]); }
+        _dpy = 0;
+        _win_list = 0;
+    }
+}
+
+
+// X11 event loop: pump until all windows closed.
+pub fn run_message_loop(): nil {
+    var guard: int = 0;
+    while (active_window_count() > 0 and guard < 10000000) {
+        pump_events(1);
+        guard = guard + 1;
+    }
+}

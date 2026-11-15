@@ -6,14 +6,22 @@
 
 #include "sokol_gfx_runtime.hh"
 #include "../gfx_uniform_layout.hh"
+#include "../native_d3d11_window.h"
 
 #if defined(_WIN32)
 #define SOKOL_D3D11
+#elif defined(__linux__)
+// Linux uses std.native.linux (pure-Lymar X11 FFI) for windows; the VM
+// graphics runtime compiles against the dummy backend until a native
+// GL/Vulkan path is wired up.
+#define SOKOL_DUMMY_BACKEND
 #endif
 #define SOKOL_NO_ENTRY
 #define SOKOL_NOAPI
 #define SOKOL_GFX_IMPL
+#if defined(_WIN32)
 #define SOKOL_GLUE_IMPL
+#endif
 
 #include "sokol_app.h"
 #include "sokol_gfx.h"
@@ -758,6 +766,32 @@ static void sg_log_stderr(const char* tag, uint32_t level, uint32_t item,
     (void)level; (void)item;
 }
 
+bool SokolGfxRuntime::attach_external_window(void* hwnd, int width, int height) {
+#if defined(_WIN32)
+    if (!LM::Runtime::native_d3d11_attach(hwnd, width, height)) return false;
+    // setup() must run after attach so sg_setup sees our device.
+    return setup();
+#else
+    (void)hwnd; (void)width; (void)height;
+    return false;
+#endif
+}
+
+void SokolGfxRuntime::detach_external_window() {
+#if defined(_WIN32)
+    shutdown();
+    LM::Runtime::native_d3d11_detach();
+#endif
+}
+
+bool SokolGfxRuntime::external_window() const {
+#if defined(_WIN32)
+    return LM::Runtime::native_d3d11_attached();
+#else
+    return false;
+#endif
+}
+
 SokolGfxRuntime& sokol_gfx_runtime() {
     static SokolGfxRuntime rt;
     return rt;
@@ -768,7 +802,20 @@ bool SokolGfxRuntime::setup() {
     impl_ = new Impl();
 
     sg_desc desc{};
-    desc.environment = sglue_environment();
+#if defined(_WIN32)
+    if (LM::Runtime::native_d3d11_attached()) {
+        // External window mode: device/context come from our own
+        // native_d3d11_window (std.native HWND), not sokol_app.
+        desc.environment.defaults.color_format = SG_PIXELFORMAT_BGRA8;
+        desc.environment.defaults.depth_format = SG_PIXELFORMAT_DEPTH;
+        desc.environment.defaults.sample_count = 1;
+        desc.environment.d3d11.device = LM::Runtime::native_d3d11_device();
+        desc.environment.d3d11.device_context =
+            LM::Runtime::native_d3d11_device_context();
+    } else {
+        desc.environment = sglue_environment();
+    }
+#endif
     desc.logger.func = sg_log_stderr;
     sg_setup(&desc); // returns void; validity checked via sg_isvalid()
     if (!sg_isvalid()) {
@@ -898,6 +945,8 @@ void SokolGfxRuntime::commit_frame() {
     pending_.clear();
 }
 
+static void present_if_external();
+
 bool SokolGfxRuntime::render_frame() {
     if (!ready_ || !impl_) return false;
     ++frame_id_;
@@ -920,9 +969,41 @@ bool SokolGfxRuntime::render_frame() {
     if (pass_open_) {
         sg_end_pass();
         sg_commit();
+        present_if_external();
         pass_open_ = false;
     }
     return true; // a complete frame batch was processed (pass committed)
+}
+
+// Frame swapchain: external mode builds it from our D3D11 RTV;
+// sokol_app mode defers to sglue (sapp-owned swapchain).
+static sg_swapchain current_frame_swapchain() {
+    sg_swapchain sc{};
+#if defined(_WIN32)
+    if (LM::Runtime::native_d3d11_attached()) {
+        sc.invalid = 0;
+        sc.width = LM::Runtime::native_d3d11_width();
+        sc.height = LM::Runtime::native_d3d11_height();
+        sc.sample_count = 1;
+        sc.color_format = SG_PIXELFORMAT_BGRA8;
+        sc.depth_format = SG_PIXELFORMAT_DEPTH;
+        sc.d3d11.render_view = LM::Runtime::native_d3d11_rtv();
+        sc.d3d11.depth_stencil_view = LM::Runtime::native_d3d11_dsv();
+        return sc;
+    }
+    return sglue_swapchain();
+#else
+    return sc;
+#endif
+}
+
+// Present after a commit when running in external-window mode.
+static void present_if_external() {
+#if defined(_WIN32)
+    if (LM::Runtime::native_d3d11_attached()) {
+        LM::Runtime::native_d3d11_present();
+    }
+#endif
 }
 
 static void apply_scissor(SokolGfxRuntime::Impl* impl) {
@@ -952,7 +1033,7 @@ void SokolGfxRuntime::execute(const GfxCommand& cmd) {
             pass.action.depth.load_action = SG_LOADACTION_CLEAR;
             pass.action.depth.store_action = SG_STOREACTION_STORE;
             pass.action.depth.clear_value = 1.0f;
-            pass.swapchain = sglue_swapchain();
+            pass.swapchain = current_frame_swapchain();
             if (pass.swapchain.invalid) return;
             im->pass_w = pass.swapchain.width;
             im->pass_h = pass.swapchain.height;
@@ -967,6 +1048,7 @@ void SokolGfxRuntime::execute(const GfxCommand& cmd) {
                 flush_text();
                 sg_end_pass();
                 sg_commit();
+                present_if_external();
                 pass_open_ = false;
             }
             break;

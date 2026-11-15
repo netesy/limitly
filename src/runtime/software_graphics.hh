@@ -13,6 +13,7 @@
 #include "gfx_uniform_layout.hh"
 #include "sokol/sokol_app_runtime.hh"
 #include "sokol/sokol_gfx_runtime.hh"
+#include "native_d3d11_window.h"
 #include "../backend/vm/font8x8_basic.h"
 #include "../../vendor/stb/stb_truetype.h"
 namespace LM::Runtime {
@@ -213,6 +214,13 @@ public:
     ResourceType getType() const override { return ResourceType::GRAPHICS; }
 
     RegisterValue call(ResourceOperation op, const std::vector<RegisterValue>& args, void*) override {
+        // External native-window attach/detach is routing-independent: it
+        // must work both before sokol_gfx is ready (first attach) and after
+        // (re-attach / detach on shutdown).
+        if (op == ResourceOperation::ATTACH_WINDOW ||
+            op == ResourceOperation::DETACH_WINDOW) {
+            return call_window_attach(op, args);
+        }
         // GPU backend: when sokol_gfx is live (windowed D3D11), decode ops
         // into GfxCommands for the sapp thread. Headless keeps this CPU path.
         if (::sokol_gfx_runtime().ready()) return call_gpu(op, args);
@@ -1058,6 +1066,22 @@ private:
     // GPU-backend op decode: mirrors the software switch above but emits
     // GfxCommands for the sokol_app thread instead of rasterizing. Text
     // (DRAW_TEXT family) is not yet implemented on the GPU path.
+    RegisterValue call_window_attach(ResourceOperation op,
+                                     const std::vector<RegisterValue>& args) {
+        if (op == ResourceOperation::DETACH_WINDOW) {
+            ::sokol_gfx_runtime().detach_external_window();
+            return value_true;
+        }
+        // args = [hwnd:int, width:int, height:int]
+        if (args.size() < 3) return value_false;
+        int64_t hwnd = register_value_to_i64(args[0]);
+        int w = static_cast<int>(register_value_to_i64(args[1]));
+        int h = static_cast<int>(register_value_to_i64(args[2]));
+        bool ok = ::sokol_gfx_runtime().attach_external_window(
+            reinterpret_cast<void*>(static_cast<intptr_t>(hwnd)), w, h);
+        return ok ? value_true : value_false;
+    }
+
     RegisterValue call_gpu(ResourceOperation op, const std::vector<RegisterValue>& args) {
         auto flatten = [&](const std::vector<RegisterValue>& v) {
             std::vector<double> out;
@@ -1086,6 +1110,11 @@ private:
             case ResourceOperation::SPAWN: {
                 // Window creation is GPU-backend agnostic: start the sapp
                 // thread (which brings up sokol_gfx in its init callback).
+                // In external-window mode the HWND is std.native-owned; a
+                // stray spawn must not create a second sokol window.
+                if (::sokol_gfx_runtime().external_window()) {
+                    return value_true;
+                }
                 int w = width_, h = height_;
                 std::string title = "Lymar Application";
                 bool resizable = true;
@@ -1310,12 +1339,19 @@ private:
                 // Frame boundary: publish this frame's command batch so the
                 // render thread only ever presents complete frames.
                 ::sokol_gfx_runtime().commit_frame();
-                sokol_app_runtime().wait_for_frame();
-                std::vector<RuntimeAppEvent> app_events;
-                sokol_app_runtime().poll_events(app_events);
-                for (const auto& ev : app_events) {
-                    if (ev.type == 1) { width_ = ev.x; height_ = ev.y; }
-                    push_native_event(ev.type, ev.x, ev.y, ev.key);
+                if (::sokol_gfx_runtime().external_window()) {
+                    // External-window mode: the VM thread owns the D3D11
+                    // context, so render+present here. OS events arrive via
+                    // std.native, not through this resource.
+                    ::sokol_gfx_runtime().render_frame();
+                } else {
+                    sokol_app_runtime().wait_for_frame();
+                    std::vector<RuntimeAppEvent> app_events;
+                    sokol_app_runtime().poll_events(app_events);
+                    for (const auto& ev : app_events) {
+                        if (ev.type == 1) { width_ = ev.x; height_ = ev.y; }
+                        push_native_event(ev.type, ev.x, ev.y, ev.key);
+                    }
                 }
                 LmList* list = lm_list_new();
                 std::lock_guard<std::mutex> lock(event_mutex_);
@@ -1340,7 +1376,11 @@ private:
                     int w = (int)f[0], h = (int)f[1];
                     if (w > 0 && h > 0) {
                         width_ = w; height_ = h;
-                        sokol_app_runtime().set_window_size(w, h);
+                        if (::sokol_gfx_runtime().external_window()) {
+                            LM::Runtime::native_d3d11_resize(w, h);
+                        } else {
+                            sokol_app_runtime().set_window_size(w, h);
+                        }
                     }
                 }
                 return value_true;

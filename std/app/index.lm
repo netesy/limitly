@@ -10,6 +10,7 @@ import std.ui.context as ui_context;
 import std.ui.components as ui_comp;
 import std.gg as gg;
 import std.os as os;
+import std.native as native;
 
 // Window configuration
 frame WindowConfig {
@@ -54,6 +55,17 @@ frame State {
 }
 
 // Global application state
+// Native-window mode: when std.native created the HWND and the GPU
+// backend attached to it, OS events flow through std.events' native
+// drain and presentation runs on the VM thread. _native_mode == 0 means
+// the legacy sokol_app-owned window path (or headless).
+var _native_win: native.Window? = nil;
+var _native_mode: int = 0;
+
+pub fn native_mode(): int {
+    return _native_mode;
+}
+
 pub var global_app_state: State = State(
     is_initialized=0,
     is_running=0,
@@ -115,6 +127,15 @@ pub fn app_shutdown(): nil {
         global_app_state.is_running = 0;
     }
 
+    if (_native_mode != 0) {
+        gg.detach_window();
+        if (_native_win != nil) {
+            native.destroy(_native_win as native.Window);
+        }
+        _native_win = nil;
+        _native_mode = 0;
+        events.clear_window();
+    }
     events.clear();
     global_app_state.is_initialized = 0;
     global_app_state.window_id = 0;
@@ -162,6 +183,9 @@ pub fn dispatch_ui_events(): nil {
                 global_app_state.framebuffer_width = ev.x;
                 global_app_state.framebuffer_height = ev.y;
                 ui_context.set_viewport_size(ev.x as float, ev.y as float);
+                // Swapchain resize is owned by events.pump_events (coalesced
+                // to the final size once per frame) — do not call
+                // gg.set_window_size per event here.
             },
             events.EventType.MouseDown => {
                 ui_context.dispatch_pointer_down(ev.x as float, ev.y as float);
@@ -255,6 +279,9 @@ pub fn set_window_size(width: int, height: int): nil {
     global_app_state.framebuffer_width = width;
     global_app_state.framebuffer_height = height;
     ui_context.set_viewport_size(width as float, height as float);
+    if (_native_mode != 0 and _native_win != nil) {
+        native.set_size(_native_win as native.Window, width, height);
+    }
     gg.set_window_size(width, height);
 }
 
@@ -291,6 +318,9 @@ pub fn set_window_title(title: str): nil {
         return;
     }
     global_app_state.window_config.title = title;
+    if (_native_mode != 0 and _native_win != nil) {
+        native.set_title(_native_win as native.Window, title);
+    }
 }
 
 pub fn set_fullscreen(fullscreen: int): nil {
@@ -311,7 +341,43 @@ pub fn show_window(): nil {
     if (global_app_state.is_initialized == 0) {
         return;
     }
-    gg.spawn_window(global_app_state.width, global_app_state.height, global_app_state.window_config.title, global_app_state.window_config.resizable);
+    if (_native_mode != 0) {
+        return;
+    }
+    var w: int = global_app_state.width;
+    var h: int = global_app_state.height;
+    var title: str = global_app_state.window_config.title;
+    if (native.available()) {
+        var win_r = native.create_window(title, w, h);
+        var win: native.Window = win_r ? else {
+            gg.spawn_window(w, h, title, global_app_state.window_config.resizable);
+            return;
+        };
+        var cw: int = win.width;
+        var ch: int = win.height;
+        if (cw <= 0) { cw = w; }
+        if (ch <= 0) { ch = h; }
+        if (gg.attach_window(win.handle, cw, ch)) {
+            // Window is a move-only frame binding: hand events its own
+            // copy, then keep the original for destroy/set_title/set_size.
+            var win_copy = native.Window(handle=win.handle, id=win.id,
+                                         width=win.width, height=win.height,
+                                         closed=win.closed, backend=win.backend);
+            _native_win = win;
+            _native_mode = 1;
+            events.set_window(win_copy);
+            global_app_state.width = cw;
+            global_app_state.height = ch;
+            global_app_state.framebuffer_width = cw;
+            global_app_state.framebuffer_height = ch;
+            ui_context.set_viewport_size(cw as float, ch as float);
+            return;
+        }
+        // GPU backend could not bind to the native window: drop it and
+        // fall back to the sokol_app-owned window path.
+        native.destroy(win);
+    }
+    gg.spawn_window(w, h, title, global_app_state.window_config.resizable);
 }
 pub fn hide_window(): nil {}
 pub fn focus_window(): nil {}
