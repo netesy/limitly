@@ -80,181 +80,119 @@ function filterNav() {
 <h2>index.lm</h2>
 <input type="text" id="search-input" placeholder="Filter symbols..." oninput="filterNav()">
 <div id="nav-list">
-<a class="nav-link" href="#WindowConfig">WindowConfig <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
-<a class="nav-link" href="#default_window_config">default_window_config <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
-<a class="nav-link" href="#State">State <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
-<a class="nav-link" href="#app_init">app_init <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
-<a class="nav-link" href="#init">init <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
-<a class="nav-link" href="#app_shutdown">app_shutdown <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
-<a class="nav-link" href="#shutdown">shutdown <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
-<a class="nav-link" href="#app_is_valid">app_is_valid <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
-<a class="nav-link" href="#app_is_running">app_is_running <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
-<a class="nav-link" href="#ui">ui <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
-<a class="nav-link" href="#set_ui">set_ui <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
-<a class="nav-link" href="#dispatch_ui_events">dispatch_ui_events <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
-<a class="nav-link" href="#process_events">process_events <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
-<a class="nav-link" href="#run_frame_step">run_frame_step <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
-<a class="nav-link" href="#app_run">app_run <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
-<a class="nav-link" href="#run">run <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
-<a class="nav-link" href="#app_quit">app_quit <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
-<a class="nav-link" href="#quit">quit <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
-<a class="nav-link" href="#present_frame">present_frame <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
-<a class="nav-link" href="#set_window_size">set_window_size <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#native_mode">native_mode <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#App">App <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
 <a class="nav-link" href="#get_window_width">get_window_width <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 <a class="nav-link" href="#get_window_height">get_window_height <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 <a class="nav-link" href="#get_framebuffer_width">get_framebuffer_width <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 <a class="nav-link" href="#get_framebuffer_height">get_framebuffer_height <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 <a class="nav-link" href="#get_dpi_scale">get_dpi_scale <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 <a class="nav-link" href="#get_frame_count">get_frame_count <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
-<a class="nav-link" href="#get_delta_time">get_delta_time <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#app_delta_time">app_delta_time <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#app_is_running">app_is_running <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#app_is_initialized">app_is_initialized <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#quit">quit <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#on_update">on_update <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#on_draw">on_draw <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#set_clear_color">set_clear_color <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#set_window_size">set_window_size <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 <a class="nav-link" href="#set_window_title">set_window_title <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 <a class="nav-link" href="#set_fullscreen">set_fullscreen <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 <a class="nav-link" href="#set_swap_interval">set_swap_interval <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
-<a class="nav-link" href="#show_window">show_window <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
-<a class="nav-link" href="#hide_window">hide_window <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
-<a class="nav-link" href="#focus_window">focus_window <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
-<a class="nav-link" href="#request_attention">request_attention <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
-<a class="nav-link" href="#get_current_time">get_current_time <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
-<a class="nav-link" href="#sleep_ms">sleep_ms <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
-<a class="nav-link" href="#get_clipboard_string">get_clipboard_string <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
-<a class="nav-link" href="#set_clipboard_string">set_clipboard_string <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
-<a class="nav-link" href="#get_mouse_position">get_mouse_position <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
-<a class="nav-link" href="#set_mouse_position">set_mouse_position <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
-<a class="nav-link" href="#get_mouse_button_state">get_mouse_button_state <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
-<a class="nav-link" href="#get_key_state">get_key_state <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
-<a class="nav-link" href="#get_modifier_state">get_modifier_state <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
-<a class="nav-link" href="#create_app_data_directory">create_app_data_directory <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 <a class="nav-link" href="#get_executable_path">get_executable_path <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 <a class="nav-link" href="#get_home_directory">get_home_directory <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#WindowConfig">WindowConfig <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#State">State <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#_boot">_boot <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_shutdown">_shutdown <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_pump">_pump <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_dispatch_events">_dispatch_events <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_begin_pass">_begin_pass <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_end_pass">_end_pass <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_show_window">_show_window <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 </div>
 </nav>
 <main>
 <h1>index.lm API Reference</h1>
 <h2>Module Overview</h2>
 <div class="summary"><p>Application Module
-Portable window application lifecycle, event loop, and timing driver
+The single owner of window lifecycle, the event loop, and frame
+presentation for Lymar applications — UI apps and games alike.
 
-Windowing and the Fluent UI loop live here. OS event pumping and the typed
-event queue live in std.events — this module only *dispatches* queued
-events into the Fluent ui_context.</p></div>
-<div id="WindowConfig">
-<h3>WindowConfig <span class="badge badge-pub">Frame</span></h3>
-<pre class="code-sig"><code>frame WindowConfig</code></pre>
-<div class="summary"><p>Window configuration</p></div>
+Usage (UI app — the common case):
+
+  import std.app as app;
+  import std.ui as ui;
+
+  var a = app.App("Gallery", 1280, 800);
+  a.ui(root);
+  a.run();
+
+Usage (game / custom loop — full control, locals stay in scope):
+
+  var a = app.App("Game", 1280, 720);
+  a.open();
+  while (a.is_running()) {
+      a.pump();          // events -> queue + UI dispatch + frame dt
+      // ... game logic, has access to a.delta_time() ...
+      a.begin_pass();    // start GPU pass (clear color)
+      // ... draw: scenes, std.gui, anything ...
+      a.end_pass();      // draw hooks + retained UI on top + swap
+      sleep(0.008);
+  }
+  a.close();
+
+Optional per-frame hooks (module fn values — see std.ui.button for the
+same callback convention):
+
+  a.on_update(fn(dt: float): nil { ... });   // after pump, before present
+  a.on_draw(fn(): nil { ... });              // inside pass, before UI
+
+OS event pumping and the typed event queue live in std.events — this
+module only *dispatches* queued events into the component tree
+(std.ui.tree) and calls the registered hooks.</p></div>
+<div id="native_mode">
+<h3>native_mode <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn native_mode(): int</code></pre>
+</div><hr>
+<div id="App">
+<h3>App <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame App</code></pre>
+<div class="summary"><p>── App frame ────────────────────────────────────────────────────────────────
+Window + loop configuration. Effectively a singleton façade over the
+module state above — one window per process.</p></div>
 <h4>Members</h4>
 <ul>
+<li><code>var pub title: str</code> <em>(field)</em></li>
 <li><code>var pub width: int</code> <em>(field)</em></li>
 <li><code>var pub height: int</code> <em>(field)</em></li>
-<li><code>var pub title: str</code> <em>(field)</em></li>
 <li><code>var pub resizable: int</code> <em>(field)</em></li>
 <li><code>var pub fullscreen: int</code> <em>(field)</em></li>
 <li><code>var pub high_dpi: int</code> <em>(field)</em></li>
 <li><code>var pub sample_count: int</code> <em>(field)</em></li>
 <li><code>var pub swap_interval: int</code> <em>(field)</em></li>
+<li><code>pub init()</code> <em>(constructor)</em></li>
+<li><code>pub fn ui(root: ui_component.Component): nil</code> <em>(method)</em></li>
+<li><code>pub fn on_update(cb: union): nil</code> <em>(method)</em></li>
+<li><code>pub fn on_draw(cb: union): nil</code> <em>(method)</em></li>
+<li><code>pub fn run(): nil</code> <em>(method)</em></li>
+<li><code>pub fn open(): nil</code> <em>(method)</em></li>
+<li><code>pub fn step(): nil</code> <em>(method)</em></li>
+<li><code>pub fn pump(): nil</code> <em>(method)</em></li>
+<li><code>pub fn present(): nil</code> <em>(method)</em></li>
+<li><code>pub fn begin_pass(): nil</code> <em>(method)</em></li>
+<li><code>pub fn end_pass(): nil</code> <em>(method)</em></li>
+<li><code>pub fn close(): nil</code> <em>(method)</em></li>
+<li><code>pub fn quit(): nil</code> <em>(method)</em></li>
+<li><code>pub fn is_running(): bool</code> <em>(method)</em></li>
+<li><code>pub fn view_width(): int</code> <em>(method)</em></li>
+<li><code>pub fn view_height(): int</code> <em>(method)</em></li>
+<li><code>pub fn framebuffer_width(): int</code> <em>(method)</em></li>
+<li><code>pub fn framebuffer_height(): int</code> <em>(method)</em></li>
+<li><code>pub fn dpi_scale(): float</code> <em>(method)</em></li>
+<li><code>pub fn frame_count(): int</code> <em>(method)</em></li>
+<li><code>pub fn delta_time(): float</code> <em>(method)</em></li>
 </ul>
-</div><hr>
-<div id="default_window_config">
-<h3>default_window_config <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn default_window_config(): WindowConfig</code></pre>
-<div class="summary"><p>Default window configuration</p></div>
-</div><hr>
-<div id="State">
-<h3>State <span class="badge badge-pub">Frame</span></h3>
-<pre class="code-sig"><code>frame State</code></pre>
-<div class="summary"><p>Application state</p></div>
-<h4>Members</h4>
-<ul>
-<li><code>var pub is_initialized: int</code> <em>(field)</em></li>
-<li><code>var pub is_running: int</code> <em>(field)</em></li>
-<li><code>var pub window_config: WindowConfig</code> <em>(field)</em></li>
-<li><code>var pub window_id: int</code> <em>(field)</em></li>
-<li><code>var pub width: int</code> <em>(field)</em></li>
-<li><code>var pub height: int</code> <em>(field)</em></li>
-<li><code>var pub framebuffer_width: int</code> <em>(field)</em></li>
-<li><code>var pub framebuffer_height: int</code> <em>(field)</em></li>
-<li><code>var pub dpi_scale: float</code> <em>(field)</em></li>
-<li><code>var pub frame_count: int</code> <em>(field)</em></li>
-<li><code>var pub last_frame_time: int</code> <em>(field)</em></li>
-<li><code>var pub delta_time: float</code> <em>(field)</em></li>
-</ul>
-</div><hr>
-<div id="app_init">
-<h3>app_init <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn app_init(config: WindowConfig): int</code></pre>
-<div class="summary"><p>Initialize application with window configuration</p></div>
-</div><hr>
-<div id="init">
-<h3>init <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn init(config: any = ...): int</code></pre>
-</div><hr>
-<div id="app_shutdown">
-<h3>app_shutdown <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn app_shutdown(): nil</code></pre>
-<div class="summary"><p>Shutdown application and release resources</p></div>
-</div><hr>
-<div id="shutdown">
-<h3>shutdown <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn shutdown(): nil</code></pre>
-</div><hr>
-<div id="app_is_valid">
-<h3>app_is_valid <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn app_is_valid(): int</code></pre>
-</div><hr>
-<div id="app_is_running">
-<h3>app_is_running <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn app_is_running(): int</code></pre>
-</div><hr>
-<div id="ui">
-<h3>ui <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn ui(root: ui_comp.Fluent): nil</code></pre>
-</div><hr>
-<div id="set_ui">
-<h3>set_ui <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn set_ui(root: ui_comp.Fluent): nil</code></pre>
-</div><hr>
-<div id="dispatch_ui_events">
-<h3>dispatch_ui_events <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn dispatch_ui_events(): nil</code></pre>
-<div class="summary"><p>dispatch_ui_events delivers this frame's std.events stream into the
-Fluent ui_context. It reads events.pending_events() non-destructively, so
-std.game.Game (or any other consumer) can observe the same stream — fan-out
-is the default, not the exception.</p></div>
-</div><hr>
-<div id="process_events">
-<h3>process_events <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn process_events(): nil</code></pre>
-<div class="summary"><p>process_events = pump + Fluent dispatch: the per-frame event step for the
-std.app/Fluent run loop. std.game.Game calls events.pump_events() and reads
-the same pending_events() stream for its InputManager/IMGUI — both
-consumers see every event (fan-out).</p></div>
-</div><hr>
-<div id="run_frame_step">
-<h3>run_frame_step <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn run_frame_step(): nil</code></pre>
-</div><hr>
-<div id="app_run">
-<h3>app_run <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn app_run(): nil</code></pre>
-</div><hr>
-<div id="run">
-<h3>run <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn run(root: union = ...): nil</code></pre>
-</div><hr>
-<div id="app_quit">
-<h3>app_quit <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn app_quit(): nil</code></pre>
-</div><hr>
-<div id="quit">
-<h3>quit <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn quit(): nil</code></pre>
-</div><hr>
-<div id="present_frame">
-<h3>present_frame <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn present_frame(): nil</code></pre>
-</div><hr>
-<div id="set_window_size">
-<h3>set_window_size <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn set_window_size(width: int, height: int): nil</code></pre>
 </div><hr>
 <div id="get_window_width">
 <h3>get_window_width <span class="badge badge-pub">Function</span></h3>
@@ -280,9 +218,41 @@ consumers see every event (fan-out).</p></div>
 <h3>get_frame_count <span class="badge badge-pub">Function</span></h3>
 <pre class="code-sig"><code>pub fn get_frame_count(): int</code></pre>
 </div><hr>
-<div id="get_delta_time">
-<h3>get_delta_time <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn get_delta_time(): float</code></pre>
+<div id="app_delta_time">
+<h3>app_delta_time <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn app_delta_time(): float</code></pre>
+</div><hr>
+<div id="app_is_running">
+<h3>app_is_running <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn app_is_running(): int</code></pre>
+</div><hr>
+<div id="app_is_initialized">
+<h3>app_is_initialized <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn app_is_initialized(): int</code></pre>
+</div><hr>
+<div id="quit">
+<h3>quit <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn quit(): nil</code></pre>
+</div><hr>
+<div id="on_update">
+<h3>on_update <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn on_update(cb: union): nil</code></pre>
+<div class="summary"><p>Per-frame hooks — module fn values, the codebase's callback convention.
+on_update runs after event dispatch, before presentation; on_draw runs
+inside the GPU pass before the retained UI submits.</p></div>
+</div><hr>
+<div id="on_draw">
+<h3>on_draw <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn on_draw(cb: union): nil</code></pre>
+</div><hr>
+<div id="set_clear_color">
+<h3>set_clear_color <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn set_clear_color(r: float, g: float, b: float, a: float): nil</code></pre>
+<div class="summary"><p>Frame clear color for begin_pass/present (see App.begin_pass).</p></div>
+</div><hr>
+<div id="set_window_size">
+<h3>set_window_size <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn set_window_size(width: int, height: int): nil</code></pre>
 </div><hr>
 <div id="set_window_title">
 <h3>set_window_title <span class="badge badge-pub">Function</span></h3>
@@ -296,62 +266,6 @@ consumers see every event (fan-out).</p></div>
 <h3>set_swap_interval <span class="badge badge-pub">Function</span></h3>
 <pre class="code-sig"><code>pub fn set_swap_interval(interval: int): nil</code></pre>
 </div><hr>
-<div id="show_window">
-<h3>show_window <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn show_window(): nil</code></pre>
-</div><hr>
-<div id="hide_window">
-<h3>hide_window <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn hide_window(): nil</code></pre>
-</div><hr>
-<div id="focus_window">
-<h3>focus_window <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn focus_window(): nil</code></pre>
-</div><hr>
-<div id="request_attention">
-<h3>request_attention <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn request_attention(): nil</code></pre>
-</div><hr>
-<div id="get_current_time">
-<h3>get_current_time <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn get_current_time(): int</code></pre>
-</div><hr>
-<div id="sleep_ms">
-<h3>sleep_ms <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn sleep_ms(milliseconds: int): nil</code></pre>
-</div><hr>
-<div id="get_clipboard_string">
-<h3>get_clipboard_string <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn get_clipboard_string(): str</code></pre>
-</div><hr>
-<div id="set_clipboard_string">
-<h3>set_clipboard_string <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn set_clipboard_string(text: str): nil</code></pre>
-</div><hr>
-<div id="get_mouse_position">
-<h3>get_mouse_position <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn get_mouse_position(): tuple</code></pre>
-</div><hr>
-<div id="set_mouse_position">
-<h3>set_mouse_position <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn set_mouse_position(x: int, y: int): nil</code></pre>
-</div><hr>
-<div id="get_mouse_button_state">
-<h3>get_mouse_button_state <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn get_mouse_button_state(button: int): int</code></pre>
-</div><hr>
-<div id="get_key_state">
-<h3>get_key_state <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn get_key_state(key: int): int</code></pre>
-</div><hr>
-<div id="get_modifier_state">
-<h3>get_modifier_state <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn get_modifier_state(): int</code></pre>
-</div><hr>
-<div id="create_app_data_directory">
-<h3>create_app_data_directory <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn create_app_data_directory(): str</code></pre>
-</div><hr>
 <div id="get_executable_path">
 <h3>get_executable_path <span class="badge badge-pub">Function</span></h3>
 <pre class="code-sig"><code>pub fn get_executable_path(): str</code></pre>
@@ -361,6 +275,75 @@ location of the program, not about the application loop.</p></div>
 <div id="get_home_directory">
 <h3>get_home_directory <span class="badge badge-pub">Function</span></h3>
 <pre class="code-sig"><code>pub fn get_home_directory(): str</code></pre>
+</div><hr>
+<div id="WindowConfig">
+<h3>WindowConfig <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame WindowConfig</code></pre>
+<div class="summary"><p>Window configuration carried into global_app_state (kept internal —
+App's fields are the public surface).</p></div>
+<h4>Members</h4>
+<ul>
+<li><code>var pub width: int</code> <em>(field)</em></li>
+<li><code>var pub height: int</code> <em>(field)</em></li>
+<li><code>var pub title: str</code> <em>(field)</em></li>
+<li><code>var pub resizable: int</code> <em>(field)</em></li>
+<li><code>var pub fullscreen: int</code> <em>(field)</em></li>
+<li><code>var pub high_dpi: int</code> <em>(field)</em></li>
+<li><code>var pub sample_count: int</code> <em>(field)</em></li>
+<li><code>var pub swap_interval: int</code> <em>(field)</em></li>
+</ul>
+</div><hr>
+<div id="State">
+<h3>State <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame State</code></pre>
+<div class="summary"><p>Application state</p></div>
+<h4>Members</h4>
+<ul>
+<li><code>var pub is_initialized: int</code> <em>(field)</em></li>
+<li><code>var pub is_running: int</code> <em>(field)</em></li>
+<li><code>var pub window_config: WindowConfig</code> <em>(field)</em></li>
+<li><code>var pub window_id: int</code> <em>(field)</em></li>
+<li><code>var pub width: int</code> <em>(field)</em></li>
+<li><code>var pub height: int</code> <em>(field)</em></li>
+<li><code>var pub framebuffer_width: int</code> <em>(field)</em></li>
+<li><code>var pub framebuffer_height: int</code> <em>(field)</em></li>
+<li><code>var pub dpi_scale: float</code> <em>(field)</em></li>
+<li><code>var pub frame_count: int</code> <em>(field)</em></li>
+<li><code>var pub last_frame_time: int</code> <em>(field)</em></li>
+<li><code>var pub delta_time: float</code> <em>(field)</em></li>
+</ul>
+</div><hr>
+<div id="_boot">
+<h3>_boot <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _boot(title: str, width: int, height: int, resizable: int, fullscreen: int, high_dpi: int, sample_count: int, swap_interval: int): nil</code></pre>
+</div><hr>
+<div id="_shutdown">
+<h3>_shutdown <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _shutdown(): nil</code></pre>
+</div><hr>
+<div id="_pump">
+<h3>_pump <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _pump(): nil</code></pre>
+</div><hr>
+<div id="_dispatch_events">
+<h3>_dispatch_events <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _dispatch_events(): nil</code></pre>
+<div class="summary"><p>dispatch_events delivers this frame's std.events stream into the
+component tree. It reads events.pending_events() non-destructively, so
+std.game (or any other consumer) can observe the same stream — fan-out
+is the default, not the exception.</p></div>
+</div><hr>
+<div id="_begin_pass">
+<h3>_begin_pass <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _begin_pass(): nil</code></pre>
+</div><hr>
+<div id="_end_pass">
+<h3>_end_pass <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _end_pass(): nil</code></pre>
+</div><hr>
+<div id="_show_window">
+<h3>_show_window <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _show_window(): nil</code></pre>
 </div><hr>
 </main>
 </body>

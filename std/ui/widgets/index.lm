@@ -1,0 +1,34 @@
+// std/ui/widgets/index.lm
+// Widget collection — one file per widget. Re-exports keep the
+// `std.ui.widgets` facade (and std.ui) source-compatible.
+
+pub import std.ui.widgets.button show Button, button;
+pub import std.ui.widgets.text_input show TextInput, text_input;
+pub import std.ui.widgets.checkbox show Checkbox, checkbox;
+pub import std.ui.widgets.toggle show Toggle, toggle;
+pub import std.ui.widgets.slider show Slider, slider;
+pub import std.ui.widgets.progress_bar show ProgressBar, progress_bar;
+pub import std.ui.widgets.link show Link, link;
+pub import std.ui.widgets.spacer show Spacer, spacer;
+pub import std.ui.widgets.badge show Badge, badge;
+pub import std.ui.widgets.alert show Alert, alert, toast;
+pub import std.ui.widgets.stat show Stat, stat;
+pub import std.ui.widgets.indicator show Indicator, indicator;
+pub import std.ui.widgets.steps show Steps, steps;
+pub import std.ui.widgets.timeline show Timeline, timeline;
+pub import std.ui.widgets.diff show Diff, diff;
+pub import std.ui.widgets.image show Image, image;
+pub import std.ui.widgets.color_picker show ColorPicker, color_picker;
+pub import std.ui.widgets.calendar show Calendar, calendar;
+pub import std.ui.widgets.file_input show FileInput, file_input;
+pub import std.ui.widgets.card show Card, card;
+pub import std.ui.widgets.accordion show Accordion, accordion;
+pub import std.ui.widgets.form_field show FormField, form_field;
+pub import std.ui.widgets.tree_node show TreeNode, tree_node;
+pub import std.ui.widgets.tabs show Tabs, tabs;
+pub import std.ui.widgets.select show Select, select, multi_select;
+pub import std.ui.widgets.stepper show Stepper, stepper;
+pub import std.ui.widgets.range_slider show RangeSlider, range_slider;
+pub import std.ui.widgets.filter show Filter, filter;
+pub import std.ui.widgets.table show Table, table, table_text;
+pub import std.ui.widgets.chart show Chart, chart, bar_chart, line_chart, pie_chart, plot_histogram, plot_lines;

@@ -1,0 +1,165 @@
+// std/ui/widgets/text_input.lm
+// Widget — split from std/ui/widgets.lm.
+
+import std.ui.component as comp;
+import std.ui.component show Placed, TextBound;
+import std.ui.types as ui_types;
+import std.ui.event as uievent;
+import std.ui.context as uictx;
+import std.ui.draw_list as dl;
+import std.ui.state as state;
+import std.ui.tree as tree;
+import std.events as events;
+import std.color as color;
+import std.ui.theme as uitheme;
+import std.text.controller as text_ctrl;
+import std.text.shaping as textshape;
+import std.ui.text_metrics as tm;
+
+// ── TextInput ────────────────────────────────────────────────────────────────
+// Single-line text field backed by std.text.EditorController — real cursor,
+// selection and undo semantics. text_sig is ALWAYS present (created in
+// init): edits write it, external set() reconciles into the controller.
+// Use inp.text_sig before add() to observe/bind, or bind_text() to attach
+// an external StrSignal two-way.
+
+frame TextInput {
+    embed Placed;
+    pub var ctrl: text_ctrl.EditorController;
+    pub var text_sig: state.StrSignal;
+    pub var placeholder: str;
+    pub var bg: color.Color;
+    pub var fg: color.Color;
+    pub var font_scale: float;
+    pub var pad_x: float;
+    pub var pad_y: float;
+    pub var focused: int;
+
+    pub init(initial: str = "", hint: str = "") {
+        val pal = uitheme.palette();
+        self.ctrl = text_ctrl.EditorController(initial);
+        self.text_sig = state.signal_str(initial);
+        self.placeholder = hint;
+        self.bg = pal.surface;
+        self.fg = pal.on_accent;
+        self.font_scale = 1.0;
+        self.pad_x = 6.0;
+        self.pad_y = 4.0;
+        self.focused = 0;
+        self.id = comp.next_widget_id();
+    }
+
+    pub fn kind(): ui_types.WidgetKind { return ui_types.WidgetKind.Input; }
+    pub fn on_theme_changed(): nil {
+        val p = uitheme.palette();
+        self.bg = p.surface;
+        self.fg = p.on_accent;
+        tree.request_repaint();
+    }
+    pub fn on_overlay_dismiss(): nil { }
+
+    pub fn text(): str {
+        return self.ctrl.get_text();
+    }
+
+    // Attach an external signal two-way: widget edits write it, external
+    // set() reconciles into the controller on the next paint.
+    pub fn bind_text(sig: state.StrSignal): nil {
+        self.text_sig = sig;
+        self.ctrl.set_text(sig.get());
+    }
+
+    fn sync_sig(): nil {
+        val cur = self.ctrl.get_text();
+        if (self.text_sig.get() != cur) {
+            self.text_sig.set(cur);
+        }
+    }
+
+    fn reconcile(): nil {
+        val sig_txt = self.text_sig.get();
+        if (sig_txt != self.ctrl.get_text()) {
+            self.ctrl.set_text(sig_txt);
+        }
+    }
+
+    pub fn wants_pointer_capture(): int { return 0; }
+
+    pub fn measure(min_w: float, max_w: float, min_h: float, max_h: float): comp.Size {
+        var w: float = 120.0 * self.font_scale;
+        var h: float = tm.line_height(self.font_scale) + self.pad_y * 2.0;
+        if (w < min_w) { w = min_w; }
+        if (w > max_w) { w = max_w; }
+        if (h < min_h) { h = min_h; }
+        if (h > max_h) { h = max_h; }
+        return comp.Size(w=w, h=h);
+    }
+
+    pub fn on_event(t: events.EventType, x: int, y: int, key: int): uievent.EventResult {
+        var inside: bool = self.rect.contains(x as float, y as float);
+        if (t == events.EventType.MouseDown) {
+            if (inside) {
+                self.focused = 1;
+                tree.set_focus(self);
+                return uievent.EventResult.Handled;
+            }
+        } elif (t == events.EventType.KeyDown) {
+            if (self.focused == 0) { return uievent.EventResult.Ignored; }
+            if (key == 8 or key == 127) {
+                self.ctrl.backspace();
+                self.sync_sig();
+                return uievent.EventResult.Handled;
+            }
+            if (key == 37) {
+                self.ctrl.move_left(false);
+                return uievent.EventResult.Handled;
+            }
+            if (key == 39) {
+                self.ctrl.move_right(false);
+                return uievent.EventResult.Handled;
+            }
+            if (key == 36) {
+                self.ctrl.set_cursor(0, 0);
+                return uievent.EventResult.Handled;
+            }
+            if (key == 35) {
+                var lc = self.ctrl.get_line_count() - 1;
+                self.ctrl.set_cursor(lc, len(self.ctrl.get_line(lc)));
+                return uievent.EventResult.Handled;
+            }
+        } elif (t == events.EventType.Char) {
+            if (self.focused == 0) { return uievent.EventResult.Ignored; }
+            var ch = uictx.codepoint_to_utf8(key);
+            if (len(ch) > 0) {
+                self.ctrl.insert_text(ch);
+                self.sync_sig();
+                return uievent.EventResult.Handled;
+            }
+        }
+        return uievent.EventResult.Ignored;
+    }
+
+    pub fn paint(): nil {
+        self.reconcile();
+        dl.dl_emit_rect(dl.paint_ctx.dl, self.rect.x, self.rect.y, self.rect.w, self.rect.h,
+            self.bg.r, self.bg.g, self.bg.b, self.bg.a);
+        var txt = self.ctrl.get_text();
+        if (self.focused == 0 and len(txt) == 0 and len(self.placeholder) > 0) {
+            dl.dl_emit_text(dl.paint_ctx.dl, self.placeholder, self.rect.x + self.pad_x, self.rect.y + self.pad_y,
+                0.5, 0.55, 0.6, 0.6, self.font_scale);
+        } else {
+            dl.dl_emit_text(dl.paint_ctx.dl, textshape.prepare_display(txt), self.rect.x + self.pad_x, self.rect.y + self.pad_y,
+                self.fg.r, self.fg.g, self.fg.b, self.fg.a, self.font_scale);
+        }
+        if (self.focused != 0) {
+            // Focus ring: 1px border in accent color.
+            dl.dl_emit_rect_border(dl.paint_ctx.dl, self.rect.x, self.rect.y, self.rect.w, self.rect.h,
+                2.0, 1.0, 1.0, 0.4, 0.6, 1.0, 0.9);
+        }
+    }
+}
+
+pub fn text_input(initial: str = "", hint: str = ""): TextInput {
+    return TextInput(initial, hint);
+}
+

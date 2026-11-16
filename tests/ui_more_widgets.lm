@@ -1,0 +1,171 @@
+// M7 extension test: legacy-widget ports (Card, Accordion, Tabs, Select,
+// Stepper, RangeSlider, Filter, Table, TreeNode, Chart + display widgets).
+// Exercises construction through the std.ui facade, arrange geometry,
+// and the interactive paths that have signals/callbacks.
+
+import std.gg as gg;
+import std.ui as ui;
+import std.ui.tree as tree;
+import std.events as events;
+
+var fail_count: int = 0;
+
+fn check(cond: bool, msg: str): nil {
+    if (not cond) {
+        print("FAIL: " + msg);
+        fail_count = fail_count + 1;
+    }
+}
+
+fn click_at(root: ui.Component, x: int, y: int): nil {
+    ui.dispatch(root, events.Event(event_type=events.EventType.MouseDown, x=x, y=y, key_code=0));
+    ui.dispatch(root, events.Event(event_type=events.EventType.MouseUp, x=x, y=y, key_code=0));
+}
+
+fn main() {
+    print("=== UI More Widgets  ===");
+
+    var disp = ui.column(4.0);
+    disp.add(ui.link("docs", "https://example.com"));
+    disp.add(ui.spacer(1.0));
+    disp.add(ui.badge("NEW"));
+    disp.add(ui.alert("watch out", "warning"));
+    disp.add(ui.stat("CPU", "42%", "+5"));
+    disp.add(ui.indicator("online", "srv-1"));
+    disp.add(ui.steps(["one", "two", "three"], 1));
+    var tl = ui.timeline();
+    tl.add(ui.label("boot"));
+    tl.add(ui.label("ready"));
+    disp.add(tl);
+    disp.add(ui.diff("before", "after"));
+    disp.add(ui.image("tex_ui"));
+    disp.add(ui.color_picker("accent", nil));
+    disp.add(ui.calendar("2025-06-01"));
+    disp.add(ui.file_input("Choose file..."));
+
+    var card = ui.card("Profile");
+    card.set_child(ui.label("card body"));
+    disp.add(card);
+
+    var acc = ui.accordion("Details", ui.label("secret"), false);
+    var acc_rect = acc.rect;
+    disp.add(acc);
+
+    var ff = ui.form_field("Email", ui.text_input("", "you@x.com"), "never shared");
+    disp.add(ff);
+
+    var tn = ui.tree_node("root", false);
+    tn.add(ui.label("leaf"));
+    var tn_rect = tn.rect;
+    disp.add(tn);
+
+    var pg1 = ui.column(2.0); pg1.add(ui.label("page one"));
+    var pg2 = ui.column(2.0); pg2.add(ui.label("page two"));
+    var tabs_w = ui.tabs(["First", "Second"], [pg1, pg2], 0);
+    var tabs_rect = tabs_w.rect;
+    disp.add(tabs_w);
+
+    var sel = ui.select(["alpha", "beta", "gamma"], 0);
+    var sel_rect = sel.rect;
+    disp.add(sel);
+
+    var step = ui.stepper(5, 1, 0, 10);
+    var step_rect = step.rect;
+    disp.add(step);
+
+    var rng = ui.range_slider(20.0, 80.0, 0.0, 100.0);
+    var rng_rect = rng.rect;
+    disp.add(rng);
+
+    var filt = ui.filter("", "Filter items...");
+    disp.add(filt);
+
+    var tbl = ui.table(["Name", "Load"], [[ui.label("web"), ui.label("12%")]]);
+    disp.add(tbl);
+
+    disp.add(ui.bar_chart("CPU", [3.0, 7.0, 5.0, 9.0]));
+    disp.add(ui.line_chart("mem", [1.0, 4.0, 2.0, 8.0]));
+    disp.add(ui.pie_chart("disk", [50.0, 30.0, 20.0]));
+
+    
+    ui.update(disp, 640.0, 2400.0);
+
+    // Every added widget should have non-zero arranged bounds.
+    check(card.rect.w > 0.0 and card.rect.h > 0.0, "card should be arranged");
+    check(acc_rect.w > 0.0 and acc_rect.h > 0.0, "accordion should be arranged");
+    check(tn_rect.w > 0.0 and tn_rect.h > 0.0, "tree_node should be arranged");
+    check(tabs_rect.w > 0.0 and tabs_rect.h > 0.0, "tabs should be arranged");
+    check(sel_rect.w > 0.0 and sel_rect.h > 0.0, "select should be arranged");
+    check(step_rect.w > 0.0 and step_rect.h > 0.0, "stepper should be arranged");
+    check(rng_rect.w > 0.0 and rng_rect.h > 0.0, "range_slider should be arranged");
+    check(tree.dirty == 0, "update should clear dirty");
+
+    ui.enable_reactive();
+
+    check(acc.is_open == 0, "accordion should start closed");
+    var ax = (acc_rect.x + acc_rect.w / 2.0) as int;
+    var ay = (acc_rect.y + acc_rect.h / 2.0) as int;
+    click_at(disp, ax, ay);
+    check(acc.is_open == 1, "accordion click should open");
+
+    check(tn.is_open == 0, "tree_node should start closed");
+    var nx = (tn_rect.x + tn_rect.w / 2.0) as int;
+    var ny = (tn_rect.y + tn_rect.h / 2.0) as int;
+    click_at(disp, nx, ny);
+    check(tn.is_open == 1, "tree_node click should open");
+
+    // _tx/_tw hold the last-painted tab header rect (index 1 of 2).
+    var tx2 = (tabs_w._tx + tabs_w._tw / 2.0) as int;
+    var ty2 = (tabs_rect.y + 20.0) as int;
+    click_at(disp, tx2, ty2);
+    check(tabs_w.active_tab == 1, "tabs click should switch active tab");
+
+    var sx = (sel_rect.x + sel_rect.w / 2.0) as int;
+    var sy = (sel_rect.y + sel_rect.h / 2.0) as int;
+    click_at(disp, sx, sy);
+    check(sel.is_open == 1, "select click should open dropdown");
+    // Re-arrange so the open dropdown is inside the widget's event bounds.
+    ui.update(disp, 640.0, 2400.0);
+    // Click second menu item (below the box).
+    var my = (sel_rect.y + 34.0 + 4.0 + 28.0 * 1.5) as int;
+    click_at(disp, sx, my);
+    check(sel.is_open == 0, "select option click should close dropdown");
+    check(sel.selected_idx == 1, "select should pick clicked option, got {sel.selected_idx}");
+
+    var px = (step_rect.x + step_rect.w - 18.0) as int;
+    var py = (step_rect.y + step_rect.h / 2.0) as int;
+    click_at(disp, px, py);
+    check(step.value_sig.get() == 6, "stepper + should increment, got {step.value_sig.get()}");
+
+    var rx = (rng_rect.x + rng_rect.w * 0.9) as int;
+    var ry = (rng_rect.y + rng_rect.h / 2.0) as int;
+    ui.dispatch(disp, events.Event(event_type=events.EventType.MouseDown, x=rx, y=ry, key_code=0));
+    ui.dispatch(disp, events.Event(event_type=events.EventType.MouseMove, x=rx, y=ry, key_code=0));
+    check(rng.high_sig.get() > 80.0, "range drag should raise high, got {rng.high_sig.get()}");
+    ui.dispatch(disp, events.Event(event_type=events.EventType.MouseUp, x=rx, y=ry, key_code=0));
+
+    var fx = (filt.rect.x + 10.0) as int;
+    var fy = (filt.rect.y + filt.rect.h / 2.0) as int;
+    click_at(disp, fx, fy);
+    ui.dispatch(disp, events.Event(event_type=events.EventType.Char, x=0, y=0, key_code=97));
+    check(len(filt.ctrl.get_text()) == 1, "filter should accept char, got '{filt.ctrl.get_text()}'");
+    check(filt.query_sig.get() == "a", "filter query sig should sync");
+
+    check(ui.find_widget(disp, card.widget_id()) != nil, "find_widget card");
+    check(ui.find_widget(disp, tabs_w.widget_id()) != nil, "find_widget tabs");
+    check(ui.find_widget(disp, tn.widget_id()) != nil, "find_widget tree_node");
+
+    check(gg.setup(), "gg setup failed");
+    gg.begin_pass(640, 2400, 0.1, 0.1, 0.15, 1.0);
+    ui.request_repaint();
+    ui.update(disp, 640.0, 2400.0);
+    ui.submit();
+    gg.end_pass();
+    gg.commit();
+
+    if (fail_count == 0) {
+        print("ALL UI MORE WIDGETS TESTS PASSED");
+    } else {
+        print("{fail_count} ASSERTIONS FAILED");
+    }
+}

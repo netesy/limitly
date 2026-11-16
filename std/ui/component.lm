@@ -143,6 +143,19 @@ trait Component {
     // defaults; containers override with their real children.
     fn child_count(): int { return 0; }
     fn child_at(i: int): any;
+    // Called by tree.apply_theme after a theme swap. Widgets that
+    // snapshot uitheme.palette() re-apply theme-derived fields here;
+    // leaves/containers use an empty body.
+    fn on_theme_changed(): nil;
+    // Pointer capture: return nonzero while the widget holds an active
+    // press/drag (Slider.dragging, Button.pressed, Select.is_open, ...).
+    // tree.dispatch routes MouseMove/MouseUp to the capturer's subtree
+    // until release, so drags survive the pointer leaving the widget.
+    fn wants_pointer_capture(): int { return 0; }
+    // Called by tree.dispatch when a MouseDown lands outside this
+    // overlay's bounds — popups (Select menus, tooltips) use it to
+    // dismiss themselves on click-away. Default: no-op.
+    fn on_overlay_dismiss(): nil { return; }
 }
 
 // ── Widget identity ──────────────────────────────────────────────────────────
@@ -183,6 +196,10 @@ frame Label {
     }
 
     pub fn kind(): ui_types.WidgetKind { return ui_types.WidgetKind.Text; }
+    pub fn on_theme_changed(): nil { }
+    pub fn on_overlay_dismiss(): nil { }
+
+    pub fn wants_pointer_capture(): int { return 0; }
 
     pub fn measure(min_w: float, max_w: float, min_h: float, max_h: float): Size {
         // Measure the DISPLAY string (post shaping+bidi) with real font

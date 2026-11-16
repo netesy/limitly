@@ -10,7 +10,7 @@
 //   5. Clip push/pop balance over the emitted stream is zero.
 //   6. submit() replays the retained list while elided frames skip work.
 
-import std.ui.component as v2;
+import std.ui.component as comp;
 import std.ui.widgets as w2;
 import std.ui.container as boxes;
 import std.ui.tree as tree;
@@ -25,7 +25,7 @@ fn main() {
     print("=== UI Perf Pass (M5) ===");
 
     val sig = state.signal_str("idle");
-    val lbl = v2.label("idle");
+    val lbl = comp.label("idle");
     lbl.bind_text(sig);
     val btn = w2.button("go", nil, fn() { clicked = clicked + 1; });
     val col = boxes.column(4.0);
@@ -85,7 +85,7 @@ fn main() {
     // ── 6. Handled pointer event -> dirty -> repaint ──
     val fw = tree.find_widget(root, btn.id);
     assert(fw != nil, "find_widget locates the button");
-    val r = (fw as v2.Component).bounds();
+    val r = (fw as comp.Component).bounds();
     val cx: int = ((r.x + r.w / 2.0) as int);
     val cy: int = ((r.y + r.h / 2.0) as int);
     var down = events.Event(event_type=events.EventType.MouseDown, x=cx, y=cy, key_code=0);

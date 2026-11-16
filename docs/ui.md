@@ -1,36 +1,38 @@
 # Lymar UI — Design Document
 
-Status: proposal. This document fact-checks the three UI-adjacent systems
-that exist today (`std.ui`, `std.gui`, `std.game`), compares against five
-reference models (Flutter, SwiftUI, IMGUI, Qt Widgets, QML/Qt Quick), and
-proposes one UI system built around what Lymar can actually do — not a
-port of someone else's.
+Status: implemented. `std.ui` is the retained, typed, component-oriented
+application UI — the only app-UI system. `std.gui` remains the
+immediate-mode game/debug/HUD layer; `std.game` remains the engine
+runtime. The legacy "Fluent" widget monolith (`std.ui.components`,
+`builder`, `layout`, `context` dispatch, `HitZone` hit-testing, and the
+`std.app` Fluent entry points) has been removed; §1–§4 are kept as the
+design rationale and migration record.
 
 ---
 
 ## 1. What exists today — honest inventory
 
-### 1.1 `std.ui` — retained "Fluent" component system (~6,900 LOC)
+### 1.1 `std.ui` — retained component system (current)
 
-| Module | LOC | What it actually is |
-|---|---|---|
-| `components.lm` | 1,839 | ~40 widget frames (`Button`, `TextInput`, `Container`, `Card`…) on a `Fluent` trait; per-widget style fields |
-| `builder.lm` | 1,162 | `ui.button(...)`, `ui.column([...])` etc. — ergonomic constructors |
-| `context.lm` | 497 | `ui_context` global: root widget, frame update, hit-test, focus, `dispatch_*` event entry points |
-| `draw_list.lm` | 458 | Retained draw lists — cursor-reset `clear()`, zero per-frame alloc |
-| `state.lm` | 369 | `SignalNode`/`Signal(T)`/`ComputedSignal(T)`/`Effect` reactive graph |
-| `layout.lm` | 330 | Box layout, `GridSpec`, breakpoints — fixed w/h oriented, not constraint-based |
-| `event.lm` | 126 | `UIEvent`/`EventKind`/`EventResult?` — widget-level semantics |
-| `staged.lm` | 115 | Prototype: stage-0 folding of theme tokens/static layout |
-| `types/forms/navigation/dialog/…` | ~1,400 | WidgetKind enum, forms, tabs, nav, dialogs, charts, grid |
+| Module | What it is |
+|---|---|
+| `component.lm` | `Component` trait contract (`measure`/`arrange`/`paint`/`on_event`), `Placed` embed, `TextBound`, geometry (`Size`/`Rect`) |
+| `widgets/` | One file per widget — Button, TextInput, Checkbox, Toggle, Slider, Select, Calendar, ColorPicker, FileInput, Table, Chart, … (~30 widgets) |
+| `container.lm` + `containers/` | `Flow`/`Container`/`ScrollView` plus `Stack`/`Grid`/`Mask`/`Overlay`/`Tooltip` |
+| `tree.lm` | Frame driver: `update` (measure/arrange/paint), `submit` (replay), `dispatch` (hit-test/focus/scroll/overlays), repaint elision |
+| `state.lm` | `Signal`/`ComputedSignal`/`Effect` reactive graph — the single state channel |
+| `draw_list.lm` + `replay.lm` | Pooled GPU draw commands, zero per-frame alloc, clip stack |
+| `event.lm` | `EventKind`/`EventResult`/`fire_action` widget-level semantics over `std.events` |
+| `context.lm` | Shared plumbing only: `ui_init`, viewport size, dirty flag, UTF-8 helpers |
+| `theme.lm` | `Palette` snapshot of `std.theme` tokens + elevation shadows |
+| `index.lm` | Facade — `import std.ui as ui` |
 
-**Strengths**: statically typed widgets, exhaustive `WidgetKind` match,
-retained draw lists, signals exist, tests are green.
-**Weaknesses**: layout is fixed-size not constraint-based; string-free but
-the tree is `[Fluent]` trait-erased; signals are thinly adopted; several
-widget fields are dormant (animation state settable but unconsumed);
-`std.ui.event.UIEvent` duplicates concepts `std.events.Event` already
-covers at OS level.
+**Historical note — the removed Fluent system**: the predecessor was a
+`Fluent` trait monolith (`components.lm`, ~1,839 LOC, ~40 widgets) with a
+string-keyed `ui_context` (`context.lm`), `builder.lm` constructors,
+fixed-size `layout.lm`, `HitZone` parallel hit lists in `draw_list.lm`,
+and `std.app.ui()/set_ui()/run(root)` entry points. It was retired once
+the component set reached parity; all of it is deleted.
 
 ### 1.2 `std.gui` — immediate-mode GUI (~2,330 LOC, monolith)
 
@@ -67,8 +69,12 @@ system and shouldn't become one.
 
 - `std.events` — typed OS events, `pump_events()` once/frame,
   `pending_events()` fan-out to any number of consumers.
-- `std.app` — window lifecycle + Fluent `ui_context` dispatch +
-  `process_events()`/`present_frame()`/`app_run()`.
+- `std.app` — the single owner of window lifecycle, the event pump, and
+  frame presentation. `App(title, w, h)` + `a.ui(root)` + `a.run()` for
+  retained-UI apps; `a.open()`/`a.pump()`/`a.begin_pass()`/`a.end_pass()`/
+  `a.close()` for custom loops (games). Event dispatch routes the
+  `std.events` stream through `tree.dispatch`; `end_pass` runs
+  `tree.update`/`submit` inside the gg pass with repaint elision.
 - `std.gg` — immediate draw commands → sokol D3D11 / software fallback.
 - `std.text` — `EditorController` (line/col editing, undo/redo,
   selection). `std.font` — supersampled glyph rasterizer.
@@ -181,8 +187,10 @@ layout pass          // measure/arrange — dirty subtrees only
 paint pass           // into retained DrawList → gg replay
 ```
 
-Flutter's architecture minus the weight. `std.ui.context` already
-approximates it; v2 makes passes explicit with per-pass scratch arenas.
+Flutter's architecture minus the weight. `std.ui.tree` implements it:
+`update()` runs measure/arrange/paint, `submit()` replays the retained
+draw list, `dispatch()` routes events — with repaint elision skipping
+clean frames entirely.
 
 ### 4.3 Layout — QML/Flutter constraints, not fixed sizes
 
@@ -258,12 +266,12 @@ on the focused component — reuse, don't rewrite.
 
 | System | Verdict |
 |---|---|
-| `std.ui` components/builder/draw_list/state | **Evolve in place** — keep widget set + builder + draw lists; replace layout internals, ID scheme, state plumbing |
+| `std.ui` component tree (`component`/`widgets`/`containers`/`tree`/`state`/`draw_list`) | **Done** — the system described in §4–§5 is the implementation; the Fluent predecessor is deleted |
 | `std.gui` IMGUI | **Keep** — game/debug niche; already complements `std.game` |
 | `std.game` | **Keep** — engine layer; UI story stays "embed std.gui" |
-| `std.app` Fluent loop | **Keep** — window + event + present owner for the retained UI |
-| `std.events`, `std.text`, `std.font`, `std.theme` | **Keep** — shared infrastructure the modern std.ui builds on |
-| String widget IDs, `any` callbacks, `UIEvent` duplication | **Delete** — `WidgetId` ints, typed signals, `std.events` types |
+| `std.app` | **Keep** — sole owner of window + event pump + present; drives both retained UI (`a.ui`) and games (`a.game`-style manual loop / `on_update`/`on_draw` hooks) |
+| `std.events`, `std.text`, `std.font`, `std.theme` | **Keep** — shared infrastructure the UI builds on |
+| String widget IDs, `any` callbacks, `UIEvent` duplication, Fluent widgets/`HitZone`s/`ui_context` dispatch | **Deleted** — `WidgetId` ints, typed signals, `std.events` types, `Component` contracts |
 
 ## 5. Milestones
 
@@ -273,7 +281,7 @@ on the focused component — reuse, don't rewrite.
 2. **M2 Core set** — ✅ Button, TextInput (`EditorController`),
    Flow/Container/ScrollView, `tree.lm` focus + frame driver; real
    `std.events` routing, hit-testing, scroll, on_change/on_scroll/
-   on_arrange callbacks (`tests/ui_v2_widgets.lm`).
+   on_arrange callbacks (`tests/ui_widgets.lm`).
 
 ### Compiler semantics discovered during M1/M2 (design constraints)
 
@@ -328,7 +336,7 @@ on the focused component — reuse, don't rewrite.
   frame's own method list. → Shared leaf behavior lives on `Placed`
   (promoted via `embed`), not as trait defaults.
 - **Staged fns fold intra-module only** — a cross-module staged call
-  yields `nil` at runtime. → `std/ui/staged.lm` uses the d3 pattern:
+  yields `nil` at runtime. → staged helpers use the d3 pattern:
   private `staged fn` + `pub const` pre-folds + `pub fn` runtime twins.
   The stage-0 folder also rejects parenthesized subexpressions in return
   position — write left-associative chains.
@@ -338,7 +346,7 @@ on the focused component — reuse, don't rewrite.
    `TextInput.text_sig` always present, two-way `sig ↔ EditorController`
    reconcile each paint; `ScrollView.scroll_sig: FloatSignal` two-way;
    `tree.dirty` flag + `enable_reactive()` wired to
-   `state.register_dirty_notifier`. `tests/ui_v2_widgets.lm` verifies
+   `state.register_dirty_notifier`. `tests/ui_widgets.lm` verifies
    signal→repaint, edit→signal, external set→reconcile, wheel→signal,
    external scroll→arrange. `tests/ui_reactive.lm` completes the graph:
    `subscribe` callbacks, `Effect` run/re-run/cleanup/dispose lifecycle,
@@ -351,12 +359,12 @@ on the focused component — reuse, don't rewrite.
    satisfies the trait; `child_count()`/`child_at(i): any` on `Placed`
    (leaf defaults) overridden by Flow/Container/ScrollView enable
    `tree.find_widget(root, id): any` depth-first lookup. Staged side:
-   `std/ui/staged.lm` gained `breakpoint_cols`/`folded_text_width`
-   (private staged fold → `pub const` breakpoints + `pub fn` runtime
-   twins). `tests/ui_m4_static.lm` builds a static screen whose column
-   count is staged-derived, verifies id uniqueness, nested lookup,
-   post-update stability, and that `Label.measure` agrees with the
-   folded text-width heuristic.
+   `breakpoint_cols`/`folded_text_width` helpers (private staged fold →
+   `pub const` breakpoints + `pub fn` runtime twins; the module was
+   retired with the Fluent cleanup). `tests/ui_m4_static.lm` built a
+   static screen whose column count was staged-derived and verified id
+   uniqueness, nested lookup, post-update stability, and that
+   `Label.measure` agreed with the folded text-width heuristic.
 5. **M5 Perf pass — ✅** Repaint elision: `enable_reactive()` now enables
    `tree.repaint_elision`; `update()` skips arrange+paint when `dirty == 0`
    and the viewport is unchanged, while `submit()` replays the retained
@@ -406,6 +414,74 @@ on the focused component — reuse, don't rewrite.
    heuristic.
 7. **M7 GPU paint** *(blocked on native lowering)* — UI quads through
    the d3 vertex-stream pipeline.
+
+### Convergence updates (post-M6)
+
+The §4 end-state is now partially real:
+
+- **`std.ui` facade** — `import std.ui as ui` is the single surface:
+  `Component`/`Placed`/`TextBound`/`Size`/`Rect`, all widgets,
+  containers, typed signals, and the tree driver. Mutable tree audit vars
+  (`dirty`, `repaint_elision`, counters) are intentionally not re-exported
+  — `pub import show` of a `pub var` captures a value snapshot, not a live
+  alias; read them via `std.ui.tree` directly.
+- **`std.app` integration** — `a.ui(root)` installs a `Component` tree;
+  `App.step`/`present` pump `std.events` once per frame, route the stream
+  through `tree.dispatch`, and run `tree.update`/`submit` inside the gg
+  pass with repaint elision. Games plug in via `Game.attach()` (module-fn
+  hooks) or the manual `a.pump()`/`a.begin_pass()`/`a.end_pass()` loop —
+  `std.game` no longer touches windowing or the GPU pass.
+- **Widget coverage** — the full legacy Fluent widget set is ported:
+  Label, Button, TextInput, Checkbox, Toggle, Slider, ProgressBar,
+  Link, Spacer, Badge, Alert/Toast, Stat, Indicator, Steps, Timeline,
+  Diff, Image, ColorPicker, Calendar, FileInput, Card, Accordion,
+  FormField, TreeNode, Tabs, Select/MultiSelect, Stepper, RangeSlider,
+  Filter, Table, and Chart (bar/line/pie + plot aliases)
+  (`tests/ui_more_widgets.lm`). Container children are typed
+  `[Component]`; constructor-facing child params take `any` because the
+  type checker does not coerce frame lists/optionals into trait
+  collections — widgets cast once at the boundary.
+- **Widget file layout** — `std.ui.widgets` is a directory module:
+  `std/ui/widgets/*.lm` each hold one widget, and `index.lm` re-exports
+  them through the unchanged `std.ui.widgets` / `std.ui` facade.
+- **Structural containers** — `std.ui.containers` (`std/ui/containers/`)
+  ports the remaining legacy container kinds as real `Component`s:
+  `stack` (all children share the full rect), `grid` (fixed-column
+  row-major layout), `mask` (child clipped via draw-list
+  `ClipPush`/`ClipPop`; `shape` is stored for API parity but clipping is
+  currently rectangular), `overlay` (single child at an absolute
+  offset), and `tooltip` (hover bubble). `row`/`column`/`scroll_view`
+  stay in `std.ui.container`; legacy `join` is just a horizontal
+  container (= `row`).
+- **Theming** — `std.ui.theme.palette()` snapshots
+  `std.ui.theme.global_theme` (ColorPalette + Spacing/Typography/Shape
+  tokens) into a flat `Palette` at widget `init` time; widget color
+  fields default from it and remain per-instance overridable. Derived
+  shades (`surface_hover`, `track`, `on_accent`, `selection`,
+  `text_disabled`, …) are lerped from the base palette. Recolor by
+  mutating `global_theme` before constructing widgets — there is no
+  live re-theme of retained instances yet.
+- **Hover propagation** — `MouseMove` bypasses the per-child bounds
+  gate in `Flow`/`Stack`/`Grid`/`ScrollView` and the single-child
+  containers so hover widgets see the pointer leave and clear state;
+  press/key events remain bounds-gated.
+- **Overlay channel** — `tree.push_overlay`/`remove_overlay` gives
+  transient popups (Select dropdowns) paint-on-top and first-chance
+  pointer dispatch past their laid-out siblings; Select expands its
+  arranged bounds while open so the menu region is hit-testable.
+- **`UIEvent` deleted** — the string-keyed `UIEvent` frame, its
+  constructors, and `dispatch_event` are gone from `std.ui.event`
+  (`EventKind`/`EventResult`/`fire_action` remain).
+- **Legacy Fluent removed** — the `Fluent` trait monolith
+  (`components.lm`), `builder.lm`, `layout.lm`, `forms`/`navigation`/
+  `charts`/`dialog`/`grid`/`window`/`application`/`theme`/`staged`,
+  the `ui_context` Fluent dispatch in `context.lm`, `HitZone` hit
+  lists in `draw_list.lm`, and the `std.app.ui()/set_ui()/run(root)`
+  entry points are all deleted. `context.lm` survives only as shared
+  plumbing (`ui_init`, viewport size, dirty flag, UTF-8 helpers);
+  `draw_list.lm` carries draw commands only — hit-testing lives in
+  `std.ui.tree`. All v1 tests were removed; the `ui_*` suite is the
+  coverage.
 
 ## 6. The pitch
 

@@ -14,7 +14,8 @@ enum BatchOp {
     Triangle,
     Text,
     ClipPush,
-    ClipPop
+    ClipPop,
+    Shadow
 }
 
 fn primitive_type_code(p: PrimitiveType): int {
@@ -162,13 +163,21 @@ frame DrawBatch {
         self.push_f(scale as float);
     }
 
-    pub fn add_clip_push(x: float, y: float, w: float, h: float): nil {
+    pub fn add_clip_push(x: float, y: float, w: float, h: float, shape: int = 0, radius: float = 0.0): nil {
         self.push_op(BatchOp.ClipPush);
         self.push_f(x); self.push_f(y); self.push_f(w); self.push_f(h);
+        self.push_f(shape as float); self.push_f(radius);
     }
 
     pub fn add_clip_pop(): nil {
         self.push_op(BatchOp.ClipPop);
+    }
+
+    pub fn add_shadow(x: float, y: float, w: float, h: float, r: float, g: float, b: float, a: float, radius: float, blur: float): nil {
+        self.push_op(BatchOp.Shadow);
+        self.push_f(x); self.push_f(y); self.push_f(w); self.push_f(h);
+        self.push_f(r); self.push_f(g); self.push_f(b); self.push_f(a);
+        self.push_f(radius); self.push_f(blur);
     }
 }
 
@@ -254,15 +263,31 @@ frame GraphicsContext {
                     di = di + 7;
                 },
                 BatchOp.ClipPush => {
-                    self._args4f[0] = b.data[di];
-                    self._args4f[1] = b.data[di + 1];
-                    self._args4f[2] = b.data[di + 2];
-                    self._args4f[3] = b.data[di + 3];
-                    rt.call(self.handle, rt.OP_PUSH_CLIP, self._args4f);
-                    di = di + 4;
+                    self._args10f[0] = b.data[di];
+                    self._args10f[1] = b.data[di + 1];
+                    self._args10f[2] = b.data[di + 2];
+                    self._args10f[3] = b.data[di + 3];
+                    self._args10f[4] = b.data[di + 4];
+                    self._args10f[5] = b.data[di + 5];
+                    rt.call(self.handle, rt.OP_PUSH_CLIP, self._args10f);
+                    di = di + 6;
                 },
                 BatchOp.ClipPop => {
                     rt.call(self.handle, rt.OP_POP_CLIP, self._args0);
+                },
+                BatchOp.Shadow => {
+                    self._args10f[0] = b.data[di];
+                    self._args10f[1] = b.data[di + 1];
+                    self._args10f[2] = b.data[di + 2];
+                    self._args10f[3] = b.data[di + 3];
+                    self._args10f[4] = b.data[di + 4];
+                    self._args10f[5] = b.data[di + 5];
+                    self._args10f[6] = b.data[di + 6];
+                    self._args10f[7] = b.data[di + 7];
+                    self._args10f[8] = b.data[di + 8];
+                    self._args10f[9] = b.data[di + 9];
+                    rt.call(self.handle, rt.OP_DRAW_SHADOW, self._args10f);
+                    di = di + 10;
                 }
             }
         }
@@ -351,17 +376,19 @@ pub fn detach_window(): nil {
     }
 }
 
-pub fn push_clip(x: float, y: float, w: float, h: float): nil {
+pub fn push_clip(x: float, y: float, w: float, h: float, shape: int = 0, radius: float = 0.0): nil {
     if (global_graphics_context.handle != -1) {
         if (global_graphics_context.batching) {
-            global_graphics_context.batch.add_clip_push(x, y, w, h);
+            global_graphics_context.batch.add_clip_push(x, y, w, h, shape, radius);
             return;
         }
-        global_graphics_context._args4f[0] = x;
-        global_graphics_context._args4f[1] = y;
-        global_graphics_context._args4f[2] = w;
-        global_graphics_context._args4f[3] = h;
-        rt.call(global_graphics_context.handle, rt.OP_PUSH_CLIP, global_graphics_context._args4f);
+        global_graphics_context._args10f[0] = x;
+        global_graphics_context._args10f[1] = y;
+        global_graphics_context._args10f[2] = w;
+        global_graphics_context._args10f[3] = h;
+        global_graphics_context._args10f[4] = shape as float;
+        global_graphics_context._args10f[5] = radius;
+        rt.call(global_graphics_context.handle, rt.OP_PUSH_CLIP, global_graphics_context._args10f);
     }
 }
 
@@ -540,38 +567,117 @@ pub fn draw_rect_border_primitive(x: float, y: float, w: float, h: float, rad: f
     }
 }
 
+// AOT scratch cells for draw_line_primitive: Fyra clobbers float locals and
+// params across calls, so the second triangle's inputs are stashed in module
+// cells (stable memory) across the first draw_triangle_primitive call.
+pub var _dl_sx1: float = 0.0;
+pub var _dl_sy1: float = 0.0;
+pub var _dl_sx2: float = 0.0;
+pub var _dl_sy2: float = 0.0;
+pub var _dl_sr: float = 0.0;
+pub var _dl_sg: float = 0.0;
+pub var _dl_sb: float = 0.0;
+pub var _dl_sa: float = 0.0;
+pub var _dl_sth: float = 0.0;
+
 pub fn draw_line_primitive(x1: float, y1: float, x2: float, y2: float, r: float, g: float, b: float, a: float, thickness: float = 1.5): nil {
     val dx = x2 - x1;
     val dy = y2 - y1;
-    val len_val = math.sqrt(dx * dx + dy * dy);
-    if (len_val > 0.001) {
-        val half_t = thickness * 0.5;
-        val nx = (-dy / len_val) * half_t;
-        val ny = (dx / len_val) * half_t;
-        draw_triangle_primitive(x1 + nx, y1 + ny, x1 - nx, y1 - ny, x2 + nx, y2 + ny, r, g, b, a);
-        draw_triangle_primitive(x1 - nx, y1 - ny, x2 - nx, y2 - ny, x2 + nx, y2 + ny, r, g, b, a);
+    val len2 = dx * dx + dy * dy;
+    if (len2 <= 0.000001) {
+        return;
     }
+    // Babylonian sqrt inlined — math.sqrt routes through Float.sqrt()'s
+    // contract/assert path, which is broken under AOT.
+    var sx = len2;
+    var sy = 1.0;
+    var step = 0;
+    while (step < 32) {
+        var next_x = (sx + sy) / 2.0;
+        if (next_x == sx) {
+            break;
+        }
+        sx = next_x;
+        sy = len2 / sx;
+        step = step + 1;
+    }
+    val len_val = sx;
+    val half_t = thickness * 0.5;
+    val nx = (-dy / len_val) * half_t;
+    val ny = (dx / len_val) * half_t;
+
+    // Stash inputs before the first call — locals/params do not survive it.
+    _dl_sx1 = x1; _dl_sy1 = y1; _dl_sx2 = x2; _dl_sy2 = y2;
+    _dl_sr = r; _dl_sg = g; _dl_sb = b; _dl_sa = a; _dl_sth = thickness;
+
+    draw_triangle_primitive(x1 + nx, y1 + ny, x1 - nx, y1 - ny, x2 + nx, y2 + ny, r, g, b, a);
+
+    // Reload and recompute the second triangle's inputs.
+    val dx2 = _dl_sx2 - _dl_sx1;
+    val dy2 = _dl_sy2 - _dl_sy1;
+    val len2b = dx2 * dx2 + dy2 * dy2;
+    var sxb = len2b;
+    var syb = 1.0;
+    var stepb = 0;
+    while (stepb < 32) {
+        var next_xb = (sxb + syb) / 2.0;
+        if (next_xb == sxb) {
+            break;
+        }
+        sxb = next_xb;
+        syb = len2b / sxb;
+        stepb = stepb + 1;
+    }
+    val len_b = sxb;
+    val half_tb = _dl_sth * 0.5;
+    val nxb = (-dy2 / len_b) * half_tb;
+    val nyb = (dx2 / len_b) * half_tb;
+    draw_triangle_primitive(_dl_sx1 - nxb, _dl_sy1 - nyb, _dl_sx2 - nxb, _dl_sy2 - nyb, _dl_sx2 + nxb, _dl_sy2 + nyb, _dl_sr, _dl_sg, _dl_sb, _dl_sa);
 }
 
-pub fn draw_shadow_primitive(x: float, y: float, w: float, h: float, r: float, g: float, b: float, a: float, off_x: float, off_y: float, blur: float, spread: float): nil {
-    if (global_graphics_context.handle != -1) {
-        val sx = x + off_x - spread;
-        val sy = y + off_y - spread;
-        val sw = w + spread * 2.0;
-        val sh = h + spread * 2.0;
+// AOT scratch cells for draw_shadow_primitive: Fyra clobbers float locals
+// across calls, so the layer geometry/colour is stashed in module cells
+// (stable memory) for the duration of the multi-rect expansion.
+pub var _sh_x: float = 0.0;
+pub var _sh_y: float = 0.0;
+pub var _sh_w: float = 0.0;
+pub var _sh_h: float = 0.0;
+pub var _sh_r: float = 0.0;
+pub var _sh_g: float = 0.0;
+pub var _sh_b: float = 0.0;
+pub var _sh_a: float = 0.0;
+pub var _sh_blur: float = 0.0;
+pub var _sh_ex: float = 0.0;
+pub var _sh_la: float = 0.0;
 
-        if (blur <= 0.0) {
-            draw_rect_primitive(sx, sy, sw, sh, r, g, b, a);
-        } else {
-            val steps = 3;
-            var i = steps;
-            while (i > 0) {
-                val expand = (i as float) * (blur / 3.0);
-                val layer_a = a * (0.2 + 0.25 * ((steps - i + 1) as float) / (steps as float));
-                draw_rect_primitive(sx - expand, sy - expand, sw + expand * 2.0, sh + expand * 2.0, r, g, b, layer_a);
-                i = i - 1;
-            }
+pub fn draw_shadow_primitive(x: float, y: float, w: float, h: float, r: float, g: float, b: float, a: float, off_x: float, off_y: float, blur: float, spread: float, radius: float = 6.0): nil {
+    if (global_graphics_context.handle != -1) {
+        // Shape rect = widget + offset + spread. The GPU/CPU shadow path
+        // expands the quad by `blur` itself and applies an SDF falloff.
+        _sh_x = x + off_x - spread;
+        _sh_y = y + off_y - spread;
+        _sh_w = w + spread * 2.0;
+        _sh_h = h + spread * 2.0;
+        _sh_r = r; _sh_g = g; _sh_b = b; _sh_a = a;
+        _sh_blur = blur;
+        _sh_ex = radius + spread;
+
+        if (global_graphics_context.batching) {
+            global_graphics_context.batch.add_shadow(_sh_x, _sh_y, _sh_w, _sh_h,
+                _sh_r, _sh_g, _sh_b, _sh_a, _sh_ex, _sh_blur);
+            return;
         }
+        global_graphics_context._args10f[0] = _sh_x;
+        global_graphics_context._args10f[1] = _sh_y;
+        global_graphics_context._args10f[2] = _sh_w;
+        global_graphics_context._args10f[3] = _sh_h;
+        global_graphics_context._args10f[4] = _sh_r;
+        global_graphics_context._args10f[5] = _sh_g;
+        global_graphics_context._args10f[6] = _sh_b;
+        global_graphics_context._args10f[7] = _sh_a;
+        global_graphics_context._args10f[8] = _sh_ex;
+        global_graphics_context._args10f[9] = _sh_blur;
+        rt.call(global_graphics_context.handle, rt.OP_DRAW_SHADOW, global_graphics_context._args10f);
     }
 }
 

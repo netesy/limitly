@@ -19,7 +19,7 @@ struct GfxCommand {
         Clear,          // begin pass: f = [r,g,b,a]
         DrawRect,       // f = [x,y,w,h,r,g,b,a,radius,border_w]
         DrawTri,        // f = [x1,y1,x2,y2,x3,y3,r,g,b,a]
-        PushClip,       // f = [x,y,w,h]
+        PushClip,       // f = [x,y,w,h,shape,radius] (shape/radius optional; 0=rect)
         PopClip,
         MakeBuffer,     // i = [id, is_index]; lists[0] = float data
         ApplyPipeline,  // i = [pip_id]
@@ -29,6 +29,7 @@ struct GfxCommand {
         MakeImage,      // i = [id]; w,h + pixels (RGBA8) - texture upload
         BlitFramebuffer,// w,h + pixels (RGBA8) - software rasterizer presentation
         DrawTextCmd,    // s = text, f = [x, y, r, g, b, a, scale]
+        DrawShadow,     // f = [x,y,w,h,r,g,b,a,radius,blur] — SDF falloff quad
         EndPass,
         Nop
     };

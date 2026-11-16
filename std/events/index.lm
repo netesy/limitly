@@ -2,7 +2,7 @@
 // Typed OS/window event pump and per-frame event queue.
 //
 // This is the SINGLE translation point from raw gg.poll_events() records into
-// typed Event values. Both std.app (Fluent ui_context dispatch) and std.game
+// typed Event values. Both std.app (component-tree dispatch) and std.game
 // (InputManager/IMGUI) consume the SAME per-frame event stream — neither
 // calls gg.poll_events() directly, so events are never stolen between
 // frameworks.

@@ -1,0 +1,79 @@
+// std/ui/widgets/image.lm
+// Widget — ported from legacy Fluent Image.
+// Placeholder-level parity with legacy: rounded surface + source label
+// centered. Real texture blit lands when the GPU/image path integrates.
+
+import std.ui.component as comp;
+import std.ui.component show Placed;
+import std.ui.types as ui_types;
+import std.ui.event as uievent;
+import std.ui.context as uictx;
+import std.ui.draw_list as dl;
+import std.ui.state as state;
+import std.ui.tree as tree;
+import std.events as events;
+import std.color as color;
+import std.ui.theme as uitheme;
+import std.text.controller as text_ctrl;
+import std.text.shaping as textshape;
+import std.ui.text_metrics as tm;
+
+frame Image {
+    embed Placed;
+    pub var source: str;
+    pub var texture_id: int;
+    pub var surface: color.Color;
+    pub var text2: color.Color;
+    pub var font_scale: float;
+
+    pub init(src: str = "") {
+        val pal = uitheme.palette();
+        self.source = src;
+        self.texture_id = 0;
+        self.surface = pal.surface;
+        self.text2 = pal.text_muted;
+        self.font_scale = 0.85;
+        self.id = comp.next_widget_id();
+    }
+
+    pub fn kind(): ui_types.WidgetKind { return ui_types.WidgetKind.Image; }
+    pub fn on_theme_changed(): nil {
+        val p = uitheme.palette();
+        self.surface = p.surface;
+        self.text2 = p.text_muted;
+        tree.request_repaint();
+    }
+    pub fn on_overlay_dismiss(): nil { }
+
+    pub fn wants_pointer_capture(): int { return 0; }
+
+    pub fn measure(min_w: float, max_w: float, min_h: float, max_h: float): comp.Size {
+        var w: float = 120.0;
+        var h: float = 90.0;
+        if (w < min_w) { w = min_w; }
+        if (w > max_w) { w = max_w; }
+        if (h < min_h) { h = min_h; }
+        if (h > max_h) { h = max_h; }
+        return comp.Size(w=w, h=h);
+    }
+
+    pub fn paint(): nil {
+        dl.dl_emit_rect_rounded(dl.paint_ctx.dl, self.rect.x, self.rect.y, self.rect.w, self.rect.h,
+            4.0, self.surface.r, self.surface.g, self.surface.b, self.surface.a);
+        var label = self.source;
+        if (len(label) == 0) { label = "image"; }
+        var tw: float = tm.text_width(textshape.prepare_display(label), self.font_scale);
+        dl.dl_emit_text(dl.paint_ctx.dl, textshape.prepare_display(label),
+            self.rect.x + (self.rect.w - tw) / 2.0,
+            self.rect.y + self.rect.h / 2.0 - tm.line_height(self.font_scale) / 2.0,
+            self.text2.r, self.text2.g, self.text2.b, 1.0, self.font_scale);
+    }
+
+    pub fn on_event(t: events.EventType, x: int, y: int, key: int): uievent.EventResult {
+        return uievent.EventResult.Ignored;
+    }
+}
+
+pub fn image(src: str = ""): Image {
+    return Image(src);
+}

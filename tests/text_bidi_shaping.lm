@@ -7,7 +7,7 @@
 import std.text.utf8 as utf8;
 import std.text.bidi as bidi;
 import std.text.shaping as shaping;
-import std.ui.component as v2;
+import std.ui.component as comp;
 import std.ui.tree as tree;
 import std.ui.draw_list as dl;
 
@@ -79,7 +79,7 @@ fn main() {
     assert(disp == expect_rev, "prepare_display shapes then reorders");
 
     // ── 7. Widget path: Label emits the display string ──
-    val lbl = v2.label(hebrew);
+    val lbl = comp.label(hebrew);
     tree.update(lbl, 300.0, 100.0);
     var saw_display: int = 0;
     var i: int = 0;

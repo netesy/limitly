@@ -1,0 +1,93 @@
+// std/ui/widgets/badge.lm
+// Widget — ported from legacy Fluent Badge.
+// Small rounded label chip. bg/fg are color fields; bg.a <= 0 falls back
+// to the accent color like the legacy emit path.
+
+import std.ui.component as comp;
+import std.ui.component show Placed, TextBound;
+import std.ui.types as ui_types;
+import std.ui.event as uievent;
+import std.ui.context as uictx;
+import std.ui.draw_list as dl;
+import std.ui.state as state;
+import std.ui.tree as tree;
+import std.events as events;
+import std.color as color;
+import std.ui.theme as uitheme;
+import std.text.controller as text_ctrl;
+import std.text.shaping as textshape;
+import std.ui.text_metrics as tm;
+
+frame Badge {
+    embed Placed;
+    embed TextBound;
+    pub var bg: color.Color;
+    pub var fg: color.Color;
+    pub var accent: color.Color;
+    pub var font_scale: float;
+
+    pub init(txt: str = "") {
+        val pal = uitheme.palette();
+        self.text = txt;
+        self.bg = pal.info;
+        self.fg = pal.on_accent;
+        self.accent = pal.accent;
+        self.font_scale = 0.85;
+        self.id = comp.next_widget_id();
+    }
+
+    pub fn kind(): ui_types.WidgetKind { return ui_types.WidgetKind.Badge; }
+    pub fn on_theme_changed(): nil {
+        val p = uitheme.palette();
+        self.bg = p.info;
+        self.fg = p.on_accent;
+        self.accent = p.accent;
+        tree.request_repaint();
+    }
+    pub fn on_overlay_dismiss(): nil { }
+
+    pub fn wants_pointer_capture(): int { return 0; }
+
+    pub fn measure(min_w: float, max_w: float, min_h: float, max_h: float): comp.Size {
+        var w: float = tm.text_width(textshape.prepare_display(self.string_val()), self.font_scale) + 16.0;
+        var h: float = tm.line_height(self.font_scale) + 6.0;
+        if (w < min_w) { w = min_w; }
+        if (w > max_w) { w = max_w; }
+        if (h < min_h) { h = min_h; }
+        if (h > max_h) { h = max_h; }
+        return comp.Size(w=w, h=h);
+    }
+
+    pub fn paint(): nil {
+        var bgr = self.bg.r + 0.0;
+        var bgg = self.bg.g + 0.0;
+        var bgb = self.bg.b + 0.0;
+        if (self.bg.a <= 0.0) {
+            bgr = self.accent.r;
+            bgg = self.accent.g;
+            bgb = self.accent.b;
+        }
+        var fgr = 1.0;
+        var fgg = 1.0;
+        var fgb = 1.0;
+        if (self.fg.a > 0.0) {
+            fgr = self.fg.r;
+            fgg = self.fg.g;
+            fgb = self.fg.b;
+        }
+        var rad: float = self.rect.h / 2.0;
+        dl.dl_emit_rect_rounded(dl.paint_ctx.dl, self.rect.x, self.rect.y, self.rect.w, self.rect.h,
+            rad, bgr, bgg, bgb, 1.0);
+        dl.dl_emit_text(dl.paint_ctx.dl, textshape.prepare_display(self.string_val()),
+            self.rect.x + 8.0, self.rect.y + (self.rect.h - tm.line_height(self.font_scale)) / 2.0,
+            fgr, fgg, fgb, 1.0, self.font_scale);
+    }
+
+    pub fn on_event(t: events.EventType, x: int, y: int, key: int): uievent.EventResult {
+        return uievent.EventResult.Ignored;
+    }
+}
+
+pub fn badge(txt: str): Badge {
+    return Badge(txt);
+}

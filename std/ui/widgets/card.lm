@@ -1,0 +1,165 @@
+// std/ui/widgets/card.lm
+// Widget — ported from legacy Fluent Card.
+// Titled surface card wrapping a single child Component. The child is
+// arranged inside the card body (below the header) and painted after the
+// chrome, so it receives events through the normal bounds walk.
+
+import std.ui.component as comp;
+import std.ui.component show Placed;
+import std.ui.types as ui_types;
+import std.ui.event as uievent;
+import std.ui.context as uictx;
+import std.ui.draw_list as dl;
+import std.ui.state as state;
+import std.ui.tree as tree;
+import std.events as events;
+import std.color as color;
+import std.ui.theme as uitheme;
+import std.graphics.shadow as shadow;
+import std.text.controller as text_ctrl;
+import std.text.shaping as textshape;
+import std.ui.text_metrics as tm;
+
+frame Card {
+    embed Placed;
+    pub var title: str;
+    pub var child: comp.Component?;
+    pub var surface: color.Color;
+    pub var border: color.Color;
+    pub var text: color.Color;
+    pub var font_scale: float;
+    pub var pad: float;
+    pub var elevation: int;
+    // Theme snapshot + resolved shadow — refreshed by on_theme_changed.
+    pub var _pal: uitheme.Palette?;
+    pub var _shadow: shadow.Shadow?;
+    pub var header_h: float;
+    // Scratch — AOT float-local clobbering across trait calls.
+    pub var _cw: float = 0.0;
+    pub var _ch: float = 0.0;
+
+    pub init(t: str = "", content: any = nil) {
+        val pal = uitheme.palette();
+        self.title = t;
+        self.child = nil;
+        if (content != nil) {
+            self.child = content as comp.Component;
+        }
+        self.surface = pal.surface;
+        self.border = pal.border;
+        self.text = pal.text_primary;
+        self.font_scale = 1.05;
+        self.pad = 12.0;
+        self.header_h = 34.0;
+        self.elevation = 1;
+        self._pal = pal;
+        self._shadow = uitheme.elevation_shadow(pal, self.elevation);
+        self.id = comp.next_widget_id();
+    }
+
+    pub fn set_elevation(e: int): nil {
+        self.elevation = e;
+        if (self._pal != nil) {
+            self._shadow = uitheme.elevation_shadow(self._pal as uitheme.Palette, e);
+        }
+    }
+
+    pub fn on_theme_changed(): nil {
+        self._pal = uitheme.palette();
+        val p = self._pal as uitheme.Palette;
+        self.surface = p.surface;
+        self.border = p.border;
+        self.text = p.text_primary;
+        self._shadow = uitheme.elevation_shadow(p, self.elevation);
+        tree.request_repaint();
+    }
+    pub fn on_overlay_dismiss(): nil { }
+
+    pub fn set_child(c: comp.Component): nil {
+        self.child = c;
+    }
+
+    pub fn kind(): ui_types.WidgetKind { return ui_types.WidgetKind.Card; }
+
+    pub fn child_count(): int {
+        if (self.child == nil) { return 0; }
+        return 1;
+    }
+
+    pub fn child_at(i: int): any {
+        if (i == 0 and self.child != nil) {
+            return self.child;
+        }
+        return nil;
+    }
+
+    pub fn wants_pointer_capture(): int { return 0; }
+
+    pub fn measure(min_w: float, max_w: float, min_h: float, max_h: float): comp.Size {
+        var body_h: float = 0.0;
+        var body_w: float = 0.0;
+        if (self.child != nil) {
+            val s = (self.child as comp.Component).measure(0.0, comp.MEASURE_LOOSE, 0.0, comp.MEASURE_LOOSE);
+            body_h = s.h;
+            body_w = s.w;
+        }
+        var w: float = body_w + self.pad * 2.0;
+        if (w < 120.0) { w = 120.0; }
+        var h: float = self.header_h + body_h + self.pad * 2.0 + 6.0;
+        if (h < min_h) { h = min_h; }
+        if (w < min_w) { w = min_w; }
+        if (w > max_w) { w = max_w; }
+        if (h > max_h) { h = max_h; }
+        return comp.Size(w=w, h=h);
+    }
+
+    pub fn arrange(x: float, y: float, w: float, h: float): nil {
+        self.rect.x = x;
+        self.rect.y = y;
+        self.rect.w = w;
+        self.rect.h = h;
+        if (self.child != nil) {
+            (self.child as comp.Component).arrange(
+                x + self.pad, y + self.header_h + 6.0,
+                w - self.pad * 2.0, h - self.header_h - self.pad * 2.0 - 6.0);
+        }
+    }
+
+    pub fn paint(): nil {
+        if (self._shadow != nil) {
+            val s = self._shadow as shadow.Shadow;
+            dl.dl_emit_shadow(dl.paint_ctx.dl, self.rect.x, self.rect.y, self.rect.w, self.rect.h,
+                s.r, s.g, s.b, s.a, s.offset_x, s.offset_y, s.blur_radius, s.spread_radius);
+        }
+        dl.dl_emit_rect_rounded(dl.paint_ctx.dl, self.rect.x, self.rect.y, self.rect.w, self.rect.h,
+            8.0, self.surface.r, self.surface.g, self.surface.b, self.surface.a);
+        dl.dl_emit_rect_border(dl.paint_ctx.dl, self.rect.x, self.rect.y, self.rect.w, self.rect.h,
+            8.0, 1.0, self.border.r, self.border.g, self.border.b, 1.0);
+        dl.dl_emit_text(dl.paint_ctx.dl, textshape.prepare_display(self.title),
+            self.rect.x + self.pad, self.rect.y + (self.header_h - tm.line_height(self.font_scale)) / 2.0,
+            self.text.r, self.text.g, self.text.b, 1.0, self.font_scale);
+        if (self.child != nil) {
+            (self.child as comp.Component).paint();
+        }
+    }
+
+    pub fn on_event(t: events.EventType, x: int, y: int, key: int): uievent.EventResult {
+        if (self.child != nil) {
+            var inside: bool = true;
+            if (t != events.EventType.MouseMove and t != events.EventType.MouseUp and t != events.EventType.MouseWheel) {
+                inside = (self.child as comp.Component).bounds().contains(x as float, y as float);
+            }
+            if (inside) {
+                val res = (self.child as comp.Component).on_event(t, x, y, key);
+                if (res == uievent.EventResult.Handled) {
+                    return uievent.EventResult.Handled;
+                }
+            }
+        }
+        return uievent.EventResult.Ignored;
+    }
+}
+
+pub fn card(t: str, content: any = nil): Card {
+    return Card(t, content);
+}

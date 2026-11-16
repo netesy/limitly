@@ -1,0 +1,92 @@
+// std/ui/widgets/indicator.lm
+// Widget — ported from legacy Fluent Indicator.
+// Status dot + optional label. status: "online" | "busy" | anything else
+// (offline/unknown → gray).
+
+import std.ui.component as comp;
+import std.ui.component show Placed, TextBound;
+import std.ui.types as ui_types;
+import std.ui.event as uievent;
+import std.ui.context as uictx;
+import std.ui.draw_list as dl;
+import std.ui.state as state;
+import std.ui.tree as tree;
+import std.events as events;
+import std.color as color;
+import std.ui.theme as uitheme;
+import std.text.controller as text_ctrl;
+import std.text.shaping as textshape;
+import std.ui.text_metrics as tm;
+
+frame Indicator {
+    embed Placed;
+    embed TextBound;
+    pub var dot: color.Color;
+    pub var text_color: color.Color;
+    pub var font_scale: float;
+    pub var status_kind: str;
+
+    pub init(status: str = "online", lbl: str = "") {
+        val pal = uitheme.palette();
+        self.text = lbl;
+        self.status_kind = status;
+        if (status == "online") {
+            self.dot = pal.success;
+        } elif (status == "busy") {
+            self.dot = pal.warning;
+        } else {
+            self.dot = pal.text_disabled;
+        }
+        self.text_color = pal.text_primary;
+        self.font_scale = 0.9;
+        self.id = comp.next_widget_id();
+    }
+
+    pub fn kind(): ui_types.WidgetKind { return ui_types.WidgetKind.Indicator; }
+    pub fn on_theme_changed(): nil {
+        val p = uitheme.palette();
+        if (self.status_kind == "online") {
+            self.dot = p.success;
+        } elif (self.status_kind == "busy") {
+            self.dot = p.warning;
+        } else {
+            self.dot = p.text_disabled;
+        }
+        self.text_color = p.text_primary;
+        tree.request_repaint();
+    }
+    pub fn on_overlay_dismiss(): nil { }
+
+    pub fn wants_pointer_capture(): int { return 0; }
+
+    pub fn measure(min_w: float, max_w: float, min_h: float, max_h: float): comp.Size {
+        var w: float = 10.0;
+        if (len(self.string_val()) > 0) {
+            w = 16.0 + tm.text_width(textshape.prepare_display(self.string_val()), self.font_scale);
+        }
+        var h: float = 18.0;
+        if (w < min_w) { w = min_w; }
+        if (w > max_w) { w = max_w; }
+        if (h < min_h) { h = min_h; }
+        if (h > max_h) { h = max_h; }
+        return comp.Size(w=w, h=h);
+    }
+
+    pub fn paint(): nil {
+        dl.dl_emit_rect_rounded(dl.paint_ctx.dl, self.rect.x, self.rect.y + 4.0, 10.0, 10.0,
+            5.0, self.dot.r, self.dot.g, self.dot.b, 1.0);
+        if (len(self.string_val()) > 0) {
+            dl.dl_emit_text(dl.paint_ctx.dl, textshape.prepare_display(self.string_val()),
+                self.rect.x + 16.0, self.rect.y + 2.0,
+                self.text_color.r, self.text_color.g, self.text_color.b, 1.0, self.font_scale);
+        }
+    }
+
+    pub fn on_event(t: events.EventType, x: int, y: int, key: int): uievent.EventResult {
+        return uievent.EventResult.Ignored;
+    }
+}
+
+pub fn indicator(status: str = "online", lbl: str = ""): Indicator {
+    return Indicator(status, lbl);
+}

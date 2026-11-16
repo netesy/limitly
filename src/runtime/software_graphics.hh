@@ -522,6 +522,80 @@ public:
                 }
                 return value_true;
             }
+            case ResourceOperation::DRAW_SHADOW: {
+                // f = [x,y,w,h,r,g,b,a,radius,blur] — same SDF falloff as the
+                // GPU shadow shader, rasterized per-pixel for the CPU oracle.
+                double x = 0.0, y = 0.0, w = 0.0, h = 0.0;
+                double r = 1.0, g = 1.0, b = 1.0, a = 1.0;
+                double rad = 6.0, blur = 8.0;
+                if (!args.empty()) {
+                    if (auto* list = reinterpret_cast<LmList*>(check_header_type(args[0], list_type))) {
+                        size_t n = lm_list_len(list);
+                        if (n > 0) x = register_value_to_double(lm_list_get(list, 0));
+                        if (n > 1) y = register_value_to_double(lm_list_get(list, 1));
+                        if (n > 2) w = register_value_to_double(lm_list_get(list, 2));
+                        if (n > 3) h = register_value_to_double(lm_list_get(list, 3));
+                        if (n > 4) r = register_value_to_double(lm_list_get(list, 4));
+                        if (n > 5) g = register_value_to_double(lm_list_get(list, 5));
+                        if (n > 6) b = register_value_to_double(lm_list_get(list, 6));
+                        if (n > 7) a = register_value_to_double(lm_list_get(list, 7));
+                        if (n > 8) rad = register_value_to_double(lm_list_get(list, 8));
+                        if (n > 9) blur = register_value_to_double(lm_list_get(list, 9));
+                    } else {
+                        x = register_value_to_double(args[0]);
+                        if (args.size() > 1) y = register_value_to_double(args[1]);
+                        if (args.size() > 2) w = register_value_to_double(args[2]);
+                        if (args.size() > 3) h = register_value_to_double(args[3]);
+                        if (args.size() > 4) r = register_value_to_double(args[4]);
+                        if (args.size() > 5) g = register_value_to_double(args[5]);
+                        if (args.size() > 6) b = register_value_to_double(args[6]);
+                        if (args.size() > 7) a = register_value_to_double(args[7]);
+                        if (args.size() > 8) rad = register_value_to_double(args[8]);
+                        if (args.size() > 9) blur = register_value_to_double(args[9]);
+                    }
+                }
+                if (width_ <= 0 || height_ <= 0 || pixels_.empty()) return value_true;
+                if (w <= 0.0 || h <= 0.0 || a <= 0.0) return value_true;
+                ClipRect clip = get_current_clip();
+                int x0 = std::clamp(static_cast<int>(std::floor(x - blur)), std::max(0, clip.x0), std::min(width_, clip.x1));
+                int y0 = std::clamp(static_cast<int>(std::floor(y - blur)), std::max(0, clip.y0), std::min(height_, clip.y1));
+                int x1 = std::clamp(static_cast<int>(std::ceil(x + w + blur)), std::max(0, clip.x0), std::min(width_, clip.x1));
+                int y1 = std::clamp(static_cast<int>(std::ceil(y + h + blur)), std::max(0, clip.y0), std::min(height_, clip.y1));
+                if (x1 <= x0 || y1 <= y0) return value_true;
+                uint8_t ru = static_cast<uint8_t>(std::clamp(r * 255.0, 0.0, 255.0));
+                uint8_t gu = static_cast<uint8_t>(std::clamp(g * 255.0, 0.0, 255.0));
+                uint8_t bu = static_cast<uint8_t>(std::clamp(b * 255.0, 0.0, 255.0));
+                double hw = w * 0.5, hh = h * 0.5;
+                double ccx = x + hw, ccy = y + hh;
+                double rr = std::min(rad, std::min(hw, hh));
+                bool hard = blur <= 0.05;
+                for (int py = y0; py < y1; ++py) {
+                    for (int px = x0; px < x1; ++px) {
+                        double qx = std::fabs(px + 0.5 - ccx) - hw + rr;
+                        double qy = std::fabs(py + 0.5 - ccy) - hh + rr;
+                        double ox = std::max(qx, 0.0), oy = std::max(qy, 0.0);
+                        double dd = std::sqrt(ox * ox + oy * oy) + std::min(std::max(qx, qy), 0.0) - rr;
+                        double cov;
+                        if (hard) {
+                            cov = (dd <= 0.0) ? 1.0 : std::clamp(0.5 - dd, 0.0, 1.0);
+                        } else {
+                            double t = std::max(dd, 0.0) / blur;
+                            cov = std::exp(-t * t * 2.5);
+                            if (dd < 0.0) cov = 1.0;
+                            cov = std::min(cov, 1.0);
+                        }
+                        double ea = a * cov;
+                        if (ea <= 0.0) continue;
+                        size_t idx = static_cast<size_t>(py * width_ + px) * 4;
+                        double inv = 1.0 - ea;
+                        pixels_[idx]     = static_cast<uint8_t>(ru * ea + pixels_[idx] * inv);
+                        pixels_[idx + 1] = static_cast<uint8_t>(gu * ea + pixels_[idx + 1] * inv);
+                        pixels_[idx + 2] = static_cast<uint8_t>(bu * ea + pixels_[idx + 2] * inv);
+                        pixels_[idx + 3] = std::max(pixels_[idx + 3], static_cast<uint8_t>(ea * 255.0));
+                    }
+                }
+                return value_true;
+            }
             case ResourceOperation::DRAW_RECT: {
                 double x = 0.0, y = 0.0, w = 0.0, h = 0.0;
                 double r = 1.0, g = 1.0, b = 1.0, a = 1.0;
@@ -1286,6 +1360,14 @@ private:
                 ::sokol_gfx_runtime().submit(c);
                 return value_true;
             }
+            case ResourceOperation::DRAW_SHADOW: {
+                if (!pass_active_) return value_false;
+                auto f = flatten(args);
+                if (f.size() < 10) return value_true;
+                GfxCommand c; c.type = GfxCommand::Type::DrawShadow; c.f = f;
+                ::sokol_gfx_runtime().submit(c);
+                return value_true;
+            }
             case ResourceOperation::DRAW_TRIANGLE: {
                 if (!pass_active_) return value_false;
                 auto f = flatten(args);
@@ -1331,8 +1413,37 @@ private:
                 ::sokol_gfx_runtime().submit(c);
                 return value_true;
             }
-            case ResourceOperation::MEASURE_TEXT:
-            case ResourceOperation::GET_FONT_METRICS:
+            case ResourceOperation::MEASURE_TEXT: {
+                std::string text;
+                int scale = 1;
+                if (!args.empty()) {
+                    if (auto* list = list_at(args[0])) {
+                        if (lm_list_len(list) > 0) {
+                            const char* s = register_value_to_cstr(lm_list_get(list, 0));
+                            if (s) text = s;
+                        }
+                        if (lm_list_len(list) > 1) scale = (int)register_value_to_i64(lm_list_get(list, 1));
+                    } else {
+                        const char* s = register_value_to_cstr(args[0]);
+                        if (s) text = s;
+                        if (args.size() > 1) scale = (int)register_value_to_i64(args[1]);
+                    }
+                }
+                if (text.empty() || !gfx_text_metrics_ready()) return value_nil;
+                return Access::real(gfx_measure_text(text.c_str(), scale));
+            }
+            case ResourceOperation::GET_FONT_METRICS: {
+                int scale = 1;
+                if (!args.empty()) {
+                    if (auto* list = list_at(args[0])) {
+                        if (lm_list_len(list) > 0) scale = (int)register_value_to_i64(lm_list_get(list, 0));
+                    } else {
+                        scale = (int)register_value_to_i64(args[0]);
+                    }
+                }
+                if (!gfx_text_metrics_ready()) return value_nil;
+                return Access::real(gfx_line_height(scale));
+            }
             case ResourceOperation::READ:
                 return value_nil; // gg falls back to built-in estimates
             case ResourceOperation::POLL: {

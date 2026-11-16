@@ -1,0 +1,199 @@
+// std/ui/widgets/tree_node.lm
+// Widget — ported from legacy Fluent TreeNode.
+// Labeled row that expands/collapses a list of child Components on click.
+// Children may themselves be TreeNodes (recursive trees). Open state is a
+// plain int field plus an optional BoolSignal.
+
+import std.ui.component as comp;
+import std.ui.component show Placed;
+import std.ui.types as ui_types;
+import std.ui.event as uievent;
+import std.ui.context as uictx;
+import std.ui.draw_list as dl;
+import std.ui.state as state;
+import std.ui.tree as tree;
+import std.events as events;
+import std.color as color;
+import std.ui.theme as uitheme;
+import std.text.controller as text_ctrl;
+import std.text.shaping as textshape;
+import std.ui.text_metrics as tm;
+
+frame TreeNode {
+    embed Placed;
+    pub var label: str;
+    pub var children: [comp.Component];
+    pub var is_open: int;
+    pub var open_sig: state.BoolSignal?;
+    pub var text: color.Color;
+    pub var text2: color.Color;
+    pub var accent: color.Color;
+    pub var font_scale: float;
+    pub var row_h: float;
+    pub var indent: float;
+    // Scratch — AOT float-local clobbering across trait calls.
+    pub var _cur: float = 0.0;
+    pub var _cw: float = 0.0;
+
+    pub init(lbl: str = "", default_open: bool = false) {
+        val pal = uitheme.palette();
+        self.label = lbl;
+        self.children = [];
+        if (default_open) {
+            self.is_open = 1;
+        } else {
+            self.is_open = 0;
+        }
+        self.open_sig = nil;
+        self.text = pal.text_primary;
+        self.text2 = pal.text_muted;
+        self.accent = pal.accent;
+        self.font_scale = 1.0;
+        self.row_h = 24.0;
+        self.indent = 18.0;
+        self.id = comp.next_widget_id();
+    }
+
+    pub fn add(c: comp.Component): nil {
+        self.children.append(c);
+    }
+
+    pub fn bind_open(sig: state.BoolSignal): nil {
+        self.open_sig = sig;
+        if (sig.get()) {
+            self.is_open = 1;
+        } else {
+            self.is_open = 0;
+        }
+    }
+
+    pub fn kind(): ui_types.WidgetKind { return ui_types.WidgetKind.TreeNode; }
+    pub fn on_theme_changed(): nil {
+        val p = uitheme.palette();
+        self.text = p.text_primary;
+        self.text2 = p.text_muted;
+        self.accent = p.accent;
+        tree.request_repaint();
+    }
+    pub fn on_overlay_dismiss(): nil { }
+
+    pub fn child_count(): int {
+        if (self.is_open == 0) { return 0; }
+        return len(self.children);
+    }
+
+    pub fn child_at(i: int): any {
+        if (i < 0 or i >= len(self.children)) {
+            return nil;
+        }
+        return self.children[i];
+    }
+
+    fn open_now(): int {
+        if (self.open_sig != nil) {
+            if ((self.open_sig as state.BoolSignal).get()) {
+                return 1;
+            }
+            return 0;
+        }
+        return self.is_open;
+    }
+
+    pub fn wants_pointer_capture(): int { return 0; }
+
+    pub fn measure(min_w: float, max_w: float, min_h: float, max_h: float): comp.Size {
+        self._cur = self.row_h;
+        self._cw = tm.text_width(textshape.prepare_display(self.label), self.font_scale) + 24.0;
+        if (self.open_now() != 0) {
+            var i = 0;
+            while (i < len(self.children)) {
+                val s = self.children[i].measure(0.0, comp.MEASURE_LOOSE, 0.0, comp.MEASURE_LOOSE);
+                self._cur = self._cur + s.h;
+                if (s.w + self.indent > self._cw) { self._cw = s.w + self.indent; }
+                i = i + 1;
+            }
+        }
+        var w: float = self._cw + 0.0;
+        var h: float = self._cur + 0.0;
+        if (w < min_w) { w = min_w; }
+        if (w > max_w) { w = max_w; }
+        if (h < min_h) { h = min_h; }
+        if (h > max_h) { h = max_h; }
+        return comp.Size(w=w, h=h);
+    }
+
+    pub fn arrange(x: float, y: float, w: float, h: float): nil {
+        self.rect.x = x;
+        self.rect.y = y;
+        self.rect.w = w;
+        self.rect.h = h;
+        self._cur = self.row_h;
+        if (self.open_now() != 0) {
+            var i = 0;
+            while (i < len(self.children)) {
+                val c = self.children[i];
+                val s = c.measure(0.0, w - self.indent, 0.0, comp.MEASURE_LOOSE);
+                c.arrange(x + self.indent, y + self._cur, w - self.indent, s.h);
+                self._cur = self._cur + s.h;
+                i = i + 1;
+            }
+        }
+    }
+
+    pub fn paint(): nil {
+        // Disclosure marker + label on the header row.
+        var marker = ">";
+        if (self.open_now() != 0) { marker = "v"; }
+        if (len(self.children) == 0) { marker = " "; }
+        dl.dl_emit_text(dl.paint_ctx.dl, marker,
+            self.rect.x, self.rect.y + (self.row_h - tm.line_height(self.font_scale)) / 2.0,
+            self.text2.r, self.text2.g, self.text2.b, 1.0, self.font_scale);
+        dl.dl_emit_text(dl.paint_ctx.dl, textshape.prepare_display(self.label),
+            self.rect.x + 16.0, self.rect.y + (self.row_h - tm.line_height(self.font_scale)) / 2.0,
+            self.text.r, self.text.g, self.text.b, 1.0, self.font_scale);
+        if (self.open_now() != 0) {
+            var i = 0;
+            while (i < len(self.children)) {
+                self.children[i].paint();
+                i = i + 1;
+            }
+        }
+    }
+
+    pub fn on_event(t: events.EventType, x: int, y: int, key: int): uievent.EventResult {
+        var row: comp.Rect = comp.Rect(x=self.rect.x, y=self.rect.y, w=self.rect.w, h=self.row_h);
+        if (t == events.EventType.MouseUp and key == 0 and row.contains(x as float, y as float)) {
+            if (len(self.children) > 0) {
+                if (self.open_sig != nil) {
+                    (self.open_sig as state.BoolSignal).set(self.open_now() == 0);
+                } else {
+                    self.is_open = 1 - self.is_open;
+                }
+                tree.request_repaint();
+                return uievent.EventResult.Handled;
+            }
+        }
+        if (self.open_now() != 0) {
+            var i = len(self.children) - 1;
+            while (i >= 0) {
+                val c = self.children[i];
+                var inside: bool = true;
+                if (t != events.EventType.MouseMove and t != events.EventType.MouseUp and t != events.EventType.MouseWheel) {
+                    inside = c.bounds().contains(x as float, y as float);
+                }
+                if (inside) {
+                    val res = c.on_event(t, x, y, key);
+                    if (res == uievent.EventResult.Handled) {
+                        return uievent.EventResult.Handled;
+                    }
+                }
+                i = i - 1;
+            }
+        }
+        return uievent.EventResult.Ignored;
+    }
+}
+
+pub fn tree_node(lbl: str = "", default_open: bool = false): TreeNode {
+    return TreeNode(lbl, default_open);
+}

@@ -1,0 +1,118 @@
+// std/ui/widgets/stepper.lm
+// Widget — ported from legacy Fluent Stepper.
+// − / value / + integer stepper. Value lives in an IntSignal (bind_value);
+// clicks on the left/right thirds decrement/increment within [min,max].
+
+import std.ui.component as comp;
+import std.ui.component show Placed;
+import std.ui.types as ui_types;
+import std.ui.event as uievent;
+import std.ui.context as uictx;
+import std.ui.draw_list as dl;
+import std.ui.state as state;
+import std.ui.tree as tree;
+import std.events as events;
+import std.color as color;
+import std.ui.theme as uitheme;
+import std.text.controller as text_ctrl;
+import std.text.shaping as textshape;
+import std.ui.text_metrics as tm;
+
+frame Stepper {
+    embed Placed;
+    pub var value_sig: state.IntSignal;
+    pub var step_size: int;
+    pub var min_int: int;
+    pub var max_int: int;
+    pub var surface: color.Color;
+    pub var border: color.Color;
+    pub var text: color.Color;
+    pub var font_scale: float;
+    pub var btn_w: float;
+
+    pub init(v: int = 0, step: int = 1, min_v: int = 0, max_v: int = 100) {
+        val pal = uitheme.palette();
+        self.value_sig = state.signal_int(v);
+        self.step_size = step;
+        self.min_int = min_v;
+        self.max_int = max_v;
+        self.surface = pal.surface;
+        self.border = pal.border;
+        self.text = pal.text_primary;
+        self.font_scale = 1.0;
+        self.btn_w = 36.0;
+        self.id = comp.next_widget_id();
+    }
+
+    pub fn bind_value(sig: state.IntSignal): nil {
+        self.value_sig = sig;
+    }
+
+    pub fn kind(): ui_types.WidgetKind { return ui_types.WidgetKind.Stepper; }
+    pub fn on_theme_changed(): nil {
+        val p = uitheme.palette();
+        self.surface = p.surface;
+        self.border = p.border;
+        self.text = p.text_primary;
+        tree.request_repaint();
+    }
+    pub fn on_overlay_dismiss(): nil { }
+
+    fn clamp(v: int): int {
+        if (v < self.min_int) { return self.min_int; }
+        if (v > self.max_int) { return self.max_int; }
+        return v;
+    }
+
+    pub fn wants_pointer_capture(): int { return 0; }
+
+    pub fn measure(min_w: float, max_w: float, min_h: float, max_h: float): comp.Size {
+        var w: float = self.btn_w * 2.0 + 60.0;
+        var h: float = 30.0;
+        if (w < min_w) { w = min_w; }
+        if (w > max_w) { w = max_w; }
+        if (h < min_h) { h = min_h; }
+        if (h > max_h) { h = max_h; }
+        return comp.Size(w=w, h=h);
+    }
+
+    pub fn paint(): nil {
+        dl.dl_emit_rect_rounded(dl.paint_ctx.dl, self.rect.x, self.rect.y, self.rect.w, self.rect.h,
+            4.0, self.surface.r, self.surface.g, self.surface.b, self.surface.a);
+        dl.dl_emit_rect_border(dl.paint_ctx.dl, self.rect.x, self.rect.y, self.rect.w, self.rect.h,
+            4.0, 1.0, self.border.r, self.border.g, self.border.b, self.border.a);
+        // − button zone (left), + button zone (right), value centered.
+        dl.dl_emit_text(dl.paint_ctx.dl, "-",
+            self.rect.x + self.btn_w / 2.0 - tm.text_width("-", self.font_scale) / 2.0,
+            self.rect.y + (self.rect.h - tm.line_height(self.font_scale)) / 2.0,
+            self.text.r, self.text.g, self.text.b, 1.0, self.font_scale);
+        dl.dl_emit_text(dl.paint_ctx.dl, "{self.value_sig.get()}",
+            self.rect.x + self.rect.w / 2.0 - tm.text_width("{self.value_sig.get()}", self.font_scale) / 2.0,
+            self.rect.y + (self.rect.h - tm.line_height(self.font_scale)) / 2.0,
+            self.text.r, self.text.g, self.text.b, 1.0, self.font_scale);
+        dl.dl_emit_text(dl.paint_ctx.dl, "+",
+            self.rect.x + self.rect.w - self.btn_w + self.btn_w / 2.0 - tm.text_width("+", self.font_scale) / 2.0,
+            self.rect.y + (self.rect.h - tm.line_height(self.font_scale)) / 2.0,
+            self.text.r, self.text.g, self.text.b, 1.0, self.font_scale);
+    }
+
+    pub fn on_event(t: events.EventType, x: int, y: int, key: int): uievent.EventResult {
+        var inside: bool = self.rect.contains(x as float, y as float);
+        if (t == events.EventType.MouseUp and inside and key == 0) {
+            var fx = x as float;
+            if (fx < self.rect.x + self.btn_w) {
+                self.value_sig.set(self.clamp(self.value_sig.get() - self.step_size));
+                return uievent.EventResult.Handled;
+            }
+            if (fx > self.rect.x + self.rect.w - self.btn_w) {
+                self.value_sig.set(self.clamp(self.value_sig.get() + self.step_size));
+                return uievent.EventResult.Handled;
+            }
+        }
+        return uievent.EventResult.Ignored;
+    }
+}
+
+pub fn stepper(v: int = 0, step: int = 1, min_v: int = 0, max_v: int = 100): Stepper {
+    return Stepper(v, step, min_v, max_v);
+}

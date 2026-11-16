@@ -1,0 +1,455 @@
+// std/ui/widgets/color_picker.lm
+// Widget — HSV color picker. Closed: swatch + label. Open: popup panel
+// (overlay) with an SV square, hue bar, and hex readout; click/drag inside
+// updates `picked` live and fires the optional callback on release.
+
+import std.ui.component as comp;
+import std.ui.component show Placed;
+import std.ui.types as ui_types;
+import std.ui.event as uievent;
+import std.ui.context as uictx;
+import std.ui.draw_list as dl;
+import std.ui.state as state;
+import std.ui.tree as tree;
+import std.events as events;
+import std.color as color;
+import std.string.basic as strbasic;
+import std.text.shaping as textshape;
+import std.ui.text_metrics as tm;
+import std.ui.theme as uitheme;
+import std.ui.motion as motion;
+import std.graphics.shadow as shadow;
+
+const HEX_DIGITS: str = "0123456789ABCDEF";
+
+fn hsv_to_rgb(h: float, s: float, v: float): color.Color {
+    // h in [0,360), s/v in [0,1].
+    var hh = h;
+    while (hh >= 360.0) { hh = hh - 360.0; }
+    while (hh < 0.0) { hh = hh + 360.0; }
+    var c = v * s;
+    var sector = (hh / 60.0) as int;
+    var f = hh / 60.0 - (sector as float);
+    // x = c * (1 - |2f - 1|)
+    var af = 2.0 * f - 1.0;
+    if (af < 0.0) { af = 0.0 - af; }
+    var xx = c * (1.0 - af);
+    var m = v - c;
+    var r = 0.0;
+    var g = 0.0;
+    var b = 0.0;
+    if (sector == 0) { r = c; g = xx; b = 0.0; }
+    elif (sector == 1) { r = xx; g = c; b = 0.0; }
+    elif (sector == 2) { r = 0.0; g = c; b = xx; }
+    elif (sector == 3) { r = 0.0; g = xx; b = c; }
+    elif (sector == 4) { r = xx; g = 0.0; b = c; }
+    else { r = c; g = 0.0; b = xx; }
+    return color.Color(r=r + m, g=g + m, b=b + m, a=1.0);
+}
+
+fn rgb_to_hsv(col: color.Color): (float, float, float) {
+    var r = col.r;
+    var g = col.g;
+    var b = col.b;
+    var mx: float = r;
+    if (g > mx) { mx = g; }
+    if (b > mx) { mx = b; }
+    var mn: float = r;
+    if (g < mn) { mn = g; }
+    if (b < mn) { mn = b; }
+    var d = mx - mn;
+    var h = 0.0;
+    if (d > 0.0001) {
+        if (mx == r) {
+            h = 60.0 * (((g - b) / d) % 6.0);
+        } elif (mx == g) {
+            h = 60.0 * ((b - r) / d + 2.0);
+        } else {
+            h = 60.0 * ((r - g) / d + 4.0);
+        }
+    }
+    if (h < 0.0) { h = h + 360.0; }
+    var s = 0.0;
+    if (mx > 0.0001) { s = d / mx; }
+    return (h, s, mx);
+}
+
+fn hex2(v: int): str {
+    var n = v;
+    if (n < 0) { n = 0; }
+    if (n > 255) { n = 255; }
+    var hi = n / 16;
+    var lo = n % 16;
+    return strbasic.substring(HEX_DIGITS, hi, hi + 1) + strbasic.substring(HEX_DIGITS, lo, lo + 1);
+}
+
+frame ColorPicker {
+    embed Placed;
+    pub var label: str;
+    pub var picked: color.Color;
+    pub var border: color.Color;
+    pub var text: color.Color;
+    pub var click: (fn(): nil)?;
+    pub var font_scale: float;
+    pub var hovered: int;
+    pub var is_open: int;
+    pub var h: float;
+    pub var s: float;
+    pub var v: float;
+    // 0 = none, 1 = SV square, 2 = hue bar
+    pub var _drag: int;
+    // Set when the popup was opened by this press — the matching MouseUp
+    // must not immediately close it.
+    pub var _suppress_up: int;
+    // Popup geometry cache (paint + events share it).
+    pub var _px: float = 0.0;
+    pub var _py: float = 0.0;
+    pub var _pw: float = 0.0;
+    pub var _sv_h: float = 0.0;
+    pub var _bar_y: float = 0.0;
+    pub var _bar_h: float = 0.0;
+    pub var _panel_h: float = 0.0;
+    pub var _custom_picked: int;
+    pub var panel_surface: color.Color;
+    // Popup elevation shadow — refreshed by theme changes (same as Select).
+    pub var _shadow: shadow.Shadow?;
+
+    pub init(lbl: str = "", c: color.Color? = nil, on_change: (fn(): nil)? = nil) {
+        val pal = uitheme.palette();
+        self.label = lbl;
+        self._custom_picked = 0;
+        if (c == nil) {
+            self.picked = pal.accent;
+        } else {
+            self._custom_picked = 1;
+            self.picked = c as color.Color;
+        }
+        val hsv = rgb_to_hsv(self.picked);
+        self.h = hsv.0;
+        self.s = hsv.1;
+        self.v = hsv.2;
+        self.border = pal.border;
+        self.text = pal.text_primary;
+        self.panel_surface = pal.surface;
+        self._shadow = uitheme.elevation_shadow(pal, 3);
+        self.click = on_change;
+        self.font_scale = 1.0;
+        self.hovered = 0;
+        self.is_open = 0;
+        self._drag = 0;
+        self._suppress_up = 0;
+        self.id = comp.next_widget_id();
+    }
+
+    pub fn kind(): ui_types.WidgetKind { return ui_types.WidgetKind.ColorPicker; }
+    pub fn on_theme_changed(): nil {
+        val p = uitheme.palette();
+        if (self._custom_picked == 0) {
+            self.picked = p.accent;
+            val hsv = rgb_to_hsv(self.picked);
+            self.h = hsv.0; self.s = hsv.1; self.v = hsv.2;
+        }
+        self.border = p.border;
+        self.text = p.text_primary;
+        self.panel_surface = p.surface;
+        self._shadow = uitheme.elevation_shadow(p, 3);
+        tree.request_repaint();
+    }
+
+    pub fn wants_pointer_capture(): int { return self._drag; }
+
+    pub fn on_overlay_dismiss(): nil {
+        if (self.is_open != 0) {
+            self.is_open = 0;
+            self._drag = 0;
+            tree.remove_overlay(self);
+            tree.request_repaint();
+        }
+    }
+
+    fn set_open(v: int): nil {
+        if (v != 0 and self.is_open == 0) {
+            tree.push_overlay(self);
+        } elif (v == 0 and self.is_open != 0) {
+            tree.remove_overlay(self);
+        }
+        self.is_open = v;
+        self._drag = 0;
+    }
+
+    pub fn measure(min_w: float, max_w: float, min_h: float, max_h: float): comp.Size {
+        var w: float = 32.0;
+        if (len(self.label) > 0) {
+            w = 32.0 + tm.text_width(textshape.prepare_display(self.label), self.font_scale);
+        }
+        var h: float = 28.0;
+        if (w < min_w) { w = min_w; }
+        if (w > max_w) { w = max_w; }
+        if (h < min_h) { h = min_h; }
+        if (h > max_h) { h = max_h; }
+        return comp.Size(w=w, h=h);
+    }
+
+    pub fn arrange(x: float, y: float, w: float, h: float): nil {
+        self.rect.x = x;
+        self.rect.y = y;
+        self.rect.w = w;
+        self.rect.h = h;
+        // While open the widget bounds cover the popup so the parent
+        // forwards menu-region events to us (same trick as Select).
+        if (self.is_open != 0) {
+            self.layout_panel();
+            var need = self._py + self._panel_h - y;
+            if (need > self.rect.h) { self.rect.h = need; }
+        }
+    }
+
+    // Popup panel: SV square on top, hue bar below, hex readout at bottom.
+    // Width is capped — Flow gives children the full column width, and an
+    // unbounded panel would stretch across (and visually merge with) the
+    // whole row of widgets beneath it.
+    fn layout_panel(): nil {
+        self._pw = self.rect.w;
+        if (self._pw > 230.0) { self._pw = 230.0; }
+        if (self._pw < 190.0) { self._pw = 190.0; }
+        self._px = self.rect.x;
+        self._py = self.rect.y + 30.0;
+        self._sv_h = 130.0;
+        self._bar_y = self._py + self._sv_h + 8.0;
+        self._bar_h = 12.0;
+        self._panel_h = self._sv_h + 8.0 + self._bar_h + tm.line_height(self.font_scale) + 14.0;
+    }
+
+    fn sv_rect(): (float, float, float, float) {
+        return (self._px + 8.0, self._py + 8.0, self._pw - 16.0, self._sv_h - 16.0);
+    }
+
+    fn apply_sv(fx: float, fy: float): nil {
+        val r = self.sv_rect();
+        var nx = (fx - r.0) / r.2;
+        var ny = (fy - r.1) / r.3;
+        if (nx < 0.0) { nx = 0.0; }
+        if (nx > 1.0) { nx = 1.0; }
+        if (ny < 0.0) { ny = 0.0; }
+        if (ny > 1.0) { ny = 1.0; }
+        self.s = nx;
+        self.v = 1.0 - ny;
+        self.commit_color();
+    }
+
+    fn apply_hue(fx: float): nil {
+        var nx = (fx - (self._px + 8.0)) / (self._pw - 16.0);
+        if (nx < 0.0) { nx = 0.0; }
+        if (nx > 1.0) { nx = 1.0; }
+        self.h = nx * 360.0;
+        self.commit_color();
+    }
+
+    fn commit_color(): nil {
+        self.picked = hsv_to_rgb(self.h, self.s, self.v);
+        tree.request_repaint();
+    }
+
+    fn fire_change(): nil {
+        if (self.click != nil) {
+            (self.click as (fn(): nil))();
+        }
+    }
+
+    fn hex_text(): str {
+        var ri = (self.picked.r * 255.0) as int;
+        var gi = (self.picked.g * 255.0) as int;
+        var bi = (self.picked.b * 255.0) as int;
+        return "#" + hex2(ri) + hex2(gi) + hex2(bi);
+    }
+
+    pub fn paint(): nil {
+        // Closed-state swatch.
+        var hov: float = motion.value(self.id, 0, self.hovered as float);
+        var bc = color.lerp(self.border, color.white, hov * 0.4);
+        dl.dl_emit_rect_rounded(dl.paint_ctx.dl, self.rect.x, self.rect.y + 2.0, 24.0, 24.0,
+            4.0, self.picked.r, self.picked.g, self.picked.b, 1.0);
+        dl.dl_emit_rect_border(dl.paint_ctx.dl, self.rect.x, self.rect.y + 2.0, 24.0, 24.0,
+            4.0, 1.0, bc.r, bc.g, bc.b, 1.0);
+        if (len(self.label) > 0) {
+            dl.dl_emit_text(dl.paint_ctx.dl, textshape.prepare_display(self.label),
+                self.rect.x + 32.0, self.rect.y + (self.rect.h - tm.line_height(self.font_scale)) / 2.0,
+                self.text.r, self.text.g, self.text.b, 1.0, self.font_scale);
+        }
+        // Chevron sits next to the label — NOT at rect.w's right edge:
+        // Flow hands children the full column width, so anchoring to the
+        // far edge strands the glyph hundreds of px from the swatch.
+        var chevron_x: float = self.rect.x + 32.0;
+        if (len(self.label) > 0) {
+            chevron_x = self.rect.x + 32.0
+                + tm.text_width(textshape.prepare_display(self.label), self.font_scale) + 8.0;
+        }
+        dl.dl_emit_text(dl.paint_ctx.dl, "v",
+            chevron_x, self.rect.y + 4.0,
+            self.text.r, self.text.g, self.text.b, 0.8, self.font_scale * 0.85);
+
+        if (self.is_open == 0) { return; }
+        self.layout_panel();
+        val px = self._px;
+        val py = self._py;
+        val pw = self._pw;
+
+        // Panel shadow + background + border.
+        if (self._shadow != nil) {
+            val s = self._shadow as shadow.Shadow;
+            dl.dl_emit_shadow(dl.paint_ctx.dl, px, py, pw, self._panel_h - 6.0,
+                s.r, s.g, s.b, s.a, s.offset_x, s.offset_y, s.blur_radius, s.spread_radius, 6.0);
+        }
+        dl.dl_emit_rect_rounded(dl.paint_ctx.dl, px, py, pw, self._panel_h - 6.0,
+            6.0, self.panel_surface.r, self.panel_surface.g, self.panel_surface.b, 0.98);
+        dl.dl_emit_rect_border(dl.paint_ctx.dl, px, py, pw, self._panel_h - 6.0,
+            6.0, 1.0, self.border.r, self.border.g, self.border.b, 1.0);
+
+        // SV square: hue base, then saturation strips (white, fading L→R),
+        // then value strips (black, deepening T→B).
+        val r = self.sv_rect();
+        val base = hsv_to_rgb(self.h, 1.0, 1.0);
+        dl.dl_emit_rect(dl.paint_ctx.dl, r.0, r.1, r.2, r.3,
+            base.r, base.g, base.b, 1.0);
+        var i = 0;
+        while (i < 8) {
+            var sx = r.0 + r.2 * ((i as float) / 8.0);
+            var sw = r.2 / 8.0;
+            var sa = (1.0 - ((i as float) + 0.5) / 8.0) * 0.9;
+            dl.dl_emit_rect(dl.paint_ctx.dl, sx, r.1, sw, r.3, 1.0, 1.0, 1.0, sa);
+            i = i + 1;
+        }
+        var j = 0;
+        while (j < 6) {
+            var sy = r.1 + r.3 * ((j as float) / 6.0);
+            var sh = r.3 / 6.0;
+            var va = ((j as float) + 0.5) / 6.0 * 0.85;
+            dl.dl_emit_rect(dl.paint_ctx.dl, r.0, sy, r.2, sh, 0.0, 0.0, 0.0, va);
+            j = j + 1;
+        }
+        dl.dl_emit_rect_border(dl.paint_ctx.dl, r.0, r.1, r.2, r.3,
+            2.0, 1.0, self.border.r, self.border.g, self.border.b, 1.0);
+        // SV cursor.
+        var cx = r.0 + self.s * r.2;
+        var cy = r.1 + (1.0 - self.v) * r.3;
+        dl.dl_emit_rect_border(dl.paint_ctx.dl, cx - 4.0, cy - 4.0, 8.0, 8.0,
+            2.0, 1.5, 1.0, 1.0, 1.0, 1.0);
+
+        // Hue bar: 6 sector strips.
+        val bar_x = self._px + 8.0;
+        var k = 0;
+        while (k < 6) {
+            var seg_w = (self._pw - 16.0) / 6.0;
+            var hc = hsv_to_rgb((k as float) * 60.0 + 30.0, 1.0, 1.0);
+            dl.dl_emit_rect(dl.paint_ctx.dl, bar_x + (k as float) * seg_w, self._bar_y, seg_w, self._bar_h,
+                hc.r, hc.g, hc.b, 1.0);
+            k = k + 1;
+        }
+        dl.dl_emit_rect_border(dl.paint_ctx.dl, bar_x, self._bar_y, self._pw - 16.0, self._bar_h,
+            3.0, 1.0, self.border.r, self.border.g, self.border.b, 1.0);
+        var hx = bar_x + (self.h / 360.0) * (self._pw - 16.0);
+        dl.dl_emit_rect(dl.paint_ctx.dl, hx - 1.5, self._bar_y - 2.0, 3.0, self._bar_h + 4.0,
+            1.0, 1.0, 1.0, 1.0);
+
+        // Hex readout.
+        dl.dl_emit_text(dl.paint_ctx.dl, textshape.prepare_display(self.hex_text()),
+            self._px + 10.0, self._bar_y + self._bar_h + 6.0,
+            self.text.r, self.text.g, self.text.b, 1.0, self.font_scale);
+    }
+
+    pub fn on_event(t: events.EventType, x: int, y: int, key: int): uievent.EventResult {
+        var fx = x as float;
+        var fy = y as float;
+        var in_box: bool = self.rect.contains(fx, fy)
+            and fy < self.rect.y + 30.0;
+
+        if (t == events.EventType.MouseMove) {
+            var want: int = 0;
+            if (self.rect.contains(fx, fy)) { want = 1; }
+            if (want != self.hovered) {
+                var cur = motion.value(self.id, 0, self.hovered as float);
+                self.hovered = want;
+                motion.animate_to(self.id, 0, want as float, 0.12, cur);
+                tree.request_repaint();
+            }
+            if (self._drag == 1) {
+                self.apply_sv(fx, fy);
+                return uievent.EventResult.Handled;
+            }
+            if (self._drag == 2) {
+                self.apply_hue(fx);
+                return uievent.EventResult.Handled;
+            }
+            return uievent.EventResult.Ignored;
+        }
+
+        if (self.is_open != 0) {
+            self.layout_panel();
+            val r = self.sv_rect();
+            var in_sv: bool = (fx >= r.0 and fx < r.0 + r.2 and fy >= r.1 and fy < r.1 + r.3);
+            var in_hue: bool = (fy >= self._bar_y and fy < self._bar_y + self._bar_h
+                and fx >= self._px + 8.0 and fx < self._px + 8.0 + self._pw - 16.0);
+            var in_panel: bool = (fy >= self._py and fy < self._py + self._panel_h
+                and fx >= self._px and fx < self._px + self._pw);
+            if (t == events.EventType.MouseDown and key == 0) {
+                if (in_sv) {
+                    self._drag = 1;
+                    self.apply_sv(fx, fy);
+                    return uievent.EventResult.Handled;
+                }
+                if (in_hue) {
+                    self._drag = 2;
+                    self.apply_hue(fx);
+                    return uievent.EventResult.Handled;
+                }
+                if (in_panel) {
+                    // Press inside the panel but off the controls: swallow
+                    // so widgets beneath the popup don't get the click.
+                    return uievent.EventResult.Handled;
+                }
+            }
+            if (t == events.EventType.MouseUp and key == 0) {
+                if (self._drag != 0) {
+                    self._drag = 0;
+                    self.fire_change();
+                    return uievent.EventResult.Handled;
+                }
+                if (in_box) {
+                    if (self._suppress_up != 0) {
+                        // Release of the press that opened the popup.
+                        self._suppress_up = 0;
+                    } else {
+                        self.set_open(0);
+                    }
+                    return uievent.EventResult.Handled;
+                }
+                // Click inside the panel but outside controls: swallow.
+                if (in_panel) {
+                    return uievent.EventResult.Handled;
+                }
+            }
+            // Open: presses outside box+panel are handled by
+            // on_overlay_dismiss (tree-level click-away).
+            return uievent.EventResult.Ignored;
+        }
+
+        if (t == events.EventType.MouseDown and key == 0 and in_box) {
+            if (self.is_open == 0) {
+                self._suppress_up = 1;
+                self.set_open(1);
+            } else {
+                self.set_open(0);
+            }
+            return uievent.EventResult.Handled;
+        }
+        if (t == events.EventType.MouseUp and key == 0 and in_box) {
+            // Swallow the release that follows the opening press.
+            return uievent.EventResult.Handled;
+        }
+        return uievent.EventResult.Ignored;
+    }
+}
+
+pub fn color_picker(lbl: str = "", c: color.Color? = nil, on_change: (fn(): nil)? = nil): ColorPicker {
+    return ColorPicker(lbl, c, on_change);
+}

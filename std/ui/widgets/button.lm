@@ -1,0 +1,143 @@
+// std/ui/widgets/button.lm
+// Widget — split from std/ui/widgets.lm.
+
+import std.ui.component as comp;
+import std.ui.component show Placed, TextBound;
+import std.ui.types as ui_types;
+import std.ui.event as uievent;
+import std.ui.context as uictx;
+import std.ui.draw_list as dl;
+import std.ui.state as state;
+import std.ui.tree as tree;
+import std.events as events;
+import std.color as color;
+import std.ui.theme as uitheme;
+import std.ui.motion as motion;
+import std.text.controller as text_ctrl;
+import std.text.shaping as textshape;
+import std.ui.text_metrics as tm;
+
+// ── Button ───────────────────────────────────────────────────────────────────
+
+frame Button {
+    embed Placed;
+    embed TextBound;
+    pub var bg: color.Color;
+    pub var bg_hover: color.Color;
+    pub var bg_pressed: color.Color;
+    pub var fg: color.Color;
+    pub var font_scale: float;
+    pub var pad_x: float;
+    pub var pad_y: float;
+    pub var on_click: (fn(): nil)?;
+    pub var pressed: int;
+    pub var hovered: int;
+    pub var _custom_bg: int;
+
+    pub init(txt: str = "", c: color.Color? = nil, click: (fn(): nil)? = nil) {
+        val pal = uitheme.palette();
+        self.text = txt;
+        self._custom_bg = 0;
+        if (c == nil) {
+            self.bg = pal.surface_variant;
+            self.bg_hover = color.lerp(pal.surface_hover, color.white, 0.3);
+            self.bg_pressed = pal.surface_pressed;
+        } else {
+            self._custom_bg = 1;
+            self.bg = c as color.Color;
+            // Custom colors still need visible hover/press feedback —
+            // derive shades instead of copying bg (which made hover a no-op).
+            self.bg_hover = color.lerp(self.bg, color.white, 0.18);
+            self.bg_pressed = color.lerp(self.bg, color.black, 0.22);
+        }
+        self.fg = pal.on_accent;
+        self.font_scale = 1.0;
+        self.pad_x = 12.0;
+        self.pad_y = 6.0;
+        self.on_click = click;
+        self.pressed = 0;
+        self.hovered = 0;
+        self.id = comp.next_widget_id();
+    }
+
+    pub fn kind(): ui_types.WidgetKind { return ui_types.WidgetKind.Button; }
+    pub fn wants_pointer_capture(): int { return self.pressed; }
+    pub fn on_theme_changed(): nil {
+        val p = uitheme.palette();
+        if (self._custom_bg == 0) {
+            self.bg = p.surface_variant;
+            self.bg_hover = color.lerp(p.surface_hover, color.white, 0.3);
+            self.bg_pressed = p.surface_pressed;
+        }
+        self.fg = p.on_accent;
+        tree.request_repaint();
+    }
+    pub fn on_overlay_dismiss(): nil { }
+
+    pub fn measure(min_w: float, max_w: float, min_h: float, max_h: float): comp.Size {
+        var disp = textshape.prepare_display(self.string_val());
+        var w: float = tm.text_width(disp, self.font_scale) + self.pad_x * 2.0;
+        var h: float = tm.line_height(self.font_scale) + self.pad_y * 2.0;
+        if (w < min_w) { w = min_w; }
+        if (w > max_w) { w = max_w; }
+        if (h < min_h) { h = min_h; }
+        if (h > max_h) { h = max_h; }
+        return comp.Size(w=w, h=h);
+    }
+
+    pub fn paint(): nil {
+        var hov: float = motion.value(self.id, 0, self.hovered as float);
+        var prs: float = motion.value(self.id, 1, self.pressed as float);
+        var bgc = color.lerp(self.bg, self.bg_hover, hov);
+        bgc = color.lerp(bgc, self.bg_pressed, prs);
+        dl.dl_emit_rect(dl.paint_ctx.dl, self.rect.x, self.rect.y, self.rect.w, self.rect.h,
+            bgc.r, bgc.g, bgc.b, bgc.a);
+        var label_txt = textshape.prepare_display(self.string_val());
+        var tx: float = self.rect.x + (self.rect.w - tm.text_width(label_txt, self.font_scale)) / 2.0;
+        var ty: float = self.rect.y + (self.rect.h - tm.line_height(self.font_scale)) / 2.0;
+        dl.dl_emit_text(dl.paint_ctx.dl, label_txt, tx, ty,
+            self.fg.r, self.fg.g, self.fg.b, self.fg.a, self.font_scale);
+    }
+
+    pub fn on_event(t: events.EventType, x: int, y: int, key: int): uievent.EventResult {
+        var inside: bool = self.rect.contains(x as float, y as float);
+        if (t == events.EventType.MouseMove) {
+            var want: int = 0;
+            if (inside) { want = 1; }
+            if (want != self.hovered) {
+                var cur = motion.value(self.id, 0, self.hovered as float);
+                self.hovered = want;
+                motion.animate_to(self.id, 0, want as float, 0.12, cur);
+                tree.request_repaint();
+            }
+        } elif (t == events.EventType.MouseDown) {
+            if (inside and key == 0) {
+                var cur = motion.value(self.id, 1, self.pressed as float);
+                self.pressed = 1;
+                motion.animate_to(self.id, 1, 1.0, 0.08, cur);
+                tree.request_repaint();
+                return uievent.EventResult.Handled;
+            }
+        } elif (t == events.EventType.MouseUp) {
+            if (self.pressed != 0) {
+                self.pressed = 0;
+                motion.animate_to(self.id, 1, 0.0, 0.12,
+                    motion.value(self.id, 1, 1.0));
+                tree.request_repaint();
+                if (inside) {
+                    if (self.on_click != nil) {
+                        val cb = self.on_click as fn(): nil;
+                        cb();
+                    }
+                    return uievent.EventResult.Handled;
+                }
+            }
+        }
+        return uievent.EventResult.Ignored;
+    }
+}
+
+pub fn button(txt: str, c: color.Color? = nil, click: (fn(): nil)? = nil): Button {
+    return Button(txt, c, click);
+}
+

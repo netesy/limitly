@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>gpu_vulkan.lm - Lymar API Reference</title>
+<style>
+:root {
+  --bg-primary: #0a0e17;
+  --bg-secondary: #111827;
+  --bg-tertiary: #1f2937;
+  --accent: #38bdf8;
+  --accent-hover: #7dd3fc;
+  --text-main: #f1f5f9;
+  --text-muted: #94a3b8;
+  --border-color: #334155;
+}
+* { box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif;
+  margin: 0; padding: 0; background: var(--bg-primary); color: var(--text-main); display: flex;
+}
+nav {
+  width: 300px; height: 100vh; overflow-y: auto; background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color); padding: 24px 20px; position: fixed;
+}
+nav h2 { font-size: 1.15rem; color: var(--accent); margin-top: 0; margin-bottom: 16px; font-weight: 700; }
+#search-input {
+  width: 100%; padding: 8px 12px; background: var(--bg-tertiary); border: 1px solid var(--border-color);
+  border-radius: 6px; color: #fff; font-size: 0.85rem; margin-bottom: 16px;
+}
+#search-input:focus { outline: none; border-color: var(--accent); }
+.nav-link { display: block; color: var(--text-muted); text-decoration: none; padding: 6px 8px; font-size: 0.9rem; border-radius: 4px; }
+.nav-link:hover { color: #fff; background: var(--bg-tertiary); }
+main { margin-left: 300px; padding: 40px 48px; max-width: 950px; flex: 1; }
+h1 { color: #fff; font-size: 2.2rem; margin-top: 0; padding-bottom: 16px; border-bottom: 1px solid var(--border-color); }
+h2 { color: var(--accent); font-size: 1.4rem; margin-top: 36px; margin-bottom: 14px; }
+h3 { color: #fff; font-size: 1.25rem; margin-top: 28px; margin-bottom: 12px; display: flex; align-items: center; gap: 10px; }
+h4 { color: var(--accent); font-size: 1rem; margin-top: 20px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+.badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
+.badge-pub { background: #064e3b; color: #6ee7b7; border: 1px solid #059669; }
+.badge-private { background: #334155; color: #cbd5e1; }
+.badge-type { background: #1e1b4b; color: #c7d2fe; border: 1px solid #4338ca; }
+.code-sig { background: #090d16; border: 1px solid var(--border-color); padding: 14px 18px; border-radius: 8px; overflow-x: auto; font-family: 'Consolas', 'Fira Code', monospace; font-size: 0.95rem; color: #e2e8f0; }
+.summary { color: #cbd5e1; line-height: 1.65; margin: 14px 0; font-size: 1rem; }
+/* Callout styling */
+.callout { margin: 16px 0; padding: 14px 18px; border-radius: 8px; border-left: 4px solid; font-size: 0.92rem; }
+.callout-header { font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+.callout-tip { border-color: #10b981; background: rgba(16, 185, 129, 0.08); color: #d1fae5; }
+.callout-tip .callout-header { color: #34d399; }
+.callout-warning { border-color: #f59e0b; background: rgba(245, 158, 11, 0.08); color: #fef3c7; }
+.callout-warning .callout-header { color: #fbbf24; }
+.callout-note { border-color: #0284c7; background: rgba(2, 132, 199, 0.08); color: #e0f2fe; }
+.callout-note .callout-header { color: #38bdf8; }
+.callout-deprecated { border-color: #e11d48; background: rgba(225, 29, 72, 0.08); color: #ffe4e6; }
+.callout-deprecated .callout-header { color: #fb7185; }
+/* Example card */
+.example-card { margin: 20px 0; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: #080c14; }
+.example-header { background: #162032; padding: 8px 16px; font-size: 0.82rem; font-weight: 700; color: #94a3b8; border-bottom: 1px solid var(--border-color); }
+.example-card pre { margin: 0; padding: 14px 18px; overflow-x: auto; font-family: monospace; font-size: 0.92rem; color: #e2e8f0; }
+/* Tables */
+table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 0.92rem; }
+th { background: #162032; color: #94a3b8; text-align: left; padding: 10px 14px; font-weight: 600; border-bottom: 1px solid var(--border-color); }
+td { padding: 10px 14px; border-bottom: 1px solid #1e293b; color: #cbd5e1; }
+ul { padding-left: 20px; color: #cbd5e1; line-height: 1.6; }
+hr { border: 0; border-top: 1px solid var(--border-color); margin: 36px 0; }
+</style>
+<script>
+function filterNav() {
+  var q = document.getElementById('search-input').value.toLowerCase();
+  var links = document.querySelectorAll('.nav-link');
+  links.forEach(function(l) {
+    l.style.display = l.textContent.toLowerCase().includes(q) ? 'block' : 'none';
+  });
+}
+</script>
+</head>
+<body>
+<nav>
+<h2>gpu_vulkan.lm</h2>
+<input type="text" id="search-input" placeholder="Filter symbols..." oninput="filterNav()">
+<div id="nav-list">
+<a class="nav-link" href="#vk">vk <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#vk_device">vk_device <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#vk_resolve_all">vk_resolve_all <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#st_u32">st_u32 <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#st_u64">st_u64 <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#st_ptr">st_ptr <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#gpu_init">gpu_init <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#ensure_device">ensure_device <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#gpu_buffer_create">gpu_buffer_create <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#gpu_buffer_write">gpu_buffer_write <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#gpu_buffer_read">gpu_buffer_read <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#buf_vk">buf_vk <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#gpu_shader_create_spv">gpu_shader_create_spv <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#gpu_pipeline_create">gpu_pipeline_create <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#gpu_debug_phys_index">gpu_debug_phys_index <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#gpu_dispatch">gpu_dispatch <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#gpu_release">gpu_release <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#gpu_shutdown">gpu_shutdown <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+</div>
+</nav>
+<main>
+<h1>gpu_vulkan.lm API Reference</h1>
+<h2>Module Overview</h2>
+<div class="summary"><p>std.native.gpu_vulkan - Pure-Lymar Vulkan compute driver.
+
+Implements a real GPU device layer entirely through std.ffi: the Vulkan
+loader (vulkan-1.dll / libvulkan.so / libMoltenVK.dylib) is resolved with
+vkGetInstanceProcAddr and every command is invoked through foreign_call.
+All Vulkan structs are hand-marshaled into ffi.alloc'd memory - no C glue.
+
+This is the submission backend for Fyra's SPIR-V output:
+gpu_shader_create_spv() accepts SPIR-V words produced by the vendor/fyra
+spirv target and vkCreateShaderModule compiles them through the platform
+driver.
+
+Scope: compute only - first compute-capable queue family, host-visible +
+host-coherent memory (no staging copies), STORAGE_BUFFER descriptors
+(binding index == buffer list index), synchronous dispatch with fence
+wait. Vertex/pixel/mesh stages and device-local memory are later work.
+
+Struct layouts are x86-64 Vulkan 1.1 ABI (handles/pointers 8 bytes,
+enums/u32 4 bytes) taken from vulkan_core.h.
+
+Record layouts (ffi.alloc'd, returned as int handles):
+  buffer record (64B): @0 VkBuffer, @8 VkDeviceMemory, @16 mapped ptr,
+                       @24 size, @32 VkDeviceSize allocSize
+  pipe record (96B):   @0 VkPipeline, @8 VkPipelineLayout,
+                       @16 VkDescriptorSetLayout, @24 VkDescriptorPool,
+                       @32 VkDescriptorSet, @40 max_bindings
+
+Designed for `lymar build -shared` -> native library (gpu_vulkan.dll +
+.meta); the VM and AOT hosts call its exports through the Lymar ABI.</p></div>
+<div id="vk">
+<h3>vk <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn vk(name: str): int</code></pre>
+<div class="summary"><p>vk resolves a command pointer through vkGetInstanceProcAddr. With
+_instance == 0 only global commands resolve; after instance creation every
+device-level command resolves through the same entry point.</p></div>
+</div><hr>
+<div id="vk_device">
+<h3>vk_device <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn vk_device(name: str): int</code></pre>
+</div><hr>
+<div id="vk_resolve_all">
+<h3>vk_resolve_all <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn vk_resolve_all(): nil</code></pre>
+</div><hr>
+<div id="st_u32">
+<h3>st_u32 <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn st_u32(p: int, off: int, v: int): nil</code></pre>
+</div><hr>
+<div id="st_u64">
+<h3>st_u64 <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn st_u64(p: int, off: int, v: int): nil</code></pre>
+</div><hr>
+<div id="st_ptr">
+<h3>st_ptr <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn st_ptr(p: int, off: int, v: int): nil</code></pre>
+</div><hr>
+<div id="gpu_init">
+<h3>gpu_init <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn gpu_init(): int</code></pre>
+<div class="summary"><p>gpu_init creates the Vulkan instance, picks the first physical device with
+a compute-capable queue family, creates the device (64/16 shader features
+enabled so Fyra SPIR-V modules using Int64/Float64 validate), queue,
+command pool, one primary command buffer, and a fence.
+Returns 1 on success. Idempotent.</p></div>
+</div><hr>
+<div id="ensure_device">
+<h3>ensure_device <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn ensure_device(): int</code></pre>
+</div><hr>
+<div id="gpu_buffer_create">
+<h3>gpu_buffer_create <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn gpu_buffer_create(bytes: int): int</code></pre>
+<div class="summary"><p>gpu_buffer_create allocates a VkBuffer plus host-visible+coherent memory
+and maps it. Returns the buffer record pointer (see header layout) or 0.</p></div>
+</div><hr>
+<div id="gpu_buffer_write">
+<h3>gpu_buffer_write <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn gpu_buffer_write(buf: int, src: int, bytes: int): int</code></pre>
+<div class="summary"><p>gpu_buffer_write uploads `bytes` from raw address `src` into the mapped
+host-visible buffer memory.</p></div>
+</div><hr>
+<div id="gpu_buffer_read">
+<h3>gpu_buffer_read <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn gpu_buffer_read(buf: int, dst: int, bytes: int): int</code></pre>
+<div class="summary"><p>gpu_buffer_read downloads `bytes` from mapped memory to raw address `dst`.
+gpu_dispatch is synchronous (fence wait), so reads after it are safe.</p></div>
+</div><hr>
+<div id="buf_vk">
+<h3>buf_vk <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn buf_vk(bufrec: int): int</code></pre>
+</div><hr>
+<div id="gpu_shader_create_spv">
+<h3>gpu_shader_create_spv <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn gpu_shader_create_spv(code_ptr: int, code_size: int): int</code></pre>
+<div class="summary"><p>gpu_shader_create_spv creates a VkShaderModule from SPIR-V words.
+`code_ptr` is a raw address holding `code_size` bytes of little-endian
+SPIR-V (4-byte aligned, multiple of 4). This is the entry point for
+Fyra's spirv backend output.</p></div>
+</div><hr>
+<div id="gpu_pipeline_create">
+<h3>gpu_pipeline_create <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn gpu_pipeline_create(shader_module: int, max_bindings: int): int</code></pre>
+<div class="summary"><p>gpu_pipeline_create builds the full compute pipeline for a shader module:
+descriptor set layout with `max_bindings` STORAGE_BUFFER bindings
+(binding i <-> buffers[i] at dispatch), pipeline layout, descriptor pool,
+one descriptor set, and the VkComputePipeline. Returns the pipe record
+pointer (see header layout) or 0.</p></div>
+</div><hr>
+<div id="gpu_debug_phys_index">
+<h3>gpu_debug_phys_index <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn gpu_debug_phys_index(v: int): nil</code></pre>
+</div><hr>
+<div id="gpu_dispatch">
+<h3>gpu_dispatch <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn gpu_dispatch(pipe: int, buffers: list, x: int, y: int, z: int): int</code></pre>
+<div class="summary"><p>gpu_dispatch updates the descriptor set with `buffers` (buffer record
+pointers; index i binds descriptor binding i), records
+bind-pipeline + bind-set + dispatch into the shared command buffer,
+submits with the fence, and waits. Returns 1 on success.</p></div>
+</div><hr>
+<div id="gpu_release">
+<h3>gpu_release <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn gpu_release(obj: int): int</code></pre>
+<div class="summary"><p>gpu_release frees only the ffi record memory. Object teardown is
+gpu_shutdown's job.</p></div>
+</div><hr>
+<div id="gpu_shutdown">
+<h3>gpu_shutdown <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn gpu_shutdown(): int</code></pre>
+<div class="summary"><p>gpu_shutdown destroys device-level objects, the instance, and unloads
+the loader. Buffer/pipe records should be gpu_release'd first.</p></div>
+</div><hr>
+</main>
+</body>
+</html>

@@ -1,0 +1,208 @@
+// std/ui/widgets/file_input.lm
+// Widget — file picker control. Shows the selected path (or the
+// placeholder label) plus a "Browse" chip. Clicking fires the optional
+// callback — the app opens the native dialog and calls set_path() with
+// the result. `path_sig` mirrors selected_path for reactive UIs.
+
+import std.ui.component as comp;
+import std.ui.component show Placed;
+import std.ui.types as ui_types;
+import std.ui.event as uievent;
+import std.ui.context as uictx;
+import std.ui.draw_list as dl;
+import std.ui.state as state;
+import std.ui.tree as tree;
+import std.events as events;
+import std.color as color;
+import std.string.split as split;
+import std.text.shaping as textshape;
+import std.ui.text_metrics as tm;
+import std.ui.theme as uitheme;
+import std.ui.motion as motion;
+import std.ui.file_dialog as filedlg;
+
+frame FileInput {
+    embed Placed;
+    pub var label: str;
+    pub var selected_path: str;
+    pub var path_sig: state.StrSignal?;
+    pub var click: (fn(): nil)?;
+    pub var surface: color.Color;
+    pub var surface_hover: color.Color;
+    pub var border: color.Color;
+    pub var text: color.Color;
+    pub var text_muted: color.Color;
+    pub var accent: color.Color;
+    pub var on_accent: color.Color;
+    pub var font_scale: float;
+    pub var hovered: int;
+    pub var pressed: int;
+    // When 1, activating the widget opens the native file-open dialog
+    // (std.ui.file_dialog) and stores the result in selected_path.
+    pub var auto_dialog: int;
+    // Browse chip rect cache (paint + events share it).
+    pub var _bx: float = 0.0;
+    pub var _bw: float = 0.0;
+
+    pub init(lbl: str = "Choose File...", on_select: (fn(): nil)? = nil) {
+        val pal = uitheme.palette();
+        self.label = lbl;
+        self.selected_path = "";
+        self.path_sig = nil;
+        self.click = on_select;
+        self.surface = pal.surface;
+        self.surface_hover = pal.surface_hover;
+        self.border = pal.border;
+        self.text = pal.text_primary;
+        self.text_muted = pal.text_muted;
+        self.accent = pal.accent;
+        self.on_accent = pal.on_accent;
+        self.font_scale = 1.0;
+        self.hovered = 0;
+        self.pressed = 0;
+        self.auto_dialog = 0;
+        self.id = comp.next_widget_id();
+    }
+
+    pub fn enable_native_dialog(): nil {
+        self.auto_dialog = 1;
+    }
+
+    pub fn kind(): ui_types.WidgetKind { return ui_types.WidgetKind.FileInput; }
+    pub fn wants_pointer_capture(): int { return self.pressed; }
+    pub fn on_theme_changed(): nil {
+        val p = uitheme.palette();
+        self.surface = p.surface;
+        self.surface_hover = p.surface_hover;
+        self.border = p.border;
+        self.text = p.text_primary;
+        self.text_muted = p.text_muted;
+        self.accent = p.accent;
+        self.on_accent = p.on_accent;
+        tree.request_repaint();
+    }
+    pub fn on_overlay_dismiss(): nil { }
+
+    pub fn bind_path(sig: state.StrSignal): nil {
+        self.path_sig = sig;
+        self.selected_path = sig.get();
+    }
+
+    pub fn set_path(p: str): nil {
+        self.selected_path = p;
+        if (self.path_sig != nil) {
+            (self.path_sig as state.StrSignal).set(p);
+        }
+        tree.request_repaint();
+    }
+
+    pub fn clear(): nil {
+        self.set_path("");
+    }
+
+    // Filename for display; full path stays in selected_path.
+    fn display_name(): str {
+        if (len(self.selected_path) == 0) { return self.label; }
+        var parts = split.split(self.selected_path, "/");
+        var segs = split.split(parts[len(parts) - 1], "\\");
+        return segs[len(segs) - 1];
+    }
+
+    pub fn measure(min_w: float, max_w: float, min_h: float, max_h: float): comp.Size {
+        var w: float = 240.0;
+        var h: float = 34.0;
+        if (w < min_w) { w = min_w; }
+        if (w > max_w) { w = max_w; }
+        if (h < min_h) { h = min_h; }
+        if (h > max_h) { h = max_h; }
+        return comp.Size(w=w, h=h);
+    }
+
+    fn chip_w(): float {
+        return tm.text_width("Browse", self.font_scale) + 20.0;
+    }
+
+    pub fn paint(): nil {
+        self._bw = self.chip_w();
+        self._bx = self.rect.x + self.rect.w - self._bw - 4.0;
+        var hov: float = motion.value(self.id, 0, self.hovered as float);
+        var prs: float = motion.value(self.id, 1, self.pressed as float);
+        var fill = color.lerp(self.surface, self.surface_hover, hov);
+        fill = color.lerp(fill, self.accent, prs * 0.15);
+        dl.dl_emit_rect_rounded(dl.paint_ctx.dl, self.rect.x, self.rect.y, self.rect.w, self.rect.h,
+            4.0, fill.r, fill.g, fill.b, fill.a);
+        var bc = color.lerp(self.border, self.accent, hov * 0.6);
+        dl.dl_emit_rect_border(dl.paint_ctx.dl, self.rect.x, self.rect.y, self.rect.w, self.rect.h,
+            4.0, 1.0, bc.r, bc.g, bc.b, 1.0);
+
+        // Path text — muted when showing the placeholder.
+        var disp = self.display_name();
+        var fg = self.text;
+        if (len(self.selected_path) == 0) { fg = self.text_muted; }
+        dl.dl_emit_text(dl.paint_ctx.dl, textshape.prepare_display(disp),
+            self.rect.x + 10.0, self.rect.y + (self.rect.h - tm.line_height(self.font_scale)) / 2.0,
+            fg.r, fg.g, fg.b, 1.0, self.font_scale);
+
+        // Browse chip.
+        dl.dl_emit_rect_rounded(dl.paint_ctx.dl, self._bx, self.rect.y + 4.0, self._bw, self.rect.h - 8.0,
+            3.0, self.accent.r, self.accent.g, self.accent.b, 0.9);
+        var bw = tm.text_width("Browse", self.font_scale);
+        dl.dl_emit_text(dl.paint_ctx.dl, "Browse",
+            self._bx + (self._bw - bw) / 2.0, self.rect.y + (self.rect.h - tm.line_height(self.font_scale)) / 2.0,
+            self.on_accent.r, self.on_accent.g, self.on_accent.b, 1.0, self.font_scale);
+    }
+
+    fn in_chip(x: int, y: int): bool {
+        var fx = x as float;
+        var fy = y as float;
+        return (fx >= self._bx and fx < self._bx + self._bw
+            and fy >= self.rect.y + 4.0 and fy < self.rect.y + self.rect.h - 4.0);
+    }
+
+    pub fn on_event(t: events.EventType, x: int, y: int, key: int): uievent.EventResult {
+        var inside: bool = self.rect.contains(x as float, y as float);
+        if (t == events.EventType.MouseMove) {
+            var want: int = 0;
+            if (inside) { want = 1; }
+            if (want != self.hovered) {
+                var cur = motion.value(self.id, 0, self.hovered as float);
+                self.hovered = want;
+                motion.animate_to(self.id, 0, want as float, 0.12, cur);
+                tree.request_repaint();
+            }
+        } elif (t == events.EventType.MouseDown) {
+            if (inside and key == 0) {
+                self.pressed = 1;
+                var cur = motion.value(self.id, 1, self.pressed as float);
+                motion.animate_to(self.id, 1, 1.0, 0.08, cur);
+                return uievent.EventResult.Handled;
+            }
+        } elif (t == events.EventType.MouseUp) {
+            if (self.pressed != 0) {
+                self.pressed = 0;
+                var cur = motion.value(self.id, 1, 1.0);
+                motion.animate_to(self.id, 1, 0.0, 0.12, cur);
+                var handled = 0;
+                if (inside) {
+                    if (self.click != nil) {
+                        (self.click as (fn(): nil))();
+                        handled = 1;
+                    }
+                    if (self.auto_dialog != 0) {
+                        val picked = filedlg.pick_file();
+                        if (picked != nil) {
+                            self.set_path(picked as str);
+                        }
+                        handled = 1;
+                    }
+                }
+                if (handled != 0) { return uievent.EventResult.Handled; }
+            }
+        }
+        return uievent.EventResult.Ignored;
+    }
+}
+
+pub fn file_input(lbl: str = "Choose File...", on_select: (fn(): nil)? = nil): FileInput {
+    return FileInput(lbl, on_select);
+}

@@ -1,26 +1,56 @@
 // examples/text_editor.lm
-// Feature-rich, interactive Text Editor application built with std.game
-// Exercises tabs, file buffers, input handling, custom themes, dialogs, and metrics.
+// Lymar Studio — Text Editor (retained UI)
+//
+// Rewritten from the std.game IMGUI version onto std.ui: a typed
+// Component tree driven by std.app's component-UI path. The editor
+// surface is a custom CodeEditor component backed by
+// std.text.EditorController (multiline, cursor, selection, undo
+// history). Document tabs, find/replace and About are retained
+// components; menu actions are Buttons; theme switching goes through
+// theme presets + tree.apply_theme for live re-theming.
+//
+// Layout notes vs. the IMGUI original:
+//   - Dropdown menus are flattened into the menu bar (the UI has no popup
+//     menu widget yet); File actions are direct buttons.
+//   - Find/Replace and About are inline panels that expand between the
+//     tab strip and the editor instead of floating windows.
+//   - Keyboard shortcuts (Ctrl+S/F/H, F3, Esc) are not wired: the
+//     event stream does not carry modifier state. Use the menu buttons.
+//   - The status line is painted inside the editor's bottom strip.
+//
+//   lymar run examples/text_editor.lm
 
-import std.game as game;
-import std.math as math;
+import std.app as app;
+import std.ui as ui;
+import std.ui.theme as uitheme;
+import std.ui.tree as tree;
+import std.ui.component as comp;
+import std.ui.component show Placed;
+import std.ui.event as uievent;
+import std.ui.draw_list as dl;
+import std.ui.state as state;
+import std.ui.text_metrics as tm;
+import std.ui.types as ui_types;
+import std.ui.context as uictx;
+import std.events as events;
+import std.color as color;
+import std.text.controller as text_ctrl;
+import std.text.grapheme as grapheme;
 import std.string show substring, replace, String;
+
+// ── Document model ───────────────────────────────────────────────────────────
 
 frame EditorDocument {
     pub var title: str;
     pub var path: str;
     pub var content: str;
     pub var is_dirty: bool;
-    pub var cursor_line: int;
-    pub var cursor_col: int;
 
     pub init(title: str = "Untitled.txt", path: str = "", content: str = "") {
         self.title = title;
         self.path = path;
         self.content = content;
         self.is_dirty = false;
-        self.cursor_line = 1;
-        self.cursor_col = 1;
     }
 }
 
@@ -28,15 +58,591 @@ pub fn EditorDocument(title: str = "Untitled.txt", path: str = "", content: str 
     return EditorDocument(title=title, path=path, content=content);
 }
 
+// ── Shared mutable state ─────────────────────────────────────────────────────
+// Frame-typed fields are shared into trait snapshots, so components hold
+// `st`/`ed` references and always read live values. Flags that must
+// trigger repaints are IntSignals (set() notifies the dirty flag).
+
+frame EditorState {
+    pub var documents: [EditorDocument];
+    pub var active_tab_idx: int;
+    pub var status_message: str;
+    pub var theme_idx: int;
+    pub var last_find_idx: int;
+    pub var show_find: state.IntSignal;
+    pub var show_about: state.IntSignal;
+    pub var show_metrics: state.IntSignal;
+
+    pub init() {
+        self.documents = [] as [EditorDocument];
+        self.active_tab_idx = 0;
+        self.status_message = "Ready";
+        self.theme_idx = 0;
+        self.last_find_idx = 0;
+        self.show_find = state.signal_int(0);
+        self.show_about = state.signal_int(0);
+        self.show_metrics = state.signal_int(0);
+    }
+}
+
+// ── CodeEditor ───────────────────────────────────────────────────────────────
+// Multiline text editor component. Owns an EditorController for the
+// currently loaded document; flushes text back into the document on
+// every edit. All float geometry that must survive draw calls lives in
+// fields (AOT float-local-across-call clobber — see AGENTS notes).
+
+frame CodeEditor {
+    embed Placed;
+    pub var ctrl: text_ctrl.EditorController;
+    pub var doc: EditorDocument;
+    pub var st: EditorState;
+    pub var scroll_y: float;
+    pub var max_scroll: float;
+    pub var focused: int;
+    pub var font_scale: float;
+    pub var gutter_w: float;
+    pub var line_h: float;
+    pub var status_h: float;
+    pub var bg: color.Color;
+    pub var fg: color.Color;
+    pub var gutter: color.Color;
+    pub var sel: color.Color;
+    pub var accent: color.Color;
+    pub var panel: color.Color;
+    pub var border: color.Color;
+    pub var text_muted: color.Color;
+    // Scratch (must be fields — see header comment).
+    pub var _tx: float = 0.0;
+    pub var _lh: float = 0.0;
+    pub var _ly: float = 0.0;
+    pub var _cx: float = 0.0;
+    pub var _cy: float = 0.0;
+    pub var _sx0: float = 0.0;
+    pub var _sx1: float = 0.0;
+    pub var _acc: float = 0.0;
+    pub var _segw: float = 0.0;
+    pub var _total: float = 0.0;
+
+    pub init(d: EditorDocument, s: EditorState) {
+        val pal = uitheme.palette();
+        self.ctrl = text_ctrl.EditorController(d.content);
+        self.doc = d;
+        self.st = s;
+        self.scroll_y = 0.0;
+        self.max_scroll = 0.0;
+        self.focused = 0;
+        self.font_scale = 1.0;
+        self.gutter_w = 44.0;
+        self.line_h = 0.0;
+        self.status_h = 24.0;
+        self.bg = pal.background;
+        self.fg = pal.text_primary;
+        self.gutter = pal.text_muted;
+        self.sel = pal.selection;
+        self.accent = pal.accent;
+        self.panel = pal.surface;
+        self.border = pal.border;
+        self.text_muted = pal.text_muted;
+        self.id = comp.next_widget_id();
+        self._refresh_metrics();
+    }
+
+    pub fn kind(): ui_types.WidgetKind { return ui_types.WidgetKind.Textarea; }
+
+    pub fn on_theme_changed(): nil {
+        val p = uitheme.palette();
+        self.bg = p.background;
+        self.fg = p.text_primary;
+        self.gutter = p.text_muted;
+        self.sel = p.selection;
+        self.accent = p.accent;
+        self.panel = p.surface;
+        self.border = p.border;
+        self.text_muted = p.text_muted;
+        tree.request_repaint();
+    }
+    pub fn on_overlay_dismiss(): nil { }
+
+    fn _refresh_metrics(): nil {
+        self.line_h = tm.line_height(self.font_scale) + 3.0;
+        self._tx = self.rect.x + self.gutter_w + 8.0;
+    }
+
+    // Write the controller text back into the bound document.
+    pub fn flush_doc(): nil {
+        self.doc.content = self.ctrl.get_text();
+    }
+
+    // Load a different document into the editor (tab switch).
+    pub fn load_doc(d: EditorDocument): nil {
+        self.flush_doc();
+        self.doc = d;
+        self.ctrl.set_text(d.content);
+        self.scroll_y = 0.0;
+    }
+
+    pub fn _mark_dirty(): nil {
+        self.flush_doc();
+        self.doc.is_dirty = true;
+    }
+
+    fn _clamp_scroll(): nil {
+        if (self.scroll_y < 0.0) { self.scroll_y = 0.0; }
+        if (self.scroll_y > self.max_scroll) { self.scroll_y = self.max_scroll; }
+    }
+
+    pub fn _ensure_cursor_visible(): nil {
+        var cl: int = self.ctrl.get_cursor_line();
+        var n: int = self.ctrl.get_line_count();
+        if (cl < 0) { cl = 0; }
+        if (cl >= n) { cl = n - 1; }
+        // Content y of the cursor line relative to the view top.
+        self._cy = self.rect.y + (cl as float) * self.line_h - self.scroll_y;
+        var view_b: float = self.rect.y + self.rect.h - self.status_h;
+        if (self._cy < self.rect.y) {
+            self.scroll_y = self.scroll_y + (self._cy - self.rect.y);
+        } elif (self._cy + self.line_h > view_b) {
+            self.scroll_y = self.scroll_y + (self._cy + self.line_h - view_b);
+        }
+        self._clamp_scroll();
+    }
+
+    // Byte/char column under a pixel x offset inside `line`.
+    fn _col_at_px(line: str, px: float): int {
+        self._acc = 0.0;
+        var col: int = 0;
+        var n: int = len(line);
+        var done: int = 0;
+        while ((col < n) and (done == 0)) {
+            var nxt: int = grapheme.next_boundary(line, col);
+            if (nxt <= col) { nxt = col + 1; }
+            self._segw = tm.text_width(substring(line, col, nxt), self.font_scale);
+            if (self._acc + self._segw > px) {
+                done = 1;
+            } else {
+                self._acc = self._acc + self._segw;
+                col = nxt;
+            }
+        }
+        return col;
+    }
+
+    fn _place_cursor(x: int, y: int): nil {
+        var rel_y: float = (y as float) - self.rect.y + self.scroll_y;
+        var ln: int = (rel_y / self.line_h) as int;
+        var n: int = self.ctrl.get_line_count();
+        if (ln < 0) { ln = 0; }
+        if (ln >= n) { ln = n - 1; }
+        var px: float = (x as float) - self._tx;
+        if (px < 0.0) { px = 0.0; }
+        var col: int = self._col_at_px(self.ctrl.get_line(ln), px);
+        self.ctrl.set_cursor(ln, col);
+    }
+
+    pub fn wants_pointer_capture(): int { return 0; }
+
+    pub fn measure(min_w: float, max_w: float, min_h: float, max_h: float): comp.Size {
+        // Editor wants all remaining space: return the bounded constraint.
+        // Unbounded parents (MEASURE_LOOSE) get a sane default.
+        var w: float = 640.0;
+        var h: float = 360.0;
+        if (max_w < comp.MEASURE_LOOSE and max_w > 0.0) { w = max_w; }
+        if (max_h < comp.MEASURE_LOOSE and max_h > 0.0) { h = max_h; }
+        if (w < min_w) { w = min_w; }
+        if (w > max_w and max_w < comp.MEASURE_LOOSE) { w = max_w; }
+        if (h < min_h) { h = min_h; }
+        if (h > max_h and max_h < comp.MEASURE_LOOSE) { h = max_h; }
+        return comp.Size(w=w, h=h);
+    }
+
+    pub fn arrange(x: float, y: float, w: float, h: float): nil {
+        self.rect.x = x;
+        self.rect.y = y;
+        self.rect.w = w;
+        self.rect.h = h;
+        self._refresh_metrics();
+        var n: int = self.ctrl.get_line_count();
+        self._total = (n as float) * self.line_h;
+        var content_h: float = h - self.status_h;
+        if (content_h < 0.0) { content_h = 0.0; }
+        self.max_scroll = self._total - content_h;
+        if (self.max_scroll < 0.0) { self.max_scroll = 0.0; }
+        self._clamp_scroll();
+        self._ensure_cursor_visible();
+    }
+
+    pub fn paint(): nil {
+        var d = dl.paint_ctx.dl;
+        // Editor surface + border.
+        dl.dl_emit_rect(d, self.rect.x, self.rect.y, self.rect.w, self.rect.h,
+            self.bg.r, self.bg.g, self.bg.b, self.bg.a);
+        dl.dl_emit_rect_border(d, self.rect.x, self.rect.y, self.rect.w, self.rect.h,
+            0.0, 1.0, self.border.r, self.border.g, self.border.b, 0.6);
+        // Content area clips at the status strip.
+        var content_b: float = self.rect.y + self.rect.h - self.status_h;
+        dl.dl_push_clip(d, self.rect.x, self.rect.y, self.rect.w, self.rect.h - self.status_h);
+
+        var n: int = self.ctrl.get_line_count();
+        var first: int = (self.scroll_y / self.line_h) as int;
+        if (first < 0) { first = 0; }
+        var last: int = (((self.scroll_y + self.rect.h - self.status_h) / self.line_h) as int) + 1;
+        if (last > n) { last = n; }
+        var sr = self.ctrl.get_selection_range();
+        var has_sel: int = self.ctrl.has_selection();
+        var i: int = first;
+        while (i < last) {
+            self._ly = self.rect.y + (i as float) * self.line_h - self.scroll_y + 2.0;
+            val lt = self.ctrl.get_line(i);
+            if (has_sel != 0) {
+                var lo: int = -1;
+                var hi: int = -1;
+                if (sr[0] == sr[2]) {
+                    if (i == sr[0]) { lo = sr[1]; hi = sr[3]; }
+                } elif (i == sr[0]) {
+                    lo = sr[1]; hi = len(lt);
+                } elif (i == sr[2]) {
+                    lo = 0; hi = sr[3];
+                } elif (i > sr[0] and i < sr[2]) {
+                    lo = 0; hi = len(lt);
+                }
+                if (lo >= 0 and hi > lo) {
+                    self._sx0 = self._tx + tm.text_width(substring(lt, 0, lo), self.font_scale);
+                    self._sx1 = self._tx + tm.text_width(substring(lt, 0, hi), self.font_scale);
+                    dl.dl_emit_rect(d, self._sx0, self._ly - 1.0, self._sx1 - self._sx0,
+                        self.line_h, self.sel.r, self.sel.g, self.sel.b, self.sel.a);
+                }
+            }
+            dl.dl_emit_text(d, ((i + 1) as str), self.rect.x + 6.0, self._ly,
+                self.gutter.r, self.gutter.g, self.gutter.b, 0.55, self.font_scale * 0.85);
+            dl.dl_emit_text(d, lt, self._tx, self._ly,
+                self.fg.r, self.fg.g, self.fg.b, self.fg.a, self.font_scale);
+            i = i + 1;
+        }
+
+        // Cursor (block caret) when focused and on a visible line.
+        if (self.focused != 0) {
+            var cl: int = self.ctrl.get_cursor_line();
+            var cc: int = self.ctrl.get_cursor_col();
+            if (cl >= first and cl < last) {
+                val cline = self.ctrl.get_line(cl);
+                self._cx = self._tx + tm.text_width(substring(cline, 0, cc), self.font_scale);
+                self._cy = self.rect.y + (cl as float) * self.line_h - self.scroll_y + 2.0;
+                dl.dl_emit_rect(d, self._cx, self._cy, 1.5, self.line_h - 3.0,
+                    self.accent.r, self.accent.g, self.accent.b, 1.0);
+            }
+        }
+        dl.dl_pop_clip(d);
+
+        // ── Status strip (bottom of the editor rect) ──
+        dl.dl_emit_rect(d, self.rect.x, content_b, self.rect.w, self.status_h,
+            self.panel.r, self.panel.g, self.panel.b, self.panel.a);
+        dl.dl_emit_rect(d, self.rect.x, content_b, self.rect.w, 1.0,
+            self.border.r, self.border.g, self.border.b, 0.8);
+        var status = _status_text(self);
+        dl.dl_emit_text(d, status, self.rect.x + 8.0, content_b + 5.0,
+            self.text_muted.r, self.text_muted.g, self.text_muted.b, 0.9, 0.9);
+    }
+
+    pub fn on_event(t: events.EventType, x: int, y: int, key: int): uievent.EventResult {
+        var inside: bool = self.rect.contains(x as float, y as float);
+        if (t == events.EventType.MouseDown) {
+            if (inside) {
+                // Ignore clicks in the status strip.
+                if ((y as float) < self.rect.y + self.rect.h - self.status_h) {
+                    self.focused = 1;
+                    tree.set_focus(self);
+                    self._place_cursor(x, y);
+                    return uievent.EventResult.Handled;
+                }
+            }
+        } elif (t == events.EventType.MouseWheel) {
+            if (inside) {
+                self.scroll_y = self.scroll_y + (key as float) * 24.0;
+                self._clamp_scroll();
+                return uievent.EventResult.Handled;
+            }
+        } elif (t == events.EventType.KeyDown) {
+            if (self.focused == 0) { return uievent.EventResult.Ignored; }
+            if (key == 8) {
+                self.ctrl.backspace();
+                self._mark_dirty();
+                return uievent.EventResult.Handled;
+            }
+            if (key == 13) {
+                self.ctrl.insert_newline();
+                self._mark_dirty();
+                return uievent.EventResult.Handled;
+            }
+            if (key == 46) {
+                self.ctrl.delete_char();
+                self._mark_dirty();
+                return uievent.EventResult.Handled;
+            }
+            if (key == 9) {
+                self.ctrl.insert_text("    ");
+                self._mark_dirty();
+                return uievent.EventResult.Handled;
+            }
+            if (key == 37) { self.ctrl.move_left(false); return uievent.EventResult.Handled; }
+            if (key == 39) { self.ctrl.move_right(false); return uievent.EventResult.Handled; }
+            if (key == 38) { self.ctrl.move_up(false); return uievent.EventResult.Handled; }
+            if (key == 40) { self.ctrl.move_down(false); return uievent.EventResult.Handled; }
+            if (key == 36) {
+                self.ctrl.set_cursor(self.ctrl.get_cursor_line(), 0);
+                return uievent.EventResult.Handled;
+            }
+            if (key == 35) {
+                var lc: int = self.ctrl.get_line_count() - 1;
+                self.ctrl.set_cursor(lc, len(self.ctrl.get_line(lc)));
+                return uievent.EventResult.Handled;
+            }
+            if (key == 33 or key == 34) {
+                var page: int = ((self.rect.h / self.line_h) as int) - 1;
+                if (page < 1) { page = 1; }
+                var k: int = 0;
+                if (key == 33) {
+                    while (k < page) { self.ctrl.move_up(false); k = k + 1; }
+                } else {
+                    while (k < page) { self.ctrl.move_down(false); k = k + 1; }
+                }
+                return uievent.EventResult.Handled;
+            }
+        } elif (t == events.EventType.Char) {
+            if (self.focused == 0) { return uievent.EventResult.Ignored; }
+            var ch = uictx.codepoint_to_utf8(key);
+            if (len(ch) > 0 and ch != "\n" and ch != "\r") {
+                self.ctrl.insert_text(ch);
+                self._mark_dirty();
+                return uievent.EventResult.Handled;
+            }
+        }
+        return uievent.EventResult.Ignored;
+    }
+}
+
+// ── DocTabStrip ──────────────────────────────────────────────────────────────
+// Document tab bar: one equal-width tab per EditorDocument, active tab
+// highlighted, dirty docs get a " *" suffix. Click switches documents.
+
+frame DocTabStrip {
+    embed Placed;
+    pub var st: EditorState;
+    pub var ed: CodeEditor;
+    pub var surface: color.Color;
+    pub var text: color.Color;
+    pub var text2: color.Color;
+    pub var accent: color.Color;
+    pub var border: color.Color;
+    pub var _tw: float = 0.0;
+
+    pub init(s: EditorState, e: CodeEditor) {
+        val pal = uitheme.palette();
+        self.st = s;
+        self.ed = e;
+        self.surface = pal.surface;
+        self.text = pal.text_primary;
+        self.text2 = pal.text_muted;
+        self.accent = pal.accent;
+        self.border = pal.border;
+        self.id = comp.next_widget_id();
+    }
+
+    pub fn kind(): ui_types.WidgetKind { return ui_types.WidgetKind.Tabs; }
+
+    pub fn on_theme_changed(): nil {
+        val p = uitheme.palette();
+        self.surface = p.surface;
+        self.text = p.text_primary;
+        self.text2 = p.text_muted;
+        self.accent = p.accent;
+        self.border = p.border;
+        tree.request_repaint();
+    }
+    pub fn on_overlay_dismiss(): nil { }
+
+    pub fn wants_pointer_capture(): int { return 0; }
+
+    pub fn measure(min_w: float, max_w: float, min_h: float, max_h: float): comp.Size {
+        var h: float = 30.0;
+        var w: float = 800.0;
+        if (max_w < comp.MEASURE_LOOSE and max_w > 0.0) { w = max_w; }
+        return comp.Size(w=w, h=h);
+    }
+
+    pub fn arrange(x: float, y: float, w: float, h: float): nil {
+        self.rect.x = x;
+        self.rect.y = y;
+        self.rect.w = w;
+        self.rect.h = h;
+        var n: int = len(self.st.documents);
+        if (n > 0) {
+            self._tw = w / (n as float);
+        } else {
+            self._tw = 0.0;
+        }
+    }
+
+    pub fn paint(): nil {
+        var d = dl.paint_ctx.dl;
+        dl.dl_emit_rect(d, self.rect.x, self.rect.y, self.rect.w, self.rect.h,
+            self.surface.r, self.surface.g, self.surface.b, self.surface.a);
+        var n: int = len(self.st.documents);
+        var i: int = 0;
+        while (i < n) {
+            var tx: float = self.rect.x + (i as float) * self._tw;
+            var is_active: int = 0;
+            if (i == self.st.active_tab_idx) { is_active = 1; }
+            if (is_active != 0) {
+                dl.dl_emit_rect(d, tx + 2.0, self.rect.y + 2.0, self._tw - 4.0, self.rect.h - 4.0,
+                    self.accent.r, self.accent.g, self.accent.b, 0.25);
+            }
+            var title: str = self.st.documents[i].title;
+            if (self.st.documents[i].is_dirty) { title = title + " *"; }
+            var tc = self.text;
+            if (is_active != 0) { tc = self.accent; }
+            dl.dl_emit_text(d, title, tx + 8.0, self.rect.y + 7.0,
+                tc.r, tc.g, tc.b, 1.0, 0.95);
+            i = i + 1;
+        }
+        dl.dl_emit_rect(d, self.rect.x, self.rect.y + self.rect.h - 1.0, self.rect.w, 1.0,
+            self.border.r, self.border.g, self.border.b, 0.7);
+    }
+
+    pub fn on_event(t: events.EventType, x: int, y: int, key: int): uievent.EventResult {
+        if (t == events.EventType.MouseDown) {
+            var inside: bool = self.rect.contains(x as float, y as float);
+            if (inside and self._tw > 0.0) {
+                var idx: int = (((x as float) - self.rect.x) / self._tw) as int;
+                var n: int = len(self.st.documents);
+                if (idx < 0) { idx = 0; }
+                if (idx >= n) { idx = n - 1; }
+                if (idx != self.st.active_tab_idx) {
+                    self.ed.flush_doc();
+                    self.st.active_tab_idx = idx;
+                    self.ed.load_doc(self.st.documents[idx]);
+                    self.st.status_message = "Switched to " + self.st.documents[idx].title;
+                    return uievent.EventResult.Handled;
+                }
+                return uievent.EventResult.Handled;
+            }
+        }
+        return uievent.EventResult.Ignored;
+    }
+}
+
+// ── Visible ──────────────────────────────────────────────────────────────────
+// Visibility-gated wrapper: collapses to zero size and ignores events while
+// its IntSignal reads 0. Used for the inline Find/Replace and About panels.
+
+frame Visible {
+    embed Placed;
+    pub var child: comp.Component;
+    pub var sig: state.IntSignal;
+
+    pub init(c: comp.Component, s: state.IntSignal) {
+        self.child = c;
+        self.sig = s;
+        self.id = comp.next_widget_id();
+    }
+
+    pub fn kind(): ui_types.WidgetKind { return ui_types.WidgetKind.Container; }
+    pub fn on_theme_changed(): nil { self.child.on_theme_changed(); }
+    pub fn on_overlay_dismiss(): nil { }
+
+    pub fn child_count(): int { return 1; }
+    pub fn child_at(i: int): any {
+        if (i == 0) { return self.child; }
+        return nil;
+    }
+
+    pub fn wants_pointer_capture(): int { return 0; }
+
+    pub fn measure(min_w: float, max_w: float, min_h: float, max_h: float): comp.Size {
+        if (self.sig.get() == 0) { return comp.Size(w=0.0, h=0.0); }
+        return self.child.measure(min_w, max_w, min_h, max_h);
+    }
+
+    pub fn arrange(x: float, y: float, w: float, h: float): nil {
+        self.rect.x = x;
+        self.rect.y = y;
+        self.rect.w = w;
+        self.rect.h = h;
+        if (self.sig.get() != 0) {
+            self.child.arrange(x, y, w, h);
+        }
+    }
+
+    pub fn paint(): nil {
+        if (self.sig.get() != 0) {
+            self.child.paint();
+        }
+    }
+
+    pub fn on_event(t: events.EventType, x: int, y: int, key: int): uievent.EventResult {
+        if (self.sig.get() == 0) { return uievent.EventResult.Ignored; }
+        return self.child.on_event(t, x, y, key);
+    }
+}
+
+// ── DynLabel ─────────────────────────────────────────────────────────────────
+// Label whose text is recomputed every paint from a fn(): str — used for
+// the live "N matches" readout in the find panel.
+
+frame DynLabel {
+    embed Placed;
+    pub var get_text: fn(): str;
+    pub var fg: color.Color;
+    pub var font_scale: float;
+
+    pub init(fn_: fn(): str, c: color.Color? = nil) {
+        self.get_text = fn_;
+        if (c == nil) {
+            self.fg = color.gray;
+        } else {
+            self.fg = c as color.Color;
+        }
+        self.font_scale = 0.9;
+        self.id = comp.next_widget_id();
+    }
+
+    pub fn kind(): ui_types.WidgetKind { return ui_types.WidgetKind.Text; }
+    pub fn on_theme_changed(): nil { }
+    pub fn on_overlay_dismiss(): nil { }
+
+    pub fn wants_pointer_capture(): int { return 0; }
+
+    pub fn measure(min_w: float, max_w: float, min_h: float, max_h: float): comp.Size {
+        val s = self.get_text();
+        var w: float = tm.text_width(s, self.font_scale) + 8.0;
+        var h: float = tm.line_height(self.font_scale) + 4.0;
+        if (w < min_w) { w = min_w; }
+        if (w > max_w) { w = max_w; }
+        if (h < min_h) { h = min_h; }
+        if (h > max_h) { h = max_h; }
+        return comp.Size(w=w, h=h);
+    }
+
+    pub fn paint(): nil {
+        dl.dl_emit_text(dl.paint_ctx.dl, self.get_text(), self.rect.x + 4.0, self.rect.y + 2.0,
+            self.fg.r, self.fg.g, self.fg.b, self.fg.a, self.font_scale);
+    }
+
+    pub fn on_event(t: events.EventType, x: int, y: int, key: int): uievent.EventResult {
+        return uievent.EventResult.Ignored;
+    }
+}
+
+// ── Find/replace helpers ─────────────────────────────────────────────────────
+
 fn find_substring_from(haystack: str, needle: str, start_pos: int): int {
     var h_len = len(haystack);
     var n_len = len(needle);
-    if (n_len == 0) return -1;
-    if (start_pos < 0) start_pos = 0;
-    if (start_pos + n_len > h_len) return -1;
+    if (n_len == 0) { return -1; }
+    if (start_pos < 0) { start_pos = 0; }
+    if (start_pos + n_len > h_len) { return -1; }
     var sub = substring(haystack, start_pos, h_len);
     var idx = String(value=sub).index_of(needle);
-    if (idx < 0) return -1;
+    if (idx < 0) { return -1; }
     return start_pos + idx;
 }
 
@@ -45,7 +651,7 @@ fn char_to_line_col(text: str, target_idx: int): (int, int) {
     var col = 0;
     var ci = 0;
     var t_len = len(text);
-    if (target_idx > t_len) target_idx = t_len;
+    if (target_idx > t_len) { target_idx = t_len; }
     while (ci < target_idx) {
         if (text[ci] == "\n") {
             line = line + 1;
@@ -58,637 +664,418 @@ fn char_to_line_col(text: str, target_idx: int): (int, int) {
     return (line, col);
 }
 
+fn find_status_text(): str {
+    if (_app_ready == 0) { return ""; }
+    if (len(_apps[0].find_query()) == 0) { return ""; }
+    var mc: int = _apps[0].count_matches();
+    if (mc == 0) { return "No matches found in active document"; }
+    if (mc == 1) { return "1 match found"; }
+    return "{mc} matches found";
+}
+
+fn theme_display(i: int): str {
+    if (i == 1) { return "Light"; }
+    if (i == 2) { return "Cyberpunk"; }
+    if (i == 3) { return "Retro"; }
+    if (i == 4) { return "Nord"; }
+    return "Dark";
+}
+
+fn _status_text(ed: CodeEditor): str {
+    var st = ed.st;
+    var ln: int = ed.ctrl.get_cursor_line() + 1;
+    var cl: int = ed.ctrl.get_cursor_col() + 1;
+    var lc: int = ed.ctrl.get_line_count();
+    var cc: int = len(ed.doc.content);
+    var nd: int = len(st.documents);
+    var s = "{st.status_message}  |  Ln {ln}, Col {cl}  |  Lines: {lc}  |  Chars: {cc}  |  Theme: {theme_display(st.theme_idx)}  |  Docs: {nd}";
+    if (st.show_metrics.get() != 0) {
+        s = s + "  |  Frames: {app.get_frame_count()}";
+    }
+    return s;
+}
+
+// ── Menu action callbacks (module fns — Button.on_click is fn(): nil) ───────
+
+fn act_new() {
+    if (_app_ready == 1) { _apps[0].new_document(); }
+}
+
+fn act_save() {
+    if (_app_ready == 1) { _apps[0].save_current_document(); }
+}
+
+fn act_close_tab() {
+    if (_app_ready == 1) { _apps[0].close_current_document(); }
+}
+
+fn act_find() {
+    if (_app_ready == 1) { _apps[0].toggle_find(); }
+}
+
+fn act_about() {
+    if (_app_ready == 1) { _apps[0].toggle_about(); }
+}
+
+fn act_metrics() {
+    if (_app_ready == 1) { _apps[0].toggle_metrics(); }
+}
+
+fn act_find_next() {
+    if (_app_ready == 1) { _apps[0].find_next(); }
+}
+
+fn act_replace() {
+    if (_app_ready == 1) { _apps[0].replace_current(); }
+}
+
+fn act_replace_all() {
+    if (_app_ready == 1) { _apps[0].replace_all(); }
+}
+
+fn act_close_find() {
+    if (_app_ready == 1) { _apps[0].st.show_find.set(0); }
+}
+
+fn act_close_about() {
+    if (_app_ready == 1) { _apps[0].st.show_about.set(0); }
+}
+
+fn fx_theme() {
+    if (_app_ready == 1) { _apps[0].apply_theme_idx(); }
+}
+
+// ── TextEditorApp ────────────────────────────────────────────────────────────
+
 frame TextEditorApp {
-    pub var game_app: game.Game;
-    pub var documents: [EditorDocument];
-    pub var active_tab_idx: int;
-    pub var status_message: str;
-    pub var status_timer: float;
-
-    // Dialog & overlay states
-    pub var show_find_dialog: bool;
-    pub var find_query: str;
-    pub var replace_query: str;
-    pub var last_find_idx: int;
-    pub var show_about_dialog: bool;
-    pub var show_metrics: bool;
-
-    // Theme tracking
-    pub var current_theme_name: str;
-    pub var theme_names: [str];
-    pub var current_theme_idx: int;
+    pub var st: EditorState;
+    pub var ed: CodeEditor;
+    pub var strip: DocTabStrip;
+    pub var find_inp: ui.TextInput;
+    pub var repl_inp: ui.TextInput;
+    pub var theme_sig: state.IntSignal;
+    pub var theme_sel: ui.Select;
+    pub var root: comp.Component;
 
     pub init() {
-        var cfg = game.GameConfig(
-            title="Lymar Studio - Text Editor",
-            width=1080,
-            height=720,
-            resizable=true
-        );
-        self.game_app = game.Game(cfg);
+        uitheme.set_dark();
+        self.st = EditorState();
 
-        self.documents = [];
-        self.active_tab_idx = 0;
-        self.status_message = "Ready";
-        self.status_timer = 3.0;
-
-        self.show_find_dialog = false;
-        self.find_query = "";
-        self.replace_query = "";
-        self.last_find_idx = 0;
-        self.show_about_dialog = false;
-        self.show_metrics = false;
-
-        self.current_theme_name = "Retro";
-        self.theme_names = ["Dark", "Cyberpunk", "Light", "Retro"];
-        self.current_theme_idx = 0;
-
-        // Preload sample documents
+        // Sample documents.
         var doc1 = EditorDocument(
             title="Welcome.lm",
             path="welcome.lm",
-            content="// Welcome to Lymar Studio Text Editor!\n// Built entirely with the std.game framework.\n\nfn main(): int\n    return 0;\n"
+            content="// Welcome to Lymar Studio Text Editor!\n// Built on the std.ui retained component tree.\n\nfn main(): int\n    return 0;\n"
         );
         var doc2 = EditorDocument(
             title="notes.txt",
             path="notes.txt",
             content="Project Todo:\n- [x] Complete Phases 1-5 of std.game engine\n- [x] Vector math, camera, particles, and scenes\n- [ ] Build awesome desktop applications in Lymar!\n"
         );
+        self.st.documents.append(doc1);
+        self.st.documents.append(doc2);
 
-        self.documents.append(doc1);
-        self.documents.append(doc2);
+        self.ed = CodeEditor(self.st.documents[0], self.st);
+        self.strip = DocTabStrip(self.st, self.ed);
+
+        // Find/Replace panel contents (wrapped in Visible below).
+        self.find_inp = ui.text_input("", "Search text...");
+        self.repl_inp = ui.text_input("", "Replacement...");
+
+        // Theme selector signal + live re-theme effect.
+        self.theme_sig = state.signal_int(0);
+        var names = ["Dark", "Light", "Cyberpunk", "Retro", "Nord"];
+        self.theme_sel = ui.select(names, 0);
+        self.theme_sel.bind_selected(self.theme_sig);
+        ui.effect(fx_theme, [self.theme_sig.node]);
+
+        self.root = self.build_root();
     }
 
+    pub fn find_query(): str {
+        return self.find_inp.text();
+    }
+
+    pub fn replace_query(): str {
+        return self.repl_inp.text();
+    }
+
+    fn _panel(pad: float): ui.Flow {
+        var p = ui.column(6.0);
+        p.pad_x = pad;
+        p.pad_y = pad;
+        return p;
+    }
+
+    fn build_find_panel(): comp.Component {
+        var p = self._panel(10.0);
+        p.add(ui.label("Search:"));
+        p.add(self.find_inp);
+        p.add(ui.label("Replace with:"));
+        p.add(self.repl_inp);
+        var btns = ui.row(6.0);
+        btns.add(ui.button("Find Next", nil, act_find_next));
+        btns.add(ui.button("Replace", nil, act_replace));
+        btns.add(ui.button("Replace All", nil, act_replace_all));
+        btns.add(ui.button("Close", nil, act_close_find));
+        p.add(btns);
+        p.add(DynLabel(find_status_text));
+        return Visible(p, self.st.show_find);
+    }
+
+    fn build_about_panel(): comp.Component {
+        var inner = ui.column(4.0);
+        inner.add(ui.label("Lymar Studio Text Editor comp.0"));
+        inner.add(ui.label("A retained-component desktop editor built with:"));
+        inner.add(ui.label("- std.ui Component tree (measure/arrange/paint)"));
+        inner.add(ui.label("- std.text.EditorController multiline engine"));
+        inner.add(ui.label("- std.app window lifecycle + std.events pump"));
+        inner.add(ui.label("- std.theme live re-theming via tree.apply_theme"));
+        var btns = ui.row(6.0);
+        btns.add(ui.button("OK", nil, act_close_about));
+        inner.add(btns);
+        var card = ui.card("About", inner);
+        return Visible(card, self.st.show_about);
+    }
+
+    fn build_menu(): ui.Flow {
+        var m = ui.row(6.0);
+        m.pad_y = 2.0;
+        m.add(ui.button("New", nil, act_new));
+        m.add(ui.button("Save", nil, act_save));
+        m.add(ui.button("Close Tab", nil, act_close_tab));
+        m.add(ui.button("Find", nil, act_find));
+        m.add(ui.button("About", nil, act_about));
+        m.add(ui.button("Metrics", nil, act_metrics));
+        m.add(ui.spacer());
+        m.add(self.theme_sel);
+        return m;
+    }
+
+    pub fn build_root(): comp.Component {
+        var root = ui.column(8.0);
+        root.pad_x = 8.0;
+        root.pad_y = 6.0;
+        root.add(self.build_menu());
+        root.add(self.strip);
+        root.add(self.build_find_panel());
+        root.add(self.build_about_panel());
+        root.add(self.ed);
+        return root;
+    }
+
+    // ── Document operations ────────────────────────────────────────────────
+
     pub fn new_document(): nil {
-        var count = len(self.documents) + 1;
+        var count: int = len(self.st.documents) + 1;
         var name = "Untitled-{count}.txt";
         var doc = EditorDocument(title=name, path="", content="");
-        self.documents.append(doc);
-        self.active_tab_idx = len(self.documents) - 1;
-        self.set_status("Created " + name);
+        self.ed.flush_doc();
+        self.st.documents.append(doc);
+        self.st.active_tab_idx = len(self.st.documents) - 1;
+        self.ed.load_doc(doc);
+        self.st.status_message = "Created " + name;
+        tree.request_repaint();
     }
 
     pub fn close_current_document(): nil {
-        var n = len(self.documents);
+        var n: int = len(self.st.documents);
         if (n <= 1) {
-            self.set_status("Cannot close last remaining buffer");
+            self.st.status_message = "Cannot close last remaining buffer";
             return;
         }
-
-        var new_docs: [EditorDocument] = [];
+        var new_docs: [EditorDocument] = [] as [EditorDocument];
         var i = 0;
         while (i < n) {
-            if (i != self.active_tab_idx) {
-                new_docs.append(self.documents[i]);
+            if (i != self.st.active_tab_idx) {
+                new_docs.append(self.st.documents[i]);
             }
             i = i + 1;
         }
-        self.documents = new_docs;
-        if (self.active_tab_idx >= len(self.documents)) {
-            self.active_tab_idx = len(self.documents) - 1;
+        self.st.documents = new_docs;
+        if (self.st.active_tab_idx >= len(self.st.documents)) {
+            self.st.active_tab_idx = len(self.st.documents) - 1;
         }
-        self.set_status("Closed document");
+        self.ed.load_doc(self.st.documents[self.st.active_tab_idx]);
+        self.st.status_message = "Closed document";
+        tree.request_repaint();
     }
 
     pub fn save_current_document(): nil {
-        if (self.active_tab_idx >= 0 and self.active_tab_idx < len(self.documents)) {
-            var doc = self.documents[self.active_tab_idx];
-            doc.is_dirty = false;
-            self.set_status("Saved " + doc.title);
-        }
+        var doc = self.st.documents[self.st.active_tab_idx];
+        self.ed.flush_doc();
+        doc.is_dirty = false;
+        self.st.status_message = "Saved " + doc.title;
+        tree.request_repaint();
     }
 
-    pub fn set_status(msg: str): nil {
-        self.status_message = msg;
-        self.status_timer = 4.0;
+    // ── Panels ────────────────────────────────────────────────────────────
+
+    pub fn toggle_find(): nil {
+        self.st.show_find.set(1 - self.st.show_find.get());
     }
 
-    pub fn set_theme(theme_name: str): nil {
-        self.current_theme_name = theme_name;
-        if (theme_name == "Dark") {
-            self.game_app.gui.set_theme(game.dark_theme());
-        } elif (theme_name == "Cyberpunk") {
-            self.game_app.gui.set_theme(game.cyberpunk_theme());
-        } elif (theme_name == "Light") {
-            self.game_app.gui.set_theme(game.light_theme());
-        } elif (theme_name == "Retro") {
-            self.game_app.gui.set_theme(game.retro_theme());
-        }
-        self.game_app.config.bg_color = self.game_app.gui.theme.bg_window;
-        self.set_status("Switched theme to " + theme_name);
+    pub fn toggle_about(): nil {
+        self.st.show_about.set(1 - self.st.show_about.get());
     }
 
-    pub fn render_menu_bar(gui: any): nil {
-        var g = gui as game.GUI;
-        var win_w = self.game_app.width as float;
-
-        // Solid menu header surface (ensures higher z-index than editor content)
-        var mbg = g.get_style_color(game.COLOR_PANEL_BG);
-        g.draw_rect(0.0, 0.0, win_w, 36.0, mbg);
-        var sep = g.get_style_color(game.COLOR_SEPARATOR);
-        g.draw_rect(0.0, 35.0, win_w, 1.0, sep);
-
-        g.set_cursor(10.0, 6.0);
-
-        // Top navigation bar buttons
-        if (g.button("  File  ", 60.0, 24.0)) {
-            g.open_popup("menu_file");
-        }
-        g.same_line(6.0);
-
-        if (g.button("  Edit  ", 60.0, 24.0)) {
-            g.open_popup("menu_edit");
-        }
-        g.same_line(6.0);
-
-        if (g.button("  View  ", 60.0, 24.0)) {
-            g.open_popup("menu_view");
-        }
-        g.same_line(6.0);
-
-        if (g.button("  Help  ", 60.0, 24.0)) {
-            self.show_about_dialog = true;
-        }
-        g.same_line(20.0);
-
-        // Toolbar Action Shortcuts
-        if (g.button("+ New", 58.0, 24.0)) {
-            self.new_document();
-        }
-        g.same_line(4.0);
-
-        if (g.button("Save", 54.0, 24.0)) {
-            self.save_current_document();
-        }
-        g.same_line(4.0);
-
-        if (g.button("Close Tab", 76.0, 24.0)) {
-            self.close_current_document();
-        }
-        g.same_line(16.0);
-
-        if (g.button("Find", 50.0, 24.0)) {
-            self.show_find_dialog = not self.show_find_dialog;
-        }
-        g.same_line(4.0);
-
-        if (g.button("Metrics", 66.0, 24.0)) {
-            self.show_metrics = not self.show_metrics;
-        }
-        g.same_line(14.0);
-
-        // Quick Theme Select Dropdown
-        var new_t_idx = g.combo_box("", self.theme_names, self.current_theme_idx);
-        if (new_t_idx != self.current_theme_idx) {
-            self.current_theme_idx = new_t_idx;
-            self.set_theme(self.theme_names[new_t_idx]);
-        }
+    pub fn toggle_metrics(): nil {
+        self.st.show_metrics.set(1 - self.st.show_metrics.get());
     }
 
-    pub fn render_dropdowns(gui: any): nil {
-        var g = gui as game.GUI;
+    // ── Theme ─────────────────────────────────────────────────────────────
 
-        // Dropdown popups rendered in the overlay pass (on top of editor area)
-        if (g.begin_popup("menu_file", 10.0, 36.0, 140.0, 96.0)) {
-            if (g.button("New File", 128.0, 22.0)) {
-                self.new_document();
-                g.close_popup("menu_file");
-            }
-            if (g.button("Save File", 128.0, 22.0)) {
-                self.save_current_document();
-                g.close_popup("menu_file");
-            }
-            if (g.button("Close Tab", 128.0, 22.0)) {
-                self.close_current_document();
-                g.close_popup("menu_file");
-            }
-            g.end_popup();
-        }
-
-        if (g.begin_popup("menu_edit", 76.0, 36.0, 140.0, 72.0)) {
-            if (g.button("Find...", 128.0, 22.0)) {
-                self.show_find_dialog = true;
-                g.close_popup("menu_edit");
-            }
-            if (g.button("Select All", 128.0, 22.0)) {
-                self.set_status("Selected all text");
-                g.close_popup("menu_edit");
-            }
-            g.end_popup();
-        }
-
-        if (g.begin_popup("menu_view", 142.0, 36.0, 150.0, 120.0)) {
-            if (g.button("Dark Theme", 138.0, 22.0)) {
-                self.current_theme_idx = 0;
-                self.set_theme("Dark");
-                g.close_popup("menu_view");
-            }
-            if (g.button("Cyberpunk Theme", 138.0, 22.0)) {
-                self.current_theme_idx = 1;
-                self.set_theme("Cyberpunk");
-                g.close_popup("menu_view");
-            }
-            if (g.button("Light Theme", 138.0, 22.0)) {
-                self.current_theme_idx = 2;
-                self.set_theme("Light");
-                g.close_popup("menu_view");
-            }
-            if (g.button("Retro Theme", 138.0, 22.0)) {
-                self.current_theme_idx = 3;
-                self.set_theme("Retro");
-                g.close_popup("menu_view");
-            }
-            g.end_popup();
-        }
+    pub fn apply_theme_idx(): nil {
+        var i: int = self.theme_sig.get();
+        if (i < 0) { i = 0; }
+        if (i > 4) { i = 4; }
+        self.st.theme_idx = i;
+        if (i == 0) { uitheme.set_dark(); }
+        elif (i == 1) { uitheme.set_light(); }
+        elif (i == 2) { uitheme.set_cyberpunk(); }
+        elif (i == 3) { uitheme.set_retro(); }
+        else { uitheme.set_nord(); }
+        tree.apply_theme(self.root);
+        self.st.status_message = "Switched theme to " + theme_display(i);
     }
 
-    pub fn render_tabs(gui: any): nil {
-        var g = gui as game.GUI;
-        var win_w = self.game_app.width as float;
-
-        // Solid tab bar surface (higher z-index than editor)
-        var tbg = g.get_style_color(game.COLOR_WINDOW_BG);
-        g.draw_rect(0.0, 36.0, win_w, 34.0, tbg);
-        var sep = g.get_style_color(game.COLOR_SEPARATOR);
-        g.draw_rect(0.0, 69.0, win_w, 1.0, sep);
-
-        g.set_cursor(10.0, 40.0);
-
-        var i = 0;
-        var num_docs = len(self.documents);
-        while (i < num_docs) {
-            var doc = self.documents[i];
-            var tab_title = doc.title;
-            if (doc.is_dirty) {
-                tab_title = tab_title + " *";
-            }
-
-            var is_active = (i == self.active_tab_idx);
-            var tab_w = 120.0;
-            if (is_active) {
-                // Active tab highlighted
-                g.push_style_color(game.COLOR_BUTTON, g.theme.accent);
-                if (g.button(tab_title, tab_w, 26.0)) {
-                    self.active_tab_idx = i;
-                }
-                g.pop_style_color(1);
-            } else {
-                if (g.button(tab_title, tab_w, 26.0)) {
-                    self.active_tab_idx = i;
-                }
-            }
-            g.same_line(4.0);
-            i = i + 1;
-        }
-    }
-
-    pub fn render_editor_area(gui: any): nil {
-        var g = gui as game.GUI;
-        var cur_doc = self.documents[self.active_tab_idx];
-
-        var area_x = 10.0;
-        var area_y = 74.0;
-        var area_w = (self.game_app.width as float) - 20.0;
-        var area_h = (self.game_app.height as float) - 110.0;
-
-        g.set_cursor(area_x, area_y);
-
-        // Edit text multiline with document-namespaced widget ID
-        var editor_id = "doc_editor_" + cur_doc.title;
-        var new_text = g.input_text_multiline(editor_id, cur_doc.content, area_w, area_h);
-        if (new_text != cur_doc.content) {
-            cur_doc.content = new_text;
-            cur_doc.is_dirty = true;
-        }
-    }
-
-    pub fn render_status_bar(gui: any): nil {
-        var g = gui as game.GUI;
-        var cur_doc = self.documents[self.active_tab_idx];
-
-        var win_w = self.game_app.width as float;
-        var win_h = self.game_app.height as float;
-        var bar_h = 28.0;
-        var bar_y = win_h - bar_h;
-
-        // Solid status bar footer surface matching theme
-        var sbg = g.get_style_color(game.COLOR_PANEL_BG);
-        g.draw_rect(0.0, bar_y, win_w, bar_h, sbg);
-        var sep = g.get_style_color(game.COLOR_SEPARATOR);
-        g.draw_rect(0.0, bar_y, win_w, 1.0, sep);
-
-        g.set_cursor(10.0, bar_y + 6.0);
-
-        var line_count = 1;
-        var char_count = len(cur_doc.content);
-        var ci = 0;
-        while (ci < char_count) {
-            if (cur_doc.content[ci] == "\n") {
-                line_count = line_count + 1;
-            }
-            ci = ci + 1;
-        }
-
-        var editor_id = "doc_editor_" + cur_doc.title;
-        var cur_pos = g.get_multiline_cursor(editor_id);
-        var cur_ln = cur_pos.0 + 1;
-        var cur_cl = cur_pos.1 + 1;
-
-        var fps_int = self.game_app.fps as int;
-        var status_str = "{self.status_message}  |  Ln {cur_ln}, Col {cur_cl}  |  Lines: {line_count}  |  Chars: {char_count}  |  Theme: {self.current_theme_name}  |  FPS: {fps_int}";
-
-        g.label(status_str);
-    }
+    // ── Find / Replace ────────────────────────────────────────────────────
 
     pub fn count_matches(): int {
-        if (len(self.find_query) == 0) return 0;
-        var cur_doc = self.documents[self.active_tab_idx];
-        var content = cur_doc.content;
-        var q_len = len(self.find_query);
-        var c_len = len(content);
-        var count = 0;
-        var pos = 0;
+        var q: str = self.find_query();
+        if (len(q) == 0) { return 0; }
+        var content: str = self.ed.doc.content;
+        var q_len: int = len(q);
+        var c_len: int = len(content);
+        var count: int = 0;
+        var pos: int = 0;
         while (pos + q_len <= c_len) {
             var sub = substring(content, pos, c_len);
-            var idx = String(value=sub).index_of(self.find_query);
-            if (idx < 0) return count;
+            var idx = String(value=sub).index_of(q);
+            if (idx < 0) { return count; }
             count = count + 1;
             pos = pos + idx + q_len;
         }
         return count;
     }
 
-    pub fn find_next(gui: any): nil {
-        var g = gui as game.GUI;
-        if (len(self.find_query) == 0) {
-            self.set_status("Find: query is empty");
+    pub fn find_next(): nil {
+        var q: str = self.find_query();
+        if (len(q) == 0) {
+            self.st.status_message = "Find: query is empty";
             return;
         }
-
-        var cur_doc = self.documents[self.active_tab_idx];
-        var content = cur_doc.content;
-        var q_len = len(self.find_query);
-        var c_len = len(content);
-        if (c_len == 0) {
-            self.set_status("Document is empty");
+        var content: str = self.ed.doc.content;
+        if (len(content) == 0) {
+            self.st.status_message = "Document is empty";
             return;
         }
-
-        var start_search = self.last_find_idx;
-        var found_idx = find_substring_from(content, self.find_query, start_search);
-        var wrapped = false;
-
-        if (found_idx < 0 and start_search > 0) {
-            found_idx = find_substring_from(content, self.find_query, 0);
+        var q_len: int = len(q);
+        var found: int = find_substring_from(content, q, self.st.last_find_idx);
+        var wrapped: bool = false;
+        if (found < 0 and self.st.last_find_idx > 0) {
+            found = find_substring_from(content, q, 0);
             wrapped = true;
         }
-
-        if (found_idx >= 0) {
-            self.last_find_idx = found_idx + q_len;
-
-            var lc_start = char_to_line_col(content, found_idx);
-            var lc_end = char_to_line_col(content, found_idx + q_len);
-
-            var editor_id = "doc_editor_" + cur_doc.title;
-            g.set_multiline_selection(editor_id, lc_start.0, lc_start.1, lc_end.0, lc_end.1);
-
-            var line_display = lc_start.0 + 1;
-            var col_display = lc_start.1 + 1;
+        if (found >= 0) {
+            self.st.last_find_idx = found + q_len;
+            var ls = char_to_line_col(content, found);
+            var le = char_to_line_col(content, found + q_len);
+            self.ed.ctrl.set_cursor(ls.0, ls.1);
+            self.ed.ctrl.set_selection(le.0, le.1);
+            self.ed._ensure_cursor_visible();
+            var line_d: int = ls.0 + 1;
+            var col_d: int = ls.1 + 1;
             if (wrapped) {
-                self.set_status("Found '{self.find_query}' at Ln {line_display}, Col {col_display} (wrapped)");
+                self.st.status_message = "Found '{q}' at Ln {line_d}, Col {col_d} (wrapped)";
             } else {
-                self.set_status("Found '{self.find_query}' at Ln {line_display}, Col {col_display}");
+                self.st.status_message = "Found '{q}' at Ln {line_d}, Col {col_d}";
             }
         } else {
-            self.set_status("Not found: '{self.find_query}'");
+            self.st.status_message = "Not found: '{q}'";
         }
+        tree.request_repaint();
     }
 
-    pub fn replace_current(gui: any): nil {
-        var g = gui as game.GUI;
-        if (len(self.find_query) == 0) {
-            self.set_status("Replace: query is empty");
+    pub fn replace_current(): nil {
+        var q: str = self.find_query();
+        if (len(q) == 0) {
+            self.st.status_message = "Replace: query is empty";
             return;
         }
-
-        var cur_doc = self.documents[self.active_tab_idx];
-        var content = cur_doc.content;
-        var q_len = len(self.find_query);
-
-        var match_pos = self.last_find_idx - q_len;
+        var content: str = self.ed.doc.content;
+        var q_len: int = len(q);
+        var match_pos: int = self.st.last_find_idx - q_len;
         if (match_pos < 0 or match_pos + q_len > len(content)) {
-            self.find_next(g);
+            self.find_next();
             return;
         }
-
         var current_match = substring(content, match_pos, match_pos + q_len);
-        if (current_match != self.find_query) {
-            self.find_next(g);
+        if (current_match != q) {
+            self.find_next();
             return;
         }
-
-        var prefix = substring(content, 0, match_pos);
-        var suffix = substring(content, match_pos + q_len, len(content));
-        var new_content = prefix + self.replace_query + suffix;
-
-        cur_doc.content = new_content;
-        cur_doc.is_dirty = true;
-
-        var editor_id = "doc_editor_" + cur_doc.title;
-        g.set_multiline_text(editor_id, new_content);
-
-        self.last_find_idx = match_pos + len(self.replace_query);
-        self.set_status("Replaced 1 occurrence");
-
-        self.find_next(g);
+        // The found match is selected in the controller — insert_text
+        // replaces the selection with the replacement string.
+        var rq: str = self.replace_query();
+        self.ed.ctrl.insert_text(rq);
+        self.ed._mark_dirty();
+        self.st.last_find_idx = match_pos + len(rq);
+        self.st.status_message = "Replaced 1 occurrence";
+        self.find_next();
     }
 
-    pub fn replace_all(gui: any): nil {
-        var g = gui as game.GUI;
-        if (len(self.find_query) == 0) {
-            self.set_status("Replace: query is empty");
+    pub fn replace_all(): nil {
+        var q: str = self.find_query();
+        if (len(q) == 0) {
+            self.st.status_message = "Replace: query is empty";
             return;
         }
-
-        var cur_doc = self.documents[self.active_tab_idx];
-        var content = cur_doc.content;
-        var count = self.count_matches();
-
+        var content: str = self.ed.doc.content;
+        var count: int = self.count_matches();
         if (count == 0) {
-            self.set_status("No occurrences of '{self.find_query}' found");
+            self.st.status_message = "No occurrences of '{q}' found";
             return;
         }
-
-        var new_content = replace(content, self.find_query, self.replace_query);
-        cur_doc.content = new_content;
-        cur_doc.is_dirty = true;
-
-        var editor_id = "doc_editor_" + cur_doc.title;
-        g.set_multiline_text(editor_id, new_content);
-
-        self.last_find_idx = 0;
-        self.set_status("Replaced {count} occurrence(s) of '{self.find_query}'");
-    }
-
-    pub fn render_find_dialog(gui: any): nil {
-        var g = gui as game.GUI;
-        if (not self.show_find_dialog) return;
-
-        if (g.begin_window("Find and Replace", 300.0, 140.0, 420.0, 210.0)) {
-            g.label("Search text:");
-            self.find_query = g.input_text("find_input", self.find_query, 64);
-            g.spacing(4.0);
-
-            g.label("Replace with:");
-            self.replace_query = g.input_text("replace_input", self.replace_query, 64);
-            g.spacing(8.0);
-
-            if (g.button("Find Next", 90.0, 24.0)) {
-                self.find_next(g);
-            }
-            g.same_line(6.0);
-            if (g.button("Replace", 80.0, 24.0)) {
-                self.replace_current(g);
-            }
-            g.same_line(6.0);
-            if (g.button("Replace All", 95.0, 24.0)) {
-                self.replace_all(g);
-            }
-            g.same_line(6.0);
-            if (g.button("Close", 65.0, 24.0)) {
-                self.show_find_dialog = false;
-            }
-
-            g.spacing(6.0);
-            if (len(self.find_query) > 0) {
-                var mc = self.count_matches();
-                if (mc == 0) {
-                    g.label("No matches found in active document");
-                } elif (mc == 1) {
-                    g.label("1 match found");
-                } else {
-                    g.label("{mc} matches found");
-                }
-            }
-
-            g.end_window();
-        }
-    }
-
-    pub fn render_about_dialog(gui: any): nil {
-        var g = gui as game.GUI;
-        if (not self.show_about_dialog) return;
-
-        if (g.begin_window("About Lymar Studio", 320.0, 200.0, 340.0, 210.0)) {
-            g.label("Lymar Studio Text Editor v1.0");
-            g.separator();
-            g.label("A complete desktop text editor built with:");
-            g.label("- std.game high-level engine harness");
-            g.label("- std.game immediate-mode GUI engine");
-            g.label("- std.game vector & collision math");
-            g.label("- Pure Lymar language execution");
-            g.separator();
-            if (g.button("OK", 80.0, 24.0)) {
-                self.show_about_dialog = false;
-            }
-            g.end_window();
-        }
-    }
-
-    pub fn handle_shortcuts(): nil {
-        var input = self.game_app.input;
-
-        // Ctrl+S: Save
-        if (input.is_key_pressed(game.KEY_S) and (input.active_modifiers & game.KEY_MOD_CTRL) != 0) {
-            self.save_current_document();
-        }
-
-        // Ctrl+W: Close File
-        if (input.is_key_pressed(game.KEY_W) and (input.active_modifiers & game.KEY_MOD_CTRL) != 0) {
-            self.close_current_document();
-        }
-
-        // Ctrl+F: Open Find Dialog
-        if (input.is_key_pressed(game.KEY_F) and (input.active_modifiers & game.KEY_MOD_CTRL) != 0) {
-            self.show_find_dialog = true;
-        }
-
-        // Ctrl+H: Open Find and Replace Dialog
-        if (input.is_key_pressed(game.KEY_H) and (input.active_modifiers & game.KEY_MOD_CTRL) != 0) {
-            self.show_find_dialog = true;
-        }
-
-        // F3: Find Next
-        if (input.is_key_pressed(game.KEY_F3)) {
-            self.find_next(self.game_app.gui);
-        }
-
-        // Escape: Close Dialogs
-        if (input.is_key_pressed(game.KEY_ESCAPE)) {
-            if (self.show_find_dialog) self.show_find_dialog = false;
-            if (self.show_about_dialog) self.show_about_dialog = false;
-        }
-    }
-
-    pub fn run_one_frame(): nil {
-        var app = self.game_app;
-        app.begin_frame();
-
-        // Update status timer
-        if (self.status_timer > 0.0) {
-            self.status_timer = self.status_timer - app.delta_time;
-            if (self.status_timer <= 0.0) {
-                self.status_message = "Ready";
-            }
-        }
-
-        // Handle shortcuts
-        self.handle_shortcuts();
-
-        // 1. Base editor content layer (lowest z-index)
-        self.render_editor_area(app.gui);
-        self.render_status_bar(app.gui);
-
-        // 2. Tab strip navigation layer (higher z-index than editor)
-        self.render_tabs(app.gui);
-
-        // 3. Menu bar & Toolbar chrome layer (higher z-index than tabs and editor)
-        self.render_menu_bar(app.gui);
-
-        // 4. Overlays layer (popups & dropdown menus on top of everything)
-        self.render_dropdowns(app.gui);
-
-        // 5. Modals & Panels layer
-        self.render_find_dialog(app.gui);
-        self.render_about_dialog(app.gui);
-
-        // Diagnostics
-        if (self.show_metrics) {
-            app.gui.show_debug_hud(app.fps, app.delta_time, len(self.documents));
-        }
-
-        app.end_frame();
+        var new_content = replace(content, q, self.replace_query());
+        self.ed.doc.content = new_content;
+        self.ed.ctrl.set_text(new_content);
+        self.ed.doc.is_dirty = true;
+        self.st.last_find_idx = 0;
+        self.st.status_message = "Replaced {count} occurrence(s) of '{q}'";
+        tree.request_repaint();
     }
 }
 
+// Module-global app binding for fn(): nil widget callbacks and paint-time
+// helpers — set once in main before the tree is built. Declared after
+// TextEditorApp so the optional-frame type resolves.
+// The editor instance lives in a list: frames stored directly in module
+// vars lose trait-field receivers ("Invalid frame receiver"), while list
+// elements are boxed and keep working trait dispatch.
+var _apps: [TextEditorApp] = [];
+var _app_ready: int = 0;
+
 pub fn main(): int {
-    print(" === Launching Lymar Studio Text Editor === ");
+    print("=== Launching Lymar Studio Text Editor ===");
+
+    var a = app.App("Lymar Studio - Text Editor", 1080, 720);
+    a.resizable = 1;
+
     var editor = TextEditorApp();
-
-    if (not editor.game_app.setup()) {
-        print("Error: Failed to initialize graphics context & application window.");
-        return 1;
-    }
-
-    var doc_count = len(editor.documents);
+    var doc_count = len(editor.st.documents);
     print("Editor window opened with {doc_count} documents.");
     print("Interactive editor running. Close window to exit.");
 
-    while (editor.game_app.is_running) {
-        editor.run_one_frame();
-    }
+    val root_comp = editor.root;
+    a.ui(root_comp);
 
-    editor.game_app.shutdown();
+    // Publish to the module-global callback binding as the last use of
+    // `editor` (assignment moves the binding), then arm the callback gate.
+    _apps.append(editor);
+    _app_ready = 1;
+    a.run();
+
     print("Lymar Studio Text Editor closed cleanly.");
     return 0;
 }

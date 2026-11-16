@@ -1,0 +1,179 @@
+// std/ui/widgets/accordion.lm
+// Widget — ported from legacy Fluent Accordion.
+// Header bar that toggles its child open/closed on click. Open state is a
+// plain int field (0/1) plus an optional BoolSignal for external binding.
+
+import std.ui.component as comp;
+import std.ui.component show Placed;
+import std.ui.types as ui_types;
+import std.ui.event as uievent;
+import std.ui.context as uictx;
+import std.ui.draw_list as dl;
+import std.ui.state as state;
+import std.ui.tree as tree;
+import std.events as events;
+import std.color as color;
+import std.ui.theme as uitheme;
+import std.text.controller as text_ctrl;
+import std.text.shaping as textshape;
+import std.ui.text_metrics as tm;
+
+frame Accordion {
+    embed Placed;
+    pub var title: str;
+    pub var child: comp.Component?;
+    pub var is_open: int;
+    pub var open_sig: state.BoolSignal?;
+    pub var surface: color.Color;
+    pub var text: color.Color;
+    pub var accent: color.Color;
+    pub var font_scale: float;
+    pub var header_h: float;
+    pub var pad: float;
+    // Scratch — AOT float-local clobbering across trait calls.
+    pub var _ch: float = 0.0;
+
+    pub init(t: str = "", content: any = nil, default_open: bool = false) {
+        val pal = uitheme.palette();
+        self.title = t;
+        self.child = nil;
+        if (content != nil) {
+            self.child = content as comp.Component;
+        }
+        if (default_open) {
+            self.is_open = 1;
+        } else {
+            self.is_open = 0;
+        }
+        self.open_sig = nil;
+        self.surface = pal.surface;
+        self.text = pal.text_primary;
+        self.accent = pal.accent;
+        self.font_scale = 1.0;
+        self.header_h = 32.0;
+        self.pad = 8.0;
+        self.id = comp.next_widget_id();
+    }
+
+    pub fn set_child(c: comp.Component): nil {
+        self.child = c;
+    }
+
+    pub fn bind_open(sig: state.BoolSignal): nil {
+        self.open_sig = sig;
+        if (sig.get()) {
+            self.is_open = 1;
+        } else {
+            self.is_open = 0;
+        }
+    }
+
+    pub fn kind(): ui_types.WidgetKind { return ui_types.WidgetKind.Accordion; }
+    pub fn on_theme_changed(): nil {
+        val p = uitheme.palette();
+        self.surface = p.surface;
+        self.text = p.text_primary;
+        self.accent = p.accent;
+        tree.request_repaint();
+    }
+    pub fn on_overlay_dismiss(): nil { }
+
+    pub fn child_count(): int {
+        if (self.is_open == 0 or self.child == nil) { return 0; }
+        return 1;
+    }
+
+    pub fn child_at(i: int): any {
+        if (i == 0 and self.is_open != 0 and self.child != nil) {
+            return self.child;
+        }
+        return nil;
+    }
+
+    fn open_now(): int {
+        if (self.open_sig != nil) {
+            if ((self.open_sig as state.BoolSignal).get()) {
+                return 1;
+            }
+            return 0;
+        }
+        return self.is_open;
+    }
+
+    pub fn wants_pointer_capture(): int { return 0; }
+
+    pub fn measure(min_w: float, max_w: float, min_h: float, max_h: float): comp.Size {
+        var body_h: float = 0.0;
+        if (self.open_now() != 0 and self.child != nil) {
+            val s = (self.child as comp.Component).measure(0.0, comp.MEASURE_LOOSE, 0.0, comp.MEASURE_LOOSE);
+            body_h = s.h + self.pad * 2.0;
+        }
+        var w: float = self.rect.w + 0.0;
+        if (w <= 0.0) { w = 200.0; }
+        var h: float = self.header_h + body_h;
+        if (h < min_h) { h = min_h; }
+        if (w < min_w) { w = min_w; }
+        if (w > max_w) { w = max_w; }
+        if (h > max_h) { h = max_h; }
+        return comp.Size(w=w, h=h);
+    }
+
+    pub fn arrange(x: float, y: float, w: float, h: float): nil {
+        self.rect.x = x;
+        self.rect.y = y;
+        self.rect.w = w;
+        self.rect.h = h;
+        if (self.open_now() != 0 and self.child != nil) {
+            (self.child as comp.Component).arrange(
+                x + self.pad, y + self.header_h + self.pad,
+                w - self.pad * 2.0, h - self.header_h - self.pad * 2.0);
+        }
+    }
+
+    pub fn paint(): nil {
+        dl.dl_emit_rect_rounded(dl.paint_ctx.dl, self.rect.x, self.rect.y, self.rect.w, self.rect.h,
+            4.0, self.surface.r, self.surface.g, self.surface.b, self.surface.a);
+        dl.dl_emit_text(dl.paint_ctx.dl, textshape.prepare_display(self.title),
+            self.rect.x + 12.0, self.rect.y + (self.header_h - tm.line_height(self.font_scale)) / 2.0,
+            self.text.r, self.text.g, self.text.b, 1.0, self.font_scale);
+        // Chevron indicator: "+"/"−" glyph approximation via text.
+        var marker = "+";
+        if (self.open_now() != 0) { marker = "-"; }
+        dl.dl_emit_text(dl.paint_ctx.dl, marker,
+            self.rect.x + self.rect.w - 20.0, self.rect.y + (self.header_h - tm.line_height(self.font_scale)) / 2.0,
+            self.accent.r, self.accent.g, self.accent.b, 1.0, self.font_scale);
+        if (self.open_now() != 0 and self.child != nil) {
+            (self.child as comp.Component).paint();
+        }
+    }
+
+    pub fn on_event(t: events.EventType, x: int, y: int, key: int): uievent.EventResult {
+        var header: comp.Rect = comp.Rect(x=self.rect.x, y=self.rect.y, w=self.rect.w, h=self.header_h);
+        if (t == events.EventType.MouseUp and key == 0 and header.contains(x as float, y as float)) {
+            if (self.open_sig != nil) {
+                (self.open_sig as state.BoolSignal).set(self.open_now() == 0);
+            } else {
+                self.is_open = 1 - self.is_open;
+            }
+            tree.request_repaint();
+            return uievent.EventResult.Handled;
+        }
+        if (self.open_now() != 0 and self.child != nil) {
+            var inside: bool = true;
+            if (t != events.EventType.MouseMove and t != events.EventType.MouseUp and t != events.EventType.MouseWheel) {
+                inside = (self.child as comp.Component).bounds().contains(x as float, y as float);
+            }
+            if (inside) {
+                val res = (self.child as comp.Component).on_event(t, x, y, key);
+                if (res == uievent.EventResult.Handled) {
+                    return uievent.EventResult.Handled;
+                }
+            }
+        }
+        return uievent.EventResult.Ignored;
+    }
+}
+
+pub fn accordion(t: str, content: any = nil, default_open: bool = false): Accordion {
+    return Accordion(t, content, default_open);
+}

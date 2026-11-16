@@ -1,0 +1,106 @@
+// std/ui/widgets/progress_bar.lm
+// Widget — split from std/ui/widgets.lm.
+
+import std.ui.component as comp;
+import std.ui.component show Placed, TextBound;
+import std.ui.types as ui_types;
+import std.ui.event as uievent;
+import std.ui.context as uictx;
+import std.ui.draw_list as dl;
+import std.ui.state as state;
+import std.ui.tree as tree;
+import std.events as events;
+import std.color as color;
+import std.ui.theme as uitheme;
+import std.text.controller as text_ctrl;
+import std.text.shaping as textshape;
+import std.ui.text_metrics as tm;
+
+// ── ProgressBar ──────────────────────────────────────────────────────────────
+// Display-only bar. frac is a plain float; bind_frac() attaches a FloatSignal
+// polled live on paint (same pattern as ScrollView.scroll_sig).
+
+frame ProgressBar {
+    embed Placed;
+    pub var frac: float;
+    pub var frac_sig: state.FloatSignal?;
+    pub var track_color: color.Color;
+    pub var fill_color: color.Color;
+    pub var show_pct: int;
+    pub var fg: color.Color;
+
+    pub init(f: float = 0.0) {
+        val pal = uitheme.palette();
+        self.frac = f;
+        self.frac_sig = nil;
+        self.track_color = pal.track;
+        self.fill_color = pal.success;
+        self.show_pct = 0;
+        self.fg = pal.on_accent;
+        self.id = comp.next_widget_id();
+    }
+
+    pub fn kind(): ui_types.WidgetKind { return ui_types.WidgetKind.Progress; }
+    pub fn on_theme_changed(): nil {
+        val p = uitheme.palette();
+        self.track_color = p.track;
+        self.fill_color = p.success;
+        self.fg = p.on_accent;
+        tree.request_repaint();
+    }
+    pub fn on_overlay_dismiss(): nil { }
+
+    pub fn bind_frac(sig: state.FloatSignal): nil {
+        self.frac_sig = sig;
+        self.frac = sig.get();
+    }
+
+    pub fn wants_pointer_capture(): int { return 0; }
+
+    pub fn measure(min_w: float, max_w: float, min_h: float, max_h: float): comp.Size {
+        var w: float = 80.0;
+        var h: float = 10.0;
+        if (h < min_h) { h = min_h; }
+        if (h > max_h) { h = max_h; }
+        if (w < min_w) { w = min_w; }
+        if (w > max_w) { w = max_w; }
+        return comp.Size(w=w, h=h);
+    }
+
+    fn resolved_frac(): float {
+        var f: float = self.frac + 0.0;
+        if (self.frac_sig != nil) {
+            f = (self.frac_sig as state.FloatSignal).get();
+        }
+        if (f < 0.0) { return 0.0; }
+        if (f > 1.0) { return 1.0; }
+        return f;
+    }
+
+    pub fn paint(): nil {
+        var f: float = self.resolved_frac();
+        dl.dl_emit_rect_rounded(dl.paint_ctx.dl, self.rect.x, self.rect.y + (self.rect.h - 10.0) / 2.0,
+            self.rect.w, 10.0, 5.0,
+            self.track_color.r, self.track_color.g, self.track_color.b, 1.0);
+        var fw: float = self.rect.w * f;
+        if (fw > 0.0) {
+            dl.dl_emit_rect_rounded(dl.paint_ctx.dl, self.rect.x, self.rect.y + (self.rect.h - 10.0) / 2.0,
+                fw, 10.0, 5.0,
+                self.fill_color.r, self.fill_color.g, self.fill_color.b, 1.0);
+        }
+        if (self.show_pct != 0) {
+            var pct = ((f * 100.0) as int) as str;
+            dl.dl_emit_text(dl.paint_ctx.dl, pct + "%", self.rect.x + self.rect.w + 6.0,
+                self.rect.y + (self.rect.h - tm.line_height(1.0)) / 2.0,
+                self.fg.r, self.fg.g, self.fg.b, self.fg.a, 1.0);
+        }
+    }
+
+    pub fn on_event(t: events.EventType, x: int, y: int, key: int): uievent.EventResult {
+        return uievent.EventResult.Ignored;
+    }
+}
+
+pub fn progress_bar(f: float = 0.0): ProgressBar {
+    return ProgressBar(f);
+}

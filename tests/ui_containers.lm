@@ -1,0 +1,121 @@
+// Containers + theming test: stack/grid/mask/overlay/tooltip layout
+// semantics and std.theme-driven widget defaults via std.ui.theme.
+
+import std.ui as ui;
+import std.ui.tree as tree;
+import std.events as events;
+
+var fail_count: int = 0;
+
+fn check(cond: bool, msg: str): nil {
+    if (not cond) {
+        print("FAIL: " + msg);
+        fail_count = fail_count + 1;
+    }
+}
+
+fn main() {
+    print("=== UI Containers & Theme ===");
+
+    // ── Stack: children share the full rect ──────────────────────────
+    val s_btn = ui.button("stacked");
+    var stk = ui.stack();
+    stk.add(s_btn);
+    stk.add(ui.badge("overlay-badge"));
+    ui.update(stk, 300.0, 200.0);
+    check(stk.child_count() == 2, "stack child_count");
+    check(s_btn.rect.w > 250.0, "stack child should get full width, got {s_btn.rect.w}");
+
+    // ── Grid: fixed columns, row-major placement ─────────────────────
+    val g0 = ui.button("g0");
+    val g1 = ui.button("g1");
+    val g2 = ui.button("g2");
+    val g3 = ui.button("g3");
+    var grd = ui.grid(2, 4.0);
+    grd.add(g0); grd.add(g1); grd.add(g2); grd.add(g3);
+    ui.update(grd, 400.0, 400.0);
+    check(g0.rect.y == g1.rect.y, "grid row 0 same y");
+    check(g2.rect.y > g0.rect.y, "grid row 1 below row 0");
+    check(g0.rect.x < g1.rect.x, "grid col 0 left of col 1");
+    check(g2.rect.x == g0.rect.x, "grid col 0 aligned");
+
+    // ── Mask: child arranged inside mask rect ────────────────────────
+    val m_btn = ui.button("masked");
+    var msk = ui.mask(m_btn, "rounded");
+    ui.update(msk, 300.0, 200.0);
+    check(m_btn.rect.w > 0.0 and m_btn.rect.h > 0.0, "mask child arranged");
+
+    // ── Overlay: child offset inside parent ──────────────────────────
+    val o_badge = ui.badge("ov");
+    var ovr = ui.overlay(o_badge, 20.0, 10.0, 60.0, 20.0);
+    var oroot = ui.column(4.0);
+    oroot.add(ovr);
+    ui.update(oroot, 300.0, 200.0);
+    check(o_badge.rect.x >= ovr.rect.x + 19.0, "overlay child offset x, got {o_badge.rect.x} vs {ovr.rect.x}");
+    check(o_badge.rect.y >= ovr.rect.y + 9.0, "overlay child offset y");
+
+    // ── Tooltip: hover shows bubble (paint path exercised via gg below)
+    val tip_btn = ui.button("hover me");
+    var tip = ui.tooltip(tip_btn, "tip text");
+    var troot = ui.column(4.0);
+    troot.add(tip);
+    ui.update(troot, 300.0, 200.0);
+    check(tip.hovered == 0, "tooltip starts unhovered");
+    ui.dispatch(troot, events.Event(event_type=events.EventType.MouseMove,
+        x=(tip_btn.rect.x + 2.0) as int, y=(tip_btn.rect.y + 2.0) as int, key_code=0));
+    check(tip.hovered == 1, "tooltip hover detected");
+    ui.dispatch(troot, events.Event(event_type=events.EventType.MouseMove,
+        x=299, y=199, key_code=0));
+    check(tip.hovered == 0, "tooltip hover cleared");
+
+    // ── Theming: palette() snapshots the active std.theme ────────────
+    val pal1 = ui.palette();
+    check(pal1.surface.r != 0.0 or pal1.surface.g != 0.0, "palette surface non-zero");
+    check(pal1.rounding > 0.0, "palette rounding token");
+    check(pal1.body_size > 0.0, "palette body size token");
+    check(pal1.popup_shadow != nil, "palette popup shadow present");
+
+    // Live re-theme: swap preset, apply_theme refreshes retained widgets.
+    var themed_col = ui.column(4.0);
+    var themed_btn = ui.button("themed");
+    var themed_card = ui.card("card", nil);
+    themed_col.add(themed_btn);
+    themed_col.add(themed_card);
+    ui.update(themed_col, 300.0, 200.0);
+    val bg_before = themed_btn.bg;
+    val surf_before = themed_card.surface;
+    ui.set_light();
+    val pal_light = ui.palette();
+    check(pal_light.background.r > 0.5, "light theme background is light, got {pal_light.background.r}");
+    ui.apply_theme(themed_col);
+    check(themed_btn.bg.r != bg_before.r or themed_btn.bg.g != bg_before.g
+        or themed_btn.bg.b != bg_before.b, "button bg refreshed after set_light+apply_theme");
+    check(themed_card.surface.r != surf_before.r or themed_card.surface.g != surf_before.g
+        or themed_card.surface.b != surf_before.b, "card surface refreshed after set_light+apply_theme");
+    // Default-button bg tracks theme surface_variant; custom-color buttons keep theirs.
+    var custom_btn = ui.button("custom", pal1.accent);
+    themed_col.add(custom_btn);
+    ui.update(themed_col, 300.0, 400.0);
+    ui.apply_theme(themed_col);
+    check(custom_btn.bg.r == pal1.accent.r, "custom button bg preserved across re-theme");
+    ui.set_dark();
+    ui.apply_theme(themed_col);
+
+    // ── Combined tree through the facade ─────────────────────────────
+    var all = ui.column(4.0);
+    all.add(stk);
+    all.add(grd);
+    all.add(msk);
+    all.add(oroot);
+    all.add(troot);
+    ui.update(all, 500.0, 1200.0);
+    check(ui.find_widget(all, s_btn.widget_id()) != nil, "find_widget in stack");
+    check(ui.find_widget(all, g3.widget_id()) != nil, "find_widget in grid");
+    check(ui.find_widget(all, tip_btn.widget_id()) != nil, "find_widget in tooltip");
+
+    if (fail_count == 0) {
+        print("ALL UI CONTAINERS & THEME TESTS PASSED");
+    } else {
+        print("{fail_count} FAILURES");
+    }
+}

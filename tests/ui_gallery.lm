@@ -1,0 +1,163 @@
+// Headless repro: showcase structure — Tabs with scroll_view'd gallery page.
+import std.ui as ui;
+import std.ui.tree as tree;
+import std.ui.theme as uitheme;
+import std.events as events;
+import std.color as color;
+import std.gg as gg;
+
+fn badge(txt: str, bg_: color.Color, fg_: color.Color): ui.Badge {
+    var b = ui.badge(txt);
+    return b;
+}
+
+fn gallery_section(title: str): ui.Label {
+    return ui.label("── " + title + " ──", color.rgb(120, 160, 255));
+}
+
+fn build_gallery_page(): ui.Flow {
+    var g = ui.column(10.0);
+
+    g.add(gallery_section("Containers"));
+    var cr = ui.row(6.0);
+    cr.add(ui.label("row:", color.gray));
+    cr.add(badge("A", color.indigo, color.white));
+    cr.add(badge("B", color.green, color.white));
+    cr.add(badge("C", color.yellow, color.white));
+    g.add(cr);
+
+    var st = ui.stack(0.0);
+    st.add(ui.card("Stack layer 1", nil));
+    st.add(ui.card("Stack layer 2 (overlapping)", nil));
+    g.add(st);
+
+    var gd = ui.grid(3, 6.0);
+    gd.add(badge("g1", color.cyan, color.white));
+    gd.add(badge("g2", color.cyan, color.white));
+    gd.add(badge("g3", color.cyan, color.white));
+    gd.add(badge("g4", color.cyan, color.white));
+    gd.add(badge("g5", color.cyan, color.white));
+    gd.add(badge("g6", color.cyan, color.white));
+    g.add(gd);
+
+    g.add(ui.mask(ui.card("Masked card", nil), "rounded"));
+    g.add(ui.overlay(ui.label("Overlay child", color.white), 12.0, 4.0));
+    g.add(ui.tooltip(ui.button("Hover for tooltip", nil, nil, nil), "Tooltip label"));
+
+    g.add(gallery_section("Display"));
+    g.add(ui.label("Plain label text", color.light_gray));
+    g.add(ui.badge("Badge"));
+    g.add(ui.alert("Informational alert message", "info"));
+    g.add(ui.alert("Warning: check your config", "warning"));
+    g.add(ui.stat("Uptime", "99.98%", "+0.02%"));
+    g.add(ui.indicator("online", "API Status"));
+    g.add(ui.steps(["Create", "Configure", "Deploy", "Monitor"], 2));
+    g.add(ui.link("Documentation", "https://example.com"));
+    var sp_row = ui.row(4.0);
+    sp_row.add(ui.label("spacer", color.gray));
+    sp_row.add(ui.spacer());
+    sp_row.add(ui.label("right", color.gray));
+    g.add(sp_row);
+
+    g.add(gallery_section("Inputs"));
+    var in1 = ui.row(8.0);
+    in1.add(ui.button("Button", nil, nil, nil));
+    in1.add(ui.checkbox("Checkbox", false));
+    in1.add(ui.toggle("Toggle", true));
+    in1.add(ui.stepper(3, 1, 0, 10));
+    g.add(in1);
+    g.add(ui.text_input("", "Type here..."));
+    var sel_opts = ["Option A", "Option B", "Option C"];
+    g.add(ui.select(sel_opts, 1));
+    g.add(ui.multi_select(sel_opts, [0]));
+    g.add(ui.slider(0.0, 100.0, 40.0, "Slider"));
+    g.add(ui.range_slider(20.0, 80.0, 0.0, 100.0));
+    g.add(ui.filter("", "Filter items..."));
+    g.add(ui.file_input("Choose a file...", nil));
+    g.add(ui.color_picker("Accent color", nil, nil));
+
+    g.add(gallery_section("Data"));
+    g.add(ui.progress_bar(0.65));
+    g.add(ui.calendar("2025-06-15"));
+    var vals = [12.0, 34.0, 21.0, 55.0, 42.0, 78.0];
+    var charts = ui.row(8.0);
+    charts.add(ui.bar_chart("Bar", vals));
+    charts.add(ui.line_chart("Line", vals));
+    charts.add(ui.pie_chart("Pie", vals));
+    g.add(charts);
+    g.add(ui.table_text(["Name", "Status", "Latency"], [
+        ["api-gateway", "ok", "12ms"],
+        ["auth-svc", "ok", "8ms"],
+        ["billing", "degraded", "240ms"]
+    ]));
+    g.add(ui.diff("old line\nshared\nremoved", "old line\nshared\nadded"));
+    g.add(ui.image(""));
+
+    g.add(gallery_section("Structure"));
+    var fcard = ui.card("Form Field Card", nil);
+    var fbody = ui.column(6.0);
+    fbody.add(ui.form_field("Display Name", ui.text_input("", "Enter name"), "Shown publicly", ""));
+    fbody.add(ui.form_field("Email", ui.text_input("", "you@example.com"), "", "Invalid email"));
+    fcard.set_child(fbody);
+    g.add(fcard);
+
+    g.add(ui.accordion("Advanced Options", ui.label("Accordion content", color.gray), true));
+
+    var tn = ui.tree_node("Root node", true);
+    tn.add(ui.label("  child item", color.light_gray));
+    var tn2 = ui.tree_node("Child node", false);
+    tn2.add(ui.label("    grandchild", color.gray));
+    tn.add(tn2);
+    g.add(tn);
+
+    var tl = ui.timeline();
+    tl.add(ui.label("09:00 — Service started", color.light_gray));
+    tl.add(ui.label("09:05 — Health check passed", color.green));
+    tl.add(ui.label("09:12 — Deployment complete", color.rgb(120, 160, 255)));
+    g.add(tl);
+
+    var inner_titles = ["Pane A", "Pane B"];
+    var inner_pages = [ui.label("Inner tabs page A", color.white), ui.label("Inner tabs page B", color.white)];
+    g.add(ui.tabs(inner_titles, inner_pages, 0));
+
+    return g;
+}
+
+fn main(): int {
+    uitheme.set_dark();
+    var titles = ["Overview", "Microservices", "Live Telemetry", "Settings & Tools", "Widget Gallery"];
+    var pages = [
+        ui.label("p0", color.white),
+        ui.label("p1", color.white),
+        ui.label("p2", color.white),
+        ui.label("p3", color.white),
+        ui.scroll_view(build_gallery_page())
+    ];
+    var tabs = ui.tabs(titles, pages, 0);
+    ui.update(tabs, 820.0, 620.0);
+    print("initial update ok");
+    // MouseUp alone switches tabs — sweep x to find each header.
+    var x: int = 380;
+    while (x < 815) {
+        ui.dispatch(tabs, events.Event(event_type=events.EventType.MouseUp, x=x, y=20, key_code=0));
+        if (tabs.active_tab != 0) {
+            print("x={x} -> active_tab={tabs.active_tab}");
+        }
+        x = x + 15;
+    }
+    print("sweep done active_tab={tabs.active_tab}");
+    ui.update(tabs, 820.0, 620.0);
+    print("post-switch update ok");
+    if (gg.setup()) {
+        gg.begin_pass(820, 620, 0.1, 0.1, 0.15, 1.0);
+        ui.request_repaint();
+        ui.update(tabs, 820.0, 620.0);
+        ui.submit();
+        gg.end_pass();
+        gg.commit();
+        print("gg pass ok");
+    } else {
+        print("gg setup failed");
+    }
+    return 0;
+}

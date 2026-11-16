@@ -1,0 +1,195 @@
+// std/ui/widgets/range_slider.lm
+// Widget — ported from legacy Fluent RangeSlider.
+// Two-thumb range slider backed by two FloatSignals (low_sig/high_sig).
+// Drag whichever thumb is nearest the pointer; values clamp to
+// [min_val, max_val] and low <= high is enforced.
+
+import std.ui.component as comp;
+import std.ui.component show Placed;
+import std.ui.types as ui_types;
+import std.ui.event as uievent;
+import std.ui.context as uictx;
+import std.ui.draw_list as dl;
+import std.ui.state as state;
+import std.ui.tree as tree;
+import std.events as events;
+import std.color as color;
+import std.ui.theme as uitheme;
+import std.text.controller as text_ctrl;
+import std.text.shaping as textshape;
+import std.ui.text_metrics as tm;
+
+frame RangeSlider {
+    embed Placed;
+    pub var low_sig: state.FloatSignal;
+    pub var high_sig: state.FloatSignal;
+    pub var min_val: float;
+    pub var max_val: float;
+    pub var track_h: float;
+    pub var surface: color.Color;
+    pub var border: color.Color;
+    pub var track_color: color.Color;
+    pub var accent: color.Color;
+    pub var font_scale: float;
+    pub var dragging: int;   // 0 = none, 1 = low, 2 = high
+    pub var hovered: int;
+    // Scratch — AOT float-local clobbering across trait calls.
+    pub var _tx: float = 0.0;
+    pub var _ty: float = 0.0;
+    pub var _tw: float = 0.0;
+    pub var _th: float = 0.0;
+    pub var _lx: float = 0.0;
+    pub var _hx: float = 0.0;
+
+    pub init(low: float = 20.0, high: float = 80.0, min_v: float = 0.0, max_v: float = 100.0) {
+        val pal = uitheme.palette();
+        self.low_sig = state.signal_float(low);
+        self.high_sig = state.signal_float(high);
+        self.min_val = min_v;
+        self.max_val = max_v;
+        self.track_h = 8.0;
+        self.surface = pal.surface;
+        self.border = pal.border;
+        self.track_color = color.Color(r=0.20, g=0.22, b=0.28, a=1.0);
+        self.accent = pal.info;
+        self.font_scale = 1.0;
+        self.dragging = 0;
+        self.hovered = 0;
+        self.id = comp.next_widget_id();
+    }
+
+    pub fn bind_low(sig: state.FloatSignal): nil {
+        self.low_sig = sig;
+    }
+
+    pub fn bind_high(sig: state.FloatSignal): nil {
+        self.high_sig = sig;
+    }
+
+    pub fn kind(): ui_types.WidgetKind { return ui_types.WidgetKind.RangeSlider; }
+    pub fn wants_pointer_capture(): int { return self.dragging; }
+    pub fn on_theme_changed(): nil {
+        val p = uitheme.palette();
+        self.surface = p.surface;
+        self.border = p.border;
+        self.accent = p.info;
+        tree.request_repaint();
+    }
+    pub fn on_overlay_dismiss(): nil { }
+
+    fn clamp_val(v: float): float {
+        if (v < self.min_val) { return self.min_val; }
+        if (v > self.max_val) { return self.max_val; }
+        return v;
+    }
+
+    fn frac_of(v: float): float {
+        if (self.max_val <= self.min_val) { return 0.0; }
+        var f: float = (v - self.min_val) / (self.max_val - self.min_val);
+        if (f < 0.0) { f = 0.0; }
+        if (f > 1.0) { f = 1.0; }
+        return f;
+    }
+
+    fn value_at_px(px: float): float {
+        var frac: float = (px - self._tx) / self._tw;
+        if (frac < 0.0) { frac = 0.0; }
+        if (frac > 1.0) { frac = 1.0; }
+        return self.clamp_val(self.min_val + frac * (self.max_val - self.min_val));
+    }
+
+    // Track + thumb x positions cached in fields (AOT-safe).
+    fn layout_track(): nil {
+        self._tx = self.rect.x;
+        self._tw = self.rect.w;
+        self._ty = self.rect.y + (self.rect.h - self.track_h) / 2.0;
+        self._th = self.track_h;
+        self._lx = self._tx + self._tw * self.frac_of(self.clamp_val(self.low_sig.get()));
+        self._hx = self._tx + self._tw * self.frac_of(self.clamp_val(self.high_sig.get()));
+    }
+
+    pub fn measure(min_w: float, max_w: float, min_h: float, max_h: float): comp.Size {
+        var w: float = 220.0;
+        var h: float = self.track_h + 12.0;
+        if (w < min_w) { w = min_w; }
+        if (w > max_w) { w = max_w; }
+        if (h < min_h) { h = min_h; }
+        if (h > max_h) { h = max_h; }
+        return comp.Size(w=w, h=h);
+    }
+
+    pub fn paint(): nil {
+        self.layout_track();
+        // Track.
+        dl.dl_emit_rect_rounded(dl.paint_ctx.dl, self._tx, self._ty, self._tw, self._th,
+            self._th / 2.0, self.track_color.r, self.track_color.g, self.track_color.b, 1.0);
+        // Selected range between thumbs.
+        var rx1 = self._lx + 0.0;
+        var rx2 = self._hx + 0.0;
+        if (rx2 < rx1) { rx2 = rx1; }
+        if (rx2 > rx1) {
+            dl.dl_emit_rect_rounded(dl.paint_ctx.dl, rx1, self._ty, rx2 - rx1, self._th,
+                self._th / 2.0, self.accent.r, self.accent.g, self.accent.b, 1.0);
+        }
+        // Thumbs.
+        var thumb: float = self._th + 6.0;
+        dl.dl_emit_rect_rounded(dl.paint_ctx.dl, self._lx - thumb / 2.0, self._ty - 3.0, thumb, thumb,
+            thumb / 4.0, 1.0, 1.0, 1.0, 1.0);
+        dl.dl_emit_rect_rounded(dl.paint_ctx.dl, self._hx - thumb / 2.0, self._ty - 3.0, thumb, thumb,
+            thumb / 4.0, 1.0, 1.0, 1.0, 1.0);
+    }
+
+    pub fn on_event(t: events.EventType, x: int, y: int, key: int): uievent.EventResult {
+        self.layout_track();
+        var fx = x as float;
+        var fy = y as float;
+        var in_track: bool = (fx >= self._tx and fx <= self._tx + self._tw
+            and fy >= self._ty - 6.0 and fy <= self._ty + self._th + 6.0);
+        if (t == events.EventType.MouseDown) {
+            if (in_track and key == 0) {
+                // Pick the nearer thumb.
+                var dl_dist: float = fx - self._lx;
+                if (dl_dist < 0.0) { dl_dist = 0.0 - dl_dist; }
+                var dh_dist: float = fx - self._hx;
+                if (dh_dist < 0.0) { dh_dist = 0.0 - dh_dist; }
+                if (dl_dist <= dh_dist) {
+                    self.dragging = 1;
+                } else {
+                    self.dragging = 2;
+                }
+                self.apply_drag(fx);
+                return uievent.EventResult.Handled;
+            }
+        } elif (t == events.EventType.MouseMove) {
+            if (self.dragging != 0) {
+                self.apply_drag(fx);
+                return uievent.EventResult.Handled;
+            }
+            self.hovered = 0;
+            if (in_track) { self.hovered = 1; }
+        } elif (t == events.EventType.MouseUp) {
+            if (self.dragging != 0) {
+                self.dragging = 0;
+                return uievent.EventResult.Handled;
+            }
+        }
+        return uievent.EventResult.Ignored;
+    }
+
+    fn apply_drag(fx: float): nil {
+        var v = self.value_at_px(fx);
+        if (self.dragging == 1) {
+            var hi = self.clamp_val(self.high_sig.get());
+            if (v > hi) { v = hi; }
+            self.low_sig.set(v);
+        } else {
+            var lo = self.clamp_val(self.low_sig.get());
+            if (v < lo) { v = lo; }
+            self.high_sig.set(v);
+        }
+    }
+}
+
+pub fn range_slider(low: float = 20.0, high: float = 80.0, min_v: float = 0.0, max_v: float = 100.0): RangeSlider {
+    return RangeSlider(low, high, min_v, max_v);
+}

@@ -1,0 +1,142 @@
+// std/ui/widgets/checkbox.lm
+// Widget — split from std/ui/widgets.lm.
+
+import std.ui.component as comp;
+import std.ui.component show Placed, TextBound;
+import std.ui.types as ui_types;
+import std.ui.event as uievent;
+import std.ui.context as uictx;
+import std.ui.draw_list as dl;
+import std.ui.state as state;
+import std.ui.tree as tree;
+import std.events as events;
+import std.color as color;
+import std.ui.theme as uitheme;
+import std.ui.motion as motion;
+import std.text.controller as text_ctrl;
+import std.text.shaping as textshape;
+import std.ui.text_metrics as tm;
+
+// ── Checkbox ─────────────────────────────────────────────────────────────────
+// Labeled check box backed by a BoolSignal — always present (created in
+// init), so external set() is reflected on the next paint and widget
+// toggles write it. bind_check() attaches an external signal two-way.
+
+frame Checkbox {
+    embed Placed;
+    embed TextBound;
+    pub var checked_sig: state.BoolSignal;
+    pub var box: float;
+    pub var gap: float;
+    pub var fg: color.Color;
+    pub var accent: color.Color;
+    pub var box_border: color.Color;
+    pub var box_fill: color.Color;
+    pub var font_scale: float;
+    pub var hovered: int;
+
+    pub init(label_txt: str = "", initial: bool = false) {
+        val pal = uitheme.palette();
+        self.text = label_txt;
+        self.checked_sig = state.signal_bool(initial);
+        self.box = 14.0;
+        self.gap = 6.0;
+        self.fg = pal.on_accent;
+        self.accent = pal.accent;
+        self.box_border = pal.border;
+        self.box_fill = pal.surface_variant;
+        self.font_scale = 1.0;
+        self.hovered = 0;
+        self.id = comp.next_widget_id();
+    }
+
+    pub fn kind(): ui_types.WidgetKind { return ui_types.WidgetKind.Checkbox; }
+    pub fn on_theme_changed(): nil {
+        val p = uitheme.palette();
+        self.fg = p.on_accent;
+        self.accent = p.accent;
+        self.box_border = p.border;
+        self.box_fill = p.surface_variant;
+        tree.request_repaint();
+    }
+    pub fn on_overlay_dismiss(): nil { }
+
+    // Attach an external BoolSignal: widget toggles write it, external
+    // set() is read live on every paint/event (no reconcile needed).
+    pub fn bind_check(sig: state.BoolSignal): nil {
+        self.checked_sig = sig;
+    }
+
+    pub fn wants_pointer_capture(): int { return 0; }
+
+    pub fn measure(min_w: float, max_w: float, min_h: float, max_h: float): comp.Size {
+        var disp = textshape.prepare_display(self.string_val());
+        var text_w: float = tm.text_width(disp, self.font_scale);
+        var w: float = self.box + self.gap + text_w;
+        var h: float = self.box + 0.0;
+        var lh: float = tm.line_height(self.font_scale);
+        if (lh > h) { h = lh; }
+        if (w < min_w) { w = min_w; }
+        if (w > max_w) { w = max_w; }
+        if (h < min_h) { h = min_h; }
+        if (h > max_h) { h = max_h; }
+        return comp.Size(w=w, h=h);
+    }
+
+    pub fn paint(): nil {
+        var by: float = self.rect.y + (self.rect.h - self.box) / 2.0;
+        var bx: float = self.rect.x + 0.0;
+        var on: bool = self.checked_sig.get();
+        var hov: float = motion.value(self.id, 0, self.hovered as float);
+        // Unchecked: filled box + strong border. Checked: accent fill with a
+        // contrasting on_accent mark — clearly distinct at a glance.
+        var fill = self.box_fill;
+        if (on) { fill = self.accent; }
+        dl.dl_emit_rect(dl.paint_ctx.dl, bx, by, self.box, self.box,
+            fill.r, fill.g, fill.b, 1.0);
+        var ba: float = 0.85 + hov * 0.15;
+        if (on) {
+            dl.dl_emit_rect_border(dl.paint_ctx.dl, bx, by, self.box, self.box, 2.0, 1.0,
+                self.accent.r, self.accent.g, self.accent.b, 1.0);
+            var pad: float = self.box * 0.28;
+            var mark = color.lerp(self.accent, self.fg, 0.85);
+            dl.dl_emit_rect(dl.paint_ctx.dl, bx + pad, by + pad, self.box - pad * 2.0, self.box - pad * 2.0,
+                mark.r, mark.g, mark.b, 1.0);
+        } elif (self.hovered != 0) {
+            dl.dl_emit_rect_border(dl.paint_ctx.dl, bx, by, self.box, self.box, 2.0, 1.2,
+                self.accent.r, self.accent.g, self.accent.b, ba);
+        } else {
+            dl.dl_emit_rect_border(dl.paint_ctx.dl, bx, by, self.box, self.box, 2.0, 1.0,
+                self.box_border.r, self.box_border.g, self.box_border.b, ba);
+        }
+        var disp = textshape.prepare_display(self.string_val());
+        dl.dl_emit_text(dl.paint_ctx.dl, disp, bx + self.box + self.gap,
+            self.rect.y + (self.rect.h - tm.line_height(self.font_scale)) / 2.0,
+            self.fg.r, self.fg.g, self.fg.b, self.fg.a, self.font_scale);
+    }
+
+    pub fn on_event(t: events.EventType, x: int, y: int, key: int): uievent.EventResult {
+        var inside: bool = self.rect.contains(x as float, y as float);
+        if (t == events.EventType.MouseMove) {
+            var want: int = 0;
+            if (inside) { want = 1; }
+            if (want != self.hovered) {
+                var cur = motion.value(self.id, 0, self.hovered as float);
+                self.hovered = want;
+                motion.animate_to(self.id, 0, want as float, 0.12, cur);
+                tree.request_repaint();
+            }
+        } elif (t == events.EventType.MouseDown) {
+            if (inside and key == 0) {
+                self.checked_sig.set(not self.checked_sig.get());
+                return uievent.EventResult.Handled;
+            }
+        }
+        return uievent.EventResult.Ignored;
+    }
+}
+
+pub fn checkbox(label_txt: str = "", initial: bool = false): Checkbox {
+    return Checkbox(label_txt, initial);
+}
+

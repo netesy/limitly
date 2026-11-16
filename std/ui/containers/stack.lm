@@ -1,0 +1,143 @@
+// std/ui/containers/stack.lm
+// Container — all children share the same rect (CSS grid-stack /
+// legacy Fluent `stack`). measure reports the largest child's size;
+// arrange gives every child the full inner rect; paint/on_event forward
+// to all children in order (events reverse, topmost-last wins).
+
+import std.ui.component as comp;
+import std.ui.component show Placed;
+import std.ui.types as ui_types;
+import std.ui.event as uievent;
+import std.ui.context as uictx;
+import std.ui.draw_list as dl;
+import std.ui.state as state;
+import std.ui.tree as tree;
+import std.events as events;
+import std.color as color;
+
+frame Stack {
+    embed Placed;
+    pub var children: [comp.Component];
+    pub var spacing: float;
+    // Scratch — AOT float-local clobbering across trait calls.
+    pub var _cw: float = 0.0;
+    pub var _ch: float = 0.0;
+
+    pub init(sp: float = 12.0) {
+        self.children = [];
+        self.spacing = sp;
+        self.id = comp.next_widget_id();
+    }
+
+    pub fn add(c: comp.Component): nil {
+        self.children.append(c);
+    }
+
+    pub fn add_all(list: [any]): nil {
+        iter (c in list) {
+            self.children.append(c as comp.Component);
+        }
+    }
+
+    pub fn kind(): ui_types.WidgetKind { return ui_types.WidgetKind.Container; }
+    pub fn on_theme_changed(): nil { }
+    pub fn on_overlay_dismiss(): nil { }
+
+    pub fn child_count(): int {
+        return len(self.children);
+    }
+
+    pub fn child_at(i: int): any {
+        if (i < 0 or i >= len(self.children)) {
+            return nil;
+        }
+        return self.children[i];
+    }
+
+    pub fn wants_pointer_capture(): int { return 0; }
+
+    pub fn measure(min_w: float, max_w: float, min_h: float, max_h: float): comp.Size {
+        self._cw = 0.0;
+        self._ch = 0.0;
+        var i = 0;
+        while (i < len(self.children)) {
+            val s = self.children[i].measure(0.0, comp.MEASURE_LOOSE, 0.0, comp.MEASURE_LOOSE);
+            if (s.w > self._cw) { self._cw = s.w; }
+            if (s.h > self._ch) { self._ch = s.h; }
+            i = i + 1;
+        }
+        // Each layer offsets by `spacing`, so the extent grows by
+        // spacing * (count - 1) beyond the largest child.
+        var extra: float = self.spacing * ((len(self.children) - 1) as float);
+        if (extra < 0.0) { extra = 0.0; }
+        var w: float = self._cw + extra + 0.0;
+        var h: float = self._ch + extra + 0.0;
+        if (w < min_w) { w = min_w; }
+        if (w > max_w) { w = max_w; }
+        if (h < min_h) { h = min_h; }
+        if (h > max_h) { h = max_h; }
+        return comp.Size(w=w, h=h);
+    }
+
+    pub fn arrange(x: float, y: float, w: float, h: float): nil {
+        self.rect.x = x;
+        self.rect.y = y;
+        self.rect.w = w;
+        self.rect.h = h;
+        // Deck-of-cards cascade: layer i is offset by i*spacing and shrunk
+        // by the same amount, so every layer stays visible along the
+        // top/left edges while right/bottom edges remain aligned.
+        var i = 0;
+        while (i < len(self.children)) {
+            var off: float = self.spacing * (i as float);
+            var cw: float = w - off;
+            var ch: float = h - off;
+            if (cw < 0.0) { cw = 0.0; }
+            if (ch < 0.0) { ch = 0.0; }
+            self.children[i].arrange(x + off, y + off, cw, ch);
+            i = i + 1;
+        }
+    }
+
+    pub fn paint(): nil {
+        var i = 0;
+        while (i < len(self.children)) {
+            self.children[i].paint();
+            i = i + 1;
+        }
+    }
+
+    pub fn on_event(t: events.EventType, x: int, y: int, key: int): uievent.EventResult {
+        // MouseMove reaches every child so hover state can clear.
+        var i = len(self.children) - 1;
+        var handled: bool = false;
+        while (i >= 0) {
+            val c = self.children[i];
+            var hit: bool = true;
+            if (t != events.EventType.MouseMove and t != events.EventType.MouseUp and t != events.EventType.MouseWheel) {
+                hit = c.bounds().contains(x as float, y as float);
+            } elif (tree.captured_id != 0) {
+                hit = tree.subtree_has_widget(c, tree.captured_id);
+            }
+            if (hit) {
+                val res = c.on_event(t, x, y, key);
+                if (res == uievent.EventResult.Handled) {
+                    if (t == events.EventType.MouseMove) {
+                        handled = true;
+                    } else {
+                        return uievent.EventResult.Handled;
+                    }
+                }
+            }
+            i = i - 1;
+        }
+        if (handled) {
+            return uievent.EventResult.Handled;
+        }
+        return uievent.EventResult.Ignored;
+    }
+}
+
+pub fn stack(sp: float = 12.0): Stack {
+    return Stack(sp);
+}

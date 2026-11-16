@@ -91,6 +91,10 @@ void lower_region_ownership(ir::Module& module, const std::unordered_map<std::st
     declare("lymar_aot_tuple_length", 2, i64);
     declare("lymar_aot_string_hash", 2, i64);
     declare("lymar_aot_list_slice", 6, i64);
+    declare("lymar_aot_substring", 3, i64);
+    declare("lymar_aot_string_case", 2, i64);
+    declare("lymar_aot_string_trim", 1, i64);
+    declare("lymar_aot_input", 1, i64);
     declare("lymar_aot_box_float", 1, i64, ctx->getDoubleType());
     declare("lymar_aot_to_float", 2, ctx->getDoubleType());
     declare("lymar_aot_to_integer", 2, i64);
@@ -245,7 +249,7 @@ void lower_region_ownership(ir::Module& module, const std::unordered_map<std::st
                         inst->replaceAllUsesWith(call.get());
                         inst = call.get();
                         *it = std::move(call);
-                        if (name == "lymar_aot_channel_new" || name == "lymar_aot_scheduler_new" || name == "lymar_aot_alloc" || name == "lymar_aot_resize" || name == "lymar_aot_raw_alloc" || name == "lymar_aot_raw_resize" || name == "lymar_aot_ref_resolve" || name == "lymar_aot_nil" || name == "lymar_aot_copy_constant" || name == "lymar_aot_box_float" || name == "lymar_aot_list_slice" || name == "lymar_aot_format_argument" || name == "lymar_aot_mark_dictionary" || name == "lymar_aot_scalar_to_string" || name == "lymar_aot_float_to_string" || name == "lymar_aot_float_bits_to_string") flags[inst] = one;
+                        if (name == "lymar_aot_channel_new" || name == "lymar_aot_scheduler_new" || name == "lymar_aot_alloc" || name == "lymar_aot_resize" || name == "lymar_aot_raw_alloc" || name == "lymar_aot_raw_resize" || name == "lymar_aot_ref_resolve" || name == "lymar_aot_nil" || name == "lymar_aot_copy_constant" || name == "lymar_aot_box_float" || name == "lymar_aot_list_slice" || name == "lymar_aot_substring" || name == "lymar_aot_string_case" || name == "lymar_aot_string_trim" || name == "lymar_aot_input" || name == "lymar_aot_format_argument" || name == "lymar_aot_mark_dictionary" || name == "lymar_aot_scalar_to_string" || name == "lymar_aot_float_to_string" || name == "lymar_aot_float_bits_to_string") flags[inst] = one;
                         if (name == "lymar_aot_boolean") flags[inst] = boolean;
                         if (name == "lymar_aot_callable_receiver") flags[inst] = one;
                     }

@@ -26,7 +26,7 @@ fn test_phase1_timing_and_app() {
     assert(cfg.fixed_dt > 0.01 and cfg.fixed_dt < 0.02, "Default fixed_dt should be ~0.0166");
 
     var app = game.Game(cfg);
-    assert(not app.is_running, "Game should not be running before setup");
+    assert(not app.is_running(), "Game should not be running before setup");
     assert(app.dt() > 0.0, "Delta time should have initial non-zero fallback");
     assert(app.time_scale == 1.0, "Time scale should default to 1.0");
 

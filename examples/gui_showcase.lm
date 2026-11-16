@@ -1,0 +1,430 @@
+// examples/gui_showcase.lm
+// Lymar Studio — Cloud Console Showcase (retained UI)
+//
+// Ported from tests/gui_showcase.lm onto std.ui: a typed Component
+// tree driven by std.app's App loop (a.ui(root) / a.run()). State flows through signals (select/checkbox/slider bindings
+// + effects); widget colors come from the canonical std.theme palette
+// via uitheme.set_dark() with per-instance overrides where needed.
+//
+//   lymar run examples/gui_showcase.lm
+
+import std.app as app;
+import std.ui as ui;
+import std.ui.theme as uitheme;
+import std.color as color;
+
+// ── Action callbacks ─────────────────────────────────────────────────────────
+// Button.on_click is a plain fn(): nil — module functions, no closures.
+
+fn on_deploy() {
+    print("[Action] Deploying microservice release v2.4.0 to edge clusters...");
+}
+
+fn on_sync() {
+    print("[Action] Cluster state synchronized with central registry.");
+}
+
+fn on_drain() {
+    print("[Action] Draining worker node pool (zero-downtime cordon active).");
+}
+
+fn on_purge() {
+    print("[Action] Edge CDN cache purged globally across 34 points of presence.");
+}
+
+fn on_search_changed() {
+    print("[Search] Filter query updated.");
+}
+
+fn on_autoscale() {
+    print("[Config] Auto-Scale toggled.");
+}
+
+fn on_rolling() {
+    print("[Config] Rolling Restarts toggled.");
+}
+
+fn on_replica() {
+    print("[Config] Replica scale slider adjusted.");
+}
+
+fn on_region() {
+    print("[Config] Deployment region changed via select dropdown.");
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+fn badge(txt: str, bg_: color.Color, fg_: color.Color): ui.Badge {
+    var b = ui.badge(txt);
+    b.bg = bg_;
+    b.fg = fg_;
+    return b;
+}
+
+fn btn(txt: str, bg_: color.Color, fg_: color.Color, click: (fn(): nil)?): ui.Button {
+    var b = ui.button(txt, bg_, click);
+    b.fg = fg_;
+    b.pad_x = 10.0;
+    b.pad_y = 5.0;
+    return b;
+}
+
+// ── Header ───────────────────────────────────────────────────────────────────
+
+fn build_header(): ui.Flow {
+    var h = ui.row(8.0);
+    h.add(ui.label("LIMIT STUDIO", color.indigo));
+    h.add(ui.spacer());
+    h.add(ui.label("us-east-1", color.green));
+    h.add(badge("HEALTHY", color.rgb(30, 80, 50), color.rgb(100, 240, 150)));
+    h.add(ui.spacer());
+    h.add(btn("Deploy", color.indigo, color.white, on_deploy));
+    h.add(btn("Sync", color.rgb(45, 50, 68), color.rgba(160, 200, 255, 1.0), on_sync));
+    return h;
+}
+
+// ── Tab 0: Overview ──────────────────────────────────────────────────────────
+
+fn build_overview_page(): ui.Flow {
+    var page = ui.column(10.0);
+
+    var metrics = ui.row(8.0);
+    metrics.add(ui.stat("COMPUTE", "42.8%", "16 vCPUs active - 4 nodes"));
+    metrics.add(ui.stat("BANDWIDTH", "1.84 GB/s", "+14.2% vs prior hour"));
+    metrics.add(ui.stat("AVAILABILITY", "99.995%", "0 dropouts detected"));
+    page.add(metrics);
+
+    var summary = ui.card("Infrastructure Orchestration Summary", nil);
+    var sbody = ui.column(8.0);
+    sbody.add(ui.label("Autonomous edge cluster running across 34 PoPs. Self-healing mesh routing enabled.", color.light_gray));
+    var actions = ui.row(8.0);
+    actions.add(btn("Sync Cluster State", color.blue, color.white, on_sync));
+    actions.add(btn("Drain Worker Nodes", color.rgb(65, 40, 40), color.rgb(255, 140, 120), on_drain));
+    actions.add(btn("Purge Edge Cache", color.rgb(40, 45, 55), color.light_gray, on_purge));
+    sbody.add(actions);
+    summary.set_child(sbody);
+    page.add(summary);
+
+    return page;
+}
+
+// ── Tab 1: Microservices ─────────────────────────────────────────────────────
+
+fn service_row(name: str, status: str, healthy: int, version: str, region: str): ui.Flow {
+    var r = ui.row(8.0);
+    r.add(ui.label(name, color.white));
+    if (healthy != 0) {
+        r.add(badge(status, color.rgb(25, 75, 45), color.rgb(90, 240, 140)));
+    } else {
+        r.add(badge(status, color.rgb(75, 55, 20), color.rgb(255, 210, 80)));
+    }
+    r.add(ui.spacer());
+    r.add(badge(version, color.rgb(35, 45, 65), color.rgb(130, 180, 255)));
+    r.add(ui.spacer());
+    r.add(badge(region, color.rgb(35, 38, 48), color.gray));
+    r.add(ui.spacer());
+    r.add(btn("Restart", color.rgb(45, 48, 60), color.light_gray, on_sync));
+    return r;
+}
+
+fn build_microservices_page(): ui.Flow {
+    var page = ui.column(10.0);
+
+    var filter = ui.row(8.0);
+    filter.add(ui.label("Filter:", color.light_gray));
+    var search = ui.text_input("", "Search microservice...");
+    search.text_sig = ui.signal_str("");
+    filter.add(search);
+    filter.add(ui.spacer());
+    filter.add(badge("4 SERVICES MONITORED", color.rgb(35, 50, 70), color.rgb(140, 200, 255)));
+    page.add(filter);
+
+    var list = ui.column(8.0);
+    list.add(service_row("payments-api-v2", "ONLINE", 1, "v2.4.0", "us-east-1"));
+    list.add(service_row("auth0-gateway", "ONLINE", 1, "v1.9.3", "eu-west-1"));
+    list.add(service_row("kafka-event-mesh", "DEGRADED", 0, "v3.1.0", "ap-east-1"));
+    list.add(service_row("prom-telemetry", "ONLINE", 1, "v2.8.2", "global"));
+    page.add(list);
+
+    return page;
+}
+
+// ── Tab 2: Live Telemetry (scissor-clipped scroll view) ──────────────────────
+
+fn log_line(msg: str, c: color.Color): ui.Label {
+    return ui.label(msg, c);
+}
+
+fn build_telemetry_page(): ui.Flow {
+    var page = ui.column(8.0);
+
+    var top = ui.row(8.0);
+    top.add(ui.label("Real-Time Cluster Telemetry Feed", color.light_gray));
+    top.add(ui.spacer());
+    top.add(badge("SCISSOR CLIPPED", color.rgb(30, 60, 90), color.rgb(120, 200, 255)));
+    top.add(badge("LIVE STREAM", color.rgb(25, 75, 45), color.rgb(90, 240, 140)));
+    page.add(top);
+
+    var logs = ui.column(4.0);
+    logs.add(log_line("[13:50:02] [INFO] Deployment b72ef1 verified on 12 edge nodes - HTTP/3 enabled", color.rgb(140, 210, 160)));
+    logs.add(log_line("[13:50:18] [SEC] Autonomous TLS certificate renewal confirmed (0 ms downtime)", color.rgb(160, 190, 240)));
+    logs.add(log_line("[13:50:31] [METR] Prometheus metrics exporter heartbeat ACK received on :9090", color.gray));
+    logs.add(log_line("[13:50:44] [POD] Pod worker-node-us-east-8 auto-healed after healthcheck timeout", color.rgb(255, 200, 100)));
+    logs.add(log_line("[13:51:02] [NET] BGP anycast route converged across 34 points of presence", color.rgb(140, 210, 160)));
+    logs.add(log_line("[13:51:15] [AUTH] mTLS mutual authentication handshake success (auth0-gateway)", color.rgb(160, 190, 240)));
+    logs.add(log_line("[13:51:28] [DB] Read replica replication lag < 4ms across cross-region VPC", color.gray));
+    logs.add(log_line("[13:51:40] [CDN] Edge cache hit ratio reached 98.6% on static assets bucket", color.rgb(140, 210, 160)));
+    logs.add(log_line("[13:51:55] [SYS] Kernel eBPF packet filter rules updated without packet drop", color.rgb(160, 190, 240)));
+    logs.add(log_line("[13:52:10] [ALERT] Spike in queries absorbed by horizontal autoscale pool", color.rgb(255, 140, 120)));
+    logs.add(log_line("[13:52:25] [SYNC] Distributed consensus quorum acknowledged in epoch #4912", color.rgb(160, 190, 240)));
+    logs.add(log_line("[13:52:40] [MESH] Envoy proxy sidecar memory stabilized at 18.4 MB", color.gray));
+    logs.add(log_line("[13:52:55] [HEAL] Node pool cordon lifted automatically on us-east-prod-1", color.rgb(140, 210, 160)));
+    logs.add(log_line("[13:53:10] [RATE] Token bucket rate limiter allowed 42,900 req/sec sustained", color.rgb(160, 190, 240)));
+    logs.add(log_line("[13:53:25] [DONE] Telemetry buffer flushed cleanly to persistent storage", color.rgb(140, 210, 160)));
+
+    // ScrollView measures its child under loose constraints then clamps to
+    // the space the parent gives it — inside the tab page it fills the
+    // remaining height and clips via draw-list ClipPush/ClipPop.
+    var scroll = ui.scroll_view(logs);
+    page.add(scroll);
+
+    return page;
+}
+
+// ── Tab 3: Settings & Tools ──────────────────────────────────────────────────
+
+fn build_settings_page(): ui.Flow {
+    var page = ui.column(14.0);
+
+    var region_row = ui.row(8.0);
+    region_row.add(ui.label("Target Environment:", color.white));
+    var region_opts = ["US-East (N. Virginia)", "EU-Central (Frankfurt)", "AP-East (Tokyo)", "Global Multi-Cloud"];
+    var region_sig = ui.signal_int(0);
+    var region_sel = ui.select(region_opts, 0);
+    region_sel.bind_selected(region_sig);
+    ui.effect(fn(): nil { on_region(); }, [region_sig.node]);
+    region_row.add(region_sel);
+    region_row.add(ui.spacer());
+    region_row.add(badge("ACTIVE ENV", color.indigo, color.white));
+    page.add(region_row);
+
+    var autoscale_sig = ui.signal_bool(true);
+    var rolling_sig = ui.signal_bool(true);
+    var toggle_row = ui.row(8.0);
+    var t1 = ui.row(8.0);
+    var ac = ui.checkbox("", true);
+    ac.bind_check(autoscale_sig);
+    t1.add(ac);
+    t1.add(ui.label("Autonomous Scale", color.light_gray));
+    toggle_row.add(t1);
+    toggle_row.add(ui.spacer());
+    var t2 = ui.row(8.0);
+    var rc = ui.toggle("", true);
+    t2.add(rc);
+    t2.add(ui.label("Zero-Downtime Rolling", color.light_gray));
+    toggle_row.add(t2);
+    toggle_row.add(ui.spacer());
+    page.add(toggle_row);
+    ui.effect(fn(): nil { on_autoscale(); }, [autoscale_sig.node]);
+    ui.effect(fn(): nil { on_rolling(); }, [rolling_sig.node]);
+
+    var replica_sig = ui.signal_float(8.0);
+    var replica_row = ui.row(8.0);
+    replica_row.add(ui.label("Cluster Replicas (1..20):", color.light_gray));
+    var slider = ui.slider(1.0, 20.0, 8.0, "");
+    slider.bind_value(replica_sig);
+    replica_row.add(slider);
+    replica_row.add(ui.spacer());
+    replica_row.add(badge("8 PODS ACTIVE", color.rgb(35, 45, 65), color.rgb(130, 180, 255)));
+    page.add(replica_row);
+    ui.effect(fn(): nil { on_replica(); }, [replica_sig.node]);
+
+    var diag = ui.card("System Diagnostics & Telemetry", nil);
+    var dbody = ui.column(6.0);
+    dbody.add(ui.label("Captures live engine telemetry, clipping state, and event loop metrics.", color.gray));
+    dbody.add(btn("Run Diagnostics", color.indigo, color.white, on_sync));
+    diag.set_child(dbody);
+    page.add(diag);
+
+    return page;
+}
+
+// ── Tab 4: Widget Gallery — every widget and container ────────────────────
+
+fn gallery_section(title: str): ui.Label {
+    return ui.label("── " + title + " ──", color.rgb(120, 160, 255));
+}
+
+fn build_gallery_page(): ui.Flow {
+    var g = ui.column(10.0);
+
+    // Layout containers
+    g.add(gallery_section("Containers: row / column / stack / grid / mask / overlay / tooltip / scroll"));
+    var cr = ui.row(6.0);
+    cr.add(ui.label("row:", color.gray));
+    cr.add(badge("A", color.indigo, color.white));
+    cr.add(badge("B", color.green, color.white));
+    cr.add(badge("C", color.yellow, color.white));
+    g.add(cr);
+
+    var st = ui.stack(16.0);
+    var sc1 = ui.card("Stack layer 1", nil);
+    var sc2 = ui.card("Stack layer 2 (overlapping)", nil);
+    st.add(sc1);
+    st.add(sc2);
+    g.add(st);
+
+    var gd = ui.grid(3, 6.0);
+    gd.add(badge("g1", color.cyan, color.white));
+    gd.add(badge("g2", color.cyan, color.white));
+    gd.add(badge("g3", color.cyan, color.white));
+    gd.add(badge("g4", color.cyan, color.white));
+    gd.add(badge("g5", color.cyan, color.white));
+    gd.add(badge("g6", color.cyan, color.white));
+    g.add(gd);
+
+    var mk = ui.mask(ui.card("Masked card (rounded clip)", nil), "rounded");
+    g.add(mk);
+
+    var ov = ui.overlay(ui.label("Overlay child at offset", color.white), 12.0, 4.0);
+    g.add(ov);
+
+    var tt = ui.tooltip(ui.button("Hover for tooltip", nil, nil, nil), "Tooltip label");
+    g.add(tt);
+
+    // Display widgets
+    g.add(gallery_section("Display: label / badge / alert / stat / indicator / steps / link / spacer"));
+    g.add(ui.label("Plain label text", color.light_gray));
+    g.add(ui.badge("Badge"));
+    g.add(ui.alert("Informational alert message", "info"));
+    g.add(ui.alert("Warning: check your config", "warning"));
+    var st1 = ui.stat("Uptime", "99.98%", "+0.02% vs last week");
+    g.add(st1);
+    g.add(ui.indicator("online", "API Status"));
+    g.add(ui.steps(["Create", "Configure", "Deploy", "Monitor"], 2));
+    g.add(ui.link("Documentation", "https://example.com"));
+    var sp_row = ui.row(4.0);
+    sp_row.add(ui.label("spacer →", color.gray));
+    sp_row.add(ui.spacer());
+    sp_row.add(ui.label("← pushed right", color.gray));
+    g.add(sp_row);
+
+    // Input widgets
+    g.add(gallery_section("Inputs: button / checkbox / toggle / text_input / select / multi_select / slider / range_slider / stepper / filter / file_input / color_picker"));
+    var in1 = ui.row(8.0);
+    in1.add(ui.button("Button", nil, nil, on_sync));
+    in1.add(ui.checkbox("Checkbox", false));
+    in1.add(ui.toggle("Toggle", true));
+    in1.add(ui.stepper(3, 1, 0, 10));
+    g.add(in1);
+    g.add(ui.text_input("", "Type here..."));
+    var sel_opts = ["Option A", "Option B", "Option C"];
+    g.add(ui.select(sel_opts, 1));
+    g.add(ui.multi_select(sel_opts, [0]));
+    g.add(ui.slider(0.0, 100.0, 40.0, "Slider"));
+    g.add(ui.range_slider(20.0, 80.0, 0.0, 100.0));
+    g.add(ui.filter("", "Filter items..."));
+    var fi = ui.file_input("Choose a file...", nil);
+    fi.enable_native_dialog();
+    g.add(fi);
+    g.add(ui.color_picker("Accent color", nil, nil));
+
+    // Composite / data widgets
+    g.add(gallery_section("Data: progress_bar / calendar / chart / table / diff / image"));
+    g.add(ui.progress_bar(0.65));
+    g.add(ui.calendar("2025-06-15"));
+    var vals = [12.0, 34.0, 21.0, 55.0, 42.0, 78.0];
+    var charts = ui.row(8.0);
+    charts.add(ui.bar_chart("Bar", vals));
+    charts.add(ui.line_chart("Line", vals));
+    charts.add(ui.pie_chart("Pie", vals));
+    g.add(charts);
+    var tbl = ui.table_text(["Name", "Status", "Latency"], [
+        ["api-gateway", "ok", "12ms"],
+        ["auth-svc", "ok", "8ms"],
+        ["billing", "degraded", "240ms"]
+    ]);
+    g.add(tbl);
+    g.add(ui.diff("old line\nshared\nremoved", "old line\nshared\nadded"));
+    g.add(ui.image(""));
+
+    // Structural widgets
+    g.add(gallery_section("Structure: card / form_field / accordion / tree_node / timeline / tabs"));
+    var fcard = ui.card("Form Field Card", nil);
+    var fbody = ui.column(6.0);
+    fbody.add(ui.form_field("Display Name", ui.text_input("", "Enter name"), "Shown publicly", ""));
+    fbody.add(ui.form_field("Email", ui.text_input("", "you@example.com"), "", "Invalid email"));
+    fcard.set_child(fbody);
+    g.add(fcard);
+
+    var acc = ui.accordion("Advanced Options", ui.label("Accordion content — settings live here", color.gray), true);
+    g.add(acc);
+
+    var tn = ui.tree_node("Root node", true);
+    tn.add(ui.label("  └─ child item", color.light_gray));
+    var tn2 = ui.tree_node("Child node", false);
+    tn2.add(ui.label("    └─ grandchild", color.gray));
+    tn.add(tn2);
+    g.add(tn);
+
+    var tl = ui.timeline();
+    tl.add(ui.label("09:00 — Service started", color.light_gray));
+    tl.add(ui.label("09:05 — Health check passed", color.green));
+    tl.add(ui.label("09:12 — Deployment complete", color.rgb(120, 160, 255)));
+    g.add(tl);
+
+    var inner_titles = ["Pane A", "Pane B"];
+    var inner_pages = [ui.label("Inner tabs page A", color.white), ui.label("Inner tabs page B", color.white)];
+    g.add(ui.tabs(inner_titles, inner_pages, 0));
+
+    return g;
+}
+
+// ── Footer ───────────────────────────────────────────────────────────────────
+
+fn build_footer(): ui.Flow {
+    var f = ui.row(8.0);
+    f.add(ui.label("Lymar Engine - Retained Component UI", color.gray));
+    f.add(ui.spacer());
+    f.add(ui.label("Memory: 14.2 MB | Ready", color.gray));
+    return f;
+}
+
+// ── App root ─────────────────────────────────────────────────────────────────
+
+fn build_app_view(): ui.Flow {
+    var titles = ["Overview", "Microservices", "Live Telemetry", "Settings & Tools", "Widget Gallery"];
+    var pages = [
+        build_overview_page(),
+        build_microservices_page(),
+        build_telemetry_page(),
+        build_settings_page(),
+        ui.scroll_view(build_gallery_page())
+    ];
+    var tab_bar = ui.tabs(titles, pages, 0);
+
+    var root = ui.column(12.0);
+    root.pad_x = 14.0;
+    root.pad_y = 14.0;
+    root.add(build_header());
+    root.add(tab_bar);
+    root.add(build_footer());
+    return root;
+}
+
+fn main(): int {
+    print("=== Launching Lymar Studio - Cloud Console Showcase ===");
+
+    // Canonical std.theme palette — widgets snapshot it at init and
+    // refresh via tree.apply_theme on theme swaps.
+    uitheme.set_dark();
+
+    var a = app.App("Lymar Studio - Cloud Infrastructure Console", 820, 620);
+
+    var root = build_app_view();
+    a.ui(root);
+    a.run();
+
+    print("Lymar Studio shutdown successfully.");
+    return 0;
+}

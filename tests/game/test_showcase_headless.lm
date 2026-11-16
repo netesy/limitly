@@ -1,4 +1,5 @@
 // tests/game/test_showcase_headless.lm
+import std.app as app;
 import std.game as game;
 import std.theme as theme;
 
@@ -9,18 +10,20 @@ fn test_game_showcase_run() {
         height=600,
         resizable=true
     );
-    var app = game.Game(cfg);
-    assert(app.setup(), "Setup failed");
+    var g = game.Game(cfg);
+    var a = app.App(cfg.title, cfg.width, cfg.height);
+    a.open();
 
-    app.gui.set_theme(theme.cyberpunk_theme());
+    g.gui.set_theme(theme.cyberpunk_theme());
 
     // Run 3 simulation frames
     var frame_idx = 0;
     while (frame_idx < 3) {
-        app.begin_frame();
+        a.pump();
+        g.poll();
 
-        var sw = app.width as float;
-        var sh = app.height as float;
+        var sw = g.width as float;
+        var sh = g.height as float;
         if (frame_idx == 0) {
             assert(sw == 800.0, "sw is 800 initially");
             assert(sh == 600.0, "sh is 600 initially");
@@ -29,27 +32,31 @@ fn test_game_showcase_run() {
             assert(sh == 720.0, "sh is 720 after resize");
         }
 
-        if (app.gui.begin_window("Starship Command HUD", 16.0, 16.0, 250.0, sh - 32.0)) {
-            app.gui.label("VESSEL STATUS");
-            app.gui.progress_bar(0.85, 226.0, 14.0, "85%");
-            app.gui.end_window();
+        a.begin_pass();
+        g.imgui_begin();
+
+        if (g.gui.begin_window("Starship Command HUD", 16.0, 16.0, 250.0, sh - 32.0)) {
+            g.gui.label("VESSEL STATUS");
+            g.gui.progress_bar(0.85, 226.0, 14.0, "85%");
+            g.gui.end_window();
         }
 
-        if (app.gui.begin_window("Theme & Display Studio", 280.0, 320.0, 240.0, 260.0)) {
-            app.gui.label("DISPLAY RESOLUTION");
+        if (g.gui.begin_window("Theme & Display Studio", 280.0, 320.0, 240.0, 260.0)) {
+            g.gui.label("DISPLAY RESOLUTION");
             // Test switching resolution
-            app.set_resolution(1024, 720);
-            app.gui.end_window();
+            g.set_resolution(1024, 720);
+            g.gui.end_window();
         }
 
-        app.end_frame();
+        g.imgui_end();
+        a.end_pass();
         frame_idx = frame_idx + 1;
     }
 
-    assert(app.width == 1024, "Width updated to 1024");
-    assert(app.height == 720, "Height updated to 720");
+    assert(g.width == 1024, "Width updated to 1024");
+    assert(g.height == 720, "Height updated to 720");
 
-    app.shutdown();
+    a.close();
     print("PASS: Game showcase headless frame loop and resolution switch succeeded.");
 }
 

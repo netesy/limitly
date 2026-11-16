@@ -1,0 +1,114 @@
+// std/ui/widgets/steps.lm
+// Widget — ported from legacy Fluent Steps.
+// Horizontal sequence of numbered circles + titles; steps up to
+// active_step render in accent. `is_vertical` is accepted for API parity
+// (horizontal layout only in v1, matching the legacy emit).
+
+import std.ui.component as comp;
+import std.ui.component show Placed;
+import std.ui.types as ui_types;
+import std.ui.event as uievent;
+import std.ui.context as uictx;
+import std.ui.draw_list as dl;
+import std.ui.state as state;
+import std.ui.tree as tree;
+import std.events as events;
+import std.color as color;
+import std.ui.theme as uitheme;
+import std.text.controller as text_ctrl;
+import std.text.shaping as textshape;
+import std.ui.text_metrics as tm;
+
+frame Steps {
+    embed Placed;
+    pub var step_titles: [str];
+    pub var active_step: int;
+    pub var active_sig: state.IntSignal?;
+    pub var is_vertical: bool;
+    pub var surface: color.Color;
+    pub var accent: color.Color;
+    pub var text: color.Color;
+    pub var font_scale: float;
+    pub var step_w: float;
+
+    pub init(titles: [str], active: int = 0, vertical: bool = false) {
+        val pal = uitheme.palette();
+        self.step_titles = titles;
+        self.active_step = active;
+        self.active_sig = nil;
+        self.is_vertical = vertical;
+        self.surface = pal.surface;
+        self.accent = pal.accent;
+        self.text = pal.text_primary;
+        self.font_scale = 0.9;
+        self.step_w = 120.0;
+        self.id = comp.next_widget_id();
+    }
+
+    pub fn kind(): ui_types.WidgetKind { return ui_types.WidgetKind.Steps; }
+    pub fn on_theme_changed(): nil {
+        val p = uitheme.palette();
+        self.surface = p.surface;
+        self.accent = p.accent;
+        self.text = p.text_primary;
+        tree.request_repaint();
+    }
+    pub fn on_overlay_dismiss(): nil { }
+
+    pub fn bind_active(sig: state.IntSignal): nil {
+        self.active_sig = sig;
+    }
+
+    fn current_step(): int {
+        if (self.active_sig != nil) {
+            return (self.active_sig as state.IntSignal).get();
+        }
+        return self.active_step;
+    }
+
+    pub fn wants_pointer_capture(): int { return 0; }
+
+    pub fn measure(min_w: float, max_w: float, min_h: float, max_h: float): comp.Size {
+        var w: float = (len(self.step_titles) as float) * self.step_w;
+        var h: float = 28.0;
+        if (w < min_w) { w = min_w; }
+        if (w > max_w) { w = max_w; }
+        if (h < min_h) { h = min_h; }
+        if (h > max_h) { h = max_h; }
+        return comp.Size(w=w, h=h);
+    }
+
+    pub fn paint(): nil {
+        var cur = self.current_step();
+        var sx = self.rect.x + 0.0;
+        var i = 0;
+        while (i < len(self.step_titles)) {
+            var active: bool = (i <= cur);
+            var cr = self.surface.r + 0.0;
+            var cg = self.surface.g + 0.0;
+            var cb = self.surface.b + 0.0;
+            if (active) {
+                cr = self.accent.r;
+                cg = self.accent.g;
+                cb = self.accent.b;
+            }
+            dl.dl_emit_rect_rounded(dl.paint_ctx.dl, sx, self.rect.y, 22.0, 22.0,
+                11.0, cr, cg, cb, 1.0);
+            dl.dl_emit_text(dl.paint_ctx.dl, "{i + 1}",
+                sx + 7.0, self.rect.y + 5.0, 1.0, 1.0, 1.0, 1.0, self.font_scale);
+            dl.dl_emit_text(dl.paint_ctx.dl, textshape.prepare_display(self.step_titles[i]),
+                sx + 28.0, self.rect.y + 5.0,
+                self.text.r, self.text.g, self.text.b, 1.0, self.font_scale);
+            sx = sx + self.step_w;
+            i = i + 1;
+        }
+    }
+
+    pub fn on_event(t: events.EventType, x: int, y: int, key: int): uievent.EventResult {
+        return uievent.EventResult.Ignored;
+    }
+}
+
+pub fn steps(titles: [str], active: int = 0, vertical: bool = false): Steps {
+    return Steps(titles, active, vertical);
+}

@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>renderer.lm - Lymar API Reference</title>
+<style>
+:root {
+  --bg-primary: #0a0e17;
+  --bg-secondary: #111827;
+  --bg-tertiary: #1f2937;
+  --accent: #38bdf8;
+  --accent-hover: #7dd3fc;
+  --text-main: #f1f5f9;
+  --text-muted: #94a3b8;
+  --border-color: #334155;
+}
+* { box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif;
+  margin: 0; padding: 0; background: var(--bg-primary); color: var(--text-main); display: flex;
+}
+nav {
+  width: 300px; height: 100vh; overflow-y: auto; background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color); padding: 24px 20px; position: fixed;
+}
+nav h2 { font-size: 1.15rem; color: var(--accent); margin-top: 0; margin-bottom: 16px; font-weight: 700; }
+#search-input {
+  width: 100%; padding: 8px 12px; background: var(--bg-tertiary); border: 1px solid var(--border-color);
+  border-radius: 6px; color: #fff; font-size: 0.85rem; margin-bottom: 16px;
+}
+#search-input:focus { outline: none; border-color: var(--accent); }
+.nav-link { display: block; color: var(--text-muted); text-decoration: none; padding: 6px 8px; font-size: 0.9rem; border-radius: 4px; }
+.nav-link:hover { color: #fff; background: var(--bg-tertiary); }
+main { margin-left: 300px; padding: 40px 48px; max-width: 950px; flex: 1; }
+h1 { color: #fff; font-size: 2.2rem; margin-top: 0; padding-bottom: 16px; border-bottom: 1px solid var(--border-color); }
+h2 { color: var(--accent); font-size: 1.4rem; margin-top: 36px; margin-bottom: 14px; }
+h3 { color: #fff; font-size: 1.25rem; margin-top: 28px; margin-bottom: 12px; display: flex; align-items: center; gap: 10px; }
+h4 { color: var(--accent); font-size: 1rem; margin-top: 20px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+.badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
+.badge-pub { background: #064e3b; color: #6ee7b7; border: 1px solid #059669; }
+.badge-private { background: #334155; color: #cbd5e1; }
+.badge-type { background: #1e1b4b; color: #c7d2fe; border: 1px solid #4338ca; }
+.code-sig { background: #090d16; border: 1px solid var(--border-color); padding: 14px 18px; border-radius: 8px; overflow-x: auto; font-family: 'Consolas', 'Fira Code', monospace; font-size: 0.95rem; color: #e2e8f0; }
+.summary { color: #cbd5e1; line-height: 1.65; margin: 14px 0; font-size: 1rem; }
+/* Callout styling */
+.callout { margin: 16px 0; padding: 14px 18px; border-radius: 8px; border-left: 4px solid; font-size: 0.92rem; }
+.callout-header { font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+.callout-tip { border-color: #10b981; background: rgba(16, 185, 129, 0.08); color: #d1fae5; }
+.callout-tip .callout-header { color: #34d399; }
+.callout-warning { border-color: #f59e0b; background: rgba(245, 158, 11, 0.08); color: #fef3c7; }
+.callout-warning .callout-header { color: #fbbf24; }
+.callout-note { border-color: #0284c7; background: rgba(2, 132, 199, 0.08); color: #e0f2fe; }
+.callout-note .callout-header { color: #38bdf8; }
+.callout-deprecated { border-color: #e11d48; background: rgba(225, 29, 72, 0.08); color: #ffe4e6; }
+.callout-deprecated .callout-header { color: #fb7185; }
+/* Example card */
+.example-card { margin: 20px 0; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: #080c14; }
+.example-header { background: #162032; padding: 8px 16px; font-size: 0.82rem; font-weight: 700; color: #94a3b8; border-bottom: 1px solid var(--border-color); }
+.example-card pre { margin: 0; padding: 14px 18px; overflow-x: auto; font-family: monospace; font-size: 0.92rem; color: #e2e8f0; }
+/* Tables */
+table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 0.92rem; }
+th { background: #162032; color: #94a3b8; text-align: left; padding: 10px 14px; font-weight: 600; border-bottom: 1px solid var(--border-color); }
+td { padding: 10px 14px; border-bottom: 1px solid #1e293b; color: #cbd5e1; }
+ul { padding-left: 20px; color: #cbd5e1; line-height: 1.6; }
+hr { border: 0; border-top: 1px solid var(--border-color); margin: 36px 0; }
+</style>
+<script>
+function filterNav() {
+  var q = document.getElementById('search-input').value.toLowerCase();
+  var links = document.querySelectorAll('.nav-link');
+  links.forEach(function(l) {
+    l.style.display = l.textContent.toLowerCase().includes(q) ? 'block' : 'none';
+  });
+}
+</script>
+</head>
+<body>
+<nav>
+<h2>renderer.lm</h2>
+<input type="text" id="search-input" placeholder="Filter symbols..." oninput="filterNav()">
+<div id="nav-list">
+<a class="nav-link" href="#_quicksort_tri_order">_quicksort_tri_order <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_project_vertices_parallel">_project_vertices_parallel <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_render_mesh_item">_render_mesh_item <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_ensure_gpu_buffers">_ensure_gpu_buffers <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_ensure_material_texture">_ensure_material_texture <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_uniform_shading_int">_uniform_shading_int <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_uniform_cull_int">_uniform_cull_int <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_uniform_light_type_int">_uniform_light_type_int <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_pack_mesh_uniforms">_pack_mesh_uniforms <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_draw_mesh_gpu">_draw_mesh_gpu <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_render_scene_gpu">_render_scene_gpu <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#render_scene">render_scene <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_render_scene_cpu">_render_scene_cpu <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_accumulate_lights">_accumulate_lights <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#Renderer3D">Renderer3D <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+</div>
+</nav>
+<main>
+<h1>renderer.lm API Reference</h1>
+<h2>Module Overview</h2>
+<div class="summary"><p>std/d3/renderer.lm
+3D scene rasterizer and projection pipeline with pooled SoA triangle buffers,
+exhaustive shading/light dispatch, depth sorting, and face culling.</p></div>
+<div id="_quicksort_tri_order">
+<h3>_quicksort_tri_order <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _quicksort_tri_order(order: list, coords: list, low: int, high: int)</code></pre>
+</div><hr>
+<div id="_project_vertices_parallel">
+<h3>_project_vertices_parallel <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _project_vertices_parallel(g_verts: list, m: list, v_count: int, viewport_x: float, viewport_y: float, half_vw: float, half_vh: float, proj_buf: list)</code></pre>
+</div><hr>
+<div id="_render_mesh_item">
+<h3>_render_mesh_item <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _render_mesh_item(renderer: Renderer3D, geo: geom.Geometry, material: mtrl.Material, world: Matrix, mvp: Matrix, lights: list, n_lights: int, amb_r: float, amb_g: float, amb_b: float, viewport_x: float, viewport_y: float, half_vw: float, half_vh: float, bound_w: float, bound_h: float, bound_min_x: float, bound_max_x: float, bound_min_y: float, bound_max_y: float): nil</code></pre>
+</div><hr>
+<div id="_ensure_gpu_buffers">
+<h3>_ensure_gpu_buffers <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _ensure_gpu_buffers(geo: geom.Geometry): nil</code></pre>
+<div class="summary"><p>Builds (once) the interleaved pos+normal+uv vertex stream and index stream
+for a Geometry and uploads them as gg buffers. Local-space data is
+transformed by the MVP uniform at draw time, so one buffer serves every
+mesh/instance that shares the geometry. Vertex record: 8 floats
+(pos3, normal3, uv2); missing UVs default to (0,0).</p></div>
+</div><hr>
+<div id="_ensure_material_texture">
+<h3>_ensure_material_texture <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _ensure_material_texture(material: mtrl.Material): nil</code></pre>
+<div class="summary"><p>Loads material.base_color_texture once and uploads it as a gg image.
+material.texture_state: 0 = not tried, 1 = ready (texture_id valid),
+-1 = failed (renderer falls back to flat material color).</p></div>
+</div><hr>
+<div id="_uniform_shading_int">
+<h3>_uniform_shading_int <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _uniform_shading_int(shading: types.ShadingModel, wireframe: bool): int</code></pre>
+<div class="summary"><p>Uniform blob layout consumed by the runtime vertex-stream pipeline.
+See src/runtime/software_graphics.hh draw_vertex_stream.</p></div>
+</div><hr>
+<div id="_uniform_cull_int">
+<h3>_uniform_cull_int <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _uniform_cull_int(material: mtrl.Material): int</code></pre>
+</div><hr>
+<div id="_uniform_light_type_int">
+<h3>_uniform_light_type_int <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _uniform_light_type_int(light: lgt.Light): int</code></pre>
+</div><hr>
+<div id="_pack_mesh_uniforms">
+<h3>_pack_mesh_uniforms <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _pack_mesh_uniforms(renderer: Renderer3D, geo: geom.Geometry, material: mtrl.Material, world: Matrix, mvp: Matrix, lights: list, n_lights: int, amb_r: float, amb_g: float, amb_b: float, viewport_x: float, viewport_y: float, viewport_w: float, viewport_h: float): nil</code></pre>
+<div class="summary"><p>Fills renderer.uniform_scratch with the per-draw uniform blob. The scratch
+list is grown once and overwritten in place — no per-frame allocation.</p></div>
+</div><hr>
+<div id="_draw_mesh_gpu">
+<h3>_draw_mesh_gpu <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _draw_mesh_gpu(renderer: Renderer3D, geo: geom.Geometry, material: mtrl.Material, world: Matrix, mvp: Matrix, lights: list, n_lights: int, amb_r: float, amb_g: float, amb_b: float, viewport_x: float, viewport_y: float, viewport_w: float, viewport_h: float, frustum: list): nil</code></pre>
+<div class="summary"><p>GPU path: one vertex-stream draw call per visible mesh/instance through the
+gg buffer/pipeline/bindings handles. The runtime performs vertex transform,
+lighting, and z-buffered rasterization.</p></div>
+</div><hr>
+<div id="_render_scene_gpu">
+<h3>_render_scene_gpu <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _render_scene_gpu(renderer: Renderer3D, target_scene: sc.Scene3D, target_camera: cam.Camera3D, viewport_x: float, viewport_y: float, viewport_w: float, viewport_h: float)</code></pre>
+</div><hr>
+<div id="render_scene">
+<h3>render_scene <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn render_scene(renderer: Renderer3D, target_scene: sc.Scene3D, target_camera: cam.Camera3D, viewport_x: float, viewport_y: float, viewport_w: float, viewport_h: float)</code></pre>
+</div><hr>
+<div id="_render_scene_cpu">
+<h3>_render_scene_cpu <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _render_scene_cpu(renderer: Renderer3D, target_scene: sc.Scene3D, target_camera: cam.Camera3D, viewport_x: float, viewport_y: float, viewport_w: float, viewport_h: float)</code></pre>
+</div><hr>
+<div id="_accumulate_lights">
+<h3>_accumulate_lights <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _accumulate_lights(s_lights: list, n_lights: int, base_r: float, base_g: float, base_b: float, fnx: float, fny: float, fnz: float, wcx: float, wcy: float, wcz: float, mat_diff: float, mat_spec: float, mat_shin: float): tuple</code></pre>
+</div><hr>
+<div id="Renderer3D">
+<h3>Renderer3D <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame Renderer3D</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>var pub width: int</code> <em>(field)</em></li>
+<li><code>var pub height: int</code> <em>(field)</em></li>
+<li><code>var pub clear_color: bool</code> <em>(field)</em></li>
+<li><code>var pub proj_buf: list</code> <em>(field)</em></li>
+<li><code>var pub tri_coords: list</code> <em>(field)</em></li>
+<li><code>var pub tri_colors: list</code> <em>(field)</em></li>
+<li><code>var pub tri_wire: list</code> <em>(field)</em></li>
+<li><code>var pub tri_wire_w: list</code> <em>(field)</em></li>
+<li><code>var pub tri_order: list</code> <em>(field)</em></li>
+<li><code>var pub tri_count: int</code> <em>(field)</em></li>
+<li><code>var pub pipeline_id: int</code> <em>(field)</em></li>
+<li><code>var pub uniform_scratch: list</code> <em>(field)</em></li>
+<li><code>pub init()</code> <em>(constructor)</em></li>
+<li><code>pub fn push_triangle(x0: float, y0: float, x1: float, y1: float, x2: float, y2: float, avg_z: float, r: float, g: float, b: float, a: float, is_wire: bool, wire_w: float)</code> <em>(method)</em></li>
+<li><code>pub fn set_size(w: int, h: int)</code> <em>(method)</em></li>
+<li><code>pub fn render(target_scene: sc.Scene3D, target_camera: cam.Camera3D)</code> <em>(method)</em></li>
+</ul>
+</div><hr>
+</main>
+</body>
+</html>

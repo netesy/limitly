@@ -1,0 +1,11 @@
+// std/ui/containers/index.lm
+// Structural containers that are not leaf widgets. row/column/
+// scroll_view/Container/Flow continue to live in std.ui.container —
+// this directory holds the ported legacy container kinds (stack, grid,
+// mask, overlay, tooltip).
+
+pub import std.ui.containers.stack show Stack, stack;
+pub import std.ui.containers.grid show Grid, grid;
+pub import std.ui.containers.mask show Mask, mask;
+pub import std.ui.containers.overlay show Overlay, overlay;
+pub import std.ui.containers.tooltip show Tooltip, tooltip;

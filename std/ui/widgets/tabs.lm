@@ -1,0 +1,217 @@
+// std/ui/widgets/tabs.lm
+// Widget — ported from legacy Fluent Tabs.
+// Tab header strip + one visible page ([comp.Component] per tab). Click a
+// tab header to switch; active index lives in an IntSignal (bind_active)
+// or the plain active_tab field.
+
+import std.ui.component as comp;
+import std.ui.component show Placed;
+import std.ui.types as ui_types;
+import std.ui.event as uievent;
+import std.ui.context as uictx;
+import std.ui.draw_list as dl;
+import std.ui.state as state;
+import std.ui.tree as tree;
+import std.events as events;
+import std.color as color;
+import std.ui.theme as uitheme;
+import std.text.controller as text_ctrl;
+import std.text.shaping as textshape;
+import std.ui.text_metrics as tm;
+
+frame Tabs {
+    embed Placed;
+    pub var tab_titles: [str];
+    pub var pages: [comp.Component];
+    pub var active_tab: int;
+    pub var active_sig: state.IntSignal?;
+    pub var spacing: float;
+    pub var surface: color.Color;
+    pub var text: color.Color;
+    pub var text2: color.Color;
+    pub var accent: color.Color;
+    pub var font_scale: float;
+    pub var header_h: float;
+    // Scratch — AOT float-local clobbering across trait calls.
+    pub var _tx: float = 0.0;
+    pub var _tw: float = 0.0;
+
+    pub init(titles: [str], page_list: [any], active: int = 0) {
+        val pal = uitheme.palette();
+        self.tab_titles = titles;
+        self.pages = [];
+        iter (pg in page_list) {
+            self.pages.append(pg as comp.Component);
+        }
+        self.active_tab = active;
+        self.active_sig = nil;
+        self.spacing = 4.0;
+        self.surface = pal.surface;
+        self.text = pal.text_primary;
+        self.text2 = pal.text_muted;
+        self.accent = pal.accent;
+        self.font_scale = 1.0;
+        self.header_h = 40.0;
+        self.id = comp.next_widget_id();
+    }
+
+    pub fn bind_active(sig: state.IntSignal): nil {
+        self.active_sig = sig;
+    }
+
+    pub fn kind(): ui_types.WidgetKind { return ui_types.WidgetKind.Tabs; }
+    pub fn on_theme_changed(): nil {
+        val p = uitheme.palette();
+        self.surface = p.surface;
+        self.text = p.text_primary;
+        self.text2 = p.text_muted;
+        self.accent = p.accent;
+        tree.request_repaint();
+    }
+    pub fn on_overlay_dismiss(): nil { }
+
+    pub fn child_count(): int {
+        if (self.active_now() < 0 or self.active_now() >= len(self.pages)) { return 0; }
+        return 1;
+    }
+
+    pub fn child_at(i: int): any {
+        if (i == 0 and self.active_now() >= 0 and self.active_now() < len(self.pages)) {
+            return self.pages[self.active_now()];
+        }
+        return nil;
+    }
+
+    fn active_now(): int {
+        if (self.active_sig != nil) {
+            return (self.active_sig as state.IntSignal).get();
+        }
+        return self.active_tab;
+    }
+
+    pub fn add_page(title: str, page: any): nil {
+        self.tab_titles.append(title);
+        self.pages.append(page as comp.Component);
+    }
+
+    // Tab i header rect in fields — hit-testing and paint share it.
+    fn tab_rect(i: int): nil {
+        self._tx = self.rect.x;
+        var j = 0;
+        while (j < i) {
+            self._tx = self._tx + tm.text_width(textshape.prepare_display(self.tab_titles[j]), self.font_scale) + 24.0 + self.spacing;
+            j = j + 1;
+        }
+        self._tw = tm.text_width(textshape.prepare_display(self.tab_titles[i]), self.font_scale) + 24.0;
+    }
+
+    pub fn wants_pointer_capture(): int { return 0; }
+
+    pub fn measure(min_w: float, max_w: float, min_h: float, max_h: float): comp.Size {
+        var body_h: float = 0.0;
+        if (self.active_now() >= 0 and self.active_now() < len(self.pages)) {
+            val s = self.pages[self.active_now()].measure(0.0, comp.MEASURE_LOOSE, 0.0, comp.MEASURE_LOOSE);
+            body_h = s.h;
+        }
+        var w: float = self.rect.w + 0.0;
+        if (w <= 0.0) { w = 200.0; }
+        var h: float = self.header_h + body_h;
+        if (h < min_h) { h = min_h; }
+        if (w < min_w) { w = min_w; }
+        if (w > max_w) { w = max_w; }
+        if (h > max_h) { h = max_h; }
+        return comp.Size(w=w, h=h);
+    }
+
+    pub fn arrange(x: float, y: float, w: float, h: float): nil {
+        self.rect.x = x;
+        self.rect.y = y;
+        self.rect.w = w;
+        self.rect.h = h;
+        if (self.active_now() >= 0 and self.active_now() < len(self.pages)) {
+            self.pages[self.active_now()].arrange(
+                x, y + self.header_h, w, h - self.header_h);
+        }
+    }
+
+    pub fn paint(): nil {
+        var cur = self.active_now();
+        var i = 0;
+        while (i < len(self.tab_titles)) {
+            self.tab_rect(i);
+            var is_sel: bool = (i == cur);
+            var bgr = self.surface.r + 0.0;
+            var bgg = self.surface.g + 0.0;
+            var bgb = self.surface.b + 0.0;
+            if (is_sel) {
+                bgr = bgr * 1.5;
+                bgg = bgg * 1.5;
+                bgb = bgb * 1.8;
+            }
+            dl.dl_emit_rect(dl.paint_ctx.dl, self._tx, self.rect.y, self._tw, self.header_h - 8.0,
+                bgr, bgg, bgb, 1.0);
+            if (is_sel) {
+                dl.dl_emit_rect(dl.paint_ctx.dl, self._tx, self.rect.y + self.header_h - 10.0, self._tw, 2.0,
+                    self.accent.r, self.accent.g, self.accent.b, 1.0);
+            }
+            var tr = self.text2.r + 0.0;
+            var tg = self.text2.g + 0.0;
+            var tb = self.text2.b + 0.0;
+            if (is_sel) {
+                tr = self.text.r;
+                tg = self.text.g;
+                tb = self.text.b;
+            }
+            var tw: float = tm.text_width(textshape.prepare_display(self.tab_titles[i]), self.font_scale);
+            dl.dl_emit_text(dl.paint_ctx.dl, textshape.prepare_display(self.tab_titles[i]),
+                self._tx + (self._tw - tw) / 2.0,
+                self.rect.y + (self.header_h - 8.0 - tm.line_height(self.font_scale)) / 2.0,
+                tr, tg, tb, 1.0, self.font_scale);
+            i = i + 1;
+        }
+        if (cur >= 0 and cur < len(self.pages)) {
+            self.pages[cur].paint();
+        }
+    }
+
+    pub fn on_event(t: events.EventType, x: int, y: int, key: int): uievent.EventResult {
+        var cur = self.active_now();
+        // Header strip hit-test first.
+        if (t == events.EventType.MouseUp and key == 0
+            and (y as float) >= self.rect.y and (y as float) < self.rect.y + self.header_h) {
+            var i = 0;
+            while (i < len(self.tab_titles)) {
+                self.tab_rect(i);
+                if ((x as float) >= self._tx and (x as float) < self._tx + self._tw) {
+                    if (self.active_sig != nil) {
+                        (self.active_sig as state.IntSignal).set(i);
+                    } else {
+                        self.active_tab = i;
+                    }
+                    tree.request_repaint();
+                    return uievent.EventResult.Handled;
+                }
+                i = i + 1;
+            }
+        }
+        // Forward to the active page.
+        if (cur >= 0 and cur < len(self.pages)) {
+            val c = self.pages[cur];
+            var inside: bool = true;
+            if (t != events.EventType.MouseMove and t != events.EventType.MouseUp and t != events.EventType.MouseWheel) {
+                inside = c.bounds().contains(x as float, y as float);
+            }
+            if (inside) {
+                val res = c.on_event(t, x, y, key);
+                if (res == uievent.EventResult.Handled) {
+                    return uievent.EventResult.Handled;
+                }
+            }
+        }
+        return uievent.EventResult.Ignored;
+    }
+}
+
+pub fn tabs(titles: [str], page_list: [any], active: int = 0): Tabs {
+    return Tabs(titles, page_list, active);
+}

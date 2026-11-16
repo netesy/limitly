@@ -38,7 +38,11 @@ pub fn replay(draw_list: dl.DrawList): nil {
                 gg.draw_triangle_primitive(cmd.x, cmd.y, cmd.x2, cmd.y2, cmd.x3, cmd.y3, cmd.r, cmd.g, cmd.b, cmd.a);
             },
             dl.DrawCmdKind.ClipPush => {
-                gg.push_clip(cmd.x, cmd.y, cmd.w, cmd.h);
+                gg.push_clip(cmd.x, cmd.y, cmd.w, cmd.h, cmd.clip_shape, cmd.radius);
+            },
+            dl.DrawCmdKind.Shadow => {
+                gg.draw_shadow_primitive(cmd.x, cmd.y, cmd.w, cmd.h,
+                    cmd.r, cmd.g, cmd.b, cmd.a, cmd.x2, cmd.y2, cmd.x3, cmd.y3, cmd.radius);
             },
             dl.DrawCmdKind.ClipPop => {
                 gg.pop_clip();

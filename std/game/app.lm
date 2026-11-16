@@ -1,10 +1,41 @@
 // std/game/app.lm
-// High-level game loop, event polling, timing driver, and application runner for std.game
+// Game-domain runtime: timing, input interpretation, scene management, and
+// IMGUI integration. std.app owns the window, the event pump, and the
+// frame loop — Game plugs into it.
+//
+// Two ways to drive a game:
+//
+//   // 1. Attached — Game state lives in module scope / scenes:
+//   var g = game.Game(game.default_config());
+//   g.register_scene("level1", level);
+//   g.attach();                       // moves g into the app hooks
+//   var a = app.App("My Game", 1280, 720);
+//   a.run();                          // pump -> g.poll -> g.render -> UI -> swap
+//
+//   // 2. Manual loop — game logic lives in main() locals:
+//   var g = game.Game(game.default_config());
+//   var a = app.App(g.config.title, g.config.width, g.config.height);
+//   a.open();
+//   while (a.is_running()) {
+//       a.pump();                     // events -> queue + UI dispatch
+//       g.poll();                     // dt, input, scene update
+//       // ... all game logic, locals in scope ...
+//       a.begin_pass();
+//       g.imgui_begin();
+//       // ... scene render + IMGUI windows ...
+//       g.imgui_end();
+//       a.end_pass();                 // retained UI on top + swap
+//       sleep(0.008);
+//   }
+//   a.close();
+//
+// Game never calls events.pump_events, gg.begin_pass, or gg.commit — those
+// belong to std.app. poll() reads events.pending_events() non-destructively
+// after App.pump() has filled the queue.
 
 import std.app as app;
 import std.events as events;
 import std.gg as gg;
-
 
 import std.time.timer show Timer, Duration;
 import std.gui show GUI;
@@ -44,9 +75,9 @@ frame Game {
     pub var gui: GUI;
     pub var input: InputManager;
     pub var scenes: SceneManager;
-    pub var is_running: bool;
 
-    // Window dimensions
+    // Window dimensions — mirrors the live std.app window size, refreshed
+    // by poll() each frame.
     pub var width: int;
     pub var height: int;
 
@@ -70,7 +101,6 @@ frame Game {
         self.gui = GUI();
         self.input = InputManager();
         self.scenes = SceneManager();
-        self.is_running = false;
 
         self.width = self.config.width;
         self.height = self.config.height;
@@ -86,49 +116,35 @@ frame Game {
         self.fixed_dt = self.config.fixed_dt;
     }
 
-    pub fn setup(): bool {
-        var r_val = 0;
-        if (self.config.resizable) {
-            r_val = 1;
-        }
-        var wc = app.WindowConfig(
-            width=self.config.width,
-            height=self.config.height,
-            title=self.config.title,
-            resizable=r_val,
-            fullscreen=0,
-            high_dpi=1,
-            sample_count=1,
-            swap_interval=1
-        );
-        var ok_init = app.app_init(wc);
-        if (ok_init != 0) {
-            app.show_window();
-            self.is_running = true;
-            self.timer.reset();
+    // ── Attached mode ──────────────────────────────────────────────────────
+    // Move this Game into the std.app frame hooks. After attach() the local
+    // binding is consumed — all per-frame work must live in scenes, module
+    // state, or the GUI/InputManager fields.
 
-            // Warm-up present: the window is already visible but nothing has
-            // been committed yet, so it would show a black framebuffer until
-            // the first loop frame finishes (shader/pipeline creation makes
-            // that gap noticeable). On the GPU backend frames are only
-            // published by poll_events -> commit_frame, so present the clear
-            // explicitly instead of relying on gg.commit() (a no-op there).
-            var bg = color.hex(0x1e1e24, 1.0);
-            if (self.gui != nil and self.gui.theme != nil) {
-                bg = self.gui.theme.bg_window;
-            }
-            gg.begin_pass(self.width, self.height, bg.r, bg.g, bg.b, bg.a);
-            gg.end_pass();
-            // events.pump_events (not gg.poll_events) so any events arriving
-            // during startup land in the typed queue for the first drain.
-            events.pump_events();
-        } else {
-            self.is_running = false;
-        }
-        return self.is_running;
+    pub fn attach(): nil {
+        _active = self;
+        app.on_update(_game_update);
+        app.on_draw(_game_draw);
     }
 
-    pub fn begin_frame(): nil {
+    // A pre-configured std.app.App matching this game's Config. Build the
+    // UI root / extra hooks on it, then run().
+    pub fn window(): app.App {
+        var a = app.App(self.config.title, self.config.width, self.config.height);
+        if (self.config.resizable) {
+            a.resizable = 1;
+        }
+        return a;
+    }
+
+    // ── Per-frame phases ───────────────────────────────────────────────────
+    // poll() is the update phase; imgui_begin/imgui_end bracket IMGUI draw
+    // calls inside the app-owned GPU pass.
+
+    // Timing, input interpretation, and scene update. Reads
+    // events.pending_events() — call after app.pump() (or inside the
+    // on_update hook, which runs after pump automatically).
+    pub fn poll(): nil {
         // High-precision frame delta calculation
         var el: Duration = self.timer.elapsed();
         self.timer.reset();
@@ -149,18 +165,22 @@ frame Game {
         var current_inst_fps = 1.0 / raw_dt;
         self.fps = self.fps * 0.9 + current_inst_fps * 0.1;
 
+        // Live window size (resize events already landed in std.app).
+        if (app.app_is_initialized() != 0) {
+            self.width = app.get_window_width();
+            self.height = app.get_window_height();
+        }
+
         // Reset per-frame input transients
         self.input.begin_frame();
 
-        // Events: std.events owns the single raw->typed pump (pump_events
-        // calls gg.poll_events, the frame-publish boundary on the GPU
-        // backend). We read pending_events() non-destructively — the Fluent
-        // path observes the same stream via app.dispatch_ui_events, so a game
-        // can drive IMGUI and Fluent widgets from one event source.
-        events.pump_events();
+        // Events: std.app's pump already ran events.pump_events; we read
+        // pending_events() non-destructively — the app UI path observes the
+        // same stream, so a game can drive IMGUI and retained widgets from
+        // one event source.
         iter (ev in events.pending_events()) {
             match (ev.event_type) {
-                events.EventType.Quit => { self.is_running = false; },
+                events.EventType.Quit => { app.quit(); },
                 events.EventType.Resize => { self.width = ev.x; self.height = ev.y; },
                 events.EventType.MouseMove => { self.input.on_mouse_move(ev.x as float, ev.y as float); },
                 events.EventType.MouseDown => {
@@ -183,18 +203,14 @@ frame Game {
         self.gui.typed_chars = self.input.typed_chars;
         self.gui.active_modifiers = self.input.active_modifiers;
 
-        // Clear pass: the GUI theme window background always drives the chrome
-        // clear. config.bg_color is the scene/renderer clear color — apps feed
-        // it to their renderer (e.g. d3.Scene3D.background) rather than
-        // overriding the window clear here.
-        var bg = color.hex(0x1e1e24, 1.0);
+        // The GUI theme window background drives the window clear — set it
+        // now so app.begin_pass picks it up later this frame. config.bg_color
+        // is the scene/renderer clear color — apps feed it to their renderer
+        // (e.g. d3.Scene3D.background) rather than overriding the window clear.
         if (self.gui != nil and self.gui.theme != nil) {
-            bg = self.gui.theme.bg_window;
+            var bg = self.gui.theme.bg_window;
+            app.set_clear_color(bg.r, bg.g, bg.b, bg.a);
         }
-        gg.begin_pass(self.width, self.height, bg.r, bg.g, bg.b, bg.a);
-
-        // Begin IMGUI
-        self.gui.begin(self.input.mouse_x, self.input.mouse_y, self.input.is_mouse_down(0), self.input.mouse_wheel, self.delta_time, self.input.is_mouse_pressed(0), self.input.is_mouse_released(0));
 
         // Update active scenes
         if (self.scenes.has_scenes()) {
@@ -202,15 +218,29 @@ frame Game {
         }
     }
 
-    pub fn end_frame(): nil {
-        // Draw scene layers before finishing IMGUI & render pass
+    // Begin IMGUI — call inside the app-owned GPU pass, before any
+    // gui.* / scenes.draw_gui calls.
+    pub fn imgui_begin(): nil {
+        self.gui.begin(self.input.mouse_x, self.input.mouse_y,
+                       self.input.is_mouse_down(0), self.input.mouse_wheel,
+                       self.delta_time,
+                       self.input.is_mouse_pressed(0), self.input.is_mouse_released(0));
+    }
+
+    // End IMGUI — call after all gui.* / scenes.draw_gui calls, still
+    // inside the pass.
+    pub fn imgui_end(): nil {
+        self.gui.end();
+    }
+
+    // Attached-mode draw hook: IMGUI bracket + scene layers.
+    pub fn render(): nil {
+        self.imgui_begin();
         if (self.scenes.has_scenes()) {
             self.scenes.draw();
             self.scenes.draw_gui();
         }
-        self.gui.end();
-        gg.end_pass();
-        gg.commit();
+        self.imgui_end();
     }
 
     pub fn dt(): float {
@@ -259,7 +289,7 @@ frame Game {
         self.config.width = w;
         self.config.height = h;
         // Route through std.app so window state, framebuffer size and the
-        // Fluent viewport all stay in sync — single windowing owner.
+        // UI viewport all stay in sync — single windowing owner.
         app.set_window_size(w, h);
     }
 
@@ -268,15 +298,27 @@ frame Game {
     }
 
     pub fn quit(): nil {
-        self.is_running = false;
+        app.quit();
     }
 
-    pub fn shutdown(): nil {
-        self.is_running = false;
-        // app.app_shutdown() stops the sokol runtime AND resets std.app's
-        // global state (is_initialized, event queue, ui context) — calling
-        // gg.shutdown() alone would leave app_init permanently latched and
-        // break any subsequent Game.setup() in the same process.
-        app.app_shutdown();
+    pub fn is_running(): bool {
+        return app.app_is_running() != 0;
+    }
+}
+
+// Attached game instance — populated by Game.attach(). Module fn hooks
+// (not closures) are the codebase's callback convention; the moved Game
+// lives here for the process lifetime.
+var _active: Game? = nil;
+
+fn _game_update(dt: float): nil {
+    if (_active != nil) {
+        (_active as Game).poll();
+    }
+}
+
+fn _game_draw(): nil {
+    if (_active != nil) {
+        (_active as Game).render();
     }
 }

@@ -80,94 +80,127 @@ function filterNav() {
 <h2>theme.lm</h2>
 <input type="text" id="search-input" placeholder="Filter symbols..." oninput="filterNav()">
 <div id="nav-list">
-<a class="nav-link" href="#ColorPalette">ColorPalette <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
-<a class="nav-link" href="#SpacingTokens">SpacingTokens <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
-<a class="nav-link" href="#TypographyTokens">TypographyTokens <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
-<a class="nav-link" href="#ShapeTokens">ShapeTokens <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
-<a class="nav-link" href="#Theme">Theme <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#Palette">Palette <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#palette">palette <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#set_theme">set_theme <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#set_default">set_default <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#set_dark">set_dark <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#set_light">set_light <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#set_cyberpunk">set_cyberpunk <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#set_retro">set_retro <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#set_nord">set_nord <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#elevation_shadow">elevation_shadow <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 </div>
 </nav>
 <main>
 <h1>theme.lm API Reference</h1>
 <h2>Module Overview</h2>
-<div class="summary"><p>std/ui/theme - Design tokens and theming system</p></div>
-<div id="ColorPalette">
-<h3>ColorPalette <span class="badge badge-pub">Frame</span></h3>
-<pre class="code-sig"><code>frame ColorPalette</code></pre>
-<div class="summary"><p>Color palette token</p></div>
+<div class="summary"><p>std/ui/theme.lm
+Theming layer for the Component UI, backed by the canonical
+std.theme.types.Theme (the same type the presets produce).
+
+  import std.ui.theme as uitheme;
+  val pal = uitheme.palette();          // init-time snapshot
+  self.surface = pal.surface;
+
+Live re-theming:
+  uitheme.set_dark();                    // swap preset + bump version
+  tree.apply_theme(root);                // walk tree, refresh widgets
+
+Widgets snapshot palette() in init and may implement
+on_theme_changed() to re-snapshot; tree.apply_theme drives that.
+Per-instance fields remain overridable — the palette only supplies
+defaults.</p></div>
+<div id="Palette">
+<h3>Palette <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame Palette</code></pre>
 <h4>Members</h4>
 <ul>
-<li><code>var pub primary: ui_types.Color</code> <em>(field)</em></li>
-<li><code>var pub secondary: ui_types.Color</code> <em>(field)</em></li>
-<li><code>var pub tertiary: ui_types.Color</code> <em>(field)</em></li>
-<li><code>var pub background: ui_types.Color</code> <em>(field)</em></li>
-<li><code>var pub surface: ui_types.Color</code> <em>(field)</em></li>
-<li><code>var pub surface_variant: ui_types.Color</code> <em>(field)</em></li>
-<li><code>var pub error: ui_types.Color</code> <em>(field)</em></li>
-<li><code>var pub success: ui_types.Color</code> <em>(field)</em></li>
-<li><code>var pub warning: ui_types.Color</code> <em>(field)</em></li>
-<li><code>var pub info: ui_types.Color</code> <em>(field)</em></li>
-<li><code>var pub text_primary: ui_types.Color</code> <em>(field)</em></li>
-<li><code>var pub text_secondary: ui_types.Color</code> <em>(field)</em></li>
-<li><code>var pub border: ui_types.Color</code> <em>(field)</em></li>
-<li><code>var pub focus_ring: ui_types.Color</code> <em>(field)</em></li>
-<li><code>pub init()</code> <em>(constructor)</em></li>
-</ul>
-</div><hr>
-<div id="SpacingTokens">
-<h3>SpacingTokens <span class="badge badge-pub">Frame</span></h3>
-<pre class="code-sig"><code>frame SpacingTokens</code></pre>
-<div class="summary"><p>Spacing tokens</p></div>
-<h4>Members</h4>
-<ul>
-<li><code>var pub xs: float</code> <em>(field)</em></li>
-<li><code>var pub sm: float</code> <em>(field)</em></li>
-<li><code>var pub md: float</code> <em>(field)</em></li>
-<li><code>var pub lg: float</code> <em>(field)</em></li>
-<li><code>var pub xl: float</code> <em>(field)</em></li>
-<li><code>pub init()</code> <em>(constructor)</em></li>
-</ul>
-</div><hr>
-<div id="TypographyTokens">
-<h3>TypographyTokens <span class="badge badge-pub">Frame</span></h3>
-<pre class="code-sig"><code>frame TypographyTokens</code></pre>
-<div class="summary"><p>Typography tokens</p></div>
-<h4>Members</h4>
-<ul>
-<li><code>var pub font_family: str</code> <em>(field)</em></li>
-<li><code>var pub display_size: float</code> <em>(field)</em></li>
-<li><code>var pub headline_size: float</code> <em>(field)</em></li>
-<li><code>var pub title_size: float</code> <em>(field)</em></li>
-<li><code>var pub body_size: float</code> <em>(field)</em></li>
-<li><code>var pub label_size: float</code> <em>(field)</em></li>
-<li><code>pub init()</code> <em>(constructor)</em></li>
-</ul>
-</div><hr>
-<div id="ShapeTokens">
-<h3>ShapeTokens <span class="badge badge-pub">Frame</span></h3>
-<pre class="code-sig"><code>frame ShapeTokens</code></pre>
-<div class="summary"><p>Border radius tokens</p></div>
-<h4>Members</h4>
-<ul>
-<li><code>var pub corner_xs: float</code> <em>(field)</em></li>
+<li><code>var pub background: color.Color</code> <em>(field)</em></li>
+<li><code>var pub surface: color.Color</code> <em>(field)</em></li>
+<li><code>var pub surface_variant: color.Color</code> <em>(field)</em></li>
+<li><code>var pub surface_hover: color.Color</code> <em>(field)</em></li>
+<li><code>var pub surface_pressed: color.Color</code> <em>(field)</em></li>
+<li><code>var pub border: color.Color</code> <em>(field)</em></li>
+<li><code>var pub text_primary: color.Color</code> <em>(field)</em></li>
+<li><code>var pub text_muted: color.Color</code> <em>(field)</em></li>
+<li><code>var pub accent: color.Color</code> <em>(field)</em></li>
+<li><code>var pub primary: color.Color</code> <em>(field)</em></li>
+<li><code>var pub secondary: color.Color</code> <em>(field)</em></li>
+<li><code>var pub focus_ring: color.Color</code> <em>(field)</em></li>
+<li><code>var pub btn_normal: color.Color</code> <em>(field)</em></li>
+<li><code>var pub btn_hover: color.Color</code> <em>(field)</em></li>
+<li><code>var pub btn_active: color.Color</code> <em>(field)</em></li>
+<li><code>var pub tab_active: color.Color</code> <em>(field)</em></li>
+<li><code>var pub thumb: color.Color</code> <em>(field)</em></li>
+<li><code>var pub thumb_hover: color.Color</code> <em>(field)</em></li>
+<li><code>var pub check: color.Color</code> <em>(field)</em></li>
+<li><code>var pub track: color.Color</code> <em>(field)</em></li>
+<li><code>var pub on_accent: color.Color</code> <em>(field)</em></li>
+<li><code>var pub accent_hover: color.Color</code> <em>(field)</em></li>
+<li><code>var pub selection: color.Color</code> <em>(field)</em></li>
+<li><code>var pub text_disabled: color.Color</code> <em>(field)</em></li>
+<li><code>var pub success: color.Color</code> <em>(field)</em></li>
+<li><code>var pub warning: color.Color</code> <em>(field)</em></li>
+<li><code>var pub error: color.Color</code> <em>(field)</em></li>
+<li><code>var pub info: color.Color</code> <em>(field)</em></li>
+<li><code>var pub plot_lines: color.Color</code> <em>(field)</em></li>
+<li><code>var pub plot_histogram: color.Color</code> <em>(field)</em></li>
+<li><code>var pub spacing: float</code> <em>(field)</em></li>
+<li><code>var pub item_height: float</code> <em>(field)</em></li>
+<li><code>var pub rounding: float</code> <em>(field)</em></li>
 <li><code>var pub corner_sm: float</code> <em>(field)</em></li>
 <li><code>var pub corner_md: float</code> <em>(field)</em></li>
 <li><code>var pub corner_lg: float</code> <em>(field)</em></li>
-<li><code>pub init()</code> <em>(constructor)</em></li>
+<li><code>var pub body_size: float</code> <em>(field)</em></li>
+<li><code>var pub label_size: float</code> <em>(field)</em></li>
+<li><code>var pub button_shadow: shadow.Shadow?</code> <em>(field)</em></li>
+<li><code>var pub window_shadow: shadow.Shadow?</code> <em>(field)</em></li>
+<li><code>var pub popup_shadow: shadow.Shadow?</code> <em>(field)</em></li>
 </ul>
 </div><hr>
-<div id="Theme">
-<h3>Theme <span class="badge badge-pub">Frame</span></h3>
-<pre class="code-sig"><code>frame Theme</code></pre>
-<div class="summary"><p>Complete theme</p></div>
-<h4>Members</h4>
-<ul>
-<li><code>var pub colors: ColorPalette</code> <em>(field)</em></li>
-<li><code>var pub spacing: SpacingTokens</code> <em>(field)</em></li>
-<li><code>var pub typography: TypographyTokens</code> <em>(field)</em></li>
-<li><code>var pub shape: ShapeTokens</code> <em>(field)</em></li>
-<li><code>pub init()</code> <em>(constructor)</em></li>
-</ul>
+<div id="palette">
+<h3>palette <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn palette(): Palette</code></pre>
+<div class="summary"><p>Snapshot the active theme into a UI palette. Called per-widget init
+and per on_theme_changed — allocation happens only at those times,
+never per-frame.</p></div>
+</div><hr>
+<div id="set_theme">
+<h3>set_theme <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn set_theme(t: tt.Theme): nil</code></pre>
+</div><hr>
+<div id="set_default">
+<h3>set_default <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn set_default(): nil</code></pre>
+</div><hr>
+<div id="set_dark">
+<h3>set_dark <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn set_dark(): nil</code></pre>
+</div><hr>
+<div id="set_light">
+<h3>set_light <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn set_light(): nil</code></pre>
+</div><hr>
+<div id="set_cyberpunk">
+<h3>set_cyberpunk <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn set_cyberpunk(): nil</code></pre>
+</div><hr>
+<div id="set_retro">
+<h3>set_retro <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn set_retro(): nil</code></pre>
+</div><hr>
+<div id="set_nord">
+<h3>set_nord <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn set_nord(): nil</code></pre>
+</div><hr>
+<div id="elevation_shadow">
+<h3>elevation_shadow <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn elevation_shadow(pal: Palette, elev: int): shadow.Shadow?</code></pre>
+<div class="summary"><p>Re-snapshot palette defaults on a widget after a theme swap. Widgets
+call this from on_theme_changed(); fields the user overrode keep their
+values only if the widget chose to preserve them — the convention is
+that on_theme_changed re-applies theme-derived fields.</p></div>
 </div><hr>
 </main>
 </body>

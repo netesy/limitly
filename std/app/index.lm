@@ -1,60 +1,56 @@
 // Application Module
-// Portable window application lifecycle, event loop, and timing driver
+// The single owner of window lifecycle, the event loop, and frame
+// presentation for Lymar applications — UI apps and games alike.
 //
-// Windowing and the Fluent UI loop live here. OS event pumping and the typed
-// event queue live in std.events — this module only *dispatches* queued
-// events into the Fluent ui_context.
+// Usage (UI app — the common case):
+//
+//   import std.app as app;
+//   import std.ui as ui;
+//
+//   var a = app.App("Gallery", 1280, 800);
+//   a.ui(root);
+//   a.run();
+//
+// Usage (game / custom loop — full control, locals stay in scope):
+//
+//   var a = app.App("Game", 1280, 720);
+//   a.open();
+//   while (a.is_running()) {
+//       a.pump();          // events -> queue + UI dispatch + frame dt
+//       // ... game logic, has access to a.delta_time() ...
+//       a.begin_pass();    // start GPU pass (clear color)
+//       // ... draw: scenes, std.gui, anything ...
+//       a.end_pass();      // draw hooks + retained UI on top + swap
+//       sleep(0.008);
+//   }
+//   a.close();
+//
+// Optional per-frame hooks (module fn values — see std.ui.button for the
+// same callback convention):
+//
+//   a.on_update(fn(dt: float): nil { ... });   // after pump, before present
+//   a.on_draw(fn(): nil { ... });              // inside pass, before UI
+//
+// OS event pumping and the typed event queue live in std.events — this
+// module only *dispatches* queued events into the component tree
+// (std.ui.tree) and calls the registered hooks.
 
 import std.events as events;
 import std.ui.context as ui_context;
-import std.ui.components as ui_comp;
+import std.ui.component as ui_component;
+import std.ui.tree as ui_tree;
+import std.ui.motion as ui_motion;
+import std.ui.file_dialog as filedlg;
 import std.gg as gg;
 import std.os as os;
 import std.native as native;
+import std.time.timer show Timer, Duration;
+import std.color as color;
 
-// Window configuration
-frame WindowConfig {
-    pub var width: int;
-    pub var height: int;
-    pub var title: str;
-    pub var resizable: int;
-    pub var fullscreen: int;
-    pub var high_dpi: int;
-    pub var sample_count: int;
-    pub var swap_interval: int;
-}
-
-// Default window configuration
-pub fn default_window_config(): WindowConfig {
-    return WindowConfig(
-        width=800,
-        height=600,
-        title="Lymar Application",
-        resizable=1,
-        fullscreen=0,
-        high_dpi=1,
-        sample_count=1,
-        swap_interval=1
-    );
-}
-
-// Application state
-frame State {
-    pub var is_initialized: int;
-    pub var is_running: int;
-    pub var window_config: WindowConfig;
-    pub var window_id: int;
-    pub var width: int;
-    pub var height: int;
-    pub var framebuffer_width: int;
-    pub var framebuffer_height: int;
-    pub var dpi_scale: float;
-    pub var frame_count: int;
-    pub var last_frame_time: int;
-    pub var delta_time: float;
-}
-
-// Global application state
+// ── Application state ────────────────────────────────────────────────────────
+// Windowing and the retained-component UI loop live here. OS event pumping
+// and the typed event queue live in std.events — this module only
+// *dispatches* queued events into the component tree (std.ui.tree).
 // Native-window mode: when std.native created the HWND and the GPU
 // backend attached to it, OS events flow through std.events' native
 // drain and presentation runs on the VM thread. _native_mode == 0 means
@@ -62,215 +58,199 @@ frame State {
 var _native_win: native.Window? = nil;
 var _native_mode: int = 0;
 
+// Retained-component UI root. When set via App.ui(), event dispatch and
+// present route through std.ui.tree.
+var _ui_root: ui_component.Component? = nil;
+var _ui_active: int = 0;
+
+// Per-frame hooks (module fn values — the codebase's callback convention).
+var _update_cb: (fn(float): nil) | nil = nil;
+var _draw_cb: (fn(): nil) | nil = nil;
+
+// Frame clear color for begin_pass/present. Games set it from their theme
+// each frame via set_clear_color().
+var _clear: color.Color = color.hex(0x101018, 1.0);
+
+// Real frame delta measured in pump() — handed to on_update hooks and
+// readable via App.delta_time() / app_delta_time().
+var _timer: Timer = Timer();
+var _frame_dt: float = 0.01666667;
+var _pump_count: int = 0;
+
 pub fn native_mode(): int {
     return _native_mode;
 }
 
-pub var global_app_state: State = State(
-    is_initialized=0,
-    is_running=0,
-    window_config=default_window_config(),
-    window_id=0,
-    width=800,
-    height=600,
-    framebuffer_width=800,
-    framebuffer_height=600,
-    dpi_scale=1.0,
-    frame_count=0,
-    last_frame_time=0,
-    delta_time=0.0
-);
+// ── App frame ────────────────────────────────────────────────────────────────
+// Window + loop configuration. Effectively a singleton façade over the
+// module state above — one window per process.
+frame App {
+    pub var title: str;
+    pub var width: int;
+    pub var height: int;
+    pub var resizable: int;
+    pub var fullscreen: int;
+    pub var high_dpi: int;
+    pub var sample_count: int;
+    pub var swap_interval: int;
 
-// Initialize application with window configuration
-pub fn app_init(config: WindowConfig): int {
-    if (global_app_state.is_initialized != 0) {
-        return 0;
+    pub init(title: str = "Lymar", width: int = 800, height: int = 600) {
+        self.title = title;
+        self.width = width;
+        self.height = height;
+        self.resizable = 1;
+        self.fullscreen = 0;
+        self.high_dpi = 1;
+        self.sample_count = 1;
+        self.swap_interval = 1;
     }
 
-    gg.setup();
-    events.clear();
-    global_app_state.window_config = config;
-    global_app_state.width = config.width;
-    global_app_state.height = config.height;
-    global_app_state.framebuffer_width = config.width;
-    global_app_state.framebuffer_height = config.height;
-    global_app_state.window_id = 1;
+    // Install a retained Component tree as the application UI.
+    pub fn ui(root: ui_component.Component): nil {
+        _ui_root = root;
+        _ui_active = 1;
+        ui_tree.enable_reactive();
+        ui_tree.request_repaint();
+    }
 
-    global_app_state.is_initialized = 1;
-    global_app_state.is_running = 0;
-    global_app_state.frame_count = 0;
-    global_app_state.last_frame_time = 0;
-    global_app_state.delta_time = 0.0;
-    ui_context.ui_init();
-    ui_context.set_viewport_size(config.width as float, config.height as float);
+    // Per-frame hook: called by pump-driven loops after event dispatch,
+    // before presentation. Receives the measured frame delta (seconds).
+    pub fn on_update(cb: (fn(float): nil) | nil): nil {
+        _update_cb = cb;
+    }
 
-    return 1;
-}
+    // Per-frame hook: called inside the GPU pass after user draw code and
+    // before the retained UI submits — i.e. the last thing before swap.
+    pub fn on_draw(cb: (fn(): nil) | nil): nil {
+        _draw_cb = cb;
+    }
 
-pub fn init(config: any = nil): int {
-    if (config != nil) {
-        var wc = config as WindowConfig;
-        if (wc != nil) {
-            return app_init(wc);
+    // Full lifecycle: open -> loop -> close. Blocks until quit.
+    pub fn run(): nil {
+        if (global_app_state.is_initialized == 0) {
+            self.open();
         }
+        if (global_app_state.is_running == 0) {
+            global_app_state.is_running = 1;
+        }
+        while (global_app_state.is_running != 0) {
+            self.step();
+            sleep(0.008);
+        }
+        _shutdown();
     }
-    return app_init(default_window_config());
-}
 
-// Shutdown application and release resources
-pub fn app_shutdown(): nil {
-    if (global_app_state.is_initialized == 0) {
-        return;
+    // Initialize + show the window and start the running state, without
+    // entering the loop. Pair with step()/close() for custom loops.
+    pub fn open(): nil {
+        if (global_app_state.is_initialized != 0) {
+            return;
+        }
+        _boot(self.title, self.width, self.height, self.resizable,
+              self.fullscreen, self.high_dpi, self.sample_count, self.swap_interval);
+        _show_window();
+        global_app_state.is_running = 1;
+        _timer.reset();
+        // Warm-up present: the window is already visible but nothing has
+        // been committed yet — show the clear instead of a black
+        // framebuffer while pipelines compile.
+        _begin_pass();
+        _end_pass();
     }
 
-    if (global_app_state.is_running != 0) {
+    // One full frame step: pump events, run update hook, present.
+    // Requires open() (or run()).
+    pub fn step(): nil {
+        _pump();
+        if (_update_cb != nil) {
+            val cb = _update_cb as fn(float): nil;
+            cb(_frame_dt);
+        }
+        _begin_pass();
+        _end_pass();
+        global_app_state.frame_count = global_app_state.frame_count + 1;
+    }
+
+    // Event phase only: pump raw events, dispatch to UI tree, tick
+    // motion, measure frame delta. Safe to call from custom loops.
+    pub fn pump(): nil {
+        _pump();
+    }
+
+    // Presentation phase: begin pass + draw hook + retained UI + swap.
+    // For custom loops that need draw code between begin_pass/end_pass,
+    // call those two directly instead.
+    pub fn present(): nil {
+        _begin_pass();
+        _end_pass();
+    }
+
+    // Start the GPU pass with the configured clear color.
+    pub fn begin_pass(): nil {
+        _begin_pass();
+    }
+
+    // Finish the frame: draw hook, retained UI submit, end pass, swap.
+    pub fn end_pass(): nil {
+        _end_pass();
+    }
+
+    // Stop the loop and release resources.
+    pub fn close(): nil {
+        global_app_state.is_running = 0;
+        _shutdown();
+    }
+
+    pub fn quit(): nil {
         global_app_state.is_running = 0;
     }
 
-    if (_native_mode != 0) {
-        gg.detach_window();
-        if (_native_win != nil) {
-            native.destroy(_native_win as native.Window);
-        }
-        _native_win = nil;
-        _native_mode = 0;
-        events.clear_window();
-    }
-    events.clear();
-    global_app_state.is_initialized = 0;
-    global_app_state.window_id = 0;
-    gg.shutdown();
-}
-
-pub fn shutdown(): nil {
-    app_shutdown();
-}
-
-pub fn app_is_valid(): int {
-    return global_app_state.is_initialized;
-}
-
-pub fn app_is_running(): int {
-    return global_app_state.is_running;
-}
-
-pub fn ui(root: ui_comp.Fluent): nil {
-    ui_context.ui_init();
-    ui_context.set_root(root);
-}
-
-pub fn set_ui(root: ui_comp.Fluent): nil {
-    ui_context.ui_init();
-    ui_context.set_root(root);
-}
-
-// dispatch_ui_events delivers this frame's std.events stream into the
-// Fluent ui_context. It reads events.pending_events() non-destructively, so
-// std.game.Game (or any other consumer) can observe the same stream — fan-out
-// is the default, not the exception.
-pub fn dispatch_ui_events(): nil {
-    if (global_app_state.is_initialized == 0) {
-        return;
-    }
-    iter (ev in events.pending_events()) {
-        match (ev.event_type) {
-            events.EventType.Quit => {
-                global_app_state.is_running = 0;
-            },
-            events.EventType.Resize => {
-                global_app_state.width = ev.x;
-                global_app_state.height = ev.y;
-                global_app_state.framebuffer_width = ev.x;
-                global_app_state.framebuffer_height = ev.y;
-                ui_context.set_viewport_size(ev.x as float, ev.y as float);
-                // Swapchain resize is owned by events.pump_events (coalesced
-                // to the final size once per frame) — do not call
-                // gg.set_window_size per event here.
-            },
-            events.EventType.MouseDown => {
-                ui_context.dispatch_pointer_down(ev.x as float, ev.y as float);
-            },
-            events.EventType.MouseUp => {
-                ui_context.dispatch_pointer_up(ev.x as float, ev.y as float);
-            },
-            events.EventType.MouseMove => {
-                ui_context.dispatch_pointer_move(ev.x as float, ev.y as float);
-            },
-            events.EventType.KeyDown => {
-                ui_context.dispatch_key_down(ev.key_code);
-            },
-            events.EventType.Char => {
-                ui_context.dispatch_char_input(ev.key_code);
-            },
-            events.EventType.MouseWheel => {
-                ui_context.dispatch_mouse_wheel(ev.y as float);
-            },
-            _ => {}
-        }
-    }
-}
-
-// process_events = pump + Fluent dispatch: the per-frame event step for the
-// std.app/Fluent run loop. std.game.Game calls events.pump_events() and reads
-// the same pending_events() stream for its InputManager/IMGUI — both
-// consumers see every event (fan-out).
-pub fn process_events(): nil {
-    events.pump_events();
-    dispatch_ui_events();
-}
-
-pub fn run_frame_step(): nil {
-    process_events();
-    present_frame();
-    global_app_state.frame_count = global_app_state.frame_count + 1;
-}
-
-pub fn app_run(): nil {
-    if (global_app_state.is_initialized == 0) {
-        return;
+    pub fn is_running(): bool {
+        return global_app_state.is_running != 0;
     }
 
-    if (global_app_state.is_running != 0) {
-        return;
-    }
-
-    show_window();
-    global_app_state.is_running = 1;
-
-    // Main event loop
-    while (global_app_state.is_running != 0) {
-        run_frame_step();
-        sleep(0.008);
-    }
+    // Live window state (post-resize values, not the config fields).
+    pub fn view_width(): int { return global_app_state.width; }
+    pub fn view_height(): int { return global_app_state.height; }
+    pub fn framebuffer_width(): int { return global_app_state.framebuffer_width; }
+    pub fn framebuffer_height(): int { return global_app_state.framebuffer_height; }
+    pub fn dpi_scale(): float { return global_app_state.dpi_scale; }
+    pub fn frame_count(): int { return global_app_state.frame_count; }
+    pub fn delta_time(): float { return _frame_dt; }
 }
 
-pub fn run(root: ui_comp.Fluent | nil = nil): nil {
-    if (root != nil) {
-        set_ui(root as ui_comp.Fluent);
-    }
-    app_run();
-}
+// ── Module-level state accessors ────────────────────────────────────────────
+// Kept as free functions for std.game and custom drivers that don't hold
+// an App instance.
 
-pub fn app_quit(): nil {
+pub fn get_window_width(): int { return global_app_state.width; }
+pub fn get_window_height(): int { return global_app_state.height; }
+pub fn get_framebuffer_width(): int { return global_app_state.framebuffer_width; }
+pub fn get_framebuffer_height(): int { return global_app_state.framebuffer_height; }
+pub fn get_dpi_scale(): float { return global_app_state.dpi_scale; }
+pub fn get_frame_count(): int { return global_app_state.frame_count; }
+pub fn app_delta_time(): float { return _frame_dt; }
+pub fn app_is_running(): int { return global_app_state.is_running; }
+pub fn app_is_initialized(): int { return global_app_state.is_initialized; }
+
+pub fn quit(): nil {
     global_app_state.is_running = 0;
 }
 
-pub fn quit(): nil {
-    app_quit();
+// Per-frame hooks — module fn values, the codebase's callback convention.
+// on_update runs after event dispatch, before presentation; on_draw runs
+// inside the GPU pass before the retained UI submits.
+pub fn on_update(cb: (fn(float): nil) | nil): nil {
+    _update_cb = cb;
 }
 
-pub fn present_frame(): nil {
-    if (global_app_state.is_initialized == 0) {
-        return;
-    }
-    if (ui_context.global_ui_context.dirty == 0 and global_app_state.frame_count > 2) {
-        return;
-    }
-    ui_context.set_viewport_size(global_app_state.width as float, global_app_state.height as float);
-    gg.begin_pass(global_app_state.width, global_app_state.height, 0.1, 0.1, 0.15, 1.0);
-    ui_context.frame_update(0.016);
-    gg.end_pass();
-    gg.commit();
+pub fn on_draw(cb: (fn(): nil) | nil): nil {
+    _draw_cb = cb;
+}
+
+// Frame clear color for begin_pass/present (see App.begin_pass).
+pub fn set_clear_color(r: float, g: float, b: float, a: float): nil {
+    _clear = color.Color(r=r, g=g, b=b, a=a);
 }
 
 pub fn set_window_size(width: int, height: int): nil {
@@ -283,34 +263,6 @@ pub fn set_window_size(width: int, height: int): nil {
         native.set_size(_native_win as native.Window, width, height);
     }
     gg.set_window_size(width, height);
-}
-
-pub fn get_window_width(): int {
-    return global_app_state.width;
-}
-
-pub fn get_window_height(): int {
-    return global_app_state.height;
-}
-
-pub fn get_framebuffer_width(): int {
-    return global_app_state.framebuffer_width;
-}
-
-pub fn get_framebuffer_height(): int {
-    return global_app_state.framebuffer_height;
-}
-
-pub fn get_dpi_scale(): float {
-    return global_app_state.dpi_scale;
-}
-
-pub fn get_frame_count(): int {
-    return global_app_state.frame_count;
-}
-
-pub fn get_delta_time(): float {
-    return global_app_state.delta_time;
 }
 
 pub fn set_window_title(title: str): nil {
@@ -337,7 +289,193 @@ pub fn set_swap_interval(interval: int): nil {
     global_app_state.window_config.swap_interval = interval;
 }
 
-pub fn show_window(): nil {
+// These two are answered by std.os: they are facts about the machine and the
+// location of the program, not about the application loop.
+pub fn get_executable_path(): str { return os.exe_path(); }
+pub fn get_home_directory(): str { return os.home_dir(); }
+
+// ── Internal machinery ───────────────────────────────────────────────────────
+
+// Window configuration carried into global_app_state (kept internal —
+// App's fields are the public surface).
+frame WindowConfig {
+    pub var width: int;
+    pub var height: int;
+    pub var title: str;
+    pub var resizable: int;
+    pub var fullscreen: int;
+    pub var high_dpi: int;
+    pub var sample_count: int;
+    pub var swap_interval: int;
+}
+
+// Application state
+frame State {
+    pub var is_initialized: int;
+    pub var is_running: int;
+    pub var window_config: WindowConfig;
+    pub var window_id: int;
+    pub var width: int;
+    pub var height: int;
+    pub var framebuffer_width: int;
+    pub var framebuffer_height: int;
+    pub var dpi_scale: float;
+    pub var frame_count: int;
+    pub var last_frame_time: int;
+    pub var delta_time: float;
+}
+
+pub var global_app_state: State = State(
+    is_initialized=0,
+    is_running=0,
+    window_config=WindowConfig(
+        width=800, height=600, title="Lymar Application",
+        resizable=1, fullscreen=0, high_dpi=1, sample_count=1, swap_interval=1
+    ),
+    window_id=0,
+    width=800,
+    height=600,
+    framebuffer_width=800,
+    framebuffer_height=600,
+    dpi_scale=1.0,
+    frame_count=0,
+    last_frame_time=0,
+    delta_time=0.0
+);
+
+fn _boot(title: str, width: int, height: int, resizable: int,
+         fullscreen: int, high_dpi: int, sample_count: int, swap_interval: int): nil {
+    gg.setup();
+    events.clear();
+    global_app_state.window_config = WindowConfig(
+        width=width, height=height, title=title,
+        resizable=resizable, fullscreen=fullscreen, high_dpi=high_dpi,
+        sample_count=sample_count, swap_interval=swap_interval
+    );
+    global_app_state.width = width;
+    global_app_state.height = height;
+    global_app_state.framebuffer_width = width;
+    global_app_state.framebuffer_height = height;
+    global_app_state.window_id = 1;
+
+    global_app_state.is_initialized = 1;
+    global_app_state.is_running = 0;
+    global_app_state.frame_count = 0;
+    global_app_state.last_frame_time = 0;
+    global_app_state.delta_time = 0.0;
+    ui_context.ui_init();
+    ui_context.set_viewport_size(width as float, height as float);
+}
+
+fn _shutdown(): nil {
+    if (global_app_state.is_initialized == 0) {
+        return;
+    }
+    if (global_app_state.is_running != 0) {
+        global_app_state.is_running = 0;
+    }
+    if (_native_mode != 0) {
+        gg.detach_window();
+        if (_native_win != nil) {
+            native.destroy(_native_win as native.Window);
+        }
+        _native_win = nil;
+        _native_mode = 0;
+        events.clear_window();
+    }
+    events.clear();
+    global_app_state.is_initialized = 0;
+    global_app_state.window_id = 0;
+    gg.shutdown();
+}
+
+fn _pump(): nil {
+    if (global_app_state.is_initialized == 0) {
+        return;
+    }
+    // Measure real frame delta (clamped like std.game's timing did).
+    val el: Duration = _timer.elapsed();
+    _timer.reset();
+    var raw_dt = el.to_seconds();
+    if (raw_dt <= 0.00001) {
+        raw_dt = 0.01666667;
+    } elif (raw_dt > 0.1) {
+        raw_dt = 0.1;
+    }
+    _frame_dt = raw_dt;
+    _pump_count = _pump_count + 1;
+
+    events.pump_events();
+    _dispatch_events();
+    ui_motion.tick(_frame_dt);
+}
+
+// dispatch_events delivers this frame's std.events stream into the
+// component tree. It reads events.pending_events() non-destructively, so
+// std.game (or any other consumer) can observe the same stream — fan-out
+// is the default, not the exception.
+fn _dispatch_events(): nil {
+    if (global_app_state.is_initialized == 0) {
+        return;
+    }
+    iter (ev in events.pending_events()) {
+        if (ev.event_type == events.EventType.Quit) {
+            global_app_state.is_running = 0;
+        } elif (ev.event_type == events.EventType.Resize) {
+            global_app_state.width = ev.x;
+            global_app_state.height = ev.y;
+            global_app_state.framebuffer_width = ev.x;
+            global_app_state.framebuffer_height = ev.y;
+            ui_context.set_viewport_size(ev.x as float, ev.y as float);
+            // A resize invalidates the retained draw list — force a
+            // repaint on the next present even under elision.
+            if (_ui_active != 0) {
+                ui_tree.request_repaint();
+            }
+            // Swapchain resize is owned by events.pump_events (coalesced
+            // to the final size once per frame) — do not call
+            // gg.set_window_size per event here.
+        } elif (_ui_active != 0) {
+            // Component-tree UI: route every remaining event type through
+            // tree.dispatch — hit-testing, focus and scroll live there.
+            ui_tree.dispatch(_ui_root as ui_component.Component, ev);
+        }
+    }
+}
+
+fn _begin_pass(): nil {
+    if (global_app_state.is_initialized == 0) {
+        return;
+    }
+    gg.begin_pass(global_app_state.width, global_app_state.height,
+                  _clear.r, _clear.g, _clear.b, _clear.a);
+}
+
+fn _end_pass(): nil {
+    if (global_app_state.is_initialized == 0) {
+        return;
+    }
+    // Draw hook: game renderers / IMGUI draw inside the pass, before the
+    // retained UI submits on top.
+    if (_draw_cb != nil) {
+        val cb = _draw_cb as fn(): nil;
+        cb();
+    }
+    // Retained UI submit. tree.update self-elides: on a clean frame it
+    // skips measure/arrange/paint but leaves the draw list intact, and
+    // submit() must still replay it every frame — skipping submit would
+    // commit a cleared pass with nothing drawn (blank window).
+    if (_ui_active != 0) {
+        var w: int = global_app_state.width;
+        var h: int = global_app_state.height;
+        ui_tree.update(_ui_root as ui_component.Component, w as float, h as float);
+        ui_tree.submit();
+    }
+    gg.end_pass();
+    gg.commit();
+}
+
+fn _show_window(): nil {
     if (global_app_state.is_initialized == 0) {
         return;
     }
@@ -363,8 +501,10 @@ pub fn show_window(): nil {
             var win_copy = native.Window(handle=win.handle, id=win.id,
                                          width=win.width, height=win.height,
                                          closed=win.closed, backend=win.backend);
+            val win_hwnd: int = win.handle;
             _native_win = win;
             _native_mode = 1;
+            filedlg.set_owner(win_hwnd);
             events.set_window(win_copy);
             global_app_state.width = cw;
             global_app_state.height = ch;
@@ -379,20 +519,3 @@ pub fn show_window(): nil {
     }
     gg.spawn_window(w, h, title, global_app_state.window_config.resizable);
 }
-pub fn hide_window(): nil {}
-pub fn focus_window(): nil {}
-pub fn request_attention(): nil {}
-pub fn get_current_time(): int { return 0; }
-pub fn sleep_ms(milliseconds: int): nil {}
-pub fn get_clipboard_string(): str { return ""; }
-pub fn set_clipboard_string(text: str): nil {}
-pub fn get_mouse_position(): (int, int) { return (0, 0); }
-pub fn set_mouse_position(x: int, y: int): nil {}
-pub fn get_mouse_button_state(button: int): int { return 0; }
-pub fn get_key_state(key: int): int { return 0; }
-pub fn get_modifier_state(): int { return 0; }
-pub fn create_app_data_directory(): str { return ""; }
-// These two are answered by std.os: they are facts about the machine and the
-// location of the program, not about the application loop.
-pub fn get_executable_path(): str { return os.exe_path(); }
-pub fn get_home_directory(): str { return os.home_dir(); }

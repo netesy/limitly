@@ -1,0 +1,135 @@
+// std/ui/widgets/toggle.lm
+// Widget — split from std/ui/widgets.lm.
+
+import std.ui.component as comp;
+import std.ui.component show Placed, TextBound;
+import std.ui.types as ui_types;
+import std.ui.event as uievent;
+import std.ui.context as uictx;
+import std.ui.draw_list as dl;
+import std.ui.state as state;
+import std.ui.tree as tree;
+import std.events as events;
+import std.color as color;
+import std.ui.theme as uitheme;
+import std.ui.motion as motion;
+import std.text.controller as text_ctrl;
+import std.text.shaping as textshape;
+import std.ui.text_metrics as tm;
+
+// ── Toggle ───────────────────────────────────────────────────────────────────
+// Switch-style boolean — same BoolSignal contract as Checkbox, pill + knob
+// rendering instead of a box + check.
+
+frame Toggle {
+    embed Placed;
+    embed TextBound;
+    pub var on_sig: state.BoolSignal;
+    pub var track_w: float;
+    pub var track_h: float;
+    pub var gap: float;
+    pub var fg: color.Color;
+    pub var on_color: color.Color;
+    pub var off_color: color.Color;
+    pub var font_scale: float;
+    pub var hovered: int;
+
+    pub init(label_txt: str = "", initial: bool = false) {
+        val pal = uitheme.palette();
+        self.text = label_txt;
+        self.on_sig = state.signal_bool(initial);
+        self.track_w = 34.0;
+        self.track_h = 18.0;
+        self.gap = 6.0;
+        self.fg = pal.on_accent;
+        self.on_color = pal.success;
+        self.off_color = pal.track;
+        self.font_scale = 1.0;
+        self.hovered = 0;
+        self.id = comp.next_widget_id();
+    }
+
+    pub fn kind(): ui_types.WidgetKind { return ui_types.WidgetKind.Toggle; }
+    pub fn on_theme_changed(): nil {
+        val p = uitheme.palette();
+        self.fg = p.on_accent;
+        self.on_color = p.success;
+        self.off_color = p.track;
+        tree.request_repaint();
+    }
+    pub fn on_overlay_dismiss(): nil { }
+
+    pub fn bind_toggle(sig: state.BoolSignal): nil {
+        self.on_sig = sig;
+    }
+
+    pub fn wants_pointer_capture(): int { return 0; }
+
+    pub fn measure(min_w: float, max_w: float, min_h: float, max_h: float): comp.Size {
+        var text_w: float = tm.text_width(textshape.prepare_display(self.string_val()), self.font_scale);
+        var w: float = self.track_w + self.gap + text_w;
+        var h: float = self.track_h + 0.0;
+        var lh: float = tm.line_height(self.font_scale);
+        if (lh > h) { h = lh; }
+        if (w < min_w) { w = min_w; }
+        if (w > max_w) { w = max_w; }
+        if (h < min_h) { h = min_h; }
+        if (h > max_h) { h = max_h; }
+        return comp.Size(w=w, h=h);
+    }
+
+    pub fn paint(): nil {
+        var ty: float = self.rect.y + (self.rect.h - self.track_h) / 2.0;
+        var on: bool = self.on_sig.get();
+        var hov: float = motion.value(self.id, 0, self.hovered as float);
+        var track = self.off_color;
+        if (on) { track = self.on_color; }
+        track = color.lerp(track, color.white, hov * 0.15);
+        dl.dl_emit_rect_rounded(dl.paint_ctx.dl, self.rect.x, ty, self.track_w, self.track_h,
+            self.track_h / 2.0, track.r, track.g, track.b, 1.0);
+        // Knob slides between the ends; motion prop 1 carries the 0→1
+        // transition so flips animate instead of snapping.
+        var knob: float = self.track_h - 4.0;
+        var ktarget: float = 0.0;
+        if (on) { ktarget = 1.0; }
+        var k01: float = motion.value(self.id, 1, ktarget);
+        var kx: float = self.rect.x + 2.0 + k01 * (self.track_w - knob - 4.0);
+        dl.dl_emit_rect_rounded(dl.paint_ctx.dl, kx, ty + 2.0, knob, knob, knob / 3.0,
+            1.0, 1.0, 1.0, 1.0);
+        if (len(self.string_val()) > 0) {
+            dl.dl_emit_text(dl.paint_ctx.dl, textshape.prepare_display(self.string_val()), self.rect.x + self.track_w + self.gap,
+                self.rect.y + (self.rect.h - tm.line_height(self.font_scale)) / 2.0,
+                self.fg.r, self.fg.g, self.fg.b, self.fg.a, self.font_scale);
+        }
+    }
+
+    pub fn on_event(t: events.EventType, x: int, y: int, key: int): uievent.EventResult {
+        var inside: bool = self.rect.contains(x as float, y as float);
+        if (t == events.EventType.MouseMove) {
+            var want: int = 0;
+            if (inside) { want = 1; }
+            if (want != self.hovered) {
+                var cur = motion.value(self.id, 0, self.hovered as float);
+                self.hovered = want;
+                motion.animate_to(self.id, 0, want as float, 0.12, cur);
+                tree.request_repaint();
+            }
+        } elif (t == events.EventType.MouseDown) {
+            if (inside and key == 0) {
+                self.on_sig.set(not self.on_sig.get());
+                var kt: float = 0.0;
+                if (self.on_sig.get()) { kt = 1.0; }
+                var kcur = motion.value(self.id, 1, 1.0 - kt);
+                motion.animate_to(self.id, 1, kt, 0.15, kcur);
+                tree.request_repaint();
+                return uievent.EventResult.Handled;
+            }
+        }
+        return uievent.EventResult.Ignored;
+    }
+}
+
+pub fn toggle(label_txt: str = "", initial: bool = false): Toggle {
+    return Toggle(label_txt, initial);
+}
+

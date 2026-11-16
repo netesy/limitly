@@ -1,0 +1,246 @@
+// std/ui/widgets/chart.lm
+// Widget — ported from legacy Fluent Chart (+ chart factories).
+// kinds: BarChart, LineChart, PieChart (PlotHistogram renders as bars,
+// matching the legacy emit which aliases histogram→bar).
+// values: [float] series; labels: [str] optional category labels (unused
+// in v1 paint, kept for API parity). min_val/max_val accepted for parity;
+// v1 auto-scales to the data max like the legacy emit.
+
+import std.ui.component as comp;
+import std.ui.component show Placed;
+import std.ui.types as ui_types;
+import std.ui.event as uievent;
+import std.ui.context as uictx;
+import std.ui.draw_list as dl;
+import std.ui.state as state;
+import std.ui.tree as tree;
+import std.events as events;
+import std.color as color;
+import std.ui.theme as uitheme;
+import std.math as math;
+import std.text.controller as text_ctrl;
+import std.text.shaping as textshape;
+import std.ui.text_metrics as tm;
+
+frame Chart {
+    embed Placed;
+    pub var chart_kind: ui_types.WidgetKind;
+    pub var label: str;
+    pub var values: [float];
+    pub var labels: [str];
+    pub var min_val: float;
+    pub var max_val: float;
+    pub var surface: color.Color;
+    pub var accent: color.Color;
+    pub var line_color: color.Color;
+    pub var text: color.Color;
+    pub var font_scale: float;
+    // Pie palette (legacy emit colors).
+    pub var pal_r: [float];
+    pub var pal_g: [float];
+    pub var pal_b: [float];
+    // Scratch — AOT float-local clobbering across trait calls.
+    pub var _cw: float = 0.0;
+    pub var _ch: float = 0.0;
+    pub var _maxv: float = 1.0;
+    pub var _total: float = 0.0;
+
+    pub init(kind: ui_types.WidgetKind, lbl: str = "", vals: [float] = [] as [float],
+             lbls: [str] = [] as [str], min_v: float = 0.0, max_v: float = 1.0) {
+        val pal = uitheme.palette();
+        self.chart_kind = kind;
+        self.label = lbl;
+        self.values = vals;
+        self.labels = lbls;
+        self.min_val = min_v;
+        self.max_val = max_v;
+        self.surface = pal.surface;
+        self.accent = pal.accent;
+        self.line_color = pal.info;
+        self.text = pal.text_primary;
+        self.font_scale = 0.9;
+        self.pal_r = [0.39, 0.06, 0.96, 0.94, 0.23, 0.55];
+        self.pal_g = [0.40, 0.72, 0.62, 0.27, 0.51, 0.36];
+        self.pal_b = [0.95, 0.50, 0.04, 0.27, 0.96, 0.96];
+        self.id = comp.next_widget_id();
+    }
+
+    pub fn kind(): ui_types.WidgetKind { return self.chart_kind; }
+    pub fn on_theme_changed(): nil {
+        val p = uitheme.palette();
+        self.surface = p.surface;
+        self.accent = p.accent;
+        self.line_color = p.info;
+        self.text = p.text_primary;
+        tree.request_repaint();
+    }
+    pub fn on_overlay_dismiss(): nil { }
+
+    fn is_bar(): int {
+        if (self.chart_kind == ui_types.WidgetKind.BarChart
+            or self.chart_kind == ui_types.WidgetKind.PlotHistogram
+            or self.chart_kind == ui_types.WidgetKind.BubbleChart) {
+            return 1;
+        }
+        return 0;
+    }
+
+    fn is_line(): int {
+        if (self.chart_kind == ui_types.WidgetKind.LineChart
+            or self.chart_kind == ui_types.WidgetKind.PlotLines
+            or self.chart_kind == ui_types.WidgetKind.ScatterChart) {
+            return 1;
+        }
+        return 0;
+    }
+
+    fn compute_max(): nil {
+        self._maxv = 1.0;
+        var i = 0;
+        while (i < len(self.values)) {
+            if (self.values[i] > self._maxv) { self._maxv = self.values[i]; }
+            i = i + 1;
+        }
+    }
+
+    pub fn wants_pointer_capture(): int { return 0; }
+
+    pub fn measure(min_w: float, max_w: float, min_h: float, max_h: float): comp.Size {
+        var w: float = 220.0;
+        var h: float = 110.0;
+        if (w < min_w) { w = min_w; }
+        if (w > max_w) { w = max_w; }
+        if (h < min_h) { h = min_h; }
+        if (h > max_h) { h = max_h; }
+        return comp.Size(w=w, h=h);
+    }
+
+    pub fn paint(): nil {
+        self._cw = self.rect.w;
+        self._ch = self.rect.h;
+        dl.dl_emit_rect_rounded(dl.paint_ctx.dl, self.rect.x, self.rect.y, self._cw, self._ch,
+            6.0, self.surface.r, self.surface.g, self.surface.b, self.surface.a);
+        if (len(self.label) > 0) {
+            dl.dl_emit_text(dl.paint_ctx.dl, textshape.prepare_display(self.label),
+                self.rect.x + 10.0, self.rect.y + 8.0,
+                self.text.r, self.text.g, self.text.b, 1.0, self.font_scale);
+        }
+        if (self.is_bar() != 0) {
+            self.paint_bars();
+        } elif (self.is_line() != 0) {
+            self.paint_lines();
+        } else {
+            self.paint_pie();
+        }
+    }
+
+    fn paint_bars(): nil {
+        var nv = len(self.values);
+        if (nv <= 0) { return; }
+        self.compute_max();
+        var bar_w: float = (self._cw - 24.0) / (nv as float);
+        var plot_h: float = self._ch - 36.0;
+        var i = 0;
+        while (i < nv) {
+            var bh: float = (self.values[i] / self._maxv) * plot_h;
+            var bx: float = self.rect.x + 12.0 + (i as float) * bar_w + 2.0;
+            var by: float = self.rect.y + self._ch - 8.0 - bh;
+            dl.dl_emit_rect_rounded(dl.paint_ctx.dl, bx, by, bar_w - 4.0, bh,
+                2.0, self.accent.r, self.accent.g, self.accent.b, 1.0);
+            i = i + 1;
+        }
+    }
+
+    fn paint_lines(): nil {
+        var nv = len(self.values);
+        if (nv <= 1) { return; }
+        self.compute_max();
+        var dx: float = (self._cw - 24.0) / ((nv - 1) as float);
+        var plot_h: float = self._ch - 36.0;
+        var i = 0;
+        while (i < nv - 1) {
+            var x1: float = self.rect.x + 12.0 + (i as float) * dx;
+            var y1: float = self.rect.y + self._ch - 10.0 - (self.values[i] / self._maxv) * plot_h;
+            var x2: float = self.rect.x + 12.0 + ((i + 1) as float) * dx;
+            var y2: float = self.rect.y + self._ch - 10.0 - (self.values[i + 1] / self._maxv) * plot_h;
+            dl.dl_add(dl.paint_ctx.dl, dl.dcmd_line(x1, y1, x2, y2,
+                self.line_color.r, self.line_color.g, self.line_color.b, 1.0));
+            i = i + 1;
+        }
+    }
+
+    fn paint_pie(): nil {
+        var vals = self.values;
+        if (len(vals) == 0) {
+            vals = [65.0, 25.0, 10.0];
+        }
+        self._total = 0.0;
+        var i = 0;
+        while (i < len(vals)) {
+            self._total = self._total + vals[i];
+            i = i + 1;
+        }
+        if (self._total <= 0.0) { self._total = 1.0; }
+        var pie_r: float = (self._ch - 44.0) * 0.48;
+        if (pie_r > 64.0) { pie_r = 64.0; }
+        if (pie_r < 28.0) { pie_r = 28.0; }
+        var pie_cx: float = self.rect.x + pie_r + 22.0;
+        var pie_cy: float = self.rect.y + self._ch * 0.5 + 8.0;
+        var cur_angle: float = -1.5707963;
+        var si = 0;
+        while (si < len(vals)) {
+            var v = vals[si];
+            if (v > 0.0) {
+                var sweep: float = (v / self._total) * 6.2831853;
+                var end_ang: float = cur_angle + sweep;
+                var pi: int = si % 6;
+                var cr = self.pal_r[pi];
+                var cg = self.pal_g[pi];
+                var cb = self.pal_b[pi];
+                var a = cur_angle;
+                while (a < end_ang) {
+                    var next_a: float = a + 0.08;
+                    if (next_a > end_ang) { next_a = end_ang; }
+                    var x1: float = pie_cx + pie_r * math.cos(a);
+                    var y1: float = pie_cy + pie_r * math.sin(a);
+                    var x2: float = pie_cx + pie_r * math.cos(next_a);
+                    var y2: float = pie_cy + pie_r * math.sin(next_a);
+                    dl.dl_add(dl.paint_ctx.dl, dl.dcmd_triangle(pie_cx, pie_cy, x1, y1, x2, y2,
+                        cr, cg, cb, 1.0));
+                    a = next_a;
+                }
+                cur_angle = end_ang;
+            }
+            si = si + 1;
+        }
+    }
+
+    pub fn on_event(t: events.EventType, x: int, y: int, key: int): uievent.EventResult {
+        return uievent.EventResult.Ignored;
+    }
+}
+
+pub fn chart(kind: ui_types.WidgetKind, lbl: str = "", vals: [float] = [] as [float],
+             lbls: [str] = [] as [str], min_v: float = 0.0, max_v: float = 1.0): Chart {
+    return Chart(kind, lbl, vals, lbls, min_v, max_v);
+}
+
+pub fn bar_chart(lbl: str = "", vals: [float] = [] as [float]): Chart {
+    return Chart(ui_types.WidgetKind.BarChart, lbl, vals);
+}
+
+pub fn line_chart(lbl: str = "", vals: [float] = [] as [float]): Chart {
+    return Chart(ui_types.WidgetKind.LineChart, lbl, vals);
+}
+
+pub fn pie_chart(lbl: str = "", vals: [float] = [] as [float]): Chart {
+    return Chart(ui_types.WidgetKind.PieChart, lbl, vals);
+}
+
+pub fn plot_histogram(lbl: str = "", vals: [float] = [] as [float]): Chart {
+    return Chart(ui_types.WidgetKind.PlotHistogram, lbl, vals);
+}
+
+pub fn plot_lines(lbl: str = "", vals: [float] = [] as [float]): Chart {
+    return Chart(ui_types.WidgetKind.PlotLines, lbl, vals);
+}

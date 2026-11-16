@@ -1,0 +1,573 @@
+// std/ui/widgets/calendar.lm
+// Widget — month-grid calendar with day picking. Parses "YYYY-MM-DD",
+// renders a weekday header + 6x7 day grid, highlights the selected day,
+// and fires on_select with the newly picked date. "<" / ">" in the header
+// navigate months.
+
+import std.ui.component as comp;
+import std.ui.component show Placed;
+import std.ui.types as ui_types;
+import std.ui.event as uievent;
+import std.ui.context as uictx;
+import std.ui.draw_list as dl;
+import std.ui.state as state;
+import std.ui.tree as tree;
+import std.events as events;
+import std.color as color;
+import std.parse as parse;
+import std.string.split as split;
+import std.text.shaping as textshape;
+import std.ui.text_metrics as tm;
+import std.ui.theme as uitheme;
+import std.graphics.shadow as shadow;
+
+const MONTH_NAMES: [str] = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+];
+
+const WEEKDAY_NAMES: [str] = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+
+const SHORT_MONTHS: [str] = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+];
+
+fn pad2(n: int): str {
+    if (n < 10) {
+        return "0" + (n as str);
+    }
+    return n as str;
+}
+
+fn days_in_month(y: int, m: int): int {
+    if (m == 2) {
+        var leap: bool = false;
+        if (y % 4 == 0) {
+            leap = true;
+            if (y % 100 == 0 and y % 400 != 0) { leap = false; }
+        }
+        if (leap) { return 29; }
+        return 28;
+    }
+    if (m == 4 or m == 6 or m == 9 or m == 11) { return 30; }
+    return 31;
+}
+
+// Sakamoto day-of-week: 0 = Sunday.
+fn day_of_week(y: int, m: int, d: int): int {
+    var t: [int] = [0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4];
+    var yy = y;
+    if (m < 3) { yy = yy - 1; }
+    var r = (yy + yy / 4 - yy / 100 + yy / 400 + t[m - 1] + d) % 7;
+    if (r < 0) { r = r + 7; }
+    return r;
+}
+
+frame Calendar {
+    embed Placed;
+    pub var selected_date: str;
+    pub var selected_day: int;
+    pub var year: int;
+    pub var month: int;
+    pub var on_select: (fn(str): nil)?;
+    pub var surface: color.Color;
+    pub var border: color.Color;
+    pub var text: color.Color;
+    pub var muted: color.Color;
+    pub var accent: color.Color;
+    pub var on_accent: color.Color;
+    pub var font_scale: float;
+    // Layout scratch — recomputed in paint and reused by hit-testing.
+    pub var _cell: float = 0.0;
+    pub var _grid_x: float = 0.0;
+    pub var _grid_y: float = 0.0;
+    pub var _head_h: float = 0.0;
+    // Header dropdowns: 0 = closed, 1 = month list, 2 = year list.
+    pub var _popup: int = 0;
+    pub var _pop_x: float = 0.0;
+    pub var _pop_y: float = 0.0;
+    pub var _pop_w: float = 0.0;
+    pub var _pop_h: float = 0.0;
+    pub var _item_h: float = 0.0;
+    pub var _year_base: int = 0;
+    // Title word geometry (paint + events share it).
+    pub var _title_x: float = 0.0;
+    pub var _month_w: float = 0.0;
+    pub var _year_w: float = 0.0;
+    pub var _shadow: shadow.Shadow?;
+
+    pub init(date_str: str = "2025-01-01", on_pick: (fn(str): nil)? = nil) {
+        val pal = uitheme.palette();
+        self.selected_date = date_str;
+        self.selected_day = 1;
+        self.year = 2025;
+        self.month = 1;
+        self.on_select = on_pick;
+        self.surface = pal.surface;
+        self.border = pal.border;
+        self.text = pal.text_primary;
+        self.muted = pal.text_muted;
+        self.accent = pal.accent;
+        self.on_accent = pal.on_accent;
+        self.font_scale = 1.0;
+        self._cell = 0.0;
+        self._grid_x = 0.0;
+        self._grid_y = 0.0;
+        self._head_h = 0.0;
+        self._popup = 0;
+        self._pop_x = 0.0;
+        self._pop_y = 0.0;
+        self._pop_w = 0.0;
+        self._pop_h = 0.0;
+        self._item_h = 0.0;
+        self._year_base = 0;
+        self._title_x = 0.0;
+        self._month_w = 0.0;
+        self._year_w = 0.0;
+        self._shadow = uitheme.elevation_shadow(pal, 3);
+        self.parse_date(date_str);
+        self.id = comp.next_widget_id();
+    }
+
+    pub fn parse_date(ds: str): nil {
+        val parts = split.split(ds, "-");
+        if (len(parts) >= 3) {
+            self.year = parse.parse_int(parts[0])? else { self.year };
+            self.month = parse.parse_int(parts[1])? else { self.month };
+            self.selected_day = parse.parse_int(parts[2])? else { self.selected_day };
+        }
+        if (self.month < 1 or self.month > 12) { self.month = 1; }
+        var dim = days_in_month(self.year, self.month);
+        if (self.selected_day < 1) { self.selected_day = 1; }
+        if (self.selected_day > dim) { self.selected_day = dim; }
+    }
+
+    pub fn set_date(ds: str): nil {
+        self.selected_date = ds;
+        self.parse_date(ds);
+        tree.request_repaint();
+    }
+
+    pub fn kind(): ui_types.WidgetKind { return ui_types.WidgetKind.Calendar; }
+    pub fn on_theme_changed(): nil {
+        val p = uitheme.palette();
+        self.surface = p.surface;
+        self.border = p.border;
+        self.text = p.text_primary;
+        self.muted = p.text_muted;
+        self.accent = p.accent;
+        self.on_accent = p.on_accent;
+        self._shadow = uitheme.elevation_shadow(p, 3);
+        tree.request_repaint();
+    }
+    pub fn on_overlay_dismiss(): nil {
+        if (self._popup != 0) {
+            self._popup = 0;
+            tree.remove_overlay(self);
+            tree.request_repaint();
+        }
+    }
+
+    pub fn wants_pointer_capture(): int { return 0; }
+
+    fn cell_size(): float {
+        var c: float = (self.rect.w - 24.0) / 7.0;
+        // Cap the cell so a wide column doesn't blow the grid height past
+        // the measured rect (Flow gives children full width but measured
+        // height — uncapped cells bleed into siblings below).
+        if (c > 38.0) { c = 38.0; }
+        if (c < 18.0) { c = 18.0; }
+        return c;
+    }
+
+    fn grid_rows(): int {
+        var dim = days_in_month(self.year, self.month);
+        var first = day_of_week(self.year, self.month, 1);
+        var cells = first + dim;
+        var rows = (cells + 6) / 7;
+        if (rows < 4) { rows = 4; }
+        if (rows > 6) { rows = 6; }
+        return rows;
+    }
+
+    // Recompute grid origin from the current rect (paint + events share it).
+    fn layout_grid(): nil {
+        self._head_h = tm.line_height(self.font_scale) + 14.0;
+        self._cell = self.cell_size();
+        var grid_w: float = self._cell * 7.0;
+        self._grid_x = self.rect.x + (self.rect.w - grid_w) / 2.0;
+        if (self._grid_x < self.rect.x + 6.0) { self._grid_x = self.rect.x + 6.0; }
+        self._grid_y = self.rect.y + self._head_h + tm.line_height(self.font_scale) + 10.0;
+    }
+
+    pub fn measure(min_w: float, max_w: float, min_h: float, max_h: float): comp.Size {
+        var w: float = 262.0;
+        if (w < min_w) { w = min_w; }
+        if (w > max_w) { w = max_w; }
+        // Height estimate uses the capped cell so it matches paint at any
+        // arranged width (rows vary by month).
+        var cell: float = (w - 24.0) / 7.0;
+        if (cell > 38.0) { cell = 38.0; }
+        if (cell < 18.0) { cell = 18.0; }
+        var rows = self.grid_rows();
+        var head_h: float = tm.line_height(self.font_scale) + 14.0;
+        var h: float = head_h + tm.line_height(self.font_scale) + 10.0
+            + (rows as float) * cell + 12.0;
+        if (h < min_h) { h = min_h; }
+        if (h > max_h) { h = max_h; }
+        return comp.Size(w=w, h=h);
+    }
+
+    pub fn arrange(x: float, y: float, w: float, h: float): nil {
+        self.rect.x = x;
+        self.rect.y = y;
+        self.rect.w = w;
+        self.rect.h = h;
+        // While a dropdown is open the bounds must cover the popup so the
+        // parent forwards its events to us (same trick as Select).
+        if (self._popup != 0) {
+            self.popup_layout();
+            var need = self._pop_y + self._pop_h - y;
+            if (need > self.rect.h) { self.rect.h = need; }
+        }
+    }
+
+    fn shift_month(delta: int): nil {
+        var m = self.month + delta;
+        var y = self.year;
+        if (m < 1) { m = 12; y = y - 1; }
+        if (m > 12) { m = 1; y = y + 1; }
+        self.month = m;
+        self.year = y;
+        var dim = days_in_month(y, m);
+        if (self.selected_day > dim) { self.selected_day = dim; }
+        tree.request_repaint();
+    }
+
+    fn shift_year(delta: int): nil {
+        self.year = self.year + delta;
+        var dim = days_in_month(self.year, self.month);
+        if (self.selected_day > dim) { self.selected_day = dim; }
+        tree.request_repaint();
+    }
+
+    // Title word geometry: "June 2025" centered; month and year get
+    // separate hit zones for their dropdowns.
+    fn title_metrics(): nil {
+        val mname = MONTH_NAMES[self.month - 1];
+        val ystr = "{self.year}";
+        self._month_w = tm.text_width(textshape.prepare_display(mname), self.font_scale);
+        self._year_w = tm.text_width(textshape.prepare_display(ystr), self.font_scale);
+        var tw = self._month_w + 6.0 + self._year_w;
+        self._title_x = self.rect.x + (self.rect.w - tw) / 2.0;
+    }
+
+    fn set_popup(v: int): nil {
+        if (v == self._popup) { return; }
+        if (v != 0 and self._popup == 0) {
+            tree.push_overlay(self);
+            if (v == 2) {
+                // Year list: 10-year window centered on current year.
+                self._year_base = self.year - 4;
+            }
+        } elif (v == 0 and self._popup != 0) {
+            tree.remove_overlay(self);
+        }
+        self._popup = v;
+        tree.request_repaint();
+    }
+
+    // Popup geometry: month list (12 rows) or year list (page arrows +
+    // 10 rows). Positioned under the header, clamped inside the widget.
+    fn popup_layout(): nil {
+        self._item_h = tm.line_height(self.font_scale) + 6.0;
+        if (self._popup == 1) {
+            self._pop_w = 96.0;
+            self._pop_h = 12.0 * self._item_h + 8.0;
+        } else {
+            self._pop_w = 84.0;
+            self._pop_h = 8.0 + 18.0 + 10.0 * self._item_h + 4.0;
+        }
+        // Anchor under the title word that opened it.
+        var anchor: float = self._title_x + self._month_w / 2.0;
+        if (self._popup == 2) { anchor = self._title_x + self._month_w + 6.0 + self._year_w / 2.0; }
+        self._pop_x = anchor - self._pop_w / 2.0;
+        if (self._pop_x < self.rect.x + 4.0) { self._pop_x = self.rect.x + 4.0; }
+        if (self._pop_x + self._pop_w > self.rect.x + self.rect.w - 4.0) {
+            self._pop_x = self.rect.x + self.rect.w - 4.0 - self._pop_w;
+        }
+        self._pop_y = self.rect.y + self._head_h + tm.line_height(self.font_scale) + 12.0;
+    }
+
+    fn in_popup(fx: float, fy: float): bool {
+        return (fx >= self._pop_x and fx < self._pop_x + self._pop_w
+            and fy >= self._pop_y and fy < self._pop_y + self._pop_h);
+    }
+
+    fn pick_day(d: int): nil {
+        self.selected_day = d;
+        self.selected_date = "{self.year}-{pad2(self.month)}-{pad2(d)}";
+        if (self.on_select != nil) {
+            (self.on_select as (fn(str): nil))(self.selected_date);
+        }
+        tree.request_repaint();
+    }
+
+    pub fn paint(): nil {
+        dl.dl_emit_rect_rounded(dl.paint_ctx.dl, self.rect.x, self.rect.y, self.rect.w, self.rect.h,
+            6.0, self.surface.r, self.surface.g, self.surface.b, self.surface.a);
+        dl.dl_emit_rect_border(dl.paint_ctx.dl, self.rect.x, self.rect.y, self.rect.w, self.rect.h,
+            6.0, 1.0, self.border.r, self.border.g, self.border.b, 1.0);
+        self.layout_grid();
+
+        // Header: "<< <  Month Year  > >>" — << / >> step the year,
+        // < / > step the month. Month/year words open dropdowns.
+        var hy = self.rect.y + 8.0;
+        self.title_metrics();
+        dl.dl_emit_text(dl.paint_ctx.dl, "<<",
+            self.rect.x + 6.0, hy,
+            self.muted.r, self.muted.g, self.muted.b, 1.0, self.font_scale * 0.85);
+        dl.dl_emit_text(dl.paint_ctx.dl, "<",
+            self.rect.x + 26.0, hy,
+            self.muted.r, self.muted.g, self.muted.b, 1.0, self.font_scale);
+        dl.dl_emit_text(dl.paint_ctx.dl, textshape.prepare_display(MONTH_NAMES[self.month - 1]),
+            self._title_x, hy,
+            self.text.r, self.text.g, self.text.b, 1.0, self.font_scale);
+        dl.dl_emit_text(dl.paint_ctx.dl, textshape.prepare_display("{self.year}"),
+            self._title_x + self._month_w + 6.0, hy,
+            self.text.r, self.text.g, self.text.b, 1.0, self.font_scale);
+        dl.dl_emit_text(dl.paint_ctx.dl, ">",
+            self.rect.x + self.rect.w - 38.0, hy,
+            self.muted.r, self.muted.g, self.muted.b, 1.0, self.font_scale);
+        dl.dl_emit_text(dl.paint_ctx.dl, ">>",
+            self.rect.x + self.rect.w - 20.0, hy,
+            self.muted.r, self.muted.g, self.muted.b, 1.0, self.font_scale * 0.85);
+
+        // Weekday header.
+        var wy = self.rect.y + self._head_h;
+        var wi = 0;
+        while (wi < 7) {
+            dl.dl_emit_text(dl.paint_ctx.dl, WEEKDAY_NAMES[wi],
+                self._grid_x + (wi as float) * self._cell + 4.0, wy,
+                self.muted.r, self.muted.g, self.muted.b, 1.0, self.font_scale * 0.85);
+            wi = wi + 1;
+        }
+
+        // Day grid: cell k maps to day_num = k - first_weekday + 1.
+        // Only grid_rows() rows are drawn; the rest is clipped anyway.
+        var dim = days_in_month(self.year, self.month);
+        var first = day_of_week(self.year, self.month, 1);
+        var cell = self._cell;
+        var nrows = self.grid_rows();
+        dl.dl_push_clip(dl.paint_ctx.dl, self.rect.x, self.rect.y, self.rect.w, self.rect.h);
+        var row = 0;
+        while (row < nrows) {
+            var col = 0;
+            while (col < 7) {
+                var k = row * 7 + col;
+                var day_num = k - first + 1;
+                if (day_num >= 1 and day_num <= dim) {
+                    var cx = self._grid_x + (col as float) * cell;
+                    var cy = self._grid_y + (row as float) * cell;
+                    var is_sel = (day_num == self.selected_day);
+                    if (is_sel) {
+                        dl.dl_emit_rect_rounded(dl.paint_ctx.dl, cx + 2.0, cy + 2.0, cell - 4.0, cell - 4.0,
+                            4.0, self.accent.r, self.accent.g, self.accent.b, 1.0);
+                    }
+                    var ds = day_num as str;
+                    var dw = tm.text_width(ds, self.font_scale * 0.9);
+                    var fg = self.text;
+                    if (is_sel) { fg = self.on_accent; }
+                    dl.dl_emit_text(dl.paint_ctx.dl, ds,
+                        cx + (cell - dw) / 2.0, cy + (cell - tm.line_height(self.font_scale * 0.9)) / 2.0,
+                        fg.r, fg.g, fg.b, 1.0, self.font_scale * 0.9);
+                }
+                col = col + 1;
+            }
+            row = row + 1;
+        }
+        dl.dl_pop_clip(dl.paint_ctx.dl);
+
+        // Header dropdown popup (month list or year list).
+        if (self._popup != 0) {
+            self.popup_layout();
+            val px = self._pop_x;
+            val py = self._pop_y;
+            val pw = self._pop_w;
+            val ph = self._pop_h;
+            if (self._shadow != nil) {
+                val s = self._shadow as shadow.Shadow;
+                dl.dl_emit_shadow(dl.paint_ctx.dl, px, py, pw, ph,
+                    s.r, s.g, s.b, s.a, s.offset_x, s.offset_y, s.blur_radius, s.spread_radius, 4.0);
+            }
+            dl.dl_emit_rect_rounded(dl.paint_ctx.dl, px, py, pw, ph,
+                5.0, self.surface.r, self.surface.g, self.surface.b, 0.98);
+            dl.dl_emit_rect_border(dl.paint_ctx.dl, px, py, pw, ph,
+                5.0, 1.0, self.border.r, self.border.g, self.border.b, 1.0);
+
+            var iy = 0.0;
+            var ixc: float = px + 12.0;
+            if (self._popup == 1) {
+                // 12 month rows.
+                var row_y = py + 4.0;
+                while (iy < 12.0) {
+                    var mi = iy as int;
+                    if (mi + 1 == self.month) {
+                        dl.dl_emit_rect_rounded(dl.paint_ctx.dl, px + 3.0, row_y, pw - 6.0, self._item_h - 2.0,
+                            3.0, self.accent.r, self.accent.g, self.accent.b, 1.0);
+                        dl.dl_emit_text(dl.paint_ctx.dl, textshape.prepare_display(SHORT_MONTHS[mi]),
+                            ixc, row_y + 2.0,
+                            self.on_accent.r, self.on_accent.g, self.on_accent.b, 1.0, self.font_scale);
+                    } else {
+                        dl.dl_emit_text(dl.paint_ctx.dl, textshape.prepare_display(SHORT_MONTHS[mi]),
+                            ixc, row_y + 2.0,
+                            self.text.r, self.text.g, self.text.b, 1.0, self.font_scale);
+                    }
+                    row_y = row_y + self._item_h;
+                    iy = iy + 1.0;
+                }
+            } else {
+                // Year list: "<"/">" page arrows over a 10-year window.
+                var ay = py + 4.0;
+                dl.dl_emit_text(dl.paint_ctx.dl, "<",
+                    px + 10.0, ay,
+                    self.muted.r, self.muted.g, self.muted.b, 1.0, self.font_scale);
+                dl.dl_emit_text(dl.paint_ctx.dl, ">",
+                    px + pw - 22.0, ay,
+                    self.muted.r, self.muted.g, self.muted.b, 1.0, self.font_scale);
+                var row_y = ay + 18.0;
+                var yi = 0;
+                while (yi < 10) {
+                    var yy = self._year_base + yi;
+                    if (yy == self.year) {
+                        dl.dl_emit_rect_rounded(dl.paint_ctx.dl, px + 3.0, row_y, pw - 6.0, self._item_h - 2.0,
+                            3.0, self.accent.r, self.accent.g, self.accent.b, 1.0);
+                        dl.dl_emit_text(dl.paint_ctx.dl, textshape.prepare_display("{yy}"),
+                            ixc, row_y + 2.0,
+                            self.on_accent.r, self.on_accent.g, self.on_accent.b, 1.0, self.font_scale);
+                    } else {
+                        dl.dl_emit_text(dl.paint_ctx.dl, textshape.prepare_display("{yy}"),
+                            ixc, row_y + 2.0,
+                            self.text.r, self.text.g, self.text.b, 1.0, self.font_scale);
+                    }
+                    row_y = row_y + self._item_h;
+                    yi = yi + 1;
+                }
+            }
+        }
+    }
+
+    pub fn on_event(t: events.EventType, x: int, y: int, key: int): uievent.EventResult {
+        if (self.rect.w <= 0.0) { return uievent.EventResult.Ignored; }
+        self.layout_grid();
+        var fx = x as float;
+        var fy = y as float;
+        var head_y = self.rect.y + 4.0;
+        var head_h = tm.line_height(self.font_scale) + 8.0;
+
+        if (t == events.EventType.MouseUp and key == 0) {
+            var header_hit: bool = (fy >= head_y and fy < head_y + head_h);
+
+            // Open dropdown: popup items first, then header zones.
+            if (self._popup != 0) {
+                self.popup_layout();
+                if (self.in_popup(fx, fy)) {
+                    if (self._popup == 1) {
+                        var row = ((fy - (self._pop_y + 4.0)) / self._item_h) as int;
+                        if (row >= 0 and row < 12) {
+                            self.month = row + 1;
+                            var dim = days_in_month(self.year, self.month);
+                            if (self.selected_day > dim) { self.selected_day = dim; }
+                            self.set_popup(0);
+                            tree.request_repaint();
+                        }
+                    } else {
+                        var ay_bot = self._pop_y + 4.0 + 18.0;
+                        if (fy < ay_bot) {
+                            // Page arrows over the 10-year window.
+                            if (fx < self._pop_x + self._pop_w / 2.0) {
+                                self._year_base = self._year_base - 10;
+                            } else {
+                                self._year_base = self._year_base + 10;
+                            }
+                            tree.request_repaint();
+                        } else {
+                            var row = ((fy - ay_bot) / self._item_h) as int;
+                            if (row >= 0 and row < 10) {
+                                self.year = self._year_base + row;
+                                var dim = days_in_month(self.year, self.month);
+                                if (self.selected_day > dim) { self.selected_day = dim; }
+                                self.set_popup(0);
+                                tree.request_repaint();
+                            }
+                        }
+                    }
+                    return uievent.EventResult.Handled;
+                }
+                if (not header_hit) {
+                    // Click inside the widget but outside the popup:
+                    // close and swallow so day cells don't misfire.
+                    self.set_popup(0);
+                    return uievent.EventResult.Handled;
+                }
+                // Header click while open: close, then evaluate zones below.
+                self.set_popup(0);
+            }
+
+            if (header_hit) {
+                // << year-1, < month-1, title words, > month+1, >> year+1.
+                if (fx >= self.rect.x + 2.0 and fx < self.rect.x + 22.0) {
+                    self.shift_year(-1);
+                    return uievent.EventResult.Handled;
+                }
+                if (fx >= self.rect.x + 22.0 and fx < self.rect.x + 46.0) {
+                    self.shift_month(-1);
+                    return uievent.EventResult.Handled;
+                }
+                if (fx >= self.rect.x + self.rect.w - 46.0 and fx < self.rect.x + self.rect.w - 22.0) {
+                    self.shift_month(1);
+                    return uievent.EventResult.Handled;
+                }
+                if (fx >= self.rect.x + self.rect.w - 22.0 and fx < self.rect.x + self.rect.w - 2.0) {
+                    self.shift_year(1);
+                    return uievent.EventResult.Handled;
+                }
+                // Month / year words open their dropdowns.
+                self.title_metrics();
+                var y0 = self._title_x + self._month_w + 3.0;
+                var y1 = self._title_x + self._month_w + 6.0 + self._year_w + 3.0;
+                if (fx >= self._title_x - 3.0 and fx < self._title_x + self._month_w + 3.0) {
+                    self.set_popup(1);
+                    return uievent.EventResult.Handled;
+                }
+                if (fx >= y0 and fx < y1) {
+                    self.set_popup(2);
+                    return uievent.EventResult.Handled;
+                }
+            }
+            // Day cells.
+            var cell = self._cell;
+            var nrows = self.grid_rows();
+            if (fy >= self._grid_y and fy < self._grid_y + (nrows as float) * cell
+                and fx >= self._grid_x and fx < self._grid_x + 7.0 * cell) {
+                var col = ((fx - self._grid_x) / cell) as int;
+                var row = ((fy - self._grid_y) / cell) as int;
+                if (row < 0 or row >= nrows) { return uievent.EventResult.Ignored; }
+                var dim = days_in_month(self.year, self.month);
+                var first = day_of_week(self.year, self.month, 1);
+                var k = row * 7 + col;
+                var day_num = k - first + 1;
+                if (day_num >= 1 and day_num <= dim) {
+                    self.pick_day(day_num);
+                    return uievent.EventResult.Handled;
+                }
+            }
+        }
+        return uievent.EventResult.Ignored;
+    }
+}
+
+pub fn calendar(date_str: str = "2025-01-01", on_pick: (fn(str): nil)? = nil): Calendar {
+    return Calendar(date_str, on_pick);
+}

@@ -1,8 +1,8 @@
 // std/ui/draw_list.lm
 // Flat, ordered GPU draw command list with zero-allocation buffer reuse.
-// Emitted by builder.lm in a single pass; replayed by replay.lm without recursion.
-
-import std.ui.components as comp;
+// Emitted by widgets during tree.update's paint pass; replayed by
+// replay.lm without recursion. Hit-testing lives in std.ui.tree — this
+// module carries draw commands only.
 
 // ── Draw command kinds ────────────────────────────────────────────────────────
 // Real enum: dispatch on `cmd.kind` is type-checked and lowered to the tag
@@ -17,21 +17,8 @@ enum DrawCmdKind {
     ClipPush,
     ClipPop,
     Triangle,
-    Image
-}
-
-// Hit zone kinds (mirrors Widget kinds for dispatch)
-enum HitZoneKind {
-    None,
-    Button,
-    Slider,
-    Checkbox,
-    Input,
-    Toggle,
-    Select,
-    Tab,
-    TreeNode,
-    Custom
+    Image,
+    Shadow
 }
 
 // ── DrawCmd ───────────────────────────────────────────────────────────────────
@@ -50,10 +37,11 @@ frame DrawCmd {
     pub var border_width: float;
     pub var text: str;
     pub var font_scale: float;
-    pub var x2: float;  // for lines / triangles
+    pub var x2: float;  // for lines / triangles / shadow offsets
     pub var y2: float;
     pub var x3: float;
     pub var y3: float;
+    pub var clip_shape: int;  // ClipPush: 0=rect, 1=rounded, 2=ellipse
 
     pub init() {
         self.kind = DrawCmdKind.None;
@@ -66,6 +54,7 @@ frame DrawCmd {
         self.font_scale = 1.0;
         self.x2 = 0.0; self.y2 = 0.0;
         self.x3 = 0.0; self.y3 = 0.0;
+        self.clip_shape = 0;
     }
 }
 
@@ -125,10 +114,25 @@ pub fn dcmd_triangle(x1: float, y1: float, x2: float, y2: float, x3: float, y3: 
     return c;
 }
 
-pub fn dcmd_clip_push(x: float, y: float, w: float, h: float): DrawCmd {
+pub fn dcmd_clip_push(x: float, y: float, w: float, h: float, shape: int = 0, radius: float = 0.0): DrawCmd {
     var c = DrawCmd();
     c.kind = DrawCmdKind.ClipPush;
     c.x = x; c.y = y; c.w = w; c.h = h;
+    c.clip_shape = shape;
+    c.radius = radius;
+    return c;
+}
+
+// Soft drop shadow: x2=off_x, y2=off_y, x3=blur, y3=spread (reuses the
+// line/triangle coordinate fields — Shadow never draws geometry).
+pub fn dcmd_shadow(x: float, y: float, w: float, h: float, r: float, g: float, b: float, a: float,
+                   off_x: float, off_y: float, blur: float, spread: float, radius: float = 6.0): DrawCmd {
+    var c = DrawCmd();
+    c.kind = DrawCmdKind.Shadow;
+    c.x = x; c.y = y; c.w = w; c.h = h;
+    c.r = r; c.g = g; c.b = b; c.a = a;
+    c.x2 = off_x; c.y2 = off_y; c.x3 = blur; c.y3 = spread;
+    c.radius = radius;
     return c;
 }
 
@@ -138,169 +142,27 @@ pub fn dcmd_clip_pop(): DrawCmd {
     return c;
 }
 
-// ── HitZone ───────────────────────────────────────────────────────────────────
-// Parallel list to DrawCmd list — built simultaneously during build pass.
-// Hit tested as a simple linear scan — no recursion needed.
-frame HitZone {
-    pub var id: str;
-    pub var kind: HitZoneKind;
-    pub var x: float;
-    pub var y: float;
-    pub var w: float;
-    pub var h: float;
-    pub var clip_x: float;
-    pub var clip_y: float;
-    pub var clip_w: float;
-    pub var clip_h: float;
-    pub var on_click: (fn(): nil) | nil;
-    pub var on_change: (fn(): nil) | nil;
-    // Slider-specific data
-    pub var slider_min: float;
-    pub var slider_max: float;
-    pub var slider_val: float;
-    // Tab-specific
-    pub var tab_index: int;
-    // Checkbox/toggle
-    pub var is_checked: int;
-    // Widget reference for retained-state mutation
-    pub var widget: comp.Fluent | nil;
-
-    pub init() {
-        self.id = "";
-        self.kind = HitZoneKind.None;
-        self.x = 0.0; self.y = 0.0;
-        self.w = 0.0; self.h = 0.0;
-        self.clip_x = 0.0; self.clip_y = 0.0;
-        self.clip_w = 0.0; self.clip_h = 0.0;
-        self.on_click = nil;
-        self.on_change = nil;
-        self.slider_min = 0.0;
-        self.slider_max = 1.0;
-        self.slider_val = 0.0;
-        self.tab_index = 0;
-        self.is_checked = 0;
-        self.widget = nil;
-    }
-}
-
-pub fn make_button_zone(
-    id: str, x: float, y: float, w: float, h: float,
-    on_click: (fn(): nil) | nil = nil, widget: comp.Fluent | nil = nil
-): HitZone {
-    val hz = HitZone();
-    hz.id = id; hz.kind = HitZoneKind.Button;
-    hz.x = x; hz.y = y; hz.w = w; hz.h = h;
-    hz.on_click = on_click;
-    hz.widget = widget;
-    return hz;
-}
-
-pub fn make_button_zone_for(
-    id: str, x: float, y: float, w: float, h: float,
-    on_click: (fn(): nil) | nil, widget: comp.Fluent
-): HitZone {
-    val hz = make_button_zone(id, x, y, w, h, on_click, nil);
-    hz.widget = widget;
-    return hz;
-}
-
-pub fn make_slider_zone(
-    id: str, x: float, y: float, w: float, h: float,
-    min_v: float, max_v: float, cur_v: float,
-    on_change: (fn(): nil) | nil = nil, widget: comp.Fluent | nil = nil
-): HitZone {
-    val hz = HitZone();
-    hz.id = id; hz.kind = HitZoneKind.Slider;
-    hz.x = x; hz.y = y; hz.w = w; hz.h = h;
-    hz.slider_min = min_v; hz.slider_max = max_v; hz.slider_val = cur_v;
-    hz.on_change = on_change;
-    hz.widget = widget;
-    return hz;
-}
-
-pub fn make_slider_zone_for(
-    id: str, x: float, y: float, w: float, h: float,
-    min_v: float, max_v: float, cur_v: float,
-    on_change: (fn(): nil) | nil, widget: comp.Fluent
-): HitZone {
-    val hz = make_slider_zone(id, x, y, w, h, min_v, max_v, cur_v, on_change, nil);
-    hz.widget = widget;
-    return hz;
-}
-
-pub fn make_checkbox_zone(
-    id: str, x: float, y: float, w: float, h: float, checked: int,
-    on_change: (fn(): nil) | nil = nil, widget: comp.Fluent | nil = nil
-): HitZone {
-    val hz = HitZone();
-    hz.id = id; hz.kind = HitZoneKind.Checkbox;
-    hz.x = x; hz.y = y; hz.w = w; hz.h = h;
-    hz.is_checked = checked;
-    hz.on_change = on_change;
-    hz.widget = widget;
-    return hz;
-}
-
-pub fn make_checkbox_zone_for(
-    id: str, x: float, y: float, w: float, h: float, checked: int,
-    on_change: (fn(): nil) | nil, widget: comp.Fluent
-): HitZone {
-    val hz = make_checkbox_zone(id, x, y, w, h, checked, on_change, nil);
-    hz.widget = widget;
-    return hz;
-}
-
-pub fn make_input_zone(
-    id: str, x: float, y: float, w: float, h: float,
-    widget: comp.Fluent | nil = nil
-): HitZone {
-    val hz = HitZone();
-    hz.id = id; hz.kind = HitZoneKind.Input;
-    hz.x = x; hz.y = y; hz.w = w; hz.h = h;
-    hz.widget = widget;
-    return hz;
-}
-
-pub fn make_input_zone_for(
-    id: str, x: float, y: float, w: float, h: float,
-    widget: comp.Fluent
-): HitZone {
-    val hz = make_input_zone(id, x, y, w, h, nil);
-    hz.widget = widget;
-    return hz;
-}
-
 // ── DrawList ──────────────────────────────────────────────────────────────────
-// Keeps backing lists and pre-allocated DrawCmd/HitZone slots across rebuilds
+// Keeps backing lists and pre-allocated DrawCmd slots across rebuilds
 // so `clear()` resets cursor counts in O(1) with zero per-frame allocations.
 frame DrawList {
     pub var cmds: [DrawCmd];
-    pub var hits: [HitZone];
     pub var overlay_cmds: [DrawCmd];
-    pub var overlay_hits: [HitZone];
     pub var cmd_count: int;
-    pub var hit_count: int;
     pub var overlay_cmd_count: int;
-    pub var overlay_hit_count: int;
     pub var is_valid: int;
 
     pub init() {
         self.cmds = [] as [DrawCmd];
-        self.hits = [] as [HitZone];
         self.overlay_cmds = [] as [DrawCmd];
-        self.overlay_hits = [] as [HitZone];
         self.cmd_count = 0;
-        self.hit_count = 0;
         self.overlay_cmd_count = 0;
-        self.overlay_hit_count = 0;
         self.is_valid = 0;
     }
 
     pub fn clear(): nil {
         self.cmd_count = 0;
-        self.hit_count = 0;
         self.overlay_cmd_count = 0;
-        self.overlay_hit_count = 0;
         self.is_valid = 0;
     }
 }
@@ -366,6 +228,17 @@ pub fn dl_emit_rect_border(dl: DrawList, x: float, y: float, w: float, h: float,
     c.r = r; c.g = g; c.b = b; c.a = a;
 }
 
+pub fn dl_emit_shadow(dl: DrawList, x: float, y: float, w: float, h: float,
+                      r: float, g: float, b: float, a: float,
+                      off_x: float, off_y: float, blur: float, spread: float, radius: float = 6.0): nil {
+    val c = dl_alloc_cmd(dl);
+    c.kind = DrawCmdKind.Shadow;
+    c.x = x; c.y = y; c.w = w; c.h = h;
+    c.r = r; c.g = g; c.b = b; c.a = a;
+    c.x2 = off_x; c.y2 = off_y; c.x3 = blur; c.y3 = spread;
+    c.radius = radius;
+}
+
 pub fn dl_emit_text(dl: DrawList, txt: str, x: float, y: float, r: float, g: float, b: float, a: float = 1.0, scale: float = 1.0): nil {
     val c = dl_alloc_cmd(dl);
     c.kind = DrawCmdKind.Text;
@@ -385,16 +258,6 @@ pub fn dl_add(dl: DrawList, cmd: DrawCmd): nil {
     }
 }
 
-pub fn dl_add_hit(dl: DrawList, hz: HitZone): nil {
-    val idx = dl.hit_count;
-    dl.hit_count = idx + 1;
-    if (idx < len(dl.hits)) {
-        dl.hits[idx] = hz;
-    } else {
-        dl.hits.append(hz);
-    }
-}
-
 pub fn dl_add_overlay_cmd(dl: DrawList, cmd: DrawCmd): nil {
     val idx = dl.overlay_cmd_count;
     dl.overlay_cmd_count = idx + 1;
@@ -405,16 +268,6 @@ pub fn dl_add_overlay_cmd(dl: DrawList, cmd: DrawCmd): nil {
     }
 }
 
-pub fn dl_add_overlay_hit(dl: DrawList, hz: HitZone): nil {
-    val idx = dl.overlay_hit_count;
-    dl.overlay_hit_count = idx + 1;
-    if (idx < len(dl.overlay_hits)) {
-        dl.overlay_hits[idx] = hz;
-    } else {
-        dl.overlay_hits.append(hz);
-    }
-}
-
 pub fn dl_flush_overlays(dl: DrawList): nil {
     if (dl.overlay_cmd_count > 0) {
         iter (c_i in 0..dl.overlay_cmd_count) {
@@ -422,35 +275,6 @@ pub fn dl_flush_overlays(dl: DrawList): nil {
         }
         dl.overlay_cmd_count = 0;
     }
-
-    if (dl.overlay_hit_count > 0) {
-        iter (h_i in 0..dl.overlay_hit_count) {
-            dl_add_hit(dl, dl.overlay_hits[h_i]);
-        }
-        dl.overlay_hit_count = 0;
-    }
-}
-
-// Hit test: returns the topmost HitZone under (px, py), or empty HitZone.
-// O(n) linear scan — no recursion.
-pub fn dl_hit_test(dl: DrawList, px: float, py: float): HitZone {
-    val empty = HitZone();
-    val n = dl.hit_count;
-    var i = n - 1;
-    while (i >= 0) {
-        val hz = dl.hits[i];
-        if (hz.clip_w > 0.0 and hz.clip_h > 0.0) {
-            if (px < hz.clip_x or px > hz.clip_x + hz.clip_w or py < hz.clip_y or py > hz.clip_y + hz.clip_h) {
-                i = i - 1;
-                continue;
-            }
-        }
-        if (px >= hz.x and px <= hz.x + hz.w and py >= hz.y and py <= hz.y + hz.h) {
-            return hz;
-        }
-        i = i - 1;
-    }
-    return empty;
 }
 
 pub fn dl_clear(dl: DrawList): nil {

@@ -1,59 +1,152 @@
-// std/ui/theme - Design tokens and theming system
-import std.ui.types as ui_types;
+// std/ui/theme.lm
+// Theming layer for the Component UI, backed by the canonical
+// std.theme.types.Theme (the same type the presets produce).
+//
+//   import std.ui.theme as uitheme;
+//   val pal = uitheme.palette();          // init-time snapshot
+//   self.surface = pal.surface;
+//
+// Live re-theming:
+//   uitheme.set_dark();                    // swap preset + bump version
+//   tree.apply_theme(root);                // walk tree, refresh widgets
+//
+// Widgets snapshot palette() in init and may implement
+// on_theme_changed() to re-snapshot; tree.apply_theme drives that.
+// Per-instance fields remain overridable — the palette only supplies
+// defaults.
+
+import std.theme.types as tt;
+import std.theme.presets as presets;
+import std.graphics.shadow as shadow;
 import std.color as color;
 
-// Color palette token
-frame ColorPalette {
-    pub var primary: ui_types.Color;
-    pub var secondary: ui_types.Color;
-    pub var tertiary: ui_types.Color;
-    pub var background: ui_types.Color;
-    pub var surface: ui_types.Color;
-    pub var surface_variant: ui_types.Color;
-    pub var error: ui_types.Color;
-    pub var success: ui_types.Color;
-    pub var warning: ui_types.Color;
-    pub var info: ui_types.Color;
-    pub var text_primary: ui_types.Color;
-    pub var text_secondary: ui_types.Color;
-    pub var border: ui_types.Color;
-    pub var focus_ring: ui_types.Color;
+// The active theme for all widgets. Mutate via set_theme()/apply_*
+// helpers (they bump theme_version so apply_theme can detect staleness).
+pub var current: tt.Theme = presets.default_theme();
 
-    pub init() {
-        self.primary = color.blue;
-        self.secondary = color.indigo;
-        self.tertiary = color.rgb(100, 200, 100);
-        self.background = color.rgb(15, 15, 20);
-        self.surface = color.rgb(24, 26, 34);
-        self.surface_variant = color.rgb(35, 38, 48);
-        self.error = color.red;
-        self.success = color.rgb(80, 220, 130);
-        self.warning = color.rgb(255, 200, 80);
-        self.info = color.blue;
-        self.text_primary = color.white;
-        self.text_secondary = color.rgb(180, 185, 200);
-        self.border = color.rgb(60, 65, 75);
-        self.focus_ring = color.rgb(100, 180, 255);
-    }
+// Monotonic counter bumped on every theme swap.
+pub var theme_version: int = 0;
+
+frame Palette {
+    // Surfaces & text
+    pub var background: color.Color;
+    pub var surface: color.Color;
+    pub var surface_variant: color.Color;
+    pub var surface_hover: color.Color;
+    pub var surface_pressed: color.Color;
+    pub var border: color.Color;
+    pub var text_primary: color.Color;
+    pub var text_muted: color.Color;
+    pub var accent: color.Color;
+    pub var primary: color.Color;
+    pub var secondary: color.Color;
+    pub var focus_ring: color.Color;
+    // Control states (from std.theme control tokens)
+    pub var btn_normal: color.Color;
+    pub var btn_hover: color.Color;
+    pub var btn_active: color.Color;
+    pub var tab_active: color.Color;
+    pub var thumb: color.Color;
+    pub var thumb_hover: color.Color;
+    pub var check: color.Color;
+    // Derived shades
+    pub var track: color.Color;
+    pub var on_accent: color.Color;
+    pub var accent_hover: color.Color;
+    pub var selection: color.Color;
+    pub var text_disabled: color.Color;
+    // Semantic
+    pub var success: color.Color;
+    pub var warning: color.Color;
+    pub var error: color.Color;
+    pub var info: color.Color;
+    pub var plot_lines: color.Color;
+    pub var plot_histogram: color.Color;
+    // Metrics
+    pub var spacing: float;
+    pub var item_height: float;
+    pub var rounding: float;
+    pub var corner_sm: float;
+    pub var corner_md: float;
+    pub var corner_lg: float;
+    pub var body_size: float;
+    pub var label_size: float;
+    // Elevation shadows (nil when the theme disables them)
+    pub var button_shadow: shadow.Shadow?;
+    pub var window_shadow: shadow.Shadow?;
+    pub var popup_shadow: shadow.Shadow?;
 }
 
-// Spacing, Typography, and Shape tokens from std.theme
-pub import std.theme show SpacingTokens, TypographyTokens, ShapeTokens;
-
-// Complete theme
-frame Theme {
-    pub var colors: ColorPalette;
-    pub var spacing: SpacingTokens;
-    pub var typography: TypographyTokens;
-    pub var shape: ShapeTokens;
-
-    pub init() {
-        self.colors = ColorPalette();
-        self.spacing = SpacingTokens();
-        self.typography = TypographyTokens();
-        self.shape = ShapeTokens();
-    }
+// Snapshot the active theme into a UI palette. Called per-widget init
+// and per on_theme_changed — allocation happens only at those times,
+// never per-frame.
+pub fn palette(): Palette {
+    val pal = Palette();
+    pal.background = current.bg_window;
+    pal.surface = current.bg_panel;
+    pal.surface_variant = current.frame_bg;
+    pal.surface_hover = current.frame_bg_hover;
+    pal.surface_pressed = current.frame_bg_active;
+    pal.border = current.separator;
+    pal.text_primary = current.text;
+    pal.text_muted = current.text_muted;
+    pal.accent = current.accent;
+    pal.primary = current.accent;
+    pal.secondary = current.accent;
+    pal.focus_ring = current.accent;
+    pal.btn_normal = current.btn_normal;
+    pal.btn_hover = current.btn_hover;
+    pal.btn_active = current.btn_active;
+    pal.tab_active = current.tab_active;
+    pal.thumb = current.slider_thumb;
+    pal.thumb_hover = current.slider_thumb_hover;
+    pal.check = current.checkbox_check;
+    pal.track = current.slider_track;
+    pal.on_accent = current.bg_window;
+    pal.accent_hover = color.lerp(current.accent, current.text, 0.15);
+    pal.selection = color.lerp(current.accent, current.bg_panel, 0.72);
+    pal.text_disabled = color.lerp(current.text_muted, current.bg_panel, 0.45);
+    pal.success = current.success;
+    pal.warning = current.warning;
+    pal.error = current.danger;
+    pal.info = current.info;
+    pal.plot_lines = current.plot_lines;
+    pal.plot_histogram = current.plot_histogram;
+    pal.spacing = current.spacing;
+    pal.item_height = current.item_height;
+    pal.rounding = current.rounding;
+    pal.corner_sm = current.shape_tokens.corner_sm;
+    pal.corner_md = current.shape_tokens.corner_md;
+    pal.corner_lg = current.shape_tokens.corner_lg;
+    pal.body_size = current.typography_tokens.body_size;
+    pal.label_size = current.typography_tokens.label_size;
+    pal.button_shadow = current.button_shadow;
+    pal.window_shadow = current.window_shadow;
+    pal.popup_shadow = current.popup_shadow;
+    return pal;
 }
 
-// Global theme instance
-pub var global_theme: Theme = Theme();
+// ── Live theme switching ─────────────────────────────────────────────────────
+
+pub fn set_theme(t: tt.Theme): nil {
+    current = t;
+    theme_version = theme_version + 1;
+}
+
+pub fn set_default(): nil { set_theme(presets.default_theme()); }
+pub fn set_dark(): nil { set_theme(presets.dark_theme()); }
+pub fn set_light(): nil { set_theme(presets.light_theme()); }
+pub fn set_cyberpunk(): nil { set_theme(presets.cyberpunk_theme()); }
+pub fn set_retro(): nil { set_theme(presets.retro_theme()); }
+pub fn set_nord(): nil { set_theme(presets.nord_theme()); }
+
+// Re-snapshot palette defaults on a widget after a theme swap. Widgets
+// call this from on_theme_changed(); fields the user overrode keep their
+// values only if the widget chose to preserve them — the convention is
+// that on_theme_changed re-applies theme-derived fields.
+pub fn elevation_shadow(pal: Palette, elev: int): shadow.Shadow? {
+    if (elev <= 0) { return nil; }
+    if (elev == 1) { return pal.button_shadow; }
+    if (elev == 2) { return pal.window_shadow; }
+    return pal.popup_shadow;
+}

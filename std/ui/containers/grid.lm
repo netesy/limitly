@@ -1,0 +1,203 @@
+// std/ui/containers/grid.lm
+// Container — fixed-column grid. Children flow left-to-right,
+// top-to-bottom; each row's height is the tallest cell in that row.
+// Port of the legacy index.lm `grid()` helper, as a real Component so
+// cells participate in measure/arrange/paint/event dispatch.
+
+import std.ui.component as comp;
+import std.ui.component show Placed;
+import std.ui.types as ui_types;
+import std.ui.event as uievent;
+import std.ui.context as uictx;
+import std.ui.draw_list as dl;
+import std.ui.state as state;
+import std.ui.tree as tree;
+import std.events as events;
+import std.color as color;
+
+frame Grid {
+    embed Placed;
+    pub var children: [comp.Component];
+    pub var cols: int;
+    pub var spacing: float;
+    // Scratch — AOT float-local clobbering across trait calls.
+    pub var _cw: float = 0.0;
+    pub var _ch: float = 0.0;
+    pub var _cx: float = 0.0;
+    pub var _cy: float = 0.0;
+    pub var _rw: float = 0.0;
+    pub var _rh: float = 0.0;
+
+    pub init(columns: int = 2, sp: float = 4.0) {
+        self.children = [];
+        if (columns < 1) { columns = 1; }
+        self.cols = columns;
+        self.spacing = sp;
+        self.id = comp.next_widget_id();
+    }
+
+    pub fn add(c: comp.Component): nil {
+        self.children.append(c);
+    }
+
+    pub fn add_all(list: [any]): nil {
+        iter (c in list) {
+            self.children.append(c as comp.Component);
+        }
+    }
+
+    pub fn kind(): ui_types.WidgetKind { return ui_types.WidgetKind.Container; }
+    pub fn on_theme_changed(): nil { }
+    pub fn on_overlay_dismiss(): nil { }
+
+    pub fn child_count(): int {
+        return len(self.children);
+    }
+
+    pub fn child_at(i: int): any {
+        if (i < 0 or i >= len(self.children)) {
+            return nil;
+        }
+        return self.children[i];
+    }
+
+    fn row_count(): int {
+        if (self.cols <= 0) { return 0; }
+        return (len(self.children) + self.cols - 1) / self.cols;
+    }
+
+    // Measure pass shared by measure() and arrange(): fills _cw (cell
+    // width) and returns nothing — row heights are recomputed per row in
+    // arrange because they depend on the allotted width.
+    pub fn wants_pointer_capture(): int { return 0; }
+
+    pub fn measure(min_w: float, max_w: float, min_h: float, max_h: float): comp.Size {
+        if (len(self.children) == 0) {
+            return comp.Size(w=0.0, h=0.0);
+        }
+        // Widest child's natural width becomes the cell width, clamped so
+        // the whole grid fits max_w.
+        self._cw = 0.0;
+        var i = 0;
+        while (i < len(self.children)) {
+            val s = self.children[i].measure(0.0, comp.MEASURE_LOOSE, 0.0, comp.MEASURE_LOOSE);
+            if (s.w > self._cw) { self._cw = s.w; }
+            i = i + 1;
+        }
+        var grid_w: float = (self.cols as float) * self._cw + (self.cols - 1) * self.spacing;
+        if (grid_w > max_w and max_w < comp.MEASURE_LOOSE) {
+            self._cw = (max_w - (self.cols - 1) * self.spacing) / (self.cols as float);
+            if (self._cw < 0.0) { self._cw = 0.0; }
+            grid_w = max_w;
+        }
+        // Height: sum of per-row max heights at cell width _cw.
+        self._ch = 0.0;
+        var r = 0;
+        var rows = self.row_count();
+        while (r < rows) {
+            self._rh = 0.0;
+            var c = 0;
+            while (c < self.cols) {
+                var idx = r * self.cols + c;
+                if (idx < len(self.children)) {
+                    val s = self.children[idx].measure(0.0, self._cw, 0.0, comp.MEASURE_LOOSE);
+                    if (s.h > self._rh) { self._rh = s.h; }
+                }
+                c = c + 1;
+            }
+            self._ch = self._ch + self._rh + self.spacing;
+            r = r + 1;
+        }
+        if (rows > 0) { self._ch = self._ch - self.spacing; }
+        var w: float = grid_w + 0.0;
+        var h: float = self._ch + 0.0;
+        if (w < min_w) { w = min_w; }
+        if (h < min_h) { h = min_h; }
+        if (w > max_w) { w = max_w; }
+        if (h > max_h) { h = max_h; }
+        return comp.Size(w=w, h=h);
+    }
+
+    pub fn arrange(x: float, y: float, w: float, h: float): nil {
+        self.rect.x = x;
+        self.rect.y = y;
+        self.rect.w = w;
+        self.rect.h = h;
+        if (self.cols <= 0 or len(self.children) == 0) { return; }
+        // Cell width from the allotted width.
+        self._cw = (w - (self.cols - 1) * self.spacing) / (self.cols as float);
+        if (self._cw < 0.0) { self._cw = 0.0; }
+        var r = 0;
+        var rows = self.row_count();
+        self._cy = y;
+        while (r < rows) {
+            // Row height = tallest cell this row at the arranged width.
+            self._rh = 0.0;
+            var c = 0;
+            while (c < self.cols) {
+                var idx = r * self.cols + c;
+                if (idx < len(self.children)) {
+                    val s = self.children[idx].measure(0.0, self._cw, 0.0, comp.MEASURE_LOOSE);
+                    if (s.h > self._rh) { self._rh = s.h; }
+                }
+                c = c + 1;
+            }
+            c = 0;
+            self._cx = x;
+            while (c < self.cols) {
+                var idx = r * self.cols + c;
+                if (idx < len(self.children)) {
+                    val cell = self.children[idx];
+                    val s = cell.measure(0.0, self._cw, 0.0, self._rh);
+                    cell.arrange(self._cx, self._cy, self._cw, s.h);
+                    self._cx = self._cx + self._cw + self.spacing;
+                }
+                c = c + 1;
+            }
+            self._cy = self._cy + self._rh + self.spacing;
+            r = r + 1;
+        }
+    }
+
+    pub fn paint(): nil {
+        var i = 0;
+        while (i < len(self.children)) {
+            self.children[i].paint();
+            i = i + 1;
+        }
+    }
+
+    pub fn on_event(t: events.EventType, x: int, y: int, key: int): uievent.EventResult {
+        // MouseMove reaches every child so hover state can clear.
+        var i = len(self.children) - 1;
+        var handled: bool = false;
+        while (i >= 0) {
+            val c = self.children[i];
+            var hit: bool = true;
+            if (t != events.EventType.MouseMove and t != events.EventType.MouseUp and t != events.EventType.MouseWheel) {
+                hit = c.bounds().contains(x as float, y as float);
+            } elif (tree.captured_id != 0) {
+                hit = tree.subtree_has_widget(c, tree.captured_id);
+            }
+            if (hit) {
+                val res = c.on_event(t, x, y, key);
+                if (res == uievent.EventResult.Handled) {
+                    if (t == events.EventType.MouseMove) {
+                        handled = true;
+                    } else {
+                        return uievent.EventResult.Handled;
+                    }
+                }
+            }
+            i = i - 1;
+        }
+        if (handled) {
+            return uievent.EventResult.Handled;
+        }
+        return uievent.EventResult.Ignored;
+    }
+}
+
+pub fn grid(columns: int = 2, sp: float = 4.0): Grid {
+    return Grid(columns, sp);
+}

@@ -1,0 +1,227 @@
+// std/ui/widgets/diff.lm
+// Widget — line-based diff view. Computes an LCS alignment between
+// old_text and new_text, then renders context/removed/added rows with a
+// gutter marker. Rows are clipped to the widget rect; wrap in a
+// scroll_view for long diffs.
+
+import std.ui.component as comp;
+import std.ui.component show Placed;
+import std.ui.types as ui_types;
+import std.ui.event as uievent;
+import std.ui.context as uictx;
+import std.ui.draw_list as dl;
+import std.ui.state as state;
+import std.ui.tree as tree;
+import std.events as events;
+import std.color as color;
+import std.string.split as split;
+import std.text.shaping as textshape;
+import std.ui.text_metrics as tm;
+import std.ui.theme as uitheme;
+
+// Diff row kinds.
+enum DiffKind {
+    Context,
+    Removed,
+    Added
+}
+
+frame DiffLine {
+    pub var kind: DiffKind;
+    pub var text: str;
+
+    pub init(k: DiffKind, t: str) {
+        self.kind = k;
+        self.text = t;
+    }
+}
+
+frame Diff {
+    embed Placed;
+    pub var old_text: str;
+    pub var new_text: str;
+    pub var surface: color.Color;
+    pub var removed_color: color.Color;
+    pub var added_color: color.Color;
+    pub var context_color: color.Color;
+    pub var removed_bg: color.Color;
+    pub var added_bg: color.Color;
+    pub var font_scale: float;
+    // Cached alignment — rebuilt lazily on paint when texts change.
+    pub var _lines: [DiffLine];
+    pub var _built_old: str;
+    pub var _built_new: str;
+
+    pub init(old_t: str = "", new_t: str = "") {
+        val pal = uitheme.palette();
+        self.old_text = old_t;
+        self.new_text = new_t;
+        self.surface = pal.surface;
+        self.removed_color = pal.error;
+        self.added_color = pal.success;
+        self.context_color = pal.text_muted;
+        self.removed_bg = color.Color(r=pal.error.r, g=pal.error.g, b=pal.error.b, a=0.10);
+        self.added_bg = color.Color(r=pal.success.r, g=pal.success.g, b=pal.success.b, a=0.10);
+        self.font_scale = 0.95;
+        self._lines = [];
+        self._built_old = "";
+        self._built_new = "";
+        self.id = comp.next_widget_id();
+    }
+
+    pub fn set_texts(old_t: str, new_t: str): nil {
+        self.old_text = old_t;
+        self.new_text = new_t;
+        tree.request_repaint();
+    }
+
+    pub fn kind(): ui_types.WidgetKind { return ui_types.WidgetKind.Diff; }
+    pub fn on_theme_changed(): nil {
+        val p = uitheme.palette();
+        self.surface = p.surface;
+        self.removed_color = p.error;
+        self.added_color = p.success;
+        self.context_color = p.text_muted;
+        self.removed_bg = color.Color(r=p.error.r, g=p.error.g, b=p.error.b, a=0.10);
+        self.added_bg = color.Color(r=p.success.r, g=p.success.g, b=p.success.b, a=0.10);
+        tree.request_repaint();
+    }
+    pub fn on_overlay_dismiss(): nil { }
+
+    pub fn wants_pointer_capture(): int { return 0; }
+
+    fn row_h(): float {
+        return tm.line_height(self.font_scale) + 4.0;
+    }
+
+    // LCS alignment via DP. Falls back to "all removed + all added" when
+    // the inputs are too large for the quadratic table.
+    fn rebuild(): nil {
+        if (self._built_old == self.old_text and self._built_new == self.new_text) {
+            return;
+        }
+        self._built_old = self.old_text;
+        self._built_new = self.new_text;
+        self._lines = [];
+        val a = split.split(self.old_text, "\n");
+        val b = split.split(self.new_text, "\n");
+        var n = len(a);
+        var m = len(b);
+        if (n * m > 65536) {
+            iter (t in a) { self._lines.append(DiffLine(DiffKind.Removed, t)); }
+            iter (t in b) { self._lines.append(DiffLine(DiffKind.Added, t)); }
+            return;
+        }
+        // dp[i][j] = LCS length of a[i..] vs b[j..]
+        var dp: [[int]] = [];
+        var ii = 0;
+        while (ii <= n) {
+            var row: [int] = [];
+            var jj = 0;
+            while (jj <= m) {
+                row.append(0);
+                jj = jj + 1;
+            }
+            dp.append(row);
+            ii = ii + 1;
+        }
+        ii = n - 1;
+        while (ii >= 0) {
+            var jj = m - 1;
+            while (jj >= 0) {
+                if (a[ii] == b[jj]) {
+                    dp[ii][jj] = dp[ii + 1][jj + 1] + 1;
+                } else {
+                    var x = dp[ii + 1][jj];
+                    var y = dp[ii][jj + 1];
+                    if (x > y) { dp[ii][jj] = x; } else { dp[ii][jj] = y; }
+                }
+                jj = jj - 1;
+            }
+            ii = ii - 1;
+        }
+        // Backtrack.
+        var i = 0;
+        var j = 0;
+        while (i < n and j < m) {
+            if (a[i] == b[j]) {
+                self._lines.append(DiffLine(DiffKind.Context, a[i]));
+                i = i + 1;
+                j = j + 1;
+            } elif (dp[i + 1][j] >= dp[i][j + 1]) {
+                self._lines.append(DiffLine(DiffKind.Removed, a[i]));
+                i = i + 1;
+            } else {
+                self._lines.append(DiffLine(DiffKind.Added, b[j]));
+                j = j + 1;
+            }
+        }
+        while (i < n) {
+            self._lines.append(DiffLine(DiffKind.Removed, a[i]));
+            i = i + 1;
+        }
+        while (j < m) {
+            self._lines.append(DiffLine(DiffKind.Added, b[j]));
+            j = j + 1;
+        }
+    }
+
+    pub fn measure(min_w: float, max_w: float, min_h: float, max_h: float): comp.Size {
+        self.rebuild();
+        var w: float = 220.0;
+        var max_tw: float = 0.0;
+        iter (ln in self._lines) {
+            var tw = tm.text_width(textshape.prepare_display(ln.text), self.font_scale);
+            if (tw > max_tw) { max_tw = tw; }
+        }
+        w = max_tw + 34.0;
+        var h: float = (len(self._lines) as float) * self.row_h() + 16.0;
+        if (len(self._lines) == 0) { h = 40.0; }
+        if (w < min_w) { w = min_w; }
+        if (w > max_w) { w = max_w; }
+        if (h < min_h) { h = min_h; }
+        if (h > max_h) { h = max_h; }
+        return comp.Size(w=w, h=h);
+    }
+
+    pub fn paint(): nil {
+        self.rebuild();
+        dl.dl_emit_rect_rounded(dl.paint_ctx.dl, self.rect.x, self.rect.y, self.rect.w, self.rect.h,
+            4.0, self.surface.r, self.surface.g, self.surface.b, self.surface.a);
+        dl.dl_push_clip(dl.paint_ctx.dl, self.rect.x, self.rect.y, self.rect.w, self.rect.h);
+        var rh = self.row_h();
+        var y = self.rect.y + 8.0;
+        iter (ln in self._lines) {
+            var fg = self.context_color;
+            var bg = self.surface;
+            var mark = " ";
+            if (ln.kind == DiffKind.Removed) {
+                fg = self.removed_color;
+                bg = self.removed_bg;
+                mark = "-";
+            } elif (ln.kind == DiffKind.Added) {
+                fg = self.added_color;
+                bg = self.added_bg;
+                mark = "+";
+            }
+            dl.dl_emit_rect(dl.paint_ctx.dl, self.rect.x + 2.0, y, self.rect.w - 4.0, rh - 2.0,
+                bg.r, bg.g, bg.b, bg.a);
+            dl.dl_emit_text(dl.paint_ctx.dl, mark,
+                self.rect.x + 8.0, y + 2.0,
+                fg.r, fg.g, fg.b, 0.9, self.font_scale);
+            dl.dl_emit_text(dl.paint_ctx.dl, textshape.prepare_display(ln.text),
+                self.rect.x + 24.0, y + 2.0,
+                fg.r, fg.g, fg.b, 1.0, self.font_scale);
+            y = y + rh;
+        }
+        dl.dl_pop_clip(dl.paint_ctx.dl);
+    }
+
+    pub fn on_event(t: events.EventType, x: int, y: int, key: int): uievent.EventResult {
+        return uievent.EventResult.Ignored;
+    }
+}
+
+pub fn diff(old_t: str, new_t: str): Diff {
+    return Diff(old_t, new_t);
+}

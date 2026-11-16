@@ -1,0 +1,136 @@
+// std/ui/widgets/timeline.lm
+// Widget — ported from legacy Fluent Timeline.
+// Vertical list of child components, each prefixed with an accent dot.
+// Children are [comp.Component]; measure/arrange stack them top-down.
+
+import std.ui.component as comp;
+import std.ui.component show Placed;
+import std.ui.types as ui_types;
+import std.ui.event as uievent;
+import std.ui.context as uictx;
+import std.ui.draw_list as dl;
+import std.ui.state as state;
+import std.ui.tree as tree;
+import std.events as events;
+import std.color as color;
+import std.ui.theme as uitheme;
+import std.text.controller as text_ctrl;
+import std.text.shaping as textshape;
+import std.ui.text_metrics as tm;
+
+frame Timeline {
+    embed Placed;
+    pub var children: [comp.Component];
+    pub var spacing: float;
+    pub var accent: color.Color;
+    // Scratch fields — AOT clobbers float locals across trait calls.
+    pub var _cur: float = 0.0;
+    pub var _cw: float = 0.0;
+    pub var _ch: float = 0.0;
+
+    pub init() {
+        val pal = uitheme.palette();
+        self.children = [];
+        self.spacing = 8.0;
+        self.accent = pal.accent;
+        self.id = comp.next_widget_id();
+    }
+
+    pub fn add(c: comp.Component): nil {
+        self.children.append(c);
+    }
+
+    pub fn kind(): ui_types.WidgetKind { return ui_types.WidgetKind.Timeline; }
+    pub fn on_theme_changed(): nil {
+        val p = uitheme.palette();
+        self.accent = p.accent;
+        tree.request_repaint();
+    }
+    pub fn on_overlay_dismiss(): nil { }
+
+    pub fn child_count(): int {
+        return len(self.children);
+    }
+
+    pub fn child_at(i: int): any {
+        if (i < 0 or i >= len(self.children)) {
+            return nil;
+        }
+        return self.children[i];
+    }
+
+    pub fn wants_pointer_capture(): int { return 0; }
+
+    pub fn measure(min_w: float, max_w: float, min_h: float, max_h: float): comp.Size {
+        self._cur = 0.0;
+        self._cw = 0.0;
+        var i = 0;
+        while (i < len(self.children)) {
+            val s = self.children[i].measure(0.0, comp.MEASURE_LOOSE, 0.0, comp.MEASURE_LOOSE);
+            if (s.w > self._cw) { self._cw = s.w; }
+            self._cur = self._cur + s.h + self.spacing;
+            i = i + 1;
+        }
+        if (len(self.children) > 0) { self._cur = self._cur - self.spacing; }
+        var w: float = self._cw + 22.0;
+        var h: float = self._cur + 0.0;
+        if (w < min_w) { w = min_w; }
+        if (w > max_w) { w = max_w; }
+        if (h < min_h) { h = min_h; }
+        if (h > max_h) { h = max_h; }
+        return comp.Size(w=w, h=h);
+    }
+
+    pub fn arrange(x: float, y: float, w: float, h: float): nil {
+        self.rect.x = x;
+        self.rect.y = y;
+        self.rect.w = w;
+        self.rect.h = h;
+        self._cur = 0.0;
+        var i = 0;
+        while (i < len(self.children)) {
+            val c = self.children[i];
+            val s = c.measure(0.0, w - 22.0, 0.0, comp.MEASURE_LOOSE);
+            // Dot position is recomputed in paint from child bounds —
+            // arrange only needs the child's rect.
+            c.arrange(x + 22.0, y + self._cur, w - 22.0, s.h);
+            self._cur = self._cur + s.h + self.spacing;
+            i = i + 1;
+        }
+    }
+
+    pub fn paint(): nil {
+        var i = 0;
+        while (i < len(self.children)) {
+            val c = self.children[i];
+            val r = c.bounds();
+            dl.dl_emit_rect_rounded(dl.paint_ctx.dl, r.x - 18.0, r.y + 4.0, 10.0, 10.0,
+                5.0, self.accent.r, self.accent.g, self.accent.b, 1.0);
+            c.paint();
+            i = i + 1;
+        }
+    }
+
+    pub fn on_event(t: events.EventType, x: int, y: int, key: int): uievent.EventResult {
+        var i = len(self.children) - 1;
+        while (i >= 0) {
+            val c = self.children[i];
+            var inside: bool = true;
+            if (t != events.EventType.MouseMove and t != events.EventType.MouseUp and t != events.EventType.MouseWheel) {
+                inside = c.bounds().contains(x as float, y as float);
+            }
+            if (inside) {
+                val res = c.on_event(t, x, y, key);
+                if (res == uievent.EventResult.Handled) {
+                    return uievent.EventResult.Handled;
+                }
+            }
+            i = i - 1;
+        }
+        return uievent.EventResult.Ignored;
+    }
+}
+
+pub fn timeline(): Timeline {
+    return Timeline();
+}

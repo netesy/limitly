@@ -1,0 +1,252 @@
+// std/ui/widgets/table.lm
+// Widget — ported from legacy Fluent Table.
+// Header row + grid of child Components. rows is a list of rows, each a
+// list of [comp.Component] cells (nil cells render empty). Column widths are
+// equal shares of the arranged width, matching the legacy emit.
+
+import std.ui.component as comp;
+import std.ui.component show Placed;
+import std.ui.types as ui_types;
+import std.ui.event as uievent;
+import std.ui.context as uictx;
+import std.ui.draw_list as dl;
+import std.ui.state as state;
+import std.ui.tree as tree;
+import std.events as events;
+import std.color as color;
+import std.ui.theme as uitheme;
+import std.text.controller as text_ctrl;
+import std.text.shaping as textshape;
+import std.ui.text_metrics as tm;
+
+frame Table {
+    embed Placed;
+    pub var headers: [str];
+    pub var rows: [[comp.Component]];
+    pub var surface: color.Color;
+    pub var header_bg: color.Color;
+    pub var border: color.Color;
+    pub var text: color.Color;
+    pub var font_scale: float;
+    pub var row_h: float;
+    pub var header_h: float;
+    // Scratch — AOT float-local clobbering across trait calls.
+    pub var _cur: float = 0.0;
+    pub var _cw: float = 0.0;
+    pub var _ch: float = 0.0;
+
+    pub init(hdrs: [str], row_data: [[any]]) {
+        val pal = uitheme.palette();
+        self.headers = hdrs;
+        self.rows = [];
+        var ri = 0;
+        while (ri < len(row_data)) {
+            var cells: [comp.Component] = [];
+            var row = row_data[ri];
+            var ci = 0;
+            while (ci < len(row)) {
+                var cell = row[ci];
+                if (cell != nil) {
+                    cells.append(cell as comp.Component);
+                } else {
+                    cells.append(nil);
+                }
+                ci = ci + 1;
+            }
+            self.rows.append(cells);
+            ri = ri + 1;
+        }
+        self.surface = pal.background;
+        self.header_bg = pal.surface;
+        self.border = pal.border;
+        self.text = pal.text_primary;
+        self.font_scale = 1.0;
+        self.row_h = 28.0;
+        self.header_h = 28.0;
+        self.id = comp.next_widget_id();
+    }
+
+    pub fn kind(): ui_types.WidgetKind { return ui_types.WidgetKind.Table; }
+    pub fn on_theme_changed(): nil {
+        val p = uitheme.palette();
+        self.surface = p.background;
+        self.header_bg = p.surface;
+        self.border = p.border;
+        self.text = p.text_primary;
+        tree.request_repaint();
+    }
+    pub fn on_overlay_dismiss(): nil { }
+
+    pub fn add_row(cells: [any]): nil {
+        var converted: [comp.Component] = [];
+        var i = 0;
+        while (i < len(cells)) {
+            var cell = cells[i];
+            if (cell != nil) {
+                converted.append(cell as comp.Component);
+            } else {
+                converted.append(nil);
+            }
+            i = i + 1;
+        }
+        self.rows.append(converted);
+    }
+
+    fn col_count(): int {
+        if (len(self.headers) > 0) { return len(self.headers); }
+        if (len(self.rows) > 0) { return len(self.rows[0]); }
+        return 0;
+    }
+
+    pub fn child_count(): int {
+        // Flattened count for tree walks (find_widget).
+        var n: int = 0;
+        var r = 0;
+        while (r < len(self.rows)) {
+            n = n + len(self.rows[r]);
+            r = r + 1;
+        }
+        return n;
+    }
+
+    pub fn child_at(i: int): any {
+        var n: int = 0;
+        var r = 0;
+        while (r < len(self.rows)) {
+            var c = 0;
+            while (c < len(self.rows[r])) {
+                if (n == i) { return self.rows[r][c]; }
+                n = n + 1;
+                c = c + 1;
+            }
+            r = r + 1;
+        }
+        return nil;
+    }
+
+    pub fn wants_pointer_capture(): int { return 0; }
+
+    pub fn measure(min_w: float, max_w: float, min_h: float, max_h: float): comp.Size {
+        var nc = self.col_count();
+        var w: float = (nc as float) * 100.0;
+        var h: float = self.header_h + (len(self.rows) as float) * self.row_h;
+        if (len(self.rows) == 0 and nc > 0) { h = self.header_h; }
+        if (w < min_w) { w = min_w; }
+        if (w > max_w) { w = max_w; }
+        if (h < min_h) { h = min_h; }
+        if (h > max_h) { h = max_h; }
+        return comp.Size(w=w, h=h);
+    }
+
+    pub fn arrange(x: float, y: float, w: float, h: float): nil {
+        self.rect.x = x;
+        self.rect.y = y;
+        self.rect.w = w;
+        self.rect.h = h;
+        var nc = self.col_count();
+        if (nc <= 0) { return; }
+        self._cw = w / (nc as float);
+        // Header cells are not Components — only data rows arrange.
+        self._cur = y + self.header_h;
+        var r = 0;
+        while (r < len(self.rows)) {
+            var c = 0;
+            while (c < len(self.rows[r])) {
+                if (self.rows[r][c] != nil) {
+                    (self.rows[r][c] as comp.Component).arrange(
+                        x + (c as float) * self._cw + 6.0, self._cur + 2.0,
+                        self._cw - 12.0, self.row_h - 4.0);
+                }
+                c = c + 1;
+            }
+            self._cur = self._cur + self.row_h;
+            r = r + 1;
+        }
+    }
+
+    pub fn paint(): nil {
+        var nc = self.col_count();
+        if (nc <= 0) { return; }
+        // Header band.
+        dl.dl_emit_rect(dl.paint_ctx.dl, self.rect.x, self.rect.y, self.rect.w, self.header_h,
+            self.header_bg.r, self.header_bg.g, self.header_bg.b, 1.0);
+        var i = 0;
+        while (i < nc) {
+            var hx = self.rect.x + (i as float) * self._cw;
+            if (i < len(self.headers)) {
+                dl.dl_emit_text(dl.paint_ctx.dl, textshape.prepare_display(self.headers[i]),
+                    hx + 8.0, self.rect.y + (self.header_h - tm.line_height(self.font_scale)) / 2.0,
+                    self.text.r, self.text.g, self.text.b, 1.0, self.font_scale);
+            }
+            i = i + 1;
+        }
+        // Row separators.
+        var ry = self.rect.y + self.header_h;
+        var r = 0;
+        while (r <= len(self.rows)) {
+            dl.dl_emit_rect(dl.paint_ctx.dl, self.rect.x, ry, self.rect.w, 1.0,
+                self.border.r, self.border.g, self.border.b, 0.6);
+            ry = ry + self.row_h;
+            r = r + 1;
+        }
+        // Cells.
+        r = 0;
+        while (r < len(self.rows)) {
+            var c = 0;
+            while (c < len(self.rows[r])) {
+                if (self.rows[r][c] != nil) {
+                    (self.rows[r][c] as comp.Component).paint();
+                }
+                c = c + 1;
+            }
+            r = r + 1;
+        }
+    }
+
+    pub fn on_event(t: events.EventType, x: int, y: int, key: int): uievent.EventResult {
+        var i = len(self.rows) - 1;
+        while (i >= 0) {
+            var j = 0;
+            while (j < len(self.rows[i])) {
+                if (self.rows[i][j] != nil) {
+                    val cell = self.rows[i][j] as comp.Component;
+                    var inside: bool = true;
+                    if (t != events.EventType.MouseMove and t != events.EventType.MouseUp and t != events.EventType.MouseWheel) {
+                        inside = cell.bounds().contains(x as float, y as float);
+                    }
+                    if (inside) {
+                        val res = cell.on_event(t, x, y, key);
+                        if (res == uievent.EventResult.Handled) {
+                            return uievent.EventResult.Handled;
+                        }
+                    }
+                }
+                j = j + 1;
+            }
+            i = i - 1;
+        }
+        return uievent.EventResult.Ignored;
+    }
+}
+
+pub fn table(hdrs: [str], row_data: [[any]]): Table {
+    return Table(hdrs, row_data);
+}
+
+// String-grid convenience: wraps each cell in a Label. Use table() when
+// cells need to be interactive Components.
+pub fn table_text(hdrs: [str], row_data: [[str]]): Table {
+    var rows: [[any]] = [];
+    var r = 0;
+    while (r < len(row_data)) {
+        var cells: [any] = [];
+        var c = 0;
+        while (c < len(row_data[r])) {
+            cells.append(comp.label(row_data[r][c]));
+            c = c + 1;
+        }
+        rows.append(cells);
+        r = r + 1;
+    }
+    return Table(hdrs, rows);
+}

@@ -1,0 +1,125 @@
+// std/ui/containers/overlay.lm
+// Container — positions a single child at an absolute offset inside
+// (or outside) the component's own rect. Port of the legacy Fluent
+// `overlay` container. ow/oh <= 0 means "child's measured size".
+
+import std.ui.component as comp;
+import std.ui.component show Placed;
+import std.ui.types as ui_types;
+import std.ui.event as uievent;
+import std.ui.context as uictx;
+import std.ui.draw_list as dl;
+import std.ui.state as state;
+import std.ui.tree as tree;
+import std.events as events;
+import std.color as color;
+
+frame Overlay {
+    embed Placed;
+    pub var child: comp.Component?;
+    pub var ox: float;
+    pub var oy: float;
+    pub var ow: float;
+    pub var oh: float;
+    // Scratch — AOT float-local clobbering across trait calls.
+    pub var _cw: float = 0.0;
+    pub var _ch: float = 0.0;
+
+    pub init(c: any = nil, x: float = 0.0, y: float = 0.0, w: float = 0.0, h: float = 0.0) {
+        self.child = nil;
+        if (c != nil) {
+            self.child = c as comp.Component;
+        }
+        self.ox = x;
+        self.oy = y;
+        self.ow = w;
+        self.oh = h;
+        self.id = comp.next_widget_id();
+    }
+
+    pub fn set_child(c: comp.Component): nil {
+        self.child = c;
+    }
+
+    pub fn kind(): ui_types.WidgetKind { return ui_types.WidgetKind.Overlay; }
+    pub fn on_theme_changed(): nil { }
+    pub fn on_overlay_dismiss(): nil { }
+
+    pub fn child_count(): int {
+        if (self.child == nil) { return 0; }
+        return 1;
+    }
+
+    pub fn child_at(i: int): any {
+        if (i == 0 and self.child != nil) {
+            return self.child;
+        }
+        return nil;
+    }
+
+    fn child_w(): float {
+        if (self.child == nil) { return 0.0; }
+        self._cw = (self.child as comp.Component).measure(0.0, comp.MEASURE_LOOSE, 0.0, comp.MEASURE_LOOSE).w;
+        return self._cw;
+    }
+
+    fn child_h(): float {
+        if (self.child == nil) { return 0.0; }
+        self._ch = (self.child as comp.Component).measure(0.0, comp.MEASURE_LOOSE, 0.0, comp.MEASURE_LOOSE).h;
+        return self._ch;
+    }
+
+    pub fn wants_pointer_capture(): int { return 0; }
+
+    pub fn measure(min_w: float, max_w: float, min_h: float, max_h: float): comp.Size {
+        var w: float = self.ow;
+        var h: float = self.oh;
+        if (w <= 0.0) { w = self.child_w(); }
+        if (h <= 0.0) { h = self.child_h(); }
+        if (w < min_w) { w = min_w; }
+        if (w > max_w) { w = max_w; }
+        if (h < min_h) { h = min_h; }
+        if (h > max_h) { h = max_h; }
+        return comp.Size(w=w, h=h);
+    }
+
+    pub fn arrange(x: float, y: float, w: float, h: float): nil {
+        self.rect.x = x;
+        self.rect.y = y;
+        self.rect.w = w;
+        self.rect.h = h;
+        if (self.child != nil) {
+            var cw: float = self.ow;
+            var ch: float = self.oh;
+            if (cw <= 0.0) { cw = self.child_w(); }
+            if (ch <= 0.0) { ch = self.child_h(); }
+            (self.child as comp.Component).arrange(x + self.ox, y + self.oy, cw, ch);
+        }
+    }
+
+    pub fn paint(): nil {
+        if (self.child != nil) {
+            (self.child as comp.Component).paint();
+        }
+    }
+
+    pub fn on_event(t: events.EventType, x: int, y: int, key: int): uievent.EventResult {
+        if (self.child != nil) {
+            var inside: bool = true;
+            if (t != events.EventType.MouseMove and t != events.EventType.MouseUp and t != events.EventType.MouseWheel) {
+                inside = (self.child as comp.Component).bounds().contains(x as float, y as float);
+            }
+            if (inside) {
+                val res = (self.child as comp.Component).on_event(t, x, y, key);
+                if (res == uievent.EventResult.Handled) {
+                    return uievent.EventResult.Handled;
+                }
+            }
+        }
+        return uievent.EventResult.Ignored;
+    }
+}
+
+pub fn overlay(c: any = nil, x: float = 0.0, y: float = 0.0, w: float = 0.0, h: float = 0.0): Overlay {
+    return Overlay(c, x, y, w, h);
+}

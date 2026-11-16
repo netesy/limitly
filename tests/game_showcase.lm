@@ -13,6 +13,7 @@
 //   * Tab bars, collapsible tree nodes, scroll areas
 //   * Modal popups and tooltips
 
+import std.app as app;
 import std.game as game;
 import std.theme as theme;
 import std.color as color;
@@ -75,7 +76,7 @@ fn main(): int {
     ];
 
     // ── std.d3 Scene: ship, asteroids & projectiles ──────────────────────────
-    // Built BEFORE app.setup() so the window only appears once every mesh,
+    // Built BEFORE g.setup() so the window only appears once every mesh,
     // material and buffer exists — otherwise the visible-but-empty window
     // shows a black framebuffer for the whole init + first shader compile.
     // World units are screen pixels on the Z=0 plane (x right, y down); an
@@ -177,13 +178,11 @@ fn main(): int {
         proj_pool.append(bolt);
     }
 
-    var app = game.Game(cfg);
-    if (not app.setup()) {
-        print("Error: Failed to initialize graphics context & game runner.");
-        return 1;
-    }
+    var g = game.Game(cfg);
+    var a = app.App(cfg.title, cfg.width, cfg.height);
+    a.open();
 
-    app.gui.set_theme(theme.cyberpunk_theme());
+    g.gui.set_theme(theme.cyberpunk_theme());
 
     // ── Game State ─────────────────────────────────────────────────────────────
     var ship_x = 400.0;
@@ -230,12 +229,13 @@ fn main(): int {
 
     print("Running interactive game showcase loop...");
 
-    while (app.is_running) {
-        app.begin_frame();
+    while (a.is_running()) {
+        a.pump();
+        g.poll();
         sim_tick = sim_tick + 1;
 
-        var sw = app.width as float;
-        var sh = app.height as float;
+        var sw = g.width as float;
+        var sh = g.height as float;
 
         // ── Responsive Docked Panel Coordinates ─────────────────────────────
         var hud_w = 260.0;
@@ -249,10 +249,10 @@ fn main(): int {
         if (ops_x < hud_w + 32.0) { ops_x = hud_w + 32.0; }
 
         // ── Interactive Flight Controls & Physics ──────────────────────────────
-        if (app.input.is_key_down(game.KEY_A) or app.input.is_key_down(game.KEY_LEFT)) {
+        if (g.input.is_key_down(game.KEY_A) or g.input.is_key_down(game.KEY_LEFT)) {
             ship_angle = ship_angle - 0.055;
         }
-        if (app.input.is_key_down(game.KEY_D) or app.input.is_key_down(game.KEY_RIGHT)) {
+        if (g.input.is_key_down(game.KEY_D) or g.input.is_key_down(game.KEY_RIGHT)) {
             ship_angle = ship_angle + 0.055;
         }
 
@@ -261,12 +261,12 @@ fn main(): int {
         if (thrust < 0.2) { thrust = 0.2; }
         if (warp_drive) { thrust = thrust * 1.75; }
 
-        if (app.input.is_key_down(game.KEY_W) or app.input.is_key_down(game.KEY_UP)) {
+        if (g.input.is_key_down(game.KEY_W) or g.input.is_key_down(game.KEY_UP)) {
             is_thrusting = true;
             ship_vx = ship_vx + math.sin(ship_angle) * thrust;
             ship_vy = ship_vy - math.cos(ship_angle) * thrust;
         }
-        if (app.input.is_key_down(game.KEY_S) or app.input.is_key_down(game.KEY_DOWN)) {
+        if (g.input.is_key_down(game.KEY_S) or g.input.is_key_down(game.KEY_DOWN)) {
             ship_vx = ship_vx * 0.88;
             ship_vy = ship_vy * 0.88;
         }
@@ -287,10 +287,10 @@ fn main(): int {
         }
 
         // Fire projectile via Space or clicking space outside windows
-        var want_fire = app.input.is_key_pressed(game.KEY_SPACE);
-        if (app.input.is_mouse_pressed(0)) {
-            var mx = app.input.mouse_x;
-            var my = app.input.mouse_y;
+        var want_fire = g.input.is_key_pressed(game.KEY_SPACE);
+        if (g.input.is_mouse_pressed(0)) {
+            var mx = g.input.mouse_x;
+            var my = g.input.mouse_y;
             var over_hud = (mx >= 16.0 and mx <= 16.0 + hud_w and my >= 16.0 and my <= 16.0 + hud_h);
             var over_ops = (mx >= ops_x and mx <= ops_x + ops_w and my >= 16.0 and my <= 16.0 + ops_h);
             if (not over_hud and not over_ops) {
@@ -452,15 +452,17 @@ fn main(): int {
 
         // Keep the 3D scene clear in sync with the active theme background
         // so theme switches repaint the window backdrop immediately.
-        scene.background_r = app.gui.theme.bg_window.r;
-        scene.background_g = app.gui.theme.bg_window.g;
-        scene.background_b = app.gui.theme.bg_window.b;
-        scene.background_a = app.gui.theme.bg_window.a;
+        scene.background_r = g.gui.theme.bg_window.r;
+        scene.background_g = g.gui.theme.bg_window.g;
+        scene.background_b = g.gui.theme.bg_window.b;
+        scene.background_a = g.gui.theme.bg_window.a;
 
         // ── Render 3D Scene, then 2D chrome overlays ───────────────────────────
-        if (app.width != cam_w or app.height != cam_h) {
-            cam_w = app.width;
-            cam_h = app.height;
+        a.begin_pass();
+        g.imgui_begin();
+        if (g.width != cam_w or g.height != cam_h) {
+            cam_w = g.width;
+            cam_h = g.height;
             cam.ortho_left = 0.0;
             cam.ortho_right = cam_w as float;
             cam.ortho_top = 0.0;
@@ -468,7 +470,7 @@ fn main(): int {
             cam.update_projection_matrix();
             renderer3d.set_size(cam_w, cam_h);
         }
-        renderer3d.render(scene, cam, 0.0, 0.0, app.width as float, app.height as float);
+        renderer3d.render(scene, cam, 0.0, 0.0, g.width as float, g.height as float);
 
         // Ambient space grid drawn over the 3D scene (2D overlay)
         var gx = 32.0;
@@ -487,147 +489,147 @@ fn main(): int {
         gg.draw_text("[W,A,S,D] Fly | [SPACE/Click] Fire", sw * 0.5 - 110.0, 30.0, 0.55, 0.65, 0.8, 0.85, 1);
 
         // ── Window 1: Starship Command HUD (Docked Left) ──────────────────────
-        if (app.gui.begin_window("Starship Command HUD", 16.0, 16.0, hud_w, hud_h)) {
-            app.gui.begin_tab_bar("hud_tabs");
-            if (app.gui.tab_item("Vessel HUD", hud_tab_idx == 0)) {
+        if (g.gui.begin_window("Starship Command HUD", 16.0, 16.0, hud_w, hud_h)) {
+            g.gui.begin_tab_bar("hud_tabs");
+            if (g.gui.tab_item("Vessel HUD", hud_tab_idx == 0)) {
                 hud_tab_idx = 0;
             }
-            if (app.gui.tab_item("Theme Studio", hud_tab_idx == 1)) {
+            if (g.gui.tab_item("Theme Studio", hud_tab_idx == 1)) {
                 hud_tab_idx = 1;
             }
-            app.gui.end_tab_bar();
+            g.gui.end_tab_bar();
 
             var bar_w = hud_w - 24.0;
 
             if (hud_tab_idx == 0) {
-                app.gui.label("VESSEL STATUS");
-                app.gui.label("Hull Integrity");
-                app.gui.progress_bar(health / 100.0, bar_w, 14.0, "{health as int}%");
+                g.gui.label("VESSEL STATUS");
+                g.gui.label("Hull Integrity");
+                g.gui.progress_bar(health / 100.0, bar_w, 14.0, "{health as int}%");
 
-                app.gui.label("Energy Shields");
-                app.gui.progress_bar(shield / 100.0, bar_w, 14.0, "{shield as int}%");
+                g.gui.label("Energy Shields");
+                g.gui.progress_bar(shield / 100.0, bar_w, 14.0, "{shield as int}%");
 
-                app.gui.label("Reactor Output");
-                app.gui.progress_bar(energy / 100.0, bar_w, 14.0, "{energy as int}%");
+                g.gui.label("Reactor Output");
+                g.gui.progress_bar(energy / 100.0, bar_w, 14.0, "{energy as int}%");
 
-                app.gui.separator();
-                app.gui.label("ARMAMENT & PROPULSION");
-                selected_weapon = app.gui.combo_box("Active Weapon", weapons, selected_weapon);
-                ship_speed = app.gui.slider("Sublight Speed", ship_speed, 0.0, 10.0);
-                level = app.gui.stepper_int("Pilot Rank", level, 1, 1, 50);
+                g.gui.separator();
+                g.gui.label("ARMAMENT & PROPULSION");
+                selected_weapon = g.gui.combo_box("Active Weapon", weapons, selected_weapon);
+                ship_speed = g.gui.slider("Sublight Speed", ship_speed, 0.0, 10.0);
+                level = g.gui.stepper_int("Pilot Rank", level, 1, 1, 50);
 
-                app.gui.separator();
-                app.gui.label("SYSTEM OVERRIDES");
-                god_mode = app.gui.checkbox("Invulnerability Field", god_mode);
-                warp_drive = app.gui.toggle("Warp Drive", warp_drive);
+                g.gui.separator();
+                g.gui.label("SYSTEM OVERRIDES");
+                god_mode = g.gui.checkbox("Invulnerability Field", god_mode);
+                warp_drive = g.gui.toggle("Warp Drive", warp_drive);
 
-                app.gui.separator();
-                if (app.gui.button_colored("ENGAGE HYPERDRIVE", color.hex(0xff0055, 1.0), bar_w, 28.0)) {
+                g.gui.separator();
+                if (g.gui.button_colored("ENGAGE HYPERDRIVE", color.hex(0xff0055, 1.0), bar_w, 28.0)) {
                     log_messages.append("[Hyperdrive] Micro-jump sequence initiated!");
                 }
             } else {
-                app.gui.label("PRESET UI THEMES");
-                if (app.gui.radio_button("Cyberpunk Neon", active_theme_idx == 0)) {
+                g.gui.label("PRESET UI THEMES");
+                if (g.gui.radio_button("Cyberpunk Neon", active_theme_idx == 0)) {
                     active_theme_idx = 0;
-                    app.gui.set_theme(theme.cyberpunk_theme());
+                    g.gui.set_theme(theme.cyberpunk_theme());
                 }
-                if (app.gui.radio_button("Dark Obsidian", active_theme_idx == 1)) {
+                if (g.gui.radio_button("Dark Obsidian", active_theme_idx == 1)) {
                     active_theme_idx = 1;
-                    app.gui.set_theme(theme.dark_theme());
+                    g.gui.set_theme(theme.dark_theme());
                 }
-                if (app.gui.radio_button("Clean Studio (Light)", active_theme_idx == 2)) {
+                if (g.gui.radio_button("Clean Studio (Light)", active_theme_idx == 2)) {
                     active_theme_idx = 2;
-                    app.gui.set_theme(theme.light_theme());
+                    g.gui.set_theme(theme.light_theme());
                 }
-                if (app.gui.radio_button("Classic 90s Retro", active_theme_idx == 3)) {
+                if (g.gui.radio_button("Classic 90s Retro", active_theme_idx == 3)) {
                     active_theme_idx = 3;
-                    app.gui.set_theme(theme.retro_theme());
+                    g.gui.set_theme(theme.retro_theme());
                 }
-                if (app.gui.radio_button("Nord Frost", active_theme_idx == 4)) {
+                if (g.gui.radio_button("Nord Frost", active_theme_idx == 4)) {
                     active_theme_idx = 4;
-                    app.gui.set_theme(theme.nord_theme());
+                    g.gui.set_theme(theme.nord_theme());
                 }
 
-                app.gui.separator();
-                ship_color = app.gui.color_picker("Hull Paint", ship_color);
+                g.gui.separator();
+                ship_color = g.gui.color_picker("Hull Paint", ship_color);
 
-                app.gui.separator();
-                app.gui.label("DISPLAY RESOLUTION");
+                g.gui.separator();
+                g.gui.label("DISPLAY RESOLUTION");
                 var rbtn_w = (bar_w - 8.0) * 0.5;
-                if (app.gui.button("800 x 600", rbtn_w, 24.0)) {
-                    app.set_resolution(800, 600);
+                if (g.gui.button("800 x 600", rbtn_w, 24.0)) {
+                    g.set_resolution(800, 600);
                 }
-                app.gui.same_line();
-                if (app.gui.button("1024 x 720", rbtn_w, 24.0)) {
-                    app.set_resolution(1024, 720);
+                g.gui.same_line();
+                if (g.gui.button("1024 x 720", rbtn_w, 24.0)) {
+                    g.set_resolution(1024, 720);
                 }
-                if (app.gui.button("1280 x 720", rbtn_w, 24.0)) {
-                    app.set_resolution(1280, 720);
+                if (g.gui.button("1280 x 720", rbtn_w, 24.0)) {
+                    g.set_resolution(1280, 720);
                 }
-                app.gui.same_line();
-                if (app.gui.button("1920 x 1080", rbtn_w, 24.0)) {
-                    app.set_resolution(1920, 1080);
+                g.gui.same_line();
+                if (g.gui.button("1920 x 1080", rbtn_w, 24.0)) {
+                    g.set_resolution(1920, 1080);
                 }
             }
 
-            app.gui.end_window();
+            g.gui.end_window();
         }
 
         // ── Window 2: Operations & Diagnostics (Docked Right) ─────────────────
-        if (app.gui.begin_window("Flight Operations", ops_x, 16.0, ops_w, ops_h)) {
-            app.gui.begin_tab_bar("ops_tabs");
-            if (app.gui.tab_item("Telemetry", ops_tab_idx == 0)) {
+        if (g.gui.begin_window("Flight Operations", ops_x, 16.0, ops_w, ops_h)) {
+            g.gui.begin_tab_bar("ops_tabs");
+            if (g.gui.tab_item("Telemetry", ops_tab_idx == 0)) {
                 ops_tab_idx = 0;
             }
-            if (app.gui.tab_item("Flight Log", ops_tab_idx == 1)) {
+            if (g.gui.tab_item("Flight Log", ops_tab_idx == 1)) {
                 ops_tab_idx = 1;
             }
-            app.gui.end_tab_bar();
+            g.gui.end_tab_bar();
 
             var plot_w = ops_w - 24.0;
 
             if (ops_tab_idx == 0) {
-                app.gui.label("REAL-TIME METRICS");
-                app.gui.plot_lines("FPS", fps_data, 45.0, 75.0, plot_w, 42.0);
-                app.gui.plot_histogram("Frame Latency (ms)", frame_times, 0.0, 30.0, plot_w, 36.0);
+                g.gui.label("REAL-TIME METRICS");
+                g.gui.plot_lines("FPS", fps_data, 45.0, 75.0, plot_w, 42.0);
+                g.gui.plot_histogram("Frame Latency (ms)", frame_times, 0.0, 30.0, plot_w, 36.0);
 
-                app.gui.separator();
-                app.gui.label("SCENE HIERARCHY");
-                if (app.gui.tree_node("Sector Entities (12)")) {
-                    app.gui.label("├─ PlayerCruiser [Active]");
-                    app.gui.label("├─ Waypoint Alpha");
-                    app.gui.label("├─ Asteroid Belt (4 bodies)");
-                    app.gui.label("└─ Space Station Outpost 7");
-                    app.gui.tree_pop();
+                g.gui.separator();
+                g.gui.label("SCENE HIERARCHY");
+                if (g.gui.tree_node("Sector Entities (12)")) {
+                    g.gui.label("├─ PlayerCruiser [Active]");
+                    g.gui.label("├─ Waypoint Alpha");
+                    g.gui.label("├─ Asteroid Belt (4 bodies)");
+                    g.gui.label("└─ Space Station Outpost 7");
+                    g.gui.tree_pop();
                 }
 
-                if (app.gui.tree_node("Lighting & Shaders")) {
-                    app.gui.label("├─ Ambient Pass: D3D11 / Metal");
-                    app.gui.label("├─ Subpixel TrueType Renderer");
-                    app.gui.label("└─ HDR Bloom: Active");
-                    app.gui.tree_pop();
+                if (g.gui.tree_node("Lighting & Shaders")) {
+                    g.gui.label("├─ Ambient Pass: D3D11 / Metal");
+                    g.gui.label("├─ Subpixel TrueType Renderer");
+                    g.gui.label("└─ HDR Bloom: Active");
+                    g.gui.tree_pop();
                 }
 
-                app.gui.separator();
-                if (app.gui.button("Trigger Emergency Alert", plot_w, 26.0)) {
-                    app.gui.open_popup("AlertModal");
+                g.gui.separator();
+                if (g.gui.button("Trigger Emergency Alert", plot_w, 26.0)) {
+                    g.gui.open_popup("AlertModal");
                 }
             } else {
-                app.gui.label("SYSTEM EVENT LOG");
+                g.gui.label("SYSTEM EVENT LOG");
                 var log_count = len(log_messages);
                 var content_h = (log_count as float) * 18.0;
                 var scroll_h = ops_h - 100.0;
                 if (scroll_h < 120.0) { scroll_h = 120.0; }
-                app.gui.begin_scroll_area(plot_w, scroll_h, content_h);
+                g.gui.begin_scroll_area(plot_w, scroll_h, content_h);
                 var l_idx = 0;
                 while (l_idx < log_count) {
-                    app.gui.label(log_messages[l_idx]);
+                    g.gui.label(log_messages[l_idx]);
                     l_idx = l_idx + 1;
                 }
-                app.gui.end_scroll_area();
+                g.gui.end_scroll_area();
             }
 
-            app.gui.end_window();
+            g.gui.end_window();
         }
 
         // ── Modal Popup: Emergency Alert ───────────────────────────────────────
@@ -635,26 +637,27 @@ fn main(): int {
         var popup_h = 150.0;
         var popup_x = (sw - popup_w) * 0.5;
         var popup_y = (sh - popup_h) * 0.5;
-        if (app.gui.begin_popup("AlertModal", popup_x, popup_y, popup_w, popup_h)) {
-            app.gui.label("[WARN] SYSTEM ANOMALY DETECTED");
-            app.gui.label("Core temperature rising rapidly.");
-            app.gui.label("Initiate thermal purge?");
-            app.gui.spacing(8.0);
+        if (g.gui.begin_popup("AlertModal", popup_x, popup_y, popup_w, popup_h)) {
+            g.gui.label("[WARN] SYSTEM ANOMALY DETECTED");
+            g.gui.label("Core temperature rising rapidly.");
+            g.gui.label("Initiate thermal purge?");
+            g.gui.spacing(8.0);
 
-            if (app.gui.button_colored("PURGE CORE", color.hex(0xee2222, 1.0), 120.0, 26.0)) {
+            if (g.gui.button_colored("PURGE CORE", color.hex(0xee2222, 1.0), 120.0, 26.0)) {
                 log_messages.append("[Purge] Core flushed! Temp stabilized.");
-                app.gui.close_popup("AlertModal");
+                g.gui.close_popup("AlertModal");
             }
-            app.gui.same_line();
-            if (app.gui.button("Cancel", 120.0, 26.0)) {
-                app.gui.close_popup("AlertModal");
+            g.gui.same_line();
+            if (g.gui.button("Cancel", 120.0, 26.0)) {
+                g.gui.close_popup("AlertModal");
             }
-            app.gui.end_popup();
+            g.gui.end_popup();
         }
 
-        app.end_frame();
+        g.imgui_end();
+        a.end_pass();
     }
 
-    app.shutdown();
+    a.close();
     return 0;
 }

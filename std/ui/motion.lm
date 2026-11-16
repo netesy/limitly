@@ -1,0 +1,86 @@
+// std/ui/motion.lm
+// Minimal tween driver for widget animation. Widgets call
+// animate_to(id, prop, target, dur) when a visual state changes and read
+// value(id, prop, fallback) each paint — the returned float eases toward
+// the target. App.pump() ticks the registry (via ui_motion.tick); while any tween is
+// live it requests repaints so animation actually advances under elision.
+//
+// prop is an opaque per-widget slot (0=primary, 1=secondary, ...).
+// Everything is float math — no allocations on the hot path beyond the
+// small tween list itself.
+
+import std.ui.tree as tree;
+
+frame Tween {
+    pub var owner: int;
+    pub var prop: int;
+    pub var start_v: float;
+    pub var to: float;
+    pub var t: float;
+    pub var dur: float;
+}
+
+pub var tweens: [Tween] = [] as [Tween];
+
+fn ease_out(t: float): float {
+    // ease-out cubic
+    var u: float = 1.0 - t;
+    return 1.0 - u * u * u;
+}
+
+// Advance all tweens by dt seconds; request repaint while any are live.
+pub fn tick(dt: float): nil {
+    var live: int = 0;
+    var i: int = 0;
+    while (i < len(tweens)) {
+        tweens[i].t = tweens[i].t + dt;
+        if (tweens[i].t < tweens[i].dur) {
+            live = 1;
+        }
+        i = i + 1;
+    }
+    if (live != 0) {
+        tree.request_repaint();
+    } else {
+        tweens = [] as [Tween];
+    }
+}
+
+// Start (or retarget) a tween. `cur` is the value to start from — callers
+// pass value(id, prop, target) so retargets are seamless.
+pub fn animate_to(owner: int, prop: int, target: float, dur: float, cur: float): nil {
+    var i: int = 0;
+    while (i < len(tweens)) {
+        if (tweens[i].owner == owner and tweens[i].prop == prop) {
+            tweens[i].start_v = tweens[i].start_v + (tweens[i].to - tweens[i].start_v)
+                * ease_out(tweens[i].t / tweens[i].dur);
+            tweens[i].to = target;
+            tweens[i].t = 0.0;
+            tweens[i].dur = dur;
+            return;
+        }
+        i = i + 1;
+    }
+    var tw = Tween();
+    tw.owner = owner;
+    tw.prop = prop;
+    tw.start_v = cur;
+    tw.to = target;
+    tw.t = 0.0;
+    tw.dur = dur;
+    tweens.append(tw);
+}
+
+// Current eased value for (owner, prop); `fallback` when no tween exists.
+pub fn value(owner: int, prop: int, fallback: float): float {
+    var i: int = 0;
+    while (i < len(tweens)) {
+        if (tweens[i].owner == owner and tweens[i].prop == prop) {
+            var k: float = tweens[i].t / tweens[i].dur;
+            if (k > 1.0) { k = 1.0; }
+            return tweens[i].start_v + (tweens[i].to - tweens[i].start_v) * ease_out(k);
+        }
+        i = i + 1;
+    }
+    return fallback;
+}

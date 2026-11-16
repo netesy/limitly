@@ -1,0 +1,165 @@
+// std/ui/containers/tooltip.lm
+// Container — wraps a child and shows a label bubble while the
+// pointer hovers the child's bounds. Hover is tracked via MouseMove in
+// on_event; entering/leaving requests a repaint.
+
+import std.ui.component as comp;
+import std.ui.component show Placed;
+import std.ui.types as ui_types;
+import std.ui.event as uievent;
+import std.ui.context as uictx;
+import std.ui.draw_list as dl;
+import std.ui.state as state;
+import std.ui.tree as tree;
+import std.events as events;
+import std.color as color;
+import std.text.controller as text_ctrl;
+import std.text.shaping as textshape;
+import std.ui.text_metrics as tm;
+import std.ui.theme as uitheme;
+import std.graphics.shadow as shadow;
+
+frame Tooltip {
+    embed Placed;
+    pub var child: comp.Component?;
+    pub var label_text: str;
+    pub var hovered: int;
+    pub var bg: color.Color;
+    pub var border: color.Color;
+    pub var text: color.Color;
+    pub var font_scale: float;
+    pub var pad_x: float;
+    pub var pad_y: float;
+    // Theme snapshot + popup shadow — refreshed by on_theme_changed.
+    pub var _pal: uitheme.Palette?;
+    pub var _shadow: shadow.Shadow?;
+    // Scratch — AOT float-local clobbering across trait calls.
+    pub var _bw: float = 0.0;
+    pub var _bh: float = 0.0;
+
+    pub init(c: any = nil, lbl: str = "") {
+        self.child = nil;
+        if (c != nil) {
+            self.child = c as comp.Component;
+        }
+        self.label_text = lbl;
+        self.hovered = 0;
+        val pal = uitheme.palette();
+        self.bg = pal.surface_variant;
+        self.border = pal.border;
+        self.text = pal.text_primary;
+        self.font_scale = 0.85;
+        self.pad_x = 8.0;
+        self.pad_y = 4.0;
+        self._pal = pal;
+        self._shadow = uitheme.elevation_shadow(pal, 3);
+        self.id = comp.next_widget_id();
+    }
+
+    pub fn on_theme_changed(): nil {
+        self._pal = uitheme.palette();
+        val p = self._pal as uitheme.Palette;
+        self.bg = p.surface_variant;
+        self.border = p.border;
+        self.text = p.text_primary;
+        self._shadow = uitheme.elevation_shadow(p, 3);
+        tree.request_repaint();
+    }
+    pub fn on_overlay_dismiss(): nil { }
+
+    pub fn set_child(c: comp.Component): nil {
+        self.child = c;
+    }
+
+    pub fn set_label(s: str): nil {
+        self.label_text = s;
+    }
+
+    pub fn kind(): ui_types.WidgetKind { return ui_types.WidgetKind.Tooltip; }
+
+    pub fn child_count(): int {
+        if (self.child == nil) { return 0; }
+        return 1;
+    }
+
+    pub fn child_at(i: int): any {
+        if (i == 0 and self.child != nil) {
+            return self.child;
+        }
+        return nil;
+    }
+
+    pub fn wants_pointer_capture(): int { return 0; }
+
+    pub fn measure(min_w: float, max_w: float, min_h: float, max_h: float): comp.Size {
+        if (self.child == nil) {
+            return comp.Size(w=0.0, h=0.0);
+        }
+        return (self.child as comp.Component).measure(min_w, max_w, min_h, max_h);
+    }
+
+    pub fn arrange(x: float, y: float, w: float, h: float): nil {
+        self.rect.x = x;
+        self.rect.y = y;
+        self.rect.w = w;
+        self.rect.h = h;
+        if (self.child != nil) {
+            (self.child as comp.Component).arrange(x, y, w, h);
+        }
+    }
+
+    pub fn paint(): nil {
+        if (self.child != nil) {
+            (self.child as comp.Component).paint();
+        }
+        if (self.hovered != 0 and len(self.label_text) > 0) {
+            // Bubble above the child's rect, clamped inside the parent.
+            self._bw = tm.text_width(textshape.prepare_display(self.label_text), self.font_scale) + self.pad_x * 2.0;
+            self._bh = tm.line_height(self.font_scale) + self.pad_y * 2.0;
+            var bx: float = self.rect.x + (self.rect.w - self._bw) / 2.0;
+            var by: float = self.rect.y - self._bh - 4.0;
+            if (by < 0.0) { by = self.rect.y + self.rect.h + 4.0; }
+            if (self._shadow != nil) {
+                val s = self._shadow as shadow.Shadow;
+                dl.dl_emit_shadow(dl.paint_ctx.dl, bx, by, self._bw, self._bh,
+                    s.r, s.g, s.b, s.a, s.offset_x, s.offset_y, s.blur_radius, s.spread_radius);
+            }
+            dl.dl_emit_rect_rounded(dl.paint_ctx.dl, bx, by, self._bw, self._bh,
+                4.0, self.bg.r, self.bg.g, self.bg.b, self.bg.a);
+            dl.dl_emit_rect_border(dl.paint_ctx.dl, bx, by, self._bw, self._bh,
+                4.0, 1.0, self.border.r, self.border.g, self.border.b, 1.0);
+            dl.dl_emit_text(dl.paint_ctx.dl, textshape.prepare_display(self.label_text),
+                bx + self.pad_x, by + self.pad_y,
+                self.text.r, self.text.g, self.text.b, 1.0, self.font_scale);
+        }
+    }
+
+    pub fn on_event(t: events.EventType, x: int, y: int, key: int): uievent.EventResult {
+        var inside: bool = self.rect.contains(x as float, y as float);
+        if (t == events.EventType.MouseMove) {
+            var want: int = 0;
+            if (inside) { want = 1; }
+            if (want != self.hovered) {
+                self.hovered = want;
+                tree.request_repaint();
+            }
+        }
+        if (self.child != nil) {
+            var inside: bool = true;
+            if (t != events.EventType.MouseMove and t != events.EventType.MouseUp and t != events.EventType.MouseWheel) {
+                inside = (self.child as comp.Component).bounds().contains(x as float, y as float);
+            }
+            if (inside) {
+                val res = (self.child as comp.Component).on_event(t, x, y, key);
+                if (res == uievent.EventResult.Handled) {
+                    return uievent.EventResult.Handled;
+                }
+            }
+        }
+        return uievent.EventResult.Ignored;
+    }
+}
+
+pub fn tooltip(c: any = nil, lbl: str = ""): Tooltip {
+    return Tooltip(c, lbl);
+}

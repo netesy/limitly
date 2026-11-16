@@ -3,7 +3,7 @@
 // backend. Updated for the M2 scalar-signature trait (see component.lm).
 
 import std.gg as gg;
-import std.ui.component as v2;
+import std.ui.component as comp;
 import std.ui.draw_list as dl;
 import std.ui.replay as replay;
 import std.ui.event as uievent;
@@ -13,8 +13,8 @@ fn main() {
     print("=== UI Component Skeleton (M1) ===");
 
     // ── Measure under loose constraints ──
-    var lab = v2.Label("Hello");
-    var s = lab.measure(0.0, v2.MEASURE_LOOSE, 0.0, v2.MEASURE_LOOSE);
+    var lab = comp.Label("Hello");
+    var s = lab.measure(0.0, comp.MEASURE_LOOSE, 0.0, comp.MEASURE_LOOSE);
     assert(s.w > 0.0 and s.h > 0.0, "label should have positive intrinsic size");
     print("intrinsic size: w=" + (s.w as str) + " h=" + (s.h as str));
 

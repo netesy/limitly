@@ -18,23 +18,11 @@ fn main(): nil {
     dlist.dl_add(dl, dlist.dcmd_rect_rounded(10.0, 100.0, 120.0, 36.0, 8.0, 0.2, 0.6, 0.9, 1.0));
     dlist.dl_add(dl, dlist.dcmd_text("Button", 40.0, 112.0, 1.0, 1.0, 1.0, 1.0, 1.0));
 
-    // Add a hit zone
-    dlist.dl_add_hit(dl, dlist.make_button_zone("btn_ok", 10.0, 100.0, 120.0, 36.0, nil));
-
     print("Commands: {len(dl.cmds)}");
-    print("HitZones: {len(dl.hits)}");
-
-    // Hit test
-    var hz = dlist.dl_hit_test(dl, 60.0, 115.0);
-    if (hz.kind == dlist.HitZoneKind.Button) {
-        print("Hit: '{hz.id}' (button)");
-    } else {
-        print("No hit zone");
-    }
 
     // Replay to GPU for 3 frames
-    app.init();
-    app.show_window();
+    var a = app.App("DrawList Test", 800, 600);
+    a.open();
     var fn_idx = 0;
     while (fn_idx < 3) {
         gg.begin_pass(800, 600, 0.08, 0.08, 0.12, 1.0);
@@ -46,5 +34,5 @@ fn main(): nil {
     }
 
     print("Done. Replayed {fn_idx} frames with zero tree traversal.");
-    app.shutdown();
+    a.close();
 }

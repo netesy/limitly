@@ -1,0 +1,325 @@
+// std/ui/widgets/select.lm
+// Widget — ported from legacy Fluent Select (+ multi_select).
+// Closed: rounded box with selected label + chevron. Open: dropdown menu
+// painted below the box; menu item rects are cached in fields for
+// hit-testing (the menu may extend past the widget's arranged bounds —
+// on_event receives all pointer events, so manual hit-tests work).
+
+import std.ui.component as comp;
+import std.ui.component show Placed, TextBound;
+import std.ui.types as ui_types;
+import std.ui.event as uievent;
+import std.ui.context as uictx;
+import std.ui.draw_list as dl;
+import std.ui.state as state;
+import std.ui.tree as tree;
+import std.events as events;
+import std.color as color;
+import std.ui.theme as uitheme;
+import std.ui.motion as motion;
+import std.graphics.shadow as shadow;
+import std.text.controller as text_ctrl;
+import std.text.shaping as textshape;
+import std.ui.text_metrics as tm;
+
+frame Select {
+    embed Placed;
+    pub var options: [str];
+    pub var selected_idx: int;
+    pub var selected_sig: state.IntSignal?;
+    pub var is_open: int;
+    pub var hovered: int;
+    pub var hover_idx: int;
+    pub var is_multi: int;
+    pub var multi_sel: [int];
+    pub var surface: color.Color;
+    pub var border: color.Color;
+    pub var text: color.Color;
+    pub var text2: color.Color;
+    pub var accent: color.Color;
+    pub var font_scale: float;
+    pub var box_h: float;
+    pub var item_h: float;
+    // Scratch — AOT float-local clobbering across trait calls.
+    pub var _sx: float = 0.0;
+    pub var _sy: float = 0.0;
+    pub var _sw: float = 0.0;
+    pub var _sh: float = 0.0;
+    pub var _menu_y: float = 0.0;
+    pub var _mh: float = 0.0;
+    // Theme snapshot + popup shadow for the open menu — refreshed by
+    // on_theme_changed.
+    pub var _pal: uitheme.Palette?;
+    pub var _shadow: shadow.Shadow?;
+
+    pub init(opts: [str], idx: int = 0, multi: bool = false) {
+        val pal = uitheme.palette();
+        self.options = opts;
+        self.selected_idx = idx;
+        self.selected_sig = nil;
+        self.is_open = 0;
+        self.hovered = 0;
+        self.hover_idx = -1;
+        self.is_multi = 0;
+        if (multi) { self.is_multi = 1; }
+        self.multi_sel = [];
+        self.surface = pal.surface;
+        self.border = pal.border;
+        self.text = pal.text_primary;
+        self.text2 = pal.text_muted;
+        self.accent = pal.accent;
+        self.font_scale = 1.0;
+        self.box_h = 30.0;
+        self.item_h = 28.0;
+        self._pal = pal;
+        self._shadow = uitheme.elevation_shadow(pal, 3);
+        self.id = comp.next_widget_id();
+    }
+
+    pub fn on_theme_changed(): nil {
+        self._pal = uitheme.palette();
+        val p = self._pal as uitheme.Palette;
+        self.surface = p.surface;
+        self.border = p.border;
+        self.text = p.text_primary;
+        self.text2 = p.text_muted;
+        self.accent = p.accent;
+        self._shadow = uitheme.elevation_shadow(p, 3);
+        tree.request_repaint();
+    }
+
+    pub fn bind_selected(sig: state.IntSignal): nil {
+        self.selected_sig = sig;
+    }
+
+    pub fn kind(): ui_types.WidgetKind {
+        if (self.is_multi != 0) { return ui_types.WidgetKind.MultiSelect; }
+        return ui_types.WidgetKind.Select;
+    }
+    pub fn wants_pointer_capture(): int { return self.is_open; }
+
+    pub fn on_overlay_dismiss(): nil {
+        if (self.is_open != 0) {
+            self.set_open(0);
+            tree.request_repaint();
+        }
+    }
+
+    fn selected_now(): int {
+        if (self.selected_sig != nil) {
+            return (self.selected_sig as state.IntSignal).get();
+        }
+        return self.selected_idx;
+    }
+
+    fn set_selected(i: int): nil {
+        if (self.selected_sig != nil) {
+            (self.selected_sig as state.IntSignal).set(i);
+        } else {
+            self.selected_idx = i;
+        }
+    }
+
+    fn set_open(v: int): nil {
+        if (v != 0 and self.is_open == 0) {
+            tree.push_overlay(self);
+        } elif (v == 0 and self.is_open != 0) {
+            tree.remove_overlay(self);
+        }
+        self.is_open = v;
+    }
+
+    fn label_text(): str {
+        var cur = self.selected_now();
+        if (cur >= 0 and cur < len(self.options)) {
+            return self.options[cur];
+        }
+        return "Select...";
+    }
+
+    pub fn measure(min_w: float, max_w: float, min_h: float, max_h: float): comp.Size {
+        var w: float = 190.0;
+        var h: float = self.box_h + 0.0;
+        if (w < min_w) { w = min_w; }
+        if (w > max_w) { w = max_w; }
+        if (h < min_h) { h = min_h; }
+        if (h > max_h) { h = max_h; }
+        return comp.Size(w=w, h=h);
+    }
+
+    pub fn arrange(x: float, y: float, w: float, h: float): nil {
+        // When open, extend the stored bounds to cover the dropdown so the
+        // parent container forwards menu-region pointer events to us.
+        self.rect.x = x;
+        self.rect.y = y;
+        self.rect.w = w;
+        self.rect.h = h;
+        if (self.is_open != 0 and len(self.options) > 0) {
+            var menu_h: float = (len(self.options) as float) * self.item_h + 12.0;
+            if (self.box_h + menu_h > self.rect.h) {
+                self.rect.h = self.box_h + menu_h;
+            }
+        }
+    }
+
+    // Cache box + menu geometry in fields (paint and on_event share it).
+    fn layout_menu(): nil {
+        self._sx = self.rect.x;
+        self._sy = self.rect.y;
+        self._sw = self.rect.w;
+        self._sh = self.box_h;
+        self._menu_y = self.rect.y + self.box_h + 4.0;
+    }
+
+    pub fn paint(): nil {
+        self.layout_menu();
+        dl.dl_emit_rect_rounded(dl.paint_ctx.dl, self._sx, self._sy, self._sw, self._sh,
+            4.0, self.surface.r, self.surface.g, self.surface.b, 1.0);
+        var hov: float = motion.value(self.id, 0, self.hovered as float);
+        var border_c = color.lerp(self.border, self.accent, hov * 0.7);
+        dl.dl_emit_rect_border(dl.paint_ctx.dl, self._sx, self._sy, self._sw, self._sh,
+            4.0, 1.0, border_c.r, border_c.g, border_c.b, 1.0);
+        dl.dl_emit_text(dl.paint_ctx.dl, textshape.prepare_display(self.label_text()),
+            self._sx + 10.0, self._sy + (self._sh - tm.line_height(self.font_scale)) / 2.0,
+            self.text.r, self.text.g, self.text.b, 1.0, self.font_scale);
+        // Chevron.
+        var ch = "v";
+        if (self.is_open != 0) { ch = "^"; }
+        dl.dl_emit_text(dl.paint_ctx.dl, ch,
+            self._sx + self._sw - 18.0, self._sy + (self._sh - tm.line_height(self.font_scale)) / 2.0,
+            self.text2.r, self.text2.g, self.text2.b, 1.0, self.font_scale);
+
+        if (self.is_open != 0 and len(self.options) > 0) {
+            self._mh = (len(self.options) as float) * self.item_h + 8.0;
+            if (self._shadow != nil) {
+                val s = self._shadow as shadow.Shadow;
+                dl.dl_emit_shadow(dl.paint_ctx.dl, self._sx, self._menu_y, self._sw, self._mh,
+                    s.r, s.g, s.b, s.a, s.offset_x, s.offset_y, s.blur_radius, s.spread_radius);
+            }
+            dl.dl_emit_rect_rounded(dl.paint_ctx.dl, self._sx, self._menu_y, self._sw, self._mh,
+                6.0, self.surface.r, self.surface.g, self.surface.b, 1.0);
+            dl.dl_emit_rect_border(dl.paint_ctx.dl, self._sx, self._menu_y, self._sw, self._mh,
+                6.0, 1.0, self.border.r, self.border.g, self.border.b, 1.0);
+            var i = 0;
+            while (i < len(self.options)) {
+                var oy: float = self._menu_y + 4.0 + (i as float) * self.item_h;
+                if (i == self.hover_idx) {
+                    dl.dl_emit_rect_rounded(dl.paint_ctx.dl, self._sx + 4.0, oy, self._sw - 8.0, self.item_h,
+                        4.0, self.accent.r * 0.12, self.accent.g * 0.12, self.accent.b * 0.12, 1.0);
+                }
+                var cur = self.selected_now();
+                var is_sel: bool = false;
+                if (self.is_multi != 0) {
+                    var j = 0;
+                    while (j < len(self.multi_sel)) {
+                        if (self.multi_sel[j] == i) { is_sel = true; }
+                        j = j + 1;
+                    }
+                } else {
+                    is_sel = (i == cur);
+                }
+                if (is_sel) {
+                    dl.dl_emit_rect_rounded(dl.paint_ctx.dl, self._sx + 4.0, oy, self._sw - 8.0, self.item_h,
+                        4.0, self.accent.r * 0.25, self.accent.g * 0.25, self.accent.b * 0.25, 1.0);
+                    dl.dl_emit_text(dl.paint_ctx.dl, "x",
+                        self._sx + self._sw - 22.0, oy + (self.item_h - tm.line_height(self.font_scale)) / 2.0,
+                        self.accent.r, self.accent.g, self.accent.b, 1.0, self.font_scale);
+                }
+                dl.dl_emit_text(dl.paint_ctx.dl, textshape.prepare_display(self.options[i]),
+                    self._sx + 10.0, oy + (self.item_h - tm.line_height(self.font_scale)) / 2.0,
+                    self.text.r, self.text.g, self.text.b, 1.0, self.font_scale);
+                i = i + 1;
+            }
+        }
+    }
+
+    pub fn on_event(t: events.EventType, x: int, y: int, key: int): uievent.EventResult {
+        self.layout_menu();
+        var fx = x as float;
+        var fy = y as float;
+        var in_box: bool = (fx >= self._sx and fx < self._sx + self._sw
+            and fy >= self._sy and fy < self._sy + self._sh);
+        var menu_bottom: float = self._menu_y + (len(self.options) as float) * self.item_h + 8.0;
+        var in_menu: bool = (self.is_open != 0 and fx >= self._sx and fx < self._sx + self._sw
+            and fy >= self._menu_y and fy < menu_bottom);
+
+        if (t == events.EventType.MouseMove) {
+            var want: int = 0;
+            if (in_box) { want = 1; }
+            if (want != self.hovered) {
+                var cur = motion.value(self.id, 0, self.hovered as float);
+                self.hovered = want;
+                motion.animate_to(self.id, 0, want as float, 0.12, cur);
+                tree.request_repaint();
+            }
+            var hi: int = -1;
+            if (in_menu) {
+                hi = ((fy - self._menu_y - 4.0) / self.item_h) as int;
+                if (hi < 0 or hi >= len(self.options)) { hi = -1; }
+            }
+            if (hi != self.hover_idx) {
+                self.hover_idx = hi;
+                tree.request_repaint();
+            }
+        }
+        if (t == events.EventType.MouseDown and key == 0 and (in_menu or in_box)) {
+            // Claim the press: while open this arms pointer capture so the
+            // option MouseUp can't be stolen by widgets under the menu.
+            return uievent.EventResult.Handled;
+        }
+        if (t == events.EventType.MouseUp and key == 0) {
+            if (in_menu) {
+                var idx: int = ((fy - self._menu_y - 4.0) / self.item_h) as int;
+                if (idx >= 0 and idx < len(self.options)) {
+                    if (self.is_multi != 0) {
+                        // Toggle membership in multi_sel.
+                        var found = 0;
+                        var pos = 0;
+                        var k = 0;
+                        while (k < len(self.multi_sel)) {
+                            if (self.multi_sel[k] == idx) { found = 1; pos = k; }
+                            k = k + 1;
+                        }
+                        if (found != 0) {
+                            var removed: [int] = [];
+                            var m = 0;
+                            while (m < len(self.multi_sel)) {
+                                if (m != pos) { removed.append(self.multi_sel[m]); }
+                                m = m + 1;
+                            }
+                            self.multi_sel = removed;
+                        } else {
+                            self.multi_sel.append(idx);
+                        }
+                    } else {
+                        self.set_selected(idx);
+                        self.set_open(0);
+                    }
+                    tree.request_repaint();
+                    return uievent.EventResult.Handled;
+                }
+            }
+            if (in_box) {
+                self.set_open(1 - self.is_open);
+                tree.request_repaint();
+                return uievent.EventResult.Handled;
+            }
+            if (self.is_open != 0) {
+                self.set_open(0);
+                tree.request_repaint();
+                return uievent.EventResult.Handled;
+            }
+        }
+        return uievent.EventResult.Ignored;
+    }
+}
+
+pub fn select(opts: [str], idx: int = 0): Select {
+    return Select(opts, idx, false);
+}
+
+pub fn multi_select(opts: [str], selected: [int] = [] as [int]): Select {
+    var s = Select(opts, 0, true);
+    s.multi_sel = selected;
+    return s;
+}

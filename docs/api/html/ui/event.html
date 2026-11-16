@@ -80,81 +80,17 @@ function filterNav() {
 <h2>event.lm</h2>
 <input type="text" id="search-input" placeholder="Filter symbols..." oninput="filterNav()">
 <div id="nav-list">
-<a class="nav-link" href="#UIEvent">UIEvent <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
-<a class="nav-link" href="#make_click_event">make_click_event <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
-<a class="nav-link" href="#make_hover_event">make_hover_event <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
-<a class="nav-link" href="#make_key_event">make_key_event <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
-<a class="nav-link" href="#fire_action">fire_action <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
-<a class="nav-link" href="#route">route <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
-<a class="nav-link" href="#dispatch_event">dispatch_event <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 </div>
 </nav>
 <main>
 <h1>event.lm API Reference</h1>
 <h2>Module Overview</h2>
 <div class="summary"><p>std/ui/event.lm
-Type-Safe Event Handling & Fallible Event Propagation for Lymar UI
+Type-Safe Event Handling for Lymar UI
 
-Replaces untyped `any` callbacks and sentinel numbers with nominal enums,
-exhaustive match dispatch, and Lymar fallible types (`EventResult?`).
-
-A widget stores its callback in the `on_click_action` / `on_change_action`
-slot as a `fn(): nil` (the shape the retained renderer already invokes).
-`fire_action`/`fire_action_for` route that slot through a fallible pipeline
-so the dynamic `any` never leaks past this boundary: it is cast once, guarded,
-and a nil/absent handler becomes an `Unhandled` result rather than a nil check
-at every call site.</p></div>
-<div id="UIEvent">
-<h3>UIEvent <span class="badge badge-pub">Frame</span></h3>
-<pre class="code-sig"><code>frame UIEvent</code></pre>
-<h4>Members</h4>
-<ul>
-<li><code>var pub kind: EventKind</code> <em>(field)</em></li>
-<li><code>var pub target_id: str</code> <em>(field)</em></li>
-<li><code>var pub x: float</code> <em>(field)</em></li>
-<li><code>var pub y: float</code> <em>(field)</em></li>
-<li><code>var pub delta_x: float</code> <em>(field)</em></li>
-<li><code>var pub delta_y: float</code> <em>(field)</em></li>
-<li><code>var pub key_code: int</code> <em>(field)</em></li>
-<li><code>var pub is_shift: bool</code> <em>(field)</em></li>
-<li><code>var pub is_ctrl: bool</code> <em>(field)</em></li>
-<li><code>var pub is_alt: bool</code> <em>(field)</em></li>
-<li><code>pub init(k: EventKind)</code> <em>(constructor)</em></li>
-</ul>
-</div><hr>
-<div id="make_click_event">
-<h3>make_click_event <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn make_click_event(target_id: str, x: float, y: float): UIEvent</code></pre>
-</div><hr>
-<div id="make_hover_event">
-<h3>make_hover_event <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn make_hover_event(target_id: str, x: float, y: float): UIEvent</code></pre>
-</div><hr>
-<div id="make_key_event">
-<h3>make_key_event <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn make_key_event(k: EventKind, key: int): UIEvent</code></pre>
-</div><hr>
-<div id="fire_action">
-<h3>fire_action <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn fire_action(action): EventResult?</code></pre>
-<div class="summary"><p>Invoke a widget's `fn(): nil` action slot fallibly. A nil action is not an
-error condition -- it is simply `Unhandled`, which removes the
-`if (w.on_click_action != nil)` guard from every dispatch site.</p></div>
-</div><hr>
-<div id="route">
-<h3>route <span class="badge badge-private">Function</span></h3>
-<pre class="code-sig"><code>fn route(handler): EventResult?</code></pre>
-<div class="summary"><p>Route an actionable event: fire the handler if one is bound (best-effort),
-then report the event as consumed. A nil handler is not a failure of routing
--- the event was still handled by reaching a target.</p></div>
-</div><hr>
-<div id="dispatch_event">
-<h3>dispatch_event <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn dispatch_event(evt: UIEvent, handler: any = ...): EventResult?</code></pre>
-<div class="summary"><p>Full fallible pipeline: resolve the target, dispatch on the nominal kind via
-`match`, then invoke the handler. Returns `err()` when the event carries no
-target so callers can propagate with `?` instead of inspecting fields.</p></div>
-</div><hr>
+Nominal enums and exhaustive match dispatch for widget-level event
+results. The component tree (std.ui.component/tree) dispatches typed
+std.events.Event values directly through the Component.on_event contract.</p></div>
 </main>
 </body>
 </html>

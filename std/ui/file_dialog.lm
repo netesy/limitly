@@ -1,0 +1,246 @@
+// std/ui/file_dialog.lm
+// Native file-open dialog. Windows: Win32 GetOpenFileNameW via comdlg32
+// (std.ffi). Other platforms: library_load fails and pick_file returns
+// nil — callers should keep a text-entry fallback.
+//
+// The owner hwnd is normally registered once by std.app at init via
+// set_owner(); pass an explicit owner to pick_file to override.
+
+import std.ffi as ffi;
+
+pub var owner_hwnd: int = 0;
+pub var debug: int = 0;
+
+pub fn set_owner(hwnd: int): nil {
+    owner_hwnd = hwnd;
+}
+
+pub fn set_debug(v: int): nil {
+    debug = v;
+}
+
+// Decode the UTF-8 codepoint starting at byte offset `pos` in `s`.
+// Returns (codepoint, seq_len); falls back to (0xFFFD, 1) on invalid input.
+fn utf8_at(s: str, pos: int): (int, int) {
+    var n: int = len(s);
+    var b0: int = 0;
+    unsafe {
+        b0 = _builtin_string_byte_at(s, pos);
+    }
+    var sl: int = 1;
+    if ((b0 & 0x80) != 0) {
+        if ((b0 & 0xE0) == 0xC0) { sl = 2; }
+        elif ((b0 & 0xF0) == 0xE0) { sl = 3; }
+        elif ((b0 & 0xF8) == 0xF0) { sl = 4; }
+        else { return (0xFFFD, 1); }
+    }
+    if (pos + sl > n) { return (0xFFFD, 1); }
+    if (sl == 1) { return (b0, 1); }
+    var cp: int = b0 & (0x7F >> sl);
+    var k: int = 1;
+    while (k < sl) {
+        var bx: int = 0;
+        unsafe {
+            bx = _builtin_string_byte_at(s, pos + k);
+        }
+        if ((bx & 0xC0) != 0x80) { return (0xFFFD, 1); }
+        cp = cp * 64 + (bx & 0x3F);
+        k = k + 1;
+    }
+    return (cp, sl);
+}
+
+// Write a Lymar str as UTF-16LE into an ffi buffer (zero-terminated).
+// Returns the number of WCHARs written (excluding terminator).
+fn write_wide(buf: ffi.pubptr, s: str): int {
+    var o = 0;
+    var i = 0;
+    var n: int = len(s);
+    while (i < n) {
+        val dec = utf8_at(s, i);
+        var cp: int = dec.0;
+        i = i + dec.1;
+        unsafe {
+            if (cp >= 0x10000) {
+                cp = cp - 0x10000;
+                ffi.store_u16(ffi.ptr_add(buf, o * 2), 0xD800 + (cp / 0x400));
+                ffi.store_u16(ffi.ptr_add(buf, (o + 1) * 2), 0xDC00 + (cp % 0x400));
+                o = o + 2;
+            } else {
+                ffi.store_u16(ffi.ptr_add(buf, o * 2), cp);
+                o = o + 1;
+            }
+        }
+    }
+    unsafe {
+        ffi.store_u16(ffi.ptr_add(buf, o * 2), 0);
+    }
+    return o;
+}
+
+// UTF-16LE code units -> UTF-8 bytes into out; returns byte length.
+// Handles BMP codepoints and surrogate pairs.
+fn utf16_to_utf8(wbuf: ffi.pubptr, max_chars: int, out: ffi.pubptr): int {
+    var o = 0;
+    var i = 0;
+    unsafe {
+        while (i < max_chars) {
+            var cu: int = ffi.load_u16(ffi.ptr_add(wbuf, i * 2));
+            if (cu == 0) { break; }
+            if (cu >= 0xD800 and cu <= 0xDBFF and i + 1 < max_chars) {
+                var lo: int = ffi.load_u16(ffi.ptr_add(wbuf, (i + 1) * 2));
+                if (lo >= 0xDC00 and lo <= 0xDFFF) {
+                    var cp: int = 0x10000 + ((cu - 0xD800) * 0x400) + (lo - 0xDC00);
+                    ffi.store_u8(ffi.ptr_add(out, o), 0xF0 + (cp / 262144));
+                    ffi.store_u8(ffi.ptr_add(out, o + 1), 0x80 + ((cp / 4096) % 64));
+                    ffi.store_u8(ffi.ptr_add(out, o + 2), 0x80 + ((cp / 64) % 64));
+                    ffi.store_u8(ffi.ptr_add(out, o + 3), 0x80 + (cp % 64));
+                    o = o + 4;
+                    i = i + 2;
+                    continue;
+                }
+            }
+            if (cu < 0x80) {
+                ffi.store_u8(ffi.ptr_add(out, o), cu);
+                o = o + 1;
+            } elif (cu < 0x800) {
+                ffi.store_u8(ffi.ptr_add(out, o), 0xC0 + (cu / 64));
+                ffi.store_u8(ffi.ptr_add(out, o + 1), 0x80 + (cu % 64));
+                o = o + 2;
+            } else {
+                ffi.store_u8(ffi.ptr_add(out, o), 0xE0 + (cu / 4096));
+                ffi.store_u8(ffi.ptr_add(out, o + 1), 0x80 + ((cu / 64) % 64));
+                ffi.store_u8(ffi.ptr_add(out, o + 2), 0x80 + (cu % 64));
+                o = o + 3;
+            }
+            i = i + 1;
+        }
+        ffi.store_u8(ffi.ptr_add(out, o), 0);
+    }
+    return o;
+}
+
+// GetOpenFileNameW fails with CDERR_INITIALIZATION when hwndOwner is NULL
+// in some contexts — fall back to the desktop window handle.
+fn desktop_hwnd(): int {
+    unsafe {
+        val ulib = ffi.library_load("user32.dll");
+        if (ulib == 0) { return 0; }
+        val sym = ffi.library_get_symbol(ulib, "GetDesktopWindow");
+        if (sym == 0) { return 0; }
+        return ffi.foreign_call(sym, [], ffi.TYPE_I64, []);
+    }
+}
+
+// OPENFILENAMEW. lStructSize must be 152 — the size Windows validates
+// against ends at lpTemplateName; larger tails return CDERR_STRUCTSIZE.
+// lpstrFile buffer: 1024 WCHARs.
+fn pick_open(owner: int, title: str, save_mode: int): str? {
+    var lib: int = 0;
+    var proc: int = 0;
+    var res: int = 0;
+    unsafe {
+        lib = ffi.library_load("comdlg32.dll");
+        if (lib == 0) { return nil; }
+        var sname: str = "GetOpenFileNameW";
+        if (save_mode != 0) { sname = "GetSaveFileNameW"; }
+        proc = ffi.library_get_symbol(lib, sname);
+        if (proc == 0) {
+            ffi.library_unload(lib);
+            if (debug != 0) { print("file_dialog: symbol {sname} not found"); }
+            return nil;
+        }
+        var own: int = owner;
+        if (own == 0) { own = desktop_hwnd(); }
+        if (own == 0) {
+            ffi.library_unload(lib);
+            return nil;
+        }
+        if (debug != 0) { print("file_dialog: lib={lib} proc={proc} owner={own}"); }
+
+        val ofn = ffi.alloc(256);
+        val filebuf = ffi.alloc(4096);
+        val filterbuf = ffi.alloc(256);
+        val titlebuf = ffi.alloc(512);
+        val utf8buf = ffi.alloc(8192);
+        ffi.memset(ofn, 0, 256);
+        ffi.memset(filebuf, 0, 4096);
+        ffi.memset(filterbuf, 0, 256);
+        ffi.memset(titlebuf, 0, 512);
+
+        // Filter: "All Files\0*.*\0\0" (double-NUL terminated wide string).
+        var fi = write_wide(filterbuf, "All Files");
+        fi = fi + 1; // skip terminator
+        var fj = write_wide(ffi.ptr_add(filterbuf, fi * 2), "*.*");
+        fi = fi + fj + 1; // skip "*.*" + its terminator
+        ffi.store_u16(ffi.ptr_add(filterbuf, fi * 2), 0); // extra NUL → double-NUL end
+
+        write_wide(titlebuf, title);
+
+        // OPENFILENAMEW fields (byte offsets). lStructSize=152: Windows
+        // validates against the pre-Vista struct ending at lpTemplateName.
+        ffi.store_u32(ffi.ptr_add(ofn, 0), 152);          // lStructSize
+        ffi.store_ptr(ffi.ptr_add(ofn, 8), own);          // hwndOwner
+        ffi.store_ptr(ffi.ptr_add(ofn, 16), 0);           // hInstance
+        ffi.store_ptr(ffi.ptr_add(ofn, 24), filterbuf);   // lpstrFilter
+        ffi.store_ptr(ffi.ptr_add(ofn, 32), 0);           // lpstrCustomFilter
+        ffi.store_u32(ffi.ptr_add(ofn, 40), 0);           // nMaxCustFilter
+        ffi.store_u32(ffi.ptr_add(ofn, 48), 1);           // nFilterIndex
+        ffi.store_ptr(ffi.ptr_add(ofn, 56), filebuf);     // lpstrFile
+        ffi.store_u32(ffi.ptr_add(ofn, 64), 1024);        // nMaxFile
+        ffi.store_ptr(ffi.ptr_add(ofn, 72), 0);           // lpstrFileTitle
+        ffi.store_u32(ffi.ptr_add(ofn, 80), 0);           // nMaxFileTitle
+        ffi.store_ptr(ffi.ptr_add(ofn, 88), 0);           // lpstrInitialDir
+        ffi.store_ptr(ffi.ptr_add(ofn, 96), titlebuf);    // lpstrTitle
+        // Flags: FILEMUSTEXIST|PATHMUSTEXIST|NOCHANGEDIR|HIDEREADONLY (+OVERWRITEPROMPT for save)
+        var flags: int = 0x180C;
+        if (save_mode != 0) { flags = flags + 0x4000; }
+        ffi.store_u32(ffi.ptr_add(ofn, 104), flags);
+        ffi.store_u16(ffi.ptr_add(ofn, 112), 0);          // nFileOffset
+        ffi.store_u16(ffi.ptr_add(ofn, 114), 0);          // nFileExtension
+        ffi.store_ptr(ffi.ptr_add(ofn, 120), 0);          // lpstrDefExt
+        ffi.store_ptr(ffi.ptr_add(ofn, 128), 0);          // lCustData
+        ffi.store_ptr(ffi.ptr_add(ofn, 136), 0);          // lpfnHook
+        ffi.store_ptr(ffi.ptr_add(ofn, 144), 0);          // lpTemplateName
+        // (152-byte struct ends here; tail fields unread)
+
+        res = ffi.foreign_call(proc, [ofn], ffi.TYPE_I32, [ffi.TYPE_PTR]);
+        if (debug != 0) {
+            print("file_dialog: res={res}");
+            if (res == 0) {
+                val eproc = ffi.library_get_symbol(lib, "CommDlgExtendedError");
+                if (eproc != 0) {
+                    val cerr = ffi.foreign_call(eproc, [], ffi.TYPE_I32, []);
+                    print("file_dialog: CommDlgExtendedError={cerr}");
+                }
+            }
+        }
+        ffi.library_unload(lib);
+
+        var out: str? = nil;
+        if (res != 0) {
+            unsafe {
+                utf16_to_utf8(filebuf, 1024, utf8buf);
+                out = ffi.cstring_to_string(utf8buf);
+            }
+        }
+        // ffi.alloc'd buffers are region-scoped: freed automatically when
+        // this function's region exits — do NOT ffi.free them here.
+        return out;
+    }
+    return nil;
+}
+
+// Open-file dialog. Returns the chosen path, or nil on cancel/failure.
+pub fn pick_file(owner: int = 0, title: str = "Open File"): str? {
+    var own = owner;
+    if (own == 0) { own = owner_hwnd; }
+    return pick_open(own, title, 0);
+}
+
+// Save-file dialog. Returns the chosen path, or nil on cancel/failure.
+pub fn pick_save(owner: int = 0, title: str = "Save File"): str? {
+    var own = owner;
+    if (own == 0) { own = owner_hwnd; }
+    return pick_open(own, title, 1);
+}

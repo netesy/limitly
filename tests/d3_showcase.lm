@@ -5,6 +5,7 @@
 
 import std.d3 as d3;
 import std.gg as gg;
+import std.app as app;
 import std.game as game;
 import std.theme as theme;
 import std.color as color;
@@ -329,13 +330,11 @@ fn main(): int {
     );
     cfg.bg_color = color.hex(0x080914, 1.0);
 
-    var app = game.Game(cfg);
-    if (not app.setup()) {
-        print("Error: Failed to initialize graphics context.");
-        return 1;
-    }
+    var g = game.Game(cfg);
+    var a = app.App(cfg.title, cfg.width, cfg.height);
+    a.open();
 
-    app.gui.set_theme(theme.cyberpunk_theme());
+    g.gui.set_theme(theme.cyberpunk_theme());
 
     // ── Build 3D Scene & Lighting ──────────────────────────────────────────
     var scene = d3.Scene3D();
@@ -444,24 +443,25 @@ fn main(): int {
 
     print("Running 3D render loop...");
 
-    while (app.is_running) {
-        app.begin_frame();
+    while (a.is_running()) {
+        a.pump();
+        g.poll();
         anim_tick = anim_tick + 1;
 
-        var sw = app.width as float;
-        var sh = app.height as float;
-        if (app.width != last_w or app.height != last_h) {
-            renderer.set_size(app.width, app.height);
+        var sw = g.width as float;
+        var sh = g.height as float;
+        if (g.width != last_w or g.height != last_h) {
+            renderer.set_size(g.width, g.height);
             camera.aspect = sw / sh;
             camera.update_projection_matrix();
-            last_w = app.width;
-            last_h = app.height;
+            last_w = g.width;
+            last_h = g.height;
         }
 
         // ── Direct 3D Viewport Mouse Drag Rotation (Arcball) ────────────────
-        if (app.input.is_mouse_down(0) and app.input.mouse_x > 330.0) {
+        if (g.input.is_mouse_down(0) and g.input.mouse_x > 330.0) {
             auto_rotate = false;
-            var m_delta = app.input.mouse_delta();
+            var m_delta = g.input.mouse_delta();
             ship_yaw = ship_yaw + m_delta.x * 0.012;
             ship_pitch = ship_pitch + m_delta.y * 0.012;
             if (ship_pitch > 1.55) { ship_pitch = 1.55; }
@@ -469,64 +469,64 @@ fn main(): int {
         }
 
         // ── Keyboard Shortcuts ──────────────────────────────────────────────
-        if (app.input.is_key_down(game.KEY_LEFT) or app.input.is_key_down(game.KEY_A)) {
+        if (g.input.is_key_down(game.KEY_LEFT) or g.input.is_key_down(game.KEY_A)) {
             ship_yaw = ship_yaw - 0.035;
             auto_rotate = false;
         }
-        if (app.input.is_key_down(game.KEY_RIGHT) or app.input.is_key_down(game.KEY_D)) {
+        if (g.input.is_key_down(game.KEY_RIGHT) or g.input.is_key_down(game.KEY_D)) {
             ship_yaw = ship_yaw + 0.035;
             auto_rotate = false;
         }
-        if (app.input.is_key_down(game.KEY_UP) or app.input.is_key_down(game.KEY_W)) {
+        if (g.input.is_key_down(game.KEY_UP) or g.input.is_key_down(game.KEY_W)) {
             ship_pitch = ship_pitch - 0.025;
             auto_rotate = false;
         }
-        if (app.input.is_key_down(game.KEY_DOWN) or app.input.is_key_down(game.KEY_S)) {
+        if (g.input.is_key_down(game.KEY_DOWN) or g.input.is_key_down(game.KEY_S)) {
             ship_pitch = ship_pitch + 0.025;
             auto_rotate = false;
         }
-        if (app.input.is_key_down(game.KEY_Q)) {
+        if (g.input.is_key_down(game.KEY_Q)) {
             ship_roll = ship_roll - 0.035;
             auto_rotate = false;
         }
-        if (app.input.is_key_down(game.KEY_E)) {
+        if (g.input.is_key_down(game.KEY_E)) {
             ship_roll = ship_roll + 0.035;
             auto_rotate = false;
         }
-        if (app.input.is_key_pressed(game.KEY_SPACE)) {
+        if (g.input.is_key_pressed(game.KEY_SPACE)) {
             auto_rotate = not auto_rotate;
         }
 
         // Livery hotkeys
-        if (app.input.is_key_down(game.KEY_1)) {
+        if (g.input.is_key_down(game.KEY_1)) {
             livery_id = 0;
             hull_mat.set_color(0.88, 0.92, 0.98);
             canopy_mat.set_color(0.10, 0.85, 0.98);
             trim_mat.set_color(0.20, 0.22, 0.28);
             thruster_mat.set_color(0.0, 0.95 * thruster_glow, 1.0 * thruster_glow);
         }
-        if (app.input.is_key_down(game.KEY_2)) {
+        if (g.input.is_key_down(game.KEY_2)) {
             livery_id = 1;
             hull_mat.set_color(0.85, 0.12, 0.18);
             canopy_mat.set_color(0.98, 0.82, 0.15);
             trim_mat.set_color(0.14, 0.14, 0.18);
             thruster_mat.set_color(1.0 * thruster_glow, 0.45 * thruster_glow, 0.05);
         }
-        if (app.input.is_key_down(game.KEY_3)) {
+        if (g.input.is_key_down(game.KEY_3)) {
             livery_id = 2;
             hull_mat.set_color(0.18, 0.20, 0.24);
             canopy_mat.set_color(0.82, 0.22, 0.96);
             trim_mat.set_color(0.10, 0.10, 0.14);
             thruster_mat.set_color(0.95 * thruster_glow, 0.10 * thruster_glow, 1.0);
         }
-        if (app.input.is_key_down(game.KEY_4)) {
+        if (g.input.is_key_down(game.KEY_4)) {
             livery_id = 3;
             hull_mat.set_color(0.95, 0.78, 0.12);
             canopy_mat.set_color(0.15, 0.95, 0.55);
             trim_mat.set_color(0.16, 0.18, 0.22);
             thruster_mat.set_color(0.20 * thruster_glow, 0.85 * thruster_glow, 1.0);
         }
-        if (app.input.is_key_down(game.KEY_R)) {
+        if (g.input.is_key_down(game.KEY_R)) {
             ship_yaw = 0.55;
             ship_pitch = 0.28;
             ship_roll = -0.05;
@@ -572,6 +572,8 @@ fn main(): int {
         }
 
         // ── Deep-Space Starfield Grid Background ───────────────────────────
+        a.begin_pass();
+        g.imgui_begin();
         var g_i = 0;
         while (g_i < 16) {
             var gx = (g_i as float) * 65.0;
@@ -588,13 +590,13 @@ fn main(): int {
         }
 
         // ── 2D Immediate-Mode GUI Studio Controls ───────────────────────────
-        if (app.gui.begin_window("Valkyrie SF-9 Studio (std.d3)", 15.0, 15.0, 315.0, 670.0)) {
-            app.gui.label("Aerospace Superiority Interceptor");
-            app.gui.separator();
+        if (g.gui.begin_window("Valkyrie SF-9 Studio (std.d3)", 15.0, 15.0, 315.0, 670.0)) {
+            g.gui.label("Aerospace Superiority Interceptor");
+            g.gui.separator();
 
-            auto_rotate = app.gui.toggle("Auto-Orbit Spin", auto_rotate);
+            auto_rotate = g.gui.toggle("Auto-Orbit Spin", auto_rotate);
 
-            var new_wire = app.gui.toggle("Wireframe Mode", wireframe_mode);
+            var new_wire = g.gui.toggle("Wireframe Mode", wireframe_mode);
             if (new_wire != wireframe_mode) {
                 wireframe_mode = new_wire;
                 hull_mat.wireframe = wireframe_mode;
@@ -606,31 +608,31 @@ fn main(): int {
                 canyon_mat.wireframe = wireframe_mode;
             }
 
-            app.gui.separator();
-            app.gui.label("Flight Attitude Controls:");
+            g.gui.separator();
+            g.gui.label("Flight Attitude Controls:");
 
             var prev_yaw = ship_yaw;
-            ship_yaw = app.gui.slider("Yaw", ship_yaw, -3.14, 3.14, 185.0);
+            ship_yaw = g.gui.slider("Yaw", ship_yaw, -3.14, 3.14, 185.0);
             if (ship_yaw != prev_yaw) {
                 auto_rotate = false;
             }
 
             var prev_pitch = ship_pitch;
-            ship_pitch = app.gui.slider("Pitch", ship_pitch, -1.57, 1.57, 185.0);
+            ship_pitch = g.gui.slider("Pitch", ship_pitch, -1.57, 1.57, 185.0);
             if (ship_pitch != prev_pitch) {
                 auto_rotate = false;
             }
 
             var prev_roll = ship_roll;
-            ship_roll = app.gui.slider("Roll", ship_roll, -3.14, 3.14, 185.0);
+            ship_roll = g.gui.slider("Roll", ship_roll, -3.14, 3.14, 185.0);
             if (ship_roll != prev_roll) {
                 auto_rotate = false;
             }
 
-            app.gui.separator();
-            app.gui.label("Procedural Environment (std.d3):");
+            g.gui.separator();
+            g.gui.label("Procedural Environment (std.d3):");
 
-            var new_show_ter = app.gui.toggle("Planetary Canyon", show_terrain);
+            var new_show_ter = g.gui.toggle("Planetary Canyon", show_terrain);
             if (new_show_ter != show_terrain) {
                 show_terrain = new_show_ter;
                 if (show_terrain) {
@@ -641,12 +643,12 @@ fn main(): int {
             }
 
             var prev_alt = terrain_alt;
-            terrain_alt = app.gui.slider("Altitude", terrain_alt, -8.0, -3.0, 185.0);
+            terrain_alt = g.gui.slider("Altitude", terrain_alt, -8.0, -3.0, 185.0);
             if (terrain_alt != prev_alt and show_terrain) {
                 canyon.position_y = terrain_alt;
             }
 
-            var new_show_ast = app.gui.toggle("Asteroid Field", show_asteroids);
+            var new_show_ast = g.gui.toggle("Asteroid Field", show_asteroids);
             if (new_show_ast != show_asteroids) {
                 show_asteroids = new_show_ast;
                 if (show_asteroids) {
@@ -660,7 +662,7 @@ fn main(): int {
                 }
             }
 
-            var new_show_moon = app.gui.toggle("Icosphere Moon", show_moon);
+            var new_show_moon = g.gui.toggle("Icosphere Moon", show_moon);
             if (new_show_moon != show_moon) {
                 show_moon = new_show_moon;
                 if (show_moon) {
@@ -670,20 +672,20 @@ fn main(): int {
                 }
             }
 
-            app.gui.separator();
-            app.gui.label("Optics & Illumination:");
+            g.gui.separator();
+            g.gui.label("Optics & Illumination:");
 
-            cam_distance = app.gui.slider("Zoom", cam_distance, 4.0, 14.0, 185.0);
+            cam_distance = g.gui.slider("Zoom", cam_distance, 4.0, 14.0, 185.0);
 
             var prev_sun = sun_angle;
-            sun_angle = app.gui.slider("Sun Orbit", sun_angle, 0.0, 6.28, 185.0);
+            sun_angle = g.gui.slider("Sun Orbit", sun_angle, 0.0, 6.28, 185.0);
             if (sun_angle != prev_sun) {
                 sun.direction_x = math.cos(sun_angle) * 0.8;
                 sun.direction_z = math.sin(sun_angle) * 0.8;
             }
 
             var prev_glow = thruster_glow;
-            thruster_glow = app.gui.slider("Thrust", thruster_glow, 0.2, 2.5, 185.0);
+            thruster_glow = g.gui.slider("Thrust", thruster_glow, 0.2, 2.5, 185.0);
             if (thruster_glow != prev_glow) {
                 if (livery_id == 0) {
                     thruster_mat.set_color(0.0, 0.95 * thruster_glow, 1.0 * thruster_glow);
@@ -696,32 +698,32 @@ fn main(): int {
                 }
             }
 
-            orbit_speed = app.gui.slider("Orbit Rate", orbit_speed, 0.0, 3.0, 185.0);
+            orbit_speed = g.gui.slider("Orbit Rate", orbit_speed, 0.0, 3.0, 185.0);
 
-            app.gui.separator();
-            app.gui.label("Fleet Livery Theme:");
-            if (app.gui.button("Ghost (Titanium / Cyan)")) {
+            g.gui.separator();
+            g.gui.label("Fleet Livery Theme:");
+            if (g.gui.button("Ghost (Titanium / Cyan)")) {
                 livery_id = 0;
                 hull_mat.set_color(0.88, 0.92, 0.98);
                 canopy_mat.set_color(0.10, 0.85, 0.98);
                 trim_mat.set_color(0.20, 0.22, 0.28);
                 thruster_mat.set_color(0.0, 0.95 * thruster_glow, 1.0 * thruster_glow);
             }
-            if (app.gui.button("Crimson Fury (Red / Gold)")) {
+            if (g.gui.button("Crimson Fury (Red / Gold)")) {
                 livery_id = 1;
                 hull_mat.set_color(0.85, 0.12, 0.18);
                 canopy_mat.set_color(0.98, 0.82, 0.15);
                 trim_mat.set_color(0.14, 0.14, 0.18);
                 thruster_mat.set_color(1.0 * thruster_glow, 0.45 * thruster_glow, 0.05);
             }
-            if (app.gui.button("Void Shadow (Stealth / Violet)")) {
+            if (g.gui.button("Void Shadow (Stealth / Violet)")) {
                 livery_id = 2;
                 hull_mat.set_color(0.18, 0.20, 0.24);
                 canopy_mat.set_color(0.82, 0.22, 0.96);
                 trim_mat.set_color(0.10, 0.10, 0.14);
                 thruster_mat.set_color(0.95 * thruster_glow, 0.10 * thruster_glow, 1.0);
             }
-            if (app.gui.button("Viper Gold (Gold / Emerald)")) {
+            if (g.gui.button("Viper Gold (Gold / Emerald)")) {
                 livery_id = 3;
                 hull_mat.set_color(0.95, 0.78, 0.12);
                 canopy_mat.set_color(0.15, 0.95, 0.55);
@@ -729,17 +731,17 @@ fn main(): int {
                 thruster_mat.set_color(0.20 * thruster_glow, 0.85 * thruster_glow, 1.0);
             }
 
-            app.gui.separator();
-            app.gui.label("Telemetry & Procedural Stats:");
-            app.gui.label("Performance: {app.fps as int} FPS");
+            g.gui.separator();
+            g.gui.label("Telemetry & Procedural Stats:");
+            g.gui.label("Performance: {g.fps as int} FPS");
             var ship_polys = hull_geo.get_face_count() + canopy_geo.get_face_count() + trim_geo.get_face_count() + thruster_geo.get_face_count();
             var env_polys = rock1_geo.get_face_count() + rock2_geo.get_face_count() + rock3_geo.get_face_count() + moon_geo.get_face_count() + canyon_geo.get_face_count();
             var total_polys = ship_polys + env_polys;
-            app.gui.label("Ship Polys: {ship_polys} | Env: {env_polys}");
-            app.gui.label("Total Polys: {total_polys}");
-            app.gui.label("Features: Extrude, Revolve, Terrain, Asteroids, Icosphere");
+            g.gui.label("Ship Polys: {ship_polys} | Env: {env_polys}");
+            g.gui.label("Total Polys: {total_polys}");
+            g.gui.label("Features: Extrude, Revolve, Terrain, Asteroids, Icosphere");
 
-            if (app.gui.button("Reset Ship & Camera")) {
+            if (g.gui.button("Reset Ship & Camera")) {
                 ship_yaw = 0.55;
                 ship_pitch = 0.28;
                 ship_roll = -0.05;
@@ -761,17 +763,18 @@ fn main(): int {
                 auto_rotate = true;
             }
 
-            app.gui.end_window();
+            g.gui.end_window();
         }
 
-        app.end_frame();
+        g.imgui_end();
+        a.end_pass();
 
-        if (anim_tick > 120 and app.input.is_key_down(game.KEY_ESCAPE)) {
-            app.is_running = false;
+        if (anim_tick > 120 and g.input.is_key_down(game.KEY_ESCAPE)) {
+            g.quit();
         }
     }
 
-    app.shutdown();
+    a.close();
     print("Showcase terminated cleanly.");
     return 0;
 }

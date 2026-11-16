@@ -1,0 +1,90 @@
+// std/ui/widgets/stat.lm
+// Widget — ported from legacy Fluent Stat.
+// Metric card: small title, large value, optional accent description.
+
+import std.ui.component as comp;
+import std.ui.component show Placed;
+import std.ui.types as ui_types;
+import std.ui.event as uievent;
+import std.ui.context as uictx;
+import std.ui.draw_list as dl;
+import std.ui.state as state;
+import std.ui.tree as tree;
+import std.events as events;
+import std.color as color;
+import std.ui.theme as uitheme;
+import std.text.controller as text_ctrl;
+import std.text.shaping as textshape;
+import std.ui.text_metrics as tm;
+
+frame Stat {
+    embed Placed;
+    pub var title: str;
+    pub var value_text: str;
+    pub var desc: str;
+    pub var surface: color.Color;
+    pub var text: color.Color;
+    pub var text2: color.Color;
+    pub var accent: color.Color;
+    pub var font_scale: float;
+
+    pub init(t: str = "", v: str = "", d: str = "") {
+        val pal = uitheme.palette();
+        self.title = t;
+        self.value_text = v;
+        self.desc = d;
+        self.surface = pal.surface;
+        self.text = pal.text_primary;
+        self.text2 = pal.text_muted;
+        self.accent = pal.accent;
+        self.font_scale = 1.0;
+        self.id = comp.next_widget_id();
+    }
+
+    pub fn kind(): ui_types.WidgetKind { return ui_types.WidgetKind.Stat; }
+    pub fn on_theme_changed(): nil {
+        val p = uitheme.palette();
+        self.surface = p.surface;
+        self.text = p.text_primary;
+        self.text2 = p.text_muted;
+        self.accent = p.accent;
+        tree.request_repaint();
+    }
+    pub fn on_overlay_dismiss(): nil { }
+
+    pub fn wants_pointer_capture(): int { return 0; }
+
+    pub fn measure(min_w: float, max_w: float, min_h: float, max_h: float): comp.Size {
+        var w: float = 180.0;
+        var h: float = 74.0;
+        if (w < min_w) { w = min_w; }
+        if (w > max_w) { w = max_w; }
+        if (h < min_h) { h = min_h; }
+        if (h > max_h) { h = max_h; }
+        return comp.Size(w=w, h=h);
+    }
+
+    pub fn paint(): nil {
+        dl.dl_emit_rect_rounded(dl.paint_ctx.dl, self.rect.x, self.rect.y, self.rect.w, self.rect.h,
+            6.0, self.surface.r, self.surface.g, self.surface.b, self.surface.a);
+        dl.dl_emit_text(dl.paint_ctx.dl, textshape.prepare_display(self.title),
+            self.rect.x + 12.0, self.rect.y + 10.0,
+            self.text2.r, self.text2.g, self.text2.b, 1.0, self.font_scale * 0.85);
+        dl.dl_emit_text(dl.paint_ctx.dl, textshape.prepare_display(self.value_text),
+            self.rect.x + 12.0, self.rect.y + 30.0,
+            self.text.r, self.text.g, self.text.b, 1.0, self.font_scale * 1.4);
+        if (len(self.desc) > 0) {
+            dl.dl_emit_text(dl.paint_ctx.dl, textshape.prepare_display(self.desc),
+                self.rect.x + 12.0, self.rect.y + 54.0,
+                self.accent.r, self.accent.g, self.accent.b, 1.0, self.font_scale * 0.8);
+        }
+    }
+
+    pub fn on_event(t: events.EventType, x: int, y: int, key: int): uievent.EventResult {
+        return uievent.EventResult.Ignored;
+    }
+}
+
+pub fn stat(t: str, v: str, d: str = ""): Stat {
+    return Stat(t, v, d);
+}

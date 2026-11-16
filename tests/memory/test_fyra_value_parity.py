@@ -17,7 +17,7 @@ class FyraValueParityTests(unittest.TestCase):
             "tests/types/basic.lm",
             "tests/graphics_triangle_test.lm",
             "tests/text_render_test.lm",
-            "tests/retained_ui_test.lm",
+            "tests/ui_component_skeleton.lm",
             "tests/game/test_imgui.lm",
             "tests/basic/literals.lm",
             "tests/expressions/large_literals.lm",

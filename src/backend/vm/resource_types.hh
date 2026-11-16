@@ -106,7 +106,8 @@ enum class ResourceOperation : uint32_t {
     // Graphics resource: bind an externally-owned native window (HWND etc).
     // args = [handle:int, width:int, height:int]; returns bool.
     ATTACH_WINDOW = 68,
-    DETACH_WINDOW = 69
+    DETACH_WINDOW = 69,
+    DRAW_SHADOW = 70
 };
 
 } // namespace VM

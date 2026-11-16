@@ -218,6 +218,7 @@ struct VMGraphicsAccess {
     // heap-promotes when it does not, matching make_integer below.
     static Value number(int64_t value) {return make_i64(value);}
     static Value make_integer(int64_t value) {return make_i64(value);}
+    static Value real(double value) {return make_float(value);}
 };
 using SoftwareGraphicsResource=LM::Runtime::SoftwareGraphicsResource<VMGraphicsAccess>;
 

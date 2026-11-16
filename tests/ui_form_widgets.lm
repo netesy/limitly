@@ -1,0 +1,125 @@
+// M2/M3 extension test: Checkbox, Toggle, Slider, ProgressBar + std.ui facade.
+// Same model as ui_widgets.lm — signals are the live state channel,
+// geometry is observed through the live `rect` alias.
+
+import std.gg as gg;
+import std.ui as ui;
+import std.ui.tree as tree;
+import std.events as events;
+
+var assert_count: int = 0;
+
+fn assert(cond: bool, msg: str): nil {
+    if (not cond) {
+        print("FAIL: " + msg);
+        assert_count = assert_count + 1;
+    }
+}
+
+fn main() {
+    print("=== UI Form Widgets  ===");
+
+    // ── Build tree through the std.ui facade ──
+    var agree = ui.signal_bool(false);
+    var enabled = ui.signal_bool(true);
+    var volume = ui.signal_float(0.5);
+    var progress = ui.signal_float(0.25);
+
+    var cb = ui.checkbox("I agree", false);
+    var cb_rect = cb.rect;
+    cb.bind_check(agree);
+
+    var tg = ui.toggle("Power", true);
+    var tg_rect = tg.rect;
+    tg.bind_toggle(enabled);
+
+    var sl = ui.slider(0.0, 100.0, 50.0, "Volume");
+    var sl_rect = sl.rect;
+    sl.bind_value(volume);
+
+    var pb = ui.progress_bar(0.0);
+    var pb_rect = pb.rect;
+    pb.bind_frac(progress);
+    pb.show_pct = 1;
+
+    var root = ui.column(6.0);
+    root.add(cb);
+    root.add(tg);
+    root.add(sl);
+    root.add(pb);
+
+    // ── Frame 1: arrange ──
+    ui.update(root, 300.0, 200.0);
+
+    assert(cb_rect.w > 0.0 and cb_rect.h > 0.0, "checkbox should be arranged");
+    assert(tg_rect.w > 0.0 and tg_rect.h > 0.0, "toggle should be arranged");
+    assert(sl_rect.w > 0.0 and sl_rect.h > 0.0, "slider should be arranged");
+    assert(pb_rect.w > 0.0 and pb_rect.h > 0.0, "progress should be arranged");
+    assert(tree.dirty == 0, "update should clear dirty");
+
+    ui.enable_reactive();
+
+    // ── Checkbox click toggles the bound signal ──
+    var cx: int = (cb_rect.x + cb_rect.w / 2.0) as int;
+    var cy: int = (cb_rect.y + cb_rect.h / 2.0) as int;
+    ui.dispatch(root, events.Event(event_type=events.EventType.MouseDown, x=cx, y=cy, key_code=0));
+    ui.dispatch(root, events.Event(event_type=events.EventType.MouseUp, x=cx, y=cy, key_code=0));
+    assert(agree.get() == true, "checkbox click should set bound BoolSignal");
+    assert(cb.checked_sig.get() == true, "checkbox internal sig should match");
+
+    // External write reflects on next paint (signal is read live).
+    agree.set(false);
+    ui.update(root, 300.0, 200.0);
+    assert(agree.get() == false, "external set should persist");
+
+    // ── Toggle click flips its signal ──
+    var tx: int = (tg_rect.x + tg_rect.w / 2.0) as int;
+    var ty: int = (tg_rect.y + tg_rect.h / 2.0) as int;
+    ui.dispatch(root, events.Event(event_type=events.EventType.MouseDown, x=tx, y=ty, key_code=0));
+    assert(enabled.get() == false, "toggle click should flip bound BoolSignal");
+
+    // ── Slider drag writes the bound FloatSignal ──
+    var sx: int = (sl_rect.x + sl_rect.w * 0.75) as int;
+    var sy: int = (sl_rect.y + sl_rect.h / 2.0) as int;
+    ui.dispatch(root, events.Event(event_type=events.EventType.MouseDown, x=sx, y=sy, key_code=0));
+    assert(volume.get() > 50.0, "slider drag should raise value, got: " + (volume.get() as str));
+    // Drag continues with MouseMove while button held.
+    var sx2: int = (sl_rect.x + sl_rect.w * 0.25) as int;
+    ui.dispatch(root, events.Event(event_type=events.EventType.MouseMove, x=sx2, y=sy, key_code=0));
+    assert(volume.get() < 50.0, "slider move-drag should lower value, got: " + (volume.get() as str));
+    ui.dispatch(root, events.Event(event_type=events.EventType.MouseUp, x=sx2, y=sy, key_code=0));
+    // After release, moves outside the track must not change the value.
+    var before: float = volume.get();
+    ui.dispatch(root, events.Event(event_type=events.EventType.MouseMove, x=sl_rect.x as int, y=sy, key_code=0));
+    assert(volume.get() == before, "slider should ignore moves when not dragging");
+
+    // External write reflects on next paint.
+    volume.set(10.0);
+    ui.update(root, 300.0, 200.0);
+    assert(volume.get() == 10.0, "external slider sig should persist");
+
+    // ── ProgressBar reads its bound signal live ──
+    progress.set(0.8);
+    ui.update(root, 300.0, 200.0);
+    assert(progress.get() == 0.8, "progress sig should persist");
+
+    // ── find_widget walks the new widgets by id ──
+    var found = ui.find_widget(root, cb.widget_id());
+    assert(found != nil, "find_widget should locate checkbox by id");
+    var found2 = ui.find_widget(root, sl.widget_id());
+    assert(found2 != nil, "find_widget should locate slider by id");
+
+    // ── Paint to screen and verify pixels ──
+    assert(gg.setup(), "gg setup failed");
+    gg.begin_pass(300, 200, 0.1, 0.1, 0.15, 1.0);
+    ui.update(root, 300.0, 200.0);
+    ui.submit();
+    gg.end_pass();
+    gg.commit();
+
+    if (assert_count == 0) {
+        print("UI Form Widgets PASSED.");
+    } else {
+        print("UI Form Widgets FAILED: " + (assert_count as str) + " assertion(s)");
+    }
+}

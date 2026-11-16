@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>macos.lm - Lymar API Reference</title>
+<style>
+:root {
+  --bg-primary: #0a0e17;
+  --bg-secondary: #111827;
+  --bg-tertiary: #1f2937;
+  --accent: #38bdf8;
+  --accent-hover: #7dd3fc;
+  --text-main: #f1f5f9;
+  --text-muted: #94a3b8;
+  --border-color: #334155;
+}
+* { box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif;
+  margin: 0; padding: 0; background: var(--bg-primary); color: var(--text-main); display: flex;
+}
+nav {
+  width: 300px; height: 100vh; overflow-y: auto; background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color); padding: 24px 20px; position: fixed;
+}
+nav h2 { font-size: 1.15rem; color: var(--accent); margin-top: 0; margin-bottom: 16px; font-weight: 700; }
+#search-input {
+  width: 100%; padding: 8px 12px; background: var(--bg-tertiary); border: 1px solid var(--border-color);
+  border-radius: 6px; color: #fff; font-size: 0.85rem; margin-bottom: 16px;
+}
+#search-input:focus { outline: none; border-color: var(--accent); }
+.nav-link { display: block; color: var(--text-muted); text-decoration: none; padding: 6px 8px; font-size: 0.9rem; border-radius: 4px; }
+.nav-link:hover { color: #fff; background: var(--bg-tertiary); }
+main { margin-left: 300px; padding: 40px 48px; max-width: 950px; flex: 1; }
+h1 { color: #fff; font-size: 2.2rem; margin-top: 0; padding-bottom: 16px; border-bottom: 1px solid var(--border-color); }
+h2 { color: var(--accent); font-size: 1.4rem; margin-top: 36px; margin-bottom: 14px; }
+h3 { color: #fff; font-size: 1.25rem; margin-top: 28px; margin-bottom: 12px; display: flex; align-items: center; gap: 10px; }
+h4 { color: var(--accent); font-size: 1rem; margin-top: 20px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+.badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
+.badge-pub { background: #064e3b; color: #6ee7b7; border: 1px solid #059669; }
+.badge-private { background: #334155; color: #cbd5e1; }
+.badge-type { background: #1e1b4b; color: #c7d2fe; border: 1px solid #4338ca; }
+.code-sig { background: #090d16; border: 1px solid var(--border-color); padding: 14px 18px; border-radius: 8px; overflow-x: auto; font-family: 'Consolas', 'Fira Code', monospace; font-size: 0.95rem; color: #e2e8f0; }
+.summary { color: #cbd5e1; line-height: 1.65; margin: 14px 0; font-size: 1rem; }
+/* Callout styling */
+.callout { margin: 16px 0; padding: 14px 18px; border-radius: 8px; border-left: 4px solid; font-size: 0.92rem; }
+.callout-header { font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+.callout-tip { border-color: #10b981; background: rgba(16, 185, 129, 0.08); color: #d1fae5; }
+.callout-tip .callout-header { color: #34d399; }
+.callout-warning { border-color: #f59e0b; background: rgba(245, 158, 11, 0.08); color: #fef3c7; }
+.callout-warning .callout-header { color: #fbbf24; }
+.callout-note { border-color: #0284c7; background: rgba(2, 132, 199, 0.08); color: #e0f2fe; }
+.callout-note .callout-header { color: #38bdf8; }
+.callout-deprecated { border-color: #e11d48; background: rgba(225, 29, 72, 0.08); color: #ffe4e6; }
+.callout-deprecated .callout-header { color: #fb7185; }
+/* Example card */
+.example-card { margin: 20px 0; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: #080c14; }
+.example-header { background: #162032; padding: 8px 16px; font-size: 0.82rem; font-weight: 700; color: #94a3b8; border-bottom: 1px solid var(--border-color); }
+.example-card pre { margin: 0; padding: 14px 18px; overflow-x: auto; font-family: monospace; font-size: 0.92rem; color: #e2e8f0; }
+/* Tables */
+table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 0.92rem; }
+th { background: #162032; color: #94a3b8; text-align: left; padding: 10px 14px; font-weight: 600; border-bottom: 1px solid var(--border-color); }
+td { padding: 10px 14px; border-bottom: 1px solid #1e293b; color: #cbd5e1; }
+ul { padding-left: 20px; color: #cbd5e1; line-height: 1.6; }
+hr { border: 0; border-top: 1px solid var(--border-color); margin: 36px 0; }
+</style>
+<script>
+function filterNav() {
+  var q = document.getElementById('search-input').value.toLowerCase();
+  var links = document.querySelectorAll('.nav-link');
+  links.forEach(function(l) {
+    l.style.display = l.textContent.toLowerCase().includes(q) ? 'block' : 'none';
+  });
+}
+</script>
+</head>
+<body>
+<nav>
+<h2>macos.lm</h2>
+<input type="text" id="search-input" placeholder="Filter symbols..." oninput="filterNav()">
+<div id="nav-list">
+<a class="nav-link" href="#keep">keep <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#asym">asym <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#objc_sym">objc_sym <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#appkit_sym">appkit_sym <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#call_i64">call_i64 <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#call_i64_ret">call_i64_ret <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#call_void">call_void <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#cstr">cstr <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#p2i">p2i <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#cb_load">cb_load <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#cb_store">cb_store <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#msg_fn">msg_fn <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#msgstret_fn">msgstret_fn <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#msg0">msg0 <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#msg0_ret">msg0_ret <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#msg1i">msg1i <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#msg1i_ret">msg1i_ret <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#msg2i">msg2i <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#msg3i">msg3i <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#msg_stret0">msg_stret0 <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#msg_stret1">msg_stret1 <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#sel">sel <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#find_block">find_block <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#active_window_count">active_window_count <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#ring_push">ring_push <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#kind_from_int">kind_from_int <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#block_pop_event">block_pop_event <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#delegate_window_should_close">delegate_window_should_close <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#delegate_window_did_resize">delegate_window_did_resize <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#ensure_classes">ensure_classes <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#available">available <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#next_window_id">next_window_id <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#make_nsstring">make_nsstring <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#add_window_block">add_window_block <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#ensure_delegate">ensure_delegate <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#create_window">create_window <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#pump_events">pump_events <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#nsevent_type">nsevent_type <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#translate_nsevent">translate_nsevent <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#nmods">nmods <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#utf8_first">utf8_first <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#poll_event">poll_event <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#wait_event">wait_event <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#invalidate">invalidate <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#set_title">set_title <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#set_size">set_size <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#client_size">client_size <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#destroy">destroy <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#run_message_loop">run_message_loop <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+</div>
+</nav>
+<main>
+<h1>macos.lm API Reference</h1>
+<h2>Module Overview</h2>
+<div class="summary"><p>std.native.macos - Pure-Lymar macOS windowing backend (Cocoa/ObjC).
+
+Implements the std.native.types contract through std.ffi:
+  - libobjc.dylib: objc_getClass / sel_registerName / objc_msgSend
+    / objc_msgSend_stret / class_addMethod (for a Lymar-defined
+    NSWindowDelegate giving us windowShouldClose/windowDidResize)
+  - AppKit.framework loaded dynamically (no link-time dependency)
+  - NSRect-by-value arguments via ffi struct support
+    ([ffi.TYPE_STRUCT, ffi.TYPE_F64 x4])
+
+No C glue, no sokol. The event pump pulls NSEvents via
+-[NSApplication nextEventMatchingMask:untilDate:inMode:dequeue:].
+
+Control blocks + event rings are ffi.alloc'd raw memory so native
+callbacks never touch Lymar heap objects (same discipline as
+std.native.win32/linux).</p></div>
+<div id="keep">
+<h3>keep <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn keep(p: pubptr): pubptr</code></pre>
+</div><hr>
+<div id="asym">
+<h3>asym <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn asym(lib: int, name: str): int</code></pre>
+</div><hr>
+<div id="objc_sym">
+<h3>objc_sym <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn objc_sym(name: str): int</code></pre>
+</div><hr>
+<div id="appkit_sym">
+<h3>appkit_sym <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn appkit_sym(name: str): int</code></pre>
+</div><hr>
+<div id="call_i64">
+<h3>call_i64 <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn call_i64(fptr: int, args: list): int</code></pre>
+</div><hr>
+<div id="call_i64_ret">
+<h3>call_i64_ret <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn call_i64_ret(fptr: int, args: list, ret: int): int</code></pre>
+</div><hr>
+<div id="call_void">
+<h3>call_void <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn call_void(fptr: int, args: list): nil</code></pre>
+</div><hr>
+<div id="cstr">
+<h3>cstr <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn cstr(s: str): int</code></pre>
+</div><hr>
+<div id="p2i">
+<h3>p2i <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn p2i(p: int): int</code></pre>
+</div><hr>
+<div id="cb_load">
+<h3>cb_load <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn cb_load(block: int, off: int): int</code></pre>
+</div><hr>
+<div id="cb_store">
+<h3>cb_store <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn cb_store(block: int, off: int, v: int): nil</code></pre>
+</div><hr>
+<div id="msg_fn">
+<h3>msg_fn <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn msg_fn(): int</code></pre>
+</div><hr>
+<div id="msgstret_fn">
+<h3>msgstret_fn <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn msgstret_fn(): int</code></pre>
+</div><hr>
+<div id="msg0">
+<h3>msg0 <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn msg0(obj: int, sel: int): int</code></pre>
+</div><hr>
+<div id="msg0_ret">
+<h3>msg0_ret <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn msg0_ret(obj: int, sel: int, ret: int): int</code></pre>
+</div><hr>
+<div id="msg1i">
+<h3>msg1i <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn msg1i(obj: int, sel: int, a: int): int</code></pre>
+</div><hr>
+<div id="msg1i_ret">
+<h3>msg1i_ret <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn msg1i_ret(obj: int, sel: int, a: int, ret: int): int</code></pre>
+</div><hr>
+<div id="msg2i">
+<h3>msg2i <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn msg2i(obj: int, sel: int, a: int, b: int): int</code></pre>
+</div><hr>
+<div id="msg3i">
+<h3>msg3i <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn msg3i(obj: int, sel: int, a: int, b: int, c: int): int</code></pre>
+</div><hr>
+<div id="msg_stret0">
+<h3>msg_stret0 <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn msg_stret0(out: int, obj: int, sel: int): nil</code></pre>
+<div class="summary"><p>stret variant: struct return written to `out` buffer.</p></div>
+</div><hr>
+<div id="msg_stret1">
+<h3>msg_stret1 <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn msg_stret1(out: int, obj: int, sel: int, a: int): nil</code></pre>
+</div><hr>
+<div id="sel">
+<h3>sel <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn sel(name: str): int</code></pre>
+</div><hr>
+<div id="find_block">
+<h3>find_block <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn find_block(nswindow: int): int</code></pre>
+</div><hr>
+<div id="active_window_count">
+<h3>active_window_count <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn active_window_count(): int</code></pre>
+</div><hr>
+<div id="ring_push">
+<h3>ring_push <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn ring_push(block: int, kind: int, x: int, y: int, w: int, h: int, key: int, ch: int, mods: int, buttons: int, delta: int): nil</code></pre>
+</div><hr>
+<div id="kind_from_int">
+<h3>kind_from_int <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn kind_from_int(k: int): nt.EventKind</code></pre>
+</div><hr>
+<div id="block_pop_event">
+<h3>block_pop_event <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn block_pop_event(block: int): any</code></pre>
+</div><hr>
+<div id="delegate_window_should_close">
+<h3>delegate_window_should_close <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn delegate_window_should_close(self_obj: int, _cmd: int, sender: int): int</code></pre>
+<div class="summary"><p>windowShouldClose:(id)sender -> BOOL. Push Close, allow close.</p></div>
+</div><hr>
+<div id="delegate_window_did_resize">
+<h3>delegate_window_did_resize <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn delegate_window_did_resize(self_obj: int, _cmd: int, sender: int): nil</code></pre>
+<div class="summary"><p>windowDidResize:(id)sender -> void. Push Resize with new size.</p></div>
+</div><hr>
+<div id="ensure_classes">
+<h3>ensure_classes <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn ensure_classes(): int</code></pre>
+</div><hr>
+<div id="available">
+<h3>available <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn available(): bool</code></pre>
+</div><hr>
+<div id="next_window_id">
+<h3>next_window_id <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn next_window_id(): int</code></pre>
+</div><hr>
+<div id="make_nsstring">
+<h3>make_nsstring <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn make_nsstring(s: str): int</code></pre>
+</div><hr>
+<div id="add_window_block">
+<h3>add_window_block <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn add_window_block(nswindow: int, width: int, height: int): int</code></pre>
+</div><hr>
+<div id="ensure_delegate">
+<h3>ensure_delegate <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn ensure_delegate(): int</code></pre>
+</div><hr>
+<div id="create_window">
+<h3>create_window <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn create_window(title: str, width: int, height: int): nt.Window?</code></pre>
+</div><hr>
+<div id="pump_events">
+<h3>pump_events <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn pump_events(blocking: int): nil</code></pre>
+<div class="summary"><p>Pump one batch of NSEvents into rings. blocking=1 uses distantFuture.</p></div>
+</div><hr>
+<div id="nsevent_type">
+<h3>nsevent_type <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn nsevent_type(ev: int): int</code></pre>
+</div><hr>
+<div id="translate_nsevent">
+<h3>translate_nsevent <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn translate_nsevent(ev: int): bool</code></pre>
+</div><hr>
+<div id="nmods">
+<h3>nmods <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn nmods(flags: int): int</code></pre>
+</div><hr>
+<div id="utf8_first">
+<h3>utf8_first <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn utf8_first(buf: int): int</code></pre>
+</div><hr>
+<div id="poll_event">
+<h3>poll_event <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn poll_event(win: nt.Window): nt.Event</code></pre>
+</div><hr>
+<div id="wait_event">
+<h3>wait_event <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn wait_event(win: nt.Window): nt.Event</code></pre>
+</div><hr>
+<div id="invalidate">
+<h3>invalidate <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn invalidate(win: nt.Window): nil</code></pre>
+</div><hr>
+<div id="set_title">
+<h3>set_title <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn set_title(win: nt.Window, title: str): nil</code></pre>
+</div><hr>
+<div id="set_size">
+<h3>set_size <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn set_size(win: nt.Window, width: int, height: int): nil</code></pre>
+</div><hr>
+<div id="client_size">
+<h3>client_size <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn client_size(win: nt.Window): tuple</code></pre>
+</div><hr>
+<div id="destroy">
+<h3>destroy <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn destroy(win: nt.Window): nil</code></pre>
+</div><hr>
+<div id="run_message_loop">
+<h3>run_message_loop <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn run_message_loop(): nil</code></pre>
+</div><hr>
+</main>
+</body>
+</html>

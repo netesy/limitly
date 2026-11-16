@@ -83,30 +83,40 @@ function filterNav() {
 <a class="nav-link" href="#DrawCmd">DrawCmd <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
 <a class="nav-link" href="#dcmd_rect">dcmd_rect <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 <a class="nav-link" href="#dcmd_rect_rounded">dcmd_rect_rounded <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#dcmd_border_rounded">dcmd_border_rounded <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 <a class="nav-link" href="#dcmd_text">dcmd_text <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 <a class="nav-link" href="#dcmd_line">dcmd_line <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#dcmd_triangle">dcmd_triangle <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 <a class="nav-link" href="#dcmd_clip_push">dcmd_clip_push <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#dcmd_shadow">dcmd_shadow <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 <a class="nav-link" href="#dcmd_clip_pop">dcmd_clip_pop <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
-<a class="nav-link" href="#HitZone">HitZone <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
-<a class="nav-link" href="#make_button_zone">make_button_zone <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
-<a class="nav-link" href="#make_slider_zone">make_slider_zone <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
-<a class="nav-link" href="#make_checkbox_zone">make_checkbox_zone <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
-<a class="nav-link" href="#make_input_zone">make_input_zone <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 <a class="nav-link" href="#DrawList">DrawList <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
 <a class="nav-link" href="#draw_list">draw_list <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#dl_alloc_cmd">dl_alloc_cmd <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#dl_alloc_overlay_cmd">dl_alloc_overlay_cmd <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#dl_emit_rect">dl_emit_rect <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#dl_emit_rect_rounded">dl_emit_rect_rounded <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#dl_emit_rect_border">dl_emit_rect_border <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#dl_emit_shadow">dl_emit_shadow <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#dl_emit_text">dl_emit_text <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 <a class="nav-link" href="#dl_add">dl_add <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
-<a class="nav-link" href="#dl_add_hit">dl_add_hit <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
-<a class="nav-link" href="#dl_hit_test">dl_hit_test <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#dl_add_overlay_cmd">dl_add_overlay_cmd <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#dl_flush_overlays">dl_flush_overlays <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 <a class="nav-link" href="#dl_clear">dl_clear <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#dl_clip_balance">dl_clip_balance <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#PaintContext">PaintContext <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#dl_push_clip">dl_push_clip <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#dl_pop_clip">dl_pop_clip <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 </div>
 </nav>
 <main>
 <h1>draw_list.lm API Reference</h1>
 <h2>Module Overview</h2>
 <div class="summary"><p>std/ui/draw_list.lm
-Flat, ordered GPU draw command list.
-Replaces the recursive Widget tree as the engine's internal representation.
-Emitted by builder.lm in a single pass; replayed by replay.lm without recursion.</p></div>
+Flat, ordered GPU draw command list with zero-allocation buffer reuse.
+Emitted by widgets during tree.update's paint pass; replayed by
+replay.lm without recursion. Hit-testing lives in std.ui.tree — this
+module carries draw commands only.</p></div>
 <div id="DrawCmd">
 <h3>DrawCmd <span class="badge badge-pub">Frame</span></h3>
 <pre class="code-sig"><code>frame DrawCmd</code></pre>
@@ -124,12 +134,14 @@ A single GPU-ready draw instruction. Approx 80 bytes vs Widget's ~400 bytes.</p>
 <li><code>var pub b: float</code> <em>(field)</em></li>
 <li><code>var pub a: float</code> <em>(field)</em></li>
 <li><code>var pub radius: float</code> <em>(field)</em></li>
+<li><code>var pub border_width: float</code> <em>(field)</em></li>
 <li><code>var pub text: str</code> <em>(field)</em></li>
 <li><code>var pub font_scale: float</code> <em>(field)</em></li>
 <li><code>var pub x2: float</code> <em>(field)</em></li>
 <li><code>var pub y2: float</code> <em>(field)</em></li>
 <li><code>var pub x3: float</code> <em>(field)</em></li>
 <li><code>var pub y3: float</code> <em>(field)</em></li>
+<li><code>var pub clip_shape: int</code> <em>(field)</em></li>
 <li><code>pub init()</code> <em>(constructor)</em></li>
 </ul>
 </div><hr>
@@ -141,6 +153,10 @@ A single GPU-ready draw instruction. Approx 80 bytes vs Widget's ~400 bytes.</p>
 <h3>dcmd_rect_rounded <span class="badge badge-pub">Function</span></h3>
 <pre class="code-sig"><code>pub fn dcmd_rect_rounded(x: float, y: float, w: float, h: float, radius: float, r: float, g: float, b: float, a: float): DrawCmd</code></pre>
 </div><hr>
+<div id="dcmd_border_rounded">
+<h3>dcmd_border_rounded <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn dcmd_border_rounded(x: float, y: float, w: float, h: float, radius: float, border_width: float, r: float, g: float, b: float, a: float): DrawCmd</code></pre>
+</div><hr>
 <div id="dcmd_text">
 <h3>dcmd_text <span class="badge badge-pub">Function</span></h3>
 <pre class="code-sig"><code>pub fn dcmd_text(text: str, x: float, y: float, r: float, g: float, b: float, a: float, font_scale: float): DrawCmd</code></pre>
@@ -149,92 +165,112 @@ A single GPU-ready draw instruction. Approx 80 bytes vs Widget's ~400 bytes.</p>
 <h3>dcmd_line <span class="badge badge-pub">Function</span></h3>
 <pre class="code-sig"><code>pub fn dcmd_line(x1: float, y1: float, x2: float, y2: float, r: float, g: float, b: float, a: float): DrawCmd</code></pre>
 </div><hr>
+<div id="dcmd_triangle">
+<h3>dcmd_triangle <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn dcmd_triangle(x1: float, y1: float, x2: float, y2: float, x3: float, y3: float, r: float, g: float, b: float, a: float): DrawCmd</code></pre>
+</div><hr>
 <div id="dcmd_clip_push">
 <h3>dcmd_clip_push <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn dcmd_clip_push(x: float, y: float, w: float, h: float): DrawCmd</code></pre>
+<pre class="code-sig"><code>pub fn dcmd_clip_push(x: float, y: float, w: float, h: float, shape: int = ..., radius: float = ...): DrawCmd</code></pre>
+</div><hr>
+<div id="dcmd_shadow">
+<h3>dcmd_shadow <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn dcmd_shadow(x: float, y: float, w: float, h: float, r: float, g: float, b: float, a: float, off_x: float, off_y: float, blur: float, spread: float, radius: float = ...): DrawCmd</code></pre>
+<div class="summary"><p>Soft drop shadow: x2=off_x, y2=off_y, x3=blur, y3=spread (reuses the
+line/triangle coordinate fields — Shadow never draws geometry).</p></div>
 </div><hr>
 <div id="dcmd_clip_pop">
 <h3>dcmd_clip_pop <span class="badge badge-pub">Function</span></h3>
 <pre class="code-sig"><code>pub fn dcmd_clip_pop(): DrawCmd</code></pre>
 </div><hr>
-<div id="HitZone">
-<h3>HitZone <span class="badge badge-pub">Frame</span></h3>
-<pre class="code-sig"><code>frame HitZone</code></pre>
-<div class="summary"><p>── HitZone ───────────────────────────────────────────────────────────────────
-Parallel list to DrawCmd list — built simultaneously during build pass.
-Hit tested as a simple linear scan — no recursion needed.</p></div>
-<h4>Members</h4>
-<ul>
-<li><code>var pub id: str</code> <em>(field)</em></li>
-<li><code>var pub kind: HitZoneKind</code> <em>(field)</em></li>
-<li><code>var pub x: float</code> <em>(field)</em></li>
-<li><code>var pub y: float</code> <em>(field)</em></li>
-<li><code>var pub w: float</code> <em>(field)</em></li>
-<li><code>var pub h: float</code> <em>(field)</em></li>
-<li><code>var pub clip_x: float</code> <em>(field)</em></li>
-<li><code>var pub clip_y: float</code> <em>(field)</em></li>
-<li><code>var pub clip_w: float</code> <em>(field)</em></li>
-<li><code>var pub clip_h: float</code> <em>(field)</em></li>
-<li><code>var pub on_click: any</code> <em>(field)</em></li>
-<li><code>var pub on_change: any</code> <em>(field)</em></li>
-<li><code>var pub slider_min: float</code> <em>(field)</em></li>
-<li><code>var pub slider_max: float</code> <em>(field)</em></li>
-<li><code>var pub slider_val: float</code> <em>(field)</em></li>
-<li><code>var pub tab_index: int</code> <em>(field)</em></li>
-<li><code>var pub is_checked: int</code> <em>(field)</em></li>
-<li><code>var pub widget: any</code> <em>(field)</em></li>
-<li><code>pub init()</code> <em>(constructor)</em></li>
-</ul>
-</div><hr>
-<div id="make_button_zone">
-<h3>make_button_zone <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn make_button_zone(id: str, x: float, y: float, w: float, h: float, on_click, widget = ...): HitZone</code></pre>
-</div><hr>
-<div id="make_slider_zone">
-<h3>make_slider_zone <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn make_slider_zone(id: str, x: float, y: float, w: float, h: float, min_v: float, max_v: float, cur_v: float, on_change, widget = ...): HitZone</code></pre>
-</div><hr>
-<div id="make_checkbox_zone">
-<h3>make_checkbox_zone <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn make_checkbox_zone(id: str, x: float, y: float, w: float, h: float, checked: int, on_change, widget = ...): HitZone</code></pre>
-</div><hr>
-<div id="make_input_zone">
-<h3>make_input_zone <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn make_input_zone(id: str, x: float, y: float, w: float, h: float, widget: any = ...): HitZone</code></pre>
-</div><hr>
 <div id="DrawList">
 <h3>DrawList <span class="badge badge-pub">Frame</span></h3>
 <pre class="code-sig"><code>frame DrawList</code></pre>
-<div class="summary"><p>── DrawList ──────────────────────────────────────────────────────────────────</p></div>
+<div class="summary"><p>── DrawList ──────────────────────────────────────────────────────────────────
+Keeps backing lists and pre-allocated DrawCmd slots across rebuilds
+so `clear()` resets cursor counts in O(1) with zero per-frame allocations.</p></div>
 <h4>Members</h4>
 <ul>
 <li><code>var pub cmds: list</code> <em>(field)</em></li>
-<li><code>var pub hits: list</code> <em>(field)</em></li>
+<li><code>var pub overlay_cmds: list</code> <em>(field)</em></li>
+<li><code>var pub cmd_count: int</code> <em>(field)</em></li>
+<li><code>var pub overlay_cmd_count: int</code> <em>(field)</em></li>
 <li><code>var pub is_valid: int</code> <em>(field)</em></li>
 <li><code>pub init()</code> <em>(constructor)</em></li>
+<li><code>pub fn clear(): nil</code> <em>(method)</em></li>
 </ul>
 </div><hr>
 <div id="draw_list">
 <h3>draw_list <span class="badge badge-pub">Function</span></h3>
 <pre class="code-sig"><code>pub fn draw_list(): DrawList</code></pre>
 </div><hr>
+<div id="dl_alloc_cmd">
+<h3>dl_alloc_cmd <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn dl_alloc_cmd(dl: DrawList): DrawCmd</code></pre>
+</div><hr>
+<div id="dl_alloc_overlay_cmd">
+<h3>dl_alloc_overlay_cmd <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn dl_alloc_overlay_cmd(dl: DrawList): DrawCmd</code></pre>
+</div><hr>
+<div id="dl_emit_rect">
+<h3>dl_emit_rect <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn dl_emit_rect(dl: DrawList, x: float, y: float, w: float, h: float, r: float, g: float, b: float, a: float = ...): nil</code></pre>
+</div><hr>
+<div id="dl_emit_rect_rounded">
+<h3>dl_emit_rect_rounded <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn dl_emit_rect_rounded(dl: DrawList, x: float, y: float, w: float, h: float, rad: float, r: float, g: float, b: float, a: float = ...): nil</code></pre>
+</div><hr>
+<div id="dl_emit_rect_border">
+<h3>dl_emit_rect_border <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn dl_emit_rect_border(dl: DrawList, x: float, y: float, w: float, h: float, rad: float, bw: float, r: float, g: float, b: float, a: float = ...): nil</code></pre>
+</div><hr>
+<div id="dl_emit_shadow">
+<h3>dl_emit_shadow <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn dl_emit_shadow(dl: DrawList, x: float, y: float, w: float, h: float, r: float, g: float, b: float, a: float, off_x: float, off_y: float, blur: float, spread: float, radius: float = ...): nil</code></pre>
+</div><hr>
+<div id="dl_emit_text">
+<h3>dl_emit_text <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn dl_emit_text(dl: DrawList, txt: str, x: float, y: float, r: float, g: float, b: float, a: float = ..., scale: float = ...): nil</code></pre>
+</div><hr>
 <div id="dl_add">
 <h3>dl_add <span class="badge badge-pub">Function</span></h3>
 <pre class="code-sig"><code>pub fn dl_add(dl: DrawList, cmd: DrawCmd): nil</code></pre>
 </div><hr>
-<div id="dl_add_hit">
-<h3>dl_add_hit <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn dl_add_hit(dl: DrawList, hz: HitZone): nil</code></pre>
+<div id="dl_add_overlay_cmd">
+<h3>dl_add_overlay_cmd <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn dl_add_overlay_cmd(dl: DrawList, cmd: DrawCmd): nil</code></pre>
 </div><hr>
-<div id="dl_hit_test">
-<h3>dl_hit_test <span class="badge badge-pub">Function</span></h3>
-<pre class="code-sig"><code>pub fn dl_hit_test(dl: DrawList, px: float, py: float): HitZone</code></pre>
-<div class="summary"><p>Hit test: returns the topmost HitZone under (px, py), or nil.
-O(n) linear scan — no recursion.</p></div>
+<div id="dl_flush_overlays">
+<h3>dl_flush_overlays <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn dl_flush_overlays(dl: DrawList): nil</code></pre>
 </div><hr>
 <div id="dl_clear">
 <h3>dl_clear <span class="badge badge-pub">Function</span></h3>
 <pre class="code-sig"><code>pub fn dl_clear(dl: DrawList): nil</code></pre>
+</div><hr>
+<div id="dl_clip_balance">
+<h3>dl_clip_balance <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn dl_clip_balance(d: DrawList): int</code></pre>
+<div class="summary"><p>M5 batching audit: clip push/pop must balance over the emitted command
+stream or the GPU clip stack leaks state into the next frame. Returns
+the net balance — 0 means every ClipPush was matched by a ClipPop.</p></div>
+</div><hr>
+<div id="PaintContext">
+<h3>PaintContext <span class="badge badge-pub">Frame</span></h3>
+<pre class="code-sig"><code>frame PaintContext</code></pre>
+<h4>Members</h4>
+<ul>
+<li><code>var pub dl: DrawList</code> <em>(field)</em></li>
+<li><code>pub init()</code> <em>(constructor)</em></li>
+</ul>
+</div><hr>
+<div id="dl_push_clip">
+<h3>dl_push_clip <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn dl_push_clip(d: DrawList, x: float, y: float, w: float, h: float): nil</code></pre>
+</div><hr>
+<div id="dl_pop_clip">
+<h3>dl_pop_clip <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn dl_pop_clip(d: DrawList): nil</code></pre>
 </div><hr>
 </main>
 </body>

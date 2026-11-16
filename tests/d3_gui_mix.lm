@@ -3,13 +3,15 @@
 // Expected: dark theme bg, a cyan box in the center, a "HUD" window top-left.
 // If the window is black or missing pieces, the bug is in this combination.
 
+import std.app as app;
 import std.game as game;
 import std.d3 as d3;
 
 fn main() {
     var cfg = game.Config(title = "D3+GUI Mix", width = 640, height = 480);
-    var app = game.Game(cfg);
-    if (not app.setup()) { print("no ctx"); return 1; }
+    var g = game.Game(cfg);
+    var a = app.App(cfg.title, cfg.width, cfg.height);
+    a.open();
 
     var scene = d3.Scene3D();
     scene.background_r = 0.2;
@@ -19,27 +21,31 @@ fn main() {
 
     var cam = d3.orthographic_camera(0.0, 640.0, 0.0, 480.0, 0.1, 100.0);
     cam.set_position(0.0, 0.0, 10.0);
-    var renderer3d = d3.Renderer3D(app.width, app.height);
+    var renderer3d = d3.Renderer3D(g.width, g.height);
     renderer3d.clear_color = true;
 
     var box = d3.Mesh(d3.box(80.0, 80.0, 10.0), d3.basic_material(0.0, 0.95, 1.0, 1.0), "box");
     scene.add(box);
 
     var ticks = 0;
-    while (app.is_running and ticks < 600) {
-        app.begin_frame();
+    while (a.is_running() and ticks < 600) {
+        a.pump();
+        g.poll();
         ticks = ticks + 1;
-        val cw = app.width as float;
-        val ch = app.height as float;
+        val cw = g.width as float;
+        val ch = g.height as float;
         box.set_position(cw * 0.5, ch * 0.5, 0.0);
+        a.begin_pass();
+        g.imgui_begin();
         renderer3d.render(scene, cam, 0.0, 0.0, cw, ch);
-        if (app.gui.begin_window("HUD", 16.0, 16.0, 200.0, 120.0)) {
-            app.gui.label("d3 + imgui coexistence test");
-            app.gui.end_window();
+        if (g.gui.begin_window("HUD", 16.0, 16.0, 200.0, 120.0)) {
+            g.gui.label("d3 + imgui coexistence test");
+            g.gui.end_window();
         }
-        app.end_frame();
+        g.imgui_end();
+        a.end_pass();
     }
     print("mix done ticks={ticks}");
-    app.shutdown();
+    a.close();
     return 0;
 }

@@ -1,8 +1,7 @@
 // std/ui/types.lm
-// Canonical Enums, Style Model, and Consolidated Geometry for Lymar Retained UI
-//
-// Retires the legacy 65-field `Widget` monolith and `Blueprint` tree.
-// Concrete UI widgets live in `std.ui.components` using zero-cost `embed`.
+// Shared enums, style model, and geometry for the retained component UI.
+// Concrete widgets live under std.ui.widgets / std.ui.containers and
+// conform to the std.ui.component.Component contract.
 
 import std.color as color;
 pub import std.widget.state show Alignment, Axis;

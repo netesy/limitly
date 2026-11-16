@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>text_metrics.lm - Lymar API Reference</title>
+<style>
+:root {
+  --bg-primary: #0a0e17;
+  --bg-secondary: #111827;
+  --bg-tertiary: #1f2937;
+  --accent: #38bdf8;
+  --accent-hover: #7dd3fc;
+  --text-main: #f1f5f9;
+  --text-muted: #94a3b8;
+  --border-color: #334155;
+}
+* { box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif;
+  margin: 0; padding: 0; background: var(--bg-primary); color: var(--text-main); display: flex;
+}
+nav {
+  width: 300px; height: 100vh; overflow-y: auto; background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color); padding: 24px 20px; position: fixed;
+}
+nav h2 { font-size: 1.15rem; color: var(--accent); margin-top: 0; margin-bottom: 16px; font-weight: 700; }
+#search-input {
+  width: 100%; padding: 8px 12px; background: var(--bg-tertiary); border: 1px solid var(--border-color);
+  border-radius: 6px; color: #fff; font-size: 0.85rem; margin-bottom: 16px;
+}
+#search-input:focus { outline: none; border-color: var(--accent); }
+.nav-link { display: block; color: var(--text-muted); text-decoration: none; padding: 6px 8px; font-size: 0.9rem; border-radius: 4px; }
+.nav-link:hover { color: #fff; background: var(--bg-tertiary); }
+main { margin-left: 300px; padding: 40px 48px; max-width: 950px; flex: 1; }
+h1 { color: #fff; font-size: 2.2rem; margin-top: 0; padding-bottom: 16px; border-bottom: 1px solid var(--border-color); }
+h2 { color: var(--accent); font-size: 1.4rem; margin-top: 36px; margin-bottom: 14px; }
+h3 { color: #fff; font-size: 1.25rem; margin-top: 28px; margin-bottom: 12px; display: flex; align-items: center; gap: 10px; }
+h4 { color: var(--accent); font-size: 1rem; margin-top: 20px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+.badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
+.badge-pub { background: #064e3b; color: #6ee7b7; border: 1px solid #059669; }
+.badge-private { background: #334155; color: #cbd5e1; }
+.badge-type { background: #1e1b4b; color: #c7d2fe; border: 1px solid #4338ca; }
+.code-sig { background: #090d16; border: 1px solid var(--border-color); padding: 14px 18px; border-radius: 8px; overflow-x: auto; font-family: 'Consolas', 'Fira Code', monospace; font-size: 0.95rem; color: #e2e8f0; }
+.summary { color: #cbd5e1; line-height: 1.65; margin: 14px 0; font-size: 1rem; }
+/* Callout styling */
+.callout { margin: 16px 0; padding: 14px 18px; border-radius: 8px; border-left: 4px solid; font-size: 0.92rem; }
+.callout-header { font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+.callout-tip { border-color: #10b981; background: rgba(16, 185, 129, 0.08); color: #d1fae5; }
+.callout-tip .callout-header { color: #34d399; }
+.callout-warning { border-color: #f59e0b; background: rgba(245, 158, 11, 0.08); color: #fef3c7; }
+.callout-warning .callout-header { color: #fbbf24; }
+.callout-note { border-color: #0284c7; background: rgba(2, 132, 199, 0.08); color: #e0f2fe; }
+.callout-note .callout-header { color: #38bdf8; }
+.callout-deprecated { border-color: #e11d48; background: rgba(225, 29, 72, 0.08); color: #ffe4e6; }
+.callout-deprecated .callout-header { color: #fb7185; }
+/* Example card */
+.example-card { margin: 20px 0; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: #080c14; }
+.example-header { background: #162032; padding: 8px 16px; font-size: 0.82rem; font-weight: 700; color: #94a3b8; border-bottom: 1px solid var(--border-color); }
+.example-card pre { margin: 0; padding: 14px 18px; overflow-x: auto; font-family: monospace; font-size: 0.92rem; color: #e2e8f0; }
+/* Tables */
+table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 0.92rem; }
+th { background: #162032; color: #94a3b8; text-align: left; padding: 10px 14px; font-weight: 600; border-bottom: 1px solid var(--border-color); }
+td { padding: 10px 14px; border-bottom: 1px solid #1e293b; color: #cbd5e1; }
+ul { padding-left: 20px; color: #cbd5e1; line-height: 1.6; }
+hr { border: 0; border-top: 1px solid var(--border-color); margin: 36px 0; }
+</style>
+<script>
+function filterNav() {
+  var q = document.getElementById('search-input').value.toLowerCase();
+  var links = document.querySelectorAll('.nav-link');
+  links.forEach(function(l) {
+    l.style.display = l.textContent.toLowerCase().includes(q) ? 'block' : 'none';
+  });
+}
+</script>
+</head>
+<body>
+<nav>
+<h2>text_metrics.lm</h2>
+<input type="text" id="search-input" placeholder="Filter symbols..." oninput="filterNav()">
+<div id="nav-list">
+<a class="nav-link" href="#render_scale">render_scale <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#render_px">render_px <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#ensure_font">ensure_font <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#using_renderer_metrics">using_renderer_metrics <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#using_real_font">using_real_font <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#text_width">text_width <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#line_height">line_height <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+</div>
+</nav>
+<main>
+<h1>text_metrics.lm API Reference</h1>
+<h2>Module Overview</h2>
+<div class="summary"><p>std/ui/text_metrics.lm
+Font metric provider for the retained UI — pixel-parity with the
+renderer when a graphics context exists, real advances otherwise.
+
+Parity chain (first hit wins):
+  1. gg.measure_text / gg.get_line_height — the RENDERER's own fons
+     metrics context: same embedded font, same gfx_font_size_for_scale
+     size mapping the draw path uses. Pixel-exact.
+  2. std.image.font system font at the renderer-mapped pixel size —
+     real advances, possibly a different typeface than the embedded
+     fons font (advances can differ slightly).
+  3. Heuristic: FALLBACK_CHAR_W per codepoint — headless/no-font.
+
+font_scale maps to renderer scale EXACTLY like replay():
+  font_scale < 1.5 -> scale 1 (13px), >= 1.5 -> scale 2 (20px).
+
+Callers must pass the DISPLAY string (textshape.prepare_display).
+Results are cached per "text#scale_milli" — each uncached query is an
+FFI call, which would break the per-frame zero-alloc budget (M5).</p></div>
+<div id="render_scale">
+<h3>render_scale <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn render_scale(font_scale: float): int</code></pre>
+<div class="summary"><p>Map widget font_scale to the renderer's integer scale, mirroring
+std/ui/replay.lm: scale_i = font_scale >= 1.5 ? 2 : 1.</p></div>
+</div><hr>
+<div id="render_px">
+<h3>render_px <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn render_px(font_scale: float): float</code></pre>
+<div class="summary"><p>Pixel size the renderer will use for a widget font_scale.
+Mirrors gfx_font_size_for_scale for the two scales replay emits.</p></div>
+</div><hr>
+<div id="ensure_font">
+<h3>ensure_font <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn ensure_font(): int</code></pre>
+</div><hr>
+<div id="using_renderer_metrics">
+<h3>using_renderer_metrics <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn using_renderer_metrics(): bool</code></pre>
+<div class="summary"><p>Whether the live-graphics-context (pixel-exact) path is active.</p></div>
+</div><hr>
+<div id="using_real_font">
+<h3>using_real_font <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn using_real_font(): bool</code></pre>
+<div class="summary"><p>Whether a fallback real font is loaded (diagnostics).</p></div>
+</div><hr>
+<div id="text_width">
+<h3>text_width <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn text_width(text: str, font_scale: float = ...): float</code></pre>
+<div class="summary"><p>Advance width of a display string at the given font_scale.</p></div>
+</div><hr>
+<div id="line_height">
+<h3>line_height <span class="badge badge-pub">Function</span></h3>
+<pre class="code-sig"><code>pub fn line_height(font_scale: float = ...): float</code></pre>
+<div class="summary"><p>Line height for single-line widgets at the given font_scale.</p></div>
+</div><hr>
+</main>
+</body>
+</html>

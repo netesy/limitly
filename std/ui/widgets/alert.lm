@@ -1,0 +1,92 @@
+// std/ui/widgets/alert.lm
+// Widget — ported from legacy Fluent Alert (+ toast helper).
+// Rounded message bar; kind selects the background color
+// (info/success/warning/danger).
+
+import std.ui.component as comp;
+import std.ui.component show Placed, TextBound;
+import std.ui.types as ui_types;
+import std.ui.event as uievent;
+import std.ui.context as uictx;
+import std.ui.draw_list as dl;
+import std.ui.state as state;
+import std.ui.tree as tree;
+import std.events as events;
+import std.color as color;
+import std.ui.theme as uitheme;
+import std.text.controller as text_ctrl;
+import std.text.shaping as textshape;
+import std.ui.text_metrics as tm;
+
+frame Alert {
+    embed Placed;
+    embed TextBound;
+    pub var bg: color.Color;
+    pub var font_scale: float;
+    pub var alert_kind: str;
+
+    pub init(msg: str = "", type_str: str = "info") {
+        val pal = uitheme.palette();
+        self.text = msg;
+        self.alert_kind = type_str;
+        if (type_str == "success") {
+            self.bg = pal.success.with_alpha(0.92);
+        } elif (type_str == "warning") {
+            self.bg = pal.warning.with_alpha(0.92);
+        } elif (type_str == "danger" or type_str == "error") {
+            self.bg = pal.error.with_alpha(0.92);
+        } else {
+            self.bg = pal.info.with_alpha(0.92);
+        }
+        self.font_scale = 1.0;
+        self.id = comp.next_widget_id();
+    }
+
+    pub fn kind(): ui_types.WidgetKind { return ui_types.WidgetKind.Alert; }
+    pub fn on_theme_changed(): nil {
+        val p = uitheme.palette();
+        if (self.alert_kind == "success") {
+            self.bg = p.success.with_alpha(0.92);
+        } elif (self.alert_kind == "warning") {
+            self.bg = p.warning.with_alpha(0.92);
+        } elif (self.alert_kind == "danger" or self.alert_kind == "error") {
+            self.bg = p.error.with_alpha(0.92);
+        } else {
+            self.bg = p.info.with_alpha(0.92);
+        }
+        tree.request_repaint();
+    }
+    pub fn on_overlay_dismiss(): nil { }
+
+    pub fn wants_pointer_capture(): int { return 0; }
+
+    pub fn measure(min_w: float, max_w: float, min_h: float, max_h: float): comp.Size {
+        var w: float = tm.text_width(textshape.prepare_display(self.string_val()), self.font_scale) + 24.0;
+        var h: float = tm.line_height(self.font_scale) + 20.0;
+        if (w < min_w) { w = min_w; }
+        if (w > max_w) { w = max_w; }
+        if (h < min_h) { h = min_h; }
+        if (h > max_h) { h = max_h; }
+        return comp.Size(w=w, h=h);
+    }
+
+    pub fn paint(): nil {
+        dl.dl_emit_rect_rounded(dl.paint_ctx.dl, self.rect.x, self.rect.y, self.rect.w, self.rect.h,
+            6.0, self.bg.r, self.bg.g, self.bg.b, self.bg.a);
+        dl.dl_emit_text(dl.paint_ctx.dl, textshape.prepare_display(self.string_val()),
+            self.rect.x + 12.0, self.rect.y + (self.rect.h - tm.line_height(self.font_scale)) / 2.0,
+            1.0, 1.0, 1.0, 1.0, self.font_scale);
+    }
+
+    pub fn on_event(t: events.EventType, x: int, y: int, key: int): uievent.EventResult {
+        return uievent.EventResult.Ignored;
+    }
+}
+
+pub fn alert(msg: str, type_str: str = "info"): Alert {
+    return Alert(msg, type_str);
+}
+
+pub fn toast(msg: str, type_str: str = "info"): Alert {
+    return Alert(msg, type_str);
+}

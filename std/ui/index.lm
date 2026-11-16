@@ -1,161 +1,72 @@
-// std.ui - Canonical Retained & Component-Embedded UI Framework for Lymar
-// Unified entry point backed directly by `std.ui.components` (`embed`),
-// `std.ui.event` (`EventResult?`), `std.ui.state` (`staged frame Signal(T: type)`),
-// and `std.ui.builder` + `std.ui.replay` (pooled DrawList).
+// std/ui/index.lm
+// Facade for the retained component UI — the only application UI system.
+//
+// This is the canonical surface: `import std.ui as ui` yields the typed
+// Component contract, geometry, widgets, containers, signals and the
+// frame driver under one namespace.
+//
+//   import std.ui as ui;
+//   import std.app as app;
+//
+//   var root = ui.column(6.0);
+//   root.add(ui.label("Hello"));
+//   root.add(ui.button("Fire", nil, on_fire));
+//   root.add(ui.checkbox("Enable", false));
+//   var a = app.App("Title", 800, 600);
+//   a.ui(root);
+//   a.run();
+//
+// State flows through signals (ui.signal_int/ui.signal_float/ui.signal_str/
+// ui.signal_bool, ui.computed_str), never through callbacks — bind before
+// add() and the tree sees live values across the trait snapshot.
 
-import std.ui.types as ui_types;
-pub import std.ui.types show Style, WidgetKind, LifecycleState;
-pub import std.ui.types show Align, Axis, Weight, Semantic, AlertKind, DotState, MaskShape, ConstraintMode, Role;
-pub import std.ui.types show align_start, align_center, align_end, AXIS_HORIZONTAL, AXIS_VERTICAL, AXIS_STACKED;
+import std.ui.file_dialog as filedlg;
 
-import std.color as color;
-import std.ui.components as comp;
-pub import std.graphics.shadow show Shadow, shadow;
-pub import std.ui.components show Fluent, Flow, LayoutMetrics, VisualStyle, Clickable, Changeable, Focusable, Button, Label, Slider, RangeSlider, Checkbox, Toggle, TextInput, ProgressBar, Container, Spacer, Badge, Card, Alert, ScrollView, Tabs, Select, Stepper, Accordion, Stat, Indicator, Steps, Timeline, TreeNode, FormField, Diff, FileInput, Filter, Calendar, Image, ColorPicker, Table, Chart, Link;
+pub import std.ui.component show Component, Placed, TextBound, Size, Rect, MEASURE_LOOSE, next_widget_id, label;
 
-pub type Widget = comp.Fluent;
+pub import std.ui.widgets show Button, TextInput, Checkbox, Toggle, Slider, ProgressBar;
+pub import std.ui.widgets show button, text_input, checkbox, toggle, slider, progress_bar;
+pub import std.ui.widgets show Link, Spacer, Badge, Alert, Stat, Indicator, Steps, Timeline;
+pub import std.ui.widgets show Diff, Image, ColorPicker, Calendar, FileInput;
+pub import std.ui.widgets show Card, Accordion, FormField, TreeNode, Tabs, Select, Stepper;
+pub import std.ui.widgets show RangeSlider, Filter, Table, Chart;
+pub import std.ui.widgets show link, spacer, badge, alert, toast, stat, indicator, steps, timeline;
+pub import std.ui.widgets show diff, image, color_picker, calendar, file_input;
+pub import std.ui.widgets show card, accordion, form_field, tree_node, tabs, select, multi_select, stepper;
+pub import std.ui.widgets show range_slider, filter, table, table_text, chart, bar_chart, line_chart, pie_chart, plot_histogram, plot_lines;
 
-pub import std.ui.state show SignalNode, Signal, ComputedSignal, Effect, BoolSignal, IntSignal, FloatSignal, StrSignal, ComputedStr, signal_bool, signal_int, signal_float, signal_str, computed_str, effect, effect_with_cleanup, batch_updates, dispose_all_effects;
+pub import std.ui.container show Flow, Container, ScrollView;
+pub import std.ui.container show row, column, scroll_view;
 
-pub import std.ui.viewport show Viewport, MediaQuery;
+pub import std.ui.containers show Stack, Grid, Mask, Overlay, Tooltip;
+pub import std.ui.containers show stack, grid, mask, overlay, tooltip;
 
-pub import std.ui.layout show LayoutBox, GridSpec, Breakpoint, compute_layout, compute_layout_enhanced, flatten_layout, hit_test_boxes, compute_grid_layout, responsive_layout, responsive, breakpoint;
+pub import std.ui.theme show Palette, palette;
+pub import std.ui.theme show current, theme_version, set_theme, set_default, set_dark, set_light;
+pub import std.ui.theme show set_cyberpunk, set_retro, set_nord, elevation_shadow;
 
-import std.ui.grid as grid_mod;
-pub import std.ui.grid show GridLayout, grid_two_column, grid_three_column, grid_with_aspect, grid_enhanced;
+pub import std.ui.state show SignalNode, Signal, ComputedSignal, Effect;
+pub import std.ui.state show BoolSignal, IntSignal, FloatSignal, StrSignal, ComputedStr;
+pub import std.ui.state show signal_bool, signal_int, signal_float, signal_str, computed_str;
+pub import std.ui.state show effect, effect_with_cleanup, batch_updates, dispose_all_effects;
+pub import std.ui.state show bind_text, bind_bool, bind_float, bind_int;
 
-pub import std.ui.navigation show Router, RouterParams, Route, make_router, make_router_with_base, router_link, tab_bar, breadcrumbs;
+pub import std.ui.tree show update, submit, dispatch, set_focus, clear_focus, focused;
+pub import std.ui.tree show enable_reactive, request_repaint, on_state_dirty, find_widget, apply_theme;
+// NOTE: tree's mutable audit vars (dirty, repaint_elision, repainted_frames,
+// skipped_frames, last_w/last_h) are deliberately NOT re-exported — a
+// `pub import show` of a `pub var` captures a value snapshot, not a live
+// alias. Read them via `import std.ui.tree as tree` when needed.
 
-pub import std.ui.charts show plot_lines, plot_histogram, bar_chart, bubble_chart, doughnut_chart, line_chart, pie_chart, polar_area_chart, radar_chart, scatter_chart;
+pub import std.ui.event show EventKind, EventResult;
 
-pub import std.ui.dialog show dialog, alert_dialog, confirm, confirm_dialog, modal_backdrop;
-
-pub import std.ui.application show Application;
-pub import std.ui.window show Window;
-
-pub import std.ui.builder show build, build_into;
-pub import std.ui.draw_list show DrawList, HitZone, dl_hit_test;
-pub import std.ui.replay show replay;
-
-pub import std.ui.staged show compute_item_width, compute_grid_column_width, compute_constrained_size, fold_box_width, fold_box_height, fold_stack_extent, fold_child_offset, theme_argb, ThemeRole, Binding;
-pub import std.ui.event show EventKind, EventResult, UIEvent, make_click_event, make_hover_event, make_key_event, dispatch_event, fire_action;
-
-pub import std.ui.forms show ValidationResult, ValidationRule, StrRule, FloatRule, FormState, FormBuilder;
-pub import std.ui.forms show required_validator, min_length_validator, max_length_validator, email_validator, min_value_validator, max_value_validator, pattern_validator, form_builder, create_form, bind_text_field, bind_checkbox_field, bind_slider_field, field_error_widget;
-
-// ── Styles & Lifecycle Constants ──────────────────────────────────────────────
-pub fn style(): Style { return ui_types.style(); }
-
-pub const LIFECYCLE_ENTERING: LifecycleState = ui_types.LIFECYCLE_ENTERING;
-pub const LIFECYCLE_ACTIVE: LifecycleState = ui_types.LIFECYCLE_ACTIVE;
-pub const LIFECYCLE_EXITING: LifecycleState = ui_types.LIFECYCLE_EXITING;
-pub const LIFECYCLE_REMOVED: LifecycleState = ui_types.LIFECYCLE_REMOVED;
-
-// ── Embedded Widget Constructors ──────────────────────────────────────────────
-pub fn accordion(title: str, content: Widget, default_open: bool = false): Accordion { return comp.Accordion(title, content, default_open); }
-pub fn alert(message: str, type_val: str = "info"): Alert { return comp.Alert(message, type_val); }
-pub fn badge(label: str): Badge { return comp.Badge(label); }
-pub fn button(label: str, on_click: (fn(): nil) | nil = nil): Button { return comp.Button(label, on_click); }
-pub fn calendar(selected_date: str = "2025-01-01"): Calendar { return comp.Calendar(selected_date); }
-pub fn card(title: str, content: Widget): Card { return comp.Card(title, content); }
-pub fn checkbox(checked: bool = false, on_change: (fn(): nil) | nil = nil): Checkbox { return comp.Checkbox("", checked, on_change); }
-pub fn color_picker(label: str, col: color.Color, on_change: (fn(): nil) | nil = nil): ColorPicker { return comp.ColorPicker(label, col, on_change); }
-pub fn column(children: [any] = [] as [any]): Container { return comp.column(children); }
-pub fn diff(old_text: str, new_text: str): Diff { return comp.Diff(old_text, new_text); }
-pub fn dock(items: [any] = [] as [any]): Container { val c = comp.container_of(WidgetKind.Dock, false); iter (x in items) { c.add(x as Fluent); } return c; }
-pub fn empty(): Container { return comp.empty(); }
-pub fn file_input(label: str = "Choose File...", on_select: (fn(): nil) | nil = nil): FileInput { return comp.FileInput(label, on_select); }
-pub fn filter(query: str = "", placeholder: str = "Filter...", on_change: (fn(): nil) | nil = nil): Filter { return comp.Filter(query, placeholder, on_change); }
-pub fn form_field(label_text: str, control: Widget, help_text: str = "", error_text: str = ""): FormField { return comp.FormField(label_text, control, help_text, error_text); }
-pub fn grid(columns_count: int, children: [any], spacing_val: float = 8.0): Container {
-    val c = comp.Container(true);
-    val tc = comp.Container(true);
-    if (columns_count <= 0) {
-        iter (ch in children) { c.add(ch as Fluent); }
-        return c.spacing(spacing_val);
-    }
-    iter (ch in children) { tc.add(ch as Fluent); }
-    val rows: [comp.Fluent] = [];
-    var cur_row: [comp.Fluent] = [];
-    iter (ch in tc.children) {
-        cur_row.append(ch);
-        if (len(cur_row) == columns_count) {
-            val rw = comp.Container(false);
-            iter (rch in cur_row) { rw.add(rch); }
-            rw.spacing_val = spacing_val;
-            rows.append(rw);
-            cur_row = [] as [comp.Fluent];
-        }
-    }
-    if (len(cur_row) > 0) {
-        while (len(cur_row) < columns_count) {
-            cur_row.append(comp.Spacer(1.0));
-        }
-        val rw = comp.Container(false);
-        iter (rch in cur_row) { rw.add(rch); }
-        rw.spacing_val = spacing_val;
-        rows.append(rw);
-    }
-    iter (r in rows) { c.add(r); }
-    return c.spacing(spacing_val);
+// Native file dialogs (std.ui.file_dialog) — Win32-backed pick_file/pick_save.
+pub fn pick_file(owner: int = 0, title: str = "Open File"): str? {
+    return filedlg.pick_file(owner, title);
 }
-pub fn image(source: str = ""): Image { return comp.Image(source); }
-pub fn indicator(status: str = "online", label: str = ""): Indicator { return comp.Indicator(status, label); }
-pub fn input(value: str = "", placeholder: str = "Type here...", on_change: (fn(): nil) | nil = nil): TextInput { return comp.TextInput(value, placeholder, on_change, false); }
-pub fn join(items: [any] = [] as [any]): Container { val c = comp.container_of(WidgetKind.Join, false); iter (x in items) { c.add(x as Fluent); } return c; }
-pub fn link(text_val: str, url: str = "", on_click: (fn(): nil) | nil = nil): Link { return comp.Link(text_val, url, on_click); }
-pub fn list(items: [any] = [] as [any]): Container { val c = comp.container_of(WidgetKind.List, true); iter (x in items) { c.add(x as Fluent); } return c; }
-pub fn mask(shape: str = "circle", child: Widget = empty()): Container { return comp.mask(shape, child); }
-pub fn overlay(content: Widget, x: float = 0.0, y: float = 0.0, width_val: float = 0.0, height_val: float = 0.0): Container { return comp.overlay(content, x, y, width_val, height_val); }
-pub fn progress(fraction: float = 0.0, width_val: float = 160.0): ProgressBar { val pb = comp.ProgressBar(fraction, 1.0); pb.width_val = width_val; return pb; }
-pub fn range_slider(low: float = 20.0, high: float = 80.0, min_val: float = 0.0, max_val: float = 100.0): RangeSlider { return comp.RangeSlider(low, high, min_val, max_val); }
-pub fn row(children: [any] = [] as [any]): Container { return comp.row(children); }
-pub fn scroll(content: Widget): ScrollView { return comp.ScrollView(content); }
-pub fn select(options: [str], selected_idx: int = 0, on_change: (fn(): nil) | nil = nil): Select { return comp.Select(options, selected_idx, on_change, false); }
-pub fn multi_select(options: [str], selected_indices: [int] = [] as [int], on_change: (fn(): nil) | nil = nil): Select { val s = comp.Select(options, 0, on_change, true); s.selected_indices = selected_indices; return s; }
-pub fn slider(value: float = 50.0, min_val: float = 0.0, max_val: float = 100.0, on_change: (fn(): nil) | nil = nil): Slider { return comp.Slider(value, min_val, max_val, on_change); }
-pub fn spacer(flex: float = 1.0): Spacer { return comp.Spacer(flex); }
-pub fn stack(children: [any] = [] as [any]): Container { return comp.stack(children); }
-pub fn stat(title: str, value: str, desc: str = ""): Stat { return comp.Stat(title, value, desc); }
-pub fn stepper(value: int = 0, step: int = 1, min_val: int = 0, max_val: int = 100, on_change: (fn(): nil) | nil = nil): Stepper { return comp.Stepper(value, step, min_val, max_val, on_change); }
-pub fn steps(step_titles: [str], active_step: int = 0): Steps { return comp.Steps(step_titles, active_step, false); }
-pub fn steps_vertical(step_titles: [str], active_step: int = 0): Steps { return comp.Steps(step_titles, active_step, true); }
-pub fn table(headers: [str], rows: [[Widget]]): Table { return comp.Table(headers, rows); }
-pub fn tabs(titles: [str], pages: [any], active: int = 0, on_change: (fn(): nil) | nil = nil): Tabs {
-    val typed_pages: [Fluent] = [];
-    iter (p in pages) {
-        typed_pages.append(p as Fluent);
-    }
-    return comp.Tabs(titles, typed_pages, active, on_change);
+pub fn pick_save(owner: int = 0, title: str = "Save File"): str? {
+    return filedlg.pick_save(owner, title);
 }
-pub fn text(content: str): Label { return comp.Label(content); }
-pub fn text_area(value: str = "", placeholder: str = "Type here...", on_change: (fn(): nil) | nil = nil): TextInput { return comp.TextInput(value, placeholder, on_change, true); }
-pub fn textarea(content: str): TextInput { return comp.TextInput(content, "", nil, true); }
-pub fn timeline(events: [any]): Timeline {
-    val typed_events: [Fluent] = [];
-    iter (ev in events) {
-        typed_events.append(ev as Fluent);
-    }
-    return comp.Timeline(typed_events);
+pub fn file_dialog_owner(hwnd: int): nil {
+    filedlg.set_owner(hwnd);
 }
-pub fn toast(message: str, type_val: str = "info"): Alert { return comp.toast(message, type_val); }
-pub fn toggle(enabled: bool = false, on_change: (fn(): nil) | nil = nil): Toggle { return comp.Toggle(enabled, on_change); }
-pub fn tooltip(label: str, content: Widget): Container { return comp.tooltip(label, content); }
-pub fn tree_node(label: str, children: [any], default_open: bool = false): TreeNode {
-    val typed_children: [Fluent] = [];
-    iter (ch in children) {
-        typed_children.append(ch as Fluent);
-    }
-    return comp.TreeNode(label, typed_children, default_open);
-}
-
-// ── M2 retained-component core (docs/ui.md) ─────────────────────────────────
-// Scalar-signature Component trait + Placed mixin + geometry. Widget frames
-// (Button, TextInput, Flow, Container, ScrollView) intentionally NOT
-// re-exported here — their names collide with the Fluent widgets above;
-// import std.ui.widgets / std.ui.container / std.ui.component directly.
-pub import std.ui.component show Component, Placed, TextBound, Size, Rect, MEASURE_LOOSE, label;
-pub import std.ui.widgets show text_input;
-pub import std.ui.container show scroll_view;
-pub import std.ui.text_metrics show text_width, line_height, using_real_font, BASE_FONT_PX;
-pub import std.ui.tree show set_focus, clear_focus, focused, update, submit, dispatch, enable_reactive, request_repaint, on_state_dirty, find_widget;

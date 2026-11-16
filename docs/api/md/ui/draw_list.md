@@ -3,30 +3,40 @@
 ## Overview
 
 std/ui/draw_list.lm
-Flat, ordered GPU draw command list.
-Replaces the recursive Widget tree as the engine's internal representation.
-Emitted by builder.lm in a single pass; replayed by replay.lm without recursion.
+Flat, ordered GPU draw command list with zero-allocation buffer reuse.
+Emitted by widgets during tree.update's paint pass; replayed by
+replay.lm without recursion. Hit-testing lives in std.ui.tree — this
+module carries draw commands only.
 
 ## Symbols
 
 - **Frame**: [`DrawCmd`](#DrawCmd)
 - **Function**: [`dcmd_rect`](#dcmd_rect)
 - **Function**: [`dcmd_rect_rounded`](#dcmd_rect_rounded)
+- **Function**: [`dcmd_border_rounded`](#dcmd_border_rounded)
 - **Function**: [`dcmd_text`](#dcmd_text)
 - **Function**: [`dcmd_line`](#dcmd_line)
+- **Function**: [`dcmd_triangle`](#dcmd_triangle)
 - **Function**: [`dcmd_clip_push`](#dcmd_clip_push)
+- **Function**: [`dcmd_shadow`](#dcmd_shadow)
 - **Function**: [`dcmd_clip_pop`](#dcmd_clip_pop)
-- **Frame**: [`HitZone`](#HitZone)
-- **Function**: [`make_button_zone`](#make_button_zone)
-- **Function**: [`make_slider_zone`](#make_slider_zone)
-- **Function**: [`make_checkbox_zone`](#make_checkbox_zone)
-- **Function**: [`make_input_zone`](#make_input_zone)
 - **Frame**: [`DrawList`](#DrawList)
 - **Function**: [`draw_list`](#draw_list)
+- **Function**: [`dl_alloc_cmd`](#dl_alloc_cmd)
+- **Function**: [`dl_alloc_overlay_cmd`](#dl_alloc_overlay_cmd)
+- **Function**: [`dl_emit_rect`](#dl_emit_rect)
+- **Function**: [`dl_emit_rect_rounded`](#dl_emit_rect_rounded)
+- **Function**: [`dl_emit_rect_border`](#dl_emit_rect_border)
+- **Function**: [`dl_emit_shadow`](#dl_emit_shadow)
+- **Function**: [`dl_emit_text`](#dl_emit_text)
 - **Function**: [`dl_add`](#dl_add)
-- **Function**: [`dl_add_hit`](#dl_add_hit)
-- **Function**: [`dl_hit_test`](#dl_hit_test)
+- **Function**: [`dl_add_overlay_cmd`](#dl_add_overlay_cmd)
+- **Function**: [`dl_flush_overlays`](#dl_flush_overlays)
 - **Function**: [`dl_clear`](#dl_clear)
+- **Function**: [`dl_clip_balance`](#dl_clip_balance)
+- **Frame**: [`PaintContext`](#PaintContext)
+- **Function**: [`dl_push_clip`](#dl_push_clip)
+- **Function**: [`dl_pop_clip`](#dl_pop_clip)
 
 ---
 
@@ -54,12 +64,14 @@ A single GPU-ready draw instruction. Approx 80 bytes vs Widget's ~400 bytes.
 - `var pub b: float` *(field)*
 - `var pub a: float` *(field)*
 - `var pub radius: float` *(field)*
+- `var pub border_width: float` *(field)*
 - `var pub text: str` *(field)*
 - `var pub font_scale: float` *(field)*
 - `var pub x2: float` *(field)*
 - `var pub y2: float` *(field)*
 - `var pub x3: float` *(field)*
 - `var pub y3: float` *(field)*
+- `var pub clip_shape: int` *(field)*
 - `pub init()` *(constructor)*
 
 ---
@@ -86,6 +98,17 @@ pub fn dcmd_rect_rounded(x: float, y: float, w: float, h: float, radius: float, 
 
 ---
 
+### `dcmd_border_rounded` <a id="dcmd_border_rounded"></a>
+
+**Kind**: Function  
+**Visibility**: `pub`  
+
+```lymar
+pub fn dcmd_border_rounded(x: float, y: float, w: float, h: float, radius: float, border_width: float, r: float, g: float, b: float, a: float): DrawCmd
+```
+
+---
+
 ### `dcmd_text` <a id="dcmd_text"></a>
 
 **Kind**: Function  
@@ -108,14 +131,39 @@ pub fn dcmd_line(x1: float, y1: float, x2: float, y2: float, r: float, g: float,
 
 ---
 
+### `dcmd_triangle` <a id="dcmd_triangle"></a>
+
+**Kind**: Function  
+**Visibility**: `pub`  
+
+```lymar
+pub fn dcmd_triangle(x1: float, y1: float, x2: float, y2: float, x3: float, y3: float, r: float, g: float, b: float, a: float): DrawCmd
+```
+
+---
+
 ### `dcmd_clip_push` <a id="dcmd_clip_push"></a>
 
 **Kind**: Function  
 **Visibility**: `pub`  
 
 ```lymar
-pub fn dcmd_clip_push(x: float, y: float, w: float, h: float): DrawCmd
+pub fn dcmd_clip_push(x: float, y: float, w: float, h: float, shape: int = ..., radius: float = ...): DrawCmd
 ```
+
+---
+
+### `dcmd_shadow` <a id="dcmd_shadow"></a>
+
+**Kind**: Function  
+**Visibility**: `pub`  
+
+```lymar
+pub fn dcmd_shadow(x: float, y: float, w: float, h: float, r: float, g: float, b: float, a: float, off_x: float, off_y: float, blur: float, spread: float, radius: float = ...): DrawCmd
+```
+
+Soft drop shadow: x2=off_x, y2=off_y, x3=blur, y3=spread (reuses the
+line/triangle coordinate fields — Shadow never draws geometry).
 
 ---
 
@@ -130,87 +178,6 @@ pub fn dcmd_clip_pop(): DrawCmd
 
 ---
 
-### `HitZone` <a id="HitZone"></a>
-
-**Kind**: Frame  
-**Visibility**: `pub`  
-
-```lymar
-frame HitZone
-```
-
-── HitZone ───────────────────────────────────────────────────────────────────
-Parallel list to DrawCmd list — built simultaneously during build pass.
-Hit tested as a simple linear scan — no recursion needed.
-
-#### Members
-
-- `var pub id: str` *(field)*
-- `var pub kind: HitZoneKind` *(field)*
-- `var pub x: float` *(field)*
-- `var pub y: float` *(field)*
-- `var pub w: float` *(field)*
-- `var pub h: float` *(field)*
-- `var pub clip_x: float` *(field)*
-- `var pub clip_y: float` *(field)*
-- `var pub clip_w: float` *(field)*
-- `var pub clip_h: float` *(field)*
-- `var pub on_click: any` *(field)*
-- `var pub on_change: any` *(field)*
-- `var pub slider_min: float` *(field)*
-- `var pub slider_max: float` *(field)*
-- `var pub slider_val: float` *(field)*
-- `var pub tab_index: int` *(field)*
-- `var pub is_checked: int` *(field)*
-- `var pub widget: any` *(field)*
-- `pub init()` *(constructor)*
-
----
-
-### `make_button_zone` <a id="make_button_zone"></a>
-
-**Kind**: Function  
-**Visibility**: `pub`  
-
-```lymar
-pub fn make_button_zone(id: str, x: float, y: float, w: float, h: float, on_click, widget = ...): HitZone
-```
-
----
-
-### `make_slider_zone` <a id="make_slider_zone"></a>
-
-**Kind**: Function  
-**Visibility**: `pub`  
-
-```lymar
-pub fn make_slider_zone(id: str, x: float, y: float, w: float, h: float, min_v: float, max_v: float, cur_v: float, on_change, widget = ...): HitZone
-```
-
----
-
-### `make_checkbox_zone` <a id="make_checkbox_zone"></a>
-
-**Kind**: Function  
-**Visibility**: `pub`  
-
-```lymar
-pub fn make_checkbox_zone(id: str, x: float, y: float, w: float, h: float, checked: int, on_change, widget = ...): HitZone
-```
-
----
-
-### `make_input_zone` <a id="make_input_zone"></a>
-
-**Kind**: Function  
-**Visibility**: `pub`  
-
-```lymar
-pub fn make_input_zone(id: str, x: float, y: float, w: float, h: float, widget: any = ...): HitZone
-```
-
----
-
 ### `DrawList` <a id="DrawList"></a>
 
 **Kind**: Frame  
@@ -221,13 +188,18 @@ frame DrawList
 ```
 
 ── DrawList ──────────────────────────────────────────────────────────────────
+Keeps backing lists and pre-allocated DrawCmd slots across rebuilds
+so `clear()` resets cursor counts in O(1) with zero per-frame allocations.
 
 #### Members
 
 - `var pub cmds: list` *(field)*
-- `var pub hits: list` *(field)*
+- `var pub overlay_cmds: list` *(field)*
+- `var pub cmd_count: int` *(field)*
+- `var pub overlay_cmd_count: int` *(field)*
 - `var pub is_valid: int` *(field)*
 - `pub init()` *(constructor)*
+- `pub fn clear(): nil` *(method)*
 
 ---
 
@@ -238,6 +210,83 @@ frame DrawList
 
 ```lymar
 pub fn draw_list(): DrawList
+```
+
+---
+
+### `dl_alloc_cmd` <a id="dl_alloc_cmd"></a>
+
+**Kind**: Function  
+**Visibility**: `pub`  
+
+```lymar
+pub fn dl_alloc_cmd(dl: DrawList): DrawCmd
+```
+
+---
+
+### `dl_alloc_overlay_cmd` <a id="dl_alloc_overlay_cmd"></a>
+
+**Kind**: Function  
+**Visibility**: `pub`  
+
+```lymar
+pub fn dl_alloc_overlay_cmd(dl: DrawList): DrawCmd
+```
+
+---
+
+### `dl_emit_rect` <a id="dl_emit_rect"></a>
+
+**Kind**: Function  
+**Visibility**: `pub`  
+
+```lymar
+pub fn dl_emit_rect(dl: DrawList, x: float, y: float, w: float, h: float, r: float, g: float, b: float, a: float = ...): nil
+```
+
+---
+
+### `dl_emit_rect_rounded` <a id="dl_emit_rect_rounded"></a>
+
+**Kind**: Function  
+**Visibility**: `pub`  
+
+```lymar
+pub fn dl_emit_rect_rounded(dl: DrawList, x: float, y: float, w: float, h: float, rad: float, r: float, g: float, b: float, a: float = ...): nil
+```
+
+---
+
+### `dl_emit_rect_border` <a id="dl_emit_rect_border"></a>
+
+**Kind**: Function  
+**Visibility**: `pub`  
+
+```lymar
+pub fn dl_emit_rect_border(dl: DrawList, x: float, y: float, w: float, h: float, rad: float, bw: float, r: float, g: float, b: float, a: float = ...): nil
+```
+
+---
+
+### `dl_emit_shadow` <a id="dl_emit_shadow"></a>
+
+**Kind**: Function  
+**Visibility**: `pub`  
+
+```lymar
+pub fn dl_emit_shadow(dl: DrawList, x: float, y: float, w: float, h: float, r: float, g: float, b: float, a: float, off_x: float, off_y: float, blur: float, spread: float, radius: float = ...): nil
+```
+
+---
+
+### `dl_emit_text` <a id="dl_emit_text"></a>
+
+**Kind**: Function  
+**Visibility**: `pub`  
+
+```lymar
+pub fn dl_emit_text(dl: DrawList, txt: str, x: float, y: float, r: float, g: float, b: float, a: float = ..., scale: float = ...): nil
 ```
 
 ---
@@ -253,28 +302,25 @@ pub fn dl_add(dl: DrawList, cmd: DrawCmd): nil
 
 ---
 
-### `dl_add_hit` <a id="dl_add_hit"></a>
+### `dl_add_overlay_cmd` <a id="dl_add_overlay_cmd"></a>
 
 **Kind**: Function  
 **Visibility**: `pub`  
 
 ```lymar
-pub fn dl_add_hit(dl: DrawList, hz: HitZone): nil
+pub fn dl_add_overlay_cmd(dl: DrawList, cmd: DrawCmd): nil
 ```
 
 ---
 
-### `dl_hit_test` <a id="dl_hit_test"></a>
+### `dl_flush_overlays` <a id="dl_flush_overlays"></a>
 
 **Kind**: Function  
 **Visibility**: `pub`  
 
 ```lymar
-pub fn dl_hit_test(dl: DrawList, px: float, py: float): HitZone
+pub fn dl_flush_overlays(dl: DrawList): nil
 ```
-
-Hit test: returns the topmost HitZone under (px, py), or nil.
-O(n) linear scan — no recursion.
 
 ---
 
@@ -285,6 +331,59 @@ O(n) linear scan — no recursion.
 
 ```lymar
 pub fn dl_clear(dl: DrawList): nil
+```
+
+---
+
+### `dl_clip_balance` <a id="dl_clip_balance"></a>
+
+**Kind**: Function  
+**Visibility**: `pub`  
+
+```lymar
+pub fn dl_clip_balance(d: DrawList): int
+```
+
+M5 batching audit: clip push/pop must balance over the emitted command
+stream or the GPU clip stack leaks state into the next frame. Returns
+the net balance — 0 means every ClipPush was matched by a ClipPop.
+
+---
+
+### `PaintContext` <a id="PaintContext"></a>
+
+**Kind**: Frame  
+**Visibility**: `pub`  
+
+```lymar
+frame PaintContext
+```
+
+#### Members
+
+- `var pub dl: DrawList` *(field)*
+- `pub init()` *(constructor)*
+
+---
+
+### `dl_push_clip` <a id="dl_push_clip"></a>
+
+**Kind**: Function  
+**Visibility**: `pub`  
+
+```lymar
+pub fn dl_push_clip(d: DrawList, x: float, y: float, w: float, h: float): nil
+```
+
+---
+
+### `dl_pop_clip` <a id="dl_pop_clip"></a>
+
+**Kind**: Function  
+**Visibility**: `pub`  
+
+```lymar
+pub fn dl_pop_clip(d: DrawList): nil
 ```
 
 ---

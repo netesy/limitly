@@ -1,4 +1,5 @@
 import std.d3 as d3;
+import std.app as app;
 import std.game as game;
 import std.color as color;
 import std.gg as gg;
@@ -6,8 +7,9 @@ import std.gg as gg;
 fn main() {
     var cfg = game.Config(title = "T", width = 640, height = 480);
     cfg.bg_color = color.hex(0x101018, 1.0);
-    var app = game.Game(cfg);
-    if (not app.setup()) { return 1; }
+    var g = game.Game(cfg);
+    var a = app.App(cfg.title, cfg.width, cfg.height);
+    a.open();
 
     var scene = d3.Scene3D();
     scene.background_r = 1.0;
@@ -51,12 +53,15 @@ fn main() {
     renderer.clear_color = true;
 
     var ticks = 0;
-    while (app.is_running and ticks < 300) {
-        app.begin_frame();
+    while (a.is_running() and ticks < 300) {
+        a.pump();
+        g.poll();
         ticks = ticks + 1;
-        renderer.render(scene, cam, 0.0, 0.0, app.width as float, app.height as float);
-        app.end_frame();
+        a.begin_pass();
+        renderer.render(scene, cam, 0.0, 0.0, g.width as float, g.height as float);
+        a.end_pass();
     }
+    a.close();
     print("done tid={tid}");
     return 0;
 }

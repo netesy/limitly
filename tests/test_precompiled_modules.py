@@ -29,7 +29,7 @@ def test_ui_and_native_leaves():
         assert os.path.exists(out + ".meta"), f"Metadata missing: {out}.meta"
 
     # 2. Retained UI Test
-    code, stdout, stderr = run_cmd("./bin/lymar run tests/retained_ui_test.lm")
+    code, stdout, stderr = run_cmd("./bin/lymar run tests/ui_reactive.lm")
     assert code == 0, f"Retained UI test failed: {stderr}"
     print("[PASS] Precompiled std.ui Retained Logic & Tree State verified")
 

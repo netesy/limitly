@@ -1,0 +1,163 @@
+// examples/gallery.lm
+// Widget & container gallery — every std.ui export in one
+// scrollable page. The same content lives inside gui_showcase.lm's
+// "Widget Gallery" tab; this file runs it as its own window for quick
+// visual checks.
+
+import std.app as app;
+import std.ui as ui;
+import std.ui.theme as uitheme;
+import std.color as color;
+
+fn badge(txt: str, bg_: color.Color, fg_: color.Color): ui.Badge {
+    var b = ui.badge(txt);
+    b.bg = bg_;
+    b.fg = fg_;
+    return b;
+}
+
+fn gallery_section(title: str): ui.Label {
+    return ui.label("── " + title + " ──", color.rgb(120, 160, 255));
+}
+
+fn build_gallery_page(): ui.Flow {
+    var g = ui.column(10.0);
+
+    // Layout containers
+    g.add(gallery_section("Containers: row / column / stack / grid / mask / overlay / tooltip / scroll"));
+    var cr = ui.row(6.0);
+    cr.add(ui.label("row:", color.gray));
+    cr.add(badge("A", color.indigo, color.white));
+    cr.add(badge("B", color.green, color.white));
+    cr.add(badge("C", color.yellow, color.white));
+    g.add(cr);
+
+    var st = ui.stack(16.0);
+    var sc1 = ui.card("Stack layer 1", nil);
+    var sc2 = ui.card("Stack layer 2 (overlapping)", nil);
+    st.add(sc1);
+    st.add(sc2);
+    g.add(st);
+
+    var gd = ui.grid(3, 6.0);
+    gd.add(badge("g1", color.cyan, color.black));
+    gd.add(badge("g2", color.cyan, color.black));
+    gd.add(badge("g3", color.cyan, color.black));
+    gd.add(badge("g4", color.cyan, color.black));
+    gd.add(badge("g5", color.cyan, color.black));
+    gd.add(badge("g6", color.cyan, color.black));
+    g.add(gd);
+
+    var mk = ui.mask(ui.card("Masked card (rounded clip)", nil), "rounded");
+    g.add(mk);
+
+    var ov = ui.overlay(ui.label("Overlay child at offset", color.white), 12.0, 4.0);
+    g.add(ov);
+
+    var tt = ui.tooltip(ui.button("Hover for tooltip", nil, nil, nil), "Tooltip label");
+    g.add(tt);
+
+    // Display widgets
+    g.add(gallery_section("Display: label / badge / alert / stat / indicator / steps / link / spacer"));
+    g.add(ui.label("Plain label text", color.light_gray));
+    g.add(ui.badge("Badge"));
+    g.add(ui.alert("Informational alert message", "info"));
+    g.add(ui.alert("Warning: check your config", "warning"));
+    var st1 = ui.stat("Uptime", "99.98%", "+0.02% vs last week");
+    g.add(st1);
+    g.add(ui.indicator("online", "API Status"));
+    g.add(ui.steps(["Create", "Configure", "Deploy", "Monitor"], 2));
+    g.add(ui.link("Documentation", "https://example.com"));
+    var sp_row = ui.row(4.0);
+    sp_row.add(ui.label("spacer →", color.gray));
+    sp_row.add(ui.spacer());
+    sp_row.add(ui.label("← pushed right", color.gray));
+    g.add(sp_row);
+
+    // Input widgets
+    g.add(gallery_section("Inputs: button / checkbox / toggle / text_input / select / multi_select / slider / range_slider / stepper / filter / file_input / color_picker"));
+    var in1 = ui.row(8.0);
+    in1.add(ui.button("Button", nil, nil, on_sync));
+    in1.add(ui.checkbox("Checkbox", false));
+    in1.add(ui.toggle("Toggle", true));
+    in1.add(ui.stepper(3, 1, 0, 10));
+    g.add(in1);
+    g.add(ui.text_input("", "Type here..."));
+    var sel_opts = ["Option A", "Option B", "Option C"];
+    g.add(ui.select(sel_opts, 1));
+    g.add(ui.multi_select(sel_opts, [0]));
+    g.add(ui.slider(0.0, 100.0, 40.0, "Slider"));
+    g.add(ui.range_slider(20.0, 80.0, 0.0, 100.0));
+    g.add(ui.filter("", "Filter items..."));
+    var fi = ui.file_input("Choose a file...", nil);
+    fi.enable_native_dialog();
+    g.add(fi);
+    g.add(ui.color_picker("Accent color", nil, nil));
+
+    // Composite / data widgets
+    g.add(gallery_section("Data: progress_bar / calendar / chart / table / diff / image"));
+    g.add(ui.progress_bar(0.65));
+    g.add(ui.calendar("2025-06-15"));
+    var vals = [12.0, 34.0, 21.0, 55.0, 42.0, 78.0];
+    var charts = ui.row(8.0);
+    charts.add(ui.bar_chart("Bar", vals));
+    charts.add(ui.line_chart("Line", vals));
+    charts.add(ui.pie_chart("Pie", vals));
+    g.add(charts);
+    var tbl = ui.table_text(["Name", "Status", "Latency"], [
+        ["api-gateway", "ok", "12ms"],
+        ["auth-svc", "ok", "8ms"],
+        ["billing", "degraded", "240ms"]
+    ]);
+    g.add(tbl);
+    g.add(ui.diff("old line\nshared\nremoved", "old line\nshared\nadded"));
+    g.add(ui.image(""));
+
+    // Structural widgets
+    g.add(gallery_section("Structure: card / form_field / accordion / tree_node / timeline / tabs"));
+    var fcard = ui.card("Form Field Card", nil);
+    var fbody = ui.column(6.0);
+    fbody.add(ui.form_field("Display Name", ui.text_input("", "Enter name"), "Shown publicly", ""));
+    fbody.add(ui.form_field("Email", ui.text_input("", "you@example.com"), "", "Invalid email"));
+    fcard.set_child(fbody);
+    g.add(fcard);
+
+    var acc = ui.accordion("Advanced Options", ui.label("Accordion content — settings live here", color.gray), true);
+    g.add(acc);
+
+    var tn = ui.tree_node("Root node", true);
+    tn.add(ui.label("  └─ child item", color.light_gray));
+    var tn2 = ui.tree_node("Child node", false);
+    tn2.add(ui.label("    └─ grandchild", color.gray));
+    tn.add(tn2);
+    g.add(tn);
+
+    var tl = ui.timeline();
+    tl.add(ui.label("09:00 — Service started", color.light_gray));
+    tl.add(ui.label("09:05 — Health check passed", color.green));
+    tl.add(ui.label("09:12 — Deployment complete", color.rgb(120, 160, 255)));
+    g.add(tl);
+
+    var inner_titles = ["Pane A", "Pane B"];
+    var inner_pages = [ui.label("Inner tabs page A", color.white), ui.label("Inner tabs page B", color.white)];
+    g.add(ui.tabs(inner_titles, inner_pages, 0));
+
+    return g;
+}
+
+fn main(): int {
+    uitheme.set_dark();
+
+    var a = app.App("Lymar Widget Gallery", 860, 640);
+
+    var root = ui.column(10.0);
+    root.pad_x = 14.0;
+    root.pad_y = 14.0;
+    root.add(ui.label("Widget & Container Gallery", color.rgb(120, 160, 255)));
+    root.add(ui.scroll_view(build_gallery_page()));
+
+    a.ui(root);
+    a.run();
+    print("Gallery shutdown.");
+    return 0;
+}

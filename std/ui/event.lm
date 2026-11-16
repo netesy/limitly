@@ -1,15 +1,9 @@
 // std/ui/event.lm
-// Type-Safe Event Handling & Fallible Event Propagation for Lymar UI
+// Type-Safe Event Handling for Lymar UI
 //
-// Replaces untyped `any` callbacks and sentinel numbers with nominal enums,
-// exhaustive match dispatch, and Lymar fallible types (`EventResult?`).
-//
-// A widget stores its callback in the `on_click_action` / `on_change_action`
-// slot as a `fn(): nil` (the shape the retained renderer already invokes).
-// `fire_action`/`fire_action_for` route that slot through a fallible pipeline
-// so the dynamic `any` never leaks past this boundary: it is cast once, guarded,
-// and a nil/absent handler becomes an `Unhandled` result rather than a nil check
-// at every call site.
+// Nominal enums and exhaustive match dispatch for widget-level event
+// results. The component tree (std.ui.component/tree) dispatches typed
+// std.events.Event values directly through the Component.on_event contract.
 
 enum EventKind {
     Click,
@@ -28,99 +22,4 @@ enum EventResult {
     Handled,
     Unhandled,
     Ignored
-}
-
-frame UIEvent {
-    pub var kind: EventKind;
-    pub var target_id: str;
-    pub var x: float;
-    pub var y: float;
-    pub var delta_x: float;
-    pub var delta_y: float;
-    pub var key_code: int;
-    pub var is_shift: bool;
-    pub var is_ctrl: bool;
-    pub var is_alt: bool;
-
-    pub init(
-        k: EventKind,
-        target: str = "",
-        x: float = 0.0,
-        y: float = 0.0,
-        dx: float = 0.0,
-        dy: float = 0.0,
-        key: int = 0
-    ) {
-        self.kind = k;
-        self.target_id = target;
-        self.x = x;
-        self.y = y;
-        self.delta_x = dx;
-        self.delta_y = dy;
-        self.key_code = key;
-        self.is_shift = false;
-        self.is_ctrl = false;
-        self.is_alt = false;
-    }
-}
-
-pub fn make_click_event(target_id: str, x: float, y: float): UIEvent {
-    return UIEvent(EventKind.Click, target=target_id, x=x, y=y);
-}
-
-pub fn make_hover_event(target_id: str, x: float, y: float): UIEvent {
-    return UIEvent(EventKind.Hover, target=target_id, x=x, y=y);
-}
-
-pub fn make_key_event(k: EventKind, key: int): UIEvent {
-    return UIEvent(k, key=key);
-}
-
-// Invoke a widget's `fn(): nil` action slot fallibly. A nil action is not an
-// error condition -- it is simply `Unhandled`, which removes the
-// `if (w.on_click_action != nil)` guard from every dispatch site.
-pub fn fire_action(action: (fn(): nil) | nil): EventResult? {
-    if (action == nil) {
-        return ok(EventResult.Ignored);
-    }
-    var act: fn(): nil = action as fn(): nil;
-    act();
-    return ok(EventResult.Handled);
-}
-
-// Route an actionable event: fire the handler if one is bound (best-effort),
-// then report the event as consumed. A nil handler is not a failure of routing
-// -- the event was still handled by reaching a target.
-fn route(handler: (fn(): nil) | nil): EventResult? {
-    fire_action(handler)? else { };
-    return ok(EventResult.Handled);
-}
-
-// Full fallible pipeline: resolve the target, dispatch on the nominal kind via
-// `match`, then invoke the handler. Returns `err()` when the event carries no
-// target so callers can propagate with `?` instead of inspecting fields.
-pub fn dispatch_event(evt: UIEvent, handler: (fn(): nil) | nil = nil): EventResult? {
-    if (evt.target_id == "") {
-        return err();
-    }
-
-    // Exhaustive `match` on the nominal kind decides routing. Each arm returns
-    // fallibly; actionable kinds consume the event via `route`.
-    match (evt.kind) {
-        EventKind.Click => { return route(handler); },
-        EventKind.Press => { return route(handler); },
-        EventKind.Release => { return route(handler); },
-        EventKind.Hover => { return route(handler); },
-        EventKind.PointerMove => { return route(handler); },
-        EventKind.Scroll => { return route(handler); },
-        EventKind.Focus => { return route(handler); },
-        EventKind.Blur => { return route(handler); },
-        EventKind.KeyDown => {
-            // Only Escape is consumed here; other keys stay unhandled.
-            if (evt.key_code == 27) { return route(handler); }
-            return ok(EventResult.Unhandled);
-        },
-        EventKind.KeyUp => { return ok(EventResult.Unhandled); },
-        _ => { return ok(EventResult.Unhandled); }
-    }
 }

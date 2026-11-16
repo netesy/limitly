@@ -96,6 +96,7 @@ struct NativeGraphicsAccess {
     static Value pointer(List* value) {return {reinterpret_cast<Word>(value),object_kind};}
     static Value number(int64_t value) {return {static_cast<Word>(value),0};}
     static Value make_integer(int64_t value) {return number(value);}
+    static Value real(double value) {return {lymar_aot_box_float(value),object_kind};}
 };
 using NativeGraphics=LM::Runtime::SoftwareGraphicsResource<NativeGraphicsAccess>;
 #endif
@@ -1047,6 +1048,9 @@ uint64_t lymar_aot_to_boolean(uint64_t value, uint64_t kind) {
 
     if (lymar_aot_is_nil(value, kind)) return 0;
     if (kind != object_kind) return value != 0;
+    // Small raw words (ints/bools stored unboxed in erased containers) are not
+    // heap pointers; read_word on them would fault. Treat them as scalars.
+    if (value <= 4096) return value != 0;
     if ((read_word(value) & 0xffffffff) == 9) return lymar_aot_to_float(value, kind) != 0.0;
     return 1;
 
@@ -1151,8 +1155,11 @@ uint64_t lymar_aot_value_equal(uint64_t left, uint64_t right, uint64_t left_kind
     try {
     RuntimeGuard runtime_guard;
 
-    const bool left_nil = lymar_aot_is_nil(left, left_kind) || (right_kind == object_kind && (left == 2 || left == 0));
-    const bool right_nil = lymar_aot_is_nil(right, right_kind) || (left_kind == object_kind && (right == 2 || right == 0));
+    // Nil-ness is decided per-side by provenance (kind==object && value in
+    // {0,2}). A proven-scalar 0 or 2 is a number, not nil — VM parity requires
+    // `0 == nil` to be false, so no cross-kind heuristic is applied here.
+    const bool left_nil = lymar_aot_is_nil(left, left_kind);
+    const bool right_nil = lymar_aot_is_nil(right, right_kind);
     if (left_nil || right_nil) return left_nil && right_nil;
     if (left_kind == boolean_kind || right_kind == boolean_kind) {
         if ((left_kind == boolean_kind || (left_kind == object_kind && left <= 1) || (!left_kind && left <= 1)) &&
@@ -1841,6 +1848,121 @@ uint64_t lymar_aot_list_slice(uint64_t value, uint64_t start, uint64_t end,
         }
         h.return_pointer = object_kind;
         return pointer;
+    } catch (const std::exception& failure) {
+        if (runtime_lock_depth && heap().worker) throw;
+        if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
+        return 0;
+    }
+}
+// String-slice/case/trim builtins. The IR-emitted versions (emit_*_ir in
+// fyra_builtin_functions.cpp) rely on alloc-slot + loop shapes the Fyra
+// backend miscompiles — substring returns "" and to_lower faults — so these
+// names lower to runtime calls instead (see lower_runtime_builtin). Args
+// arrive as erased words; string-ness is proven by the heap tag, not the
+// lossy kind sidecar, and integer args accept boxed payloads.
+static Word aot_str_arg_int(Word value) {
+    if (auto number = integer_number(value, object_kind)) return static_cast<Word>(static_cast<int64_t>(*number));
+    return value;
+}
+static Word aot_string_view(Word value, Word& length) {
+    length = 0;
+    if (value <= 4096) return 0;
+    auto& h = heap();
+    auto found = h.allocations.find(value);
+    if (found == h.allocations.end() || found->second.raw_memory || found->second.dictionary ||
+        found->second.size < 25 || (read_word(value) & 0xffffffff) != 11) return 0;
+    length = read_word(value, 8);
+    if (length > found->second.size - 25) return 0;
+    return value;
+}
+static Word aot_string_make(const char* data, Word length) {
+    auto pointer = lymar_aot_alloc(24 + length + 1);
+    Word header[] = {11, length, length};
+    std::memcpy(reinterpret_cast<void*>(pointer), header, sizeof(header));
+    if (length) std::memcpy(reinterpret_cast<void*>(pointer + 24), data, length);
+    *reinterpret_cast<char*>(pointer + 24 + length) = 0;
+    return pointer;
+}
+extern "C" uint64_t lymar_aot_substring(uint64_t value, uint64_t start, uint64_t end) {
+    try {
+    RuntimeGuard runtime_guard;
+    Word length = 0;
+    Word str = aot_string_view(value, length);
+    if (!str) return aot_string_make("", 0);
+    int64_t s = static_cast<int64_t>(aot_str_arg_int(start));
+    int64_t e = static_cast<int64_t>(aot_str_arg_int(end));
+    if (s < 0 || e > static_cast<int64_t>(length)) { if (e > static_cast<int64_t>(length)) e = static_cast<int64_t>(length); }
+    if (s < 0 || s >= e) return aot_string_make("", 0);
+    return aot_string_make(reinterpret_cast<const char*>(str + 24) + s, static_cast<Word>(e - s));
+    } catch (const std::exception& failure) {
+        if (runtime_lock_depth && heap().worker) throw;
+        if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
+        return 0;
+    }
+}
+extern "C" uint64_t lymar_aot_string_case(uint64_t value, uint64_t upper) {
+    try {
+    RuntimeGuard runtime_guard;
+    Word length = 0;
+    Word str = aot_string_view(value, length);
+    if (!str) return aot_string_make("", 0);
+    auto pointer = lymar_aot_alloc(24 + length + 1);
+    Word header[] = {11, length, length};
+    std::memcpy(reinterpret_cast<void*>(pointer), header, sizeof(header));
+    const char* src = reinterpret_cast<const char*>(str + 24);
+    char* dst = reinterpret_cast<char*>(pointer + 24);
+    for (Word i = 0; i < length; ++i) {
+        char c = src[i];
+        if (upper) { if (c >= 'a' && c <= 'z') c = static_cast<char>(c - 'a' + 'A'); }
+        else       { if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a'); }
+        dst[i] = c;
+    }
+    dst[length] = 0;
+    return pointer;
+    } catch (const std::exception& failure) {
+        if (runtime_lock_depth && heap().worker) throw;
+        if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
+        return 0;
+    }
+}
+extern "C" uint64_t lymar_aot_string_trim(uint64_t value) {
+    try {
+    RuntimeGuard runtime_guard;
+    Word length = 0;
+    Word str = aot_string_view(value, length);
+    if (!str) return aot_string_make("", 0);
+    const char* data = reinterpret_cast<const char*>(str + 24);
+    auto is_ws = [](char c) { return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\v' || c == '\f'; };
+    Word begin = 0, end = length;
+    while (begin < end && is_ws(data[begin])) ++begin;
+    while (end > begin && is_ws(data[end - 1])) --end;
+    return aot_string_make(data + begin, end - begin);
+    } catch (const std::exception& failure) {
+        if (runtime_lock_depth && heap().worker) throw;
+        if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
+        return 0;
+    }
+}
+// input(prompt): print the prompt (if a string), read one line from stdin,
+// return it as a fresh string. Mirrors the VM builtin (ops: std::getline).
+extern "C" uint64_t lymar_aot_input(uint64_t prompt, uint64_t kind) {
+    try {
+    RuntimeGuard runtime_guard;
+    Word length = 0;
+    Word str = aot_string_view(prompt, length);
+    if (str && length) {
+        std::fwrite(reinterpret_cast<const char*>(str + 24), 1, length, stdout);
+        std::fflush(stdout);
+    }
+    std::string line;
+    char chunk[4096];
+    while (std::fgets(chunk, sizeof(chunk), stdin)) {
+        line += chunk;
+        if (line.find('\n') != std::string::npos) break;
+    }
+    if (!line.empty() && line.back() == '\n') line.pop_back();
+    if (!line.empty() && line.back() == '\r') line.pop_back();
+    return aot_string_make(line.data(), static_cast<Word>(line.size()));
     } catch (const std::exception& failure) {
         if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());

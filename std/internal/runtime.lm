@@ -121,6 +121,7 @@ pub const OP_PROC_COMMAND: int = 67;
 // (src/backend/vm/resource_types.hh ATTACH_WINDOW/DETACH_WINDOW).
 pub const OP_ATTACH_WINDOW: int = 68;
 pub const OP_DETACH_WINDOW: int = 69;
+pub const OP_DRAW_SHADOW: int = 70;
 
 pub fn create_resource(kind: ResourceKind, args: any): int {
     return create(resource_kind_id(kind), args);

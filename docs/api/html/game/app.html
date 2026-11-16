@@ -83,13 +83,47 @@ function filterNav() {
 <a class="nav-link" href="#Config">Config <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
 <a class="nav-link" href="#default_config">default_config <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 <a class="nav-link" href="#Game">Game <span style="font-size: 0.75rem; opacity: 0.6;">(Frame)</span></a>
+<a class="nav-link" href="#_game_update">_game_update <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
+<a class="nav-link" href="#_game_draw">_game_draw <span style="font-size: 0.75rem; opacity: 0.6;">(Function)</span></a>
 </div>
 </nav>
 <main>
 <h1>app.lm API Reference</h1>
 <h2>Module Overview</h2>
 <div class="summary"><p>std/game/app.lm
-High-level game loop, event polling, timing driver, and application runner for std.game</p></div>
+Game-domain runtime: timing, input interpretation, scene management, and
+IMGUI integration. std.app owns the window, the event pump, and the
+frame loop — Game plugs into it.
+
+Two ways to drive a game:
+
+  // 1. Attached — Game state lives in module scope / scenes:
+  var g = game.Game(game.default_config());
+  g.register_scene("level1", level);
+  g.attach();                       // moves g into the app hooks
+  var a = app.App("My Game", 1280, 720);
+  a.run();                          // pump -> g.poll -> g.render -> UI -> swap
+
+  // 2. Manual loop — game logic lives in main() locals:
+  var g = game.Game(game.default_config());
+  var a = app.App(g.config.title, g.config.width, g.config.height);
+  a.open();
+  while (a.is_running()) {
+      a.pump();                     // events -> queue + UI dispatch
+      g.poll();                     // dt, input, scene update
+      // ... all game logic, locals in scope ...
+      a.begin_pass();
+      g.imgui_begin();
+      // ... scene render + IMGUI windows ...
+      g.imgui_end();
+      a.end_pass();                 // retained UI on top + swap
+      sleep(0.008);
+  }
+  a.close();
+
+Game never calls events.pump_events, gg.begin_pass, or gg.commit — those
+belong to std.app. poll() reads events.pending_events() non-destructively
+after App.pump() has filled the queue.</p></div>
 <div id="Config">
 <h3>Config <span class="badge badge-pub">Frame</span></h3>
 <pre class="code-sig"><code>frame Config</code></pre>
@@ -117,7 +151,6 @@ High-level game loop, event polling, timing driver, and application runner for s
 <li><code>var pub gui: GUI</code> <em>(field)</em></li>
 <li><code>var pub input: InputManager</code> <em>(field)</em></li>
 <li><code>var pub scenes: SceneManager</code> <em>(field)</em></li>
-<li><code>var pub is_running: bool</code> <em>(field)</em></li>
 <li><code>var pub width: int</code> <em>(field)</em></li>
 <li><code>var pub height: int</code> <em>(field)</em></li>
 <li><code>var pub timer: Timer</code> <em>(field)</em></li>
@@ -130,9 +163,12 @@ High-level game loop, event polling, timing driver, and application runner for s
 <li><code>var pub accumulator: float</code> <em>(field)</em></li>
 <li><code>var pub fixed_dt: float</code> <em>(field)</em></li>
 <li><code>pub init()</code> <em>(constructor)</em></li>
-<li><code>pub fn setup(): bool</code> <em>(method)</em></li>
-<li><code>pub fn begin_frame(): nil</code> <em>(method)</em></li>
-<li><code>pub fn end_frame(): nil</code> <em>(method)</em></li>
+<li><code>pub fn attach(): nil</code> <em>(method)</em></li>
+<li><code>pub fn window(): app.App</code> <em>(method)</em></li>
+<li><code>pub fn poll(): nil</code> <em>(method)</em></li>
+<li><code>pub fn imgui_begin(): nil</code> <em>(method)</em></li>
+<li><code>pub fn imgui_end(): nil</code> <em>(method)</em></li>
+<li><code>pub fn render(): nil</code> <em>(method)</em></li>
 <li><code>pub fn dt(): float</code> <em>(method)</em></li>
 <li><code>pub fn step_physics(): bool</code> <em>(method)</em></li>
 <li><code>pub fn register_scene(name: str, sc: Scene): nil</code> <em>(method)</em></li>
@@ -157,8 +193,16 @@ High-level game loop, event polling, timing driver, and application runner for s
 <li><code>pub fn set_resolution(w: int, h: int): nil</code> <em>(method)</em></li>
 <li><code>pub fn set_size(w: int, h: int): nil</code> <em>(method)</em></li>
 <li><code>pub fn quit(): nil</code> <em>(method)</em></li>
-<li><code>pub fn shutdown(): nil</code> <em>(method)</em></li>
+<li><code>pub fn is_running(): bool</code> <em>(method)</em></li>
 </ul>
+</div><hr>
+<div id="_game_update">
+<h3>_game_update <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _game_update(dt: float): nil</code></pre>
+</div><hr>
+<div id="_game_draw">
+<h3>_game_draw <span class="badge badge-private">Function</span></h3>
+<pre class="code-sig"><code>fn _game_draw(): nil</code></pre>
 </div><hr>
 </main>
 </body>

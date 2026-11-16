@@ -59,6 +59,9 @@ cbuffer RectVS : register(b0) {
     float4 u_color;
     float2 u_rad_bw;
     float2 u_viewport;
+    float4 u_clip;
+    float2 u_clip_sr;
+    float2 u_pad;
 };
 struct VSOut {
     float4 pos : SV_POSITION;
@@ -85,6 +88,9 @@ cbuffer RectFS : register(b1) {
     float4 u_color;
     float2 u_rad_bw;
     float2 u_viewport;
+    float4 u_clip;
+    float2 u_clip_sr;
+    float2 u_pad;
 };
 struct VSOut {
     float4 pos : SV_POSITION;
@@ -93,6 +99,19 @@ struct VSOut {
 float round_rect_sdf(float2 p, float2 b, float r) {
     float2 q = abs(p) - b + r;
     return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
+}
+float clip_coverage(float2 px) {
+    if (u_clip_sr.x < 0.5) return 1.0;
+    float2 half = max(u_clip.zw * 0.5, float2(0.001, 0.001));
+    float2 c = (px - u_clip.xy) - half;
+    float d;
+    if (u_clip_sr.x < 1.5) {
+        d = round_rect_sdf(c, half, u_clip_sr.y);
+    } else {
+        float2 q = c / half;
+        d = (length(q) - 1.0) * min(half.x, half.y);
+    }
+    return saturate(0.5 - d);
 }
 float4 fs_main(VSOut i) : SV_TARGET {
     float radius = u_rad_bw.x;
@@ -109,7 +128,94 @@ float4 fs_main(VSOut i) : SV_TARGET {
         cov = saturate((border_w * 0.5 + 0.5 - abs(d)) * 1.0);
         cov = (d < -border_w * 0.5) ? 1.0 : cov;
     }
-    return float4(u_color.rgb, u_color.a * cov);
+    return float4(u_color.rgb, u_color.a * cov * clip_coverage(i.pos.xy));
+}
+)";
+
+// --- shadow: soft drop shadow via rounded-rect SDF falloff ------------------
+// f = [x,y,w,h,r,g,b,a,radius,blur]; u_rad_bw = (radius, blur). The vertex
+// shader expands the quad by `blur` around the shape rect so the falloff has
+// room to render; the fragment shader measures distance to the *unexpanded*
+// shape and applies a gaussian-ish decay.
+static const char* kShadowVS = R"(
+cbuffer ShadowVS : register(b0) {
+    float2 u_pos;
+    float2 u_size;
+    float4 u_color;
+    float2 u_rad_bw;
+    float2 u_viewport;
+    float4 u_clip;
+    float2 u_clip_sr;
+    float2 u_pad;
+};
+struct VSOut {
+    float4 pos : SV_POSITION;
+    float2 lpos : TEXCOORD0;
+};
+VSOut vs_main(uint vid : SV_VertexID) {
+    float2 uv = float2((vid == 1 || vid == 2 || vid == 4) ? 1.0 : 0.0,
+                       (vid == 2 || vid == 4 || vid == 5) ? 1.0 : 0.0);
+    float blur = max(u_rad_bw.y, 0.0);
+    float2 q0 = u_pos - blur;
+    float2 px = q0 + uv * (u_size + blur * 2.0);
+    float2 ndc = float2(px.x / u_viewport.x * 2.0 - 1.0,
+                        1.0 - px.y / u_viewport.y * 2.0);
+    VSOut o;
+    o.pos = float4(ndc, 0.0, 1.0);
+    o.lpos = px - q0;
+    return o;
+}
+)";
+
+static const char* kShadowFS = R"(
+cbuffer ShadowFS : register(b1) {
+    float2 u_pos;
+    float2 u_size;
+    float4 u_color;
+    float2 u_rad_bw;
+    float2 u_viewport;
+    float4 u_clip;
+    float2 u_clip_sr;
+    float2 u_pad;
+};
+struct VSOut {
+    float4 pos : SV_POSITION;
+    float2 lpos : TEXCOORD0;
+};
+float round_rect_sdf(float2 p, float2 b, float r) {
+    float2 q = abs(p) - b + r;
+    return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
+}
+float clip_coverage(float2 px) {
+    if (u_clip_sr.x < 0.5) return 1.0;
+    float2 half = max(u_clip.zw * 0.5, float2(0.001, 0.001));
+    float2 c = (px - u_clip.xy) - half;
+    float d;
+    if (u_clip_sr.x < 1.5) {
+        d = round_rect_sdf(c, half, u_clip_sr.y);
+    } else {
+        float2 q = c / half;
+        d = (length(q) - 1.0) * min(half.x, half.y);
+    }
+    return saturate(0.5 - d);
+}
+float4 fs_main(VSOut i) : SV_TARGET {
+    float blur = max(u_rad_bw.y, 0.001);
+    float2 half = u_size * 0.5;
+    // lpos is relative to the blur-expanded quad; the shape center sits at
+    // half + blur inside it.
+    float2 c = i.lpos - (half + blur);
+    float d = round_rect_sdf(c, half, u_rad_bw.x);
+    float cov;
+    if (u_rad_bw.y <= 0.05) {
+        cov = saturate(0.5 - d);
+    } else {
+        float t = max(d, 0.0) / blur;
+        cov = exp(-t * t * 2.5);
+        if (d < 0.0) cov = 1.0;
+        cov = min(cov, 1.0);
+    }
+    return float4(u_color.rgb, u_color.a * cov * clip_coverage(i.pos.xy));
 }
 )";
 
@@ -137,12 +243,32 @@ VSOut vs_main(uint vid : SV_VertexID) {
 static const char* kTriFS = R"(
 cbuffer TriFS : register(b1) {
     float4 u_color;
+    float4 u_clip;
+    float2 u_clip_sr;
+    float2 u_pad;
 };
 struct VSOut {
     float4 pos : SV_POSITION;
 };
+float round_rect_sdf(float2 p, float2 b, float r) {
+    float2 q = abs(p) - b + r;
+    return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
+}
+float clip_coverage(float2 px) {
+    if (u_clip_sr.x < 0.5) return 1.0;
+    float2 half = max(u_clip.zw * 0.5, float2(0.001, 0.001));
+    float2 c = (px - u_clip.xy) - half;
+    float d;
+    if (u_clip_sr.x < 1.5) {
+        d = round_rect_sdf(c, half, u_clip_sr.y);
+    } else {
+        float2 q = c / half;
+        d = (length(q) - 1.0) * min(half.x, half.y);
+    }
+    return saturate(0.5 - d);
+}
 float4 fs_main(VSOut i) : SV_TARGET {
-    return u_color;
+    return float4(u_color.rgb, u_color.a * clip_coverage(i.pos.xy));
 }
 )";
 
@@ -379,9 +505,11 @@ struct SokolGfxRuntime::Impl {
     sg_shader sh_tri = {SG_INVALID_ID};
     sg_shader sh_vstream = {SG_INVALID_ID};
     sg_shader sh_blit = {SG_INVALID_ID};
+    sg_shader sh_shadow = {SG_INVALID_ID};
 
     sg_pipeline pipe_rect = {SG_INVALID_ID};
     sg_pipeline pipe_tri = {SG_INVALID_ID};
+    sg_pipeline pipe_shadow = {SG_INVALID_ID};
     sg_pipeline pipe_vstream = {SG_INVALID_ID};
     sg_pipeline pipe_vlines = {SG_INVALID_ID};
     sg_pipeline pipe_blit = {SG_INVALID_ID};
@@ -420,7 +548,16 @@ struct SokolGfxRuntime::Impl {
     int fons_font = -1;
     std::vector<GfxCommand> deferred_text; // text waits for end-of-pass: single atlas upload
 
-    std::vector<std::vector<int>> clip_stack;
+    // Clip stack entries: rect (already intersected with ancestors) plus an
+    // optional shape (0=rect, 1=rounded-rect, 2=ellipse) consumed by the
+    // custom rect/tri fragment shaders as a coverage mask. Text keeps
+    // rect-only clipping (fons pipeline is vendored bytecode).
+    struct ClipEntry { int x, y, w, h; int shape; float radius; };
+    std::vector<ClipEntry> clip_stack;
+    // Innermost shaped clip (or shape=0 when none) — pushed to shader
+    // uniforms before each DrawRect/DrawTri.
+    int clip_shape_ = 0;
+    float clip_sx_ = 0, clip_sy_ = 0, clip_sw_ = 0, clip_sh_ = 0, clip_rad_ = 0;
     int pass_w = 0, pass_h = 0;
     float clear_r = 0, clear_g = 0, clear_b = 0, clear_a = 1;
     std::vector<double> uniforms;          // last APPLY_BINDINGS uniform blob
@@ -573,7 +710,11 @@ bool gfx_text_metrics_ready() { return ensure_metrics(); }
 float gfx_measure_text(const char* text, int scale) {
     if (!text || !ensure_metrics()) return 0.0f;
     fonsSetSize(g_metrics_ctx, gfx_font_size_for_scale(scale));
-    return fonsTextBounds(g_metrics_ctx, 0.0f, 0.0f, text, text + strlen(text), nullptr);
+    // Advance width (pen position after the last glyph), NOT tight ink
+    // bounds — caret/selection math needs where the next glyph starts.
+    // fonsDrawText returns the advanced x; the metrics context has NULL
+    // render callbacks so nothing is drawn.
+    return fonsDrawText(g_metrics_ctx, 0.0f, 0.0f, text, text + strlen(text));
 }
 
 float gfx_line_height(int scale) {
@@ -592,14 +733,32 @@ static sg_shader make_rect_shader() {
     d.fragment_func.source = kRectFS;
     d.fragment_func.entry = "fs_main";
     d.fragment_func.d3d11_target = "ps_5_0";
-    // two uniform blocks: vs register(b0), fs register(b1), each 48 bytes
+    // two uniform blocks: vs register(b0), fs register(b1), each 80 bytes
     d.uniform_blocks[0].stage = SG_SHADERSTAGE_VERTEX;
-    d.uniform_blocks[0].size = 48;
+    d.uniform_blocks[0].size = 80;
     d.uniform_blocks[0].hlsl_register_b_n = 0;
     d.uniform_blocks[1].stage = SG_SHADERSTAGE_FRAGMENT;
-    d.uniform_blocks[1].size = 48;
+    d.uniform_blocks[1].size = 80;
     d.uniform_blocks[1].hlsl_register_b_n = 1;
     d.label = "lymar_rect";
+    return sg_make_shader(&d);
+}
+
+static sg_shader make_shadow_shader() {
+    sg_shader_desc d{};
+    d.vertex_func.source = kShadowVS;
+    d.vertex_func.entry = "vs_main";
+    d.vertex_func.d3d11_target = "vs_5_0";
+    d.fragment_func.source = kShadowFS;
+    d.fragment_func.entry = "fs_main";
+    d.fragment_func.d3d11_target = "ps_5_0";
+    d.uniform_blocks[0].stage = SG_SHADERSTAGE_VERTEX;
+    d.uniform_blocks[0].size = 80;
+    d.uniform_blocks[0].hlsl_register_b_n = 0;
+    d.uniform_blocks[1].stage = SG_SHADERSTAGE_FRAGMENT;
+    d.uniform_blocks[1].size = 80;
+    d.uniform_blocks[1].hlsl_register_b_n = 1;
+    d.label = "lymar_shadow";
     return sg_make_shader(&d);
 }
 
@@ -615,7 +774,7 @@ static sg_shader make_tri_shader() {
     d.uniform_blocks[0].size = 32;   // 3*float2 + float2
     d.uniform_blocks[0].hlsl_register_b_n = 0;
     d.uniform_blocks[1].stage = SG_SHADERSTAGE_FRAGMENT;
-    d.uniform_blocks[1].size = 16;
+    d.uniform_blocks[1].size = 48;   // color4 + clip4 + clip_sr2 + pad2
     d.uniform_blocks[1].hlsl_register_b_n = 1;
     d.label = "lymar_tri";
     return sg_make_shader(&d);
@@ -828,9 +987,11 @@ bool SokolGfxRuntime::setup() {
     impl_->sh_tri = make_tri_shader();
     impl_->sh_vstream = make_vstream_shader();
     impl_->sh_blit = make_blit_shader();
+    impl_->sh_shadow = make_shadow_shader();
 
     impl_->pipe_rect = make_pipe(impl_->sh_rect, false, true, 0);
     impl_->pipe_tri = make_pipe(impl_->sh_tri, false, true, 0);
+    impl_->pipe_shadow = make_pipe(impl_->sh_shadow, false, true, 0);
     impl_->pipe_vstream = make_vstream_pipe(impl_->sh_vstream, SG_PRIMITIVETYPE_TRIANGLES);
     impl_->pipe_vlines = make_vstream_pipe(impl_->sh_vstream, SG_PRIMITIVETYPE_LINES);
 
@@ -1006,6 +1167,20 @@ static void present_if_external() {
 #endif
 }
 
+static void recompute_active_clip(SokolGfxRuntime::Impl* impl) {
+    impl->clip_shape_ = 0;
+    for (int i = (int)impl->clip_stack.size() - 1; i >= 0; --i) {
+        const auto& e = impl->clip_stack[i];
+        if (e.shape != 0) {
+            impl->clip_shape_ = e.shape;
+            impl->clip_sx_ = (float)e.x; impl->clip_sy_ = (float)e.y;
+            impl->clip_sw_ = (float)e.w; impl->clip_sh_ = (float)e.h;
+            impl->clip_rad_ = e.radius;
+            return;
+        }
+    }
+}
+
 static void apply_scissor(SokolGfxRuntime::Impl* impl) {
     if (impl->clip_stack.empty()) {
         // reset to full pass area
@@ -1013,7 +1188,7 @@ static void apply_scissor(SokolGfxRuntime::Impl* impl) {
         return;
     }
     auto& r = impl->clip_stack.back();
-    sg_apply_scissor_rect(r[0], r[1], r[2], r[3], true);
+    sg_apply_scissor_rect(r.x, r.y, r.w, r.h, true);
 }
 
 void SokolGfxRuntime::execute(const GfxCommand& cmd) {
@@ -1056,13 +1231,35 @@ void SokolGfxRuntime::execute(const GfxCommand& cmd) {
         case GfxCommand::Type::DrawRect: {
             if (!pass_open_ || cmd.f.size() < 10) break;
             sg_apply_pipeline(im->pipe_rect);
-            // uniforms: pos(2) size(2) color(4) rad_bw(2) viewport(2) = 48 bytes
-            float ub[12] = {};
+            // uniforms: pos(2) size(2) color(4) rad_bw(2) viewport(2)
+            //           clip(4) clip_sr(2) pad(2) = 80 bytes
+            float ub[20] = {};
             ub[0] = cmd.f[0]; ub[1] = cmd.f[1];          // pos
             ub[2] = cmd.f[2]; ub[3] = cmd.f[3];          // size
             ub[4] = cmd.f[4]; ub[5] = cmd.f[5]; ub[6] = cmd.f[6]; ub[7] = cmd.f[7]; // color
             ub[8] = cmd.f[8]; ub[9] = cmd.f[9];          // radius, border_w
             ub[10] = im->pass_w; ub[11] = im->pass_h;    // viewport
+            ub[12] = im->clip_sx_; ub[13] = im->clip_sy_;
+            ub[14] = im->clip_sw_; ub[15] = im->clip_sh_;
+            ub[16] = (float)im->clip_shape_; ub[17] = im->clip_rad_;
+            sg_range rng{ub, sizeof(ub)};
+            sg_apply_uniforms(0, &rng);
+            sg_apply_uniforms(1, &rng);
+            sg_draw(0, 6, 1);
+            break;
+        }
+        case GfxCommand::Type::DrawShadow: {
+            if (!pass_open_ || cmd.f.size() < 10) break;
+            sg_apply_pipeline(im->pipe_shadow);
+            float ub[20] = {};
+            ub[0] = cmd.f[0]; ub[1] = cmd.f[1];          // pos (shape rect)
+            ub[2] = cmd.f[2]; ub[3] = cmd.f[3];          // size
+            ub[4] = cmd.f[4]; ub[5] = cmd.f[5]; ub[6] = cmd.f[6]; ub[7] = cmd.f[7]; // color
+            ub[8] = cmd.f[8]; ub[9] = cmd.f[9];          // radius, blur
+            ub[10] = im->pass_w; ub[11] = im->pass_h;
+            ub[12] = im->clip_sx_; ub[13] = im->clip_sy_;
+            ub[14] = im->clip_sw_; ub[15] = im->clip_sh_;
+            ub[16] = (float)im->clip_shape_; ub[17] = im->clip_rad_;
             sg_range rng{ub, sizeof(ub)};
             sg_apply_uniforms(0, &rng);
             sg_apply_uniforms(1, &rng);
@@ -1079,7 +1276,13 @@ void SokolGfxRuntime::execute(const GfxCommand& cmd) {
             ub[6] = im->pass_w; ub[7] = im->pass_h;
             sg_range vrng{ub, 32};
             sg_apply_uniforms(0, &vrng);
-            float fc[4] = {(float)cmd.f[6], (float)cmd.f[7], (float)cmd.f[8], (float)cmd.f[9]};
+            // FS block: color(4) clip(4) clip_sr(2) pad(2) = 48 bytes
+            float fc[12] = {};
+            fc[0] = (float)cmd.f[6]; fc[1] = (float)cmd.f[7];
+            fc[2] = (float)cmd.f[8]; fc[3] = (float)cmd.f[9];
+            fc[4] = im->clip_sx_; fc[5] = im->clip_sy_;
+            fc[6] = im->clip_sw_; fc[7] = im->clip_sh_;
+            fc[8] = (float)im->clip_shape_; fc[9] = im->clip_rad_;
             sg_range frng{fc, sizeof(fc)};
             sg_apply_uniforms(1, &frng);
             sg_draw(0, 3, 1);
@@ -1089,22 +1292,26 @@ void SokolGfxRuntime::execute(const GfxCommand& cmd) {
             if (cmd.f.size() < 4) break;
             int x = (int)cmd.f[0], y = (int)cmd.f[1];
             int w = (int)cmd.f[2], h = (int)cmd.f[3];
+            int shape = (cmd.f.size() >= 6) ? (int)cmd.f[4] : 0;
+            float radius = (cmd.f.size() >= 6) ? (float)cmd.f[5] : 0.0f;
             int x0 = x, y0 = y, x1 = x + w, y1 = y + h;
             if (!im->clip_stack.empty()) {
                 auto& p = im->clip_stack.back();
-                x0 = std::max(x0, p[0]); y0 = std::max(y0, p[1]);
-                x1 = std::min(x1, p[0] + p[2]); y1 = std::min(y1, p[1] + p[3]);
+                x0 = std::max(x0, p.x); y0 = std::max(y0, p.y);
+                x1 = std::min(x1, p.x + p.w); y1 = std::min(y1, p.y + p.h);
             }
             x0 = std::clamp(x0, 0, im->pass_w);
             y0 = std::clamp(y0, 0, im->pass_h);
             x1 = std::clamp(x1, 0, im->pass_w);
             y1 = std::clamp(y1, 0, im->pass_h);
-            im->clip_stack.push_back({x0, y0, std::max(0, x1 - x0), std::max(0, y1 - y0)});
+            im->clip_stack.push_back({x0, y0, std::max(0, x1 - x0), std::max(0, y1 - y0), shape, radius});
+            recompute_active_clip(im);
             apply_scissor(im);
             break;
         }
         case GfxCommand::Type::PopClip: {
             if (!im->clip_stack.empty()) im->clip_stack.pop_back();
+            recompute_active_clip(im);
             apply_scissor(im);
             break;
         }
@@ -1233,7 +1440,10 @@ void SokolGfxRuntime::execute(const GfxCommand& cmd) {
             // so all text must rasterize before a single sfons_flush+sgl_draw.
             if (!pass_open_ || cmd.s.empty()) break;
             GfxCommand d = cmd;
-            if (!im->clip_stack.empty()) d.clip = im->clip_stack.back();
+            if (!im->clip_stack.empty()) {
+                const auto& ce = im->clip_stack.back();
+                d.clip = {ce.x, ce.y, ce.w, ce.h};
+            }
             im->deferred_text.push_back(std::move(d));
             break;
         }

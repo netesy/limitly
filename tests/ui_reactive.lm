@@ -1,11 +1,11 @@
 // M3 completion test: the reactive graph end-to-end.
 //
-// Covers the pieces ui_v2_widgets.lm doesn't: subscribe callbacks,
+// Covers the pieces ui_widgets.lm doesn't: subscribe callbacks,
 // Effect run/re-run/cleanup/dispose lifecycle, batch_updates dirty
 // coalescing, ComputedStr derivation, and a computed->signal->widget
 // repaint chain through the retained tree.
 
-import std.ui.component as v2;
+import std.ui.component as comp;
 import std.ui.container as boxes;
 import std.ui.tree as tree;
 import std.ui.draw_list as dl;
@@ -64,7 +64,7 @@ fn main() {
     display.set(full.get());
     full.subscribe(fn(s: str) { display.set(s); });
 
-    var lbl = v2.label("");
+    var lbl = comp.label("");
     lbl.bind_text(display);
     var root = boxes.column(4.0);
     root.add(lbl);

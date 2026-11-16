@@ -1,0 +1,151 @@
+// std/ui/widgets/form_field.lm
+// Widget — ported from legacy Fluent FormField.
+// Label above a child control, with optional help/error caption below.
+// error takes precedence over help when both are set.
+
+import std.ui.component as comp;
+import std.ui.component show Placed;
+import std.ui.types as ui_types;
+import std.ui.event as uievent;
+import std.ui.context as uictx;
+import std.ui.draw_list as dl;
+import std.ui.state as state;
+import std.ui.tree as tree;
+import std.events as events;
+import std.color as color;
+import std.ui.theme as uitheme;
+import std.text.controller as text_ctrl;
+import std.text.shaping as textshape;
+import std.ui.text_metrics as tm;
+
+frame FormField {
+    embed Placed;
+    pub var label_text: str;
+    pub var help_text: str;
+    pub var error_text: str;
+    pub var child: comp.Component?;
+    pub var text: color.Color;
+    pub var text2: color.Color;
+    pub var error_color: color.Color;
+    pub var font_scale: float;
+    // Scratch — AOT float-local clobbering across trait calls.
+    pub var _ch: float = 0.0;
+
+    pub init(lbl: str = "", control: any = nil, help: str = "", err_txt: str = "") {
+        val pal = uitheme.palette();
+        self.label_text = lbl;
+        self.child = nil;
+        if (control != nil) {
+            self.child = control as comp.Component;
+        }
+        self.help_text = help;
+        self.error_text = err_txt;
+        self.text = pal.text_primary;
+        self.text2 = pal.text_muted;
+        self.error_color = pal.error;
+        self.font_scale = 0.9;
+        self.id = comp.next_widget_id();
+    }
+
+    pub fn set_child(c: comp.Component): nil {
+        self.child = c;
+    }
+
+    pub fn kind(): ui_types.WidgetKind { return ui_types.WidgetKind.FormField; }
+    pub fn on_theme_changed(): nil {
+        val p = uitheme.palette();
+        self.text = p.text_primary;
+        self.text2 = p.text_muted;
+        self.error_color = p.error;
+        tree.request_repaint();
+    }
+    pub fn on_overlay_dismiss(): nil { }
+
+    pub fn child_count(): int {
+        if (self.child == nil) { return 0; }
+        return 1;
+    }
+
+    pub fn child_at(i: int): any {
+        if (i == 0 and self.child != nil) {
+            return self.child;
+        }
+        return nil;
+    }
+
+    pub fn wants_pointer_capture(): int { return 0; }
+
+    pub fn measure(min_w: float, max_w: float, min_h: float, max_h: float): comp.Size {
+        var body_h: float = 0.0;
+        if (self.child != nil) {
+            val s = (self.child as comp.Component).measure(0.0, comp.MEASURE_LOOSE, 0.0, comp.MEASURE_LOOSE);
+            body_h = s.h;
+        }
+        var h: float = tm.line_height(self.font_scale) + 4.0 + body_h + 4.0;
+        if (len(self.error_text) > 0 or len(self.help_text) > 0) {
+            h = h + tm.line_height(self.font_scale) + 2.0;
+        }
+        var w: float = self.rect.w + 0.0;
+        if (w <= 0.0) { w = 200.0; }
+        if (h < min_h) { h = min_h; }
+        if (w < min_w) { w = min_w; }
+        if (w > max_w) { w = max_w; }
+        if (h > max_h) { h = max_h; }
+        return comp.Size(w=w, h=h);
+    }
+
+    pub fn arrange(x: float, y: float, w: float, h: float): nil {
+        self.rect.x = x;
+        self.rect.y = y;
+        self.rect.w = w;
+        self.rect.h = h;
+        if (self.child != nil) {
+            (self.child as comp.Component).arrange(
+                x, y + tm.line_height(self.font_scale) + 4.0,
+                w, h - tm.line_height(self.font_scale) - 4.0);
+        }
+    }
+
+    pub fn paint(): nil {
+        var cy = self.rect.y + 0.0;
+        if (len(self.label_text) > 0) {
+            dl.dl_emit_text(dl.paint_ctx.dl, textshape.prepare_display(self.label_text),
+                self.rect.x, cy,
+                self.text.r, self.text.g, self.text.b, 1.0, self.font_scale);
+            cy = cy + tm.line_height(self.font_scale) + 4.0;
+        }
+        if (self.child != nil) {
+            (self.child as comp.Component).paint();
+            cy = (self.child as comp.Component).bounds().y + (self.child as comp.Component).bounds().h + 4.0;
+        }
+        if (len(self.error_text) > 0) {
+            dl.dl_emit_text(dl.paint_ctx.dl, textshape.prepare_display(self.error_text),
+                self.rect.x, cy,
+                self.error_color.r, self.error_color.g, self.error_color.b, 1.0, self.font_scale);
+        } elif (len(self.help_text) > 0) {
+            dl.dl_emit_text(dl.paint_ctx.dl, textshape.prepare_display(self.help_text),
+                self.rect.x, cy,
+                self.text2.r, self.text2.g, self.text2.b, 1.0, self.font_scale);
+        }
+    }
+
+    pub fn on_event(t: events.EventType, x: int, y: int, key: int): uievent.EventResult {
+        if (self.child != nil) {
+            var inside: bool = true;
+            if (t != events.EventType.MouseMove and t != events.EventType.MouseUp and t != events.EventType.MouseWheel) {
+                inside = (self.child as comp.Component).bounds().contains(x as float, y as float);
+            }
+            if (inside) {
+                val res = (self.child as comp.Component).on_event(t, x, y, key);
+                if (res == uievent.EventResult.Handled) {
+                    return uievent.EventResult.Handled;
+                }
+            }
+        }
+        return uievent.EventResult.Ignored;
+    }
+}
+
+pub fn form_field(lbl: str, control: any = nil, help: str = "", err_txt: str = ""): FormField {
+    return FormField(lbl, control, help, err_txt);
+}
