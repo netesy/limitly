@@ -1,0 +1,27 @@
+// Minimal retained-UI app for VM/AOT parity checks.
+import std.app as app;
+import std.ui as ui;
+import std.ui.theme as uitheme;
+import std.color as color;
+
+fn on_click() {
+    print("[click] button pressed");
+}
+
+fn main(): int {
+    uitheme.set_dark();
+
+    var a = app.App("AOT UI Probe", 420, 320);
+
+    var root = ui.column(10.0);
+    root.pad_x = 16.0;
+    root.pad_y = 16.0;
+    root.add(ui.label("AOT UI Probe", color.rgb(120, 160, 255)));
+    root.add(ui.button("Click me", nil, on_click));
+    root.add(ui.label("If this text is visible, retained UI works in AOT", color.gray));
+
+    a.ui(root);
+    a.run();
+    print("probe shutdown");
+    return 0;
+}

@@ -39,7 +39,6 @@
 #define NOMINMAX
 #endif
 #include <windows.h>
-#include <tlhelp32.h>
 #endif
 
 
@@ -202,289 +201,8 @@ struct SharedHeap {
 // a use-after-free that surfaced as std::out_of_range("Inactive region
 // identity") at exit for every AOT program. The OS reclaims this fixed-size
 // control block at termination.
-#if defined(_WIN32)
-// TEMP DIAGNOSTIC (trait-list AV hunt): watcher-child mode. Self-attach
-// DebugActiveProcess is policy-blocked (ERROR_PRIVILEGE_NOT_HELD), so a child
-// process (same exe, LYMAR_PROBE_WATCH=<parent pid>:<parent slot addr>) runs a
-// debug loop installing a hardware write-watchpoint on the parent's leaked
-// SharedHeap* singleton slot, and blocks in a static ctor so parent main never
-// runs in the child.
-static const bool g_probe_watcher_mode = [] {
-    const char* v = std::getenv("LYMAR_PROBE_WATCH");
-    return v && *v;
-}();
-static unsigned long long g_probe_slot = 0;
-static const char* probe_env_value(const char* key) {
-    char buf[512];
-    const DWORD n = GetEnvironmentVariableA(key, buf, sizeof(buf));
-    if (!n || n >= sizeof(buf)) return nullptr;
-    buf[n] = 0;
-    // Duplicate through malloc: returned pointer must outlive this call.
-    char* out = (char*)std::malloc(n + 1);
-    if (out) std::memcpy(out, buf, n + 1);
-    return out;
-}
-static unsigned long long probe_parent_slot_from_env() {
-    const char* v = probe_env_value("LYMAR_PROBE_WATCH");
-    if (!v) return 0;
-    // Some CRT paths return "KEY=VALUE"; strip a leading key if present.
-    if (const char* eq = strstr(v, "LYMAR_PROBE_WATCH=")) v = eq + 16;
-    const char* colon = std::strchr(v, ':');
-    if (!colon) return 0;
-    ++colon;
-    unsigned long long slot = 0;
-    for (; *colon >= '0' && *colon <= '9'; ++colon) slot = slot * 10 + (*colon - '0');
-    return slot;
-}
-static unsigned long long probe_parent_pid_from_env() {
-    const char* v = probe_env_value("LYMAR_PROBE_WATCH");
-    if (!v) return 0;
-    if (const char* eq = strstr(v, "LYMAR_PROBE_WATCH=")) v = eq + 16;
-    // Manual decimal parse (bypasses any CRT strtoul weirdness).
-    unsigned long long pid = 0;
-    for (; *v >= '0' && *v <= '9'; ++v) pid = pid * 10 + (*v - '0');
-    return pid;
-}
-#endif
-static unsigned long long probe_state_slot = 0; // address of shared_heap()'s state ptr (captured pre-guard)
 SharedHeap& shared_heap() { static SharedHeap* state = new SharedHeap();
-#if defined(_WIN32)
-    if (!g_probe_watcher_mode && !probe_state_slot) probe_state_slot = (unsigned long long)(uintptr_t)&state;
-#endif
     return *state; }
-#if defined(_WIN32)
-// TEMP DIAGNOSTIC (trait-list AV hunt): first-fault dump + post-init page
-// guard on the .data page holding shared_heap()'s state pointer. ALL mutable
-// probe state lives in a heap-allocated ctx and stack buffers because this
-// TU's statics may share the guarded page (a handler write there is fatal).
-struct ProbeCtx {
-    volatile unsigned long long reports, allocs, arm_at, guard_page;
-};
-static ProbeCtx* probe_ctx = nullptr;
-static void probe_emit(const char* text) {
-    DWORD written;
-    WriteFile(GetStdHandle(STD_ERROR_HANDLE), text, (DWORD)lstrlenA(text), &written, nullptr);
-}
-static LONG WINAPI probe_exception_filter(PEXCEPTION_POINTERS e) {
-    if (!probe_ctx) return EXCEPTION_CONTINUE_SEARCH;
-    if (++probe_ctx->reports > 12) return EXCEPTION_CONTINUE_SEARCH;
-    char line[512];
-    auto code = (unsigned long long)e->ExceptionRecord->ExceptionCode;
-    auto rip = (unsigned long long)(uintptr_t)e->ExceptionRecord->ExceptionAddress;
-    auto addr = (unsigned long long)(uintptr_t)e->ExceptionRecord->ExceptionInformation[1];
-    auto access = (unsigned long long)e->ExceptionRecord->ExceptionInformation[0];
-    HMODULE fault_mod = nullptr;
-    GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-        (LPCWSTR)(LPCVOID)(uintptr_t)rip, &fault_mod);
-    char modname[260] = "?";
-    if (fault_mod) GetModuleFileNameA(fault_mod, modname, 259);
-    std::snprintf(line, sizeof(line),
-        "[PROBE] FAULT code=0x%llx access=%llu rip=0x%llx fault=0x%llx mod=%s mod_rva=0x%llx\n",
-        code, access, rip, addr, modname, fault_mod ? rip - (unsigned long long)(uintptr_t)fault_mod : 0ull);
-    probe_emit(line);
-    if (probe_state_slot) {
-        probe_emit("[PROBE] data:");
-        for (int i = -3; i <= 3; ++i) {
-            unsigned long long value = 0; SIZE_T got = 0;
-            if (ReadProcessMemory(GetCurrentProcess(), (LPCVOID)(uintptr_t)(probe_state_slot + i * 8), &value, 8, &got) && got == 8)
-                std::snprintf(line, sizeof(line), " q=0x%llx", value);
-            else std::snprintf(line, sizeof(line), " q=?");
-            probe_emit(line);
-        }
-        probe_emit("\n");
-    }
-    auto rsp = (unsigned long long)(uintptr_t)e->ContextRecord->Rsp;
-    unsigned printed = 0;
-    for (unsigned slot = 0; slot < 512 && printed < 24; ++slot) {
-        unsigned long long value = 0;
-        if (!ReadProcessMemory(GetCurrentProcess(), (LPCVOID)(uintptr_t)(rsp + slot * 8), &value, 8, nullptr) || !value) continue;
-        HMODULE mod = nullptr;
-        if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-            (LPCWSTR)(LPCVOID)(uintptr_t)value, &mod) || !mod) continue;
-        char name[260] = "?";
-        GetModuleFileNameA(mod, name, 259);
-        auto* base = (unsigned char*)(uintptr_t)mod;
-        auto size = ((PIMAGE_NT_HEADERS)(base + ((PIMAGE_DOS_HEADER)base)->e_lfanew))->OptionalHeader.SizeOfImage;
-        auto rva = value - (unsigned long long)(uintptr_t)mod;
-        if (rva >= size) continue; // data pointer inside module, not code range
-        std::snprintf(line, sizeof(line), "[PROBE] st[%u]=%s+0x%llx\n",
-            slot, strrchr(name, '\\') ? strrchr(name, '\\') + 1 : name, rva);
-        probe_emit(line);
-        ++printed;
-    }
-    if (code == 0x20474343 || code == 0xe06d7363) return EXCEPTION_CONTINUE_SEARCH;
-    // Write trips are no longer page-trapped (hardware watchpoints below).
-    TerminateProcess(GetCurrentProcess(), 4242);
-    return EXCEPTION_CONTINUE_SEARCH;
-}
-static struct ProbeExceptionInstall { ProbeExceptionInstall() {
-    if (!probe_env_value("LYMAR_PROBE_ENABLE") && !probe_env_value("LYMAR_PROBE_WATCH")) return;
-    probe_ctx = (ProbeCtx*)std::calloc(1, sizeof(ProbeCtx));
-    probe_ctx->arm_at = 2000; // arm once the runtime is fully initialized
-    AddVectoredExceptionHandler(1, probe_exception_filter);
-    probe_emit("[PROBE] handler installed\n");
-} } probe_exception_install;
-// Watcher: a hardware write-watchpoint on the exact 8 bytes of the parent's
-// shared_heap() state pointer. Reports the faulting RIP of every write.
-// Arm Dr0 write-breakpoint on one (debugger-suspended) thread.
-static void probe_arm_thread(DWORD pid, DWORD tid, unsigned long long slot, unsigned& armed_threads) {
-    if (!slot || armed_threads >= 64) return;
-    HANDLE t = OpenThread(THREAD_ALL_ACCESS, FALSE, tid);
-    if (!t) return;
-    CONTEXT ctx; ctx.ContextFlags = CONTEXT_DEBUG_REGISTERS;
-    if (GetThreadContext(t, &ctx)) {
-        ctx.Dr0 = (DWORD64)slot;
-        ctx.Dr6 = 0; ctx.Dr7 = 0;
-        ctx.Dr7 |= 0x1ull;          // L0 local
-        ctx.Dr7 &= ~(3ull << 16);    // RW0 = 00 -> write access
-        ctx.Dr7 |= 3ull << 18;       // LEN0 = 8 bytes
-        SetThreadContext(t, &ctx);
-        ++armed_threads;
-    }
-    CloseHandle(t);
-}
-static void probe_debug_loop(DWORD target_pid, unsigned long long slot) {
-    if (!DebugActiveProcess(target_pid)) {
-        char line[128];
-        snprintf(line, sizeof(line), "[PROBE] attach pid=%lu failed err=%lu\n", target_pid, GetLastError());
-        probe_emit(line);
-        return;
-    }
-    DebugSetProcessKillOnExit(FALSE);
-    DEBUG_EVENT ev;
-    unsigned hits = 0, armed_threads = 0;
-    // Attach does not deliver BREAKPOINT for already-existing threads; enumerate
-    // and arm them while the initial break suspends the target.
-    {
-        HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, target_pid);
-        if (snap != INVALID_HANDLE_VALUE) {
-            THREADENTRY32 te; te.dwSize = sizeof(te);
-            if (Thread32First(snap, &te)) {
-                do if (te.th32OwnerProcessID == target_pid)
-                    probe_arm_thread(target_pid, te.th32ThreadID, slot, armed_threads);
-                while (Thread32Next(snap, &te));
-            }
-            CloseHandle(snap);
-        }
-    }
-    char line[256];
-    snprintf(line, sizeof(line), "[PROBE] attached armed=%u slot=0x%llx\n", armed_threads, slot);
-    probe_emit(line);
-    while (WaitForDebugEvent(&ev, INFINITE)) {
-        DWORD status = DBG_CONTINUE;
-        if (ev.dwDebugEventCode == CREATE_THREAD_DEBUG_EVENT) {
-            snprintf(line, sizeof(line), "[PROBE] new-thread %lu\n", ev.dwThreadId);
-            probe_emit(line);
-        }
-        if (ev.dwDebugEventCode == EXCEPTION_DEBUG_EVENT) {
-            auto& rec = ev.u.Exception.ExceptionRecord;
-            if (rec.ExceptionCode == EXCEPTION_BREAKPOINT) {
-                // Thread is suspended here: install Dr0 write-breakpoint.
-                probe_arm_thread(target_pid, ev.dwThreadId, slot, armed_threads);
-            } else if (rec.ExceptionCode == EXCEPTION_SINGLE_STEP && hits < 12) {
-                ++hits;
-                HMODULE mod = nullptr;
-                GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-                    (LPCWSTR)(LPCVOID)(uintptr_t)rec.ExceptionAddress, &mod);
-                char name[260] = "?";
-                if (mod) GetModuleFileNameA(mod, name, 259);
-                snprintf(line, sizeof(line), "[PROBE] WRITE-HIT rip=%s+0x%llx thread=%lu\n",
-                    strrchr(name, '\\') ? strrchr(name, '\\') + 1 : name, mod ? (unsigned long long)((char*)rec.ExceptionAddress - (char*)mod) : 0ull,
-                    ev.dwThreadId);
-                probe_emit(line);
-            } else status = DBG_EXCEPTION_NOT_HANDLED;
-            if (rec.ExceptionCode != EXCEPTION_BREAKPOINT && rec.ExceptionCode != EXCEPTION_SINGLE_STEP && hits < 12) {
-                snprintf(line, sizeof(line), "[PROBE] exc 0x%lx rip=%p first=%lu\n", rec.ExceptionCode,
-                    rec.ExceptionAddress, ev.u.Exception.dwFirstChance);
-                probe_emit(line);
-            }
-        } else if (ev.dwDebugEventCode == OUTPUT_DEBUG_STRING_EVENT || ev.dwDebugEventCode == RIP_EVENT)
-            status = DBG_EXCEPTION_NOT_HANDLED;
-        ContinueDebugEvent(ev.dwProcessId, ev.dwThreadId, status);
-        if (ev.dwDebugEventCode == EXIT_PROCESS_DEBUG_EVENT) {
-            snprintf(line, sizeof(line), "[PROBE] target exited code=0x%lx\n", ev.u.ExitProcess.dwExitCode);
-            probe_emit(line);
-            break;
-        }
-    }
-    snprintf(line, sizeof(line), "[PROBE] loop done hits=%u\n", hits);
-    probe_emit(line);
-}
-// Watcher child: static ctor blocks here, so the exe's main never runs and the
-// child exists purely to pump debug events for its parent. stderr is inherited.
-static struct ProbeWatcherInit {
-    ProbeWatcherInit() {
-        if (!g_probe_watcher_mode) return;
-        const char* v = probe_env_value("LYMAR_PROBE_WATCH");
-        unsigned long long parent = 0, slot = 0;
-        if (v) {
-            while (*v && (*v < '0' || *v > '9')) ++v;   // tolerate "KEY=" prefix
-            for (; *v >= '0' && *v <= '9'; ++v) parent = parent * 10 + (*v - '0');
-            if (*v == ':') { ++v; for (; *v >= '0' && *v <= '9'; ++v) slot = slot * 10 + (*v - '0'); }
-        }
-        char line[256];
-        snprintf(line, sizeof(line), "[PROBE] watcher up parent=%llu slot=0x%llx\n", parent, slot);
-        probe_emit(line);
-        if (parent && slot) probe_debug_loop((DWORD)parent, slot);
-        ExitProcess(0);
-    }
-} probe_watcher_init;
-static void probe_arm_guard() {
-    if (!probe_ctx || !probe_state_slot) return;
-    // Self-contained AOT exes skip CRT startup, so GetModuleFileName* fails
-    // (PEB ProcessParameters NULL). Read the image path from the PEB loader
-    // list instead.
-    char exe_path[1024] = "?";
-    {
-        HMODULE main_mod = nullptr;
-        GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-            (LPCWSTR)(LPCVOID)(uintptr_t)&probe_state_slot, &main_mod);
-        if (main_mod) {
-            wchar_t wpath[1024];
-            const DWORD wn = GetModuleFileNameW(main_mod, wpath, 1023);
-            if (wn) {
-                int need = WideCharToMultiByte(CP_UTF8, 0, wpath, (int)wn, exe_path, sizeof(exe_path) - 1, nullptr, nullptr);
-                if (need > 0) exe_path[need] = 0;
-            }
-        }
-    }
-    char cmd[2048];
-    snprintf(cmd, sizeof(cmd), "\"%s\"", exe_path);
-    char envv[96];
-    snprintf(envv, sizeof(envv), "LYMAR_PROBE_WATCH=%lu:%llu", GetCurrentProcessId(), probe_state_slot);
-    SetEnvironmentVariableA("LYMAR_PROBE_WATCH", envv);
-    STARTUPINFOA si; PROCESS_INFORMATION pi;
-    std::memset(&si, 0, sizeof(si)); si.cb = sizeof(si);
-    HANDLE err = GetStdHandle(STD_ERROR_HANDLE);
-    SetHandleInformation(err, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
-    si.hStdError = err; si.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
-    si.dwFlags = STARTF_USESTDHANDLES;
-    if (CreateProcessA(nullptr, cmd, nullptr, nullptr, TRUE, 0, nullptr, nullptr, &si, &pi)) {
-        char line[128];
-        snprintf(line, sizeof(line), "[PROBE] watcher spawned pid=%lu\n", pi.dwProcessId);
-        probe_emit(line);
-        CloseHandle(pi.hThread); CloseHandle(pi.hProcess);
-    } else {
-        char line[256];
-        snprintf(line, sizeof(line), "[PROBE] spawn failed err=%lu cmd=[%s]\n", GetLastError(), cmd);
-        probe_emit(line);
-        std::memset(&si, 0, sizeof(si)); si.cb = sizeof(si);
-        if (CreateProcessA(nullptr, cmd, nullptr, nullptr, FALSE, CREATE_NEW_CONSOLE, nullptr, nullptr, &si, &pi)) {
-            snprintf(line, sizeof(line), "[PROBE] watcher spawned(new console) pid=%lu\n", pi.dwProcessId);
-            probe_emit(line);
-            CloseHandle(pi.hThread); CloseHandle(pi.hProcess);
-        } else {
-            snprintf(line, sizeof(line), "[PROBE] spawn2 failed err=%lu\n", GetLastError());
-            probe_emit(line);
-        }
-    }
-}
-#else
-[[maybe_unused]] static void probe_arm_guard() {
-    static unsigned long long probe_state_slot_guard_placeholder = 0;
-    (void)probe_state_slot_guard_placeholder;
-}
-#endif
 thread_local unsigned runtime_lock_depth = 0;
 struct RuntimeGuard {
     RuntimeGuard() { shared_heap().mutex.lock(); ++runtime_lock_depth; }
@@ -1511,11 +1229,6 @@ uint64_t lymar_aot_alloc(uint64_t size) {
     try {
     RuntimeGuard runtime_guard;
 
-    // TEMP DIAGNOSTIC: periodic page-guard arming around the state slot.
-#if defined(_WIN32)
-    if (probe_ctx && ++probe_ctx->allocs == probe_ctx->arm_at) probe_arm_guard();
-#endif
-
     if (size > SIZE_MAX) throw std::bad_alloc();
     auto pointer = reinterpret_cast<Word>(heap().allocator.allocate(std::max(size, Word(1))));
     if (!pointer) throw std::bad_alloc();
@@ -1734,8 +1447,23 @@ uint64_t lymar_aot_float_bits_to_string(uint64_t bits) {
     return lymar_aot_float_to_string(number);
 }
 uint64_t lymar_aot_length(uint64_t pointer_raw,uint64_t kind) {
+    // Standalone-AOT machine code carries no C++ unwind metadata, so a throw
+    // here would crash the process before any catch could run. Report failures
+    // directly: workers record worker_error for the scheduler; the main thread
+    // prints the VM-style error and exits nonzero (lymar_aot_assert pattern).
+    auto fail=[&](const char* message)->uint64_t {
+        if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", message);
+        if (!heap().worker) {
+            std::string text=std::string("Error: ")+message+"\n";
+            lymar_stdout_write(text.data(),text.size());
+            std::exit(1);
+        }
+        return 0;
+    };
+    try {
     RuntimeGuard guard;
     if(lymar_aot_is_nil(pointer_raw,kind)) return 0;
+    if(kind!=object_kind) return fail("len: unsupported type");
     uint64_t pointer = pointer_raw & ~7ULL;
     auto found=heap().allocations.find(pointer);
     if(found==heap().allocations.end() || found->second.raw_memory || found->second.size<8) {
@@ -1743,36 +1471,28 @@ uint64_t lymar_aot_length(uint64_t pointer_raw,uint64_t kind) {
             auto type = read_word(pointer) & 0xffffffff;
             if (type == 11) return read_word(pointer, 8);
             if (type == 1) return read_word(pointer, 16);
-            if (type == 3) return read_word(pointer, 16);
         }
-        throw std::runtime_error("Invalid or expired length receiver");
+        return fail("Invalid or expired length receiver");
     }
     auto& record=found->second;
     if(record.dictionary) {
-        if(record.size<32) throw std::runtime_error("Invalid dictionary header");
+        if(record.size<32) return fail("Invalid dictionary header");
         auto count=read_word(pointer),capacity=read_word(pointer,8);
         for(Word offset:{Word(16),Word(24)}) {
             auto data=heap().allocations.find(read_word(pointer,offset));
             if(count>capacity || data==heap().allocations.end() || capacity>data->second.size/8)
-                throw std::runtime_error("Invalid dictionary storage");
+                return fail("Invalid dictionary storage");
         }
         return count;
     }
     auto type=read_word(pointer)&0xffffffff;
     if(type==11) {
-        if(!string_data(pointer)) throw std::runtime_error("Invalid string header");
+        if(!string_data(pointer)) return fail("Invalid string header");
         return read_word(pointer,8);
     }
     if(type==1) return lymar_aot_ffi_list_size(pointer);
-    if(type==3) {
-        if(record.size<32) throw std::runtime_error("Invalid tuple header");
-        auto count=read_word(pointer,16);auto data=heap().allocations.find(read_word(pointer,8));
-        if(data==heap().allocations.end() || count>data->second.size/8)
-            throw std::runtime_error("Invalid tuple storage");
-        return count;
-    }
     if(type==15) {
-        if(record.size<40) throw std::runtime_error("Invalid frame header");
+        if(record.size<40) return fail("Invalid frame header");
         auto* name=string_data(read_word(pointer,8));
         // Preserve the VM's existing frame-length interpretation.
         if(name && std::strcmp(name,"LinkedList")==0 && read_word(pointer,24)>2) {
@@ -1781,7 +1501,17 @@ uint64_t lymar_aot_length(uint64_t pointer_raw,uint64_t kind) {
         }
         return 0;
     }
-    throw std::runtime_error("len: unsupported object type");
+    return fail("len: unsupported object type");
+    } catch (const std::exception& failure) {
+        if (runtime_lock_depth && heap().worker) throw;
+        if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
+        if (!heap().worker) {
+            std::string message = std::string("Error: ") + failure.what() + "\n";
+            lymar_stdout_write(message.data(), message.size());
+            std::exit(1);
+        }
+        return 0;
+    }
 }
 uint64_t lymar_aot_tuple_length(uint64_t pointer, uint64_t kind) {
     try {
@@ -2225,6 +1955,12 @@ uint64_t lymar_aot_raw_alloc(uint64_t size, uint64_t kind) {
     if (static_cast<int64_t>(size) < 0) return lymar_aot_nil();
     auto pointer = lymar_aot_alloc(size);
     heap().allocations.at(pointer).raw_memory = true;
+    // ffi.alloc mirrors malloc: lifetime is explicit (ffi.free) or process
+    // exit. Region-scoping is unsafe here — pubptr/fnptr are int aliases, so
+    // no GC edge can ever promote a raw buffer out of its creating region,
+    // and region cleanup frees it while raw pointers derived from it are
+    // still live (control blocks, WNDCLASSEX structs, callback scratch).
+    heap().promote(pointer, 0);
     return pointer;
 
     } catch (const std::exception& failure) {
@@ -2256,6 +1992,18 @@ void lymar_aot_memory_store(uint64_t pointer, uint64_t value, uint64_t element, 
     if (!pointer) return;
     auto* address = reinterpret_cast<void*>(pointer);
     const Word integer = element < 8 ? raw_integer_value(value, kind) : value;
+    // Pointer stores must persist the raw address, not the tag-13 wrapper
+    // object: ffi.fnptr/pubptr values are heap boxes whose payload (offset 8)
+    // is the real pointer. Storing the wrapper address hands consumers (e.g. a
+    // WNDCLASSEX.lpfnWndProc consumed by CreateWindowExA) a heap pointer that
+    // faults when called.
+    Word pointer_value = value;
+    if (element == 10 && (kind == 0 || (kind == object_kind && !lymar_aot_is_nil(value, kind)))) {
+        auto wrapped = heap().allocations.find(value);
+        if (wrapped != heap().allocations.end() && !wrapped->second.raw_memory &&
+            wrapped->second.size >= 16 && read_word(value) == 13)
+            pointer_value = read_word(value, 8);
+    }
     size_t width = 0;
     switch (element) {
 #define LM_RAW_STORE(ID, TYPE, VALUE) case ID: { TYPE stored = static_cast<TYPE>(VALUE); width = sizeof(stored); std::memcpy(address, &stored, width); break; }
@@ -2265,7 +2013,7 @@ void lymar_aot_memory_store(uint64_t pointer, uint64_t value, uint64_t element, 
         LM_RAW_STORE(6, int64_t, integer) LM_RAW_STORE(7, uint64_t, integer)
         LM_RAW_STORE(8, float, raw_numeric_value(value, kind))
         LM_RAW_STORE(9, double, raw_numeric_value(value, kind))
-        LM_RAW_STORE(10, Word, (kind == 0 || (kind == object_kind && !lymar_aot_is_nil(value, kind))) ? value : 0)
+        LM_RAW_STORE(10, Word, (kind == 0 || (kind == object_kind && !lymar_aot_is_nil(value, kind))) ? pointer_value : 0)
 #undef LM_RAW_STORE
     }
     auto& h = heap();
@@ -2543,7 +2291,6 @@ uint64_t lymar_aot_resource_create(uint64_t type, uint64_t) {
 
     if (type == 9) return 0; // stdout
     if (type == 10) return 1; // stderr
-    if (type == 18 || type == 4) { auto& f = files(); auto id = f.next++; f.handles.emplace(id, nullptr); return id; }
     if(type==16) {auto& f=files();auto id=f.next++;f.hashes.try_emplace(id);return id;}
     if(type==11) {auto& f=files();auto id=f.next++;f.mems.emplace(id, std::make_pair(nullptr, size_t(0)));return id;}
     // OS (18) and PROCESS (4) are stateless service handles. The facts they
@@ -3210,7 +2957,17 @@ uint64_t lymar_aot_ffi_wrap(uint64_t pointer) {
     RuntimeGuard guard;
     if(!pointer) return lymar_aot_nil();
     auto value=lymar_aot_alloc(16); Word header[2]={13,pointer};
-    std::memcpy(reinterpret_cast<void*>(value),header,sizeof(header)); return value;
+    std::memcpy(reinterpret_cast<void*>(value),header,sizeof(header));
+    // ffi.fnptr/pubptr are `type` aliases of int, so every consumer slot is
+    // scalar-classified and publishes no region GC edge. Under allocation
+    // pressure the wrapper's region can retire while raw copies of its
+    // address are still live (e.g. a WNDCLASSEX.lpfnWndProc stored via
+    // ffi.store_ptr, or a symbol pointer awaiting foreign_call), and
+    // lymar_aot_ffi_pointer would then fail open on the freed box. Pin the
+    // 16-byte wrapper in the permanent region; lymar_aot_ffi_invalidate
+    // still clears its payload on library/callback teardown.
+    heap().promote(value, 0);
+    return value;
 }
 void lymar_aot_ffi_invalidate(uint64_t pointer) {
     RuntimeGuard guard;

@@ -666,8 +666,8 @@ fn char_to_line_col(text: str, target_idx: int): (int, int) {
 
 fn find_status_text(): str {
     if (_app_ready == 0) { return ""; }
-    if (len(_apps[0].find_query()) == 0) { return ""; }
-    var mc: int = _apps[0].count_matches();
+    if (len((_app as TextEditorApp).find_query()) == 0) { return ""; }
+    var mc: int = (_app as TextEditorApp).count_matches();
     if (mc == 0) { return "No matches found in active document"; }
     if (mc == 1) { return "1 match found"; }
     return "{mc} matches found";
@@ -698,51 +698,51 @@ fn _status_text(ed: CodeEditor): str {
 // ── Menu action callbacks (module fns — Button.on_click is fn(): nil) ───────
 
 fn act_new() {
-    if (_app_ready == 1) { _apps[0].new_document(); }
+    if (_app_ready == 1) { (_app as TextEditorApp).new_document(); }
 }
 
 fn act_save() {
-    if (_app_ready == 1) { _apps[0].save_current_document(); }
+    if (_app_ready == 1) { (_app as TextEditorApp).save_current_document(); }
 }
 
 fn act_close_tab() {
-    if (_app_ready == 1) { _apps[0].close_current_document(); }
+    if (_app_ready == 1) { (_app as TextEditorApp).close_current_document(); }
 }
 
 fn act_find() {
-    if (_app_ready == 1) { _apps[0].toggle_find(); }
+    if (_app_ready == 1) { (_app as TextEditorApp).toggle_find(); }
 }
 
 fn act_about() {
-    if (_app_ready == 1) { _apps[0].toggle_about(); }
+    if (_app_ready == 1) { (_app as TextEditorApp).toggle_about(); }
 }
 
 fn act_metrics() {
-    if (_app_ready == 1) { _apps[0].toggle_metrics(); }
+    if (_app_ready == 1) { (_app as TextEditorApp).toggle_metrics(); }
 }
 
 fn act_find_next() {
-    if (_app_ready == 1) { _apps[0].find_next(); }
+    if (_app_ready == 1) { (_app as TextEditorApp).find_next(); }
 }
 
 fn act_replace() {
-    if (_app_ready == 1) { _apps[0].replace_current(); }
+    if (_app_ready == 1) { (_app as TextEditorApp).replace_current(); }
 }
 
 fn act_replace_all() {
-    if (_app_ready == 1) { _apps[0].replace_all(); }
+    if (_app_ready == 1) { (_app as TextEditorApp).replace_all(); }
 }
 
 fn act_close_find() {
-    if (_app_ready == 1) { _apps[0].st.show_find.set(0); }
+    if (_app_ready == 1) { (_app as TextEditorApp).st.show_find.set(0); }
 }
 
 fn act_close_about() {
-    if (_app_ready == 1) { _apps[0].st.show_about.set(0); }
+    if (_app_ready == 1) { (_app as TextEditorApp).st.show_about.set(0); }
 }
 
 fn fx_theme() {
-    if (_app_ready == 1) { _apps[0].apply_theme_idx(); }
+    if (_app_ready == 1) { (_app as TextEditorApp).apply_theme_idx(); }
 }
 
 // ── TextEditorApp ────────────────────────────────────────────────────────────
@@ -1050,10 +1050,7 @@ frame TextEditorApp {
 // Module-global app binding for fn(): nil widget callbacks and paint-time
 // helpers — set once in main before the tree is built. Declared after
 // TextEditorApp so the optional-frame type resolves.
-// The editor instance lives in a list: frames stored directly in module
-// vars lose trait-field receivers ("Invalid frame receiver"), while list
-// elements are boxed and keep working trait dispatch.
-var _apps: [TextEditorApp] = [];
+var _app: TextEditorApp? = nil;
 var _app_ready: int = 0;
 
 pub fn main(): int {
@@ -1072,7 +1069,7 @@ pub fn main(): int {
 
     // Publish to the module-global callback binding as the last use of
     // `editor` (assignment moves the binding), then arm the callback gate.
-    _apps.append(editor);
+    _app = editor;
     _app_ready = 1;
     a.run();
 

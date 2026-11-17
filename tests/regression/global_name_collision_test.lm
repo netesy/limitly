@@ -1,0 +1,67 @@
+// Regression: root-module variables whose unqualified name collides with a
+// variable in another loaded module (e.g. std.native.macos._app) must resolve
+// to the LOCAL declaration on reads. Previously the LIR generator's
+// show-import fallback scanned all non-root modules and emitted
+// LoadGlobal "std.native.macos._app" for a root `var _app`, so stores wrote
+// "_app" while loads read the foreign global -> "Invalid frame receiver".
+
+import std.app as app;
+
+frame Widget {
+    pub var count: int;
+    pub var label: str;
+
+    pub init() {
+        self.count = 0;
+        self.label = "w";
+    }
+
+    pub fn bump(): nil {
+        self.count = self.count + 1;
+    }
+}
+
+// `_app` deliberately collides with std.native.macos._app.
+var _app: Widget? = nil;
+var _app_ready: int = 0;
+
+fn bump_via_callback(): nil {
+    if (_app_ready == 1) {
+        (_app as Widget).bump();
+    }
+}
+
+fn main(): int {
+    var w = Widget();
+    _app = w;
+    _app_ready = 1;
+
+    // Field read through the optional cast.
+    if ((_app as Widget).count != 0) {
+        print("FAIL: field read returned wrong value");
+        return 1;
+    }
+
+    // Method call through the optional cast.
+    (_app as Widget).bump();
+    if ((_app as Widget).count != 1) {
+        print("FAIL: method call did not mutate stored frame");
+        return 1;
+    }
+
+    // Module-fn callback path (the shape that crashed in text_editor).
+    bump_via_callback();
+    if ((_app as Widget).count != 2) {
+        print("FAIL: callback path did not reach stored frame");
+        return 1;
+    }
+
+    // Scalar global with a colliding-ish name still reads locally.
+    if (_app_ready != 1) {
+        print("FAIL: scalar global read wrong value");
+        return 1;
+    }
+
+    print("global_name_collision_test PASSED");
+    return 0;
+}

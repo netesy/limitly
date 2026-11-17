@@ -118,15 +118,20 @@ var _next_id: int = 1;
 var _quit: bool = false;
 var _scratch_pt: int = 0;     // POINT (8B) for ScreenToClient
 var _scratch_ps: int = 0;     // PAINTSTRUCT (72B) for BeginPaint/EndPaint
+var _getkeystate: int = 0;    // cached GetKeyState fnptr (resolved once)
 
 // ffi.alloc'd memory is region-scoped: it is released when the creating
 // function's region exits. Control blocks, rings and WndProc scratch buffers
 // must outlive their creator, so every persistent allocation's pubptr is
 // retained here — storing it in a module-global list promotes the raw
 // allocation to region 0 (permanent).
-var _keep: [pubptr] = [] as [pubptr];
+var _keep: [any] = [] as [any];
 
 fn keep(p: pubptr): pubptr {
+    // [any] elements carry object kind, so the store publishes a region GC
+    // edge that promotes the raw allocation (and any tag-13 wrapper it holds)
+    // to the permanent region. A [pubptr] list would keep scalar kind and the
+    // allocation could be swept once its creating region retires.
     _keep.append(p);
     return p;
 }
@@ -201,21 +206,27 @@ fn s16(v: int): int {
 // Modifier bitmask from GetKeyState high bits (foreign calls only).
 fn modifiers(): int {
     var m: int = 0;
-    var ks = k32sym("GetKeyState");
+    if (_getkeystate == 0) { _getkeystate = u32sym("GetKeyState"); }
+    var ks: int = _getkeystate;
     if (ks != 0) {
-        var st: int = call_i64_ret(ks, [VK_SHIFT], ffi.TYPE_I16);
-        if (st & 0x8000 != 0) { m = m | nt.MOD_SHIFT; }
-        st = call_i64_ret(ks, [VK_CONTROL], ffi.TYPE_I16);
-        if (st & 0x8000 != 0) { m = m | nt.MOD_CTRL; }
-        st = call_i64_ret(ks, [VK_MENU], ffi.TYPE_I16);
-        if (st & 0x8000 != 0) { m = m | nt.MOD_ALT; }
-        var lw: int = call_i64_ret(ks, [VK_LWIN], ffi.TYPE_I16);
-        var rw: int = call_i64_ret(ks, [VK_RWIN], ffi.TYPE_I16);
-        if (lw & 0x8000 != 0 or rw & 0x8000 != 0) { m = m | nt.MOD_SUPER; }
-        st = call_i64_ret(ks, [VK_CAPITAL], ffi.TYPE_I16);
-        if (st & 0x8000 != 0) { m = m | nt.MOD_CAPS; }
-        st = call_i64_ret(ks, [VK_NUMLOCK], ffi.TYPE_I16);
-        if (st & 0x8000 != 0) { m = m | nt.MOD_NUM; }
+        // GetKeyState returns SHORT; call_i64_1 reads RAX but only bit 15
+        // (the short's sign bit) is consumed below, so upper-bit garbage
+        // from the 64-bit read cannot affect the mask tests.
+        unsafe {
+            var st: int = ffi.call_i64_1(ks, VK_SHIFT);
+            if (st & 0x8000 != 0) { m = m | nt.MOD_SHIFT; }
+            st = ffi.call_i64_1(ks, VK_CONTROL);
+            if (st & 0x8000 != 0) { m = m | nt.MOD_CTRL; }
+            st = ffi.call_i64_1(ks, VK_MENU);
+            if (st & 0x8000 != 0) { m = m | nt.MOD_ALT; }
+            var lw: int = ffi.call_i64_1(ks, VK_LWIN);
+            var rw: int = ffi.call_i64_1(ks, VK_RWIN);
+            if (lw & 0x8000 != 0 or rw & 0x8000 != 0) { m = m | nt.MOD_SUPER; }
+            st = ffi.call_i64_1(ks, VK_CAPITAL);
+            if (st & 0x8000 != 0) { m = m | nt.MOD_CAPS; }
+            st = ffi.call_i64_1(ks, VK_NUMLOCK);
+            if (st & 0x8000 != 0) { m = m | nt.MOD_NUM; }
+        }
     }
     return m;
 }
@@ -445,6 +456,10 @@ fn ensure_class(): int {
         if (hinst == 0) { return 0; }
         var cb = wndproc_cb() ? else { return 0; };
         var wndproc_ptr: int = cb.pointer;
+        // Retain the fnptr wrapper: int-typed bindings carry no region GC
+        // edge, so without this the tag-13 box can be swept and store_ptr
+        // would persist its stale heap address as lpfnWndProc.
+        keep(wndproc_ptr);
         // The trampoline must outlive every window; ffi.Callback frames
         // are GC-managed and we never call cb.close().
         var wc = ffi.alloc(80);

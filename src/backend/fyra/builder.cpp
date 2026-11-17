@@ -161,6 +161,34 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
     }
 
     auto inspect_instructions = [&](const LIR::LIR_Function& f) {
+        // ffi.create_callback resolves its target by name string at runtime,
+        // so the callee is invisible to the call graph — same problem gpu
+        // stage entries solve by explicit seeding. Track string literals per
+        // register and seed any literal passed as the callback name.
+        std::unordered_map<uint32_t, std::string> literal_regs;
+        auto literal_of = [](const LIR::LIR_Inst& inst) -> std::string {
+            if (!inst.const_val || !IS_PTR(inst.const_val)) return "";
+            ObjHeader* h = (ObjHeader*)UNBOX_PTR(inst.const_val);
+            if (h->type_id == TYPE_STRING) return ((LmStringHeader*)h)->data;
+            if (h->type_id == TYPE_BOX && ((LmBox*)h)->type == LM_BOX_STRING)
+                return static_cast<const char*>(((LmBox*)h)->value.as_ptr);
+            return "";
+        };
+        for (const auto& inst : f.instructions) {
+            if (inst.op == LIR::LIR_Op::LoadConst) {
+                auto lit = literal_of(inst);
+                if (!lit.empty()) literal_regs[inst.dst] = lit;
+            } else if (inst.op == LIR::LIR_Op::Mov && literal_regs.count(inst.a)) {
+                literal_regs[inst.dst] = literal_regs[inst.a];
+            }
+            if ((inst.op == LIR::LIR_Op::Call || inst.op == LIR::LIR_Op::CallVoid) &&
+                (inst.func_name == "std.ffi.create_callback" || inst.func_name == "ffi.create_callback") &&
+                !inst.call_args.empty() && literal_regs.count(inst.call_args[0])) {
+                const std::string& target = literal_regs[inst.call_args[0]];
+                if (registry.getFunction(target) && reachable_funcs.insert(target).second)
+                    worklist.push_back(target);
+            }
+        }
         for (const auto& inst : f.instructions) {
             if (inst.op == LIR::LIR_Op::NewFrame) {
                 auto name = !inst.type_name.empty() ? inst.type_name : inst.func_name;
@@ -1621,6 +1649,19 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     }
                 }
 
+                // See CallBuiltin below: generic len() must not lower to the
+                // list-only lm_list_len; route it through the kind-checked
+                // runtime so scalars/i128 get the VM's error instead of a
+                // wild offset-16 read.
+                if (name == "len" && args.size() == 1 && !inst.call_args.empty()) {
+                    auto* len_res = builder_->createExternCall("lymar_aot_length",
+                        {erased_word(args[0]), word_kind(inst.call_args[0])},
+                        context_->getIntegerType(64));
+                    if (inst.dst != UINT32_MAX)
+                        store_reg(inst.dst, len_res, inst.result_type);
+                    break;
+                }
+
                 if (auto* value = lower_runtime_builtin(name, args)) {
                     if (inst.dst != UINT32_MAX) {
                         if (inst.result_type == LIR::Type::F64 || inst.result_type == LIR::Type::F32 || (value && value->getType()->isFloatingPoint()))
@@ -1994,6 +2035,20 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
 
                 std::vector<ir::Value*> args;
                 for (auto r : inst.call_args) args.push_back(load_reg(r, LIR::Type::I64));
+
+                // len() is type-agnostic in Lymar (str/list/dict/frame/nil);
+                // the lm_list_len IR builtin reads a raw offset-16 word and
+                // returns garbage/segfaults on scalars and i128 boxes. The
+                // runtime validates the erased kind sidecar and rejects
+                // unsupported receivers the same way the VM does.
+                if (name == "len" && args.size() == 1 && !inst.call_args.empty()) {
+                    auto* len_res = builder_->createExternCall("lymar_aot_length",
+                        {erased_word(args[0]), word_kind(inst.call_args[0])},
+                        context_->getIntegerType(64));
+                    if (inst.dst != UINT32_MAX)
+                        store_reg(inst.dst, len_res, inst.result_type);
+                    break;
+                }
 
                 if (auto* value = lower_runtime_builtin(name, args)) {
                     if (inst.dst != UINT32_MAX) {

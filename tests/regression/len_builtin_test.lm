@@ -1,0 +1,32 @@
+// len() builtin: valid receivers across VM and AOT.
+// Unsupported receivers (int, i128, tuple, float, bool) must error in both
+// backends; that path is verified manually since builtin errors are not
+// catchable in Lymar.
+fn main() {
+    var failures = 0;
+
+    var lst: [int] = [1, 2, 3, 4];
+    if (len(lst) != 4) { print("FAIL list len"); failures = failures + 1; }
+
+    var empty: [int] = [];
+    if (len(empty) != 0) { print("FAIL empty list len"); failures = failures + 1; }
+
+    var s: str = "hello";
+    if (len(s) != 5) { print("FAIL str len"); failures = failures + 1; }
+
+    var d: {str: int} = {"a": 1, "b": 2};
+    if (len(d) != 2) { print("FAIL dict len"); failures = failures + 1; }
+
+    var n = nil;
+    if (len(n) != 0) { print("FAIL nil len"); failures = failures + 1; }
+
+    // len through an erased/any boundary still dispatches on the runtime value.
+    var boxed: any = lst;
+    if (len(boxed) != 4) { print("FAIL any-list len"); failures = failures + 1; }
+
+    if (failures == 0) {
+        print("len_builtin_test PASSED");
+    } else {
+        print("len_builtin_test FAILED");
+    }
+}

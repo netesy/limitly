@@ -1,0 +1,24 @@
+// Regression: bare calls to show-imported functions must resolve to the
+// defining module's qualified name. Previously `import m show f` emitted an
+// unqualified `call f` that dispatched to nothing (nil result or garbage
+// register -> "Invalid frame receiver" for frame-typed arguments).
+import std.math show abs, clamp;
+import std.geometry.shapes show Rect;
+import std.geometry.collision show test_aabb_aabb, Contact2D;
+
+fn main(): int {
+    if (abs(-5) != 5) { print("FAIL abs"); return 1; }
+    if (clamp(15.0, 0.0, 10.0) != 10.0) { print("FAIL clamp"); return 1; }
+
+    var r1 = Rect(0.0, 0.0, 100.0, 100.0);
+    var r2 = Rect(50.0, 50.0, 100.0, 100.0);
+    var c = test_aabb_aabb(r1, r2);
+    if (c.collided != true) { print("FAIL collided"); return 1; }
+    if (c.penetration != 50.0) { print("FAIL penetration={c.penetration}"); return 1; }
+
+    var c2 = test_aabb_aabb(Rect(0.0, 0.0, 10.0, 10.0), Rect(500.0, 500.0, 10.0, 10.0));
+    if (c2.collided != false) { print("FAIL non-colliding"); return 1; }
+
+    print("show_import_call_test PASSED");
+    return 0;
+}

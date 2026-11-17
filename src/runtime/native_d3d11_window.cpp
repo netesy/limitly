@@ -78,7 +78,6 @@ bool native_d3d11_attach(void* hwnd_ptr, int width, int height) {
             return false;
         }
     }
-
     ComPtr<IDXGIDevice> dxgi_dev;
     ComPtr<IDXGIAdapter> adapter;
     ComPtr<IDXGIFactory2> factory;

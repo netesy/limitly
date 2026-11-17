@@ -827,7 +827,8 @@ Reg Generator::emit_variable_expr(LM::Frontend::AST::VariableExpr& expr) {
     // keep their own-module resolution (a local fn shadows an import).
     if (expr.name.find('.') == std::string::npos &&
         !function_table_.count(qualified_name) &&
-        !LIRFunctionManager::getInstance().hasFunction(qualified_name)) {
+        !LIRFunctionManager::getInstance().hasFunction(qualified_name) &&
+        !current_module_declares_var(expr.name)) {
         std::string imported_name = resolve_imported_symbol_name(expr.name);
         if (!imported_name.empty()) {
             return emit_module_member_value(imported_name, expr.inferred_type);
@@ -1694,7 +1695,16 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
             std::string qname = current_module_ + "." + func_name;
             if (function_table_.count(qname) || LIRFunctionManager::getInstance().hasFunction(qname)) vm_name = qname;
         }
-        
+        // Bare names that are not declared in the current module may be
+        // show-imported symbols (`import std.geometry show test_aabb_aabb`):
+        // the function only exists under its defining module's qualified
+        // name, so an unresolved bare Call would dispatch to nothing.
+        if (vm_name == func_name && func_name.find('.') == std::string::npos &&
+            !current_module_declares_function(func_name)) {
+            std::string imported_name = resolve_imported_symbol_name(func_name);
+            if (!imported_name.empty()) vm_name = imported_name;
+        }
+
         LIR_Inst inst(LIR_Op::Call, result, vm_name, arg_regs);
         inst.func_name = vm_name;
         for (size_t i = 0; i < arg_regs.size(); ++i) {
@@ -2798,6 +2808,43 @@ std::string Generator::resolve_imported_symbol_name(const std::string& name) {
     }
     std::sort(candidates.begin(), candidates.end());
     return candidates[0];
+}
+
+bool Generator::current_module_declares_var(const std::string& name) {
+    // True when the CURRENT module (including the root file, which
+    // resolve_imported_symbol_name skips) declares a top-level variable
+    // with this unqualified name. Local declarations must win over
+    // same-named symbols in other modules.
+    std::string path = (current_module_.empty() || current_module_ == "root") ? "root" : current_module_;
+    auto& manager = LM::Frontend::ModuleManager::getInstance();
+    auto modules = manager.get_all_modules();
+    auto it = modules.find(path);
+    if (it == modules.end() || !it->second || !it->second->ast) return false;
+    for (const auto& stmt : it->second->ast->statements) {
+        if (!stmt) continue;
+        if (auto var = std::dynamic_pointer_cast<LM::Frontend::AST::VarDeclaration>(stmt)) {
+            if (var->name == name) return true;
+        }
+    }
+    return false;
+}
+
+bool Generator::current_module_declares_function(const std::string& name) {
+    // True when the CURRENT module declares a top-level function with this
+    // unqualified name. Local functions must win over same-named symbols in
+    // other modules when resolving bare call targets.
+    std::string path = (current_module_.empty() || current_module_ == "root") ? "root" : current_module_;
+    auto& manager = LM::Frontend::ModuleManager::getInstance();
+    auto modules = manager.get_all_modules();
+    auto it = modules.find(path);
+    if (it == modules.end() || !it->second || !it->second->ast) return false;
+    for (const auto& stmt : it->second->ast->statements) {
+        if (!stmt) continue;
+        if (auto func = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(stmt)) {
+            if (!func->isStaged && func->name == name) return true;
+        }
+    }
+    return false;
 }
 
 Reg Generator::emit_member_expr(LM::Frontend::AST::MemberExpr& expr) {

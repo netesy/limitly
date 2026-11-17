@@ -231,6 +231,8 @@ private:
     Reg emit_member_access_with_obj(LM::Frontend::AST::MemberExpr& expr, Reg object_reg);
     Reg emit_module_member_value(const std::string& qualified_name, const TypePtr& inferred_type);
     std::string resolve_imported_symbol_name(const std::string& name);
+    bool current_module_declares_var(const std::string& name);
+    bool current_module_declares_function(const std::string& name);
     Reg emit_tuple_expr(LM::Frontend::AST::TupleExpr& expr);
     Reg emit_dict_expr(LM::Frontend::AST::DictExpr& expr);
     Reg emit_range_expr(LM::Frontend::AST::RangeExpr& expr);
