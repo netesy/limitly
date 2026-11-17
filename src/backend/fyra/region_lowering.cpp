@@ -368,9 +368,7 @@ void lower_region_ownership(ir::Module& module, const std::unordered_map<std::st
                     auto* addr_inst = dynamic_cast<ir::Instruction*>(address);
                     if (addr_inst && (addr_inst->getName().starts_with("scalar_slot_") || addr_inst->getName().starts_with("scalar_"))) {
                         flags[inst] = zero;
-                    } else if (addr_inst && addr_inst->getName().starts_with("slot_")) {
-                        flags[inst] = one;
-                    } else if (inst->getName().starts_with("lidx_elem_") || inst->getName().starts_with("scalar_")) {
+                    } else if (inst->getName().starts_with("scalar_")) {
                         flags[inst] = zero;
                     } else if (inst->getName().starts_with("lidx_data_ptr_") || inst->getName().starts_with("lset_data_ptr_")) {
                         flags[inst] = one;
@@ -407,7 +405,7 @@ void lower_region_ownership(ir::Module& module, const std::unordered_map<std::st
                     } else if (addr_inst && addr_inst->getName().starts_with("slot_")) {
                         emit(block, after, dynamic_cast<ir::GlobalVariable*>(address) ? "lymar_aot_global_edge" : "lymar_aot_edge",
                              {address, value->getType()->isFloatingPoint() ? static_cast<ir::Value*>(zero) : value,
-                              value->getType()->isFloatingPoint() ? static_cast<ir::Value*>(zero) : one});
+                              value->getType()->isFloatingPoint() ? static_cast<ir::Value*>(zero) : flag(value)});
                     } else {
                         emit(block, after, dynamic_cast<ir::GlobalVariable*>(address) ? "lymar_aot_global_edge" : "lymar_aot_edge",
                              {address, value->getType()->isFloatingPoint() ? static_cast<ir::Value*>(zero) : value,

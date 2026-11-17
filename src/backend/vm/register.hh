@@ -465,6 +465,7 @@ private:
         if (is_integer(value)) return as_i128(value) != 0;
         if (IS_PTR(value)) {
             ObjHeader* h = (ObjHeader*)UNBOX_PTR(value);
+            if (h->type_id == TYPE_FOREIGN_PTR) return ((ObjForeignPtr*)h)->ptr != nullptr;
             if (h->type_id == TYPE_FLOAT) return ((ObjFloat*)h)->value != 0.0;
             if (h->type_id == TYPE_BOX && ((LmBox*)h)->type == LM_BOX_STRING) {
                 LmBox* box = (LmBox*)h;

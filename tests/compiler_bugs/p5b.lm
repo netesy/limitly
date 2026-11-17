@@ -1,0 +1,1 @@
+pub staged fn cross_staged(x: int): int { return x + 100; }

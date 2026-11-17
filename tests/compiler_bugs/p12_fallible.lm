@@ -1,0 +1,13 @@
+fn might_fail(x: int): int?DivisionByZero {
+    if (x < 0) { return err(DivisionByZero); }
+    return ok(x * 2);
+}
+fn main() {
+    var a = might_fail(5);
+    var b = might_fail(-1);
+    print(a);
+    print(b);
+    var c = might_fail(21) ? else { return 1; };
+    print(c);
+    return 0;
+}

@@ -251,6 +251,17 @@ unsafe {
 
 Raw allocations are ownership-tracked. `free` and `realloc` accept only pointers returned by `ffi.alloc` / `ffi.realloc`. Foreign library allocations must be reclaimed using their matching foreign destructor.
 
+### pubptr ↔ int conversions
+
+`pubptr` is a type alias for `int` (`type pubptr = int` in `std.ffi`), but at runtime a `pubptr` value is a foreign-pointer box that carries the raw address. The runtime unwraps it automatically wherever an integer or pointer is consumed:
+
+- Passing a `pubptr` to an `int` parameter, storing it with `store_i64`, comparing it, printing it, or feeding it to `foreign_call` all yield/use the **raw address** — identical to AOT, where `ffi.alloc` returns the address directly.
+- Passing an `int` where a `pubptr` is expected treats the integer as a raw address (this is how results like `gfx_map_dynamic` feed `ffi.memcpy`).
+
+No explicit conversion is needed; `std/native/d3d11.lm` passes `ffi.alloc` results straight into `int`-typed upload parameters (`gpu_buffer_create` initial data, `gfx_texture_create_rgba` pixels, `gfx_buffer_update` source).
+
+**Exception — shared-module globals:** inside a module compiled with `lymar build -shared` (e.g. `std.native.d3d11` → `d3d11.dll`), module-level variables are stored as raw words across the DLL boundary. A `pubptr` box assigned to a global is read back as the *box address*, not the pointee — subsequent `ffi.store_*`/`ffi.load_*` calls then read/write the box object itself and corrupt the heap. Globals that must hold addresses therefore store the **raw address as `int`**, produced by a `store_ptr`/`load_i64` round-trip (see `p2i` in `std/native/d3d11.lm`). Function parameters and locals are unaffected — the coercion unwraps correctly there.
+
 ---
 
 ## 5. CString Helpers and Lifetime Rules

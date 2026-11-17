@@ -1,0 +1,327 @@
+// d3d11_pipeline - Stage 3+4 probe: pure-Lymar D3D11 full pipeline.
+// Exercises everything d3d11_clear.lm does not: vertex/index buffers,
+// input layout, DrawIndexed, blend/depth/raster/sampler states,
+// constant buffer (per-frame Map/Unmap), RGBA texture + SRV, custom
+// viewport, and mid-run resize. Run under both VM and AOT.
+import std.native as native;
+import std.native.types as nt;
+import std.native.d3d11 as d3d11;
+import std.ffi as ffi;
+import std.string.replace as replace;
+
+// HLSL literal braces are written as @ / # and substituted here.
+fn brace_src(tmpl: str): str {
+    var lb = _builtin_string_from_bytes([123]);
+    var rb = _builtin_string_from_bytes([125]);
+    var q = _builtin_string_from_bytes([34]);
+    var r1 = replace(tmpl, "@", lb);
+    var r2 = replace(r1, "#", rb);
+    return replace(r2, "~", q);
+}
+
+fn put_f32(p: pubptr, off: int, v: float): nil {
+    unsafe { ffi.store_f32(ffi.ptr_add(p, off), v); }
+}
+
+// put_f32 takes pubptr; int-typed gfx_* data-pointer parameters accept
+// pubptr values directly (pubptr is `type pubptr = int`; the runtime
+// unwraps the foreign-pointer box to the raw address on use).
+
+fn main() {
+    var win = native.create_window("d3d11 pipeline probe", 640, 480) ? else {
+        print("create_window failed");
+        return 1;
+    };
+    var a = d3d11.gfx_attach(win.handle, 640, 480);
+    print("attach=" + (a as str));
+    if (a == 0) { native.destroy(win); return 2; }
+
+    // ── Shaders ──────────────────────────────────────────────────────
+    // VS input semantics POSITION (float3) + COLOR (float4 carrying uv
+    // in xy, 1,1 in zw). Stride 32: pos @0, color @16.
+    var vs_src = brace_src("cbuffer VSC : register(b0) @ float4 vp; #; struct VO @ float4 pos : SV_Position; float4 col : TEXCOORD0; #; VO main(float3 p : POSITION, float4 c : COLOR) @ VO o; o.pos = float4(p.xy + vp.xy, p.z, 1.0); o.col = c; return o; #");
+    // PS: textured quad tinted by a per-frame constant buffer.
+    var ps_src = brace_src("Texture2D tex : register(t0); SamplerState smp : register(s0); cbuffer Tint : register(b0) @ float4 tint; #; float4 main(float4 pos : SV_Position, float4 c : TEXCOORD0) : SV_Target @ float4 t = tex.Sample(smp, c.xy); return float4(t.r * tint.r, t.g * tint.g, t.b * tint.b, 1.0); #");
+
+    var vs_blob = d3d11.gfx_compile(vs_src, "main", "vs_5_0");
+    var ps_blob = d3d11.gfx_compile(ps_src, "main", "ps_5_0");
+    print("blobs=" + (vs_blob as str) + "," + (ps_blob as str));
+    if (vs_blob == 0 or ps_blob == 0) { d3d11.gfx_detach(); native.destroy(win); return 3; }
+
+    var vs = d3d11.gfx_vs_create(d3d11.gfx_blob_ptr(vs_blob), d3d11.gfx_blob_size(vs_blob));
+    var ps = d3d11.gfx_ps_create(d3d11.gfx_blob_ptr(ps_blob), d3d11.gfx_blob_size(ps_blob));
+    print("shaders=" + (vs as str) + "," + (ps as str));
+    if (vs == 0 or ps == 0) { d3d11.gfx_detach(); native.destroy(win); return 4; }
+
+    // Input layout: POSITION=R32G32B32_FLOAT(6), COLOR=R32G32B32A32_FLOAT(2)
+    var il = d3d11.gfx_input_layout_create(["POSITION", "COLOR"], [6, 2],
+                                         d3d11.gfx_blob_ptr(vs_blob),
+                                         d3d11.gfx_blob_size(vs_blob));
+    print("il=" + (il as str));
+    if (il == 0) { d3d11.gfx_detach(); native.destroy(win); return 5; }
+
+    // Optional pipeline stages: compile + create GS/HS/DS (create/release
+    // coverage; only the GS is bound, HS/DS would need tessellation).
+    var gs_src = brace_src("struct GsIn @ float4 pos : SV_Position; float4 col : TEXCOORD0; #; [maxvertexcount(3)] void main(triangle GsIn input[3], inout TriangleStream<GsIn> stream) @ for (int i = 0; i < 3; i = i + 1) @ stream.Append(input[i]); # stream.RestartStrip(); #");
+    // hs_5_0 requires [patchconstantfunc] plus domain/partitioning/
+    // outputtopology/outputcontrolpoints attributes; SV_TessFactor lives
+    // only in the patch-constant struct, never on control-point outputs.
+    var hs_src = brace_src("struct CP @ float4 pos : SV_Position; float4 col : TEXCOORD0; #; struct PC @ float edge[3] : SV_TessFactor; float inside[1] : SV_InsideTessFactor; #; struct HsOut @ float4 pos : SV_Position; float4 col : TEXCOORD0; #; PC hs_pc(InputPatch<CP,3> ip) @ PC pc; pc.edge[0]=1; pc.edge[1]=1; pc.edge[2]=1; pc.inside[0]=1; return pc; #; [domain(~tri~)] [partitioning(~integer~)] [outputtopology(~triangle_cw~)] [outputcontrolpoints(3)] [patchconstantfunc(~hs_pc~)] HsOut main(InputPatch<CP,3> ip, uint id : SV_OutputControlPointID) @ HsOut o; o.pos = ip[id].pos; o.col = ip[id].col; return o; #");
+    // ds_5_0: (PatchConstant, OutputPatch<ControlPoint,M>, SV_DomainLocation)
+    // — the patch constant is passed directly, NOT via InputPatch.
+    var ds_src = brace_src("struct PC @ float edge[3] : SV_TessFactor; float inside[1] : SV_InsideTessFactor; #; struct CP @ float4 pos : SV_Position; float4 col : TEXCOORD0; #; struct DsOut @ float4 pos : SV_Position; float4 col : TEXCOORD0; #; [domain(~tri~)] DsOut main(PC pc, OutputPatch<CP,3> patch, float3 bary : SV_DomainLocation) @ DsOut o; o.pos = patch[0].pos * bary.x + patch[1].pos * bary.y + patch[2].pos * bary.z; o.col = patch[0].col; return o; #");
+    var gs_blob = d3d11.gfx_compile(gs_src, "main", "gs_5_0");
+    var hs_blob = d3d11.gfx_compile(hs_src, "main", "hs_5_0");
+    var ds_blob = d3d11.gfx_compile(ds_src, "main", "ds_5_0");
+    var gs = 0; var hs = 0; var dsh = 0;
+    if (gs_blob != 0) { gs = d3d11.gfx_gs_create(d3d11.gfx_blob_ptr(gs_blob), d3d11.gfx_blob_size(gs_blob)); }
+    if (hs_blob != 0) { hs = d3d11.gfx_hs_create(d3d11.gfx_blob_ptr(hs_blob), d3d11.gfx_blob_size(hs_blob)); }
+    if (ds_blob != 0) { dsh = d3d11.gfx_ds_create(d3d11.gfx_blob_ptr(ds_blob), d3d11.gfx_blob_size(ds_blob)); }
+    print("stages gs=" + (gs as str) + " hs=" + (hs as str) + " ds=" + (dsh as str) +
+          " blobs=" + (gs_blob as str) + "," + (hs_blob as str) + "," + (ds_blob as str));
+
+    // ── Vertex data: fullscreen quad, stride 32 ──────────────────────
+    unsafe {
+        var vb_data = ffi.alloc(128);
+        // v0 (-1,-1) uv(0,1)   v1 (1,-1) uv(1,1)
+        // v2 (-1, 1) uv(0,0)   v3 (1, 1) uv(1,0)
+        var px = [-1.0, -1.0, 0.0, 1.0, -1.0, 1.0, 1.0];
+        var i = 0;
+        while (i < 4) {
+            var base = i * 32;
+            var xs = [-1.0, 1.0, -1.0, 1.0];
+            var ys = [-1.0, -1.0, 1.0, 1.0];
+            var us = [0.0, 1.0, 0.0, 1.0];
+            var vs2 = [1.0, 1.0, 0.0, 0.0];
+            put_f32(vb_data, base + 0, xs[i]);
+            put_f32(vb_data, base + 4, ys[i]);
+            put_f32(vb_data, base + 8, 0.0);
+            put_f32(vb_data, base + 16, us[i]);
+            put_f32(vb_data, base + 20, vs2[i]);
+            put_f32(vb_data, base + 24, 1.0);
+            put_f32(vb_data, base + 28, 1.0);
+            i = i + 1;
+        }
+
+        // Index buffer: two triangles + 2 pad entries, u16 indices.
+        var ib_data = ffi.alloc(16);
+        var idx = [0, 1, 2, 1, 3, 2, 0, 0];
+        i = 0;
+        while (i < 8) {
+            ffi.store_u16(ffi.ptr_add(ib_data, i * 2), idx[i]);
+            i = i + 1;
+        }
+
+        // 2x2 RGBA texture: red, green / blue, yellow.
+        var px_data = ffi.alloc(16);
+        var pr = [255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 0, 255];
+        i = 0;
+        while (i < 16) {
+            ffi.store_u8(ffi.ptr_add(px_data, i), pr[i]);
+            i = i + 1;
+        }
+
+        // Per-frame tint buffer (16-byte float4).
+        var tint = ffi.alloc(16);
+        var empty_handles: [int] = [];
+        var out_buf = ffi.alloc(64);
+        // VS cbuffer initial data: vp = (0,0,0,1) -> no offset.
+        var vp_data = ffi.alloc(16);
+        put_f32(vp_data, 0, 0.0);
+        put_f32(vp_data, 4, 0.0);
+        put_f32(vp_data, 8, 0.0);
+        put_f32(vp_data, 12, 1.0);
+
+        // ── GPU resources ────────────────────────────────────────────
+        var vb = d3d11.gfx_vertex_buffer_create(128, 32, 0);
+        var vb_ok = d3d11.gfx_buffer_update(vb, vb_data, 128, 128);
+        // Second VB created WITH initial data (exercises the
+        // D3D11_SUBRESOURCE_DATA path in gpu_buffer_create).
+        var vb2 = d3d11.gfx_vertex_buffer_create(128, 32, vb_data);
+        var ib = d3d11.gfx_index_buffer_create(16, ib_data);
+        var tex = d3d11.gfx_texture_create_rgba(2, 2, px_data);
+        var srv = d3d11.gpu_srv_create(tex);
+        var cb = d3d11.gfx_buffer_create_dynamic(16, 4, 0);
+        var vscb = d3d11.gfx_cb_create(16, vp_data);
+        var bs = d3d11.gfx_blend_state_create();
+        var ds = d3d11.gfx_depth_state_create(1, 1, 4);
+        var rs = d3d11.gfx_raster_state_create(3, 1);
+        var smp = d3d11.gfx_sampler_create(21, 1, 1);
+        print("res vb=" + (vb as str) + " upd=" + (vb_ok as str) +
+              " vb2=" + (vb2 as str) + " ib=" + (ib as str) +
+              " tex=" + (tex as str) + " srv=" + (srv as str) +
+              " cb=" + (cb as str) + " vscb=" + (vscb as str));
+        print("states bs=" + (bs as str) + " ds=" + (ds as str) +
+              " rs=" + (rs as str) + " smp=" + (smp as str));
+        if (vb == 0 or vb_ok == 0 or vb2 == 0 or ib == 0 or tex == 0 or srv == 0 or
+            cb == 0 or vscb == 0 or bs == 0 or ds == 0 or rs == 0 or smp == 0) {
+            print("resource creation failed");
+            return 6;
+        }
+
+        // ── Frame loop: 150 frames, resize once at frame 50 ──────────
+        var frames = 0;
+        var running = true;
+        var resized = false;
+        while (running and frames < 150) {
+            var ev = native.poll_event(win);
+            match (ev.kind) {
+                nt.EventKind.Close => { running = false; },
+                nt.EventKind.Quit => { running = false; },
+                nt.EventKind.Resize => {
+                    var s = native.client_size(win);
+                    var rz = d3d11.gfx_resize(s.0, s.1);
+                    print("resize=" + (s.0 as str) + "x" + (s.1 as str) +
+                          " ok=" + (rz as str));
+                },
+                _ => {}
+            }
+            if (frames == 50 and resized == false) {
+                resized = true;
+                native.set_size(win, 800, 600);
+            }
+
+            d3d11.gfx_begin_frame();
+            d3d11.gfx_clear(0.02, 0.02, 0.03, 1.0);
+            d3d11.gfx_clear_depth(1.0);
+            // Custom viewport: left half of the surface.
+            d3d11.gfx_set_viewport(0.0, 0.0,
+                                   (d3d11.gfx_width() as float) / 2.0,
+                                   (d3d11.gfx_height() as float) / 2.0);
+            d3d11.gfx_set_topology(4);
+            d3d11.gfx_set_input_layout(il);
+            d3d11.gfx_set_shaders(vs, ps);
+            d3d11.gfx_set_vertex_buffer(0, vb, 32, 0);
+            d3d11.gfx_set_index_buffer(ib, 57, 0);   // DXGI_FMT_R16_UINT
+            d3d11.gfx_set_blend_state(bs);
+            d3d11.gfx_set_depth_state(ds, 0);
+            d3d11.gfx_set_raster_state(rs);
+            d3d11.gfx_ps_set_shader_resource(0, srv);
+            d3d11.gfx_ps_set_sampler(0, smp);
+            d3d11.gfx_ps_set_cb(0, cb);
+            d3d11.gfx_vs_set_cb(0, vscb);
+            // Passthrough GS bound for the whole run (exercises
+            // GSSetShader); HS/DS stay unbound.
+            d3d11.gfx_set_geometry_shader(gs);
+
+            // Pulse the tint via Map(WRITE_DISCARD)/Unmap on the
+            // dynamic constant buffer.
+            var t: float = ((frames % 120) as float) / 120.0;
+            put_f32(tint, 0, 0.4 + t);
+            put_f32(tint, 4, 0.6 - t * 0.5);
+            put_f32(tint, 8, 0.8);
+            put_f32(tint, 12, 1.0);
+            var mp = d3d11.gfx_map_dynamic(cb);
+            if (mp != 0) {
+                ffi.memcpy(mp, tint, 16);
+                d3d11.gfx_unmap(cb);
+            }
+
+            d3d11.gfx_draw_indexed(6, 0, 0);
+            // Non-indexed draw: same quad as a triangle strip using the
+            // initial-data VB (vb2), no index buffer bound for this call.
+            d3d11.gfx_set_topology(5);
+            d3d11.gfx_set_vertex_buffer(0, vb2, 32, 0);
+            d3d11.gfx_set_index_buffer(0, 57, 0);
+            d3d11.gfx_draw(4, 0);
+            d3d11.gfx_set_topology(4);
+            if (frames == 75) {
+                // Re-upload the texture through UpdateSubresource.
+                var tu = d3d11.gfx_update_texture_rgba(tex, 2, 2, px_data);
+                print("tex_update=" + (tu as str));
+            }
+            if (frames == 100) {
+                // Explicit render-target override: unbind RTV+DSV for
+                // this frame's remainder; next begin_frame rebinds.
+                d3d11.gfx_set_render_targets(empty_handles, 0);
+            }
+            d3d11.gfx_end_frame();
+            frames = frames + 1;
+        }
+        print("frames=" + (frames as str));
+
+        // ── Compute path: real SRV→UAV transform ────────────────────
+        // in = {10,20,30,40}; shader: out[i] = in[i]*3+1 → {31,61,91,121}
+        var cs_src = brace_src("RWBuffer<uint> outp : register(u0); Buffer<uint> inp : register(t0); [numthreads(4,1,1)] void main(uint3 tid : SV_DispatchThreadID) @ outp[tid.x] = inp[tid.x] * 3 + 1; #");
+        var cs = d3d11.gpu_shader_create(cs_src);
+        // DYNAMIC+UAV bind is rejected by CreateBuffer; SRV bind is fine
+        // for a pure Map/copy readback test. bytes must be the FULL
+        // buffer size — CopyResource rejects mismatched staging sizes.
+        var cbuf = d3d11.gfx_buffer_create_dynamic(64, 8, 0);
+        var wr = d3d11.gpu_buffer_write(cbuf, tint, 64);
+        var rd = d3d11.gpu_buffer_read(cbuf, out_buf, 64);
+        var rd_ok = 0;
+        if (rd == 1) {
+            // tint[0..1] = {0.6417, 0.1716} floats; compare raw bits.
+            if (ffi.load_i64(out_buf) == ffi.load_i64(tint)) { rd_ok = 1; }
+        }
+
+        // Typed-buffer compute: input DEFAULT+SRV with initial data,
+        // output DEFAULT+UAV, dispatch 1 group of 4 threads.
+        var in_data = ffi.alloc(16);
+        ffi.store_u32(in_data, 10);
+        ffi.store_u32(ffi.ptr_add(in_data, 4), 20);
+        ffi.store_u32(ffi.ptr_add(in_data, 8), 30);
+        ffi.store_u32(ffi.ptr_add(in_data, 12), 40);
+        // gpu_buffer_create(bytes, usage, bind, cpu, misc, stride, init)
+        var cin = d3d11.gpu_buffer_create(16, 0, 8, 0, 0, 0, in_data);
+        var cin_srv = d3d11.gpu_srv_create_typed(cin, 42, 4);
+        var cout = d3d11.gpu_buffer_create(16, 0, 128, 0, 0, 0, 0);
+        var cout_uav = d3d11.gpu_uav_create_typed(cout, 42, 4);
+        var uav_list = [cout_uav];
+        var srv_list = [cin_srv];
+        var cdisp = d3d11.gpu_dispatch(cs, uav_list, srv_list, 1, 1, 1);
+        var crd = d3d11.gpu_buffer_read(cout, out_buf, 16);
+        var comp_ok = 0;
+        if (crd == 1) {
+            if (ffi.load_u32(out_buf) == 31 and
+                ffi.load_u32(ffi.ptr_add(out_buf, 4)) == 61 and
+                ffi.load_u32(ffi.ptr_add(out_buf, 8)) == 91 and
+                ffi.load_u32(ffi.ptr_add(out_buf, 12)) == 121) {
+                comp_ok = 1;
+            }
+        }
+        print("compute cs=" + (cs as str) + " cin=" + (cin as str) +
+              " srv=" + (cin_srv as str) + " cout=" + (cout as str) +
+              " uav=" + (cout_uav as str) + " disp=" + (cdisp as str) +
+              " rd_ok=" + (rd_ok as str) + " comp_ok=" + (comp_ok as str));
+        d3d11.gpu_release(cin_srv);
+        d3d11.gpu_release(cin);
+        d3d11.gpu_release(cout_uav);
+        d3d11.gpu_release(cout);
+        ffi.free(in_data);
+
+        // ── Teardown: release every gfx object, then full device ─────
+        d3d11.gpu_release(cs);
+        d3d11.gpu_release(cbuf);
+        d3d11.gpu_release(smp);
+        d3d11.gpu_release(ds);
+        d3d11.gpu_release(bs);
+        d3d11.gpu_release(rs);
+        d3d11.gpu_release(vscb);
+        d3d11.gpu_release(cb);
+        d3d11.gpu_release(srv);
+        d3d11.gpu_release(tex);
+        d3d11.gpu_release(ib);
+        d3d11.gpu_release(vb);
+        d3d11.gpu_release(vb2);
+        d3d11.gpu_release(il);
+        d3d11.gpu_release(gs);
+        d3d11.gpu_release(hs);
+        d3d11.gpu_release(dsh);
+        d3d11.gpu_release(gs_blob);
+        d3d11.gpu_release(hs_blob);
+        d3d11.gpu_release(ds_blob);
+        d3d11.gpu_release(vs);
+        d3d11.gpu_release(ps);
+        d3d11.gpu_release(vs_blob);
+        d3d11.gpu_release(ps_blob);
+        // discard_all releases swapchain/views/factory; release_all then
+        // drops the immediate context + device (full teardown path).
+        d3d11.gfx_discard_all();
+        d3d11.gfx_release_all();
+        native.destroy(win);
+        print("done");
+        return 0;
+    }
+}

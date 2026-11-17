@@ -1,0 +1,427 @@
+// std.gg.native - Native GPU backend for std.gg.
+//
+// Drives the pure-Lymar drivers in std.native (d3d11 / vulkan) through
+// the shared gfx_* surface instead of the rt resource path (sokol/CPU).
+// Selected by std.gg when gg.backend != "sokol" and
+// native.gfx_backend(prefer) reports a usable driver.
+//
+// Vertex format (32B stride, shared by both drivers):
+//   float2 POSITION @0  (x, y)
+//   float4 COLOR    @16 (r, g, b, a)
+// Input layout: ["POSITION","COLOR"], DXGI formats [R32G32_FLOAT=10,
+// R32G32B32A32_FLOAT=2]. Vulkan maps these to VkFormat internally.
+
+import std.native as native;
+import std.native.d3d11 as d3d;
+import std.native.vulkan as vk;
+import std.ffi as ffi;
+import std.string.replace as replace;
+
+// ── driver dispatch ─────────────────────────────────────────────────
+
+var _drv: str = "";
+var _prefer: str = "";
+var _attached: int = 0;
+var _pipe_ready: int = 0;
+var _frame_open: int = 0;
+var _w: int = 0;
+var _h: int = 0;
+
+var _vs: int = 0;
+var _ps: int = 0;
+var _il: int = 0;
+var _blend: int = 0;
+var _rast: int = 0;
+var _depth: int = 0;
+var _vb: int = 0;
+var _vb_cap: int = 0;
+
+// persistent vertex scratch: raw ptr (p2i'd) + vert count
+var _vdata: int = 0;
+var _vdata_cap: int = 0;
+var _vcount: int = 0;
+
+// clip stack: flat [x0,y0,x1,y1] quads; _clip_n is the active prefix
+// length (multiple of 4). Slots are reused on pop - no per-frame alloc.
+var _clip: [int] = [];
+var _clip_n: int = 0;
+
+// keep()/p2i(): ffi.alloc blocks that must outlive their creating call's
+// region (same contract as std.native.d3d11).
+var _keep: [any] = [] as [any];
+
+fn keep(p: pubptr): pubptr {
+    _keep.append(p);
+    return p;
+}
+
+fn p2i(p: pubptr): int {
+    unsafe {
+        var tmp = ffi.alloc(8);
+        ffi.store_ptr(tmp, p);
+        var v: int = ffi.load_i64(tmp);
+        ffi.free(tmp);
+        return v;
+    }
+}
+
+fn alloc_persist(size: int): int {
+    unsafe { return p2i(keep(ffi.alloc(size))); }
+}
+
+// ── driver wrappers (identical gfx_* surface on both modules) ───────
+
+fn drv_attach(hwnd: int, w: int, h: int): int {
+    if (_drv == "vulkan") { return vk.gfx_attach(hwnd, w, h); }
+    return d3d.gfx_attach(hwnd, w, h);
+}
+fn drv_detach(): nil {
+    if (_drv == "vulkan") { vk.gfx_detach(); return; }
+    d3d.gfx_detach();
+}
+fn drv_resize(w: int, h: int): int {
+    if (_drv == "vulkan") { return vk.gfx_resize(w, h); }
+    return d3d.gfx_resize(w, h);
+}
+fn drv_begin_frame(): int {
+    if (_drv == "vulkan") { return vk.gfx_begin_frame(); }
+    return d3d.gfx_begin_frame();
+}
+fn drv_clear(r: float, g: float, b: float, a: float): nil {
+    if (_drv == "vulkan") { vk.gfx_clear(r, g, b, a); return; }
+    d3d.gfx_clear(r, g, b, a);
+}
+fn drv_end_frame(): int {
+    if (_drv == "vulkan") { return vk.gfx_end_frame(); }
+    d3d.gfx_end_frame();
+    return 1;
+}
+fn drv_set_topology(t: int): nil {
+    if (_drv == "vulkan") { vk.gfx_set_topology(t); return; }
+    d3d.gfx_set_topology(t);
+}
+fn drv_set_shaders(vs: int, ps: int): nil {
+    if (_drv == "vulkan") { vk.gfx_set_shaders(vs, ps); return; }
+    d3d.gfx_set_shaders(vs, ps);
+}
+fn drv_set_input_layout(il: int): nil {
+    if (_drv == "vulkan") { vk.gfx_set_input_layout(il); return; }
+    d3d.gfx_set_input_layout(il);
+}
+fn drv_set_blend_state(s: int): nil {
+    if (_drv == "vulkan") { vk.gfx_set_blend_state(s); return; }
+    d3d.gfx_set_blend_state(s);
+}
+fn drv_set_raster_state(s: int): nil {
+    if (_drv == "vulkan") { vk.gfx_set_raster_state(s); return; }
+    d3d.gfx_set_raster_state(s);
+}
+fn drv_set_depth_state(s: int, ref_: int): nil {
+    if (_drv == "vulkan") { vk.gfx_set_depth_state(s, ref_); return; }
+    d3d.gfx_set_depth_state(s, ref_);
+}
+fn drv_dyn_buf(bytes: int, bind: int, stride: int): int {
+    if (_drv == "vulkan") { return vk.gfx_buffer_create_dynamic(bytes, bind, stride); }
+    return d3d.gfx_buffer_create_dynamic(bytes, bind, stride);
+}
+fn drv_buf_update(buf: int, src: int, bytes: int): int {
+    if (_drv == "vulkan") { return vk.gfx_buffer_update(buf, src, bytes, bytes); }
+    return d3d.gfx_buffer_update(buf, src, bytes, bytes);
+}
+fn drv_set_vb(slot: int, buf: int, stride: int, off: int): nil {
+    if (_drv == "vulkan") { vk.gfx_set_vertex_buffer(slot, buf, stride, off); return; }
+    d3d.gfx_set_vertex_buffer(slot, buf, stride, off);
+}
+fn drv_draw(count: int, start: int): nil {
+    if (_drv == "vulkan") { vk.gfx_draw(count, start); return; }
+    d3d.gfx_draw(count, start);
+}
+fn drv_scissor(x: int, y: int, w: int, h: int): nil {
+    if (_drv == "vulkan") { vk.gfx_set_scissor(x, y, w, h); return; }
+    d3d.gfx_set_scissor(x, y, w, h);
+}
+
+// ── shader sources ──────────────────────────────────────────────────
+
+// SPIR-V words for the solid-color UI pipeline (assembled+validated with
+// spirv-as/spirv-val): VS consumes POSITION vec2 @loc0 + COLOR vec4
+// @loc1, PS passthrough. Position arrives as vec3 in the vertex layout;
+// the extra component is ignored by the shader.
+var _VS_SPV: [int] = [119734787,67072,458752,22,0,131089,1,196622,0,1,589839,0,1,1852399981,0,2,3,4,5,262215,2,30,0,262215,3,30,1,262215,4,11,0,262215,5,30,0,131091,6,196641,7,6,196630,8,32,262167,9,8,2,262167,10,8,4,262176,11,1,9,262176,12,1,10,262176,13,3,10,262187,8,14,0,262187,8,15,1065353216,262203,11,2,1,262203,12,3,1,262203,13,4,3,262203,13,5,3,327734,6,1,0,7,131320,16,262205,9,17,2,327761,8,18,17,0,327761,8,19,17,1,458832,10,20,18,19,14,15,196670,4,20,262205,10,21,3,196670,5,21,65789,65592];
+var _PS_SPV: [int] = [119734787,67072,458752,12,0,131089,1,196622,0,1,458767,4,1,1852399981,0,2,3,196624,1,7,262215,2,30,0,262215,3,30,0,131091,4,196641,5,4,196630,6,32,262167,7,6,4,262176,8,1,7,262176,9,3,7,262203,8,2,1,262203,9,3,3,327734,4,1,0,5,131320,10,262205,7,11,2,196670,3,11,65789,65592];
+
+fn brace_src(tmpl: str): str {
+    var lb = _builtin_string_from_bytes([123]);
+    var rb = _builtin_string_from_bytes([125]);
+    var q = _builtin_string_from_bytes([34]);
+    var r1 = replace(tmpl, "@", lb);
+    var r2 = replace(r1, "#", rb);
+    return replace(r2, "~", q);
+}
+
+// HLSL equivalents for the d3d11 driver (compiled via D3DCompile).
+var _VS_HLSL: str = brace_src("struct VO @ float4 pos : SV_Position; float4 col : TEXCOORD0; #; VO main(float2 p : POSITION, float4 c : COLOR) @ VO o; o.pos = float4(p, 0.0, 1.0); o.col = c; return o; #");
+var _PS_HLSL: str = brace_src("float4 main(float4 pos : SV_Position, float4 c : TEXCOORD0) : SV_Target @ return c; #");
+
+// ── pipeline init ───────────────────────────────────────────────────
+
+fn spv_upload(words: [int]): int {
+    unsafe {
+        var n = len(words);
+        var p = alloc_persist(n * 4);
+        var i = 0;
+        while (i < n) {
+            ffi.store_u32(ffi.ptr_add(p, i * 4), words[i]);
+            i = i + 1;
+        }
+        return p;
+    }
+}
+
+fn pipeline_init(): int {
+    unsafe {
+        if (_pipe_ready != 0) { return 1; }
+        var names: [str] = ["POSITION", "COLOR"];
+        if (_drv == "vulkan") {
+            var vp = spv_upload(_VS_SPV);
+            var pp = spv_upload(_PS_SPV);
+            _vs = vk.gfx_vs_create(vp, len(_VS_SPV) * 4);
+            _ps = vk.gfx_ps_create(pp, len(_PS_SPV) * 4);
+            _il = vk.gfx_input_layout_create(names, [10, 2], 0, 0);
+        } else {
+            var vb_ = d3d.gfx_compile(_VS_HLSL, "main", "vs_5_0");
+            var pb_ = d3d.gfx_compile(_PS_HLSL, "main", "ps_5_0");
+            if (vb_ == 0 or pb_ == 0) { return 0; }
+            _vs = d3d.gfx_vs_create(d3d.gfx_blob_ptr(vb_), d3d.gfx_blob_size(vb_));
+            _ps = d3d.gfx_ps_create(d3d.gfx_blob_ptr(pb_), d3d.gfx_blob_size(pb_));
+            _il = d3d.gfx_input_layout_create(names, [10, 2],
+                                              d3d.gfx_blob_ptr(vb_),
+                                              d3d.gfx_blob_size(vb_));
+        }
+        if (_vs == 0 or _ps == 0 or _il == 0) { return 0; }
+        drv_set_shaders(_vs, _ps);
+        drv_set_input_layout(_il);
+        drv_set_topology(4); // D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST
+        if (_drv == "vulkan") {
+            _blend = vk.gfx_blend_state_create_ex(1);
+            _rast = vk.gfx_raster_state_create(0, 0);
+            _depth = vk.gfx_depth_state_create(0, 0, 7);
+        } else {
+            _blend = d3d.gfx_blend_state_create_ex(1);
+            _rast = d3d.gfx_raster_state_create(0, 0);
+            _depth = d3d.gfx_depth_state_create(0, 0, 7);
+        }
+        if (_blend != 0) { drv_set_blend_state(_blend); }
+        if (_rast != 0) { drv_set_raster_state(_rast); }
+        if (_depth != 0) { drv_set_depth_state(_depth, 0); }
+        // dynamic vertex buffer, 32B stride; start at 256KB, grow on demand
+        _vb_cap = 262144;
+        _vb = drv_dyn_buf(_vb_cap, 1, 32);
+        if (_vb == 0) { return 0; }
+        drv_set_vb(0, _vb, 32, 0);
+        // vertex scratch: 8192 verts * 32B = 256KB persistent
+        _vdata_cap = 262144;
+        _vdata = alloc_persist(_vdata_cap);
+        _pipe_ready = 1;
+        return 1;
+    }
+}
+
+// ── vertex emission ─────────────────────────────────────────────────
+
+fn vtx(x: float, y: float, r: float, g: float, b: float, a: float): nil {
+    unsafe {
+        if (_vcount * 32 + 32 > _vdata_cap) { flush_verts(); }
+        var p = ffi.ptr_add(_vdata, _vcount * 32);
+        ffi.store_f32(p, x);
+        ffi.store_f32(ffi.ptr_add(p, 4), y);
+        ffi.store_f32(ffi.ptr_add(p, 8), 0.0);
+        ffi.store_f32(ffi.ptr_add(p, 12), 0.0);
+        ffi.store_f32(ffi.ptr_add(p, 16), r);
+        ffi.store_f32(ffi.ptr_add(p, 20), g);
+        ffi.store_f32(ffi.ptr_add(p, 24), b);
+        ffi.store_f32(ffi.ptr_add(p, 28), a);
+        _vcount = _vcount + 1;
+    }
+}
+
+fn quad(x: float, y: float, w: float, h: float,
+        r: float, g: float, b: float, a: float): nil {
+    // two triangles, 6 verts; winding irrelevant (cull none)
+    vtx(x, y, r, g, b, a);
+    vtx(x + w, y, r, g, b, a);
+    vtx(x + w, y + h, r, g, b, a);
+    vtx(x, y, r, g, b, a);
+    vtx(x + w, y + h, r, g, b, a);
+    vtx(x, y + h, r, g, b, a);
+}
+
+pub fn flush_verts(): int {
+    unsafe {
+        if (_vcount == 0) { return 1; }
+        if (pipeline_init() == 0) { _vcount = 0; return 0; }
+        var bytes = _vcount * 32;
+        if (bytes > _vb_cap) {
+            // grow: double until it fits (rare; batches are bounded)
+            var ncap = _vb_cap * 2;
+            while (ncap < bytes) { ncap = ncap * 2; }
+            var nvb = drv_dyn_buf(ncap, 1, 32);
+            if (nvb == 0) { _vcount = 0; return 0; }
+            _vb = nvb; _vb_cap = ncap;
+            drv_set_vb(0, _vb, 32, 0);
+        }
+        if (drv_buf_update(_vb, _vdata, bytes) == 0) { _vcount = 0; return 0; }
+        drv_draw(_vcount, 0);
+        _vcount = 0;
+        return 1;
+    }
+}
+
+// ── clip stack ──────────────────────────────────────────────────────
+
+// clip rects stored flat as [x0,y0,x1,y1] quads; clip_rect returns
+// (x0, y0, x1, y1) in framebuffer pixels.
+fn clip_rect(): (int, int, int, int) {
+    if (_clip_n == 0) { return (0, 0, _w, _h); }
+    return (_clip[_clip_n - 4], _clip[_clip_n - 3],
+            _clip[_clip_n - 2], _clip[_clip_n - 1]);
+}
+
+fn clip_emit(): nil {
+    unsafe {
+        flush_verts();
+        var r = clip_rect();
+        drv_scissor(r.0, r.1, r.2 - r.0, r.3 - r.1);
+    }
+}
+
+// ── public ops (called by std.gg routing) ───────────────────────────
+
+pub fn set_prefer(p: str): nil { _prefer = p; }
+pub fn driver(): str { return _drv; }
+pub fn attached(): int { return _attached; }
+
+// attach binds the selected native driver to an externally-owned window.
+// Returns 1 on success; caller falls back to the rt path on 0.
+pub fn attach(hwnd: int, w: int, h: int): int {
+    unsafe {
+        var b = native.gfx_backend(_prefer);
+        if (b == "none" or b == "metal") { return 0; }
+        _drv = b;
+        if (drv_attach(hwnd, w, h) == 0) { _drv = ""; return 0; }
+        _w = w; _h = h;
+        _attached = 1;
+        _vcount = 0;
+        _clip_n = 0;
+        return 1;
+    }
+}
+
+pub fn detach(): nil {
+    unsafe {
+        flush_verts();
+        if (_attached != 0) { drv_detach(); }
+        _attached = 0; _frame_open = 0; _pipe_ready = 0;
+        _vcount = 0; _clip_n = 0;
+        _vs = 0; _ps = 0; _il = 0; _blend = 0; _rast = 0; _depth = 0; _vb = 0;
+    }
+}
+
+pub fn resize(w: int, h: int): int {
+    if (_attached == 0) { return 0; }
+    var r = drv_resize(w, h);
+    if (r != 0) { _w = w; _h = h; }
+    return r;
+}
+
+// begin_pass equivalent: opens the driver frame and clears.
+pub fn begin_pass(w: int, h: int, r: float, g: float, b: float, a: float): int {
+    unsafe {
+        if (_attached == 0) { return 0; }
+        if (_frame_open != 0) { return 1; }
+        if (drv_begin_frame() == 0) { return 0; }
+        _frame_open = 1;
+        _vcount = 0;
+        _clip_n = 0;
+        drv_clear(r, g, b, a);
+        if (pipeline_init() == 0) { return 0; }
+        drv_scissor(0, 0, w, h);
+        return 1;
+    }
+}
+
+// end_pass equivalent: draws are already recorded; just drop batch state.
+pub fn end_pass(): nil {
+    unsafe { flush_verts(); }
+}
+
+// commit equivalent: flush remaining verts and present.
+pub fn commit(): int {
+    unsafe {
+        if (_frame_open == 0) { return 0; }
+        flush_verts();
+        var r = drv_end_frame();
+        _frame_open = 0;
+        return r;
+    }
+}
+
+pub fn draw_rect(x: float, y: float, w: float, h: float,
+                 r: float, g: float, b: float, a: float): nil {
+    unsafe { quad(x, y, w, h, r, g, b, a); }
+}
+
+pub fn draw_tri(x1: float, y1: float, x2: float, y2: float,
+                x3: float, y3: float,
+                r: float, g: float, b: float, a: float): nil {
+    unsafe {
+        vtx(x1, y1, r, g, b, a);
+        vtx(x2, y2, r, g, b, a);
+        vtx(x3, y3, r, g, b, a);
+    }
+}
+
+// shadow approximates as a translucent quad (alpha blend); real blur
+// needs a shader pass - deferred.
+pub fn draw_shadow(x: float, y: float, w: float, h: float,
+                   r: float, g: float, b: float, a: float,
+                   radius: float, blur: float): nil {
+    unsafe { quad(x, y, w, h, r, g, b, a); }
+}
+
+pub fn push_clip(x: float, y: float, w: float, h: float,
+                 shape: int, radius: float): nil {
+    unsafe {
+        // intersect with current clip in pixel space
+        var cur = clip_rect();
+        var x0 = x as int; var y0 = y as int;
+        var x1 = (x + w) as int; var y1 = (y + h) as int;
+        if (x0 < cur.0) { x0 = cur.0; }
+        if (y0 < cur.1) { y0 = cur.1; }
+        if (x1 > cur.2) { x1 = cur.2; }
+        if (y1 > cur.3) { y1 = cur.3; }
+        if (x1 < x0) { x1 = x0; }
+        if (y1 < y0) { y1 = y0; }
+        if (len(_clip) < _clip_n + 4) {
+            while (len(_clip) < _clip_n + 4) { _clip.append(0); }
+        }
+        _clip[_clip_n] = x0; _clip[_clip_n + 1] = y0;
+        _clip[_clip_n + 2] = x1; _clip[_clip_n + 3] = y1;
+        _clip_n = _clip_n + 4;
+        clip_emit();
+    }
+}
+
+pub fn pop_clip(): nil {
+    unsafe {
+        if (_clip_n >= 4) { _clip_n = _clip_n - 4; }
+        clip_emit();
+    }
+}
+
+// text rendering needs a glyph atlas texture pipeline - deferred.
+// Kept as a no-op so callers do not crash; metrics still come from the
+// rt CPU path via gg.measure_text.
+pub fn draw_text(text_str: str, x: float, y: float,
+                 r: float, g: float, b: float, a: float,
+                 scale: int): nil {}

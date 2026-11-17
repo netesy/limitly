@@ -1,0 +1,130 @@
+// vk_tri - Vulkan graphics pipeline probe: SPIR-V VS+PS, vertex buffer
+// with position+color attributes, triangle draw + present on real HW.
+import std.native as native;
+import std.native.types as nt;
+import std.native.vulkan as vk;
+import std.ffi as ffi;
+
+var VS_WORDS: [int] = [119734787,67072,458752,22,0,131089,1,196622,0,1,589839,0,1,1852399981,0,2,3,4,5,262215,2,30,0,262215,3,30,1,262215,4,11,0,262215,5,30,0,131091,6,196641,7,6,196630,8,32,262167,9,8,2,262167,10,8,4,262176,11,1,9,262176,12,1,10,262176,13,3,10,262187,8,14,0,262187,8,15,1065353216,262203,11,2,1,262203,12,3,1,262203,13,4,3,262203,13,5,3,327734,6,1,0,7,131320,16,262205,9,17,2,327761,8,18,17,0,327761,8,19,17,1,458832,10,20,18,19,14,15,196670,4,20,262205,10,21,3,196670,5,21,65789,65592];
+var PS_WORDS: [int] = [119734787,67072,458752,12,0,131089,1,196622,0,1,458767,4,1,1852399981,0,2,3,196624,1,7,262215,2,30,0,262215,3,30,0,131091,4,196641,5,4,196630,6,32,262167,7,6,4,262176,8,1,7,262176,9,3,7,262203,8,2,1,262203,9,3,3,327734,4,1,0,5,131320,10,262205,7,11,2,196670,3,11,65789,65592];
+
+fn spv_module(words: [int]): int {
+    unsafe {
+        var n = len(words);
+        var spv = ffi.alloc(n * 4);
+        var i = 0;
+        while (i < n) {
+            ffi.store_u32(ffi.ptr_add(spv, i * 4), words[i]);
+            i = i + 1;
+        }
+        var m = vk.gpu_shader_create_spv(spv as int, n * 4);
+        ffi.free(spv);
+        return m;
+    }
+}
+
+fn main() {
+    var win = native.create_window("vulkan tri probe", 640, 480) ? else {
+        print("create_window failed");
+        return 1;
+    };
+    var hwnd = win.handle;
+    var attached = vk.gfx_attach(hwnd, 640, 480);
+    print("attach=" + (attached as str));
+    if (attached == 0) { native.destroy(win); return 2; }
+
+    var vs = vk.gfx_vs_create(0, 0);
+    // gfx_vs_create wraps gpu_shader_create_spv; use module path directly
+    var vsmod = spv_module(VS_WORDS);
+    var psmod = spv_module(PS_WORDS);
+    print("vsmod=" + (vsmod as str) + " psmod=" + (psmod as str));
+    vk.gfx_set_shaders(vsmod, psmod);
+
+    var names: [str] = ["POSITION", "COLOR"];
+    var fmts: [int] = [0x10, 0x02]; // R32G32_FLOAT, R32G32B32A32_FLOAT
+    var il = vk.gfx_input_layout_create(names, fmts, 0, 0);
+    print("il=" + (il as str));
+    vk.gfx_set_input_layout(il);
+
+    // 3 verts x 32B: pos vec2 @0, color vec4 @16
+    var vb: int = 0;
+    var vbuf: int = 0;
+    unsafe {
+    vb = ffi.alloc(96);
+    ffi.store_f32(vb, -0.8); ffi.store_f32(ffi.ptr_add(vb,4), -0.8);
+    ffi.store_f32(ffi.ptr_add(vb,16), 1.0); ffi.store_f32(ffi.ptr_add(vb,20), 0.0);
+    ffi.store_f32(ffi.ptr_add(vb,24), 0.0); ffi.store_f32(ffi.ptr_add(vb,28), 1.0);
+    ffi.store_f32(ffi.ptr_add(vb,32), 0.8); ffi.store_f32(ffi.ptr_add(vb,36), -0.8);
+    ffi.store_f32(ffi.ptr_add(vb,48), 0.0); ffi.store_f32(ffi.ptr_add(vb,52), 1.0);
+    ffi.store_f32(ffi.ptr_add(vb,56), 0.0); ffi.store_f32(ffi.ptr_add(vb,60), 1.0);
+    ffi.store_f32(ffi.ptr_add(vb,64), 0.0); ffi.store_f32(ffi.ptr_add(vb,68), 0.8);
+    ffi.store_f32(ffi.ptr_add(vb,80), 0.0); ffi.store_f32(ffi.ptr_add(vb,84), 0.0);
+    ffi.store_f32(ffi.ptr_add(vb,88), 1.0); ffi.store_f32(ffi.ptr_add(vb,92), 1.0);
+    vbuf = vk.gfx_vertex_buffer_create(96, 32, vb as int);
+    ffi.free(vb);
+    }
+    print("vbuf=" + (vbuf as str));
+    vk.gfx_set_vertex_buffer(0, vbuf, 32, 0);
+
+    // index buffer: 3 x u16 {0,1,2}
+    var ib: int = 0;
+    unsafe {
+        ib = ffi.alloc(8);
+        ffi.store_u16(ib, 0); ffi.store_u16(ffi.ptr_add(ib,2), 1);
+        ffi.store_u16(ffi.ptr_add(ib,4), 2);
+        var ibuf = vk.gfx_index_buffer_create(6, ib as int);
+        ffi.free(ib);
+        vk.gfx_set_index_buffer(ibuf, 0x39, 0); // DXGI R16_UINT
+        print("ibuf=" + (ibuf as str));
+
+        // constant buffer: 64B
+        var cbd = ffi.alloc(64);
+        ffi.memset(cbd, 0, 64);
+        ffi.store_f32(cbd, 1.0); ffi.store_f32(ffi.ptr_add(cbd,4), 0.5);
+        ffi.store_f32(ffi.ptr_add(cbd,8), 0.25); ffi.store_f32(ffi.ptr_add(cbd,12), 1.0);
+        var cb = vk.gfx_cb_create(64, cbd as int);
+        ffi.free(cbd);
+        vk.gfx_vs_set_cb(0, cb);
+        vk.gfx_ps_set_cb(0, cb);
+        print("cb=" + (cb as str));
+
+        // 2x2 RGBA texture + sampler
+        var px = ffi.alloc(16);
+        ffi.memset(px, 0, 16);
+        ffi.store_u32(px, 0xFFFF0000); ffi.store_u32(ffi.ptr_add(px,4), 0xFF00FF00);
+        ffi.store_u32(ffi.ptr_add(px,8), 0xFF0000FF); ffi.store_u32(ffi.ptr_add(px,12), 0xFFFFFFFF);
+        var tex = vk.gfx_texture_create_rgba(2, 2, px as int);
+        ffi.free(px);
+        var smp = vk.gfx_sampler_create(0, 0, 0);
+        vk.gfx_ps_set_shader_resource(0, tex);
+        vk.gfx_ps_set_sampler(0, smp);
+        print("tex=" + (tex as str) + " smp=" + (smp as str));
+    }
+
+    var frames = 0;
+    var running = true;
+    while (running and frames < 120) {
+        var ev = native.poll_event(win);
+        match (ev.kind) {
+            nt.EventKind.Close => { running = false; },
+            nt.EventKind.Quit => { running = false; },
+            _ => {}
+        }
+        if (frames == 0) { print("bf"); }
+        var bf = vk.gfx_begin_frame();
+        if (frames == 0) { print("bf=" + (bf as str)); }
+        vk.gfx_clear(0.05, 0.05, 0.08, 1.0);
+        if (frames == 0) { print("dr"); }
+        if (frames % 2 == 0) { vk.gfx_draw(3, 0); }
+        else { vk.gfx_draw_indexed(3, 0, 0); }
+        if (frames == 0) { print("ef"); }
+        var ef = vk.gfx_end_frame();
+        if (frames == 0) { print("ef=" + (ef as str)); }
+        frames = frames + 1;
+    }
+    print("frames=" + (frames as str));
+    vk.gfx_detach();
+    native.destroy(win);
+    print("done");
+    return 0;
+}

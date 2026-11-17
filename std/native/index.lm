@@ -23,6 +23,9 @@ import std.native.win32 as w32;
 import std.native.linux as lx;
 import std.native.macos as mc;
 import std.native.android as andr;
+import std.native.d3d11 as d3d;
+import std.native.vulkan as vk;
+import std.native.metal as mt;
 
 pub import std.native.types show Window, Event, EventKind, event_none;
 pub import std.native.types show MOD_SHIFT, MOD_CTRL, MOD_ALT, MOD_SUPER, MOD_CAPS, MOD_NUM;
@@ -53,6 +56,33 @@ pub fn backend_name(): str {
 /// True when a usable native backend exists on this host.
 pub fn available(): bool {
     return backend_name() != "none";
+}
+
+/// Name of the preferred GPU backend for this host:
+/// "d3d11" | "vulkan" | "metal" | "none".
+///
+/// Capability query only - probes driver library availability without
+/// creating a device. std.gg initializes the chosen driver lazily when it
+/// attaches to a window. `prefer` overrides the default order when that
+/// backend is available (e.g. prefer="vulkan" for the SPIR-V/Fyra path).
+pub fn gfx_backend(prefer: str = ""): str {
+    var os: str = osid.os_name();
+    if (prefer == "d3d11" and d3d.gpu_available() != 0) { return "d3d11"; }
+    if (prefer == "vulkan" and vk.gpu_available() != 0) { return "vulkan"; }
+    if (prefer == "metal" and mt.gpu_available() != 0) { return "metal"; }
+    if (os == "windows") {
+        if (d3d.gpu_available() != 0) { return "d3d11"; }
+        if (vk.gpu_available() != 0) { return "vulkan"; }
+        return "none";
+    }
+    if (os == "darwin") {
+        if (mt.gpu_available() != 0) { return "metal"; }
+        if (vk.gpu_available() != 0) { return "vulkan"; }
+        return "none";
+    }
+    // linux / freebsd / android: Vulkan (or MoltenVK where applicable).
+    if (vk.gpu_available() != 0) { return "vulkan"; }
+    return "none";
 }
 
 pub fn create_window(title: str, width: int, height: int): nt.Window? {

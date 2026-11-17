@@ -49,6 +49,7 @@ RUNTIME_API bool is_integer(LmValue v) {
     if (IS_INT(v)) return true;
     if (IS_PTR(v)) {
         ObjHeader* h = (ObjHeader*)UNBOX_PTR(v);
+        if (h->type_id == TYPE_FOREIGN_PTR) return true;
         if (h->type_id == TYPE_I64 || h->type_id == TYPE_U64 ||
             h->type_id == TYPE_I128 || h->type_id == TYPE_U128) return true;
         if (h->type_id == TYPE_BOX) {
@@ -79,6 +80,7 @@ RUNTIME_API int64_t as_i64(LmValue v) {
     if (IS_INT(v)) return UNBOX_INT(v);
     if (IS_PTR(v)) {
         ObjHeader* h = (ObjHeader*)UNBOX_PTR(v);
+        if (h->type_id == TYPE_FOREIGN_PTR) return (int64_t)((ObjForeignPtr*)h)->ptr;
         if (h->type_id == TYPE_I64) return ((ObjI64*)h)->value;
         if (h->type_id == TYPE_U64) return (int64_t)((ObjU64*)h)->value;
         if (h->type_id == TYPE_I128) return (int64_t)((ObjI128*)h)->value;
@@ -97,6 +99,7 @@ RUNTIME_API uint64_t as_u64(LmValue v) {
     if (IS_INT(v)) return (uint64_t)UNBOX_INT(v);
     if (IS_PTR(v)) {
         ObjHeader* h = (ObjHeader*)UNBOX_PTR(v);
+        if (h->type_id == TYPE_FOREIGN_PTR) return (uint64_t)((ObjForeignPtr*)h)->ptr;
         if (h->type_id == TYPE_I64) return (uint64_t)((ObjI64*)h)->value;
         if (h->type_id == TYPE_U64) return ((ObjU64*)h)->value;
         if (h->type_id == TYPE_I128) return (uint64_t)((ObjI128*)h)->value;
@@ -114,6 +117,7 @@ RUNTIME_API __int128 as_i128(LmValue v) {
     if (IS_INT(v)) return (__int128)UNBOX_INT(v);
     if (IS_PTR(v)) {
         ObjHeader* h = (ObjHeader*)UNBOX_PTR(v);
+        if (h->type_id == TYPE_FOREIGN_PTR) return (__int128)(intptr_t)((ObjForeignPtr*)h)->ptr;
         if (h->type_id == TYPE_I64) return (__int128)((ObjI64*)h)->value;
         if (h->type_id == TYPE_U64) return (__int128)((ObjU64*)h)->value;
         if (h->type_id == TYPE_I128) return ((ObjI128*)h)->value;
@@ -132,6 +136,7 @@ RUNTIME_API unsigned __int128 as_u128(LmValue v) {
     if (IS_INT(v)) return (unsigned __int128)UNBOX_INT(v);
     if (IS_PTR(v)) {
         ObjHeader* h = (ObjHeader*)UNBOX_PTR(v);
+        if (h->type_id == TYPE_FOREIGN_PTR) return (unsigned __int128)(uintptr_t)((ObjForeignPtr*)h)->ptr;
         if (h->type_id == TYPE_I64) return (unsigned __int128)((ObjI64*)h)->value;
         if (h->type_id == TYPE_U64) return (unsigned __int128)((ObjU64*)h)->value;
         if (h->type_id == TYPE_I128) return (unsigned __int128)((ObjI128*)h)->value;
@@ -425,6 +430,8 @@ static LmStringHeader* format_value(LmValue value) {
                 return res;
             }
             case TYPE_FLOAT: return lm_double_to_str(((ObjFloat*)h)->value);
+            case TYPE_FOREIGN_PTR:
+                return lm_int_to_str((int64_t)((ObjForeignPtr*)h)->ptr);
             case TYPE_LIST: return format_list((LmList*)h);
             case TYPE_TUPLE: return format_tuple((LmTuple*)h);
             case TYPE_DICT: return format_dict((LmDict*)h);

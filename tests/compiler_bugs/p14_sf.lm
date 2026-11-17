@@ -1,0 +1,12 @@
+frame Error { pub var msg: str = ""; }
+frame Ok { pub var v: int = 0; }
+staged fn combine(a: any, b: any): int {
+    return 1;
+}
+fn main() {
+    var e = Error(msg="x");
+    var o = Ok(v=2);
+    var r = combine(e, o);
+    print(r);
+    return 0;
+}

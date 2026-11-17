@@ -1,0 +1,48 @@
+// vk_clear - Vulkan surface/swapchain/present probe. Creates a Win32
+// window via std.native, attaches a VkSurfaceKHR + swapchain, clears to a
+// solid color each frame, pumps events until close or frame cap.
+import std.native as native;
+import std.native.types as nt;
+import std.native.vulkan as vk;
+
+fn main() {
+    var win = native.create_window("vulkan clear probe", 640, 480) ? else {
+        print("create_window failed");
+        return 1;
+    };
+    var hwnd = win.handle;
+    print("window hwnd=" + (hwnd as str));
+
+    var attached = vk.gfx_attach(hwnd, 640, 480);
+    print("attach=" + (attached as str));
+    if (attached == 0) {
+        native.destroy(win);
+        return 2;
+    }
+    print("size=" + (vk.gfx_width() as str) + "x" + (vk.gfx_height() as str));
+
+    var frames = 0;
+    var running = true;
+    while (running and frames < 3600) {
+        var ev = native.poll_event(win);
+        match (ev.kind) {
+            nt.EventKind.Close => { running = false; },
+            nt.EventKind.Quit => { running = false; },
+            nt.EventKind.Resize => {
+                var s = native.client_size(win);
+                var rz = vk.gfx_resize(s.0, s.1);
+                print("resize=" + (s.0 as str) + "x" + (s.1 as str) + " ok=" + (rz as str));
+            },
+            _ => {}
+        }
+        vk.gfx_begin_frame();
+        vk.gfx_clear(0.10, 0.35, 0.75, 1.0);
+        vk.gfx_end_frame();
+        frames = frames + 1;
+    }
+    print("frames=" + (frames as str));
+    vk.gfx_detach();
+    native.destroy(win);
+    print("done");
+    return 0;
+}

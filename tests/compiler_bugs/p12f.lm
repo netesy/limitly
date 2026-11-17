@@ -1,0 +1,10 @@
+fn f(x: int): int?DivisionByZero {
+    if (x < 0) { return err(DivisionByZero); }
+    return ok(x * 2);
+}
+fn main() {
+    var a = f(5);
+    var v = a ? else { return 1; };
+    print(v);
+    return 0;
+}

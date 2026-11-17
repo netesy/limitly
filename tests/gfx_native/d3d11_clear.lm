@@ -1,0 +1,49 @@
+// d3d11_clear - Stage 1+2 probe: pure-Lymar D3D11 swapchain + clear +
+// present. Creates a Win32 window, attaches a DXGI flip-model swapchain,
+// clears to a solid color each frame, pumps events until close.
+import std.native as native;
+import std.native.types as nt;
+import std.native.d3d11 as d3d11;
+
+fn main() {
+    var win = native.create_window("d3d11 clear probe", 640, 480) ? else {
+        print("create_window failed");
+        return 1;
+    };
+    var hwnd = win.handle;
+    print("window hwnd=" + (hwnd as str));
+
+    var attached = d3d11.gfx_attach(hwnd, 640, 480);
+    print("attach=" + (attached as str));
+    if (attached == 0) {
+        native.destroy(win);
+        return 2;
+    }
+    print("size=" + (d3d11.gfx_width() as str) + "x" + (d3d11.gfx_height() as str));
+
+    var frames = 0;
+    var running = true;
+    while (running and frames < 3600) {
+        var ev = native.poll_event(win);
+        match (ev.kind) {
+            nt.EventKind.Close => { running = false; },
+            nt.EventKind.Quit => { running = false; },
+            nt.EventKind.Resize => {
+                var s = native.client_size(win);
+                var rz = d3d11.gfx_resize(s.0, s.1);
+                print("resize=" + (s.0 as str) + "x" + (s.1 as str) + " ok=" + (rz as str));
+            },
+            _ => {}
+        }
+        d3d11.gfx_begin_frame();
+        d3d11.gfx_clear(0.05, 0.12, 0.35, 1.0);
+        d3d11.gfx_clear_depth(1.0);
+        d3d11.gfx_end_frame();
+        frames = frames + 1;
+    }
+    print("frames=" + (frames as str));
+    d3d11.gfx_detach();
+    native.destroy(win);
+    print("done");
+    return 0;
+}

@@ -1,0 +1,10 @@
+fn main() {
+    var a: int? = 10;
+    var b: int? = nil;
+    var v = a ? else { 0 };
+    var w = b ? else { -1 };
+    print(v);
+    print(w);
+    if (b != nil) { print("has b"); } else { print("b is nil"); }
+    return 0;
+}

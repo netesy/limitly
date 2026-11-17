@@ -1,0 +1,21 @@
+fn main() {
+    var a: i128 = 5;
+    var b: i128 = 170141183460469231731687303715884105727;
+    var c: i128 = -170141183460469231731687303715884105728;
+    var d: i128 = -42;
+    var e: i128 = 1000000000000;
+    print(a);
+    print(b);
+    print(c);
+    print(d);
+    print(e);
+    print(a + b);
+    print(d + a);
+    print(b - 1);
+    print(c + 1);
+    var f: d2 = 12.34;
+    print(f);
+    var g: d4 = 3.14159;
+    print(g);
+    return 0;
+}

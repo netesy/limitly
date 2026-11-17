@@ -1062,7 +1062,7 @@ void Generator::emit_contract_stmt(LM::Frontend::AST::ContractStatement& stmt) {
     Reg cond_reg = emit_expr(*stmt.condition);
     Reg msg_reg = stmt.message ? emit_expr(*stmt.message) : 0;
 
-    LIR_Inst inst(LIR_Op::CallBuiltin, Type::Void, 0, 0, 0);
+    LIR_Inst inst(LIR_Op::CallBuiltin, Type::Void, UINT32_MAX, 0, 0);
     inst.func_name = "assert";
     inst.call_args.push_back(cond_reg);
     if (msg_reg != 0) {

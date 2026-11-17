@@ -1,4 +1,4 @@
-import std.native.gpu_vulkan as vk;
+import std.native.vulkan as vk;
 import std.ffi as ffi;
 var SPV_WORDS: [int] = [119734787,65536,0,64,0,131089,1,196622,0,1,327695,5,10,1852399981,0,393232,10,17,1,1,1,131091,1,196641,2,1,327734,1,10,0,2,131320,11,65789,65592];
 fn main() {

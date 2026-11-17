@@ -1,0 +1,13 @@
+trait Greeter { fn greet(): str; }
+frame Person: Greeter { pub name: str;
+    pub fn greet(): str { return "hi " + self.name; }
+}
+fn make(): Greeter? { return ok(Person(name="bob")); }
+fn main() {
+    var g = make();
+    if (g != nil) {
+        var gg = g as Greeter;
+        print(gg.greet());
+    }
+    return 0;
+}

@@ -1,0 +1,30 @@
+// std.native.metal - Apple Metal graphics backend (macOS / iOS).
+//
+// STATUS: scaffold. The windowing side already exists in std.native.macos
+// (Cocoa/objc_msgSend FFI). This module will own the GPU side:
+//
+//   - MTLCreateSystemDefaultDevice via objc_msgSend on the Metal framework
+//   - CAMetalLayer-backed drawables attached to the NSWindow's content view
+//   - MTLRenderCommandEncoder clear/draw/dispatch encoding into command
+//     buffers committed per frame (nextDrawable -> presentDrawable)
+//
+// Planned public surface mirrors std.native.d3d11 / std.native.vulkan so
+// std.gg can route by capability without knowing the backend:
+//
+//   gpu_available() / gpu_init() / gpu_shutdown()
+//   gfx_attach(hwnd_or_view, w, h) / gfx_detach() / gfx_resize()
+//   gfx_begin_frame() / gfx_clear() / gfx_end_frame()
+//   gpu_buffer_create/write/read, gpu_shader_create, gpu_pipeline_create,
+//   gpu_dispatch  (Metal compute via MTLComputePipelineState)
+//
+// Until implemented every entry point reports unavailability so
+// std.native.gfx_backend() falls through to Vulkan (MoltenVK) on macOS.
+
+/// True when the Metal framework and a system default device exist.
+pub fn gpu_available(): int { return 0; }
+
+/// Initialize the Metal device. Returns 1 on success, 0 while unimplemented.
+pub fn gpu_init(): int { return 0; }
+
+/// Release all Metal objects. No-op while unimplemented.
+pub fn gpu_shutdown(): int { return 0; }

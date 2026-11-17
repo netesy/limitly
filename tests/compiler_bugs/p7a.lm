@@ -1,0 +1,7 @@
+import p7b;
+fn main() {
+    print(p7b.config_name);
+    p7b.config_name = "changed";
+    print(p7b.config_name);
+    return 0;
+}

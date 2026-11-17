@@ -1,0 +1,82 @@
+// gg_smoke - std.gg native-backend probe. Creates a Win32 window via
+// std.native, attaches through gg.attach_window (which should select the
+// pure-Lymar d3d11/vulkan driver), then runs begin_pass/draw/end_pass/
+// commit frames incl. rect, triangle, clip, shadow, and batched draws.
+import std.native as native;
+import std.native.types as nt;
+import std.gg as gg;
+
+
+fn main() {
+    gg.global_graphics_context.backend_prefer = "vulkan";
+    if (gg.setup() == false) {
+        print("gg.setup failed");
+        return 1;
+    }
+    var win = native.create_window("gg native smoke", 640, 480) ? else {
+        print("create_window failed");
+        return 2;
+    };
+    var hwnd = win.handle;
+
+    var attached_ok = gg.attach_window(hwnd, 640, 480);
+    print("attach=" + (attached_ok as str));
+    print("backend=" + gg.global_graphics_context.backend);
+    if (attached_ok == false) {
+        native.destroy(win);
+        return 3;
+    }
+
+    var frames = 0;
+    var running = true;
+    while (running and frames < 120) {
+        var ev = native.poll_event(win);
+        match (ev.kind) {
+            nt.EventKind.Close => { running = false; },
+            nt.EventKind.Quit => { running = false; },
+            nt.EventKind.Resize => {
+                var s = native.client_size(win);
+                gg.set_window_size(s.0, s.1);
+            },
+            _ => {}
+        }
+
+        gg.begin_pass(640, 480, 0.08, 0.10, 0.16, 1.0);
+
+        // plain rect + triangle
+        gg.draw_rect_primitive(40.0, 40.0, 200.0, 120.0, 0.9, 0.3, 0.3, 1.0);
+        gg.draw_triangle_primitive(300.0, 300.0, 500.0, 300.0, 400.0, 450.0,
+                                   0.2, 0.8, 0.4, 1.0);
+
+        // clip push/pop around a rect
+        gg.push_clip(50.0, 150.0, 300.0, 200.0, 0, 0.0);
+        gg.draw_rect_primitive(0.0, 0.0, 640.0, 480.0, 0.2, 0.5, 0.9, 0.8);
+        gg.pop_clip();
+
+        // shadow approximation + line (2 tris)
+        gg.draw_shadow_primitive(350.0, 100.0, 150.0, 80.0,
+                                 0.0, 0.0, 0.0, 0.5, 4.0, 8.0, 12.0, 4.0);
+        gg.draw_line_primitive(20.0, 400.0, 620.0, 400.0,
+                               1.0, 1.0, 1.0, 1.0, 2.0);
+
+        // batched round: rects + text (text is a native no-op v1)
+        gg.begin_batch();
+        gg.draw_rect_primitive(50.0, 300.0, 80.0, 80.0, 0.8, 0.6, 0.2, 1.0);
+        gg.draw_rect_rounded_primitive(160.0, 300.0, 80.0, 80.0, 12.0,
+                                       0.6, 0.8, 0.2, 1.0);
+        gg.draw_rect_border_primitive(270.0, 300.0, 80.0, 80.0, 8.0, 3.0,
+                                      0.9, 0.9, 0.9, 1.0);
+        gg.draw_text("hello", 50.0, 60.0, 1.0, 1.0, 1.0, 1.0, 1);
+        gg.end_batch();
+
+        gg.end_pass();
+        gg.commit();
+        frames = frames + 1;
+    }
+    print("frames=" + (frames as str));
+    gg.detach_window();
+    gg.shutdown();
+    native.destroy(win);
+    print("done");
+    return 0;
+}

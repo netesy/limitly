@@ -1,0 +1,14 @@
+trait Widget {
+    fn name(): str;
+    fn describe(): str { return "widget-default"; }
+}
+frame Box: Widget {
+    pub fn name(): str { return "box"; }
+}
+fn describe_it(w: Widget): str { return w.describe(); }
+fn main() {
+    var b = Box();
+    var w: Widget = b;
+    print(describe_it(w));
+    return 0;
+}

@@ -1,0 +1,3253 @@
+// std.native.vulkan - Pure-Lymar Vulkan compute driver.
+//
+// Implements a real GPU device layer entirely through std.ffi: the Vulkan
+// loader (vulkan-1.dll / libvulkan.so / libMoltenVK.dylib) is resolved with
+// vkGetInstanceProcAddr and every command is invoked through foreign_call.
+// All Vulkan structs are hand-marshaled into ffi.alloc'd memory - no C glue.
+//
+// This is the submission backend for Fyra's SPIR-V output:
+// gpu_shader_create_spv() accepts SPIR-V words produced by the vendor/fyra
+// spirv target and vkCreateShaderModule compiles them through the platform
+// driver.
+//
+// Scope: compute only - first compute-capable queue family, host-visible +
+// host-coherent memory (no staging copies), STORAGE_BUFFER descriptors
+// (binding index == buffer list index), synchronous dispatch with fence
+// wait. Vertex/pixel/mesh stages and device-local memory are later work.
+//
+// Struct layouts are x86-64 Vulkan 1.1 ABI (handles/pointers 8 bytes,
+// enums/u32 4 bytes) taken from vulkan_core.h.
+//
+// Record layouts (ffi.alloc'd, returned as int handles):
+//   buffer record (64B): @0 VkBuffer, @8 VkDeviceMemory, @16 mapped ptr,
+//                        @24 size, @32 VkDeviceSize allocSize
+//   pipe record (96B):   @0 VkPipeline, @8 VkPipelineLayout,
+//                        @16 VkDescriptorSetLayout, @24 VkDescriptorPool,
+//                        @32 VkDescriptorSet, @40 max_bindings
+//
+// Designed for `lymar build -shared` -> native library (vulkan.dll +
+// .meta); the VM and AOT hosts call its exports through the Lymar ABI.
+
+import std.ffi as ffi;
+import std.os.identity as osid;
+
+// ---- VkStructureType values (vulkan_core.h) ----
+const VKS_APPLICATION_INFO: int = 0;
+const VKS_INSTANCE_CREATE_INFO: int = 1;
+const VKS_DEVICE_QUEUE_CREATE_INFO: int = 2;
+const VKS_DEVICE_CREATE_INFO: int = 3;
+const VKS_SUBMIT_INFO: int = 4;
+const VKS_MEMORY_ALLOCATE_INFO: int = 5;
+const VKS_FENCE_CREATE_INFO: int = 8;
+const VKS_BUFFER_CREATE_INFO: int = 12;
+const VKS_SHADER_MODULE_CREATE_INFO: int = 16;
+const VKS_SHADER_STAGE_CREATE_INFO: int = 18;
+const VKS_COMPUTE_PIPELINE_CREATE_INFO: int = 29;
+const VKS_PIPELINE_CACHE_CREATE_INFO: int = 17;
+const VKS_PIPELINE_LAYOUT_CREATE_INFO: int = 30;
+const VKS_DESCRIPTOR_SET_LAYOUT_CREATE_INFO: int = 32;
+const VKS_DESCRIPTOR_POOL_CREATE_INFO: int = 33;
+const VKS_DESCRIPTOR_SET_ALLOCATE_INFO: int = 34;
+const VKS_WRITE_DESCRIPTOR_SET: int = 35;
+const VKS_COMMAND_POOL_CREATE_INFO: int = 39;
+const VKS_COMMAND_BUFFER_ALLOCATE_INFO: int = 40;
+const VKS_COMMAND_BUFFER_BEGIN_INFO: int = 42;
+const VKS_SEMAPHORE_CREATE_INFO: int = 9;
+const VKS_IMAGE_VIEW_CREATE_INFO: int = 15;
+const VKS_FRAMEBUFFER_CREATE_INFO: int = 37;
+const VKS_RENDER_PASS_CREATE_INFO: int = 38;
+const VKS_RENDER_PASS_BEGIN_INFO: int = 43;
+const VKS_SWAPCHAIN_CREATE_INFO_KHR: int = 1000001000;
+const VKS_PRESENT_INFO_KHR: int = 1000001002;
+const VKS_WIN32_SURFACE_CREATE_INFO_KHR: int = 1000009000;
+const VKS_GRAPHICS_PIPELINE_CREATE_INFO: int = 28;
+const VKS_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO: int = 19;
+const VKS_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO: int = 20;
+const VKS_PIPELINE_VIEWPORT_STATE_CREATE_INFO: int = 22;
+const VKS_PIPELINE_RASTERIZATION_STATE_CREATE_INFO: int = 23;
+const VKS_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO: int = 24;
+const VKS_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO: int = 25;
+const VKS_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO: int = 26;
+const VKS_PIPELINE_DYNAMIC_STATE_CREATE_INFO: int = 27;
+const VKS_SAMPLER_CREATE_INFO: int = 31;
+const VKS_IMAGE_CREATE_INFO: int = 14;
+
+const VK_API_VERSION_1_1: int = 0x00401000;
+
+const QUEUE_COMPUTE_BIT: int = 0x2;
+const QUEUE_FAMILY_PROPS_SIZE: int = 24; // VkQueueFamilyProperties stride
+const MAX_QUEUE_FAMILIES: int = 16;
+
+const BUFFER_USAGE_ALL: int = 0x23; // TRANSFER_SRC|DST|STORAGE_BUFFER
+
+const MEM_HOST_VISIBLE: int = 0x2;
+const MEM_HOST_COHERENT: int = 0x4;
+
+const DESCRIPTOR_TYPE_STORAGE_BUFFER: int = 7;
+const SHADER_STAGE_COMPUTE: int = 0x20;
+const PIPELINE_BIND_COMPUTE: int = 1;
+
+const CMD_ONE_TIME_SUBMIT: int = 0x1;
+const CMD_LEVEL_PRIMARY: int = 0;
+const POOL_FREE_DESCRIPTOR_SET: int = 0x1;
+
+const VK_WHOLE_SIZE: int = -1; // ~0ULL as i64
+const FENCE_TIMEOUT_MAX: int = -1;
+
+const PHYSICAL_DEVICE_FEATURES_SIZE: int = 256;
+
+// presentation enums
+const VK_FORMAT_B8G8R8A8_UNORM: int = 44;
+const VK_FORMAT_R8G8B8A8_UNORM: int = 37;
+const VK_COLORSPACE_SRGB_NONLINEAR: int = 0;
+const PRESENT_MODE_FIFO: int = 2;
+const PRESENT_MODE_IMMEDIATE: int = 0;
+const IMAGE_USAGE_COLOR_ATTACHMENT: int = 0x10;
+const IMAGE_USAGE_TRANSFER_SRC: int = 0x1;
+const SHARING_MODE_EXCLUSIVE: int = 0;
+const COMPOSITE_ALPHA_OPAQUE: int = 0x1;
+const PRETRANSFORM_IDENTITY: int = 0x1;
+const SURFACE_TRANSFORM_IDENTITY: int = 0x1;
+const LOAD_OP_CLEAR: int = 0;
+const LOAD_OP_DONT_CARE: int = 1000301000;
+const STORE_OP_STORE: int = 1;
+const STORE_OP_DONT_CARE: int = 1000301000;
+const LAYOUT_UNDEFINED: int = 0;
+const LAYOUT_COLOR_ATTACHMENT: int = 2;
+const LAYOUT_PRESENT_SRC: int = 1000001001;
+const PIPELINE_BIND_GRAPHICS: int = 0;
+const ACCESS_COLOR_WRITE: int = 0x100;
+const STAGE_COLOR_OUTPUT: int = 0x400;
+const STAGE_TOP_OF_PIPE: int = 0x1;
+const IMAGE_ASPECT_COLOR: int = 0x1;
+const VIEW_TYPE_2D: int = 1;
+const SAMPLE_COUNT_1: int = 0x1;
+// VkPhysicalDeviceFeatures is VkBool32 words; shaderFloat64=bit39,
+// shaderInt64=bit40, shaderInt16=bit41 -> bits 7,8,9 of word 1.
+const FEATURES_SHADER_64_16: int = 0x380;
+
+// graphics enums
+const SHADER_STAGE_VERTEX: int = 0x1;
+const SHADER_STAGE_FRAGMENT: int = 0x10;
+const SHADER_STAGE_ALL_GRAPHICS: int = 0x1F;
+const PIPELINE_BIND_GRAPHICS: int = 0;
+const BUFFER_USAGE_TRANSFER_SRC: int = 0x1;
+const BUFFER_USAGE_TRANSFER_DST: int = 0x2;
+const BUFFER_USAGE_UNIFORM_BUFFER: int = 0x10;
+const BUFFER_USAGE_INDEX_BUFFER: int = 0x40;
+const BUFFER_USAGE_VERTEX_BUFFER: int = 0x80;
+const IMAGE_USAGE_TRANSFER_DST: int = 0x2;
+const IMAGE_USAGE_SAMPLED: int = 0x4;
+const IMAGE_TILING_OPTIMAL: int = 0;
+const LAYOUT_TRANSFER_DST_OPTIMAL: int = 7;
+const LAYOUT_SHADER_READ_ONLY: int = 5;
+const ACCESS_SHADER_READ: int = 0x20;
+const ACCESS_TRANSFER_READ: int = 0x800;
+const ACCESS_TRANSFER_WRITE: int = 0x1000;
+const STAGE_FRAGMENT_SHADER: int = 0x80;
+const STAGE_TRANSFER: int = 0x1000;
+const STAGE_ALL_GRAPHICS: int = 0x8000;
+const STAGE_ALL_COMMANDS: int = 0x10000;
+const DESCRIPTOR_TYPE_UNIFORM_BUFFER: int = 6;
+const DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER: int = 1;
+const FILTER_NEAREST: int = 0;
+const FILTER_LINEAR: int = 1;
+const MIPMAP_NEAREST: int = 0;
+const MIPMAP_LINEAR: int = 1;
+const ADDR_REPEAT: int = 0;
+const ADDR_MIRRORED: int = 1;
+const ADDR_CLAMP_EDGE: int = 2;
+const INDEX_TYPE_UINT16: int = 0;
+const INDEX_TYPE_UINT32: int = 1;
+const TOPO_POINT_LIST: int = 0;
+const TOPO_TRIANGLE_LIST: int = 3;
+const POLYGON_MODE_FILL: int = 0;
+const POLYGON_MODE_LINE: int = 1;
+const CULL_MODE_NONE: int = 0;
+const CULL_MODE_FRONT: int = 1;
+const CULL_MODE_BACK: int = 2;
+const FRONT_FACE_CCW: int = 0;
+const FRONT_FACE_CW: int = 1;
+const COMPARE_OP_NEVER: int = 0;
+const COMPARE_OP_ALWAYS: int = 7;
+const BLEND_FACTOR_ZERO: int = 0;
+const BLEND_FACTOR_ONE: int = 1;
+const BLEND_FACTOR_SRC_COLOR: int = 2;
+const BLEND_FACTOR_ONE_MINUS_SRC_COLOR: int = 3;
+const BLEND_FACTOR_DST_COLOR: int = 4;
+const BLEND_FACTOR_ONE_MINUS_DST_COLOR: int = 5;
+const BLEND_FACTOR_SRC_ALPHA: int = 6;
+const BLEND_FACTOR_ONE_MINUS_SRC_ALPHA: int = 7;
+const BLEND_FACTOR_DST_ALPHA: int = 8;
+const BLEND_FACTOR_ONE_MINUS_DST_ALPHA: int = 9;
+const BLEND_FACTOR_SRC_ALPHA_SATURATE: int = 10;
+const BLEND_OP_ADD: int = 0;
+const COLOR_WRITE_ALL: int = 15;
+const MEM_DEVICE_LOCAL: int = 0x1;
+const DXGI_FMT_R32G32B32A32_FLOAT: int = 0x02;
+const DXGI_FMT_R32G32B32_FLOAT: int = 0x06;
+const DXGI_FMT_R16G16B16A16_FLOAT: int = 0xa;
+const DXGI_FMT_R32G32_FLOAT: int = 0x10;
+const DXGI_FMT_R32G32_UINT: int = 0x11;
+const DXGI_FMT_R8G8B8A8_UNORM: int = 0x1c;
+const DXGI_FMT_R8G8B8A8_UINT: int = 0x1e;
+const DXGI_FMT_R32_FLOAT: int = 0x29;
+const DXGI_FMT_R32_UINT: int = 0x2a;
+const DXGI_FMT_R16_UINT: int = 0x39;
+const DXGI_FMT_R8_UINT: int = 0x3e;
+const DXGI_FMT_B8G8R8A8_UNORM: int = 0x57;
+const VK_FMT_R8_UINT: int = 13;
+const VK_FMT_R8G8B8A8_UNORM: int = 37;
+const VK_FMT_R8G8B8A8_UINT: int = 41;
+const VK_FMT_B8G8R8A8_UNORM: int = 44;
+const VK_FMT_R16_UINT: int = 74;
+const VK_FMT_R16G16B16A16_SFLOAT: int = 97;
+const VK_FMT_R32_UINT: int = 98;
+const VK_FMT_R32_SFLOAT: int = 100;
+const VK_FMT_R32G32_UINT: int = 101;
+const VK_FMT_R32G32_SFLOAT: int = 103;
+const VK_FMT_R32G32B32_SFLOAT: int = 106;
+const VK_FMT_R32G32B32A32_SFLOAT: int = 109;
+const DYN_STATE_VIEWPORT: int = 0;
+const DYN_STATE_SCISSOR: int = 1;
+
+// ---- driver state ----
+var _loader: int = 0;
+var _gipa: int = 0;            // vkGetInstanceProcAddr (fnptr stored as int)
+var _instance: int = 0;
+var _physdev: int = 0;
+var _device: int = 0;
+var _queue: int = 0;
+var _qfamily: int = 0;
+var _cmd_pool: int = 0;
+var _cmd_buf: int = 0;
+var _fence: int = 0;
+var _indirect_buf: int = 0; // buffer record holding dispatch indirect args
+var _pcache: int = 0;
+var _phys_index: int = -1;
+
+// presentation state
+var _surface: int = 0;
+var _swapchain: int = 0;
+var _swap_images: int = 0;    // ptr to VkImage handle array
+var _swap_count: int = 0;
+var _swap_format: int = 0;
+var _swap_w: int = 0;
+var _swap_h: int = 0;
+var _views: int = 0;          // ptr to VkImageView handle array
+var _framebuffers: int = 0;   // ptr to VkFramebuffer handle array
+var _render_pass: int = 0;
+var _sem_acquire: int = 0;
+var _sem_render: int = 0;
+var _gfx_fence: int = 0;
+var _cur_image: int = 0;
+var _attached: int = 0;
+var _gfx_w: int = 0;
+var _gfx_h: int = 0;
+var _hwnd: int = 0;
+var _hinst: int = 0;
+var _cc_r: float = 0.0;
+var _cc_g: float = 0.0;
+var _cc_b: float = 0.0;
+var _cc_a: float = 1.0;
+
+// resolved command pointers
+var _vk_create_instance: int = 0;
+var _vk_enum_phys: int = 0;
+var _vk_qf_props: int = 0;
+var _vk_mem_props: int = 0;
+var _vk_create_device: int = 0;
+var _vk_get_queue: int = 0;
+var _vk_destroy_device: int = 0;
+var _vk_destroy_instance: int = 0;
+var _vk_create_buffer: int = 0;
+var _vk_get_buf_memreq: int = 0;
+var _vk_alloc_mem: int = 0;
+var _vk_bind_buf_mem: int = 0;
+var _vk_map_mem: int = 0;
+var _vk_unmap_mem: int = 0;
+var _vk_create_shader: int = 0;
+var _vk_destroy_shader: int = 0;
+var _vk_create_dsl: int = 0;
+var _vk_destroy_dsl: int = 0;
+var _vk_create_pl: int = 0;
+var _vk_destroy_pl: int = 0;
+var _vk_create_dp: int = 0;
+var _vk_destroy_dp: int = 0;
+var _vk_alloc_sets: int = 0;
+var _vk_update_sets: int = 0;
+var _vk_create_pipelines: int = 0;
+var _vk_create_pcache: int = 0;
+var _vk_destroy_pipeline: int = 0;
+var _vk_create_cpool: int = 0;
+var _vk_destroy_cpool: int = 0;
+var _vk_alloc_cmds: int = 0;
+var _vk_begin_cmd: int = 0;
+var _vk_reset_cmd: int = 0;
+var _vk_end_cmd: int = 0;
+var _vk_cmd_bind_pipe: int = 0;
+var _vk_cmd_bind_sets: int = 0;
+var _vk_cmd_dispatch: int = 0;
+var _vk_cmd_dispatch_indirect: int = 0;
+var _vk_create_fence: int = 0;
+var _vk_reset_fences: int = 0;
+var _vk_queue_submit: int = 0;
+var _vk_wait_fences: int = 0;
+var _vk_create_surface: int = 0;
+var _vk_destroy_surface: int = 0;
+var _vk_surf_caps: int = 0;
+var _vk_surf_formats: int = 0;
+var _vk_surf_modes: int = 0;
+var _vk_create_swapchain: int = 0;
+var _vk_destroy_swapchain: int = 0;
+var _vk_get_swap_images: int = 0;
+var _vk_acquire_image: int = 0;
+var _vk_present: int = 0;
+var _vk_create_semaphore: int = 0;
+var _vk_destroy_semaphore: int = 0;
+var _vk_create_image_view: int = 0;
+var _vk_destroy_image_view: int = 0;
+var _vk_create_render_pass: int = 0;
+var _vk_destroy_render_pass: int = 0;
+var _vk_create_framebuffer: int = 0;
+var _vk_destroy_framebuffer: int = 0;
+var _vk_cmd_begin_rp: int = 0;
+var _vk_cmd_end_rp: int = 0;
+var _vk_cmd_set_viewport: int = 0;
+var _vk_destroy_fence: int = 0;
+var _vk_create_gpipelines: int = 0;
+var _vk_cmd_bind_vb: int = 0;
+var _vk_cmd_bind_ib: int = 0;
+var _vk_cmd_draw: int = 0;
+var _vk_cmd_draw_indexed: int = 0;
+var _vk_cmd_set_scissor: int = 0;
+var _vk_create_sampler: int = 0;
+var _vk_destroy_sampler: int = 0;
+var _vk_create_image: int = 0;
+var _vk_get_img_memreq: int = 0;
+var _vk_bind_img_mem: int = 0;
+var _vk_destroy_image: int = 0;
+var _vk_free_memory: int = 0;
+var _vk_destroy_buffer: int = 0;
+var _vk_cmd_pipeline_barrier: int = 0;
+var _vk_cmd_copy_buf_img: int = 0;
+var _vk_free_cmds: int = 0;
+var _gdpa: int = 0; // vkGetDeviceProcAddr
+
+// graphics pipeline state
+var _gfx_pipe: int = 0;
+var _gfx_pl: int = 0;
+var _gfx_dsl: int = 0;
+var _gfx_dp: int = 0;
+var _gfx_dset: int = 0;
+var _gfx_pipe_dirty: int = 1;
+var _gfx_vs: int = 0;
+var _gfx_ps: int = 0;
+var _gfx_layout: int = 0;
+var _gfx_blend_en: int = 0;
+var _gfx_sc_x: int = 0;
+var _gfx_sc_y: int = 0;
+var _gfx_sc_w: int = 0;
+var _gfx_sc_h: int = 0;
+var _gfx_raster_fill: int = 0;
+var _gfx_raster_cull: int = 0;
+var _gfx_topology: int = TOPO_TRIANGLE_LIST;
+var _gfx_bind: int = 0;      // ffi block: cb/srv/smp/vb slots
+var _gfx_reg: int = 0;       // ffi block: release registry {ptr,type} 16B
+var _gfx_keep: [any] = [] as [any]; // permanent-region keep list for gfx recs
+var _gfx_reg_count: int = 0;
+var _gfx_desc_dirty: int = 1;
+var _gfx_dummy_buf: int = 0;
+var _gfx_dummy_tex: int = 0;
+var _gfx_dummy_smp: int = 0;
+var _gfx_dummy_view: int = 0;
+var _cmd_bound: int = 0;
+var _rp_open: int = 0;
+var _frame_active: int = 0;
+var _vp_x: float = 0.0;
+var _vp_y: float = 0.0;
+var _vp_w: float = 0.0;
+var _vp_h: float = 0.0;
+
+// vk resolves a command pointer through vkGetInstanceProcAddr. With
+// _instance == 0 only global commands resolve; after instance creation every
+// device-level command resolves through the same entry point.
+fn vk(name: str): int {
+    unsafe {
+        var c = ffi.string_to_cstring(name);
+        return ffi.foreign_call(_gipa, [_instance, c.ptr], ffi.TYPE_I64,
+                                [ffi.TYPE_U64, ffi.TYPE_CSTRING]) as int;
+    }
+}
+
+fn vk_device(name: str): int {
+    unsafe {
+        var c = ffi.string_to_cstring(name);
+        // vkGetDeviceProcAddr(VkDevice device, const char* pName)
+        return ffi.foreign_call(_gdpa, [_device, c.ptr], ffi.TYPE_I64,
+                                [ffi.TYPE_U64, ffi.TYPE_CSTRING]) as int;
+    }
+}
+
+fn vk_resolve_all(): nil {
+    _vk_create_instance = vk("vkCreateInstance");
+    _vk_enum_phys = vk("vkEnumeratePhysicalDevices");
+    _vk_qf_props = vk("vkGetPhysicalDeviceQueueFamilyProperties");
+    _vk_mem_props = vk("vkGetPhysicalDeviceMemoryProperties");
+    _vk_create_device = vk("vkCreateDevice");
+    _vk_get_queue = vk("vkGetDeviceQueue");
+    _vk_destroy_device = vk("vkDestroyDevice");
+    _vk_destroy_instance = vk("vkDestroyInstance");
+    _vk_create_buffer = vk("vkCreateBuffer");
+    _vk_get_buf_memreq = vk("vkGetBufferMemoryRequirements");
+    _vk_alloc_mem = vk("vkAllocateMemory");
+    _vk_bind_buf_mem = vk("vkBindBufferMemory");
+    _vk_map_mem = vk("vkMapMemory");
+    _vk_unmap_mem = vk("vkUnmapMemory");
+    _vk_create_shader = vk("vkCreateShaderModule");
+    _vk_destroy_shader = vk("vkDestroyShaderModule");
+    _vk_create_dsl = vk("vkCreateDescriptorSetLayout");
+    _vk_destroy_dsl = vk("vkDestroyDescriptorSetLayout");
+    _vk_create_pl = vk("vkCreatePipelineLayout");
+    _vk_destroy_pl = vk("vkDestroyPipelineLayout");
+    _vk_create_dp = vk("vkCreateDescriptorPool");
+    _vk_destroy_dp = vk("vkDestroyDescriptorPool");
+    _vk_alloc_sets = vk("vkAllocateDescriptorSets");
+    _vk_update_sets = vk("vkUpdateDescriptorSets");
+    _vk_create_pipelines = vk("vkCreateComputePipelines");
+    _vk_create_pcache = vk("vkCreatePipelineCache");
+    _vk_destroy_pipeline = vk("vkDestroyPipeline");
+    _vk_create_cpool = vk("vkCreateCommandPool");
+    _vk_destroy_cpool = vk("vkDestroyCommandPool");
+    _vk_alloc_cmds = vk("vkAllocateCommandBuffers");
+    _vk_begin_cmd = vk("vkBeginCommandBuffer");
+    _vk_reset_cmd = vk("vkResetCommandBuffer");
+    _vk_end_cmd = vk("vkEndCommandBuffer");
+    _vk_cmd_bind_pipe = vk("vkCmdBindPipeline");
+    _vk_cmd_bind_sets = vk("vkCmdBindDescriptorSets");
+    _vk_cmd_dispatch = vk("vkCmdDispatch");
+    _vk_cmd_dispatch_indirect = vk("vkCmdDispatchIndirect");
+    _vk_create_fence = vk("vkCreateFence");
+    _vk_destroy_fence = vk("vkDestroyFence");
+    _vk_reset_fences = vk("vkResetFences");
+    _vk_queue_submit = vk("vkQueueSubmit");
+    _vk_wait_fences = vk("vkWaitForFences");
+    // presentation (instance-level entry points)
+    _vk_create_surface = vk("vkCreateWin32SurfaceKHR");
+    _vk_destroy_surface = vk("vkDestroySurfaceKHR");
+    _vk_surf_caps = vk("vkGetPhysicalDeviceSurfaceCapabilitiesKHR");
+    _vk_surf_formats = vk("vkGetPhysicalDeviceSurfaceFormatsKHR");
+    _vk_surf_modes = vk("vkGetPhysicalDeviceSurfacePresentModesKHR");
+}
+
+fn st_u32(p: int, off: int, v: int): nil {
+    unsafe { ffi.store_u32(ffi.ptr_add(p, off), v); }
+}
+fn st_u64(p: int, off: int, v: int): nil {
+    unsafe { ffi.store_u64(ffi.ptr_add(p, off), v); }
+}
+fn st_ptr(p: int, off: int, v: int): nil {
+    unsafe { ffi.store_ptr(ffi.ptr_add(p, off), v); }
+}
+
+// gpu_init creates the Vulkan instance, picks the first physical device with
+// gpu_available reports whether a Vulkan loader library can be loaded.
+// Cheap probe - does not create an instance or device. gpu_init does the
+// real check (and verifies a compute-capable physical device exists).
+pub fn gpu_available(): int {
+    unsafe {
+        if (_loader == 0) {
+            _loader = ffi.library_load("vulkan-1.dll");
+            if (_loader == 0) { _loader = ffi.library_load("libvulkan.so.1"); }
+            if (_loader == 0) { _loader = ffi.library_load("libvulkan.so"); }
+            if (_loader == 0) { _loader = ffi.library_load("libMoltenVK.dylib"); }
+        }
+        if (_loader != 0) { return 1; }
+        return 0;
+    }
+}
+
+// a compute-capable queue family, creates the device (64/16 shader features
+// enabled so Fyra SPIR-V modules using Int64/Float64 validate), queue,
+// command pool, one primary command buffer, and a fence.
+// Returns 1 on success. Idempotent.
+pub fn gpu_init(): int {
+    unsafe {
+        if (_device != 0) { return 1; }
+        if (_loader == 0) { gpu_available(); }
+        if (_loader == 0) { return 0; }
+        var gsym = ffi.library_get_symbol(_loader, "vkGetInstanceProcAddr");
+        if (gsym == 0) { return 0; }
+        _gipa = gsym as int;
+        _vk_create_instance = vk("vkCreateInstance");
+        if (_vk_create_instance == 0) { return 0; }
+
+        // VkApplicationInfo (48B) + VkInstanceCreateInfo (64B).
+        var app = ffi.alloc(48);
+        var ici = ffi.alloc(64);
+        var islot = ffi.alloc(8);
+        ffi.memset(app, 0, 48);
+        ffi.memset(ici, 0, 64);
+        st_u32(app, 0, VKS_APPLICATION_INFO);
+        st_u32(app, 44, VK_API_VERSION_1_1);
+        st_u32(ici, 0, VKS_INSTANCE_CREATE_INFO);
+        st_ptr(ici, 24, app);
+        // Instance extensions: VK_KHR_surface + the platform surface
+        // extension. If the platform ext is unavailable the create fails and
+        // we retry without extensions (compute-only fallback).
+        var osn: str = osid.os_name();
+        var surf_ext = "";
+        if (osn == "windows") { surf_ext = "VK_KHR_win32_surface"; }
+        elif (osn == "linux" or osn == "freebsd") { surf_ext = "VK_KHR_xcb_surface"; }
+        elif (osn == "android") { surf_ext = "VK_KHR_android_surface"; }
+        elif (osn == "darwin") { surf_ext = "VK_MVK_macos_surface"; }
+        var ires = 1;
+        if (surf_ext != "") {
+            var e1 = ffi.string_to_cstring("VK_KHR_surface");
+            var e2 = ffi.string_to_cstring(surf_ext);
+            var earr = ffi.alloc(16);
+            ffi.memset(earr, 0, 16);
+            ffi.store_ptr(earr, ffi.cstring_as_ptr(e1));
+            ffi.store_ptr(ffi.ptr_add(earr, 8), ffi.cstring_as_ptr(e2));
+            st_u32(ici, 48, 2);
+            st_ptr(ici, 56, earr);
+            ires = ffi.foreign_call(_vk_create_instance,
+                [ici, 0, islot], ffi.TYPE_I32,
+                [ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_PTR]) as int;
+            ffi.free(earr);
+            if (ires != 0) { ffi.memset(ici, 0, 64); st_u32(ici, 0, VKS_INSTANCE_CREATE_INFO); st_ptr(ici, 24, app); }
+        }
+        if (ires != 0) {
+            ires = ffi.foreign_call(_vk_create_instance,
+                [ici, 0, islot], ffi.TYPE_I32,
+                [ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_PTR]) as int;
+        }
+        ffi.free(app); ffi.free(ici);
+        if (ires != 0) { ffi.free(islot); return 0; }
+        _instance = ffi.load_i64(islot);
+        ffi.free(islot);
+
+        vk_resolve_all();
+        if (_vk_enum_phys == 0 or _vk_create_device == 0 or
+            _vk_create_cpool == 0 or _vk_create_fence == 0) {
+            return 0;
+        }
+
+        // Enumerate physical devices (two-call pattern).
+        var pcount = ffi.alloc(4);
+        ffi.store_u32(pcount, 0);
+        ffi.foreign_call(_vk_enum_phys, [_instance, pcount, 0], ffi.TYPE_I32,
+                         [ffi.TYPE_U64, ffi.TYPE_PTR, ffi.TYPE_PTR]);
+        var npdev: int = ffi.load_u32(pcount);
+        if (npdev == 0) { ffi.free(pcount); return 0; }
+        var pdevs = ffi.alloc(npdev * 8);
+        ffi.store_u32(pcount, npdev);
+        ffi.foreign_call(_vk_enum_phys, [_instance, pcount, pdevs], ffi.TYPE_I32,
+                         [ffi.TYPE_U64, ffi.TYPE_PTR, ffi.TYPE_PTR]);
+        ffi.free(pcount);
+
+        // Pick device exposing a compute-capable queue family.
+        // _phys_index >= 0 forces a specific enumerated device (debug).
+        var qprops = ffi.alloc(MAX_QUEUE_FAMILIES * QUEUE_FAMILY_PROPS_SIZE);
+        var chosen_qf = -1;
+        var pi = 0;
+        var pstart = 0;
+        if (_phys_index >= 0) { pstart = _phys_index; }
+        var pend = npdev;
+        while (pstart + pi < pend) {
+            var cand = ffi.load_i64(ffi.ptr_add(pdevs, (pstart + pi) * 8));
+            var qcount = ffi.alloc(4);
+            ffi.store_u32(qcount, MAX_QUEUE_FAMILIES);
+            ffi.memset(qprops, 0, MAX_QUEUE_FAMILIES * QUEUE_FAMILY_PROPS_SIZE);
+            ffi.foreign_call(_vk_qf_props, [cand, qcount, qprops], ffi.TYPE_VOID,
+                             [ffi.TYPE_U64, ffi.TYPE_PTR, ffi.TYPE_PTR]);
+            var nqf = ffi.load_u32(qcount);
+            var qi = 0;
+            while (qi < nqf) {
+                var flags = ffi.load_u32(
+                    ffi.ptr_add(qprops, qi * QUEUE_FAMILY_PROPS_SIZE));
+                if ((flags & QUEUE_COMPUTE_BIT) != 0) {
+                    _physdev = cand;
+                    chosen_qf = qi;
+                    break;
+                }
+                qi = qi + 1;
+            }
+            ffi.free(qcount);
+            if (chosen_qf >= 0) { break; }
+            pi = pi + 1;
+        }
+        ffi.free(pdevs);
+        ffi.free(qprops);
+        if (chosen_qf < 0) { return 0; }
+        _qfamily = chosen_qf;
+
+        // VkDeviceQueueCreateInfo (40B) + VkDeviceCreateInfo (72B).
+        var qci = ffi.alloc(40);
+        var dci = ffi.alloc(72);
+        var prio = ffi.alloc(4);
+        var features = ffi.alloc(PHYSICAL_DEVICE_FEATURES_SIZE);
+        ffi.memset(qci, 0, 40);
+        ffi.memset(dci, 0, 72);
+        ffi.memset(features, 0, PHYSICAL_DEVICE_FEATURES_SIZE);
+        ffi.store_f32(prio, 1.0);
+        ffi.store_u32(ffi.ptr_add(features, 4), FEATURES_SHADER_64_16);
+        st_u32(qci, 0, VKS_DEVICE_QUEUE_CREATE_INFO);
+        st_u32(qci, 20, _qfamily);
+        st_u32(qci, 24, 1);
+        st_ptr(qci, 32, prio);
+        st_u32(dci, 0, VKS_DEVICE_CREATE_INFO);
+        st_u32(dci, 20, 1);
+        st_ptr(dci, 24, qci);
+        st_ptr(dci, 64, 0); // pEnabledFeatures = NULL (all features off)
+        // VK_KHR_swapchain: required for surface presentation.
+        var ext_sw = ffi.string_to_cstring("VK_KHR_swapchain");
+        var ext_arr = ffi.alloc(8);
+        ffi.memset(ext_arr, 0, 8);
+        ffi.store_ptr(ext_arr, ffi.cstring_as_ptr(ext_sw));
+        st_u32(dci, 48, 1);              // enabledExtensionCount
+        st_ptr(dci, 56, ext_arr);        // ppEnabledExtensionNames
+
+        var devslot = ffi.alloc(8);
+        var dres = ffi.foreign_call(_vk_create_device,
+            [_physdev, dci, 0, devslot], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_PTR]) as int;
+        ffi.free(qci); ffi.free(dci); ffi.free(prio); ffi.free(features);
+        if (dres != 0) { ffi.free(devslot); return 0; }
+        _device = ffi.load_i64(devslot);
+        ffi.free(devslot);
+
+        // Re-resolve device-level commands through vkGetDeviceProcAddr -
+        // the authoritative path once a device exists.
+        _gdpa = vk("vkGetDeviceProcAddr");
+        if (_gdpa != 0) {
+            var p: int = 0;
+            p = vk_device("vkCmdDispatch");
+            if (p != 0) { _vk_cmd_dispatch = p; }
+            p = vk_device("vkCmdDispatchIndirect");
+            if (p != 0) { _vk_cmd_dispatch_indirect = p; }
+            p = vk_device("vkCmdBindPipeline");
+            if (p != 0) { _vk_cmd_bind_pipe = p; }
+            p = vk_device("vkCmdBindDescriptorSets");
+            if (p != 0) { _vk_cmd_bind_sets = p; }
+            p = vk_device("vkEndCommandBuffer");
+            if (p != 0) { _vk_end_cmd = p; }
+            p = vk_device("vkBeginCommandBuffer");
+            if (p != 0) { _vk_begin_cmd = p; }
+            p = vk_device("vkResetCommandBuffer");
+            if (p != 0) { _vk_reset_cmd = p; }
+            p = vk_device("vkQueueSubmit");
+            if (p != 0) { _vk_queue_submit = p; }
+            p = vk_device("vkWaitForFences");
+            if (p != 0) { _vk_wait_fences = p; }
+            p = vk_device("vkResetFences");
+            if (p != 0) { _vk_reset_fences = p; }
+            p = vk_device("vkUpdateDescriptorSets");
+            if (p != 0) { _vk_update_sets = p; }
+            p = vk_device("vkCreateComputePipelines");
+            if (p != 0) { _vk_create_pipelines = p; }
+            p = vk_device("vkCreateShaderModule");
+            if (p != 0) { _vk_create_shader = p; }
+            p = vk_device("vkCreateDescriptorSetLayout");
+            if (p != 0) { _vk_create_dsl = p; }
+            p = vk_device("vkCreatePipelineLayout");
+            if (p != 0) { _vk_create_pl = p; }
+            p = vk_device("vkCreateDescriptorPool");
+            if (p != 0) { _vk_create_dp = p; }
+            p = vk_device("vkAllocateDescriptorSets");
+            if (p != 0) { _vk_alloc_sets = p; }
+            // presentation (device-level entry points)
+            p = vk_device("vkCreateSwapchainKHR");
+            if (p != 0) { _vk_create_swapchain = p; }
+            p = vk_device("vkDestroySwapchainKHR");
+            if (p != 0) { _vk_destroy_swapchain = p; }
+            p = vk_device("vkGetSwapchainImagesKHR");
+            if (p != 0) { _vk_get_swap_images = p; }
+            p = vk_device("vkAcquireNextImageKHR");
+            if (p != 0) { _vk_acquire_image = p; }
+            p = vk_device("vkQueuePresentKHR");
+            if (p != 0) { _vk_present = p; }
+            p = vk_device("vkCreateSemaphore");
+            if (p != 0) { _vk_create_semaphore = p; }
+            p = vk_device("vkDestroySemaphore");
+            if (p != 0) { _vk_destroy_semaphore = p; }
+            p = vk_device("vkCreateImageView");
+            if (p != 0) { _vk_create_image_view = p; }
+            p = vk_device("vkDestroyImageView");
+            if (p != 0) { _vk_destroy_image_view = p; }
+            p = vk_device("vkCreateRenderPass");
+            if (p != 0) { _vk_create_render_pass = p; }
+            p = vk_device("vkDestroyRenderPass");
+            if (p != 0) { _vk_destroy_render_pass = p; }
+            p = vk_device("vkCreateFramebuffer");
+            if (p != 0) { _vk_create_framebuffer = p; }
+            p = vk_device("vkDestroyFramebuffer");
+            if (p != 0) { _vk_destroy_framebuffer = p; }
+            p = vk_device("vkCmdBeginRenderPass");
+            if (p != 0) { _vk_cmd_begin_rp = p; }
+            p = vk_device("vkCmdEndRenderPass");
+            if (p != 0) { _vk_cmd_end_rp = p; }
+            p = vk_device("vkCmdSetViewport");
+            if (p != 0) { _vk_cmd_set_viewport = p; }
+            p = vk_device("vkDestroyFence");
+            if (p != 0) { _vk_destroy_fence = p; }
+            p = vk_device("vkCreateGraphicsPipelines");
+            if (p != 0) { _vk_create_gpipelines = p; }
+            p = vk_device("vkCmdBindVertexBuffers");
+            if (p != 0) { _vk_cmd_bind_vb = p; }
+            p = vk_device("vkCmdBindIndexBuffer");
+            if (p != 0) { _vk_cmd_bind_ib = p; }
+            p = vk_device("vkCmdDraw");
+            if (p != 0) { _vk_cmd_draw = p; }
+            p = vk_device("vkCmdDrawIndexed");
+            if (p != 0) { _vk_cmd_draw_indexed = p; }
+            p = vk_device("vkCmdSetScissor");
+            if (p != 0) { _vk_cmd_set_scissor = p; }
+            p = vk_device("vkCreateSampler");
+            if (p != 0) { _vk_create_sampler = p; }
+            p = vk_device("vkDestroySampler");
+            if (p != 0) { _vk_destroy_sampler = p; }
+            p = vk_device("vkCreateImage");
+            if (p != 0) { _vk_create_image = p; }
+            p = vk_device("vkGetImageMemoryRequirements");
+            if (p != 0) { _vk_get_img_memreq = p; }
+            p = vk_device("vkBindImageMemory");
+            if (p != 0) { _vk_bind_img_mem = p; }
+            p = vk_device("vkDestroyImage");
+            if (p != 0) { _vk_destroy_image = p; }
+            p = vk_device("vkFreeMemory");
+            if (p != 0) { _vk_free_memory = p; }
+            p = vk_device("vkDestroyBuffer");
+            if (p != 0) { _vk_destroy_buffer = p; }
+            p = vk_device("vkCmdPipelineBarrier");
+            if (p != 0) { _vk_cmd_pipeline_barrier = p; }
+            p = vk_device("vkCmdCopyBufferToImage");
+            if (p != 0) { _vk_cmd_copy_buf_img = p; }
+            p = vk_device("vkFreeCommandBuffers");
+            if (p != 0) { _vk_free_cmds = p; }
+        }
+
+        var qslot = ffi.alloc(8);
+        ffi.foreign_call(_vk_get_queue, [_device, _qfamily, 0, qslot],
+                         ffi.TYPE_VOID,
+                         [ffi.TYPE_U64, ffi.TYPE_U32, ffi.TYPE_U32, ffi.TYPE_PTR]);
+        _queue = ffi.load_i64(qslot);
+        ffi.free(qslot);
+
+        // Command pool (32B) + one primary command buffer.
+        var cpci = ffi.alloc(32);
+        ffi.memset(cpci, 0, 32);
+        st_u32(cpci, 0, VKS_COMMAND_POOL_CREATE_INFO);
+        st_u32(cpci, 16, 0x2); // VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT
+        st_u32(cpci, 20, _qfamily); // queueFamilyIndex @20 (u32 pair)
+        var cpslot = ffi.alloc(8);
+        var cres = ffi.foreign_call(_vk_create_cpool,
+            [_device, cpci, 0, cpslot], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_PTR]) as int;
+        ffi.free(cpci);
+        if (cres != 0) { ffi.free(cpslot); return 0; }
+        _cmd_pool = ffi.load_i64(cpslot);
+        ffi.free(cpslot);
+
+        var aci = ffi.alloc(40);
+        var cbufslot = ffi.alloc(8);
+        ffi.memset(aci, 0, 40);
+        st_u32(aci, 0, VKS_COMMAND_BUFFER_ALLOCATE_INFO);
+        st_ptr(aci, 16, _cmd_pool);
+        st_u32(aci, 24, CMD_LEVEL_PRIMARY);
+        st_u32(aci, 28, 1); // commandBufferCount @28 (u32 pair)
+        var ares = ffi.foreign_call(_vk_alloc_cmds,
+            [_device, aci, cbufslot], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_PTR, ffi.TYPE_PTR]) as int;
+        ffi.free(aci);
+        if (ares != 0) { ffi.free(cbufslot); return 0; }
+        _cmd_buf = ffi.load_i64(cbufslot);
+        ffi.free(cbufslot);
+
+        // Fence (24B).
+        var fci = ffi.alloc(24);
+        ffi.memset(fci, 0, 24);
+        st_u32(fci, 0, VKS_FENCE_CREATE_INFO);
+        var fslot = ffi.alloc(8);
+        var fres = ffi.foreign_call(_vk_create_fence,
+            [_device, fci, 0, fslot], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_PTR]) as int;
+        ffi.free(fci);
+        if (fres != 0) { ffi.free(fslot); return 0; }
+        _fence = ffi.load_i64(fslot);
+        ffi.free(fslot);
+        return 1;
+    }
+}
+
+fn ensure_device(): int {
+    if (_device == 0) { return gpu_init(); }
+    return 1;
+}
+
+// vk_buf_create allocates a VkBuffer plus host-visible+coherent memory
+// and maps it. `usage` is the VkBufferUsageFlags bitmask. Returns the
+// buffer record pointer (see header layout) or 0.
+fn vk_buf_create(bytes: int, usage: int): int {
+    unsafe {
+        if (ensure_device() == 0 or bytes <= 0) { return 0; }
+
+        // VkBufferCreateInfo (56B)
+        var bci = ffi.alloc(56);
+        var bslot = ffi.alloc(8);
+        ffi.memset(bci, 0, 56);
+        st_u32(bci, 0, VKS_BUFFER_CREATE_INFO);
+        st_u64(bci, 24, bytes);
+        st_u32(bci, 32, usage);
+        st_u32(bci, 36, 0); // EXCLUSIVE sharing
+        var bres = ffi.foreign_call(_vk_create_buffer,
+            [_device, bci, 0, bslot], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_PTR]) as int;
+        ffi.free(bci);
+        if (bres != 0) { ffi.free(bslot); return 0; }
+        var buffer = ffi.load_i64(bslot);
+        ffi.free(bslot);
+
+        // VkMemoryRequirements (24B)
+        var req = ffi.alloc(24);
+        ffi.memset(req, 0, 24);
+        ffi.foreign_call(_vk_get_buf_memreq, [_device, buffer, req],
+                         ffi.TYPE_VOID,
+                         [ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_PTR]);
+        var mem_size = ffi.load_u64(req);
+        ffi.free(req);
+
+        // Find a HOST_VISIBLE|HOST_COHERENT memory type.
+        // VkPhysicalDeviceMemoryProperties: u32 count @0, VkMemoryType[32]
+        // @4 (8B stride, 4B-aligned), u32 heapCount @260, heaps @264.
+        var memprops = ffi.alloc(520);
+        ffi.memset(memprops, 0, 520);
+        ffi.foreign_call(_vk_mem_props, [_physdev, memprops], ffi.TYPE_VOID,
+                         [ffi.TYPE_U64, ffi.TYPE_PTR]);
+        var mtcount = ffi.load_u32(memprops);
+        var mtype = -1;
+        var mi = 0;
+        while (mi < mtcount) {
+            var mflags = ffi.load_u32(ffi.ptr_add(memprops, 4 + mi * 8));
+            if ((mflags & (MEM_HOST_VISIBLE | MEM_HOST_COHERENT)) ==
+                (MEM_HOST_VISIBLE | MEM_HOST_COHERENT)) {
+                mtype = mi;
+                break;
+            }
+            mi = mi + 1;
+        }
+        ffi.free(memprops);
+        if (mtype < 0) { return 0; }
+
+        // VkMemoryAllocateInfo (32B)
+        var mai = ffi.alloc(32);
+        var mslot = ffi.alloc(8);
+        ffi.memset(mai, 0, 32);
+        st_u32(mai, 0, VKS_MEMORY_ALLOCATE_INFO);
+        st_u64(mai, 16, mem_size);
+        st_u32(mai, 24, mtype);
+        var mres = ffi.foreign_call(_vk_alloc_mem,
+            [_device, mai, 0, mslot], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_PTR]) as int;
+        ffi.free(mai);
+        if (mres != 0) { ffi.free(mslot); return 0; }
+        var memory = ffi.load_i64(mslot);
+        ffi.free(mslot);
+
+        var bindres = ffi.foreign_call(_vk_bind_buf_mem,
+            [_device, buffer, memory, 0], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_U64]) as int;
+        if (bindres != 0) { return 0; }
+
+        var mapped = ffi.alloc(8);
+        var mapres = ffi.foreign_call(_vk_map_mem,
+            [_device, memory, 0, VK_WHOLE_SIZE, 0, mapped], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_U64,
+             ffi.TYPE_U32, ffi.TYPE_PTR]) as int;
+        if (mapres != 0) { ffi.free(mapped); return 0; }
+        var mapptr = ffi.load_i64(mapped);
+        ffi.free(mapped);
+
+        var rec = keep(ffi.alloc(64));
+        ffi.memset(rec, 0, 64);
+        st_u64(rec, 0, buffer);
+        st_u64(rec, 8, memory);
+        st_u64(rec, 16, mapptr);
+        st_u64(rec, 24, bytes);
+        st_u64(rec, 32, mem_size);
+        return rec;
+    }
+}
+
+// gpu_buffer_create allocates a general-purpose buffer (transfer +
+// storage usage) for the compute path.
+pub fn gpu_buffer_create(bytes: int): int {
+    unsafe { return vk_buf_create(bytes, BUFFER_USAGE_ALL); }
+}
+
+// gpu_buffer_write uploads `bytes` from raw address `src` into the mapped
+// host-visible buffer memory.
+pub fn gpu_buffer_write(buf: int, src: int, bytes: int): int {
+    unsafe {
+        if (buf == 0 or ensure_device() == 0) { return 0; }
+        var dst = ffi.load_i64(ffi.ptr_add(buf, 16));
+        ffi.memcpy(dst, src, bytes);
+        return 1;
+    }
+}
+
+// gpu_buffer_read downloads `bytes` from mapped memory to raw address `dst`.
+// gpu_dispatch is synchronous (fence wait), so reads after it are safe.
+pub fn gpu_buffer_read(buf: int, dst: int, bytes: int): int {
+    unsafe {
+        if (buf == 0 or ensure_device() == 0) { return 0; }
+        var src = ffi.load_i64(ffi.ptr_add(buf, 16));
+        ffi.memcpy(dst, src, bytes);
+        return 1;
+    }
+}
+
+fn buf_vk(bufrec: int): int {
+    unsafe { return ffi.load_i64(ffi.ptr_add(bufrec, 0)); }
+}
+
+// gpu_shader_create_spv creates a VkShaderModule from SPIR-V words.
+// `code_ptr` is a raw address holding `code_size` bytes of little-endian
+// SPIR-V (4-byte aligned, multiple of 4). This is the entry point for
+// Fyra's spirv backend output.
+pub fn gpu_shader_create_spv(code_ptr: int, code_size: int): int {
+    unsafe {
+        if (ensure_device() == 0 or code_size <= 0) { return 0; }
+        var smci = ffi.alloc(40);
+        var slot = ffi.alloc(8);
+        ffi.memset(smci, 0, 40);
+        st_u32(smci, 0, VKS_SHADER_MODULE_CREATE_INFO);
+        st_u64(smci, 24, code_size);
+        st_ptr(smci, 32, code_ptr);
+        var res = ffi.foreign_call(_vk_create_shader,
+            [_device, smci, 0, slot], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_PTR]) as int;
+        ffi.free(smci);
+        if (res != 0) { ffi.free(slot); return 0; }
+        var mod_ = ffi.load_i64(slot);
+        ffi.free(slot);
+        return mod_;
+    }
+}
+
+// gpu_pipeline_create builds the full compute pipeline for a shader module:
+// descriptor set layout with `max_bindings` STORAGE_BUFFER bindings
+// (binding i <-> buffers[i] at dispatch), pipeline layout, descriptor pool,
+// one descriptor set, and the VkComputePipeline. Returns the pipe record
+// pointer (see header layout) or 0.
+pub fn gpu_pipeline_create(shader_module: int, max_bindings: int): int {
+    unsafe {
+        if (ensure_device() == 0 or shader_module == 0) { return 0; }
+        if (max_bindings <= 0) { max_bindings = 1; }
+        if (max_bindings > 8) { max_bindings = 8; }
+
+        // VkDescriptorSetLayoutBinding array: 24B each.
+        var bindings = ffi.alloc(max_bindings * 24);
+        ffi.memset(bindings, 0, max_bindings * 24);
+        var bi = 0;
+        while (bi < max_bindings) {
+            var bp = ffi.ptr_add(bindings, bi * 24);
+            ffi.store_u32(bp, bi);                    // binding
+            ffi.store_u32(ffi.ptr_add(bp, 4), DESCRIPTOR_TYPE_STORAGE_BUFFER);
+            ffi.store_u32(ffi.ptr_add(bp, 8), 1);     // descriptorCount
+            ffi.store_u32(ffi.ptr_add(bp, 12), SHADER_STAGE_COMPUTE);
+            bi = bi + 1;
+        }
+
+        // VkDescriptorSetLayoutCreateInfo (32B): flags@16, bindingCount@20,
+        // pBindings@24.
+        var dslci = ffi.alloc(40);
+        var dsllot = ffi.alloc(8);
+        ffi.memset(dslci, 0, 40);
+        st_u32(dslci, 0, VKS_DESCRIPTOR_SET_LAYOUT_CREATE_INFO);
+        st_u32(dslci, 20, max_bindings);
+        st_ptr(dslci, 24, bindings);
+        var dres = ffi.foreign_call(_vk_create_dsl,
+            [_device, dslci, 0, dsllot], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_PTR]) as int;
+        ffi.free(dslci); ffi.free(bindings);
+        if (dres != 0) { ffi.free(dsllot); return 0; }
+        var set_layout = ffi.load_i64(dsllot);
+        ffi.free(dsllot);
+
+        // VkPipelineLayoutCreateInfo (48B): flags@16, setLayoutCount@20,
+        // pSetLayouts@24, pushConstantRangeCount@32, pPushConstantRanges@40.
+        var plci = ffi.alloc(56);
+        var plslot = ffi.alloc(8);
+        var layout_arr = ffi.alloc(8);
+        ffi.memset(plci, 0, 56);
+        ffi.memset(layout_arr, 0, 8);
+        st_u32(plci, 0, VKS_PIPELINE_LAYOUT_CREATE_INFO);
+        st_u32(plci, 20, 1);                 // setLayoutCount
+        st_u64(layout_arr, 0, set_layout);
+        st_ptr(plci, 24, layout_arr);        // pSetLayouts
+        var pres = ffi.foreign_call(_vk_create_pl,
+            [_device, plci, 0, plslot], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_PTR]) as int;
+        ffi.free(plci); ffi.free(layout_arr);
+        if (pres != 0) { ffi.free(plslot); return 0; }
+        var pipeline_layout = ffi.load_i64(plslot);
+        ffi.free(plslot);
+
+        // VkDescriptorPoolCreateInfo (40B) + VkDescriptorPoolSize (8B)
+        var dpci = ffi.alloc(40);
+        var dpslot = ffi.alloc(8);
+        var dpsize = ffi.alloc(8);
+        ffi.memset(dpci, 0, 40);
+        ffi.memset(dpsize, 0, 8);
+        st_u32(dpci, 0, VKS_DESCRIPTOR_POOL_CREATE_INFO);
+        st_u32(dpci, 16, 0);
+        st_u32(dpci, 20, 16);                // maxSets
+        st_u32(dpci, 24, 1);                 // poolSizeCount
+        st_ptr(dpci, 32, dpsize);
+        ffi.store_u32(dpsize, DESCRIPTOR_TYPE_STORAGE_BUFFER);
+        ffi.store_u32(ffi.ptr_add(dpsize, 4), max_bindings * 16);
+        var dpres = ffi.foreign_call(_vk_create_dp,
+            [_device, dpci, 0, dpslot], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_PTR]) as int;
+        ffi.free(dpci); ffi.free(dpsize);
+        if (dpres != 0) { ffi.free(dpslot); return 0; }
+        var pool = ffi.load_i64(dpslot);
+        ffi.free(dpslot);
+
+        // VkDescriptorSetAllocateInfo (40B)
+        var dsa = ffi.alloc(40);
+        var setslot = ffi.alloc(8);
+        var setlayout_arr = ffi.alloc(8);
+        ffi.memset(dsa, 0, 40);
+        ffi.memset(setlayout_arr, 0, 8);
+        st_u32(dsa, 0, VKS_DESCRIPTOR_SET_ALLOCATE_INFO);
+        st_u64(dsa, 16, pool);
+        st_u32(dsa, 24, 1);                 // descriptorSetCount
+        st_u64(setlayout_arr, 0, set_layout);
+        st_ptr(dsa, 32, setlayout_arr);     // pSetLayouts
+        var ares = ffi.foreign_call(_vk_alloc_sets,
+            [_device, dsa, setslot], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_PTR, ffi.TYPE_PTR]) as int;
+        ffi.free(dsa); ffi.free(setlayout_arr);
+        if (ares != 0) { ffi.free(setslot); return 0; }
+        var descriptor_set = ffi.load_i64(setslot);
+        ffi.free(setslot);
+
+        // VkComputePipelineCreateInfo (96B): sType@0, pNext@8, flags@16,
+        // stage@24, layout@72, basePipelineHandle@80, basePipelineIndex@88.
+        // VkPipelineShaderStageCreateInfo embedded @24: sType@24, pNext@32,
+        // flags@40, stage@44, module@48, pName@56, pSpecializationInfo@64.
+        var cpci = ffi.alloc(96);
+        var pname = ffi.alloc(8);
+        ffi.memset(pname, 0, 8);
+        ffi.memset(cpci, 0, 96);
+        // "main\0" as raw bytes.
+        ffi.store_u32(pname, 0x6E69616D);
+        st_u32(cpci, 0, VKS_COMPUTE_PIPELINE_CREATE_INFO);
+        st_u32(cpci, 24, VKS_SHADER_STAGE_CREATE_INFO);
+        st_u32(cpci, 44, SHADER_STAGE_COMPUTE);
+        st_u64(cpci, 48, shader_module);
+        st_ptr(cpci, 56, pname);
+        st_u64(cpci, 72, pipeline_layout);
+        // VkPipelineCache (lazy, shared) — some drivers misbehave with a
+        // null cache on compute pipelines.
+        if (_pcache == 0 and _vk_create_pcache != 0) {
+            var pcci = ffi.alloc(48);
+            var pcslot = ffi.alloc(8);
+            ffi.memset(pcci, 0, 48);
+            st_u32(pcci, 0, VKS_PIPELINE_CACHE_CREATE_INFO);
+            st_u64(pcci, 40, 0xFFFFFFFF); // maximumCacheSize = UINT32_MAX-ish
+            var pcres = ffi.foreign_call(_vk_create_pcache,
+                [_device, pcci, 0, pcslot], ffi.TYPE_I32,
+                [ffi.TYPE_U64, ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_PTR]) as int;
+            ffi.free(pcci);
+            if (pcres == 0) { _pcache = ffi.load_i64(pcslot); }
+            ffi.free(pcslot);
+        }
+
+        var one: int = 1;
+
+        var pipeslot = ffi.alloc(8);
+        ffi.store_u64(pipeslot, 0);
+        var cires = ffi.foreign_call(_vk_create_pipelines,
+            [_device, _pcache, one, cpci, 0, pipeslot], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_U32, ffi.TYPE_PTR,
+             ffi.TYPE_PTR, ffi.TYPE_PTR]) as int;
+        ffi.free(cpci); ffi.free(pname);
+        if (cires != 0) { ffi.free(pipeslot); return 0; }
+        var pipeline = ffi.load_i64(pipeslot);
+        ffi.free(pipeslot);
+        if (pipeline == 0) { return 0; }
+
+        // pipe record (96B)
+        var rec = keep(ffi.alloc(96));
+        ffi.memset(rec, 0, 96);
+        st_u64(rec, 0, pipeline);
+        st_u64(rec, 8, pipeline_layout);
+        st_u64(rec, 16, set_layout);
+        st_u64(rec, 24, pool);
+        st_u64(rec, 32, descriptor_set);
+        st_u64(rec, 40, max_bindings);
+        return rec;
+    }
+}
+
+pub fn gpu_debug_phys_index(v: int): nil { _phys_index = v; }
+
+// gpu_dispatch updates the descriptor set with `buffers` (buffer record
+// pointers; index i binds descriptor binding i), records
+// bind-pipeline + bind-set + dispatch into the shared command buffer,
+// submits with the fence, and waits. Returns 1 on success.
+pub fn gpu_dispatch(pipe: int, buffers: [int], x: int, y: int, z: int): int {
+    unsafe {
+        if (pipe == 0 or ensure_device() == 0) { return 0; }
+        var pipeline = ffi.load_i64(ffi.ptr_add(pipe, 0));
+        var layout = ffi.load_i64(ffi.ptr_add(pipe, 8));
+        var dset = ffi.load_i64(ffi.ptr_add(pipe, 32));
+        var maxb = ffi.load_i64(ffi.ptr_add(pipe, 40));
+        var nb = len(buffers);
+        if (nb > maxb) { nb = maxb; }
+
+        // VkWriteDescriptorSet array (64B each) + VkDescriptorBufferInfo (24B).
+        if (nb > 0) {
+            var writes = ffi.alloc(nb * 64);
+            var binfos = ffi.alloc(nb * 24);
+            ffi.memset(writes, 0, nb * 64);
+            ffi.memset(binfos, 0, nb * 24);
+            var wi = 0;
+            while (wi < nb) {
+                var wp = ffi.ptr_add(writes, wi * 64);
+                var bp = ffi.ptr_add(binfos, wi * 24);
+                st_u32(wp, 0, VKS_WRITE_DESCRIPTOR_SET);
+                st_u64(wp, 16, dset);
+                st_u32(wp, 24, wi);            // dstBinding
+                st_u32(wp, 32, 1);             // descriptorCount
+                st_u32(wp, 36, DESCRIPTOR_TYPE_STORAGE_BUFFER);
+                st_ptr(wp, 48, bp);            // pBufferInfo
+                st_u64(bp, 0, buf_vk(buffers[wi]));
+                st_u64(bp, 8, 0);              // offset
+                st_u64(bp, 16, VK_WHOLE_SIZE); // range
+                wi = wi + 1;
+            }
+            ffi.foreign_call(_vk_update_sets,
+                [_device, nb, writes, 0, 0], ffi.TYPE_VOID,
+                [ffi.TYPE_U64, ffi.TYPE_U32, ffi.TYPE_PTR, ffi.TYPE_U32,
+                 ffi.TYPE_PTR]);
+            ffi.free(writes); ffi.free(binfos);
+        }
+
+        // Record command buffer.
+        var cbgi = ffi.alloc(32);
+        ffi.memset(cbgi, 0, 32);
+        st_u32(cbgi, 0, VKS_COMMAND_BUFFER_BEGIN_INFO);
+        st_u32(cbgi, 16, CMD_ONE_TIME_SUBMIT);
+        var rres = ffi.foreign_call(_vk_reset_cmd, [_cmd_buf, 0], ffi.TYPE_I32,
+                         [ffi.TYPE_U64, ffi.TYPE_U32]) as int;
+        var bres = ffi.foreign_call(_vk_begin_cmd, [_cmd_buf, cbgi], ffi.TYPE_I32,
+                         [ffi.TYPE_U64, ffi.TYPE_PTR]) as int;
+        ffi.free(cbgi);
+        if (rres != 0 or bres != 0) { return 0; }
+        ffi.foreign_call(_vk_cmd_bind_pipe,
+            [_cmd_buf, PIPELINE_BIND_COMPUTE, pipeline], ffi.TYPE_VOID,
+            [ffi.TYPE_U64, ffi.TYPE_U32, ffi.TYPE_U64]);
+        var setarr = ffi.alloc(8);
+        ffi.memset(setarr, 0, 8);
+        st_u64(setarr, 0, dset);
+        ffi.foreign_call(_vk_cmd_bind_sets,
+            [_cmd_buf, PIPELINE_BIND_COMPUTE, layout, 0, 1, setarr, 0, 0],
+            ffi.TYPE_VOID,
+            [ffi.TYPE_U64, ffi.TYPE_U32, ffi.TYPE_U64, ffi.TYPE_U32,
+             ffi.TYPE_U32, ffi.TYPE_PTR, ffi.TYPE_U32, ffi.TYPE_PTR]);
+        ffi.free(setarr);
+        ffi.foreign_call(_vk_cmd_dispatch,
+            [_cmd_buf, x, y, z], ffi.TYPE_VOID,
+            [ffi.TYPE_U64, ffi.TYPE_U32, ffi.TYPE_U32, ffi.TYPE_U32]);
+        var ecres = ffi.foreign_call(_vk_end_cmd, [_cmd_buf], ffi.TYPE_I32,
+                         [ffi.TYPE_U64]) as int;
+        if (ecres != 0) { return 0; }
+
+        // VkSubmitInfo (72B): commandBufferCount @40, pCommandBuffers @48.
+        var si = ffi.alloc(72);
+        var cbs = ffi.alloc(8);
+        ffi.memset(si, 0, 72);
+        ffi.memset(cbs, 0, 8);
+        st_u32(si, 0, VKS_SUBMIT_INFO);
+        st_u32(si, 40, 1);
+        st_u64(cbs, 0, _cmd_buf);
+        st_ptr(si, 48, cbs);
+        var subres = ffi.foreign_call(_vk_queue_submit,
+            [_queue, 1, si, _fence], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_U32, ffi.TYPE_PTR, ffi.TYPE_U64]) as int;
+        ffi.free(si); ffi.free(cbs);
+        if (subres != 0) { return 0; }
+
+        // Wait + reset the fence.
+        var farr = ffi.alloc(8);
+        ffi.memset(farr, 0, 8);
+        st_u64(farr, 0, _fence);
+        var wres = ffi.foreign_call(_vk_wait_fences,
+            [_device, 1, farr, 1, FENCE_TIMEOUT_MAX], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_U32, ffi.TYPE_PTR, ffi.TYPE_U32,
+             ffi.TYPE_U64]) as int;
+        ffi.free(farr);
+        if (wres != 0) { return 0; }
+        var rarr = ffi.alloc(8);
+        ffi.memset(rarr, 0, 8);
+        st_u64(rarr, 0, _fence);
+        ffi.foreign_call(_vk_reset_fences, [_device, 1, rarr], ffi.TYPE_I32,
+                         [ffi.TYPE_U64, ffi.TYPE_U32, ffi.TYPE_PTR]);
+        ffi.free(rarr);
+        return 1;
+    }
+}
+
+// ---- presentation (surface / swapchain / render pass / present) ----
+
+fn get_hinstance(): int {
+    unsafe {
+        if (_hinst != 0) { return _hinst; }
+        var k32 = ffi.library_load("kernel32.dll");
+        if (k32 == 0) { return 0; }
+        var sym = ffi.library_get_symbol(k32, "GetModuleHandleA");
+        if (sym == 0) { return 0; }
+        _hinst = ffi.foreign_call(sym, [0], ffi.TYPE_U64, [ffi.TYPE_PTR]) as int;
+        return _hinst;
+    }
+}
+
+pub fn gfx_attached(): int { return _attached; }
+pub fn gfx_width(): int { return _gfx_w; }
+pub fn gfx_height(): int { return _gfx_h; }
+
+// swapchain_destroy frees swapchain + per-image views/framebuffers.
+// Render pass and semaphores persist across resizes.
+fn swapchain_destroy(): nil {
+    unsafe {
+        if (_swapchain != 0 and _vk_destroy_swapchain != 0) {
+            ffi.foreign_call(_vk_destroy_swapchain, [_device, _swapchain, 0],
+                             ffi.TYPE_VOID, [ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_PTR]);
+        }
+        _swapchain = 0;
+        var dev = _device;
+        var views_p = _views;
+        var fbs_p = _framebuffers;
+        var i = 0;
+        while (i < _swap_count and views_p != 0) {
+            var v = ffi.load_i64(ffi.ptr_add(views_p, i * 8));
+            if (v != 0 and _vk_destroy_image_view != 0) {
+                ffi.foreign_call(_vk_destroy_image_view, [dev, v, 0],
+                                 ffi.TYPE_VOID, [ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_PTR]);
+            }
+            if (fbs_p != 0) {
+                var fb = ffi.load_i64(ffi.ptr_add(fbs_p, i * 8));
+                if (fb != 0 and _vk_destroy_framebuffer != 0) {
+                    ffi.foreign_call(_vk_destroy_framebuffer, [dev, fb, 0],
+                                     ffi.TYPE_VOID, [ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_PTR]);
+                }
+            }
+            i = i + 1;
+        }
+        if (_views != 0) { ffi.free(_views); _views = 0; }
+        if (_framebuffers != 0) { ffi.free(_framebuffers); _framebuffers = 0; }
+        if (_swap_images != 0) { ffi.free(_swap_images); _swap_images = 0; }
+        _swap_count = 0;
+    }
+}
+
+// swapchain_make_view creates one VkImageView (80B) for a swapchain image.
+// Takes device as a parameter: the AOT backend miscompiles foreign_call
+// sites that read module-global data inside a caller's loop.
+fn swapchain_make_view(imgs_p: int, idx: int, fmt: int, dev: int): int {
+    unsafe {
+        var image = ffi.load_i64(ffi.ptr_add(imgs_p, idx * 8));
+        var iv = ffi.alloc(80);
+        ffi.memset(iv, 0, 80);
+        st_u32(iv, 0, VKS_IMAGE_VIEW_CREATE_INFO);
+        st_u64(iv, 24, image);
+        st_u32(iv, 32, VIEW_TYPE_2D);
+        st_u32(iv, 36, fmt);
+        // components @40: all VK_COMPONENT_SWIZZLE_IDENTITY (1)
+        st_u32(iv, 40, 1); st_u32(iv, 44, 1);
+        st_u32(iv, 48, 1); st_u32(iv, 52, 1);
+        // subresourceRange @56
+        st_u32(iv, 56, IMAGE_ASPECT_COLOR);
+        st_u32(iv, 64, 1);  // levelCount
+        st_u32(iv, 72, 1);  // layerCount
+        var vslot = ffi.alloc(8);
+        var vres = ffi.foreign_call(_vk_create_image_view,
+            [dev, iv, 0, vslot], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_PTR, ffi.TYPE_PTR]) as int;
+        ffi.free(iv);
+        if (vres != 0) { ffi.free(vslot); return 0; }
+        var view = ffi.load_i64(vslot);
+        ffi.free(vslot);
+        return view;
+    }
+}
+
+// swapchain_make_framebuffer creates one VkFramebuffer (64B) for a view.
+fn swapchain_make_framebuffer(views_p: int, idx: int, dev: int, rp: int, w: int, h: int): int {
+    unsafe {
+        var view = ffi.load_i64(ffi.ptr_add(views_p, idx * 8));
+        var vptr = ffi.alloc(8);
+        ffi.store_u64(vptr, view);
+        var fbci = ffi.alloc(64);
+        ffi.memset(fbci, 0, 64);
+        st_u32(fbci, 0, VKS_FRAMEBUFFER_CREATE_INFO);
+        st_u64(fbci, 24, rp);
+        st_u32(fbci, 32, 1);
+        st_ptr(fbci, 40, vptr);         // pAttachments -> single VkImageView
+        st_u32(fbci, 48, w);
+        st_u32(fbci, 52, h);
+        st_u32(fbci, 56, 1);
+        var fbslot = ffi.alloc(8);
+        var fbres = ffi.foreign_call(_vk_create_framebuffer,
+            [dev, fbci, 0, fbslot], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_PTR, ffi.TYPE_PTR]) as int;
+        ffi.free(fbci); ffi.free(vptr);
+        if (fbres != 0) { ffi.free(fbslot); return 0; }
+        var fb = ffi.load_i64(fbslot);
+        ffi.free(fbslot);
+        return fb;
+    }
+}
+
+// swapchain_images_views queries surface caps/format/present-mode, creates
+// the VkSwapchainKHR, and builds one VkImageView per swapchain image.
+// Fills _swap_format/_swap_w/_swap_h/_swap_images/_views/_swap_count.
+fn swapchain_images_views(w: int, h: int): int {
+    unsafe {
+        // VkSurfaceCapabilitiesKHR (52B)
+        var caps = ffi.alloc(56);
+        ffi.memset(caps, 0, 56);
+        var cres = ffi.foreign_call(_vk_surf_caps,
+            [_physdev, _surface, caps], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_PTR]) as int;
+        if (cres != 0) { ffi.free(caps); return 0; }
+        var min_count = ffi.load_u32(caps);
+        var max_count = ffi.load_u32(ffi.ptr_add(caps, 4));
+        var cur_w = ffi.load_u32(ffi.ptr_add(caps, 8));
+        var cur_h = ffi.load_u32(ffi.ptr_add(caps, 12));
+        var min_ew = ffi.load_u32(ffi.ptr_add(caps, 16));
+        var min_eh = ffi.load_u32(ffi.ptr_add(caps, 20));
+        var max_ew = ffi.load_u32(ffi.ptr_add(caps, 24));
+        var max_eh = ffi.load_u32(ffi.ptr_add(caps, 28));
+        var cur_transform = ffi.load_u32(ffi.ptr_add(caps, 40));
+        var alpha_flags = ffi.load_u32(ffi.ptr_add(caps, 44));
+        var usage_flags = ffi.load_u32(ffi.ptr_add(caps, 48));
+        ffi.free(caps);
+        var ew = w;
+        var eh = h;
+        if (cur_w != 0xFFFFFFFF) { ew = cur_w; eh = cur_h; }
+        if (ew < min_ew) { ew = min_ew; }
+        if (eh < min_eh) { eh = min_eh; }
+        if (max_ew != 0xFFFFFFFF and ew > max_ew) { ew = max_ew; }
+        if (max_eh != 0xFFFFFFFF and eh > max_eh) { eh = max_eh; }
+        if (ew <= 0 or eh <= 0) { return 0; }
+        var img_count = min_count;
+        if (img_count < 2) { img_count = 2; }
+        if (max_count != 0 and img_count > max_count) { img_count = max_count; }
+        var usage = IMAGE_USAGE_COLOR_ATTACHMENT;
+        if ((usage_flags & IMAGE_USAGE_COLOR_ATTACHMENT) == 0) {
+            usage = usage_flags & (IMAGE_USAGE_COLOR_ATTACHMENT | IMAGE_USAGE_TRANSFER_SRC);
+            if (usage == 0) { usage = IMAGE_USAGE_TRANSFER_SRC; }
+        }
+        var alpha = COMPOSITE_ALPHA_OPAQUE;
+        if ((alpha_flags & COMPOSITE_ALPHA_OPAQUE) == 0) {
+            alpha = alpha_flags & 0xF;
+            if (alpha == 0) { alpha = alpha_flags; }
+        }
+
+        // surface format: prefer B8G8R8A8_UNORM + SRGB_NONLINEAR
+        var fcount = ffi.alloc(4);
+        ffi.store_u32(fcount, 0);
+        var fres = ffi.foreign_call(_vk_surf_formats,
+            [_physdev, _surface, fcount, 0], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_PTR, ffi.TYPE_PTR]) as int;
+        if (fres != 0) { ffi.free(fcount); return 0; }
+        var nf = ffi.load_u32(fcount);
+        if (nf == 0) { ffi.free(fcount); return 0; }
+        var fmts = ffi.alloc(nf * 8);
+        ffi.store_u32(fcount, nf);
+        ffi.foreign_call(_vk_surf_formats,
+            [_physdev, _surface, fcount, fmts], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_PTR, ffi.TYPE_PTR]);
+        ffi.free(fcount);
+        var fmt = ffi.load_u32(fmts);
+        var fi = 0;
+        while (fi < nf) {
+            var f = ffi.load_u32(ffi.ptr_add(fmts, fi * 8));
+            var cs = ffi.load_u32(ffi.ptr_add(fmts, fi * 8 + 4));
+            if (cs == VK_COLORSPACE_SRGB_NONLINEAR and
+                (f == VK_FORMAT_B8G8R8A8_UNORM or f == VK_FORMAT_R8G8B8A8_UNORM)) {
+                fmt = f; break;
+            }
+            fi = fi + 1;
+        }
+        ffi.free(fmts);
+        _swap_format = fmt;
+
+        // present mode: prefer FIFO
+        var mcount = ffi.alloc(4);
+        ffi.store_u32(mcount, 0);
+        ffi.foreign_call(_vk_surf_modes,
+            [_physdev, _surface, mcount, 0], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_PTR, ffi.TYPE_PTR]);
+        var nm = ffi.load_u32(mcount);
+        var pmode = PRESENT_MODE_FIFO;
+        if (nm > 0) {
+            var modes = ffi.alloc(nm * 4);
+            ffi.store_u32(mcount, nm);
+            ffi.foreign_call(_vk_surf_modes,
+                [_physdev, _surface, mcount, modes], ffi.TYPE_I32,
+                [ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_PTR, ffi.TYPE_PTR]);
+            ffi.free(mcount);
+            pmode = ffi.load_u32(modes);
+            var mi = 0;
+            while (mi < nm) {
+                if (ffi.load_u32(ffi.ptr_add(modes, mi * 4)) == PRESENT_MODE_FIFO) {
+                    pmode = PRESENT_MODE_FIFO; break;
+                }
+                mi = mi + 1;
+            }
+            ffi.free(modes);
+        } else { ffi.free(mcount); }
+
+        // VkSwapchainCreateInfoKHR (104B)
+        var sci = ffi.alloc(104);
+        ffi.memset(sci, 0, 104);
+        st_u32(sci, 0, VKS_SWAPCHAIN_CREATE_INFO_KHR);
+        st_u64(sci, 24, _surface);
+        st_u32(sci, 32, img_count);
+        st_u32(sci, 36, fmt);
+        st_u32(sci, 40, VK_COLORSPACE_SRGB_NONLINEAR);
+        st_u32(sci, 44, ew);
+        st_u32(sci, 48, eh);
+        st_u32(sci, 52, 1);             // imageArrayLayers
+        st_u32(sci, 56, usage);
+        st_u32(sci, 60, SHARING_MODE_EXCLUSIVE);
+        st_u32(sci, 80, cur_transform); // preTransform
+        st_u32(sci, 84, alpha);
+        st_u32(sci, 88, pmode);
+        st_u32(sci, 92, 1);             // clipped
+        var sslot = ffi.alloc(8);
+        var sres = ffi.foreign_call(_vk_create_swapchain,
+            [_device, sci, 0, sslot], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_PTR, ffi.TYPE_PTR]) as int;
+        ffi.free(sci);
+        if (sres != 0) { ffi.free(sslot); return 0; }
+        _swapchain = ffi.load_i64(sslot);
+        ffi.free(sslot);
+        _swap_w = ew; _swap_h = eh;
+
+        // swapchain images
+        var icount = ffi.alloc(4);
+        ffi.store_u32(icount, 0);
+        var ires = ffi.foreign_call(_vk_get_swap_images,
+            [_device, _swapchain, icount, 0], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_PTR, ffi.TYPE_PTR]) as int;
+        if (ires != 0) { ffi.free(icount); return 0; }
+        var ni = ffi.load_u32(icount);
+        _swap_images = ffi.alloc(ni * 8);
+        ffi.memset(_swap_images, 0, ni * 8);
+        ffi.store_u32(icount, ni);
+        ffi.foreign_call(_vk_get_swap_images,
+            [_device, _swapchain, icount, _swap_images], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_PTR, ffi.TYPE_PTR]);
+        ffi.free(icount);
+        _swap_count = ni;
+
+        // image views (80B each)
+        _views = ffi.alloc(ni * 8);
+        ffi.memset(_views, 0, ni * 8);
+        var imgs_p = _swap_images;
+        var dev = _device;
+        var vi = 0;
+        while (vi < ni) {
+            var view = swapchain_make_view(imgs_p, vi, fmt, dev);
+            if (view == 0) { return 0; }
+            st_u64(_views, vi * 8, view);
+            vi = vi + 1;
+        }
+        return 1;
+    }
+}
+
+// swapchain_framebuffers creates one VkFramebuffer per swapchain image
+// view, all targeting _render_pass at _swap_w x _swap_h.
+fn swapchain_framebuffers(): int {
+    unsafe {
+        _framebuffers = ffi.alloc(_swap_count * 8);
+        ffi.memset(_framebuffers, 0, _swap_count * 8);
+        var views_p = _views;
+        var dev = _device;
+        var rp = _render_pass;
+        var sw = _swap_w;
+        var sh = _swap_h;
+        var fi = 0;
+        while (fi < _swap_count) {
+            var fb = swapchain_make_framebuffer(views_p, fi, dev, rp, sw, sh);
+            if (fb == 0) { return 0; }
+            st_u64(_framebuffers, fi * 8, fb);
+            fi = fi + 1;
+        }
+        return 1;
+    }
+}
+
+// render_pass_create builds the single-attachment clear-to-present pass.
+fn render_pass_create(): int {
+    unsafe {
+        var att = ffi.alloc(36);
+        var sub = ffi.alloc(72);
+        var aref = ffi.alloc(8);
+        var dep = ffi.alloc(32);
+        var rpci = ffi.alloc(64);
+        ffi.memset(att, 0, 36);
+        ffi.memset(sub, 0, 72);
+        ffi.memset(aref, 0, 8);
+        ffi.memset(dep, 0, 32);
+        ffi.memset(rpci, 0, 64);
+        st_u32(att, 4, _swap_format);
+        st_u32(att, 8, SAMPLE_COUNT_1);
+        st_u32(att, 12, LOAD_OP_CLEAR);
+        st_u32(att, 16, STORE_OP_STORE);
+        st_u32(att, 20, LOAD_OP_DONT_CARE);
+        st_u32(att, 24, STORE_OP_DONT_CARE);
+        st_u32(att, 32, LAYOUT_PRESENT_SRC);
+        // VkSubpassDescription: flags@0, pipelineBindPoint@4, ...
+        st_u32(sub, 4, PIPELINE_BIND_GRAPHICS);
+        st_u32(sub, 24, 1);             // colorAttachmentCount
+        st_ptr(sub, 32, aref);
+        st_u32(aref, 0, 0);             // attachment index
+        st_u32(aref, 4, LAYOUT_COLOR_ATTACHMENT);
+        // VkSubpassDependency: external -> subpass 0
+        st_u32(dep, 0, 0xFFFFFFFF);     // srcSubpass = VK_SUBPASS_EXTERNAL
+        st_u32(dep, 4, 0);              // dstSubpass
+        st_u32(dep, 8, STAGE_COLOR_OUTPUT);
+        st_u32(dep, 12, STAGE_COLOR_OUTPUT);
+        st_u32(dep, 20, ACCESS_COLOR_WRITE);
+        // VkRenderPassCreateInfo: counts are u32 packed before pointers
+        st_u32(rpci, 0, VKS_RENDER_PASS_CREATE_INFO);
+        st_u32(rpci, 20, 1);            // attachmentCount
+        st_ptr(rpci, 24, att);          // pAttachments
+        st_u32(rpci, 32, 1);            // subpassCount
+        st_ptr(rpci, 40, sub);          // pSubpasses
+        st_u32(rpci, 48, 1);            // dependencyCount
+        st_ptr(rpci, 56, dep);          // pDependencies
+        var rpslot = ffi.alloc(8);
+        var rres = ffi.foreign_call(_vk_create_render_pass,
+            [_device, rpci, 0, rpslot], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_PTR, ffi.TYPE_PTR]) as int;
+        ffi.free(att); ffi.free(sub); ffi.free(aref); ffi.free(dep); ffi.free(rpci);
+        if (rres != 0) { ffi.free(rpslot); return 0; }
+        _render_pass = ffi.load_i64(rpslot);
+        ffi.free(rpslot);
+        return 1;
+    }
+}
+
+// sem_create makes one binary semaphore.
+fn sem_create(): int {
+    unsafe {
+        var sci = ffi.alloc(24);
+        ffi.memset(sci, 0, 24);
+        st_u32(sci, 0, VKS_SEMAPHORE_CREATE_INFO);
+        var slot = ffi.alloc(8);
+        var res = ffi.foreign_call(_vk_create_semaphore,
+            [_device, sci, 0, slot], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_PTR, ffi.TYPE_PTR]) as int;
+        ffi.free(sci);
+        if (res != 0) { ffi.free(slot); return 0; }
+        var s = ffi.load_i64(slot);
+        ffi.free(slot);
+        return s;
+    }
+}
+
+// gfx_attach binds the Vulkan swapchain to an externally-owned native
+// window. hwnd is the OS window handle (HWND on Windows). w/h are the
+// initial client size. Returns 1 on success.
+pub fn gfx_attach(hwnd: int, width: int, height: int): int {
+    unsafe {
+        if (_attached != 0) { return 1; }
+        if (ensure_device() == 0) { return 0; }
+        if (_vk_create_surface == 0 or _vk_create_swapchain == 0 or
+            _vk_surf_caps == 0 or _vk_surf_formats == 0 or
+            _vk_surf_modes == 0 or _vk_get_swap_images == 0 or
+            _vk_acquire_image == 0 or _vk_present == 0 or
+            _vk_create_image_view == 0 or _vk_create_render_pass == 0 or
+            _vk_create_framebuffer == 0 or _vk_create_semaphore == 0 or
+            _vk_cmd_begin_rp == 0 or _vk_cmd_end_rp == 0) { return 0; }
+        var osn: str = osid.os_name();
+        if (osn == "windows") {
+            if (_hinst == 0) { _hinst = get_hinstance(); }
+            if (_hinst == 0) { return 0; }
+            var wsci = ffi.alloc(40);
+            ffi.memset(wsci, 0, 40);
+            st_u32(wsci, 0, VKS_WIN32_SURFACE_CREATE_INFO_KHR);
+            st_u64(wsci, 24, _hinst);
+            st_u64(wsci, 32, hwnd);
+            var sslot = ffi.alloc(8);
+            var sres = ffi.foreign_call(_vk_create_surface,
+                [_instance, wsci, 0, sslot], ffi.TYPE_I32,
+                [ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_PTR, ffi.TYPE_PTR]) as int;
+            ffi.free(wsci);
+            if (sres != 0) { ffi.free(sslot); return 0; }
+            _surface = ffi.load_i64(sslot);
+            ffi.free(sslot);
+            if (_surface == 0) { return 0; }
+        } else {
+            return 0; // non-win32 surface creation not yet implemented
+        }
+        _hwnd = hwnd;
+        _gfx_w = width; _gfx_h = height;
+        // Order matters: swapchain images/views first (fills _swap_format),
+        // then the render pass (needs the format), then framebuffers.
+        if (swapchain_images_views(width, height) == 0) { return 0; }
+        if (render_pass_create() == 0) { return 0; }
+        if (swapchain_framebuffers() == 0) { return 0; }
+        _sem_acquire = sem_create();
+        _sem_render = sem_create();
+        if (_sem_acquire == 0 or _sem_render == 0) { return 0; }
+        // dedicated graphics fence
+        var fci = ffi.alloc(32);
+        ffi.memset(fci, 0, 32);
+        st_u32(fci, 0, VKS_FENCE_CREATE_INFO);
+        st_u32(fci, 16, 1);             // VK_FENCE_CREATE_SIGNALED_BIT
+        var fslot = ffi.alloc(8);
+        var fres = ffi.foreign_call(_vk_create_fence,
+            [_device, fci, 0, fslot], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_PTR, ffi.TYPE_PTR]) as int;
+        ffi.free(fci);
+        if (fres != 0) { ffi.free(fslot); return 0; }
+        _gfx_fence = ffi.load_i64(fslot);
+        ffi.free(fslot);
+        _attached = 1;
+        return 1;
+    }
+}
+
+pub fn gfx_detach(): nil {
+    unsafe {
+        if (_attached == 0) { return; }
+        _attached = 0;
+        swapchain_destroy();
+        if (_render_pass != 0 and _vk_destroy_render_pass != 0) {
+            ffi.foreign_call(_vk_destroy_render_pass, [_device, _render_pass, 0],
+                             ffi.TYPE_VOID, [ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_PTR]);
+        }
+        _render_pass = 0;
+        if (_sem_acquire != 0 and _vk_destroy_semaphore != 0) {
+            ffi.foreign_call(_vk_destroy_semaphore, [_device, _sem_acquire, 0],
+                             ffi.TYPE_VOID, [ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_PTR]);
+        }
+        if (_sem_render != 0 and _vk_destroy_semaphore != 0) {
+            ffi.foreign_call(_vk_destroy_semaphore, [_device, _sem_render, 0],
+                             ffi.TYPE_VOID, [ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_PTR]);
+        }
+        _sem_acquire = 0; _sem_render = 0;
+        if (_gfx_fence != 0 and _vk_destroy_fence != 0) {
+            ffi.foreign_call(_vk_destroy_fence, [_device, _gfx_fence, 0],
+                             ffi.TYPE_VOID, [ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_PTR]);
+        }
+        _gfx_fence = 0;
+        if (_surface != 0 and _vk_destroy_surface != 0) {
+            ffi.foreign_call(_vk_destroy_surface, [_instance, _surface, 0],
+                             ffi.TYPE_VOID, [ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_PTR]);
+        }
+        _surface = 0;
+        if (_gfx_pipe != 0 and _vk_destroy_pipeline != 0) {
+            ffi.foreign_call(_vk_destroy_pipeline, [_device, _gfx_pipe, 0],
+                             ffi.TYPE_VOID, [ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_PTR]);
+        }
+        _gfx_pipe = 0; _gfx_pipe_dirty = 1;
+        if (_gfx_dset != 0) { _gfx_dset = 0; }
+        if (_gfx_dp != 0 and _vk_destroy_dp != 0) {
+            ffi.foreign_call(_vk_destroy_dp, [_device, _gfx_dp, 0],
+                             ffi.TYPE_VOID, [ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_PTR]);
+        }
+        _gfx_dp = 0;
+        if (_gfx_pl != 0 and _vk_destroy_pl != 0) {
+            ffi.foreign_call(_vk_destroy_pl, [_device, _gfx_pl, 0],
+                             ffi.TYPE_VOID, [ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_PTR]);
+        }
+        _gfx_pl = 0;
+        if (_gfx_dsl != 0 and _vk_destroy_dsl != 0) {
+            ffi.foreign_call(_vk_destroy_dsl, [_device, _gfx_dsl, 0],
+                             ffi.TYPE_VOID, [ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_PTR]);
+        }
+        _gfx_dsl = 0;
+        _rp_open = 0; _frame_active = 0; _cmd_bound = 0;
+    }
+}
+
+// gfx_resize recreates the swapchain at a new size (same hwnd/surface).
+pub fn gfx_resize(width: int, height: int): int {
+    unsafe {
+        if (_attached == 0 or width <= 0 or height <= 0) { return 0; }
+        swapchain_destroy();
+        _gfx_w = width; _gfx_h = height;
+        if (swapchain_images_views(width, height) == 0) { return 0; }
+        if (swapchain_framebuffers() == 0) { return 0; }
+        return 1;
+    }
+}
+
+// gfx_begin_frame acquires the next swapchain image and starts command
+// buffer recording. Returns 1 on success.
+pub fn gfx_begin_frame(): int {
+    unsafe {
+        if (_attached == 0 or ensure_device() == 0) { return 0; }
+        var idxslot = ffi.alloc(4);
+        ffi.store_u32(idxslot, 0);
+        var ares = ffi.foreign_call(_vk_acquire_image,
+            [_device, _swapchain, -1, _sem_acquire, 0, idxslot], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_U64,
+             ffi.TYPE_U64, ffi.TYPE_PTR]) as int;
+        if (ares != 0) { ffi.free(idxslot); return 0; }
+        _cur_image = ffi.load_u32(idxslot);
+        ffi.free(idxslot);
+        // wait for last frame's submit before re-recording
+        var farr = ffi.alloc(8);
+        ffi.memset(farr, 0, 8);
+        st_u64(farr, 0, _gfx_fence);
+        ffi.foreign_call(_vk_wait_fences,
+            [_device, 1, farr, 1, FENCE_TIMEOUT_MAX], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_U32, ffi.TYPE_PTR, ffi.TYPE_U32,
+             ffi.TYPE_U64]);
+        ffi.foreign_call(_vk_reset_fences, [_device, 1, farr],
+                         ffi.TYPE_I32, [ffi.TYPE_U64, ffi.TYPE_U32, ffi.TYPE_PTR]);
+        var cbgi = ffi.alloc(32);
+        ffi.memset(cbgi, 0, 32);
+        st_u32(cbgi, 0, VKS_COMMAND_BUFFER_BEGIN_INFO);
+        var rres = ffi.foreign_call(_vk_reset_cmd, [_cmd_buf, 0], ffi.TYPE_I32,
+                         [ffi.TYPE_U64, ffi.TYPE_U32]) as int;
+        var bres = ffi.foreign_call(_vk_begin_cmd, [_cmd_buf, cbgi], ffi.TYPE_I32,
+                         [ffi.TYPE_U64, ffi.TYPE_PTR]) as int;
+        ffi.free(cbgi); ffi.free(farr);
+        if (rres != 0 or bres != 0) { return 0; }
+        _rp_open = 0;
+        _frame_active = 1;
+        _cmd_bound = 0;
+        return 1;
+    }
+}
+
+// gfx_clear sets the clear color for the current frame's render pass.
+pub fn gfx_clear(r: float, g: float, b: float, a: float): nil {
+    _cc_r = r; _cc_g = g; _cc_b = b; _cc_a = a;
+}
+
+// gfx_end_frame records render-pass clear, submits with acquire/render
+// semaphores + fence, and presents. Returns 1 on success.
+// gfx_clear_depth is a no-op on this path: the swapchain render pass has
+// no depth attachment (depth testing is disabled in the pipeline state).
+pub fn gfx_clear_depth(depth: float): nil {}
+
+pub fn gfx_end_frame(): int {
+    unsafe {
+        if (_attached == 0) { return 0; }
+        // Lazily open the render pass (records clear values + any draws
+        // already issued between begin_frame and end_frame).
+        if (gfx_rp_begin() == 0) { return 0; }
+        ffi.foreign_call(_vk_cmd_end_rp, [_cmd_buf], ffi.TYPE_VOID,
+                         [ffi.TYPE_U64]);
+        _rp_open = 0;
+        _frame_active = 0;
+        _cmd_bound = 0;
+        var ecres = ffi.foreign_call(_vk_end_cmd, [_cmd_buf], ffi.TYPE_I32,
+                         [ffi.TYPE_U64]) as int;
+        if (ecres != 0) { return 0; }
+
+        // VkSubmitInfo (72B) with acquire wait + render signal
+        var si = ffi.alloc(72);
+        var wsems = ffi.alloc(8);
+        var wstages = ffi.alloc(4);
+        var ssems = ffi.alloc(8);
+        var cbs = ffi.alloc(8);
+        ffi.memset(si, 0, 72);
+        st_u64(wsems, 0, _sem_acquire);
+        st_u64(ssems, 0, _sem_render);
+        st_u32(wstages, 0, STAGE_COLOR_OUTPUT);
+        st_u64(cbs, 0, _cmd_buf);
+        st_u32(si, 0, VKS_SUBMIT_INFO);
+        st_u32(si, 16, 1);              // waitSemaphoreCount
+        st_ptr(si, 24, wsems);
+        st_ptr(si, 32, wstages);        // pWaitDstStageMask (VkPipelineStageFlags*)
+        st_u32(si, 40, 1);              // commandBufferCount
+        st_ptr(si, 48, cbs);
+        st_u32(si, 56, 1);              // signalSemaphoreCount
+        st_ptr(si, 64, ssems);
+        var subres = ffi.foreign_call(_vk_queue_submit,
+            [_queue, 1, si, _gfx_fence], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_U32, ffi.TYPE_PTR, ffi.TYPE_U64]) as int;
+        ffi.free(si); ffi.free(wsems); ffi.free(wstages);
+        ffi.free(ssems); ffi.free(cbs);
+        if (subres != 0) { return 0; }
+
+        // VkPresentInfoKHR (64B)
+        var pi = ffi.alloc(64);
+        var psems = ffi.alloc(8);
+        var pchains = ffi.alloc(8);
+        var pidx = ffi.alloc(4);
+        ffi.memset(pi, 0, 64);
+        st_u64(psems, 0, _sem_render);
+        st_u64(pchains, 0, _swapchain);
+        st_u32(pidx, 0, _cur_image);
+        st_u32(pi, 0, VKS_PRESENT_INFO_KHR);
+        st_u32(pi, 16, 1);
+        st_ptr(pi, 24, psems);
+        st_u32(pi, 32, 1);
+        st_ptr(pi, 40, pchains);
+        st_ptr(pi, 48, pidx);
+        var pres = ffi.foreign_call(_vk_present,
+            [_queue, pi], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_PTR]) as int;
+        ffi.free(pi); ffi.free(psems); ffi.free(pchains); ffi.free(pidx);
+        if (pres == 0) { return 1; }
+        return 0;
+    }
+}
+
+// ── Stage D+E+F: graphics pipeline, buffers, textures, descriptors ──────
+// d3d11-compatible gfx_* surface implemented on Vulkan objects. Vertex
+// input uses DXGI format ints mapped to VkFormat; semantics map to
+// locations via gfx_sem_loc. Constant buffers are UNIFORM_BUFFER
+// descriptors (set 0, bindings 0-15 vertex / 16-31 fragment); textures
+// are COMBINED_IMAGE_SAMPLER (bindings 32-47, fragment stage).
+
+// keep() publishes a region GC edge so ffi.alloc'd blocks that are
+// returned to callers (or stored raw in other records) survive their
+// creating call's region exit - same contract as std.native.d3d11.
+fn keep(p: pubptr): pubptr {
+    _gfx_keep.append(p);
+    return p;
+}
+
+fn p2i(p: pubptr): int {
+    unsafe {
+        var tmp = ffi.alloc(8);
+        ffi.store_ptr(tmp, p);
+        var v: int = ffi.load_i64(tmp);
+        ffi.free(tmp);
+        return v;
+    }
+}
+
+fn gfx_reg_add(ptr: int, typ: int): nil {
+    unsafe {
+        if (_gfx_reg == 0) {
+            _gfx_reg = ffi.alloc(4096);
+            ffi.memset(_gfx_reg, 0, 4096);
+        }
+        if (_gfx_reg_count < 256) {
+            var e = ffi.ptr_add(_gfx_reg, _gfx_reg_count * 16);
+            st_u64(e, 0, ptr);
+            st_u64(e, 8, typ);
+            _gfx_reg_count = _gfx_reg_count + 1;
+        }
+    }
+}
+
+
+fn gfx_sem_loc(name: str): int {
+    if (name == "POSITION") { return 0; }
+    if (name == "COLOR") { return 1; }
+    if (name == "NORMAL") { return 2; }
+    if (name == "TEXCOORD0") { return 3; }
+    if (name == "TEXCOORD1") { return 4; }
+    if (name == "TEXCOORD2") { return 5; }
+    if (name == "TEXCOORD3") { return 6; }
+    if (name == "TEXCOORD4") { return 7; }
+    if (name == "TEXCOORD5") { return 8; }
+    if (name == "TEXCOORD6") { return 9; }
+    if (name == "TEXCOORD7") { return 10; }
+    if (name == "BLENDWEIGHT") { return 11; }
+    if (name == "BLENDINDICES") { return 12; }
+    return -1;
+}
+
+fn dxgi_to_vk_fmt(f: int): int {
+    if (f == DXGI_FMT_R32G32B32A32_FLOAT) { return VK_FMT_R32G32B32A32_SFLOAT; }
+    if (f == DXGI_FMT_R32G32B32_FLOAT) { return VK_FMT_R32G32B32_SFLOAT; }
+    if (f == DXGI_FMT_R16G16B16A16_FLOAT) { return VK_FMT_R16G16B16A16_SFLOAT; }
+    if (f == DXGI_FMT_R32G32_FLOAT) { return VK_FMT_R32G32_SFLOAT; }
+    if (f == DXGI_FMT_R32G32_UINT) { return VK_FMT_R32G32_UINT; }
+    if (f == DXGI_FMT_R8G8B8A8_UNORM) { return VK_FMT_R8G8B8A8_UNORM; }
+    if (f == DXGI_FMT_R8G8B8A8_UINT) { return VK_FMT_R8G8B8A8_UINT; }
+    if (f == DXGI_FMT_B8G8R8A8_UNORM) { return VK_FMT_B8G8R8A8_UNORM; }
+    if (f == DXGI_FMT_R32_FLOAT) { return VK_FMT_R32_SFLOAT; }
+    if (f == DXGI_FMT_R32_UINT) { return VK_FMT_R32_UINT; }
+    if (f == DXGI_FMT_R16_UINT) { return VK_FMT_R16_UINT; }
+    if (f == DXGI_FMT_R8_UINT) { return VK_FMT_R8_UINT; }
+    return 0;
+}
+
+fn fmt_size_vk(f: int): int {
+    if (f == DXGI_FMT_R32G32B32A32_FLOAT) { return 16; }
+    if (f == DXGI_FMT_R32G32B32_FLOAT) { return 12; }
+    if (f == DXGI_FMT_R16G16B16A16_FLOAT) { return 8; }
+    if (f == DXGI_FMT_R32G32_FLOAT or f == DXGI_FMT_R32G32_UINT) { return 8; }
+    if (f == DXGI_FMT_R8G8B8A8_UNORM or f == DXGI_FMT_R8G8B8A8_UINT or
+        f == DXGI_FMT_B8G8R8A8_UNORM or f == DXGI_FMT_R32_FLOAT or
+        f == DXGI_FMT_R32_UINT) { return 4; }
+    if (f == DXGI_FMT_R16_UINT) { return 2; }
+    if (f == DXGI_FMT_R8_UINT) { return 1; }
+    return 0;
+}
+
+fn fmt_align_vk(f: int): int {
+    var sz = fmt_size_vk(f);
+    if (sz >= 16) { return 16; }
+    if (sz == 8) { return 8; }
+    if (sz == 2) { return 2; }
+    if (sz == 1) { return 1; }
+    return 4;
+}
+
+fn gfx_ensure_bind(): nil {
+    unsafe {
+        if (_gfx_bind == 0) {
+            _gfx_bind = ffi.alloc(4096);
+            ffi.memset(_gfx_bind, 0, 4096);
+        }
+    }
+}
+
+// vk_mem_type_index finds a memory type whose propertyFlags include
+// `flags`. Returns the type index or -1.
+fn vk_mem_type_index(flags: int): int {
+    unsafe {
+        var memprops = ffi.alloc(520);
+        ffi.memset(memprops, 0, 520);
+        ffi.foreign_call(_vk_mem_props, [_physdev, memprops], ffi.TYPE_VOID,
+                         [ffi.TYPE_U64, ffi.TYPE_PTR]);
+        var mtcount = ffi.load_u32(memprops);
+        var mtype = -1;
+        var mi = 0;
+        while (mi < mtcount) {
+            var mflags = ffi.load_u32(ffi.ptr_add(memprops, 4 + mi * 8));
+            if ((mflags & flags) == flags) { mtype = mi; break; }
+            mi = mi + 1;
+        }
+        ffi.free(memprops);
+        return mtype;
+    }
+}
+
+// gfx_buf_destroy releases a vk_buf_create record (type 1).
+fn gfx_buf_destroy(rec: int): nil {
+    unsafe {
+        if (rec == 0) { return; }
+        var buf = ffi.load_i64(ffi.ptr_add(rec, 0));
+        var mem = ffi.load_i64(ffi.ptr_add(rec, 8));
+        var mapped = ffi.load_i64(ffi.ptr_add(rec, 16));
+        if (mapped != 0 and _vk_unmap_mem != 0) {
+            ffi.foreign_call(_vk_unmap_mem, [_device, mem], ffi.TYPE_VOID,
+                             [ffi.TYPE_U64, ffi.TYPE_U64]);
+        }
+        if (buf != 0 and _vk_destroy_buffer != 0) {
+            ffi.foreign_call(_vk_destroy_buffer, [_device, buf, 0],
+                             ffi.TYPE_VOID, [ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_PTR]);
+        }
+        if (mem != 0 and _vk_free_memory != 0) {
+            ffi.foreign_call(_vk_free_memory, [_device, mem, 0],
+                             ffi.TYPE_VOID, [ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_PTR]);
+        }
+        ffi.free(rec);
+    }
+}
+
+// gfx_image_view creates a 2D VkImageView for `image` in `format`.
+fn gfx_image_view(image: int, format: int): int {
+    unsafe {
+        var iv = ffi.alloc(80);
+        var slot = ffi.alloc(8);
+        ffi.memset(iv, 0, 80);
+        st_u32(iv, 0, VKS_IMAGE_VIEW_CREATE_INFO);
+        st_u64(iv, 24, image);
+        st_u32(iv, 32, VIEW_TYPE_2D);
+        st_u32(iv, 36, format);
+        st_u32(iv, 40, 1); st_u32(iv, 44, 1);
+        st_u32(iv, 48, 1); st_u32(iv, 52, 1);
+        st_u32(iv, 56, IMAGE_ASPECT_COLOR);
+        st_u32(iv, 60, 0); st_u32(iv, 64, 1);
+        st_u32(iv, 68, 0); st_u32(iv, 72, 1);
+        var res = ffi.foreign_call(_vk_create_image_view,
+            [_device, iv, 0, slot], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_PTR]) as int;
+        ffi.free(iv);
+        if (res != 0) { ffi.free(slot); return 0; }
+        var view = ffi.load_i64(slot);
+        ffi.free(slot);
+        return view;
+    }
+}
+
+// gfx_barrier_image records an image memory barrier inside `cb`.
+fn gfx_barrier_image(cb: int, image: int, oldl: int, newl: int,
+                     srcacc: int, dstacc: int, srcstage: int,
+                     dststage: int): nil {
+    unsafe {
+        var mb = ffi.alloc(72);
+        ffi.memset(mb, 0, 72);
+        st_u32(mb, 0, 45); // VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER
+        st_u32(mb, 16, srcacc);
+        st_u32(mb, 20, dstacc);
+        st_u32(mb, 24, oldl);
+        st_u32(mb, 28, newl);
+        st_u32(mb, 32, 0xFFFFFFFF); // srcQueueFamilyIndex ignored
+        st_u32(mb, 36, 0xFFFFFFFF); // dstQueueFamilyIndex ignored
+        st_u64(mb, 40, image);
+        st_u32(mb, 48, IMAGE_ASPECT_COLOR);
+        st_u32(mb, 52, 0); st_u32(mb, 56, 0);
+        st_u32(mb, 60, 1); st_u32(mb, 64, 1);
+        ffi.foreign_call(_vk_cmd_pipeline_barrier,
+            [cb, srcstage, dststage, 0, 0, 0, 0, 0, 1, mb], ffi.TYPE_VOID,
+            [ffi.TYPE_U64, ffi.TYPE_U32, ffi.TYPE_U32, ffi.TYPE_U32,
+             ffi.TYPE_U32, ffi.TYPE_PTR, ffi.TYPE_U32, ffi.TYPE_PTR,
+             ffi.TYPE_U32, ffi.TYPE_PTR]);
+        ffi.free(mb);
+    }
+}
+
+// gfx_submit_wait submits `cb` on _queue with _fence and waits.
+fn gfx_submit_wait(cb: int): int {
+    unsafe {
+        var si = ffi.alloc(72);
+        var cbs = ffi.alloc(8);
+        ffi.memset(si, 0, 72);
+        ffi.memset(cbs, 0, 8);
+        st_u32(si, 0, VKS_SUBMIT_INFO);
+        st_u32(si, 40, 1);
+        st_u64(cbs, 0, cb);
+        st_ptr(si, 48, cbs);
+        var subres = ffi.foreign_call(_vk_queue_submit,
+            [_queue, 1, si, _fence], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_U32, ffi.TYPE_PTR, ffi.TYPE_U64]) as int;
+        ffi.free(si); ffi.free(cbs);
+        if (subres != 0) { return 0; }
+        var farr = ffi.alloc(8);
+        ffi.memset(farr, 0, 8);
+        st_u64(farr, 0, _fence);
+        var wres = ffi.foreign_call(_vk_wait_fences,
+            [_device, 1, farr, 1, FENCE_TIMEOUT_MAX], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_U32, ffi.TYPE_PTR, ffi.TYPE_U32,
+             ffi.TYPE_U64]) as int;
+        ffi.free(farr);
+        if (wres != 0) { return 0; }
+        var rarr = ffi.alloc(8);
+        ffi.memset(rarr, 0, 8);
+        st_u64(rarr, 0, _fence);
+        ffi.foreign_call(_vk_reset_fences, [_device, 1, rarr], ffi.TYPE_I32,
+                         [ffi.TYPE_U64, ffi.TYPE_U32, ffi.TYPE_PTR]);
+        ffi.free(rarr);
+        return 1;
+    }
+}
+
+// tex_upload copies `w*h*4` bytes from the staging buffer record into
+// `image` (assumed SHADER_READ_ONLY or worse) via a one-shot command
+// buffer, leaving the image in SHADER_READ_ONLY_OPTIMAL.
+fn tex_upload(staging: int, image: int, w: int, h: int): int {
+    unsafe {
+        var aci = ffi.alloc(40);
+        var slot = ffi.alloc(8);
+        ffi.memset(aci, 0, 40);
+        st_u32(aci, 0, VKS_COMMAND_BUFFER_ALLOCATE_INFO);
+        st_u64(aci, 16, _cmd_pool);
+        st_u32(aci, 24, CMD_LEVEL_PRIMARY);
+        st_u32(aci, 28, 1);
+        var ares = ffi.foreign_call(_vk_alloc_cmds,
+            [_device, aci, slot], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_PTR, ffi.TYPE_PTR]) as int;
+        ffi.free(aci);
+        if (ares != 0) { ffi.free(slot); return 0; }
+        var cb = ffi.load_i64(slot);
+        ffi.free(slot);
+        var cbgi = ffi.alloc(32);
+        ffi.memset(cbgi, 0, 32);
+        st_u32(cbgi, 0, VKS_COMMAND_BUFFER_BEGIN_INFO);
+        st_u32(cbgi, 16, CMD_ONE_TIME_SUBMIT);
+        var bres = ffi.foreign_call(_vk_begin_cmd, [cb, cbgi], ffi.TYPE_I32,
+                         [ffi.TYPE_U64, ffi.TYPE_PTR]) as int;
+        ffi.free(cbgi);
+        if (bres != 0) { return 0; }
+        // UNDEFINED/current -> TRANSFER_DST, copy, -> SHADER_READ_ONLY
+        gfx_barrier_image(cb, image, LAYOUT_UNDEFINED, LAYOUT_TRANSFER_DST_OPTIMAL,
+                          0, ACCESS_TRANSFER_WRITE, STAGE_TOP_OF_PIPE, STAGE_TRANSFER);
+        var bci = ffi.alloc(56);
+        ffi.memset(bci, 0, 56);
+        st_u32(bci, 16, IMAGE_ASPECT_COLOR);
+        st_u32(bci, 20, 0); st_u32(bci, 24, 0); st_u32(bci, 28, 1);
+        st_u32(bci, 44, w); st_u32(bci, 48, h); st_u32(bci, 52, 1);
+        ffi.foreign_call(_vk_cmd_copy_buf_img,
+            [cb, buf_vk(staging), image, LAYOUT_TRANSFER_DST_OPTIMAL, 1, bci],
+            ffi.TYPE_VOID,
+            [ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_U32, ffi.TYPE_PTR]);
+        ffi.free(bci);
+        gfx_barrier_image(cb, image, LAYOUT_TRANSFER_DST_OPTIMAL,
+                          LAYOUT_SHADER_READ_ONLY, ACCESS_TRANSFER_WRITE,
+                          ACCESS_SHADER_READ, STAGE_TRANSFER, STAGE_ALL_GRAPHICS);
+        var ecres = ffi.foreign_call(_vk_end_cmd, [cb], ffi.TYPE_I32,
+                         [ffi.TYPE_U64]) as int;
+        if (ecres != 0) { return 0; }
+        var sok = gfx_submit_wait(cb);
+        if (_vk_free_cmds != 0) {
+            var cbs = ffi.alloc(8);
+            var fci = ffi.alloc(16);
+            ffi.memset(cbs, 0, 8);
+            ffi.memset(fci, 0, 16);
+            st_u64(cbs, 0, cb);
+            st_u64(fci, 0, _cmd_pool);
+            st_u32(fci, 8, 1);
+            st_u64(fci, 8, cb); // placeholder overwritten below
+            ffi.free(fci);
+            var fci2 = ffi.alloc(24);
+            ffi.memset(fci2, 0, 24);
+            st_u64(fci2, 0, _cmd_pool);
+            st_u32(fci2, 8, 1);
+            st_ptr(fci2, 16, cbs);
+            ffi.foreign_call(_vk_free_cmds,
+                [_device, _cmd_pool, 1, cbs], ffi.TYPE_VOID,
+                [ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_U32, ffi.TYPE_PTR]);
+            ffi.free(cbs); ffi.free(fci2);
+        }
+        return sok;
+    }
+}
+
+// tex_create builds a sampled 2D RGBA8 texture: staging buffer + optimal
+// image + device-local memory + view + upload. Record (64B):
+// @0 VkImage, @8 VkDeviceMemory, @16 VkImageView, @24 w, @32 h,
+// @40 staging buffer record.
+fn tex_create(w: int, h: int, pixels: int): int {
+    unsafe {
+        if (ensure_device() == 0 or w <= 0 or h <= 0) { return 0; }
+        var nbytes = w * h * 4;
+        var staging = vk_buf_create(nbytes,
+            BUFFER_USAGE_TRANSFER_SRC | BUFFER_USAGE_TRANSFER_DST);
+        if (staging == 0) { return 0; }
+        if (pixels != 0) { gpu_buffer_write(staging, pixels, nbytes); }
+        var ici = ffi.alloc(88);
+        var islot = ffi.alloc(8);
+        ffi.memset(ici, 0, 88);
+        st_u32(ici, 0, VKS_IMAGE_CREATE_INFO);
+        st_u32(ici, 20, 1); // IMAGE_TYPE_2D
+        st_u32(ici, 24, VK_FMT_R8G8B8A8_UNORM);
+        st_u32(ici, 28, w); st_u32(ici, 32, h); st_u32(ici, 36, 1);
+        st_u32(ici, 40, 1); st_u32(ici, 44, 1); st_u32(ici, 48, 1);
+        st_u32(ici, 52, IMAGE_TILING_OPTIMAL);
+        st_u32(ici, 56, IMAGE_USAGE_SAMPLED | IMAGE_USAGE_TRANSFER_DST);
+        st_u32(ici, 60, SHARING_MODE_EXCLUSIVE);
+        st_u32(ici, 80, LAYOUT_UNDEFINED);
+        var ires = ffi.foreign_call(_vk_create_image,
+            [_device, ici, 0, islot], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_PTR]) as int;
+        ffi.free(ici);
+        if (ires != 0) { ffi.free(islot); gfx_buf_destroy(staging); return 0; }
+        var image = ffi.load_i64(islot);
+        ffi.free(islot);
+        // memory requirements + allocate (prefer DEVICE_LOCAL)
+        var req = ffi.alloc(24);
+        ffi.memset(req, 0, 24);
+        ffi.foreign_call(_vk_get_img_memreq, [_device, image, req],
+                         ffi.TYPE_VOID, [ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_PTR]);
+        var msize = ffi.load_u64(req);
+        ffi.free(req);
+        var mtype = vk_mem_type_index(MEM_DEVICE_LOCAL);
+        if (mtype < 0) {
+            mtype = vk_mem_type_index(MEM_HOST_VISIBLE | MEM_HOST_COHERENT);
+        }
+        if (mtype < 0) {
+            if (_vk_destroy_image != 0) {
+                ffi.foreign_call(_vk_destroy_image, [_device, image, 0],
+                                 ffi.TYPE_VOID, [ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_PTR]);
+            }
+            gfx_buf_destroy(staging);
+            return 0;
+        }
+        var mai = ffi.alloc(32);
+        var mslot = ffi.alloc(8);
+        ffi.memset(mai, 0, 32);
+        st_u32(mai, 0, VKS_MEMORY_ALLOCATE_INFO);
+        st_u64(mai, 16, msize);
+        st_u32(mai, 24, mtype);
+        var mres = ffi.foreign_call(_vk_alloc_mem,
+            [_device, mai, 0, mslot], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_PTR]) as int;
+        ffi.free(mai);
+        if (mres != 0) { ffi.free(mslot); gfx_buf_destroy(staging); return 0; }
+        var mem = ffi.load_i64(mslot);
+        ffi.free(mslot);
+        var bindres = ffi.foreign_call(_vk_bind_img_mem,
+            [_device, image, mem, 0], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_U64]) as int;
+        if (bindres != 0) {
+            if (_vk_free_memory != 0) {
+                ffi.foreign_call(_vk_free_memory, [_device, mem, 0],
+                                 ffi.TYPE_VOID, [ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_PTR]);
+            }
+            if (_vk_destroy_image != 0) {
+                ffi.foreign_call(_vk_destroy_image, [_device, image, 0],
+                                 ffi.TYPE_VOID, [ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_PTR]);
+            }
+            gfx_buf_destroy(staging);
+            return 0;
+        }
+        var view = gfx_image_view(image, VK_FMT_R8G8B8A8_UNORM);
+        if (view == 0) {
+            if (_vk_free_memory != 0) {
+                ffi.foreign_call(_vk_free_memory, [_device, mem, 0],
+                                 ffi.TYPE_VOID, [ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_PTR]);
+            }
+            if (_vk_destroy_image != 0) {
+                ffi.foreign_call(_vk_destroy_image, [_device, image, 0],
+                                 ffi.TYPE_VOID, [ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_PTR]);
+            }
+            gfx_buf_destroy(staging);
+            return 0;
+        }
+        if (tex_upload(staging, image, w, h) == 0) {
+            if (_vk_destroy_image_view != 0) {
+                ffi.foreign_call(_vk_destroy_image_view, [_device, view, 0],
+                                 ffi.TYPE_VOID, [ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_PTR]);
+            }
+            if (_vk_free_memory != 0) {
+                ffi.foreign_call(_vk_free_memory, [_device, mem, 0],
+                                 ffi.TYPE_VOID, [ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_PTR]);
+            }
+            if (_vk_destroy_image != 0) {
+                ffi.foreign_call(_vk_destroy_image, [_device, image, 0],
+                                 ffi.TYPE_VOID, [ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_PTR]);
+            }
+            gfx_buf_destroy(staging);
+            return 0;
+        }
+        // Staging is call-local: its ffi.alloc block is region-owned and
+        // would dangle if stored raw in the record. Upload is synchronous,
+        // so destroy it now; gfx_update_texture_rgba recreates one.
+        gfx_buf_destroy(staging);
+        var rec = keep(ffi.alloc(64));
+        ffi.memset(rec, 0, 64);
+        st_u64(rec, 0, image);
+        st_u64(rec, 8, mem);
+        st_u64(rec, 16, view);
+        st_u64(rec, 24, w);
+        st_u64(rec, 32, h);
+        st_u64(rec, 40, 0);
+        gfx_reg_add(rec, 3);
+        return rec;
+    }
+}
+
+// gfx_tex_destroy releases a texture record (type 3).
+fn gfx_tex_destroy(rec: int): nil {
+    unsafe {
+        if (rec == 0) { return; }
+        var image = ffi.load_i64(ffi.ptr_add(rec, 0));
+        var mem = ffi.load_i64(ffi.ptr_add(rec, 8));
+        var view = ffi.load_i64(ffi.ptr_add(rec, 16));
+        var staging = ffi.load_i64(ffi.ptr_add(rec, 40));
+        if (view != 0 and _vk_destroy_image_view != 0) {
+            ffi.foreign_call(_vk_destroy_image_view, [_device, view, 0],
+                             ffi.TYPE_VOID, [ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_PTR]);
+        }
+        if (image != 0 and _vk_destroy_image != 0) {
+            ffi.foreign_call(_vk_destroy_image, [_device, image, 0],
+                             ffi.TYPE_VOID, [ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_PTR]);
+        }
+        if (mem != 0 and _vk_free_memory != 0) {
+            ffi.foreign_call(_vk_free_memory, [_device, mem, 0],
+                             ffi.TYPE_VOID, [ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_PTR]);
+        }
+        if (staging != 0) { gfx_buf_destroy(staging); }
+        ffi.free(rec);
+    }
+}
+
+// gfx_ensure_desc creates the graphics descriptor set layout (48
+// bindings), pipeline layout, pool, and one descriptor set.
+fn gfx_ensure_desc(): int {
+    unsafe {
+        if (_gfx_dsl != 0) { return 1; }
+        if (ensure_device() == 0) { return 0; }
+        // VkDescriptorSetLayoutBinding array: 48 x 24B.
+        var bindings = ffi.alloc(48 * 24);
+        ffi.memset(bindings, 0, 48 * 24);
+        var bi = 0;
+        while (bi < 48) {
+            var bp = ffi.ptr_add(bindings, bi * 24);
+            ffi.store_u32(bp, bi);              // binding
+            if (bi < 32) {
+                ffi.store_u32(ffi.ptr_add(bp, 4), DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+                if (bi < 16) {
+                    ffi.store_u32(ffi.ptr_add(bp, 12), SHADER_STAGE_VERTEX);
+                } else {
+                    ffi.store_u32(ffi.ptr_add(bp, 12), SHADER_STAGE_FRAGMENT);
+                }
+            } else {
+                ffi.store_u32(ffi.ptr_add(bp, 4), DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+                ffi.store_u32(ffi.ptr_add(bp, 12), SHADER_STAGE_FRAGMENT);
+            }
+            ffi.store_u32(ffi.ptr_add(bp, 8), 1); // descriptorCount
+            bi = bi + 1;
+        }
+        var dslci = ffi.alloc(40);
+        var dsllot = ffi.alloc(8);
+        ffi.memset(dslci, 0, 40);
+        st_u32(dslci, 0, VKS_DESCRIPTOR_SET_LAYOUT_CREATE_INFO);
+        st_u32(dslci, 20, 48);
+        st_ptr(dslci, 24, bindings);
+        var dres = ffi.foreign_call(_vk_create_dsl,
+            [_device, dslci, 0, dsllot], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_PTR]) as int;
+        ffi.free(dslci); ffi.free(bindings);
+        if (dres != 0) { ffi.free(dsllot); return 0; }
+        _gfx_dsl = ffi.load_i64(dsllot);
+        ffi.free(dsllot);
+        // pipeline layout with the single set layout
+        var plci = ffi.alloc(56);
+        var plslot = ffi.alloc(8);
+        var layout_arr = ffi.alloc(8);
+        ffi.memset(plci, 0, 56);
+        ffi.memset(layout_arr, 0, 8);
+        st_u32(plci, 0, VKS_PIPELINE_LAYOUT_CREATE_INFO);
+        st_u32(plci, 20, 1);
+        st_u64(layout_arr, 0, _gfx_dsl);
+        st_ptr(plci, 24, layout_arr);
+        var pres = ffi.foreign_call(_vk_create_pl,
+            [_device, plci, 0, plslot], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_PTR]) as int;
+        ffi.free(plci); ffi.free(layout_arr);
+        if (pres != 0) { ffi.free(plslot); return 0; }
+        _gfx_pl = ffi.load_i64(plslot);
+        ffi.free(plslot);
+        // descriptor pool: 1 set, 32 UBO + 16 samplers
+        var dpci = ffi.alloc(40);
+        var dpslot = ffi.alloc(8);
+        var dpsize = ffi.alloc(16);
+        ffi.memset(dpci, 0, 40);
+        ffi.memset(dpsize, 0, 16);
+        st_u32(dpci, 0, VKS_DESCRIPTOR_POOL_CREATE_INFO);
+        st_u32(dpci, 16, POOL_FREE_DESCRIPTOR_SET);
+        st_u32(dpci, 20, 1);
+        st_u32(dpci, 24, 2);
+        st_ptr(dpci, 32, dpsize);
+        ffi.store_u32(dpsize, DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+        ffi.store_u32(ffi.ptr_add(dpsize, 4), 32);
+        ffi.store_u32(ffi.ptr_add(dpsize, 8), DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+        ffi.store_u32(ffi.ptr_add(dpsize, 12), 16);
+        var dpres = ffi.foreign_call(_vk_create_dp,
+            [_device, dpci, 0, dpslot], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_PTR]) as int;
+        ffi.free(dpci); ffi.free(dpsize);
+        if (dpres != 0) { ffi.free(dpslot); return 0; }
+        _gfx_dp = ffi.load_i64(dpslot);
+        ffi.free(dpslot);
+        // allocate the single descriptor set
+        var dsa = ffi.alloc(40);
+        var setslot = ffi.alloc(8);
+        var setlayout_arr = ffi.alloc(8);
+        ffi.memset(dsa, 0, 40);
+        ffi.memset(setlayout_arr, 0, 8);
+        st_u32(dsa, 0, VKS_DESCRIPTOR_SET_ALLOCATE_INFO);
+        st_u64(dsa, 16, _gfx_dp);
+        st_u32(dsa, 24, 1);
+        st_u64(setlayout_arr, 0, _gfx_dsl);
+        st_ptr(dsa, 32, setlayout_arr);
+        var ares = ffi.foreign_call(_vk_alloc_sets,
+            [_device, dsa, setslot], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_PTR, ffi.TYPE_PTR]) as int;
+        ffi.free(dsa); ffi.free(setlayout_arr);
+        if (ares != 0) { ffi.free(setslot); return 0; }
+        _gfx_dset = ffi.load_i64(setslot);
+        ffi.free(setslot);
+        return 1;
+    }
+}
+
+// gfx_sync_descriptors rewrites all 48 bindings from the _gfx_bind
+// slot block. Unbound UBO slots point at a dummy buffer; unbound
+// texture slots point at dummy image/sampler.
+fn gfx_sync_descriptors(): nil {
+    unsafe {
+        if (_gfx_dset == 0 or _gfx_bind == 0) { return; }
+        var writes = ffi.alloc(48 * 64);
+        var binfos = ffi.alloc(32 * 24);
+        var iinfos = ffi.alloc(16 * 24);
+        ffi.memset(writes, 0, 48 * 64);
+        ffi.memset(binfos, 0, 32 * 24);
+        ffi.memset(iinfos, 0, 16 * 24);
+        var wi = 0;
+        while (wi < 48) {
+            var wp = ffi.ptr_add(writes, wi * 64);
+            st_u32(wp, 0, VKS_WRITE_DESCRIPTOR_SET);
+            st_u64(wp, 16, _gfx_dset);
+            st_u32(wp, 24, wi);
+            st_u32(wp, 28, 0);
+            st_u32(wp, 32, 1);
+            if (wi < 32) {
+                st_u32(wp, 36, DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+                var bp = ffi.ptr_add(binfos, wi * 24);
+                var src = 0;
+                if (wi < 16) {
+                    src = ffi.load_i64(ffi.ptr_add(_gfx_bind, wi * 8));
+                } else {
+                    src = ffi.load_i64(ffi.ptr_add(_gfx_bind, 128 + (wi - 16) * 8));
+                }
+                if (src == 0) { src = _gfx_dummy_buf; }
+                st_u64(bp, 0, buf_vk(src));
+                st_u64(bp, 8, 0);
+                st_u64(bp, 16, VK_WHOLE_SIZE);
+                st_ptr(wp, 48, bp);
+            } else {
+                st_u32(wp, 36, DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+                var ti = wi - 32;
+                var ip = ffi.ptr_add(iinfos, ti * 24);
+                var tex = ffi.load_i64(ffi.ptr_add(_gfx_bind, 256 + ti * 8));
+                var smp = ffi.load_i64(ffi.ptr_add(_gfx_bind, 384 + ti * 8));
+                if (tex == 0) { tex = _gfx_dummy_tex; }
+                if (smp == 0) { smp = _gfx_dummy_smp; }
+                st_u64(ip, 0, ffi.load_i64(ffi.ptr_add(smp, 0)));
+                st_u64(ip, 8, ffi.load_i64(ffi.ptr_add(tex, 16)));
+                st_u32(ip, 16, LAYOUT_SHADER_READ_ONLY);
+                st_ptr(wp, 40, ip);
+            }
+            wi = wi + 1;
+        }
+        ffi.foreign_call(_vk_update_sets,
+            [_device, 48, writes, 0, 0], ffi.TYPE_VOID,
+            [ffi.TYPE_U64, ffi.TYPE_U32, ffi.TYPE_PTR, ffi.TYPE_U32,
+             ffi.TYPE_PTR]);
+        ffi.free(writes); ffi.free(binfos); ffi.free(iinfos);
+        _gfx_desc_dirty = 0;
+    }
+}
+
+// gfx_ensure_dummies lazily creates the fallback UBO/sampler/image used
+// for unbound descriptor slots.
+fn gfx_ensure_dummies(): int {
+    unsafe {
+        if (_gfx_dummy_buf != 0 and _gfx_dummy_tex != 0 and _gfx_dummy_smp != 0) {
+            return 1;
+        }
+        if (_gfx_dummy_buf == 0) {
+            _gfx_dummy_buf = vk_buf_create(16,
+                BUFFER_USAGE_UNIFORM_BUFFER | BUFFER_USAGE_TRANSFER_DST);
+            if (_gfx_dummy_buf != 0) { gfx_reg_add(_gfx_dummy_buf, 1); }
+        }
+        if (_gfx_dummy_tex == 0) {
+            var px = ffi.alloc(4);
+            ffi.memset(px, 0, 4);
+            _gfx_dummy_tex = tex_create(1, 1, px);
+            ffi.free(px);
+        }
+        if (_gfx_dummy_smp == 0) {
+            var rec = keep(ffi.alloc(16));
+            ffi.memset(rec, 0, 16);
+            var sci = ffi.alloc(80);
+            var sslot = ffi.alloc(8);
+            ffi.memset(sci, 0, 80);
+            st_u32(sci, 0, VKS_SAMPLER_CREATE_INFO);
+            st_u32(sci, 20, FILTER_NEAREST);
+            st_u32(sci, 24, FILTER_NEAREST);
+            st_u32(sci, 28, MIPMAP_NEAREST);
+            st_u32(sci, 32, ADDR_CLAMP_EDGE);
+            st_u32(sci, 36, ADDR_CLAMP_EDGE);
+            st_u32(sci, 40, ADDR_CLAMP_EDGE);
+            ffi.store_f32(ffi.ptr_add(sci, 64), 0.0);
+            ffi.store_f32(ffi.ptr_add(sci, 68), 1.0);
+            var sres = ffi.foreign_call(_vk_create_sampler,
+                [_device, sci, 0, sslot], ffi.TYPE_I32,
+                [ffi.TYPE_U64, ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_PTR]) as int;
+            ffi.free(sci);
+            if (sres == 0) {
+                st_u64(rec, 0, ffi.load_i64(sslot));
+                ffi.free(sslot);
+                gfx_reg_add(rec, 4);
+                _gfx_dummy_smp = rec;
+            } else {
+                ffi.free(sslot); ffi.free(rec);
+            }
+        }
+        if (_gfx_dummy_buf == 0 or _gfx_dummy_tex == 0 or _gfx_dummy_smp == 0) {
+            return 0;
+        }
+        return 1;
+    }
+}
+
+// gfx_rebuild_pipeline builds the VkGraphicsPipeline from current
+// shaders, input layout, and state objects.
+fn gfx_rebuild_pipeline(): int {
+    unsafe {
+        if (_gfx_vs == 0 or _gfx_ps == 0 or _render_pass == 0) { return 0; }
+        if (gfx_ensure_desc() == 0) { return 0; }
+        if (gfx_ensure_dummies() == 0) { return 0; }
+        var pname = ffi.alloc(8);
+        ffi.memset(pname, 0, 8);
+        ffi.store_u32(pname, 0x6E69616D); // "main"
+        // 2 shader stages (48B each)
+        var stages = ffi.alloc(96);
+        ffi.memset(stages, 0, 96);
+        st_u32(stages, 0, VKS_SHADER_STAGE_CREATE_INFO);
+        st_u32(stages, 20, SHADER_STAGE_VERTEX);
+        st_u64(stages, 24, _gfx_vs);
+        st_ptr(stages, 32, pname);
+        var s2 = ffi.ptr_add(stages, 48);
+        st_u32(s2, 0, VKS_SHADER_STAGE_CREATE_INFO);
+        st_u32(s2, 20, SHADER_STAGE_FRAGMENT);
+        st_u64(s2, 24, _gfx_ps);
+        st_ptr(s2, 32, pname);
+        // vertex input state (48B)
+        var vis = ffi.alloc(48);
+        var bdesc = ffi.alloc(12);
+        ffi.memset(vis, 0, 48);
+        ffi.memset(bdesc, 0, 12);
+        st_u32(vis, 0, VKS_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO);
+        var attrs_ptr = 0;
+        var nattr = 0;
+        var stride = 0;
+        if (_gfx_layout != 0) {
+            attrs_ptr = ffi.ptr_add(_gfx_layout, 16);
+            nattr = ffi.load_i64(ffi.ptr_add(_gfx_layout, 0));
+            stride = ffi.load_i64(ffi.ptr_add(_gfx_layout, 8));
+        }
+        if (nattr > 0) {
+            st_u32(vis, 20, 1);
+            st_ptr(vis, 24, bdesc);
+            st_u32(vis, 32, nattr);
+            st_ptr(vis, 40, attrs_ptr);
+            st_u32(bdesc, 0, 0);
+            st_u32(bdesc, 4, stride);
+            st_u32(bdesc, 8, 0);
+        }
+        // input assembly (32B): topology @20
+        var ias = ffi.alloc(32);
+        ffi.memset(ias, 0, 32);
+        st_u32(ias, 0, VKS_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO);
+        st_u32(ias, 20, _gfx_topology);
+        // viewport state (48B): counts 1, null ptrs (dynamic)
+        var vps = ffi.alloc(48);
+        ffi.memset(vps, 0, 48);
+        st_u32(vps, 0, VKS_PIPELINE_VIEWPORT_STATE_CREATE_INFO);
+        st_u32(vps, 20, 1);
+        st_u32(vps, 32, 1);
+        // rasterization (64B)
+        var rs = ffi.alloc(64);
+        ffi.memset(rs, 0, 64);
+        st_u32(rs, 0, VKS_PIPELINE_RASTERIZATION_STATE_CREATE_INFO);
+        st_u32(rs, 28, _gfx_raster_fill);
+        st_u32(rs, 32, _gfx_raster_cull);
+        st_u32(rs, 36, FRONT_FACE_CCW);
+        ffi.store_f32(ffi.ptr_add(rs, 56), 1.0);
+        // multisample (48B): 1 sample
+        var ms = ffi.alloc(48);
+        ffi.memset(ms, 0, 48);
+        st_u32(ms, 0, VKS_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO);
+        st_u32(ms, 20, 1);
+        // depth stencil (104B): disabled
+        var ds = ffi.alloc(104);
+        ffi.memset(ds, 0, 104);
+        st_u32(ds, 0, VKS_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO);
+        st_u32(ds, 28, COMPARE_OP_ALWAYS);
+        ffi.store_f32(ffi.ptr_add(ds, 92), 1.0);
+        // color blend (56B) + attachment (32B)
+        var cbs = ffi.alloc(56);
+        var cba = ffi.alloc(32);
+        ffi.memset(cbs, 0, 56);
+        ffi.memset(cba, 0, 32);
+        st_u32(cbs, 0, VKS_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO);
+        st_u32(cbs, 28, 1);
+        st_ptr(cbs, 32, cba);
+        var ben = 0;
+        if (_gfx_blend_en != 0) {
+            var brec = _gfx_blend_en;
+            ben = ffi.load_i64(ffi.ptr_add(brec, 0));
+        }
+        if (ben != 0) {
+            st_u32(cba, 0, 1);
+            st_u32(cba, 4, BLEND_FACTOR_SRC_ALPHA);
+            st_u32(cba, 8, BLEND_FACTOR_ONE_MINUS_SRC_ALPHA);
+            st_u32(cba, 12, BLEND_OP_ADD);
+            st_u32(cba, 16, BLEND_FACTOR_SRC_ALPHA);
+            st_u32(cba, 20, BLEND_FACTOR_ONE_MINUS_SRC_ALPHA);
+            st_u32(cba, 24, BLEND_OP_ADD);
+        }
+        st_u32(cba, 28, COLOR_WRITE_ALL);
+        // dynamic state: viewport + scissor
+        var dy = ffi.alloc(24);
+        var dynarr = ffi.alloc(8);
+        ffi.memset(dy, 0, 24);
+        ffi.memset(dynarr, 0, 8);
+        st_u32(dy, 0, VKS_PIPELINE_DYNAMIC_STATE_CREATE_INFO);
+        st_u32(dy, 20, 2);
+        st_ptr(dy, 24, dynarr);
+        st_u32(dynarr, 0, DYN_STATE_VIEWPORT);
+        st_u32(dynarr, 4, DYN_STATE_SCISSOR);
+        // VkGraphicsPipelineCreateInfo (144B)
+        var gpci = ffi.alloc(144);
+        ffi.memset(gpci, 0, 144);
+        st_u32(gpci, 0, VKS_GRAPHICS_PIPELINE_CREATE_INFO);
+        st_u32(gpci, 20, 2);
+        st_ptr(gpci, 24, stages);
+        st_ptr(gpci, 32, vis);
+        st_ptr(gpci, 40, ias);
+        st_ptr(gpci, 56, vps);
+        st_ptr(gpci, 64, rs);
+        st_ptr(gpci, 72, ms);
+        st_ptr(gpci, 80, ds);
+        st_ptr(gpci, 88, cbs);
+        st_ptr(gpci, 96, dy);
+        st_u64(gpci, 104, _gfx_pl);
+        st_u64(gpci, 112, _render_pass);
+        st_u32(gpci, 120, 0);
+        var pslot = ffi.alloc(8);
+        ffi.store_u64(pslot, 0);
+        var cres = ffi.foreign_call(_vk_create_gpipelines,
+            [_device, _pcache, 1, gpci, 0, pslot], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_U32, ffi.TYPE_PTR,
+             ffi.TYPE_PTR, ffi.TYPE_PTR]) as int;
+        ffi.free(gpci); ffi.free(stages); ffi.free(vis); ffi.free(bdesc);
+        ffi.free(ias); ffi.free(vps); ffi.free(rs); ffi.free(ms);
+        ffi.free(ds); ffi.free(cbs); ffi.free(cba); ffi.free(dy);
+        ffi.free(dynarr); ffi.free(pname);
+        if (cres != 0) { ffi.free(pslot); return 0; }
+        var pipe = ffi.load_i64(pslot);
+        ffi.free(pslot);
+        if (pipe == 0) { return 0; }
+        _gfx_pipe = pipe;
+        _gfx_pipe_dirty = 0;
+        return 1;
+    }
+}
+
+fn gfx_rp_begin(): int {
+    unsafe {
+        if (_rp_open != 0) { return 1; }
+        var cv = ffi.alloc(16);
+        ffi.store_f32(cv, _cc_r);
+        ffi.store_f32(ffi.ptr_add(cv, 4), _cc_g);
+        ffi.store_f32(ffi.ptr_add(cv, 8), _cc_b);
+        ffi.store_f32(ffi.ptr_add(cv, 12), _cc_a);
+        var rpbi = ffi.alloc(64);
+        ffi.memset(rpbi, 0, 64);
+        st_u32(rpbi, 0, VKS_RENDER_PASS_BEGIN_INFO);
+        st_u64(rpbi, 16, _render_pass);
+        var fb = ffi.load_i64(ffi.ptr_add(_framebuffers, _cur_image * 8));
+        st_u64(rpbi, 24, fb);
+        st_u32(rpbi, 40, _swap_w);
+        st_u32(rpbi, 44, _swap_h);
+        st_u32(rpbi, 48, 1);
+        st_ptr(rpbi, 56, cv);
+        ffi.foreign_call(_vk_cmd_begin_rp,
+            [_cmd_buf, rpbi, 0], ffi.TYPE_VOID,
+            [ffi.TYPE_U64, ffi.TYPE_PTR, ffi.TYPE_U32]);
+        ffi.free(rpbi); ffi.free(cv);
+        _rp_open = 1;
+        return 1;
+    }
+}
+
+fn gfx_draw_setup(): int {
+    unsafe {
+        if (_cmd_bound != 0) { return 1; }
+        if (_gfx_desc_dirty != 0) {
+            if (gfx_ensure_dummies() == 0) { return 0; }
+            gfx_sync_descriptors();
+        }
+        ffi.foreign_call(_vk_cmd_bind_pipe,
+            [_cmd_buf, PIPELINE_BIND_GRAPHICS, _gfx_pipe], ffi.TYPE_VOID,
+            [ffi.TYPE_U64, ffi.TYPE_U32, ffi.TYPE_U64]);
+        var sets = ffi.alloc(8);
+        ffi.memset(sets, 0, 8);
+        st_u64(sets, 0, _gfx_dset);
+        ffi.foreign_call(_vk_cmd_bind_sets,
+            [_cmd_buf, PIPELINE_BIND_GRAPHICS, _gfx_pl, 0, 1, sets, 0, 0],
+            ffi.TYPE_VOID,
+            [ffi.TYPE_U64, ffi.TYPE_U32, ffi.TYPE_U64, ffi.TYPE_U32,
+             ffi.TYPE_U32, ffi.TYPE_PTR, ffi.TYPE_U32, ffi.TYPE_PTR]);
+        ffi.free(sets);
+        var vw = _vp_w;
+        var vh = _vp_h;
+        if (vw <= 0.0) { vw = _swap_w as float; }
+        if (vh <= 0.0) { vh = _swap_h as float; }
+        var vp = ffi.alloc(24);
+        ffi.memset(vp, 0, 24);
+        ffi.store_f32(vp, _vp_x);
+        ffi.store_f32(ffi.ptr_add(vp, 4), _vp_y);
+        ffi.store_f32(ffi.ptr_add(vp, 8), vw);
+        ffi.store_f32(ffi.ptr_add(vp, 12), vh);
+        ffi.store_f32(ffi.ptr_add(vp, 16), 0.0);
+        ffi.store_f32(ffi.ptr_add(vp, 20), 1.0);
+        ffi.foreign_call(_vk_cmd_set_viewport,
+            [_cmd_buf, 0, 1, vp], ffi.TYPE_VOID,
+            [ffi.TYPE_U64, ffi.TYPE_U32, ffi.TYPE_U32, ffi.TYPE_PTR]);
+        ffi.free(vp);
+        var sc = ffi.alloc(16);
+        ffi.memset(sc, 0, 16);
+        st_u32(sc, 0, 0); st_u32(sc, 4, 0);
+        st_u32(sc, 8, _swap_w); st_u32(sc, 12, _swap_h);
+        ffi.foreign_call(_vk_cmd_set_scissor,
+            [_cmd_buf, 0, 1, sc], ffi.TYPE_VOID,
+            [ffi.TYPE_U64, ffi.TYPE_U32, ffi.TYPE_U32, ffi.TYPE_PTR]);
+        ffi.free(sc);
+        _cmd_bound = 1;
+        return 1;
+    }
+}
+
+fn gfx_ensure_draw_ready(): int {
+    if (_frame_active == 0 or _attached == 0) { return 0; }
+    if (gfx_rp_begin() == 0) { return 0; }
+    if (_gfx_pipe_dirty != 0 or _gfx_pipe == 0) {
+        if (gfx_rebuild_pipeline() == 0) { return 0; }
+    }
+    if (gfx_draw_setup() == 0) { return 0; }
+    return 1;
+}
+
+// Emits the current clip scissor (dynamic state) before each draw so
+// mid-frame clip changes take effect without rebuilding the pipeline.
+fn gfx_emit_scissor(): nil {
+    unsafe {
+        var x = _gfx_sc_x;
+        var y = _gfx_sc_y;
+        var w = _gfx_sc_w;
+        var h = _gfx_sc_h;
+        if (w <= 0 or h <= 0) { x = 0; y = 0; w = _swap_w; h = _swap_h; }
+        var sc = ffi.alloc(16);
+        ffi.memset(sc, 0, 16);
+        st_u32(sc, 0, x); st_u32(sc, 4, y);
+        st_u32(sc, 8, w); st_u32(sc, 12, h);
+        ffi.foreign_call(_vk_cmd_set_scissor,
+            [_cmd_buf, 0, 1, sc], ffi.TYPE_VOID,
+            [ffi.TYPE_U64, ffi.TYPE_U32, ffi.TYPE_U32, ffi.TYPE_PTR]);
+        ffi.free(sc);
+    }
+}
+
+fn gfx_bind_vb_slot(slot: int): nil {
+    unsafe {
+        if (_gfx_bind == 0) { return; }
+        var ep = ffi.ptr_add(_gfx_bind, 512 + slot * 24);
+        var b = ffi.load_i64(ep);
+        if (b == 0) { return; }
+        var barr = ffi.alloc(8);
+        var oarr = ffi.alloc(8);
+        ffi.memset(barr, 0, 8);
+        ffi.memset(oarr, 0, 8);
+        st_u64(barr, 0, buf_vk(b));
+        st_u64(oarr, 0, ffi.load_i64(ffi.ptr_add(ep, 16)));
+        ffi.foreign_call(_vk_cmd_bind_vb,
+            [_cmd_buf, slot, 1, barr, oarr], ffi.TYPE_VOID,
+            [ffi.TYPE_U64, ffi.TYPE_U32, ffi.TYPE_U32, ffi.TYPE_PTR, ffi.TYPE_PTR]);
+        ffi.free(barr); ffi.free(oarr);
+    }
+}
+
+fn gfx_bind_ib(): nil {
+    unsafe {
+        if (_gfx_bind == 0) { return; }
+        var buf = ffi.load_i64(ffi.ptr_add(_gfx_bind, 640));
+        if (buf == 0) { return; }
+        var fmt = ffi.load_i64(ffi.ptr_add(_gfx_bind, 648));
+        var off = ffi.load_i64(ffi.ptr_add(_gfx_bind, 656));
+        ffi.foreign_call(_vk_cmd_bind_ib,
+            [_cmd_buf, buf_vk(buf), off, fmt], ffi.TYPE_VOID,
+            [ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_U32]);
+    }
+}
+
+// ── public gfx_* surface (d3d11-compatible) ──
+
+pub fn gfx_input_layout_create(names: [str], formats: [int],
+                               code_ptr: int, code_size: int): int {
+    unsafe {
+        if (ensure_device() == 0) { return 0; }
+        var n = len(names);
+        if (n == 0 or n != len(formats)) { return 0; }
+        // Single allocation: {count@0, stride@8, VkVertexInputAttributeDescription[]@16}.
+        // ffi.alloc memory is region-owned; inlining keeps the attribute
+        // array inside the promoted return block instead of dangling.
+        var rec = keep(ffi.alloc(16 + n * 16));
+        ffi.memset(rec, 0, 16 + n * 16);
+        var offset = 0;
+        var maxal = 4;
+        var i = 0;
+        while (i < n) {
+            var vkf = dxgi_to_vk_fmt(formats[i]);
+            var sz = fmt_size_vk(formats[i]);
+            if (vkf == 0 or sz == 0) { ffi.free(rec); return 0; }
+            var al = fmt_align_vk(formats[i]);
+            if (al > maxal) { maxal = al; }
+            var aoff = offset;
+            while (aoff % al != 0) { aoff = aoff + 1; }
+            var ap = ffi.ptr_add(rec, 16 + i * 16);
+            var loc = gfx_sem_loc(names[i]);
+            if (loc < 0) { loc = i; }
+            ffi.store_u32(ap, loc);
+            ffi.store_u32(ffi.ptr_add(ap, 4), 0);
+            ffi.store_u32(ffi.ptr_add(ap, 8), vkf);
+            ffi.store_u32(ffi.ptr_add(ap, 12), aoff);
+            offset = aoff + sz;
+            i = i + 1;
+        }
+        while (offset % maxal != 0) { offset = offset + 1; }
+        st_u64(rec, 0, n);
+        st_u64(rec, 8, offset);
+        gfx_reg_add(rec, 5);
+        return rec;
+    }
+}
+
+pub fn gfx_set_shaders(vs: int, ps: int): nil {
+    _gfx_vs = vs;
+    _gfx_ps = ps;
+    _gfx_pipe_dirty = 1;
+}
+
+pub fn gfx_set_geometry_shader(gs: int): nil {}
+pub fn gfx_set_hull_shader(hs: int): nil {}
+pub fn gfx_set_domain_shader(ds: int): nil {}
+
+pub fn gfx_set_input_layout(layout: int): nil {
+    _gfx_layout = layout;
+    _gfx_pipe_dirty = 1;
+}
+
+pub fn gfx_vertex_buffer_create(bytes: int, stride: int,
+                                data_ptr: int): int {
+    unsafe {
+        var rec = vk_buf_create(bytes,
+            BUFFER_USAGE_VERTEX_BUFFER | BUFFER_USAGE_TRANSFER_SRC |
+            BUFFER_USAGE_TRANSFER_DST);
+        if (rec == 0) { return 0; }
+        st_u64(rec, 40, stride);
+        if (data_ptr != 0) { gpu_buffer_write(rec, data_ptr, bytes); }
+        gfx_reg_add(rec, 1);
+        return rec;
+    }
+}
+
+pub fn gfx_index_buffer_create(bytes: int, data_ptr: int): int {
+    unsafe {
+        var rec = vk_buf_create(bytes,
+            BUFFER_USAGE_INDEX_BUFFER | BUFFER_USAGE_TRANSFER_SRC |
+            BUFFER_USAGE_TRANSFER_DST);
+        if (rec == 0) { return 0; }
+        if (data_ptr != 0) { gpu_buffer_write(rec, data_ptr, bytes); }
+        gfx_reg_add(rec, 1);
+        return rec;
+    }
+}
+
+pub fn gfx_buffer_create_dynamic(bytes: int, bind: int,
+                                 stride: int): int {
+    unsafe {
+        var usage = BUFFER_USAGE_TRANSFER_SRC | BUFFER_USAGE_TRANSFER_DST;
+        if ((bind & 1) != 0) { usage = usage | BUFFER_USAGE_VERTEX_BUFFER; }
+        if ((bind & 2) != 0) { usage = usage | BUFFER_USAGE_INDEX_BUFFER; }
+        if ((bind & 4) != 0) { usage = usage | BUFFER_USAGE_UNIFORM_BUFFER; }
+        var rec = vk_buf_create(bytes, usage);
+        if (rec == 0) { return 0; }
+        st_u64(rec, 40, stride);
+        gfx_reg_add(rec, 1);
+        return rec;
+    }
+}
+
+pub fn gfx_buffer_update(buf: int, src: int, bytes: int,
+                         row_pitch: int): int {
+    unsafe {
+        if (buf == 0) { return 0; }
+        var dst = ffi.load_i64(ffi.ptr_add(buf, 16));
+        ffi.memcpy(dst, src, bytes);
+        return 1;
+    }
+}
+
+pub fn gfx_set_vertex_buffer(slot: int, buf: int,
+                             stride: int, offset: int): nil {
+    unsafe {
+        gfx_ensure_bind();
+        if (slot < 0 or slot > 3) { return; }
+        var ep = ffi.ptr_add(_gfx_bind, 512 + slot * 24);
+        st_u64(ep, 0, buf);
+        st_u64(ep, 8, stride);
+        st_u64(ep, 16, offset);
+    }
+}
+
+pub fn gfx_set_index_buffer(buf: int, format: int, offset: int): nil {
+    unsafe {
+        gfx_ensure_bind();
+        st_u64(_gfx_bind, 640, buf);
+        var it = INDEX_TYPE_UINT32;
+        if (format == DXGI_FMT_R16_UINT or format == DXGI_FMT_R8_UINT) {
+            it = INDEX_TYPE_UINT16;
+        }
+        st_u64(_gfx_bind, 648, it);
+        st_u64(_gfx_bind, 656, offset);
+    }
+}
+
+pub fn gfx_set_topology(topo: int): nil {
+    var t = topo - 1;
+    if (t < TOPO_POINT_LIST) { t = TOPO_POINT_LIST; }
+    if (t > 5) { t = 5; }
+    _gfx_topology = t;
+    _gfx_pipe_dirty = 1;
+}
+
+pub fn gfx_draw(vertex_count: int, start_vertex: int): nil {
+    unsafe {
+        if (gfx_ensure_draw_ready() == 0) { return; }
+        gfx_bind_vb_slot(0);
+        gfx_bind_vb_slot(1);
+        gfx_bind_vb_slot(2);
+        gfx_bind_vb_slot(3);
+        gfx_emit_scissor();
+        ffi.foreign_call(_vk_cmd_draw,
+            [_cmd_buf, vertex_count, 1, start_vertex, 0], ffi.TYPE_VOID,
+            [ffi.TYPE_U64, ffi.TYPE_U32, ffi.TYPE_U32, ffi.TYPE_U32,
+             ffi.TYPE_U32]);
+    }
+}
+
+pub fn gfx_draw_indexed(index_count: int, start_index: int,
+                        base_vertex: int): nil {
+    unsafe {
+        if (gfx_ensure_draw_ready() == 0) { return; }
+        gfx_bind_vb_slot(0);
+        gfx_bind_vb_slot(1);
+        gfx_bind_vb_slot(2);
+        gfx_bind_vb_slot(3);
+        gfx_bind_ib();
+        gfx_emit_scissor();
+        ffi.foreign_call(_vk_cmd_draw_indexed,
+            [_cmd_buf, index_count, 1, start_index, base_vertex, 0],
+            ffi.TYPE_VOID,
+            [ffi.TYPE_U64, ffi.TYPE_U32, ffi.TYPE_U32, ffi.TYPE_U32,
+             ffi.TYPE_U32, ffi.TYPE_U32]);
+    }
+}
+
+pub fn gfx_compile(hlsl: str, entry: str, target: str): int {
+    return 0;
+}
+
+pub fn gfx_blob_ptr(blob: int): int { return 0; }
+pub fn gfx_blob_size(blob: int): int { return 0; }
+
+pub fn gfx_vs_create(code_ptr: int, code_size: int): int {
+    unsafe { return gpu_shader_create_spv(code_ptr, code_size); }
+}
+pub fn gfx_ps_create(code_ptr: int, code_size: int): int {
+    unsafe { return gpu_shader_create_spv(code_ptr, code_size); }
+}
+pub fn gfx_gs_create(code_ptr: int, code_size: int): int { return 0; }
+pub fn gfx_hs_create(code_ptr: int, code_size: int): int { return 0; }
+pub fn gfx_ds_create(code_ptr: int, code_size: int): int { return 0; }
+
+pub fn gfx_cb_create(bytes: int, data_ptr: int): int {
+    unsafe {
+        var rec = vk_buf_create(bytes,
+            BUFFER_USAGE_UNIFORM_BUFFER | BUFFER_USAGE_TRANSFER_SRC |
+            BUFFER_USAGE_TRANSFER_DST);
+        if (rec == 0) { return 0; }
+        if (data_ptr != 0) { gpu_buffer_write(rec, data_ptr, bytes); }
+        gfx_reg_add(rec, 1);
+        return rec;
+    }
+}
+
+pub fn gfx_vs_set_cb(slot: int, buf: int): nil {
+    unsafe {
+        gfx_ensure_bind();
+        if (slot < 0 or slot > 15) { return; }
+        st_u64(_gfx_bind, slot * 8, buf);
+        _gfx_desc_dirty = 1;
+    }
+}
+
+pub fn gfx_ps_set_cb(slot: int, buf: int): nil {
+    unsafe {
+        gfx_ensure_bind();
+        if (slot < 0 or slot > 15) { return; }
+        st_u64(_gfx_bind, 128 + slot * 8, buf);
+        _gfx_desc_dirty = 1;
+    }
+}
+
+pub fn gfx_blend_state_create(): int {
+    return gfx_blend_state_create_ex(0);
+}
+
+// gfx_blend_state_create_ex builds a blend-state record; enable!=0 turns
+// on standard alpha blending (SRC_ALPHA / ONE_MINUS_SRC_ALPHA).
+pub fn gfx_blend_state_create_ex(enable: int): int {
+    unsafe {
+        if (ensure_device() == 0) { return 0; }
+        var rec = keep(ffi.alloc(16));
+        ffi.memset(rec, 0, 16);
+        st_u64(rec, 0, enable);
+        gfx_reg_add(rec, 6);
+        return rec;
+    }
+}
+
+pub fn gfx_depth_state_create(enable: int, write_mask: int,
+                              func: int): int {
+    unsafe {
+        if (ensure_device() == 0) { return 0; }
+        var rec = keep(ffi.alloc(16));
+        ffi.memset(rec, 0, 16);
+        st_u64(rec, 0, enable);
+        st_u64(rec, 8, func);
+        gfx_reg_add(rec, 6);
+        return rec;
+    }
+}
+
+pub fn gfx_raster_state_create(fill: int, cull: int): int {
+    unsafe {
+        if (ensure_device() == 0) { return 0; }
+        var rec = keep(ffi.alloc(16));
+        ffi.memset(rec, 0, 16);
+        st_u64(rec, 0, fill);
+        st_u64(rec, 8, cull);
+        gfx_reg_add(rec, 6);
+        return rec;
+    }
+}
+
+pub fn gfx_set_blend_state(state: int): nil {
+    _gfx_blend_en = state;
+    _gfx_pipe_dirty = 1;
+}
+
+pub fn gfx_set_depth_state(state: int, stencil_ref: int): nil {}
+
+pub fn gfx_set_raster_state(state: int): nil {
+    unsafe {
+        if (state == 0) { return; }
+        var fill = ffi.load_i64(ffi.ptr_add(state, 0));
+        var cull = ffi.load_i64(ffi.ptr_add(state, 8));
+        if (fill == 1) {
+            _gfx_raster_fill = POLYGON_MODE_LINE;
+        } else {
+            _gfx_raster_fill = POLYGON_MODE_FILL;
+        }
+        if (cull == 1) { _gfx_raster_cull = CULL_MODE_FRONT; }
+        elif (cull == 2) { _gfx_raster_cull = CULL_MODE_BACK; }
+        elif (cull == 3) { _gfx_raster_cull = 3; }
+        else { _gfx_raster_cull = CULL_MODE_NONE; }
+        _gfx_pipe_dirty = 1;
+    }
+}
+
+fn gfx_map_filter(filter: int): int {
+    if (filter == 1) { return FILTER_NEAREST; }
+    return FILTER_LINEAR;
+}
+
+fn gfx_map_addr(addr: int): int {
+    if (addr == 1) { return ADDR_REPEAT; }
+    if (addr == 2) { return ADDR_MIRRORED; }
+    return ADDR_CLAMP_EDGE;
+}
+
+pub fn gfx_sampler_create(filter: int, addr_u: int,
+                          addr_v: int): int {
+    unsafe {
+        if (ensure_device() == 0) { return 0; }
+        var sci = ffi.alloc(80);
+        var sslot = ffi.alloc(8);
+        ffi.memset(sci, 0, 80);
+        st_u32(sci, 0, VKS_SAMPLER_CREATE_INFO);
+        st_u32(sci, 20, gfx_map_filter(filter));
+        st_u32(sci, 24, gfx_map_filter(filter));
+        st_u32(sci, 28, MIPMAP_LINEAR);
+        st_u32(sci, 32, gfx_map_addr(addr_u));
+        st_u32(sci, 36, gfx_map_addr(addr_v));
+        st_u32(sci, 40, gfx_map_addr(addr_v));
+        ffi.store_f32(ffi.ptr_add(sci, 44), 0.0);
+        st_u32(sci, 48, 0);
+        st_u32(sci, 52, 0);
+        st_u32(sci, 56, COMPARE_OP_NEVER);
+        ffi.store_f32(ffi.ptr_add(sci, 64), 0.0);
+        ffi.store_f32(ffi.ptr_add(sci, 68), 1000.0);
+        st_u32(sci, 72, 0);
+        st_u32(sci, 76, 0);
+        var res = ffi.foreign_call(_vk_create_sampler,
+            [_device, sci, 0, sslot], ffi.TYPE_I32,
+            [ffi.TYPE_U64, ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_PTR]) as int;
+        ffi.free(sci);
+        if (res != 0) { ffi.free(sslot); return 0; }
+        var rec = keep(ffi.alloc(16));
+        ffi.memset(rec, 0, 16);
+        st_u64(rec, 0, ffi.load_i64(sslot));
+        ffi.free(sslot);
+        gfx_reg_add(rec, 4);
+        return rec;
+    }
+}
+
+pub fn gfx_texture_create_rgba(width: int, height: int,
+                               pixels_ptr: int): int {
+    unsafe { return tex_create(width, height, pixels_ptr); }
+}
+
+pub fn gfx_update_texture_rgba(tex: int, width: int, height: int,
+                               pixels_ptr: int): int {
+    unsafe {
+        if (tex == 0 or pixels_ptr == 0) { return 0; }
+        var image = ffi.load_i64(ffi.ptr_add(tex, 0));
+        var nbytes = width * height * 4;
+        var staging = vk_buf_create(nbytes,
+            BUFFER_USAGE_TRANSFER_SRC | BUFFER_USAGE_TRANSFER_DST);
+        if (staging == 0) { return 0; }
+        gpu_buffer_write(staging, pixels_ptr, nbytes);
+        var up = tex_upload(staging, image, width, height);
+        gfx_buf_destroy(staging);
+        return up;
+    }
+}
+
+pub fn gfx_ps_set_shader_resource(slot: int, srv: int): nil {
+    unsafe {
+        gfx_ensure_bind();
+        if (slot < 0 or slot > 15) { return; }
+        st_u64(_gfx_bind, 256 + slot * 8, srv);
+        _gfx_desc_dirty = 1;
+    }
+}
+
+pub fn gfx_ps_set_sampler(slot: int, smp: int): nil {
+    unsafe {
+        gfx_ensure_bind();
+        if (slot < 0 or slot > 15) { return; }
+        st_u64(_gfx_bind, 384 + slot * 8, smp);
+        _gfx_desc_dirty = 1;
+    }
+}
+
+// gfx_set_scissor sets the draw scissor rect in framebuffer pixels.
+// w<=0 or h<=0 restores full-window scissor. Clip stacks are implemented
+// by callers intersecting rects before each flush.
+pub fn gfx_set_scissor(x: int, y: int, w: int, h: int): nil {
+    _gfx_sc_x = x; _gfx_sc_y = y; _gfx_sc_w = w; _gfx_sc_h = h;
+}
+
+pub fn gfx_set_viewport(x: float, y: float, w: float, h: float): nil {
+    _vp_x = x; _vp_y = y; _vp_w = w; _vp_h = h;
+}
+
+pub fn gfx_set_render_targets(rtvs: [int], dsv: int): nil {
+    // Vulkan path renders to the swapchain framebuffer; offscreen
+    // render targets are not yet supported.
+}
+
+pub fn gfx_discard_all(): nil {
+    unsafe {
+        if (_attached != 0) { gfx_detach(); }
+    }
+}
+
+fn gfx_reg_destroy_one(idx: int): nil {
+    unsafe {
+        var e = ffi.ptr_add(_gfx_reg, idx * 16);
+        var p = ffi.load_i64(e);
+        var t = ffi.load_i64(ffi.ptr_add(e, 8));
+        if (t == 1) { gfx_buf_destroy(p); }
+        elif (t == 2) {
+            if (_vk_destroy_shader != 0) {
+                ffi.foreign_call(_vk_destroy_shader, [_device, p, 0],
+                                 ffi.TYPE_VOID, [ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_PTR]);
+            }
+        }
+        elif (t == 3) { gfx_tex_destroy(p); }
+        elif (t == 4) {
+            var sm = ffi.load_i64(ffi.ptr_add(p, 0));
+            if (sm != 0 and _vk_destroy_sampler != 0) {
+                ffi.foreign_call(_vk_destroy_sampler, [_device, sm, 0],
+                                 ffi.TYPE_VOID, [ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_PTR]);
+            }
+            ffi.free(p);
+        }
+        elif (t == 5) { ffi.free(p); }
+        elif (t == 6) { ffi.free(p); }
+    }
+}
+
+pub fn gfx_release_all(): nil {
+    unsafe {
+        gfx_discard_all();
+        // destroy registered gfx objects
+        var i = 0;
+        while (i < _gfx_reg_count) {
+            gfx_reg_destroy_one(i);
+            i = i + 1;
+        }
+        _gfx_reg_count = 0;
+        if (_gfx_bind != 0) { ffi.free(_gfx_bind); _gfx_bind = 0; }
+        if (_gfx_reg != 0) { ffi.free(_gfx_reg); _gfx_reg = 0; }
+        _gfx_pipe = 0; _gfx_pl = 0; _gfx_dsl = 0; _gfx_dp = 0;
+        _gfx_dset = 0; _gfx_pipe_dirty = 1;
+        _gfx_vs = 0; _gfx_ps = 0; _gfx_layout = 0;
+        _gfx_dummy_buf = 0; _gfx_dummy_tex = 0; _gfx_dummy_smp = 0;
+        _gfx_desc_dirty = 1; _cmd_bound = 0;
+        gpu_shutdown();
+    }
+}
+
+pub fn gfx_device_ok(): int {
+    if (_device != 0) { return 1; }
+    return 0;
+}
+
+pub fn gfx_context(): int { return _device; }
+pub fn gfx_device(): int { return _device; }
+
+pub fn gfx_map_dynamic(buf: int): int {
+    unsafe {
+        if (buf == 0) { return 0; }
+        return ffi.load_i64(ffi.ptr_add(buf, 16));
+    }
+}
+
+pub fn gfx_unmap(buf: int): nil {}
+
+// gpu_release frees only the ffi record memory. Object teardown is
+// gpu_shutdown's job.
+pub fn gpu_release(obj: int): int {
+    unsafe {
+        if (obj != 0) { ffi.free(obj); }
+        return 1;
+    }
+}
+
+// gpu_shutdown destroys device-level objects, the instance, and unloads
+// the loader. Buffer/pipe records should be gpu_release'd first.
+pub fn gpu_shutdown(): int {
+    unsafe {
+        if (_attached != 0) { gfx_detach(); }
+        if (_device != 0 and _vk_destroy_device != 0) {
+            ffi.foreign_call(_vk_destroy_device, [_device, 0], ffi.TYPE_VOID,
+                             [ffi.TYPE_U64, ffi.TYPE_PTR]);
+        }
+        _device = 0; _queue = 0; _physdev = 0;
+        _cmd_pool = 0; _cmd_buf = 0; _fence = 0;
+        if (_instance != 0 and _vk_destroy_instance != 0) {
+            ffi.foreign_call(_vk_destroy_instance, [_instance, 0],
+                             ffi.TYPE_VOID,
+                             [ffi.TYPE_U64, ffi.TYPE_PTR]);
+        }
+        _instance = 0;
+        return 1;
+    }
+}

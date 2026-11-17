@@ -2,6 +2,7 @@
 
 import std.internal.runtime as rt;
 import std.math as math;
+import std.gg.native as ggn;
 
 enum PrimitiveType {
     Rect,
@@ -186,6 +187,11 @@ frame GraphicsContext {
     pub var next_resource_id: int;
     pub var batching: bool;
     pub var batch: DrawBatch;
+    // Selected graphics backend: "sokol" (rt resource path) or a native
+    // driver name ("d3d11"/"vulkan") once attach_window succeeds.
+    pub var backend: str;
+    // Optional native driver preference ("d3d11"/"vulkan"/"metal"/"").
+    pub var backend_prefer: str;
 
     // Reusable fixed-arity argument slots so primitive calls do zero list allocations.
     pub var _args0: [int];
@@ -200,6 +206,8 @@ frame GraphicsContext {
         self.next_resource_id = 1;
         self.batching = false;
         self.batch = DrawBatch();
+        self.backend = "sokol";
+        self.backend_prefer = "";
         self._args0 = [];
         self._args1i = [0];
         self._args2i = [0, 0];
@@ -209,6 +217,10 @@ frame GraphicsContext {
     }
 
     pub fn flush_draw_batch(b: DrawBatch): nil {
+        if (_native_on != 0) {
+            b.clear();
+            return;
+        }
         if (self.handle == -1 or b.op_count == 0) {
             b.clear();
             return;
@@ -298,6 +310,13 @@ frame GraphicsContext {
 
 pub var global_graphics_context: GraphicsContext = GraphicsContext();
 
+// 1 when the native driver path (std.gg.native) owns the frame; 0 means
+// the rt resource path (sokol/CPU software) is active.
+var _native_on: int = 0;
+// Optional driver preference passed to native.gfx_backend(), e.g.
+// gg.global_graphics_context.backend_prefer = "vulkan".
+// Empty = platform default order.
+
 pub fn setup(): bool {
     if (global_graphics_context.handle != -1) {
         return true;
@@ -320,6 +339,11 @@ pub fn setup_checked(): nil?GraphicsInitError {
 }
 
 pub fn shutdown(): nil {
+    if (_native_on != 0) {
+        ggn.detach();
+        _native_on = 0;
+        global_graphics_context.backend = "none";
+    }
     if (global_graphics_context.handle != -1) {
         flush_batch();
         rt.call(global_graphics_context.handle, rt.OP_CLOSE, global_graphics_context._args0);
@@ -351,6 +375,7 @@ pub fn submit_batch(b: DrawBatch): nil {
 }
 
 pub fn spawn_window(width: int, height: int, title: str, resizable: int = 1): nil {
+    if (_native_on != 0) { return; }
     if (global_graphics_context.handle != -1) {
         rt.call(global_graphics_context.handle, rt.OP_SPAWN, [width, height, title, resizable]);
     }
@@ -362,21 +387,42 @@ pub fn spawn_window(width: int, height: int, title: str, resizable: int = 1): ni
 // back to spawn_window (sokol_app-owned window) or run headless.
 pub fn attach_window(hwnd: int, width: int, height: int): bool {
     if (global_graphics_context.handle != -1) {
+        // Native driver path first: pure-Lymar d3d11/vulkan attached to
+        // the externally-owned window. Falls back to the rt resource
+        // (sokol/CPU) path when no GPU driver is available or attach fails.
+        ggn.set_prefer(global_graphics_context.backend_prefer);
+        if (ggn.attach(hwnd, width, height) != 0) {
+            _native_on = 1;
+            global_graphics_context.backend = ggn.driver();
+            return true;
+        }
         val res = rt.call(global_graphics_context.handle, rt.OP_ATTACH_WINDOW, [hwnd, width, height]);
         if (res != nil) {
-            return res as bool;
+            val ok_attach = res as bool;
+            if (ok_attach) { global_graphics_context.backend = "sokol"; }
+            return ok_attach;
         }
     }
     return false;
 }
 
 pub fn detach_window(): nil {
+    if (_native_on != 0) {
+        ggn.detach();
+        _native_on = 0;
+        global_graphics_context.backend = "none";
+        return;
+    }
     if (global_graphics_context.handle != -1) {
         rt.call(global_graphics_context.handle, rt.OP_DETACH_WINDOW, global_graphics_context._args0);
     }
 }
 
 pub fn push_clip(x: float, y: float, w: float, h: float, shape: int = 0, radius: float = 0.0): nil {
+    if (_native_on != 0) {
+        ggn.push_clip(x, y, w, h, shape, radius);
+        return;
+    }
     if (global_graphics_context.handle != -1) {
         if (global_graphics_context.batching) {
             global_graphics_context.batch.add_clip_push(x, y, w, h, shape, radius);
@@ -393,6 +439,10 @@ pub fn push_clip(x: float, y: float, w: float, h: float, shape: int = 0, radius:
 }
 
 pub fn pop_clip(): nil {
+    if (_native_on != 0) {
+        ggn.pop_clip();
+        return;
+    }
     if (global_graphics_context.handle != -1) {
         if (global_graphics_context.batching) {
             global_graphics_context.batch.add_clip_pop();
@@ -403,6 +453,7 @@ pub fn pop_clip(): nil {
 }
 
 pub fn poll_events(): [int] | nil {
+    if (_native_on != 0) { return nil; }
     if (global_graphics_context.handle != -1) {
         val res = rt.call(global_graphics_context.handle, rt.OP_POLL, global_graphics_context._args0);
         if (res != nil) {
@@ -508,6 +559,10 @@ pub fn make_bindings(vbuf_id: int, ibuf_id: int, tex_id: int, sampler_id: int): 
 }
 
 pub fn begin_pass(w: int, h: int, r: float, g: float, b: float, a: float): nil {
+    if (_native_on != 0) {
+        ggn.begin_pass(w, h, r, g, b, a);
+        return;
+    }
     if (global_graphics_context.handle != -1) {
         global_graphics_context.batch.clear();
         rt.call(global_graphics_context.handle, rt.OP_FILL, [w, h, r, g, b, a]);
@@ -515,6 +570,10 @@ pub fn begin_pass(w: int, h: int, r: float, g: float, b: float, a: float): nil {
 }
 
 pub fn set_window_size(width: int, height: int): nil {
+    if (_native_on != 0) {
+        ggn.resize(width, height);
+        return;
+    }
     if (global_graphics_context.handle != -1) {
         global_graphics_context._args2i[0] = width;
         global_graphics_context._args2i[1] = height;
@@ -523,6 +582,10 @@ pub fn set_window_size(width: int, height: int): nil {
 }
 
 pub fn draw_rect_primitive(x: float, y: float, w: float, h: float, r: float, g: float, b: float, a: float): nil {
+    if (_native_on != 0) {
+        ggn.draw_rect(x, y, w, h, r, g, b, a);
+        return;
+    }
     if (global_graphics_context.handle != -1) {
         if (global_graphics_context.batching) {
             global_graphics_context.batch.add_rect(x, y, w, h, r, g, b, a, 0.0, 0.0);
@@ -538,6 +601,10 @@ pub fn draw_rect_primitive(x: float, y: float, w: float, h: float, r: float, g: 
 }
 
 pub fn draw_rect_rounded_primitive(x: float, y: float, w: float, h: float, rad: float, r: float, g: float, b: float, a: float): nil {
+    if (_native_on != 0) {
+        ggn.draw_rect(x, y, w, h, r, g, b, a);
+        return;
+    }
     if (global_graphics_context.handle != -1) {
         if (global_graphics_context.batching) {
             global_graphics_context.batch.add_rect(x, y, w, h, r, g, b, a, rad, 0.0);
@@ -553,6 +620,10 @@ pub fn draw_rect_rounded_primitive(x: float, y: float, w: float, h: float, rad: 
 }
 
 pub fn draw_rect_border_primitive(x: float, y: float, w: float, h: float, rad: float, border_w: float, r: float, g: float, b: float, a: float): nil {
+    if (_native_on != 0) {
+        ggn.draw_rect(x, y, w, h, r, g, b, a);
+        return;
+    }
     if (global_graphics_context.handle != -1) {
         if (global_graphics_context.batching) {
             global_graphics_context.batch.add_rect(x, y, w, h, r, g, b, a, rad, border_w);
@@ -651,6 +722,13 @@ pub var _sh_ex: float = 0.0;
 pub var _sh_la: float = 0.0;
 
 pub fn draw_shadow_primitive(x: float, y: float, w: float, h: float, r: float, g: float, b: float, a: float, off_x: float, off_y: float, blur: float, spread: float, radius: float = 6.0): nil {
+    if (_native_on != 0) {
+        // native v1: translucent quad approximation of the shadow
+        ggn.draw_shadow(x + off_x - spread, y + off_y - spread,
+                        w + spread * 2.0, h + spread * 2.0,
+                        r, g, b, a, radius + spread, blur);
+        return;
+    }
     if (global_graphics_context.handle != -1) {
         // Shape rect = widget + offset + spread. The GPU/CPU shadow path
         // expands the quad by `blur` itself and applies an SDF falloff.
@@ -682,6 +760,10 @@ pub fn draw_shadow_primitive(x: float, y: float, w: float, h: float, r: float, g
 }
 
 pub fn draw_triangle_primitive(x1: float, y1: float, x2: float, y2: float, x3: float, y3: float, r: float, g: float, b: float, a: float): nil {
+    if (_native_on != 0) {
+        ggn.draw_tri(x1, y1, x2, y2, x3, y3, r, g, b, a);
+        return;
+    }
     if (global_graphics_context.handle != -1) {
         if (global_graphics_context.batching) {
             global_graphics_context.batch.add_triangle(x1, y1, x2, y2, x3, y3, r, g, b, a);
@@ -697,6 +779,10 @@ pub fn draw_triangle_primitive(x1: float, y1: float, x2: float, y2: float, x3: f
 }
 
 pub fn draw_text(text_str: str, x: float, y: float, r: float, g: float, b: float, a: float, scale: int = 1): nil {
+    if (_native_on != 0) {
+        ggn.draw_text(text_str, x, y, r, g, b, a, scale);
+        return;
+    }
     if (global_graphics_context.handle != -1) {
         if (global_graphics_context.batching) {
             global_graphics_context.batch.add_text(text_str, x, y, r, g, b, a, scale);
@@ -728,6 +814,10 @@ pub fn get_line_height(scale: int = 1): float {
 }
 
 pub fn end_pass(): nil {
+    if (_native_on != 0) {
+        ggn.end_pass();
+        return;
+    }
     if (global_graphics_context.handle != -1) {
         flush_batch();
         rt.call(global_graphics_context.handle, rt.OP_END_PASS, global_graphics_context._args0);
@@ -765,6 +855,10 @@ pub fn draw(base: int, count: int, instances: int): nil {
 }
 
 pub fn commit(): nil {
+    if (_native_on != 0) {
+        ggn.commit();
+        return;
+    }
     if (global_graphics_context.handle != -1) {
         flush_batch();
         rt.call(global_graphics_context.handle, rt.OP_FLUSH, global_graphics_context._args0);

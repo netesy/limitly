@@ -1,0 +1,6 @@
+import std.math as math;
+fn main() {
+    print(math.sqrt(2.0));
+    print(math.sqrt(16.0));
+    return 0;
+}

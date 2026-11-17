@@ -1,0 +1,7 @@
+import p5b;
+staged fn local_helper(x: int): int { return x * 2; }
+fn main() {
+    print(local_helper(21));
+    print(p5b.cross_staged(5));
+    return 0;
+}

@@ -1,0 +1,43 @@
+import std.native.vulkan as vk;
+import std.ffi as ffi;
+var SPV_WORDS: [int] = [119734787,65536,0,60,0,131089,1,720906,1599492179,1599227979,1919906931,1600481121,1717990754,1935635045,1634889588,1667196263,1936941420,0,196622,0,1,393231,5,30,1852399981,0,16,393232,30,17,4,1,1,262215,17,34,0,262215,17,33,0,196679,11,2,327752,11,0,35,0,262215,10,6,4,262215,16,11,28,131091,1,196641,2,1,262165,3,32,1,262187,3,4,0,262187,3,5,1,262187,3,6,3,262167,14,3,3,262176,15,1,14,262203,15,16,1,196637,10,3,196638,11,10,262176,12,12,11,262203,12,17,12,262176,13,12,3,327734,1,30,0,2,131320,31,262205,14,40,16,327761,3,41,40,0,393281,13,43,17,4,41,262205,3,44,43,327812,3,45,44,6,327808,3,46,45,5,196670,43,46,65789,65592];
+fn main() {
+    var init = vk.gpu_init();
+    if (init == 0) { print("init fail"); return 0; }
+    var buf = vk.gpu_buffer_create(64);
+    if (buf == 0) { print("buf fail"); return 0; }
+    unsafe {
+        // fill input {10,20,30,40} as u32x4 + pad to 64B
+        var src = ffi.alloc(64);
+        ffi.store_u32(src, 10); ffi.store_u32(ffi.ptr_add(src,4), 20);
+        ffi.store_u32(ffi.ptr_add(src,8), 30); ffi.store_u32(ffi.ptr_add(src,12), 40);
+        ffi.memset(ffi.ptr_add(src,16), 0, 48);
+        vk.gpu_buffer_write(buf, src as int, 64);
+        var spv = ffi.alloc(149 * 4);
+        var i = 0;
+        while (i < 149) {
+            ffi.store_u32(ffi.ptr_add(spv, i * 4), SPV_WORDS[i]);
+            i = i + 1;
+        }
+        var shader = vk.gpu_shader_create_spv(spv as int, 149 * 4);
+        if (shader == 0) { print("shader fail"); return 0; }
+        var pipe = vk.gpu_pipeline_create(shader, 1);
+        if (pipe == 0) { print("pipe fail"); return 0; }
+        var bufs: [int] = [buf];
+        var disp = vk.gpu_dispatch(pipe, bufs, 1, 1, 1);
+        print("dispatch=" + (disp as str));
+        if (disp == 0) { return 0; }
+        var out = ffi.alloc(64);
+        vk.gpu_buffer_read(buf, out as int, 64);
+        var good: int = 1;
+        var expect: [int] = [31, 61, 91, 121];
+        var di = 0;
+        while (di < 16) {
+            var v = ffi.load_u32(ffi.ptr_add(out, di * 4));
+            print("buf[" + (di as str) + "]=" + (v as str));
+            if (di < 4 and v != expect[di]) { good = 0; }
+            di = di + 1;
+        }
+        print("comp_ok=" + (good as str));
+    }
+}

@@ -8,6 +8,7 @@
 #include <mutex>
 #include <string>
 #include <vector>
+
 #include <stdexcept>
 namespace {
 using Word=uint64_t;

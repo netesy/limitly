@@ -1,0 +1,40 @@
+import std.ffi as ffi;
+
+var _g: int = 0;
+var _fn: int = 0;
+
+fn setup() {
+    unsafe {
+        var tmp = ffi.alloc(8);
+        var p = ffi.alloc(64);
+        ffi.store_ptr(tmp, p);
+        _g = ffi.load_i64(tmp);
+        ffi.free(tmp);
+        ffi.free(p);
+        var lib = ffi.library_load("kernel32.dll");
+        _fn = ffi.library_get_symbol(lib, "GetTickCount");
+    }
+}
+
+// helper reads a module global via ffi.load_i64 AND makes a foreign_call
+fn fc_user(i: int): int {
+    unsafe {
+        var v = ffi.load_i64(ffi.ptr_add(_g, i * 8));
+        var r = ffi.foreign_call(_fn, [], ffi.TYPE_I32, []);
+        return ((v as int) + (r as int)) % 1000;
+    }
+}
+
+fn main() {
+    setup();
+    var i = 0;
+    var acc = 0;
+    unsafe {
+        while (i < 8) {
+            acc = acc + fc_user(i);
+            i = i + 1;
+        }
+    }
+    print(acc);
+    return 0;
+}
