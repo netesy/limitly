@@ -251,6 +251,8 @@ void Generator::generate_function(LM::Frontend::AST::FunctionDeclaration& fn) {
     scope_stack_.clear();
     loop_stack_.clear();
     register_types_.clear();
+    register_abi_types_.clear();
+    register_language_types_.clear();
     
     start_cfg_build();
     enter_scope();

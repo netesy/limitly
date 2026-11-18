@@ -44,6 +44,8 @@ void Generator::lower_trait_method(const std::string& trait_name, LM::Frontend::
     generator_region_counter_ = 0;
     loop_stack_.clear();
     register_types_.clear();
+    register_abi_types_.clear();
+    register_language_types_.clear();
     enter_scope();
     
     cfg_context_.building_cfg = false;
@@ -172,6 +174,8 @@ void Generator::lower_frame_method(const std::string& frame_name, LM::Frontend::
     generator_region_counter_ = 0;
     loop_stack_.clear();
     register_types_.clear();
+    register_abi_types_.clear();
+    register_language_types_.clear();
     enter_scope();
     
     // Use CFG mode for proper JIT compatibility (disabled for now)
@@ -322,6 +326,8 @@ void Generator::lower_frame_init_method(const std::string& frame_name, LM::Front
     generator_region_counter_ = 0;
     loop_stack_.clear();
     register_types_.clear();
+    register_abi_types_.clear();
+    register_language_types_.clear();
     enter_scope();
     
     // Use CFG mode for proper JIT compatibility (disabled for now)
@@ -466,6 +472,8 @@ void Generator::lower_frame_deinit_method(const std::string& frame_name, LM::Fro
     generator_region_counter_ = 0;
     loop_stack_.clear();
     register_types_.clear();
+    register_abi_types_.clear();
+    register_language_types_.clear();
     enter_scope();
     
     // Use CFG mode for proper JIT compatibility (disabled for now)

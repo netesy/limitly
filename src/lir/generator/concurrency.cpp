@@ -899,6 +899,8 @@ void Generator::lower_task_body(LM::Frontend::AST::TaskStatement& stmt) {
     cfg_context_ = CFGContext();
     scope_stack_.clear();
     register_types_.clear();
+    register_abi_types_.clear();
+    register_language_types_.clear();
     
     // Enter function scope
     enter_scope();
@@ -989,6 +991,8 @@ void Generator::lower_worker_body(LM::Frontend::AST::WorkerStatement& stmt) {
     cfg_context_ = CFGContext();
     scope_stack_.clear();
     register_types_.clear();
+    register_abi_types_.clear();
+    register_language_types_.clear();
     
     // Enter function scope
     enter_scope();

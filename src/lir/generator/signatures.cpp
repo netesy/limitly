@@ -147,6 +147,13 @@ void Generator::lower_function_bodies(const LM::Frontend::TypeCheckResult& type_
         current_function_ = std::make_unique<LIR_Function>(init_func_name, 0);
         next_register_ = 0;
         scope_stack_.clear();
+        // Register type maps are per-function: without clearing them the
+        // init inherits stale reg->type entries from whatever was lowered
+        // previously, mistyping locals (e.g. the .done guard flag lowering
+        // as f64 when the prior function used that reg for a double).
+        register_types_.clear();
+        register_abi_types_.clear();
+        register_language_types_.clear();
         
         start_cfg_build();
         enter_scope();
