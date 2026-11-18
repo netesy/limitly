@@ -42,6 +42,9 @@ private:
     // candidates are restricted to these frames: an unconstructed frame can
     // never be a trait receiver, so its methods can be tree-shaken.
     std::unordered_set<std::string> constructed_frames_;
+    // Reachable function set captured after the worklist fixpoint; used
+    // by codegen to omit calls into tree-shaken (pure, unneeded) __init__s.
+    std::unordered_set<std::string> reachable_funcs_;
 
     ir::Type* lir_type_to_fyra_type(LIR::Type lir_type);
     std::string generate_label();

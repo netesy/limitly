@@ -217,6 +217,177 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
         }
     };
 
+    // Module-init pruning: a pure __init__ (only data/global initialization,
+    // no calls except other pure inits) is seeded only when its module
+    // contributes reachable functions or referenced globals. Impure inits
+    // always run so import side effects are preserved. Purity is transitive
+    // over __init__ -> __init__ call edges.
+    auto all_modules = LM::Frontend::ModuleManager::getInstance().get_all_modules();
+    std::vector<std::string> module_paths;
+    module_paths.reserve(all_modules.size());
+    for (const auto& kv : all_modules) module_paths.push_back(kv.first);
+    std::sort(module_paths.begin(), module_paths.end(),
+              [](const std::string& a, const std::string& b) { return a.size() > b.size(); });
+    auto module_of = [&](const std::string& name) -> std::string {
+        for (const auto& m : module_paths) {
+            if (name == m) return m;
+            if (name.size() > m.size() && name.compare(0, m.size(), m) == 0 && name[m.size()] == '.')
+                return m;
+        }
+        return "";
+    };
+
+    auto init_op_is_safe = [](LIR::LIR_Op op) -> bool {
+        switch (op) {
+            case LIR::LIR_Op::Mov: case LIR::LIR_Op::LoadConst:
+            case LIR::LIR_Op::LoadGlobal: case LIR::LIR_Op::StoreGlobal:
+            case LIR::LIR_Op::Add: case LIR::LIR_Op::Sub: case LIR::LIR_Op::Mul:
+            case LIR::LIR_Op::Div: case LIR::LIR_Op::Mod: case LIR::LIR_Op::Neg:
+            case LIR::LIR_Op::And: case LIR::LIR_Op::Or: case LIR::LIR_Op::Xor:
+            case LIR::LIR_Op::Shl: case LIR::LIR_Op::Shr:
+            case LIR::LIR_Op::CmpEQ: case LIR::LIR_Op::CmpNEQ:
+            case LIR::LIR_Op::CmpLT: case LIR::LIR_Op::CmpLE:
+            case LIR::LIR_Op::CmpGT: case LIR::LIR_Op::CmpGE:
+            case LIR::LIR_Op::StringIndex:
+            case LIR::LIR_Op::Jump: case LIR::LIR_Op::JumpIfFalse:
+            case LIR::LIR_Op::JumpIf: case LIR::LIR_Op::Label:
+            case LIR::LIR_Op::Nop: case LIR::LIR_Op::Load:
+            case LIR::LIR_Op::Store: case LIR::LIR_Op::Cast:
+            case LIR::LIR_Op::Copy: case LIR::LIR_Op::ToString:
+            case LIR::LIR_Op::STR_CONCAT: case LIR::LIR_Op::STR_FORMAT:
+            case LIR::LIR_Op::IAdd_Unchecked: case LIR::LIR_Op::IXor_Unchecked:
+            case LIR::LIR_Op::IAnd_Unchecked: case LIR::LIR_Op::IOr_Unchecked:
+            case LIR::LIR_Op::DecAdd: case LIR::LIR_Op::DecSub:
+            case LIR::LIR_Op::DecMul: case LIR::LIR_Op::DecDiv:
+            case LIR::LIR_Op::DecMod: case LIR::LIR_Op::DecNeg:
+            case LIR::LIR_Op::DecRescale:
+            case LIR::LIR_Op::ListCreate: case LIR::LIR_Op::ListAppend:
+            case LIR::LIR_Op::ListIndex: case LIR::LIR_Op::ListSet:
+            case LIR::LIR_Op::ListLen:
+            case LIR::LIR_Op::DictCreate: case LIR::LIR_Op::DictSet:
+            case LIR::LIR_Op::DictGet: case LIR::LIR_Op::DictHas:
+            case LIR::LIR_Op::DictLen: case LIR::LIR_Op::DictItems:
+            case LIR::LIR_Op::TupleCreate: case LIR::LIR_Op::TupleGet:
+            case LIR::LIR_Op::TupleSet: case LIR::LIR_Op::TupleLen:
+            case LIR::LIR_Op::MakeEnum: case LIR::LIR_Op::GetTag:
+            case LIR::LIR_Op::GetPayload:
+            case LIR::LIR_Op::ConstructError: case LIR::LIR_Op::ConstructOk:
+            case LIR::LIR_Op::IsError: case LIR::LIR_Op::Unwrap:
+            case LIR::LIR_Op::UnwrapOr:
+            case LIR::LIR_Op::NewFrame:
+            case LIR::LIR_Op::FrameGetField: case LIR::LIR_Op::FrameSetField:
+            case LIR::LIR_Op::FrameGetFieldAtomic:
+            case LIR::LIR_Op::FrameSetFieldAtomic:
+            case LIR::LIR_Op::FrameFieldAtomicAdd:
+            case LIR::LIR_Op::FrameFieldAtomicSub:
+            case LIR::LIR_Op::Return: case LIR::LIR_Op::Ret:
+            case LIR::LIR_Op::AtomicLoad: case LIR::LIR_Op::AtomicStore:
+            case LIR::LIR_Op::AtomicFetchAdd:
+            case LIR::LIR_Op::VaStart: case LIR::LIR_Op::VaArg:
+            case LIR::LIR_Op::VaEnd:
+            // Region/ownership/ref plumbing: memory-model bookkeeping with
+            // no observable side effects beyond the init's own stores.
+            case LIR::LIR_Op::RegionEnter: case LIR::LIR_Op::RegionExit:
+            case LIR::LIR_Op::RegionMove:
+            case LIR::LIR_Op::RefCreate: case LIR::LIR_Op::RefResolve:
+            case LIR::LIR_Op::RefRelease: case LIR::LIR_Op::RefMove:
+            case LIR::LIR_Op::OwnershipConsume:
+                return true;
+            default:
+                return false;
+        }
+    };
+    auto is_init_name = [](const std::string& n) -> bool {
+        return n.size() > 9 && n.compare(n.size() - 9, 9, ".__init__") == 0;
+    };
+
+    // Pure-data builtins: collection/string/math services with no
+    // observable side effects. Anything else (print, input, assert, sleep,
+    // file_*, FFI, ...) keeps the init impure.
+    auto builtin_is_pure = [](const std::string& n) -> bool {
+        static const std::unordered_set<std::string> pure_exact = {
+            "len", "length", "_builtin_length", "typeof",
+            "abs", "sqrt", "sin", "cos", "tan", "asin", "acos", "atan",
+            "log", "log10", "exp", "ceil", "floor", "round",
+            "lm_to_string", "lm_error_new", "lm_key_eq"
+        };
+        if (pure_exact.count(n)) return true;
+        static const char* pure_prefixes[] = {
+            "lm_list_", "lm_dict_", "lm_tuple_", "lm_str_",
+            "lm_box_", "jit_dict_", "_builtin_"
+        };
+        for (const char* pfx : pure_prefixes)
+            if (n.rfind(pfx, 0) == 0) return true;
+        return false;
+    };
+    // Runtime memory/region plumbing — no observable side effects beyond
+    // the init's own stores. Excludes ffi/io/concurrency/OS services.
+    auto runtime_call_is_pure = [](const std::string& n) -> bool {
+        if (n.rfind("lymar_aot_", 0) != 0) return false;
+        static const char* bad[] = {
+            "ffi", "io_", "file", "print", "input", "sleep", "time",
+            "random", "channel", "task", "sched", "worker", "parallel",
+            "callback", "resource", "window", "event", "gpu", "native",
+            "d3d", "vulkan", "sokol", "console", "process", "thread",
+            "mutex", "lock", "socket", "http", "net", "env", "exit",
+            "signal", "pipe", "dir", "watch"
+        };
+        for (const char* b : bad)
+            if (n.find(b) != std::string::npos) return false;
+        return true;
+    };
+
+    // Calls to other __init__ functions are neutral: they only express
+    // import ordering, which the topological init sequence already
+    // guarantees, and each dep init is seeded/skipped on its own merits.
+    std::unordered_map<std::string, bool> init_pure;
+    for (const auto& fname : registry.getFunctionNames()) {
+        if (!is_init_name(fname)) continue;
+        auto* f = registry.getFunction(fname);
+        if (!f) continue;
+        bool pure = true;
+        for (const auto& inst : f->instructions) {
+            if (inst.op == LIR::LIR_Op::Call || inst.op == LIR::LIR_Op::CallVoid) {
+                if (is_init_name(inst.func_name) || runtime_call_is_pure(inst.func_name)) continue;
+                if (std::getenv("LYMAR_DEBUG_INIT"))
+                    std::cerr << "IMPURE " << fname << ": call " << inst.func_name << std::endl;
+                pure = false;
+                break;
+            }
+            if (inst.op == LIR::LIR_Op::CallBuiltin) {
+                if (builtin_is_pure(inst.func_name)) continue;
+                if (std::getenv("LYMAR_DEBUG_INIT"))
+                    std::cerr << "IMPURE " << fname << ": CallBuiltin " << inst.func_name << std::endl;
+                pure = false;
+                break;
+            }
+            if ((inst.op == LIR::LIR_Op::LoadGlobal || inst.op == LIR::LIR_Op::StoreGlobal) &&
+                !inst.func_name.empty()) {
+                // Cross-module global access can mutate shared state in
+                // place (append/set on a loaded collection) without any
+                // call — treat as impure so the init always runs.
+                std::string own_mod = fname.substr(0, fname.size() - 9);
+                std::string gmod = module_of(inst.func_name);
+                if (!gmod.empty() && gmod != own_mod) {
+                    if (std::getenv("LYMAR_DEBUG_INIT"))
+                        std::cerr << "IMPURE " << fname << ": xglobal " << inst.func_name << std::endl;
+                    pure = false;
+                    break;
+                }
+            }
+            if (!init_op_is_safe(inst.op)) {
+                if (std::getenv("LYMAR_DEBUG_INIT"))
+                    std::cerr << "IMPURE " << fname << ": op " << (int)inst.op << " fn=" << inst.func_name << std::endl;
+                pure = false;
+                break;
+            }
+        }
+        init_pure[fname] = pure;
+    }
+
+    std::set<std::string> pending_pure_inits;
+    std::set<std::string> referenced_globals;
+
     auto inspect_instructions = [&](const LIR::LIR_Function& f) {
         // ffi.create_callback resolves its target by name string at runtime,
         // so the callee is invisible to the call graph — same problem gpu
@@ -247,6 +418,9 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
             }
         }
         for (const auto& inst : f.instructions) {
+            if ((inst.op == LIR::LIR_Op::LoadGlobal || inst.op == LIR::LIR_Op::StoreGlobal) &&
+                !inst.func_name.empty())
+                referenced_globals.insert(inst.func_name);
             if (inst.op == LIR::LIR_Op::NewFrame) {
                 auto name = !inst.type_name.empty() ? inst.type_name : inst.func_name;
                 if (!name.empty() && constructed_frames.insert(name).second) constructed_version++;
@@ -270,7 +444,18 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
                 try_seed_trait_candidates(inst.type_name, inst.func_name);
             }
             if (!callee.empty() && registry.getFunction(callee)) {
-                if (reachable_funcs.find(callee) == reachable_funcs.end()) {
+                if (is_init_name(callee)) {
+                    auto pit = init_pure.find(callee);
+                    if (std::getenv("LYMAR_DEBUG_INIT") && callee.find("calendar") != std::string::npos)
+                        std::cerr << "INIT-SEED " << callee << " pure=" << (pit != init_pure.end() ? (pit->second ? 1 : 0) : -1) << std::endl;
+                    if (pit != init_pure.end() && pit->second) {
+                        // Pure init: defer until we know its module is needed.
+                        pending_pure_inits.insert(callee);
+                    } else if (reachable_funcs.insert(callee).second) {
+                        // Impure/unknown init: side effects must run.
+                        worklist.push_back(callee);
+                    }
+                } else if (reachable_funcs.find(callee) == reachable_funcs.end()) {
                     reachable_funcs.insert(callee);
                     worklist.push_back(callee);
                 }
@@ -294,16 +479,57 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
                 if (f) inspect_instructions(*f);
             }
         }
+        size_t reachable_before = reachable_funcs.size();
         // Fixpoint: newly discovered constructions can unlock trait
         // candidates skipped in earlier rounds; re-seed every recorded
         // site and drain again until the constructed set stops growing.
-        if (constructed_version == seeded_constructed_version) break;
-        seeded_constructed_version = constructed_version;
-        for (const auto& site : trait_sites) {
-            try_seed_trait_candidates(site.first, site.second);
+        if (constructed_version != seeded_constructed_version) {
+            seeded_constructed_version = constructed_version;
+            for (const auto& site : trait_sites) {
+                try_seed_trait_candidates(site.first, site.second);
+            }
         }
+        // Module-init pruning: seed a deferred pure __init__ only when its
+        // module contributes a reachable function or a referenced global.
+        // Newly reached init bodies can reference more globals, so this
+        // recomputes each round until no new function becomes reachable.
+        std::unordered_set<std::string> needed_modules;
+        for (const auto& fn : reachable_funcs) {
+            auto m = module_of(fn);
+            if (!m.empty()) needed_modules.insert(m);
+        }
+        for (const auto& g : referenced_globals) {
+            auto m = module_of(g);
+            if (!m.empty()) needed_modules.insert(m);
+        }
+        for (const auto& init : pending_pure_inits) {
+            if (reachable_funcs.count(init)) continue;
+            std::string mod = init.substr(0, init.size() - 9);
+            if (needed_modules.count(mod)) {
+                if (std::getenv("LYMAR_DEBUG_INIT") && mod.find("calendar") != std::string::npos) {
+                    for (const auto& fn : reachable_funcs)
+                        if (fn.rfind(mod + ".", 0) == 0 || fn == mod)
+                            std::cerr << "NEEDED-FN " << fn << std::endl;
+                    for (const auto& g : referenced_globals)
+                        if (g.rfind(mod + ".", 0) == 0 || g == mod)
+                            std::cerr << "NEEDED-GLOBAL " << g << std::endl;
+                }
+                reachable_funcs.insert(init);
+                worklist.push_back(init);
+            }
+        }
+        if (reachable_funcs.size() == reachable_before) break;
+    }
+    if (std::getenv("LYMAR_DEBUG_INIT")) {
+        std::cerr << "REACHABLE=" << reachable_funcs.size()
+                  << " cal_init=" << reachable_funcs.count("std.ui.widgets.calendar.__init__")
+                  << " pending=" << pending_pure_inits.size()
+                  << " pure_map=" << init_pure.size() << std::endl;
+        auto pit = init_pure.find("std.ui.widgets.calendar.__init__");
+        std::cerr << "cal_pure=" << (pit == init_pure.end() ? -1 : (pit->second ? 1 : 0)) << std::endl;
     }
     constructed_frames_ = constructed_frames;
+    reachable_funcs_ = reachable_funcs;
 
     auto is_func_ret_float = [](const LIR::LIR_Function* f) -> bool {
         if (!f) return false;
@@ -403,7 +629,7 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
 
     // 1b. Pre-scan global variable types across reachable functions
     for (const auto& func_name : registry.getFunctionNames()) {
-        if (reachable_funcs.find(func_name) == reachable_funcs.end() && !func_name.ends_with(".__init__")) continue;
+        if (reachable_funcs.find(func_name) == reachable_funcs.end()) continue;
         auto* f = registry.getFunction(func_name);
         if (!f) continue;
         for (const auto& inst : f->instructions) {
@@ -421,7 +647,7 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
     for (const auto& func_name : registry.getFunctionNames()) {
         if (func_name == lir_func.name) continue;
         if (LIR::BuiltinUtils::isBuiltinFunction(func_name)) continue;
-        if (reachable_funcs.find(func_name) == reachable_funcs.end() && !func_name.ends_with(".__init__")) continue;
+        if (reachable_funcs.find(func_name) == reachable_funcs.end()) continue;
         auto* f = registry.getFunction(func_name);
         if (!f) continue;
 
@@ -949,6 +1175,9 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
         auto& registry = LIR::FunctionRegistry::getInstance();
         for (const auto& func_name : registry.getFunctionNames()) {
             if (func_name.ends_with(".__init__")) {
+                // Tree-shaken pure inits are not emitted; only call the
+                // ones reachability kept (needed modules + impure inits).
+                if (reachable_funcs_.find(func_name) == reachable_funcs_.end()) continue;
                 ir::Function* init_fn = current_module_->getFunction(func_name);
                 if (!init_fn) {
                     init_fn = builder_->createFunction(func_name, context_->getVoidType(), {});
@@ -1895,6 +2124,15 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     if (LIR::BuiltinUtils::isBuiltinFunction(lir_func.name)) {
                         name = lir_func.name;
                     }
+                }
+
+                // Tree-shaken pure module inits emit no call; the result
+                // register is defined as 0 (init return values are unused).
+                if (name.size() > 9 && name.compare(name.size() - 9, 9, ".__init__") == 0 &&
+                    reachable_funcs_.find(name) == reachable_funcs_.end()) {
+                    if (inst.dst != UINT32_MAX)
+                        store_reg(inst.dst, context_->getConstantInt(context_->getIntegerType(64), 0), inst.result_type);
+                    break;
                 }
 
                 if (name == "channel") {
