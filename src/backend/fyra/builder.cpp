@@ -160,6 +160,63 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
             worklist.push_back(fname);
     }
 
+    // Devirtualization support: a frame that is never constructed cannot be
+    // a trait receiver, so structural/declared trait dispatch candidates are
+    // restricted to frames whose NewFrame appears in reachable code. The set
+    // grows as the worklist drains; trait sites are re-seeded each round
+    // until the constructed set stops changing (fixpoint).
+    std::unordered_set<std::string> constructed_frames;
+    size_t constructed_version = 0;
+    std::set<std::pair<std::string, std::string>> trait_sites;
+
+    // method name -> candidate frame names, precomputed once so re-seeding
+    // rounds do not rescan the whole registry per trait call site.
+    std::unordered_map<std::string, std::vector<std::string>> trait_method_frames;
+    {
+        const auto& fmethods = LM::Frontend::ModuleManager::getInstance().frame_method_names();
+        if (!fmethods.empty()) {
+            for (const auto& fm : fmethods) {
+                auto dot = fm.rfind('.');
+                if (dot == std::string::npos || dot + 1 >= fm.size()) continue;
+                trait_method_frames[fm.substr(dot + 1)].push_back(fm.substr(0, dot));
+            }
+        } else {
+            // LIR-cache hit: no frame-method metadata; fall back to the
+            // registry-wide suffix scan (unfiltered, as before).
+            for (const auto& fname : registry.getFunctionNames()) {
+                auto dot = fname.rfind('.');
+                if (dot == std::string::npos || dot + 1 >= fname.size()) continue;
+                trait_method_frames[fname.substr(dot + 1)].push_back(fname.substr(0, dot));
+            }
+        }
+    }
+
+    auto try_seed_trait_candidates = [&](const std::string& type_name, const std::string& method_name) {
+        const auto& impls = LM::Frontend::ModuleManager::getInstance().trait_implementors();
+        auto iit = impls.find(type_name);
+        if (iit != impls.end()) {
+            for (const auto& frame_name : iit->second) {
+                // Only frames with a reachable constructor can be receivers.
+                if (!constructed_frames.count(frame_name)) continue;
+                std::string target = frame_name + "." + method_name;
+                if (registry.getFunction(target) && reachable_funcs.insert(target).second)
+                    worklist.push_back(target);
+            }
+            std::string def = type_name + "." + method_name;
+            if (registry.getFunction(def) && reachable_funcs.insert(def).second)
+                worklist.push_back(def);
+            return;
+        }
+        auto mit = trait_method_frames.find(method_name);
+        if (mit == trait_method_frames.end()) return;
+        for (const auto& frame_name : mit->second) {
+            if (!constructed_frames.count(frame_name)) continue;
+            std::string target = frame_name + "." + method_name;
+            if (registry.getFunction(target) && reachable_funcs.insert(target).second)
+                worklist.push_back(target);
+        }
+    };
+
     auto inspect_instructions = [&](const LIR::LIR_Function& f) {
         // ffi.create_callback resolves its target by name string at runtime,
         // so the callee is invisible to the call graph — same problem gpu
@@ -192,6 +249,7 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
         for (const auto& inst : f.instructions) {
             if (inst.op == LIR::LIR_Op::NewFrame) {
                 auto name = !inst.type_name.empty() ? inst.type_name : inst.func_name;
+                if (!name.empty() && constructed_frames.insert(name).second) constructed_version++;
                 auto finalizer = name + ".deinit";
                 if (registry.getFunction(finalizer) && reachable_funcs.insert(finalizer).second)
                     worklist.push_back(finalizer);
@@ -204,16 +262,12 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
                     callee = static_cast<const char*>(((LmBox*)h)->value.as_ptr);
             }
             if (inst.op == LIR::LIR_Op::TraitCallMethod && !inst.func_name.empty()) {
-                std::string method_suffix = "." + inst.func_name;
-                for (const auto& rfunc : registry.getFunctionNames()) {
-                    if (rfunc.size() > method_suffix.size() &&
-                        rfunc.compare(rfunc.size() - method_suffix.size(), method_suffix.size(), method_suffix) == 0) {
-                        if (reachable_funcs.find(rfunc) == reachable_funcs.end()) {
-                            reachable_funcs.insert(rfunc);
-                            worklist.push_back(rfunc);
-                        }
-                    }
-                }
+                // Record the site; candidates are (re)seeded by
+                // try_seed_trait_candidates, restricted to frames with a
+                // reachable NewFrame. Re-seeding happens each fixpoint round
+                // because later-discovered constructions unlock more frames.
+                trait_sites.insert({inst.type_name, inst.func_name});
+                try_seed_trait_candidates(inst.type_name, inst.func_name);
             }
             if (!callee.empty() && registry.getFunction(callee)) {
                 if (reachable_funcs.find(callee) == reachable_funcs.end()) {
@@ -229,15 +283,27 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
     };
 
     size_t work_idx = 0;
-    while (work_idx < worklist.size()) {
-        std::string fname = worklist[work_idx++];
-        if (fname == lir_func.name) {
-            inspect_instructions(lir_func);
-        } else {
-            auto* f = registry.getFunction(fname);
-            if (f) inspect_instructions(*f);
+    size_t seeded_constructed_version = 0;
+    while (true) {
+        while (work_idx < worklist.size()) {
+            std::string fname = worklist[work_idx++];
+            if (fname == lir_func.name) {
+                inspect_instructions(lir_func);
+            } else {
+                auto* f = registry.getFunction(fname);
+                if (f) inspect_instructions(*f);
+            }
+        }
+        // Fixpoint: newly discovered constructions can unlock trait
+        // candidates skipped in earlier rounds; re-seed every recorded
+        // site and drain again until the constructed set stops growing.
+        if (constructed_version == seeded_constructed_version) break;
+        seeded_constructed_version = constructed_version;
+        for (const auto& site : trait_sites) {
+            try_seed_trait_candidates(site.first, site.second);
         }
     }
+    constructed_frames_ = constructed_frames;
 
     auto is_func_ret_float = [](const LIR::LIR_Function* f) -> bool {
         if (!f) return false;
@@ -3116,13 +3182,32 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 std::string method_suffix = "." + method_name;
                 
                 std::vector<std::pair<std::string, ir::Function*>> candidates;
-                for (const auto& fname : registry.getFunctionNames()) {
-                    if (fname.size() > method_suffix.size() &&
-                        fname.compare(fname.size() - method_suffix.size(), method_suffix.size(), method_suffix) == 0) {
-                        std::string fr_name = fname.substr(0, fname.size() - method_suffix.size());
+                const auto& impls = LM::Frontend::ModuleManager::getInstance().trait_implementors();
+                auto iit = impls.find(inst.type_name);
+                if (iit != impls.end()) {
+                    // Verified implementors only: one frame_matches probe per
+                    // real candidate instead of every same-named function.
+                    for (const auto& frame_name : iit->second) {
+                        // An unconstructed frame can never be the receiver.
+                        if (!constructed_frames_.empty() && !constructed_frames_.count(frame_name)) continue;
+                        std::string fname = frame_name + "." + method_name;
                         ir::Function* target_fn = current_module_->getFunction(fname);
                         if (target_fn) {
-                            candidates.push_back({fr_name, target_fn});
+                            candidates.push_back({frame_name, target_fn});
+                        }
+                    }
+                } else {
+                    const auto& frame_methods = LM::Frontend::ModuleManager::getInstance().frame_method_names();
+                    for (const auto& fname : registry.getFunctionNames()) {
+                        if (fname.size() > method_suffix.size() &&
+                            fname.compare(fname.size() - method_suffix.size(), method_suffix.size(), method_suffix) == 0 &&
+                            (frame_methods.empty() || frame_methods.count(fname))) {
+                            std::string fr_name = fname.substr(0, fname.size() - method_suffix.size());
+                            if (!constructed_frames_.empty() && !constructed_frames_.count(fr_name)) continue;
+                            ir::Function* target_fn = current_module_->getFunction(fname);
+                            if (target_fn) {
+                                candidates.push_back({fr_name, target_fn});
+                            }
                         }
                     }
                 }
@@ -3169,45 +3254,81 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                         call_args.push_back(load_reg(arg_reg, LIR::Type::I64));
                     }
                 }
-                
-                ir::BasicBlock* b_join = builder_->createBasicBlock("trait_join_" + std::to_string(label_counter_++), main_fn);
-                ir::Instruction* res_slot = builder_->createAlloc(context_->getConstantInt(context_->getIntegerType(64), 8), context_->getIntegerType(64));
-                builder_->createStore(context_->getConstantInt(context_->getIntegerType(64), 0), res_slot);
-                ir::BasicBlock* b_fallback = trait_default_fn ? builder_->createBasicBlock("trait_default_" + std::to_string(label_counter_++), main_fn) : nullptr;
 
-                for (size_t ci = 0; ci < candidates.size(); ++ci) {
-                    ir::BasicBlock* b_match = builder_->createBasicBlock("trait_match_" + std::to_string(label_counter_++), main_fn);
-                    ir::BasicBlock* b_next = (ci + 1 < candidates.size()) ? builder_->createBasicBlock("trait_next_" + std::to_string(label_counter_++), main_fn)
-                                               : (b_fallback ? b_fallback : b_join);
-                    
-                    auto* expected_name = FyraBuiltinFunctions::get_or_create_global_str(current_module_.get(), builder_.get(),
-                        "trait_receiver_" + candidates[ci].first, candidates[ci].first);
-                    ir::Value* is_cand = builder_->createExternCall("lymar_aot_frame_matches", {receiver, expected_name,
-                        context_->getConstantInt(context_->getIntegerType(64), candidates[ci].first.size())}, context_->getIntegerType(64));
-                    builder_->createBr(is_cand, b_match, b_next);
-                    
-                    builder_->setInsertPoint(b_match);
-                    ir::Value* call_res = builder_->createCall(candidates[ci].second, call_args);
-                    builder_->createStore(erased_word(call_res), res_slot);
-                    builder_->createJmp(b_join);
-                    
-                    if (ci + 1 < candidates.size()) {
-                        builder_->setInsertPoint(b_next);
+                // Dedupe: the frame_matches candidate chain is pure dispatch —
+                // identical (trait, method, arity) inputs give identical results,
+                // so emit it once as a shared helper and call it from each site.
+                std::string dispatch_key = "__trait_dispatch_" + inst.type_name + "_" +
+                    inst.func_name + "_" + std::to_string(inst.call_args.size());
+                auto dit = trait_dispatch_helpers_.find(dispatch_key);
+                ir::Function* dispatch_fn = dit != trait_dispatch_helpers_.end() ? dit->second : nullptr;
+                if (!dispatch_fn) {
+                    std::vector<ir::Type*> helper_param_types;
+                    for (size_t ai = 0; ai < inst.call_args.size(); ++ai) {
+                        ir::Type* pty = nullptr;
+                        if (!sig_params.empty()) {
+                            auto pit = sig_params.begin();
+                            std::advance(pit, std::min(ai, sig_params.size() - 1));
+                            pty = (*pit)->getType();
+                        }
+                        helper_param_types.push_back((pty && pty->isFloatingPoint())
+                            ? static_cast<ir::Type*>(context_->getDoubleType())
+                            : static_cast<ir::Type*>(context_->getIntegerType(64)));
                     }
-                }
-                
-                if (candidates.empty() && b_fallback) {
-                    builder_->createJmp(b_fallback);
-                }
-                if (b_fallback) {
-                    builder_->setInsertPoint(b_fallback);
-                    ir::Value* fb_res = builder_->createCall(trait_default_fn, call_args);
-                    builder_->createStore(erased_word(fb_res), res_slot);
-                    builder_->createJmp(b_join);
+                    dispatch_fn = builder_->createFunction(dispatch_key, context_->getIntegerType(64), helper_param_types);
+                    trait_dispatch_helpers_[dispatch_key] = dispatch_fn;
+
+                    auto* saved_ip = builder_->getInsertPoint();
+                    ir::BasicBlock* h_entry = builder_->createBasicBlock(dispatch_key + "_entry", dispatch_fn);
+                    builder_->setInsertPoint(h_entry);
+
+                    std::vector<ir::Value*> h_args;
+                    for (auto& hp : dispatch_fn->getParameters()) h_args.push_back(hp.get());
+                    ir::Value* h_receiver = h_args.empty() ? nullptr : h_args[0];
+
+                    ir::BasicBlock* b_join = builder_->createBasicBlock("trait_join_" + std::to_string(label_counter_++), dispatch_fn);
+                    ir::Instruction* res_slot = builder_->createAlloc(context_->getConstantInt(context_->getIntegerType(64), 8), context_->getIntegerType(64));
+                    builder_->createStore(context_->getConstantInt(context_->getIntegerType(64), 0), res_slot);
+                    ir::BasicBlock* b_fallback = trait_default_fn ? builder_->createBasicBlock("trait_default_" + std::to_string(label_counter_++), dispatch_fn) : nullptr;
+
+                    for (size_t ci = 0; ci < candidates.size(); ++ci) {
+                        ir::BasicBlock* b_match = builder_->createBasicBlock("trait_match_" + std::to_string(label_counter_++), dispatch_fn);
+                        ir::BasicBlock* b_next = (ci + 1 < candidates.size()) ? builder_->createBasicBlock("trait_next_" + std::to_string(label_counter_++), dispatch_fn)
+                                               : (b_fallback ? b_fallback : b_join);
+
+                        auto* expected_name = FyraBuiltinFunctions::get_or_create_global_str(current_module_.get(), builder_.get(),
+                            "trait_receiver_" + candidates[ci].first, candidates[ci].first);
+                        ir::Value* is_cand = builder_->createExternCall("lymar_aot_frame_matches", {h_receiver, expected_name,
+                            context_->getConstantInt(context_->getIntegerType(64), candidates[ci].first.size())}, context_->getIntegerType(64));
+                        builder_->createBr(is_cand, b_match, b_next);
+
+                        builder_->setInsertPoint(b_match);
+                        ir::Value* call_res = builder_->createCall(candidates[ci].second, h_args);
+                        builder_->createStore(erased_word(call_res), res_slot);
+                        builder_->createJmp(b_join);
+
+                        if (ci + 1 < candidates.size()) {
+                            builder_->setInsertPoint(b_next);
+                        }
+                    }
+
+                    if (candidates.empty() && b_fallback) {
+                        builder_->createJmp(b_fallback);
+                    }
+                    if (b_fallback) {
+                        builder_->setInsertPoint(b_fallback);
+                        ir::Value* fb_res = builder_->createCall(trait_default_fn, h_args);
+                        builder_->createStore(erased_word(fb_res), res_slot);
+                        builder_->createJmp(b_join);
+                    }
+
+                    builder_->setInsertPoint(b_join);
+                    ir::Value* joined = builder_->createLoadl(res_slot);
+                    builder_->createRet(joined);
+                    if (saved_ip) builder_->setInsertPoint(saved_ip);
                 }
 
-                builder_->setInsertPoint(b_join);
-                ir::Value* joined = builder_->createLoadl(res_slot);
+                ir::Value* joined = builder_->createCall(dispatch_fn, call_args);
                 if (res_t == LIR::Type::F64 || res_t == LIR::Type::F32) {
                     // erased_word boxed the callee's double return; unbox it.
                     store_float_reg(inst.dst, builder_->createExternCall("lymar_aot_to_float",

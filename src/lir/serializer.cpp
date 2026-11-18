@@ -75,7 +75,7 @@ namespace LIR {
 namespace {
 
 constexpr char kMagic[4] = {'L', 'I', 'R', '1'};
-constexpr uint8_t kVersion = 2;
+constexpr uint8_t kVersion = 3; // v3: register_language_types payload appended
 
 enum class ConstTag : uint8_t {
     None         = 0,
@@ -336,6 +336,349 @@ Backend::Value read_const_val(Reader& r) {
     }
 }
 
+// ---- Language type codec (serializer version 3+) -------------------------
+// register_language_types carry frontend TypePtr trees the VM consults for
+// value representation (string conversion, casts, call marshaling, match
+// probes). They are serialized recursively. Only semantic payload is kept:
+// RefinedType conditions are AST expressions and are dropped (the refinement
+// was already enforced at type-check time), and Enum/Function name/default
+// metadata that the VM never queries is omitted.
+
+constexpr uint8_t kLangTypeNull = 0xFF;
+constexpr int kLangTypeMaxDepth = 24;
+
+void write_lang_type(Writer& w, const TypePtr& t, int depth) {
+    if (!t) { w.u8(kLangTypeNull); return; }
+    w.u8(static_cast<uint8_t>(t->tag));
+    if (depth >= kLangTypeMaxDepth) return;
+    using FT = TypeTag;
+    auto wt = [&](const TypePtr& c) { write_lang_type(w, c, depth + 1); };
+    // Payload-bearing tags write a has-payload flag first so hand-built
+    // Type(tag) values with monostate extras round-trip losslessly.
+    auto has_extra = t->extra.index() != 0;
+    switch (t->tag) {
+        case FT::List:
+            w.flag(has_extra);
+            if (has_extra) wt(std::get<ListType>(t->extra).elementType);
+            break;
+        case FT::Dict:
+            w.flag(has_extra);
+            if (has_extra) {
+                auto& d = std::get<DictType>(t->extra);
+                wt(d.keyType); wt(d.valueType);
+            }
+            break;
+        case FT::Tuple:
+            w.flag(has_extra);
+            if (has_extra) {
+                auto& tp = std::get<TupleType>(t->extra);
+                w.u32(static_cast<uint32_t>(tp.elementTypes.size()));
+                for (auto& e : tp.elementTypes) wt(e);
+            }
+            break;
+        case FT::Union:
+            w.flag(has_extra);
+            if (has_extra) {
+                auto& u = std::get<UnionType>(t->extra);
+                w.u32(static_cast<uint32_t>(u.types.size()));
+                for (auto& m : u.types) wt(m);
+                w.u32(static_cast<uint32_t>(u.variantNames.size()));
+                for (auto& n : u.variantNames) w.str(n);
+            }
+            break;
+        case FT::ErrorUnion:
+            w.flag(has_extra);
+            if (has_extra) {
+                auto& e = std::get<ErrorUnionType>(t->extra);
+                wt(e.successType);
+                w.u32(static_cast<uint32_t>(e.errorTypes.size()));
+                for (auto& n : e.errorTypes) w.str(n);
+                w.u8(e.isGenericError ? 1 : 0);
+            }
+            break;
+        case FT::Enum:
+            w.flag(has_extra);
+            if (has_extra) {
+                auto& en = std::get<EnumType>(t->extra);
+                w.str(en.name);
+                w.u32(static_cast<uint32_t>(en.values.size()));
+                for (auto& v : en.values) w.str(v);
+                w.u32(static_cast<uint32_t>(en.variantTypes.size()));
+                for (auto& kv : en.variantTypes) {
+                    w.str(kv.first);
+                    w.u32(static_cast<uint32_t>(kv.second.size()));
+                    for (auto& pt : kv.second) wt(pt);
+                }
+            }
+            break;
+        case FT::Sum:
+            w.flag(has_extra);
+            if (has_extra) {
+                auto& s = std::get<SumType>(t->extra);
+                w.u32(static_cast<uint32_t>(s.variants.size()));
+                for (auto& v : s.variants) wt(v);
+                w.u32(static_cast<uint32_t>(s.variantNames.size()));
+                for (auto& n : s.variantNames) w.str(n);
+            }
+            break;
+        case FT::Function:
+        case FT::Closure:
+            w.flag(has_extra);
+            if (has_extra) {
+                auto& f = std::get<FunctionType>(t->extra);
+                w.u32(static_cast<uint32_t>(f.paramTypes.size()));
+                for (auto& p : f.paramTypes) wt(p);
+                wt(f.returnType);
+            }
+            break;
+        case FT::UserDefined:
+            w.flag(has_extra);
+            if (has_extra) {
+                auto& u = std::get<UserDefinedType>(t->extra);
+                w.str(u.name);
+                w.u32(static_cast<uint32_t>(u.fields.size()));
+                for (auto& kv : u.fields) {
+                    w.str(kv.first);
+                    w.u32(static_cast<uint32_t>(kv.second.size()));
+                    for (auto& ft2 : kv.second) { w.str(ft2.first); wt(ft2.second); }
+                }
+            }
+            break;
+        case FT::Frame:
+            w.flag(has_extra);
+            if (has_extra) {
+                auto& fr = std::get<FrameType>(t->extra);
+                w.str(fr.name);
+                w.u32(static_cast<uint32_t>(fr.fields.size()));
+                for (auto& kv : fr.fields) { w.str(kv.first); wt(kv.second); }
+                w.u32(static_cast<uint32_t>(fr.implements.size()));
+                for (auto& n : fr.implements) w.str(n);
+                w.u32(static_cast<uint32_t>(fr.methodSignatures.size()));
+                for (auto& kv : fr.methodSignatures) { w.str(kv.first); wt(kv.second); }
+                w.u8((fr.hasInit ? 1 : 0) | (fr.hasDeinit ? 2 : 0));
+            }
+            break;
+        case FT::Trait:
+            w.flag(has_extra);
+            if (has_extra) {
+                auto& tr = std::get<TraitType>(t->extra);
+                w.str(tr.name);
+                w.u32(static_cast<uint32_t>(tr.methodSignatures.size()));
+                for (auto& kv : tr.methodSignatures) { w.str(kv.first); wt(kv.second); }
+                w.u32(static_cast<uint32_t>(tr.extends.size()));
+                for (auto& n : tr.extends) w.str(n);
+            }
+            break;
+        case FT::TraitObject:
+            w.flag(has_extra);
+            if (has_extra) {
+                auto& to = std::get<TraitObjectType>(t->extra);
+                w.str(to.traitName);
+                wt(to.underlyingType);
+            }
+            break;
+        case FT::Structural:
+            w.flag(has_extra);
+            if (has_extra) {
+                auto& s = std::get<StructuralType>(t->extra);
+                w.u32(static_cast<uint32_t>(s.fields.size()));
+                for (auto& kv : s.fields) { w.str(kv.first); wt(kv.second); }
+                w.u8(s.hasRest ? 1 : 0);
+            }
+            break;
+        case FT::Refined:
+            w.flag(has_extra);
+            if (has_extra) wt(std::get<RefinedType>(t->extra).baseType);
+            break;
+        case FT::Capability:
+            w.flag(has_extra);
+            if (has_extra) {
+                auto& c = std::get<CapabilityType>(t->extra);
+                wt(c.valueType);
+                w.str(c.region);
+                w.u64(static_cast<uint64_t>(c.begin));
+                w.u64(static_cast<uint64_t>(c.end));
+                w.u8(c.mutableAccess ? 1 : 0);
+            }
+            break;
+        default:
+            break;
+    }
+}
+
+TypePtr read_lang_type(Reader& r, int depth) {
+    uint8_t tag = r.u8();
+    if (tag == kLangTypeNull) return nullptr;
+    if (tag > static_cast<uint8_t>(TypeTag::Decimal6))
+        throw std::runtime_error("LIR deserialize: invalid language type tag");
+    auto tt = static_cast<TypeTag>(tag);
+    auto mk = [](TypeTag t) { return std::make_shared<::Type>(t); };
+    if (depth >= kLangTypeMaxDepth) return mk(tt);
+    using FT = TypeTag;
+    auto rt = [&]() { return read_lang_type(r, depth + 1); };
+    auto has_extra = [&]() { return r.u8() != 0; };
+    auto rd_strs = [&](std::vector<std::string>& out, uint32_t n) {
+        out.reserve(n);
+        for (uint32_t i = 0; i < n; ++i) out.push_back(r.str());
+    };
+    switch (tt) {
+        case FT::List: {
+            if (!has_extra()) return mk(tt);
+            return std::make_shared<::Type>(tt, ListType{rt()});
+        }
+        case FT::Dict: {
+            if (!has_extra()) return mk(tt);
+            DictType d{rt(), rt()};
+            return std::make_shared<::Type>(tt, d);
+        }
+        case FT::Tuple: {
+            if (!has_extra()) return mk(tt);
+            auto n = r.u32();
+            std::vector<TypePtr> elems;
+            elems.reserve(n);
+            for (uint32_t i = 0; i < n; ++i) elems.push_back(rt());
+            return std::make_shared<::Type>(tt, TupleType(elems));
+        }
+        case FT::Union: {
+            if (!has_extra()) return mk(tt);
+            UnionType u;
+            auto n = r.u32();
+            u.types.reserve(n);
+            for (uint32_t i = 0; i < n; ++i) u.types.push_back(rt());
+            rd_strs(u.variantNames, r.u32());
+            return std::make_shared<::Type>(tt, u);
+        }
+        case FT::ErrorUnion: {
+            if (!has_extra()) return mk(tt);
+            ErrorUnionType e;
+            e.successType = rt();
+            rd_strs(e.errorTypes, r.u32());
+            e.isGenericError = r.u8() != 0;
+            return std::make_shared<::Type>(tt, e);
+        }
+        case FT::Enum: {
+            if (!has_extra()) return mk(tt);
+            EnumType en;
+            en.name = r.str();
+            rd_strs(en.values, r.u32());
+            auto vn = r.u32();
+            for (uint32_t i = 0; i < vn; ++i) {
+                auto vname = r.str();
+                auto pt_n = r.u32();
+                std::vector<TypePtr> pts;
+                pts.reserve(pt_n);
+                for (uint32_t j = 0; j < pt_n; ++j) pts.push_back(rt());
+                en.variantTypes[vname] = std::move(pts);
+            }
+            return std::make_shared<::Type>(tt, en);
+        }
+        case FT::Sum: {
+            if (!has_extra()) return mk(tt);
+            SumType s;
+            auto n = r.u32();
+            s.variants.reserve(n);
+            for (uint32_t i = 0; i < n; ++i) s.variants.push_back(rt());
+            rd_strs(s.variantNames, r.u32());
+            return std::make_shared<::Type>(tt, s);
+        }
+        case FT::Function:
+        case FT::Closure: {
+            if (!has_extra()) return mk(tt);
+            FunctionType f;
+            auto n = r.u32();
+            f.paramTypes.reserve(n);
+            for (uint32_t i = 0; i < n; ++i) f.paramTypes.push_back(rt());
+            f.returnType = rt();
+            return std::make_shared<::Type>(tt, f);
+        }
+        case FT::UserDefined: {
+            if (!has_extra()) return mk(tt);
+            UserDefinedType u;
+            u.name = r.str();
+            auto n = r.u32();
+            for (uint32_t i = 0; i < n; ++i) {
+                auto fname = r.str();
+                std::map<std::string, TypePtr> ftypes;
+                auto nf = r.u32();
+                for (uint32_t j = 0; j < nf; ++j) {
+                    auto tname = r.str();
+                    ftypes.emplace(std::move(tname), rt());
+                }
+                u.fields.emplace_back(std::move(fname), std::move(ftypes));
+            }
+            return std::make_shared<::Type>(tt, u);
+        }
+        case FT::Frame: {
+            if (!has_extra()) return mk(tt);
+            FrameType fr;
+            fr.name = r.str();
+            auto nf = r.u32();
+            for (uint32_t i = 0; i < nf; ++i) {
+                auto fname = r.str();
+                fr.fields.emplace_back(std::move(fname), rt());
+            }
+            rd_strs(fr.implements, r.u32());
+            auto nm = r.u32();
+            for (uint32_t i = 0; i < nm; ++i) {
+                auto mname = r.str();
+                fr.methodSignatures.emplace(mname, rt());
+            }
+            auto flags = r.u8();
+            fr.hasInit = (flags & 1) != 0;
+            fr.hasDeinit = (flags & 2) != 0;
+            return std::make_shared<::Type>(tt, fr);
+        }
+        case FT::Trait: {
+            if (!has_extra()) return mk(tt);
+            TraitType tr;
+            tr.name = r.str();
+            auto nm = r.u32();
+            for (uint32_t i = 0; i < nm; ++i) {
+                auto mname = r.str();
+                tr.methodSignatures.emplace_back(mname, rt());
+            }
+            rd_strs(tr.extends, r.u32());
+            return std::make_shared<::Type>(tt, tr);
+        }
+        case FT::TraitObject: {
+            if (!has_extra()) return mk(tt);
+            TraitObjectType to;
+            to.traitName = r.str();
+            to.underlyingType = rt();
+            return std::make_shared<::Type>(tt, to);
+        }
+        case FT::Structural: {
+            if (!has_extra()) return mk(tt);
+            StructuralType s;
+            auto n = r.u32();
+            for (uint32_t i = 0; i < n; ++i) {
+                auto fname = r.str();
+                s.fields.emplace_back(std::move(fname), rt());
+            }
+            s.hasRest = r.u8() != 0;
+            return std::make_shared<::Type>(tt, s);
+        }
+        case FT::Refined: {
+            if (!has_extra()) return mk(tt);
+            RefinedType ref;
+            ref.baseType = rt();
+            return std::make_shared<::Type>(tt, ref);
+        }
+        case FT::Capability: {
+            if (!has_extra()) return mk(tt);
+            CapabilityType c;
+            c.valueType = rt();
+            c.region = r.str();
+            c.begin = static_cast<int64_t>(r.u64());
+            c.end = static_cast<int64_t>(r.u64());
+            c.mutableAccess = r.u8() != 0;
+            return std::make_shared<::Type>(tt, c);
+        }
+        default:
+            return mk(tt);
+    }
+}
+
 } // namespace
 
 // ========================================================================
@@ -437,6 +780,13 @@ std::vector<uint8_t> Serializer::serialize(const LIR_Function& func) {
     w.u8(func.gpu_stage);
     w.u64(static_cast<uint64_t>(func.gpu_threads[0])); w.u64(static_cast<uint64_t>(func.gpu_threads[1])); w.u64(static_cast<uint64_t>(func.gpu_threads[2]));
     w.u64(static_cast<uint64_t>(func.gpu_max_vertices)); w.u64(static_cast<uint64_t>(func.gpu_max_primitives));
+
+    // Language types for register metadata (version 3+)
+    w.u32(static_cast<uint32_t>(func.register_language_types.size()));
+    for (const auto& kv : func.register_language_types) {
+        w.u32(kv.first);
+        write_lang_type(w, kv.second, 0);
+    }
     return w.buf;
 }
 
@@ -591,6 +941,14 @@ LIR_Function Serializer::deserialize(const std::vector<uint8_t>& buffer) {
     if (func.gpu_stage > 4) throw std::runtime_error("LIR deserialize: invalid gpu stage");
     func.gpu_threads[0] = static_cast<int64_t>(r.u64()); func.gpu_threads[1] = static_cast<int64_t>(r.u64()); func.gpu_threads[2] = static_cast<int64_t>(r.u64());
     func.gpu_max_vertices = static_cast<int64_t>(r.u64()); func.gpu_max_primitives = static_cast<int64_t>(r.u64());
+
+    // Language types for register metadata (version 3+)
+    auto lang_count = r.u32();
+    for (uint32_t i = 0; i < lang_count; ++i) {
+        auto reg = r.u32();
+        if (reg >= func.register_count) throw std::runtime_error("LIR deserialize: invalid language-type register");
+        func.register_language_types[reg] = read_lang_type(r, 0);
+    }
 
     if (r.pos != buffer.size()) throw std::runtime_error("LIR deserialize: trailing data");
     std::vector<std::string> ownership_errors;

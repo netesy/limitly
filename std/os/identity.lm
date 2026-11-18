@@ -4,6 +4,20 @@
 import std.os.service as service;
 import std.internal.runtime as rt;
 
+// Compile-time target constants. TARGET_OS is rewritten by the compiler to
+// match the compile target (`lymar run` uses the host, `lymar build -target`
+// uses the requested platform), so `if (osid.TARGET_OS == osid.OS_WINDOWS)`
+// folds at compile time and the dead branch emits no code. Use these for
+// platform-conditional imports/dispatch; keep os_name() for runtime probes.
+pub const OS_UNKNOWN: int = 0;
+pub const OS_WINDOWS: int = 1;
+pub const OS_LINUX: int = 2;
+pub const OS_MACOS: int = 3;
+pub const OS_ANDROID: int = 4;
+pub const OS_FREEBSD: int = 5;
+pub const OS_WASI: int = 6;
+pub const TARGET_OS: int = 0;
+
 /// Returns the operating system identifier string ("windows", "linux", "darwin", "android", "freebsd", "wasi", "unknown").
 ///
 /// @return OS name string.

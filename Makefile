@@ -85,7 +85,7 @@ RSP_DIR := build/rsp
 # =============================
 PRECOMPILE_MODULES ?= std.font std.ui
 PRECOMPILE_ARTIFACTS ?= shared static
-PYTHON ?= python3
+PYTHON ?= $(shell command -v python3 2>/dev/null || command -v python 2>/dev/null || echo python3)
 PRECOMPILE_PLATFORM := $(if $(filter Windows_NT,$(OS)),windows,$(if $(filter .dylib,$(SO_EXT)),macos,linux))
 
 # Helper to find all precompilable modules (directories in std/ containing index.lm)
@@ -99,7 +99,7 @@ FRONT_SRCS := src/frontend/scanner.cpp src/frontend/parser.cpp \
               src/frontend/parser/types.cpp src/frontend/parser/patterns.cpp \
               src/frontend/cst.cpp src/frontend/cst/printer.cpp src/frontend/cst/utils.cpp \
               src/frontend/ast/printer.cpp src/frontend/type_checker/core.cpp src/frontend/type_checker/expressions.cpp src/frontend/type_checker/statements.cpp src/frontend/type_checker/declarations.cpp src/frontend/type_checker/types.cpp src/frontend/type_checker/staged_vm.cpp src/frontend/type_checker/patterns.cpp src/frontend/type_checker/utils.cpp src/frontend/type_checker_factory.cpp src/frontend/memory_checker.cpp src/memory/ownership.cpp src/frontend/constraint_engine.cpp src/frontend/module_graph.cpp src/frontend/declaration_resolver.cpp \
-              src/frontend/ast/optimizer.cpp src/frontend/optimizer/stream_fusion.cpp src/frontend/module_manager.cpp src/frontend/cheader_import.cpp
+              src/frontend/optimizer/stream_fusion.cpp src/frontend/module_manager.cpp src/frontend/cheader_import.cpp
 
 # Recursive wildcard function for pure GNU Make file discovery
 rwildcard = $(foreach d,$(wildcard $(1:=/*)),$(call rwildcard,$d,$2) $(filter $(subst *,%,$2),$d))

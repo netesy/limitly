@@ -577,7 +577,18 @@ TypePtr TypeChecker::check_if_statement(std::shared_ptr<LM::Frontend::AST::IfSta
     if (!is_boolean_type(condition_type)) {
         add_type_error("bool", condition_type->toString(), if_stmt->condition->line);
     }
-    
+
+    // Record compile-time-constant conditions so the LIR generator can emit
+    // only the live branch (dead platform dispatch arms produce no code).
+    {
+        long long ci = 0;
+        double cd = 0.0;
+        bool is_int = false;
+        if (evaluate_const_expr(if_stmt->condition, ci, cd, is_int, this)) {
+            if_stmt->const_branch = (is_int ? (ci != 0) : (cd != 0.0)) ? 1 : 0;
+        }
+    }
+
     check_statement(if_stmt->thenBranch);
     if (if_stmt->elseBranch) check_statement(if_stmt->elseBranch);
 

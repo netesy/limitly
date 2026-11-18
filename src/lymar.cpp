@@ -151,6 +151,19 @@ int Compiler::executeFile(const std::string& filename, const CompileOptions& opt
             ast = LM::Frontend::AST::StreamFusionVisitor::optimizeProgram(ast);
             auto t_opt = std::chrono::steady_clock::now();
 
+            // Publish the compile-time target OS so std.os.identity.TARGET_OS
+            // specializes and platform dispatch folds before LIR generation.
+            {
+                int target_os_code = 0;
+                if (options.target == "windows") target_os_code = 1;
+                else if (options.target == "linux") target_os_code = 2;
+                else if (options.target == "macos") target_os_code = 3;
+                else if (options.target == "android") target_os_code = 4;
+                else if (options.target == "freebsd") target_os_code = 5;
+                else if (options.target == "wasm" || options.target == "wasi") target_os_code = 6;
+                LM::Frontend::ModuleManager::getInstance().set_target_os(target_os_code);
+            }
+
             const auto verification_policy = options.strict_verification
                 ? LM::Frontend::VerificationPolicy::Strict
                 : LM::Frontend::VerificationPolicy::Hybrid;
@@ -273,6 +286,27 @@ int Compiler::executeFile(const std::string& filename, const CompileOptions& opt
                     default:
                         fyra_options.artifact_kind = LM::Backend::Fyra::ArtifactKind::Executable;
                         break;
+                }
+
+                // GUI-subsystem detection: any loaded module under the
+                // windowing/graphics stacks marks the program as a GUI app,
+                // so the Windows link emits a GUI-subsystem PE instead of a
+                // console one. All of these transitively import std.gg.
+                {
+                    static const char* kGuiRoots[] = {
+                        "std.gg", "std.ui", "std.gui", "std.game",
+                        "std.d3", "std.app", "std.events", "std.native"
+                    };
+                    for (const auto& [mname, mptr] : LM::Frontend::ModuleManager::getInstance().get_all_modules()) {
+                        for (const char* root : kGuiRoots) {
+                            const std::string r = root;
+                            if (mname == r || mname.rfind(r + ".", 0) == 0) {
+                                fyra_options.gui_app = true;
+                                break;
+                            }
+                        }
+                        if (fyra_options.gui_app) break;
+                    }
                 }
 
                 // Foreign .c/.cpp sources are compiled by the native toolchain

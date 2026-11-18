@@ -1,5 +1,6 @@
 #include "../generator.hh"
 #include "../functions.hh"
+#include "../../backend/vm/constant_utils.hh"
 #include "../../frontend/module_manager.hh"
 #include "../function_registry.hh"
 #include "../builtin_functions.hh"
@@ -149,6 +150,37 @@ void Generator::lower_function_bodies(const LM::Frontend::TypeCheckResult& type_
         
         start_cfg_build();
         enter_scope();
+
+        // Module-init memoization: __init__ is invoked by the top-level
+        // wrapper (topological order) AND inline at every import site
+        // (emit_import_stmt). Without a guard, a module imported by N
+        // others re-runs its initializers O(N) times -- and each of those
+        // runs re-triggers its own imports' inits, giving combinatorial
+        // blowup on deep import graphs (e.g. the std.ui facade). Guard with
+        // a per-module flag global: first call executes the body, later
+        // calls return immediately.
+        {
+            std::string done_name = init_func_name + ".done";
+            LIR_BasicBlock* init_body = create_basic_block("init_body");
+            LIR_BasicBlock* init_done = create_basic_block("init_done");
+            Reg flag_reg = allocate_register();
+            LIR_Inst load_done(LIR_Op::LoadGlobal, Type::Ptr, flag_reg, 0, 0);
+            load_done.func_name = done_name;
+            emit_instruction(load_done);
+            emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, flag_reg, 0, init_body->id));
+            emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, init_done->id));
+            add_block_edge(get_current_block(), init_body);
+            add_block_edge(get_current_block(), init_done);
+            set_current_block(init_done);
+            emit_instruction(LIR_Inst(LIR_Op::Return, Type::Void, 0, 0, 0));
+            set_current_block(init_body);
+            Reg one_reg = allocate_register();
+            emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, one_reg, make_i64(1)));
+            LIR_Inst store_done(LIR_Op::StoreGlobal, Type::Void, 0, one_reg, 0);
+            store_done.func_name = done_name;
+            emit_instruction(store_done);
+            global_variables_.insert(done_name);
+        }
 
         for (const auto& stmt : module->ast->statements) {
             if (dynamic_cast<LM::Frontend::AST::FunctionDeclaration*>(stmt.get()) ||

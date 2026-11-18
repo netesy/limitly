@@ -550,6 +550,20 @@ std::shared_ptr<Module> ModuleManager::load_module(const std::string& module_pat
     auto ast = parser.parse();
     if (ast) {
         ast = AST::StreamFusionVisitor::optimizeProgram(ast);
+        // Specialize compile-time target constants (std.os.identity.TARGET_OS)
+        // so platform dispatch folds before LIR generation.
+        if (module_path == "std.os.identity") {
+            auto lit_code = std::to_string(target_os_code_);
+            for (auto& stmt : ast->statements) {
+                auto var = std::dynamic_pointer_cast<LM::Frontend::AST::VarDeclaration>(stmt);
+                if (!var || !var->isConst || var->name != "TARGET_OS") continue;
+                auto lit = std::make_shared<LM::Frontend::AST::LiteralExpr>();
+                lit->line = var->line;
+                lit->value = lit_code;
+                lit->literalType = LM::Frontend::TokenType::INT_LITERAL;
+                var->initializer = lit;
+            }
+        }
     }
 
     if (!ast || LM::Error::Debugger::hasError()) {

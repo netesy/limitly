@@ -54,10 +54,30 @@ constexpr Word boolean_kind = static_cast<Word>(LM::Memory::AOTValueKind::Boolea
 // `stdout` FILE* is left NULL and std::fwrite silently writes nothing. Writing
 // through the OS console handle keeps print/output working without depending on
 // CRT stdio initialization. POSIX keeps the normal buffered stream.
+// GUI-subsystem dual console: the PE entry point never runs CRT startup,
+// so a GUI app has no std handles. AttachConsole(ATTACH_PARENT_PROCESS) once
+// and open CONOUT$/CONIN$ directly; when there is no parent console (Explorer
+// launch) every call fails fast and output stays silently discarded.
+#if defined(_WIN32)
+namespace {
+long g_console_attach_tried = 0;
+HANDLE lymar_console_handle(DWORD which, DWORD access, const char* device) {
+    HANDLE h = GetStdHandle(which);
+    if (h && h != INVALID_HANDLE_VALUE) return h;
+    if (!g_console_attach_tried) {
+        g_console_attach_tried = 1;
+        AttachConsole(ATTACH_PARENT_PROCESS);
+    }
+    return CreateFileA(device, access, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                       nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+}
+}
+#endif
+
 void lymar_stdout_write(const void* data, size_t len) {
     if (!data || len == 0) return;
 #if defined(_WIN32)
-    HANDLE handle = GetStdHandle(STD_OUTPUT_HANDLE);
+    HANDLE handle = lymar_console_handle(STD_OUTPUT_HANDLE, GENERIC_WRITE, "CONOUT$");
     if (!handle || handle == INVALID_HANDLE_VALUE) return;
     const char* bytes = static_cast<const char*>(data);
     size_t offset = 0;
@@ -1804,15 +1824,26 @@ extern "C" uint64_t lymar_aot_input(uint64_t prompt, uint64_t kind) {
     Word length = 0;
     Word str = aot_string_view(prompt, length);
     if (str && length) {
-        std::fwrite(reinterpret_cast<const char*>(str + 24), 1, length, stdout);
-        std::fflush(stdout);
+        lymar_stdout_write(reinterpret_cast<const char*>(str + 24), length);
     }
     std::string line;
     char chunk[4096];
+#if defined(_WIN32)
+    HANDLE input_handle = lymar_console_handle(STD_INPUT_HANDLE, GENERIC_READ, "CONIN$");
+    if (input_handle && input_handle != INVALID_HANDLE_VALUE) {
+        for (;;) {
+            DWORD got = 0;
+            if (!ReadFile(input_handle, chunk, sizeof(chunk), &got, nullptr) || got == 0) break;
+            line.append(chunk, got);
+            if (line.find('\n') != std::string::npos) break;
+        }
+    }
+#else
     while (std::fgets(chunk, sizeof(chunk), stdin)) {
         line += chunk;
         if (line.find('\n') != std::string::npos) break;
     }
+#endif
     if (!line.empty() && line.back() == '\n') line.pop_back();
     if (!line.empty() && line.back() == '\r') line.pop_back();
     return aot_string_make(line.data(), static_cast<Word>(line.size()));

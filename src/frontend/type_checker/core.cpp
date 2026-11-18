@@ -265,6 +265,11 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
                     }
                 }
 
+                // Share this module's compile-time constants so `alias.CONST`
+                // expressions in dependent modules can fold (each module is
+                // checked by a separate TypeChecker instance).
+                ModuleManager::getInstance().record_module_constants(path, checker.constant_ints, checker.constant_doubles);
+
                 // Keep the module's staged fns reachable for cross-module compile-time
                 // folding: `mod.staged_fn(args)` at a call site, and bare staged callees
                 // inside this module's own staged bodies.

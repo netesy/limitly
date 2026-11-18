@@ -43,7 +43,6 @@ set(FRONTEND_SOURCES
     src/frontend/type_checker_factory.cpp
     src/frontend/memory_checker.cpp
     src/memory/ownership.cpp
-    src/frontend/ast/optimizer.cpp
     src/frontend/optimizer/stream_fusion.cpp
     src/frontend/module_manager.cpp
     src/frontend/cheader_import.cpp

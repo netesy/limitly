@@ -149,6 +149,7 @@ void Generator::lower_frame_methods(LM::Frontend::AST::FrameDeclaration& frame_d
 void Generator::lower_frame_method(const std::string& frame_name, LM::Frontend::AST::FrameMethod& method) {
     // Create a function with the frame method name (frame_name.method_name)
     std::string full_method_name = frame_name + "." + method.name;
+    LM::Frontend::ModuleManager::getInstance().record_frame_method(full_method_name);
     
     auto& func_manager = LIRFunctionManager::getInstance();
     
@@ -298,6 +299,7 @@ void Generator::lower_frame_method(const std::string& frame_name, LM::Frontend::
 void Generator::lower_frame_init_method(const std::string& frame_name, LM::Frontend::AST::FrameMethod& init_method) {
     // Create a function with the frame init method name (frame_name.init)
     std::string full_method_name = frame_name + ".init";
+    LM::Frontend::ModuleManager::getInstance().record_frame_method(full_method_name);
     
     auto& func_manager = LIRFunctionManager::getInstance();
     
@@ -441,6 +443,7 @@ void Generator::lower_frame_init_method(const std::string& frame_name, LM::Front
 void Generator::lower_frame_deinit_method(const std::string& frame_name, LM::Frontend::AST::FrameMethod& deinit_method) {
     // Create a function with the frame deinit method name (frame_name.deinit)
     std::string full_method_name = frame_name + ".deinit";
+    LM::Frontend::ModuleManager::getInstance().record_frame_method(full_method_name);
     
     auto& func_manager = LIRFunctionManager::getInstance();
     

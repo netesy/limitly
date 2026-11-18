@@ -644,7 +644,20 @@ void Generator::emit_block_stmt(LM::Frontend::AST::BlockStatement& stmt) {
 void Generator::emit_if_stmt(LM::Frontend::AST::IfStatement& stmt) {
     bool prev_in_control_flow = cfg_context_.in_control_flow;
     cfg_context_.in_control_flow = true;
-    
+
+    // Compile-time-constant condition (e.g. osid.TARGET_OS == osid.OS_WINDOWS):
+    // emit only the live branch so dead platform dispatch produces no code.
+    if (stmt.const_branch == 1) {
+        if (stmt.thenBranch) emit_stmt(*stmt.thenBranch);
+        cfg_context_.in_control_flow = prev_in_control_flow;
+        return;
+    }
+    if (stmt.const_branch == 0) {
+        if (stmt.elseBranch) emit_stmt(*stmt.elseBranch);
+        cfg_context_.in_control_flow = prev_in_control_flow;
+        return;
+    }
+
     if (cfg_context_.building_cfg) {
         // CFG mode: create basic blocks
         emit_if_stmt_cfg(stmt);

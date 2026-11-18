@@ -474,6 +474,41 @@ bool evaluate_const_expr(std::shared_ptr<LM::Frontend::AST::Expression> expr, lo
                 return true;
             }
         }
+    } else if (auto member = std::dynamic_pointer_cast<LM::Frontend::AST::MemberExpr>(expr)) {
+        // Module-constant access (`alias.CONST`): the alias resolves to a
+        // module path; constants are looked up in the cross-module registry
+        // recorded by ModuleManager (each module has its own TypeChecker, so
+        // the checker's local constant_ints only covers same-module consts).
+        // Re-exports are followed via the module's reexport_sources map.
+        if (checker) {
+            if (auto obj = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(member->object)) {
+                auto alias_it = checker->get_import_aliases().find(obj->name);
+                if (alias_it != checker->get_import_aliases().end()) {
+                    auto& mm = ModuleManager::getInstance();
+                    std::string mod_path = alias_it->second;
+                    if (auto mod = mm.get_module(mod_path)) {
+                        auto rs = mod->reexport_sources.find(member->name);
+                        if (rs != mod->reexport_sources.end()) mod_path = rs->second;
+                    }
+                    if (auto ints = mm.module_int_constants(mod_path)) {
+                        auto it_int = ints->find(member->name);
+                        if (it_int != ints->end()) {
+                            out_int = it_int->second;
+                            is_int = true;
+                            return true;
+                        }
+                    }
+                    if (auto dbls = mm.module_double_constants(mod_path)) {
+                        auto it_double = dbls->find(member->name);
+                        if (it_double != dbls->end()) {
+                            out_double = it_double->second;
+                            is_int = false;
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
     } else if (auto literal = std::dynamic_pointer_cast<LM::Frontend::AST::LiteralExpr>(expr)) {
         if (std::holds_alternative<bool>(literal->value)) {
             out_int = std::get<bool>(literal->value) ? 1 : 0;
@@ -551,11 +586,35 @@ bool evaluate_const_expr(std::shared_ptr<LM::Frontend::AST::Expression> expr, lo
             }
         }
 
-        long long left_int = 0, right_int = 0;
-        double left_double = 0.0, right_double = 0.0;
-        bool left_is_int = false, right_is_int = false;
+        // Short-circuit const propagation for `and`/`or`: the runtime skips
+        // the right operand when the left decides the result, so a constant
+        // left operand determines the fold without evaluating the right.
+        if (binary->op == TokenType::AND || binary->op == TokenType::OR) {
+            long long li = 0; double ld = 0.0; bool li_is_int = false;
+            if (evaluate_const_expr(binary->left, li, ld, li_is_int, checker)) {
+                bool ltruth = li_is_int ? (li != 0) : (ld != 0.0);
+                bool is_and = (binary->op == TokenType::AND);
+                if ((is_and && !ltruth) || (!is_and && ltruth)) {
+                    out_int = ltruth ? 1 : 0;
+                    is_int = true;
+                    return true;
+                }
+                long long ri = 0; double rd = 0.0; bool ri_is_int = false;
+                if (evaluate_const_expr(binary->right, ri, rd, ri_is_int, checker)) {
+                    bool rtruth = ri_is_int ? (ri != 0) : (rd != 0.0);
+                    out_int = rtruth ? 1 : 0;
+                    is_int = true;
+                    return true;
+                }
+            }
+            return false;
+        }
 
-        if (evaluate_const_expr(binary->left, left_int, left_double, left_is_int, checker) &&
+        long long left_int = 0, right_int = 0;
+        double left_double = 0.0, right_double = 0.0;
+        bool left_is_int = false, right_is_int = false;
+
+        if (evaluate_const_expr(binary->left, left_int, left_double, left_is_int, checker) &&
             evaluate_const_expr(binary->right, right_int, right_double, right_is_int, checker)) {
 
             bool both_int = left_is_int && right_is_int;

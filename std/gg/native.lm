@@ -14,6 +14,7 @@
 import std.native as native;
 import std.native.d3d11 as d3d;
 import std.native.vulkan as vk;
+import std.os.identity as osid;
 import std.ffi as ffi;
 import std.string.replace as replace;
 
@@ -73,72 +74,77 @@ fn alloc_persist(size: int): int {
 
 fn drv_attach(hwnd: int, w: int, h: int): int {
     if (_drv == "vulkan") { return vk.gfx_attach(hwnd, w, h); }
-    return d3d.gfx_attach(hwnd, w, h);
+    if (osid.TARGET_OS == osid.OS_WINDOWS) { return d3d.gfx_attach(hwnd, w, h); }
+    return 0;
 }
 fn drv_detach(): nil {
     if (_drv == "vulkan") { vk.gfx_detach(); return; }
-    d3d.gfx_detach();
+    if (osid.TARGET_OS == osid.OS_WINDOWS) { d3d.gfx_detach(); return; }
 }
 fn drv_resize(w: int, h: int): int {
     if (_drv == "vulkan") { return vk.gfx_resize(w, h); }
-    return d3d.gfx_resize(w, h);
+    if (osid.TARGET_OS == osid.OS_WINDOWS) { return d3d.gfx_resize(w, h); }
+    return 0;
 }
 fn drv_begin_frame(): int {
     if (_drv == "vulkan") { return vk.gfx_begin_frame(); }
-    return d3d.gfx_begin_frame();
+    if (osid.TARGET_OS == osid.OS_WINDOWS) { return d3d.gfx_begin_frame(); }
+    return 0;
 }
 fn drv_clear(r: float, g: float, b: float, a: float): nil {
     if (_drv == "vulkan") { vk.gfx_clear(r, g, b, a); return; }
-    d3d.gfx_clear(r, g, b, a);
+    if (osid.TARGET_OS == osid.OS_WINDOWS) { d3d.gfx_clear(r, g, b, a); return; }
 }
 fn drv_end_frame(): int {
     if (_drv == "vulkan") { return vk.gfx_end_frame(); }
-    d3d.gfx_end_frame();
+    if (osid.TARGET_OS == osid.OS_WINDOWS) { d3d.gfx_end_frame(); return 1; }
     return 1;
 }
 fn drv_set_topology(t: int): nil {
     if (_drv == "vulkan") { vk.gfx_set_topology(t); return; }
-    d3d.gfx_set_topology(t);
+    if (osid.TARGET_OS == osid.OS_WINDOWS) { d3d.gfx_set_topology(t); return; }
 }
 fn drv_set_shaders(vs: int, ps: int): nil {
     if (_drv == "vulkan") { vk.gfx_set_shaders(vs, ps); return; }
-    d3d.gfx_set_shaders(vs, ps);
+    if (osid.TARGET_OS == osid.OS_WINDOWS) { d3d.gfx_set_shaders(vs, ps); return; }
 }
 fn drv_set_input_layout(il: int): nil {
     if (_drv == "vulkan") { vk.gfx_set_input_layout(il); return; }
-    d3d.gfx_set_input_layout(il);
+    if (osid.TARGET_OS == osid.OS_WINDOWS) { d3d.gfx_set_input_layout(il); return; }
 }
 fn drv_set_blend_state(s: int): nil {
     if (_drv == "vulkan") { vk.gfx_set_blend_state(s); return; }
-    d3d.gfx_set_blend_state(s);
+    if (osid.TARGET_OS == osid.OS_WINDOWS) { d3d.gfx_set_blend_state(s); return; }
 }
 fn drv_set_raster_state(s: int): nil {
     if (_drv == "vulkan") { vk.gfx_set_raster_state(s); return; }
-    d3d.gfx_set_raster_state(s);
+    if (osid.TARGET_OS == osid.OS_WINDOWS) { d3d.gfx_set_raster_state(s); return; }
 }
 fn drv_set_depth_state(s: int, ref_: int): nil {
     if (_drv == "vulkan") { vk.gfx_set_depth_state(s, ref_); return; }
-    d3d.gfx_set_depth_state(s, ref_);
+    if (osid.TARGET_OS == osid.OS_WINDOWS) { d3d.gfx_set_depth_state(s, ref_); return; }
 }
 fn drv_dyn_buf(bytes: int, bind: int, stride: int): int {
     if (_drv == "vulkan") { return vk.gfx_buffer_create_dynamic(bytes, bind, stride); }
-    return d3d.gfx_buffer_create_dynamic(bytes, bind, stride);
+    if (osid.TARGET_OS == osid.OS_WINDOWS) { return d3d.gfx_buffer_create_dynamic(bytes, bind, stride); }
+    return 0;
 }
 fn drv_buf_update(buf: int, src: int, bytes: int): int {
     if (_drv == "vulkan") { return vk.gfx_buffer_update(buf, src, bytes, bytes); }
-    return d3d.gfx_buffer_update(buf, src, bytes, bytes);
+    if (osid.TARGET_OS == osid.OS_WINDOWS) { return d3d.gfx_buffer_update(buf, src, bytes, bytes); }
+    return 0;
 }
 fn drv_set_vb(slot: int, buf: int, stride: int, off: int): nil {
     if (_drv == "vulkan") { vk.gfx_set_vertex_buffer(slot, buf, stride, off); return; }
-    d3d.gfx_set_vertex_buffer(slot, buf, stride, off);
+    if (osid.TARGET_OS == osid.OS_WINDOWS) { d3d.gfx_set_vertex_buffer(slot, buf, stride, off); return; }
 }
 fn drv_draw(count: int, start: int): nil {
     if (_drv == "vulkan") { vk.gfx_draw(count, start); return; }
-    d3d.gfx_draw(count, start);
+    if (osid.TARGET_OS == osid.OS_WINDOWS) { d3d.gfx_draw(count, start); return; }
 }
 fn drv_scissor(x: int, y: int, w: int, h: int): nil {
     if (_drv == "vulkan") { vk.gfx_set_scissor(x, y, w, h); return; }
-    d3d.gfx_set_scissor(x, y, w, h);
+    if (osid.TARGET_OS == osid.OS_WINDOWS) { d3d.gfx_set_scissor(x, y, w, h); return; }
 }
 
 // ── shader sources ──────────────────────────────────────────────────
@@ -188,7 +194,7 @@ fn pipeline_init(): int {
             _vs = vk.gfx_vs_create(vp, len(_VS_SPV) * 4);
             _ps = vk.gfx_ps_create(pp, len(_PS_SPV) * 4);
             _il = vk.gfx_input_layout_create(names, [10, 2], 0, 0);
-        } else {
+        } elif (osid.TARGET_OS == osid.OS_WINDOWS) {
             var vb_ = d3d.gfx_compile(_VS_HLSL, "main", "vs_5_0");
             var pb_ = d3d.gfx_compile(_PS_HLSL, "main", "ps_5_0");
             if (vb_ == 0 or pb_ == 0) { return 0; }
@@ -206,7 +212,7 @@ fn pipeline_init(): int {
             _blend = vk.gfx_blend_state_create_ex(1);
             _rast = vk.gfx_raster_state_create(0, 0);
             _depth = vk.gfx_depth_state_create(0, 0, 7);
-        } else {
+        } elif (osid.TARGET_OS == osid.OS_WINDOWS) {
             _blend = d3d.gfx_blend_state_create_ex(1);
             _rast = d3d.gfx_raster_state_create(0, 0);
             _depth = d3d.gfx_depth_state_create(0, 0, 7);

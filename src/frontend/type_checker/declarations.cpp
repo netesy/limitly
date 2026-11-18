@@ -611,6 +611,45 @@ TypePtr TypeChecker::check_frame_declaration_with_name(const std::string& name, 
         }
 
         const auto& trait_info = it->second;
+
+        // Record verified conformance for backend dispatch tree-shaking.
+        // trait_info.name may be an alias spelling (alias.Trait) rather than
+        // the canonical module.Trait identity that backend type_name carries,
+        // so resolve the declaring module via the shared declaration node.
+        {
+            auto& tmm = LM::Frontend::ModuleManager::getInstance();
+            std::string canon_trait;
+            auto prefix_of = [](const std::string& n) -> std::string {
+                auto pos = n.rfind('.');
+                return pos == std::string::npos ? std::string() : n.substr(0, pos);
+            };
+            if (!trait_info.name.empty() && !prefix_of(trait_info.name).empty() &&
+                tmm.get_module(prefix_of(trait_info.name))) {
+                canon_trait = trait_info.name;
+            } else if (trait_info.declaration) {
+                for (const auto& [mpath, mod] : tmm.get_all_modules()) {
+                    if (mpath == "root" || !mod || !mod->ast) continue;
+                    for (const auto& st : mod->ast->statements) {
+                        if (auto td = std::dynamic_pointer_cast<LM::Frontend::AST::TraitDeclaration>(st);
+                            td && td == trait_info.declaration) {
+                            canon_trait = mpath + "." + td->name;
+                        }
+                    }
+                }
+                if (canon_trait.empty()) {
+                    canon_trait = qualify_declared_name(trait_info.declaration->name);
+                }
+            } else {
+                canon_trait = trait_info.name;
+            }
+            if (!canon_trait.empty()) {
+                if (std::getenv("LYMAR_DEBUG_TRAITS"))
+                    std::cerr << "[RECORD] trait='" << canon_trait << "' frame='" << canon
+                              << "' (written='" << trait_name << "' tiname='" << trait_info.name << "')\n";
+                tmm.record_trait_implementor(canon_trait, canon);
+            }
+        }
+
         for (const auto& trait_method : trait_info.declaration->methods) {
             // Find the frame member that claims to satisfy this requirement.
             std::shared_ptr<LM::Frontend::AST::FrameMethod> offered_method;

@@ -77,10 +77,59 @@ public:
     std::vector<std::string> get_topological_order();
     bool has_circular_dependencies();
 
+    // Trait conformance registry: canonical trait name -> set of canonical
+    // frame names that were verified to implement it (including via parent
+    // traits). Recorded by the type checker where alias resolution has
+    // already succeeded; consumed by backend reachability/dispatch so trait
+    // calls only keep real implementors instead of every same-named method.
+    void record_trait_implementor(const std::string& trait_name, const std::string& frame_name) {
+        trait_implementors_[trait_name].insert(frame_name);
+    }
+    const std::map<std::string, std::set<std::string>>& trait_implementors() const {
+        return trait_implementors_;
+    }
+
+    // Frame-method registry: LIR function names (module.Frame.method) that
+    // are frame methods, recorded during LIR lowering. Backend trait
+    // dispatch uses it to exclude module-level functions that merely share
+    // a method's name. Empty on LIR-cache hits (lowering is skipped), in
+    // which case consumers must fall back to unfiltered matching.
+    void record_frame_method(const std::string& function_name) {
+        frame_method_names_.insert(function_name);
+    }
+    const std::set<std::string>& frame_method_names() const { return frame_method_names_; }
+
+    // Compile-time target OS specialization. The driver sets this once per
+    // compilation (host OS for `run`, -target for `build`); load_module then
+    // rewrites the std.os.identity TARGET_OS const initializer so platform
+    // dispatch folds at compile time and dead branches produce no code.
+    // Codes: 0=unknown 1=windows 2=linux 3=macos 4=android 5=freebsd 6=wasi
+    static void set_target_os(int code) { target_os_code_ = code; }
+    static int target_os() { return target_os_code_; }
+
     // Set search directories for module imports
     void set_include_dirs(const std::vector<std::string>& dirs);
     // Add a single search directory (used by c: scheme binding generation)
     void add_include_path(const std::string& dir);
+
+    // Cross-module compile-time constants. Each module is type-checked by its
+    // own TypeChecker instance, so const tables do not cross module boundaries
+    // on their own; check_program records them here keyed by module path so
+    // `alias.CONST` expressions in other modules can fold at compile time.
+    void record_module_constants(const std::string& module_path,
+                                 const std::unordered_map<std::string, long long>& ints,
+                                 const std::unordered_map<std::string, double>& doubles) {
+        module_int_consts_[module_path] = ints;
+        module_double_consts_[module_path] = doubles;
+    }
+    const std::unordered_map<std::string, long long>* module_int_constants(const std::string& module_path) const {
+        auto it = module_int_consts_.find(module_path);
+        return it == module_int_consts_.end() ? nullptr : &it->second;
+    }
+    const std::unordered_map<std::string, double>* module_double_constants(const std::string& module_path) const {
+        auto it = module_double_consts_.find(module_path);
+        return it == module_double_consts_.end() ? nullptr : &it->second;
+    }
 
     // Precompiled module discovery and registration
     const std::unordered_map<std::string, std::vector<CompiledModuleMeta>>& get_compiled_modules() const {
@@ -104,6 +153,12 @@ public:
         modules_.clear();
         compiled_modules_.clear();
         file_cache_.clear();
+        // Conformance facts are re-recorded by each type-check pass; keeping
+        // stale entries would only over-approximate dispatch candidates.
+        trait_implementors_.clear();
+        frame_method_names_.clear();
+        module_int_consts_.clear();
+        module_double_consts_.clear();
         compiled_modules_revision_counter().fetch_add(1, std::memory_order_release);
         // Type checking reloads modules after resolution; keep the configured
         // search paths so -I and installed LYMAR_HOME modules remain available.
@@ -116,10 +171,33 @@ private:
     std::vector<std::string> include_dirs_;
     std::unordered_map<std::string, std::string> file_cache_;
     std::unordered_map<std::string, std::vector<CompiledModuleMeta>> compiled_modules_;
+    std::map<std::string, std::set<std::string>> trait_implementors_;
+    std::set<std::string> frame_method_names_;
+    // Defaults to the host OS so tools that never call set_target_os (LSP,
+    // DAP, linter) still get correct specialization; lymar.cpp overrides with
+    // options.target for cross-compilation.
+    static inline int target_os_code_ =
+#ifdef _WIN32
+        1;
+#elif defined(__APPLE__)
+        3;
+#elif defined(__ANDROID__)
+        4;
+#elif defined(__FreeBSD__)
+        5;
+#elif defined(__wasi__) || defined(__wasm__)
+        6;
+#elif defined(__linux__)
+        2;
+#else
+        0;
+#endif
     static std::atomic<uint64_t>& compiled_modules_revision_counter() {
         static std::atomic<uint64_t> revision{0};
         return revision;
     }
+    std::map<std::string, std::unordered_map<std::string, long long>> module_int_consts_;
+    std::map<std::string, std::unordered_map<std::string, double>> module_double_consts_;
     mutable std::mutex modules_mutex_;
 
     std::shared_ptr<Module> get_module_unlocked(const std::string& name) const;

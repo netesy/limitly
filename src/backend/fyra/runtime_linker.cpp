@@ -203,6 +203,9 @@ std::filesystem::path libffi_archive(const target::TargetDescriptor& t) {
         return result;
     }
     if (linker != "driver") {
+        // GUI-subsystem executables (std.gg/ui/game/d3/... in the module
+        // graph) get PE subsystem 2 instead of the default console one.
+        if (options.gui_app) backend.peSubsystem(2);
         backend.addStaticLibrary(runtime.string());
         // Contribute the target C/C++ runtime archives so the self-contained
         // Fyra image links without an external driver on Windows.
@@ -238,6 +241,7 @@ std::filesystem::path libffi_archive(const target::TargetDescriptor& t) {
     if (target.os == target::OS::Windows) {
         command.push_back("-static-libgcc");
         command.push_back("-static-libstdc++");
+        if (options.gui_app) command.push_back("-mwindows");
     }
     command.push_back(temporary);
     // Foreign toolchain objects (roadmap item 2a) sit next to the program

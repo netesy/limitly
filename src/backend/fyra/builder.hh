@@ -35,6 +35,13 @@ private:
     std::unordered_map<std::string, LIR::Type> global_types_;
     std::vector<std::string> errors_;
     int label_counter_ = 0;
+    // Trait dispatch dedupe: one shared helper per (trait, method, arity)
+    // instead of inlining the frame_matches candidate chain at every call site.
+    std::unordered_map<std::string, ir::Function*> trait_dispatch_helpers_;
+    // Frames with a reachable NewFrame instruction. Structural-trait dispatch
+    // candidates are restricted to these frames: an unconstructed frame can
+    // never be a trait receiver, so its methods can be tree-shaken.
+    std::unordered_set<std::string> constructed_frames_;
 
     ir::Type* lir_type_to_fyra_type(LIR::Type lir_type);
     std::string generate_label();

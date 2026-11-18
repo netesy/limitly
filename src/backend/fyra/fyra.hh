@@ -68,6 +68,10 @@ struct FyraCompileOptions {
     // C++ driver, or the host shared-module emitter.
     std::vector<std::string> native_objects;
     std::vector<std::string> native_link_libs;
+    // True when the program's module graph contains a GUI/windowing stack
+    // (std.gg/ui/gui/game/d3/app/events/native). Windows executables then
+    // link with the GUI subsystem instead of the default console one.
+    bool gui_app = false;
 };
 
 struct CompileResult {

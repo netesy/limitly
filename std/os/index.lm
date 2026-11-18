@@ -15,3 +15,4 @@
 pub import std.os.environment show getenv, getenv_or, setenv, unsetenv, env_vars;
 pub import std.os.directories show cwd, chdir, home_dir, temp_dir, exe_path;
 pub import std.os.identity show platform, os_name, arch, hostname, num_cpu, is_windows, is_linux, is_macos, is_wasm, is_64bit, path_separator, path_list_separator;
+pub import std.os.identity show OS_UNKNOWN, OS_WINDOWS, OS_LINUX, OS_MACOS, OS_ANDROID, OS_FREEBSD, OS_WASI, TARGET_OS;
