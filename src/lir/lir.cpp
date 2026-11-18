@@ -179,6 +179,7 @@ std::string LIR_Inst::to_string() const {
             break;
         case LIR_Op::GetTag:
         case LIR_Op::GetPayload:
+        case LIR_Op::ProbeKind:
             oss << " r" << dst << ", r" << a;
             break;
         case LIR_Op::NewFrame:

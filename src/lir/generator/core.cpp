@@ -258,16 +258,22 @@ void Generator::generate_function(LM::Frontend::AST::FunctionDeclaration& fn) {
     // Register regular parameters
     for (size_t i = 0; i < fn.params.size(); ++i) {
         bind_variable(fn.params[i].first, static_cast<Reg>(i));
-        TypePtr p_type = fn.params[i].second ? convert_ast_type_to_lir_type(fn.params[i].second) : nullptr;
+        // Untyped parameters are `any`: they carry erased words whose kind is
+        // only known dynamically, so they must be pointer-classified. A null
+        // type would land them in scalar slots (kind 0), breaking match guards,
+        // printing, and GC visibility of the payload pointer.
+        TypePtr p_type = fn.params[i].second ? convert_ast_type_to_lir_type(fn.params[i].second)
+                                             : std::make_shared<::Type>(::TypeTag::Any);
         set_register_language_type(static_cast<Reg>(i), p_type);
         set_register_type(static_cast<Reg>(i), p_type);
     }
-    
+
     // Register optional parameters
     for (size_t i = 0; i < fn.optionalParams.size(); ++i) {
         size_t reg_index = fn.params.size() + i;
         bind_variable(fn.optionalParams[i].first, static_cast<Reg>(reg_index));
-        TypePtr p_type = fn.optionalParams[i].second.first ? convert_ast_type_to_lir_type(fn.optionalParams[i].second.first) : nullptr;
+        TypePtr p_type = fn.optionalParams[i].second.first ? convert_ast_type_to_lir_type(fn.optionalParams[i].second.first)
+                                                           : std::make_shared<::Type>(::TypeTag::Any);
         set_register_language_type(static_cast<Reg>(reg_index), p_type);
         set_register_type(static_cast<Reg>(reg_index), p_type);
     }
@@ -534,6 +540,10 @@ void Generator::set_register_abi_type(Reg reg, Type abi_type) {
     }
 }
 
+
+void Generator::tag_register_erased(Reg reg) {
+    set_register_language_type(reg, std::make_shared<::Type>(::TypeTag::Any));
+}
 
 void Generator::set_register_language_type(Reg reg, TypePtr lang_type) {
     register_language_types_[reg] = lang_type;
@@ -1220,7 +1230,9 @@ bool Generator::validate_cfg() {
             
             for (size_t i = 0; i < block->instructions.size(); ++i) {
                 const auto& inst = block->instructions[i];
-                if (inst.op == LIR_Op::Unwrap) {
+                // imm != 0 marks a value-level unwrap (e.g. `as` narrowing of a
+                // union), which carries no error-propagation obligation.
+                if (inst.op == LIR_Op::Unwrap && inst.imm == 0) {
                     // After unwrap, we should either:
                     // 1. Have a return/halt in the same block
                     // 2. Have successors that lead to proper termination

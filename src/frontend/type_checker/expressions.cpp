@@ -1,4 +1,5 @@
 #include "../type_checker.hh"
+#include "../module_manager.hh"
 
 using namespace LM::Frontend;
 
@@ -1090,9 +1091,21 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
             }
         }
         if (!obj_path.empty() && !is_local_shadow) {
-            auto alias_it = import_aliases.find(obj_path);
-            if (alias_it != import_aliases.end()) {
-                std::string qualified = alias_it->second + "." + member_expr->name;
+            // Inside a module-owned staged body the alias lives in that module's import
+            // table, not the importing program's.
+            std::string resolved_mod;
+            if (auto alias_it = import_aliases.find(obj_path); alias_it != import_aliases.end()) {
+                resolved_mod = alias_it->second;
+            } else if (!stage0_scope_module_.empty()) {
+                auto mod_aliases = module_alias_map(stage0_scope_module_);
+                if (auto alias_it = mod_aliases.find(obj_path); alias_it != mod_aliases.end()) {
+                    resolved_mod = alias_it->second;
+                } else if (ModuleManager::getInstance().get_module(obj_path)) {
+                    resolved_mod = obj_path;
+                }
+            }
+            if (!resolved_mod.empty()) {
+                std::string qualified = resolved_mod + "." + member_expr->name;
                 auto frame_it = frame_declarations.find(qualified);
                 if (frame_it != frame_declarations.end()) {
                     target_name = qualified + ".init";
@@ -1149,22 +1162,35 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
 
     // --- staged fn: fold the call to a compile-time constant ---
     if (!target_name.empty()) {
-        auto staged_it = staged_functions_.find(target_name);
+        auto staged_decl = find_staged_decl(target_name, stage0_scope_module_);
         // A staged call inside a body compiled for the stage-0 VM is a real call, not a fold:
         // the arguments are values that only exist while the body runs, so there is nothing to
         // fold, and a staged fn has no runtime symbol to call. Instead the callee is lowered and
         // kept registered in the LIR FunctionRegistry by stage0_prepare_fn(), so the Call the
         // generator emits resolves into it. That covers both self-recursion and nested staged
         // calls, which is what lets a loop-shaped body use the same helpers as a foldable one.
-        if (checking_staged_body_ && staged_it != staged_functions_.end()) {
-            if (is_staged_type_fn(staged_it->second)) {
+        if (checking_staged_body_ && staged_decl) {
+            if (is_staged_type_fn(staged_decl)) {
                 add_error("stage 0 VM: staged fn '" + target_name + "' returns type and cannot be "
                           "called from a body compiled for the VM", expr->line);
                 expr->inferred_type = type_system.ANY_TYPE;
                 return type_system.ANY_TYPE;
             }
+            // A bare call to a module-owned staged fn lowers to Call func_name "mod.fn" so it
+            // matches the qualified key stage0_prepare_fn registers under; member-expression
+            // callees already carry their qualified spelling.
+            if (auto ve = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(expr->callee)) {
+                if (auto smit = staged_fn_modules_.find(staged_decl.get());
+                    smit != staged_fn_modules_.end() && ve->name == staged_decl->name) {
+                    ve->name = smit->second + "." + staged_decl->name;
+                }
+            }
             TypePtr staged_callee_return = type_system.ANY_TYPE;
             auto sig_it = function_signatures.find(target_name);
+            if (sig_it == function_signatures.end() && target_name.find('.') == std::string::npos &&
+                !stage0_scope_module_.empty()) {
+                sig_it = function_signatures.find(stage0_scope_module_ + "." + target_name);
+            }
             if (sig_it != function_signatures.end()) {
                 staged_callee_return = sig_it->second.return_type;
                 const size_t want = sig_it->second.param_types.size();
@@ -1177,8 +1203,8 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
             expr->inferred_type = staged_callee_return;
             return staged_callee_return;
         }
-        if (staged_it != staged_functions_.end()) {
-            auto fn = staged_it->second;
+        if (staged_decl) {
+            auto fn = staged_decl;
             if (is_staged_type_fn(fn)) {
                 // Type constructors are callable only from type positions (annotations);
                 // there is no runtime value to produce here.
@@ -1188,6 +1214,10 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
             }
             TypePtr rt = type_system.ANY_TYPE;
             auto sig_it = function_signatures.find(target_name);
+            if (sig_it == function_signatures.end() && target_name.find('.') == std::string::npos &&
+                !stage0_scope_module_.empty()) {
+                sig_it = function_signatures.find(stage0_scope_module_ + "." + target_name);
+            }
             if (sig_it != function_signatures.end()) rt = sig_it->second.return_type;
 
             if (!expr->namedArgs.empty()) {
@@ -2039,6 +2069,50 @@ TypePtr TypeChecker::check_assign_expr(std::shared_ptr<LM::Frontend::AST::Assign
     // Handle member assignment (e.g., obj.field = value)
     if (expr->object && expr->member) {
         TypePtr object_type = check_expression(expr->object);
+        
+        // Module variable assignment (e.g., `state.counter = 41` where `state`
+        // is an import alias): the object resolves to a Frame-typed alias but
+        // the member is a module-level variable, not a frame field.
+        if (object_type && object_type->tag == TypeTag::Frame) {
+            auto* fData = std::get_if<FrameType>(&object_type->extra);
+            if (fData && import_aliases.count(fData->name)) {
+                std::string alias = fData->name;
+                std::string target_mod = import_aliases[alias];
+                std::string member_name = *expr->member;
+                auto find_member = [&](const std::string& qname) -> TypePtr {
+                    TypePtr found = lookup_variable(qname);
+                    if (found) return found;
+                    if (variable_types.count(qname)) return variable_types[qname];
+                    std::string q_low = qname;
+                    for (char& c : q_low) c = std::tolower(c);
+                    for (const auto& kv : variable_types) {
+                        std::string k_low = kv.first;
+                        for (char& c : k_low) c = std::tolower(c);
+                        if (k_low == q_low) return kv.second;
+                    }
+                    return nullptr;
+                };
+                TypePtr member_type = find_member(alias + "." + member_name);
+                if (!member_type && !target_mod.empty()) member_type = find_member(target_mod + "." + member_name);
+                if (!member_type) member_type = find_member(member_name);
+                if (!member_type && !target_mod.empty()) {
+                    for (const auto& kv : variable_types) {
+                        if (kv.first.starts_with(target_mod + ".") && kv.first.ends_with("." + member_name)) {
+                            member_type = kv.second;
+                            break;
+                        }
+                    }
+                }
+                if (member_type) {
+                    expected_type = member_type;
+                    TypePtr value_type = check_expression(expr->value, expected_type);
+                    if (!is_type_compatible(member_type, value_type)) {
+                        add_type_error(member_type->toString(), value_type->toString(), expr->line);
+                    }
+                    return value_type;
+                }
+            }
+        }
         
         // Handle frame field assignment
         if (object_type && object_type->tag == TypeTag::Frame) {
@@ -2932,6 +3006,18 @@ TypePtr TypeChecker::check_ok_construct_expr(std::shared_ptr<LM::Frontend::AST::
     return ok_type;
 }
 
+// True when every path through the statement produces a value via `return`
+// (used to decide whether a `? else` fallback can leave the result nil).
+static bool stmt_always_returns(const LM::Frontend::AST::Statement* stmt) {
+    if (!stmt) return false;
+    if (dynamic_cast<const LM::Frontend::AST::ReturnStatement*>(stmt)) return true;
+    if (auto* block = dynamic_cast<const LM::Frontend::AST::BlockStatement*>(stmt))
+        return !block->statements.empty() && stmt_always_returns(block->statements.back().get());
+    if (auto* ifs = dynamic_cast<const LM::Frontend::AST::IfStatement*>(stmt))
+        return stmt_always_returns(ifs->thenBranch.get()) && stmt_always_returns(ifs->elseBranch.get());
+    return false;
+}
+
 TypePtr TypeChecker::check_fallible_expr(std::shared_ptr<LM::Frontend::AST::FallibleExpr> expr) {
     if (!expr) return nullptr;
     
@@ -2954,7 +3040,16 @@ TypePtr TypeChecker::check_fallible_expr(std::shared_ptr<LM::Frontend::AST::Fall
         add_error("Failed to extract success type from fallible type", expr->line);
         return type_system.NIL_TYPE;
     }
-    
+
+    // A `? else` block that can complete without producing a value leaves the
+    // result potentially nil (bare trailing expressions are discarded). Widen
+    // the type to a union so consumers keep erased-word semantics — otherwise
+    // an `int` binding silently holds the nil word and prints/compares as `2`.
+    if (expr->elseHandler && !stmt_always_returns(expr->elseHandler.get())) {
+        expr->inferred_type = type_system.createUnionType({success_type, type_system.NIL_TYPE});
+        return expr->inferred_type;
+    }
+
     expr->inferred_type = success_type;
     return success_type;
 }

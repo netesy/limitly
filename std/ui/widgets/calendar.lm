@@ -133,9 +133,9 @@ frame Calendar {
     pub fn parse_date(ds: str): nil {
         val parts = split.split(ds, "-");
         if (len(parts) >= 3) {
-            self.year = parse.parse_int(parts[0])? else { self.year };
-            self.month = parse.parse_int(parts[1])? else { self.month };
-            self.selected_day = parse.parse_int(parts[2])? else { self.selected_day };
+            self.year = parse.parse_int(parts[0])? else { return self.year; };
+            self.month = parse.parse_int(parts[1])? else { return self.month; };
+            self.selected_day = parse.parse_int(parts[2])? else { return self.selected_day; };
         }
         if (self.month < 1 or self.month > 12) { self.month = 1; }
         var dim = days_in_month(self.year, self.month);

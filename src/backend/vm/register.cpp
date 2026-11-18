@@ -415,7 +415,7 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, uint64_
             case LIR::LIR_Op::ListCreate:
             case LIR::LIR_Op::DictCreate: case LIR::LIR_Op::DictSet: case LIR::LIR_Op::DictGet: case LIR::LIR_Op::DictHas:
             case LIR::LIR_Op::DictLen: case LIR::LIR_Op::DictItems: case LIR::LIR_Op::TupleCreate: case LIR::LIR_Op::TupleSet:
-            case LIR::LIR_Op::TupleGet: case LIR::LIR_Op::TupleLen: execute_collections(pc); break;
+            case LIR::LIR_Op::TupleGet: case LIR::LIR_Op::TupleLen: case LIR::LIR_Op::ProbeKind: execute_collections(pc); break;
             case LIR::LIR_Op::NewFrame:
             case LIR::LIR_Op::FrameGetField:
             case LIR::LIR_Op::FrameSetField: case LIR::LIR_Op::FrameGetFieldAtomic: case LIR::LIR_Op::FrameSetFieldAtomic:
@@ -438,9 +438,17 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, uint64_
                 // Inline SMI bitwise operations: critical for numeric loops. Same
                 // rule as above: `1 << 62` is a valid int whose value no longer fits
                 // an immediate, so an out-of-range result must not be BOX_INT'ed.
+                // i128/u128 registers must skip this path entirely: the 64-bit
+                // shift bound and truncation would corrupt 128-bit operands even
+                // when they currently fit a SMI.
+                bool wide_bitwise = false;
+                for (LIR::Reg wr : {pc->a, pc->b, pc->dst}) {
+                    TypePtr wt = get_register_language_type(wr);
+                    if (wt && (wt->tag == TypeTag::Int128 || wt->tag == TypeTag::UInt128)) { wide_bitwise = true; break; }
+                }
                 RegisterValue va = registers[pc->a];
                 RegisterValue vb = registers[pc->b];
-                if (IS_INT(va) && IS_INT(vb)) {
+                if (!wide_bitwise && IS_INT(va) && IS_INT(vb)) {
                     int64_t ia = UNBOX_INT(va);
                     int64_t ib = UNBOX_INT(vb);
                     int64_t res;

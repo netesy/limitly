@@ -1,4 +1,5 @@
 #include "../type_checker.hh"
+#include "../module_manager.hh"
 #include "../../backend/vm/register.hh"
 #include "../../lir/builtin_functions.hh"
 #include "../../lir/function_registry.hh"
@@ -15,6 +16,91 @@
 
 namespace LM {
 namespace Frontend {
+
+void TypeChecker::load_module_staged_fns(const std::string& module_path) {
+    if (module_path.empty() || module_staged_functions_.count(module_path)) return;
+    module_staged_functions_[module_path];  // mark attempted even when the module is absent
+    auto mod = ModuleManager::getInstance().get_module(module_path);
+    if (!mod || !mod->ast) return;
+    for (const auto& st : mod->ast->statements) {
+        if (auto fd = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(st)) {
+            if (fd->isStaged) {
+                module_staged_functions_[module_path][fd->name] = fd;
+                staged_fn_modules_[fd.get()] = module_path;
+            }
+        }
+    }
+}
+
+std::unordered_map<std::string, std::string> TypeChecker::module_alias_map(
+        const std::string& module_path) const {
+    std::unordered_map<std::string, std::string> aliases;
+    if (module_path.empty() || module_path == "root") return aliases;
+    auto mod = ModuleManager::getInstance().get_module(module_path);
+    if (!mod || !mod->ast) return aliases;
+    for (const auto& stmt : mod->ast->statements) {
+        if (auto imp = std::dynamic_pointer_cast<LM::Frontend::AST::ImportStatement>(stmt)) {
+            std::string alias;
+            if (imp->alias.has_value()) {
+                alias = imp->alias.value();
+            } else {
+                size_t last_dot = imp->modulePath.find_last_of('.');
+                alias = (last_dot != std::string::npos)
+                    ? imp->modulePath.substr(last_dot + 1)
+                    : imp->modulePath;
+            }
+            aliases[alias] = imp->modulePath;
+        }
+    }
+    return aliases;
+}
+
+std::string TypeChecker::resolve_module_alias(const std::string& obj_path) const {
+    if (obj_path.empty()) return "";
+    if (stage0_scope_module_.empty()) {
+        auto it = import_aliases.find(obj_path);
+        if (it != import_aliases.end()) return it->second;
+    } else {
+        auto aliases = module_alias_map(stage0_scope_module_);
+        auto it = aliases.find(obj_path);
+        if (it != aliases.end()) return it->second;
+    }
+    // The object path may itself be a module path (`import a.b;` then `a.b.fn()`).
+    if (ModuleManager::getInstance().get_module(obj_path)) return obj_path;
+    return "";
+}
+
+std::shared_ptr<LM::Frontend::AST::FunctionDeclaration> TypeChecker::find_staged_decl(
+        const std::string& name, const std::string& scope_module) {
+    if (name.empty()) return nullptr;
+    if (name.find('.') == std::string::npos) {
+        if (!scope_module.empty()) {
+            load_module_staged_fns(scope_module);
+            auto mit = module_staged_functions_.find(scope_module);
+            if (mit != module_staged_functions_.end()) {
+                auto sit = mit->second.find(name);
+                if (sit != mit->second.end()) return sit->second;
+            }
+        }
+        auto it = staged_functions_.find(name);
+        return it != staged_functions_.end() ? it->second : nullptr;
+    }
+    // Qualified name: try the spelling as written, then the canonical (re-export
+    // resolved) one. The module path is everything before the last dot.
+    auto& manager = ModuleManager::getInstance();
+    const std::string canon = manager.canonical_symbol(name);
+    for (const std::string& cand : {name, canon}) {
+        const size_t dot = cand.rfind('.');
+        if (dot == std::string::npos) continue;
+        const std::string mod = cand.substr(0, dot);
+        load_module_staged_fns(mod);
+        auto mit = module_staged_functions_.find(mod);
+        if (mit == module_staged_functions_.end()) continue;
+        auto sit = mit->second.find(cand.substr(dot + 1));
+        if (sit != mit->second.end()) return sit->second;
+    }
+    return nullptr;
+}
 
 // Stage-0 VM fallback for staged bodies outside the AST folder's subset
 // (docs/staged.md, docs/roadmaps.md build step 4).
@@ -223,6 +309,11 @@ bool TypeChecker::check_staged_body_for_vm(
     // calls, so the body sees exactly the types a normal function body would.
     std::vector<TypePtr> param_types;
     auto sig_it = function_signatures.find(fn->name);
+    if (sig_it == function_signatures.end()) {
+        if (auto smit = staged_fn_modules_.find(fn.get()); smit != staged_fn_modules_.end()) {
+            sig_it = function_signatures.find(smit->second + "." + fn->name);
+        }
+    }
     if (sig_it != function_signatures.end()) param_types = sig_it->second.param_types;
 
     const size_t errors_before = errors.size();
@@ -233,6 +324,12 @@ bool TypeChecker::check_staged_body_for_vm(
     checking_staged_body_ = true;
     current_function = fn;
     current_return_type = fn->inferred_type;
+    const std::string saved_scope_module = stage0_scope_module_;
+    if (auto smit = staged_fn_modules_.find(fn.get()); smit != staged_fn_modules_.end()) {
+        stage0_scope_module_ = smit->second;
+    } else {
+        stage0_scope_module_.clear();
+    }
     enter_scope();
     for (size_t i = 0; i < fn->params.size(); ++i) {
         TypePtr type = i < param_types.size() ? param_types[i] : type_system.ANY_TYPE;
@@ -250,6 +347,7 @@ bool TypeChecker::check_staged_body_for_vm(
     current_function = saved_function;
     current_return_type = saved_return_type;
     checking_staged_body_ = saved_staged_body;
+    stage0_scope_module_ = saved_scope_module;
 
     // Diagnostics from the body are genuine: the body only gets here because it is the one
     // being compiled. Report the failure as "not foldable" rather than letting lowering run
@@ -262,10 +360,21 @@ bool TypeChecker::stage0_prepare_fn(
     if (!fn) return false;
     const std::string& name = fn->name;
 
+    // Registry key: a staged fn declared in an imported module registers under its
+    // qualified name (`mod.fn`) so same-named staged fns in different modules cannot
+    // collide, and call sites that spell the module resolve. Root-program staged fns
+    // keep their bare name.
+    std::string key = name;
+    std::string module_path;
+    if (auto smit = staged_fn_modules_.find(fn.get()); smit != staged_fn_modules_.end()) {
+        module_path = smit->second;
+        key = module_path + "." + name;
+    }
+
     // Already prepared by an enclosing fold (or earlier in this one): mutual recursion between
     // two staged fns reaches here a second time, and re-lowering would collide with the entry
     // that is already registered.
-    if (std::find(stage0_registered_fns_.begin(), stage0_registered_fns_.end(), name) !=
+    if (std::find(stage0_registered_fns_.begin(), stage0_registered_fns_.end(), key) !=
         stage0_registered_fns_.end()) {
         return true;
     }
@@ -273,8 +382,8 @@ bool TypeChecker::stage0_prepare_fn(
     if (!check_staged_body_for_vm(fn)) return false;
 
     auto& registry = LIR::FunctionRegistry::getInstance();
-    if (registry.hasFunction(name)) {
-        add_error("stage 0 VM: name '" + name + "' is already a runtime function", fn->line);
+    if (registry.hasFunction(key)) {
+        add_error("stage 0 VM: name '" + key + "' is already a runtime function", fn->line);
         return false;
     }
 
@@ -292,8 +401,43 @@ bool TypeChecker::stage0_prepare_fn(
         // no null guard, and language types would otherwise degrade to ABI defaults.
         // Non-owning on purpose -- the TypeChecker holds the object for the whole compilation.
         generator.set_type_system(std::shared_ptr<TypeSystem>(&type_system, [](TypeSystem*) {}));
-        generator.generate_function(*fn);
-        lowered = registry.getFunction(name);
+        if (!module_path.empty()) {
+            generator.set_current_module(module_path);
+            // The body's module-qualified and alias spellings (`other.fn`, `alias.fn`)
+            // resolve through the same import table the whole-program lowering builds.
+            if (auto mod = ModuleManager::getInstance().get_module(module_path); mod && mod->ast) {
+                std::unordered_map<std::string, std::string> aliases;
+                for (const auto& stmt : mod->ast->statements) {
+                    if (auto imp = std::dynamic_pointer_cast<LM::Frontend::AST::ImportStatement>(stmt)) {
+                        std::string alias;
+                        if (imp->alias.has_value()) {
+                            alias = imp->alias.value();
+                        } else {
+                            size_t last_dot = imp->modulePath.find_last_of('.');
+                            alias = (last_dot != std::string::npos)
+                                ? imp->modulePath.substr(last_dot + 1)
+                                : imp->modulePath;
+                        }
+                        aliases[alias] = imp->modulePath;
+                    }
+                }
+                generator.set_import_aliases(aliases);
+            }
+            // Lower under the qualified name, mirroring how module functions are lowered
+            // in lower_function_bodies, so the registry key matches call-site func_names.
+            const std::string saved_name = fn->name;
+            fn->name = key;
+            try {
+                generator.generate_function(*fn);
+            } catch (...) {
+                fn->name = saved_name;
+                throw;
+            }
+            fn->name = saved_name;
+        } else {
+            generator.generate_function(*fn);
+        }
+        lowered = registry.getFunction(key);
     } catch (const std::exception& e) {
         add_error("stage 0 VM: could not lower staged fn '" + name + "': " + e.what(), fn->line);
         return false;
@@ -302,7 +446,7 @@ bool TypeChecker::stage0_prepare_fn(
         add_error("stage 0 VM: staged fn '" + name + "' produced no code", fn->line);
         return false;
     }
-    stage0_registered_fns_.push_back(name);
+    stage0_registered_fns_.push_back(key);
 
     // The fence is static, before a single instruction runs: a body that would leave the
     // language is rejected as a compile error rather than as a runtime failure halfway through a
@@ -315,18 +459,20 @@ bool TypeChecker::stage0_prepare_fn(
                       "runs pure, deterministic instructions only", fn->line);
             return false;
         }
-        if (stage0_call_hostile(inst, name)) {
+        if (stage0_call_hostile(inst, key)) {
             // Not an intrinsic and not this function: allow it only when the target is another
             // staged fn, which is prepared here so the VM can resolve the call. Anything else
             // (a runtime sibling function, an indirect target, the host) stays refused.
+            // Bare callees resolve in the module that owns the body being lowered; qualified
+            // ones (a staged call into another module) resolve through the module tables.
             const std::string callee = inst.func_name;
-            auto it = staged_functions_.find(callee);
-            if (it == staged_functions_.end()) {
+            auto callee_decl = find_staged_decl(callee, module_path);
+            if (!callee_decl) {
                 add_error("stage 0 VM: staged fn '" + name + "' cannot call '" + callee +
                           "' at compile time", fn->line);
                 return false;
             }
-            if (!stage0_prepare_fn(it->second)) return false;
+            if (!stage0_prepare_fn(callee_decl)) return false;
         }
     }
     return true;
@@ -413,7 +559,11 @@ bool TypeChecker::run_staged_fn_on_vm(
         stage0_release_fns();
         return false;
     }
-    LIR::LIR_Function* lowered = LIR::FunctionRegistry::getInstance().getFunction(name);
+    std::string key = name;
+    if (auto smit = staged_fn_modules_.find(fn.get()); smit != staged_fn_modules_.end()) {
+        key = smit->second + "." + name;
+    }
+    LIR::LIR_Function* lowered = LIR::FunctionRegistry::getInstance().getFunction(key);
     if (!lowered) {
         stage0_release_fns();
         add_error("stage 0 VM: staged fn '" + name + "' is not available to run", fn->line);

@@ -194,7 +194,7 @@ TypePtr TypeChecker::resolve_type_annotation(std::shared_ptr<LM::Frontend::AST::
                 } else if (const FrameInfo* fi2 = lookup_frame_info(annotation->typeName)) {
                     base_type = type_system.createFrameType(fi2->name);
                     type_system.addUserDefinedType(annotation->typeName, base_type);
-                } else if (auto sf = staged_functions_.find(type_name); sf != staged_functions_.end() && is_staged_type_fn(sf->second)) {
+                } else if (auto sf = find_staged_decl(type_name, stage0_scope_module_); sf && is_staged_type_fn(sf)) {
                     // Bare reference to a staged type constructor; the call form supplies
                     // the type arguments.
                     add_error("'" + type_name + "' is a staged type constructor and must be called with type arguments");

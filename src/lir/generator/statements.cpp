@@ -125,20 +125,24 @@ void bind_all_vars(Generator* gen, std::shared_ptr<LM::Frontend::AST::Expression
         if (var->name != "_") gen->bind_variable(var->name, val_reg);
     } else if (auto val_p = std::dynamic_pointer_cast<LM::Frontend::AST::ValPatternExpr>(pattern)) {
         Reg payload = gen->allocate_register();
-        gen->emit_instruction(LIR_Inst(LIR_Op::Unwrap, Type::Ptr, payload, val_reg));
+        gen->emit_instruction(LIR_Inst(LIR_Op::Unwrap, Type::Ptr, payload, val_reg, 0, 1));
+        gen->tag_register_erased(payload);
         gen->bind_variable(val_p->variableName, payload);
     } else if (auto err_p = std::dynamic_pointer_cast<LM::Frontend::AST::ErrPatternExpr>(pattern)) {
         Reg payload = gen->allocate_register();
         gen->emit_instruction(LIR_Inst(LIR_Op::GetPayload, Type::Ptr, payload, val_reg));
+        gen->tag_register_erased(payload);
         gen->bind_variable(err_p->variableName, payload);
     } else if (auto err_t_p = std::dynamic_pointer_cast<LM::Frontend::AST::ErrorTypePatternExpr>(pattern)) {
          Reg payload = gen->allocate_register();
          gen->emit_instruction(LIR_Inst(LIR_Op::GetPayload, Type::Ptr, payload, val_reg));
+         gen->tag_register_erased(payload);
          for (size_t i = 0; i < err_t_p->parameterNames.size(); ++i) {
                 Reg idx_reg = gen->allocate_register();
                 gen->emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, idx_reg, make_i64((int64_t)i)));
                 Reg elem = gen->allocate_register();
                 gen->emit_instruction(LIR_Inst(LIR_Op::TupleGet, Type::Ptr, elem, payload, idx_reg));
+                gen->tag_register_erased(elem);
                 gen->bind_variable(err_t_p->parameterNames[i], elem);
          }
     } else if (auto list_p = std::dynamic_pointer_cast<LM::Frontend::AST::ListPatternExpr>(pattern)) {
@@ -147,6 +151,7 @@ void bind_all_vars(Generator* gen, std::shared_ptr<LM::Frontend::AST::Expression
             gen->emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, idx_reg, make_i64(i)));
             Reg elem = gen->allocate_register();
             gen->emit_instruction(LIR_Inst(LIR_Op::ListIndex, Type::Ptr, elem, val_reg, idx_reg));
+            gen->tag_register_erased(elem);
             bind_all_vars(gen, list_p->elements[i], elem);
         }
         if (list_p->restElement.has_value() && list_p->restElement.value() != "_") {
@@ -170,6 +175,7 @@ void bind_all_vars(Generator* gen, std::shared_ptr<LM::Frontend::AST::Expression
             gen->set_current_block(loop_body);
             Reg elem = gen->allocate_register();
             gen->emit_instruction(LIR_Inst(LIR_Op::ListIndex, Type::Ptr, elem, val_reg, cur_idx));
+            gen->tag_register_erased(elem);
             Reg dummy_res = gen->allocate_register();
             gen->emit_instruction(LIR_Inst(LIR_Op::ListAppend, Type::Void, dummy_res, rest_list, elem));
             Reg next_idx = gen->allocate_register();
@@ -188,6 +194,7 @@ void bind_all_vars(Generator* gen, std::shared_ptr<LM::Frontend::AST::Expression
             gen->emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, idx_reg, make_i64(i)));
             Reg elem = gen->allocate_register();
             gen->emit_instruction(LIR_Inst(LIR_Op::TupleGet, Type::Ptr, elem, val_reg, idx_reg));
+            gen->tag_register_erased(elem);
             bind_all_vars(gen, tuple_p->elements[i], elem);
         }
     } else if (auto dict_p = std::dynamic_pointer_cast<LM::Frontend::AST::DictPatternExpr>(pattern)) {
@@ -196,6 +203,7 @@ void bind_all_vars(Generator* gen, std::shared_ptr<LM::Frontend::AST::Expression
             gen->emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, key_reg, BOX_PTR(lm_str_from_cstr(field.key.c_str()))));
             Reg elem = gen->allocate_register();
             gen->emit_instruction(LIR_Inst(LIR_Op::DictGet, Type::Ptr, elem, val_reg, key_reg));
+            gen->tag_register_erased(elem);
             bind_all_vars(gen, field.pattern, elem);
         }
         if (dict_p->restBinding.has_value() && dict_p->restBinding.value() != "_") {
@@ -205,7 +213,7 @@ void bind_all_vars(Generator* gen, std::shared_ptr<LM::Frontend::AST::Expression
         if (binding->typeName == "val") {
              if (!binding->patterns.empty()) {
                 Reg payload = gen->allocate_register();
-                gen->emit_instruction(LIR_Inst(LIR_Op::Unwrap, Type::Ptr, payload, val_reg));
+                gen->emit_instruction(LIR_Inst(LIR_Op::Unwrap, Type::Ptr, payload, val_reg, 0, 1));
                 bind_all_vars(gen, binding->patterns[0], payload);
             }
             return;
@@ -368,6 +376,8 @@ void Generator::emit_stmt_impl(LM::Frontend::AST::Statement& stmt) {
 
 
 void Generator::emit_expr_stmt(LM::Frontend::AST::ExprStatement& stmt) {
+    // Empty statements (`;`, error-recovery nodes) carry a null expression.
+    if (!stmt.expression) return;
     emit_expr(*stmt.expression);
 }
 
@@ -475,8 +485,26 @@ void Generator::emit_var_stmt(LM::Frontend::AST::VarDeclaration& stmt) {
         }
         bind_variable(stmt.name, val_reg);
         if (declared_type) {
-            set_register_language_type(val_reg, declared_type);
-            set_register_abi_type(val_reg, language_type_to_abi_type(declared_type));
+            // declared_type is the bare base type; re-apply the ? / ?E modifiers
+            // so union-typed registers get object-kind provenance in the backend.
+            TypePtr effective_type = declared_type;
+            if (stmt.type.has_value()) {
+                auto& ta = *stmt.type.value();
+                if (ta.isOptional) {
+                    ::UnionType ut;
+                    ut.types.push_back(declared_type);
+                    ut.types.push_back(std::make_shared<::Type>(::TypeTag::Nil));
+                    effective_type = std::make_shared<::Type>(::TypeTag::Union, ut);
+                } else if (ta.isFallible) {
+                    ::ErrorUnionType eut;
+                    eut.successType = declared_type;
+                    eut.errorTypes = ta.errorTypes;
+                    eut.isGenericError = ta.errorTypes.empty();
+                    effective_type = std::make_shared<::Type>(::TypeTag::ErrorUnion, eut);
+                }
+            }
+            set_register_language_type(val_reg, effective_type);
+            set_register_abi_type(val_reg, language_type_to_abi_type(effective_type));
         }
         LIR_Inst store_inst(LIR_Op::StoreGlobal, Type::Void, 0, val_reg, 0);
         store_inst.func_name = qualified_name;
@@ -512,7 +540,25 @@ void Generator::emit_var_stmt(LM::Frontend::AST::VarDeclaration& stmt) {
         }
         
         if (declared_type) {
-            set_register_type(value_reg, declared_type);
+            // declared_type is the bare base type; re-apply the ? / ?E modifiers
+            // so union-typed registers get object-kind provenance in the backend.
+            TypePtr effective_type = declared_type;
+            if (stmt.type.has_value()) {
+                auto& ta = *stmt.type.value();
+                if (ta.isOptional) {
+                    ::UnionType ut;
+                    ut.types.push_back(declared_type);
+                    ut.types.push_back(std::make_shared<::Type>(::TypeTag::Nil));
+                    effective_type = std::make_shared<::Type>(::TypeTag::Union, ut);
+                } else if (ta.isFallible) {
+                    ::ErrorUnionType eut;
+                    eut.successType = declared_type;
+                    eut.errorTypes = ta.errorTypes;
+                    eut.isGenericError = ta.errorTypes.empty();
+                    effective_type = std::make_shared<::Type>(::TypeTag::ErrorUnion, eut);
+                }
+            }
+            set_register_language_type(value_reg, effective_type);
         } else {
             set_register_type(value_reg, stmt.initializer->inferred_type);
         }
@@ -977,8 +1023,14 @@ void Generator::emit_return_stmt(LM::Frontend::AST::ReturnStatement& stmt) {
         // Inside an else block - store the value in the result register instead of returning
         if (stmt.value) {
             Reg value = emit_expr(*stmt.value);
-            // Move the value to the result register
-            emit_instruction(LIR_Inst(LIR_Op::Mov, Type::Ptr, else_context_.result_register, value, 0));
+            // Move the value to the result register, preserving its ABI kind --
+            // a hardcoded Ptr would reclassify scalar results as heap words.
+            Type mov_type = get_register_abi_type(value);
+            if (mov_type == Type::Void) mov_type = Type::Ptr;
+            set_register_abi_type(else_context_.result_register, mov_type);
+            TypePtr vt = get_register_type(value);
+            if (vt) set_register_language_type(else_context_.result_register, vt);
+            emit_instruction(LIR_Inst(LIR_Op::Mov, mov_type, else_context_.result_register, value, 0));
         } else {
             // No value - store a default value (0)
             auto nil_type = std::make_shared<::Type>(::TypeTag::Nil);
@@ -2798,6 +2850,17 @@ void Generator::emit_pattern_match_jump(LIR_Op op, Reg cond_reg, LIR_BasicBlock*
     }
 }
 
+void Generator::emit_match_kind_guard(Reg val_reg, int64_t expected_kind, LIR_BasicBlock* failure_target, uint32_t failure_label) {
+    Reg kind_reg = allocate_register();
+    emit_instruction(LIR_Inst(LIR_Op::ProbeKind, Type::I64, kind_reg, val_reg));
+    Reg expected_reg = allocate_register();
+    emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, expected_reg, make_i64(expected_kind)));
+    Reg cmp = allocate_register();
+    emit_instruction(LIR_Inst(LIR_Op::CmpEQ, LIR::Type::Bool, cmp, kind_reg, expected_reg));
+    set_register_type(cmp, std::make_shared<::Type>(::TypeTag::Bool));
+    emit_pattern_match_jump(LIR_Op::JumpIfFalse, cmp, failure_target, failure_label);
+}
+
 void Generator::emit_pattern_match(std::shared_ptr<LM::Frontend::AST::Expression> pattern, Reg val_reg, LIR_BasicBlock* failure_target, uint32_t failure_label) {
     auto i64_type = std::make_shared<::Type>(::TypeTag::Int64);
 
@@ -2834,7 +2897,8 @@ void Generator::emit_pattern_match(std::shared_ptr<LM::Frontend::AST::Expression
              emit_pattern_match_jump(LIR_Op::JumpIf, is_err, failure_target, failure_label);
              if (!binding->patterns.empty()) {
                  Reg payload = allocate_register();
-                 emit_instruction(LIR_Inst(LIR_Op::Unwrap, Type::Ptr, payload, val_reg));
+                 emit_instruction(LIR_Inst(LIR_Op::Unwrap, Type::Ptr, payload, val_reg, 0, 1));
+                 tag_register_erased(payload);
                  emit_pattern_match(binding->patterns[0], payload, failure_target, failure_label);
              }
         } else if (binding->typeName == "err") {
@@ -2844,6 +2908,7 @@ void Generator::emit_pattern_match(std::shared_ptr<LM::Frontend::AST::Expression
              if (!binding->patterns.empty()) {
                  Reg payload = allocate_register();
                  emit_instruction(LIR_Inst(LIR_Op::GetPayload, Type::Ptr, payload, val_reg));
+                 tag_register_erased(payload);
                  emit_pattern_match(binding->patterns[0], payload, failure_target, failure_label);
              }
         } else {
@@ -2871,6 +2936,7 @@ void Generator::emit_pattern_match(std::shared_ptr<LM::Frontend::AST::Expression
                 if (!binding->patterns.empty()) {
                     Reg payload = allocate_register();
                     emit_instruction(LIR_Inst(LIR_Op::GetPayload, Type::Ptr, payload, val_reg));
+                    tag_register_erased(payload);
                     // For single-element variants, payload is the value directly (optimization)
                     // For multi-element variants, payload is a tuple
                     if (binding->patterns.size() == 1) {
@@ -2881,6 +2947,7 @@ void Generator::emit_pattern_match(std::shared_ptr<LM::Frontend::AST::Expression
                             emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, idx_reg, make_i64(v_idx)));
                             Reg elem = allocate_register();
                             emit_instruction(LIR_Inst(LIR_Op::TupleGet, Type::Ptr, elem, payload, idx_reg));
+                            tag_register_erased(elem);
                             emit_pattern_match(binding->patterns[v_idx], elem, failure_target, failure_label);
                         }
                     }
@@ -2901,6 +2968,7 @@ void Generator::emit_pattern_match(std::shared_ptr<LM::Frontend::AST::Expression
             }
         }
     } else if (auto list_p = dynamic_cast<LM::Frontend::AST::ListPatternExpr*>(pattern.get())) {
+        emit_match_kind_guard(val_reg, 1, failure_target, failure_label);
         Reg len_reg = allocate_register();
         emit_instruction(LIR_Inst(LIR_Op::ListLen, Type::I64, len_reg, val_reg));
         Reg expected_len = allocate_register();
@@ -2920,9 +2988,11 @@ void Generator::emit_pattern_match(std::shared_ptr<LM::Frontend::AST::Expression
             emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, idx_reg, make_i64(i)));
             Reg elem = allocate_register();
             emit_instruction(LIR_Inst(LIR_Op::ListIndex, Type::Ptr, elem, val_reg, idx_reg));
+            tag_register_erased(elem);
             emit_pattern_match(list_p->elements[i], elem, failure_target, failure_label);
         }
     } else if (auto tuple_p = dynamic_cast<LM::Frontend::AST::TuplePatternExpr*>(pattern.get())) {
+        emit_match_kind_guard(val_reg, 3, failure_target, failure_label);
         Reg len_reg = allocate_register();
         emit_instruction(LIR_Inst(LIR_Op::TupleLen, Type::I64, len_reg, val_reg));
         Reg expected_len = allocate_register();
@@ -2938,9 +3008,11 @@ void Generator::emit_pattern_match(std::shared_ptr<LM::Frontend::AST::Expression
             emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, idx_reg, make_i64(i)));
             Reg elem = allocate_register();
             emit_instruction(LIR_Inst(LIR_Op::TupleGet, Type::Ptr, elem, val_reg, idx_reg));
+            tag_register_erased(elem);
             emit_pattern_match(tuple_p->elements[i], elem, failure_target, failure_label);
         }
     } else if (auto dict_p = dynamic_cast<LM::Frontend::AST::DictPatternExpr*>(pattern.get())) {
+        emit_match_kind_guard(val_reg, 2, failure_target, failure_label);
         if (!dict_p->restBinding.has_value()) {
             Reg len_reg = allocate_register();
             emit_instruction(LIR_Inst(LIR_Op::DictLen, Type::I64, len_reg, val_reg));
@@ -2964,6 +3036,7 @@ void Generator::emit_pattern_match(std::shared_ptr<LM::Frontend::AST::Expression
 
             Reg elem = allocate_register();
             emit_instruction(LIR_Inst(LIR_Op::DictGet, Type::Ptr, elem, val_reg, key_reg));
+            tag_register_erased(elem);
             emit_pattern_match(field.pattern, elem, failure_target, failure_label);
         }
     }

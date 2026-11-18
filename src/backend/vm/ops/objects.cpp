@@ -4,6 +4,7 @@
 #include "../vm_string.hh"
 #include <stdexcept>
 #include <string>
+#include <cstring>
 
 namespace LM {
 namespace Backend {
@@ -43,31 +44,33 @@ void RegisterVM::execute_objects(const LIR::LIR_Inst* pc) {
             break;
         }
         case LIR::LIR_Op::IsError: {
+            registers[pc->dst] = VAL_FALSE;
             if (IS_PTR(registers[pc->a])) {
                 void* obj = UNBOX_PTR(registers[pc->a]);
                 ObjHeader* h = (ObjHeader*)obj;
                 if (h && h->type_id == TYPE_FRAME) {
-                    LmValue is_err = lm_frame_get_field(obj, 0);
-                    registers[pc->dst] = (as_i64(is_err) != 0) ? VAL_TRUE : VAL_FALSE;
-                } else {
-                    registers[pc->dst] = VAL_FALSE;
+                    LmFrame* f = (LmFrame*)obj;
+                    if (f->name && (std::strcmp(f->name, "__lir_internal_ok__") == 0 ||
+                                    std::strcmp(f->name, "__lir_internal_error__") == 0)) {
+                        LmValue is_err = lm_frame_get_field(obj, 0);
+                        registers[pc->dst] = (as_i64(is_err) != 0) ? VAL_TRUE : VAL_FALSE;
+                    }
                 }
-            } else {
-                registers[pc->dst] = VAL_FALSE;
             }
             break;
         }
         case LIR::LIR_Op::Unwrap: {
+            registers[pc->dst] = registers[pc->a];
             if (IS_PTR(registers[pc->a])) {
                 void* obj = UNBOX_PTR(registers[pc->a]);
                 ObjHeader* h = (ObjHeader*)obj;
                 if (h && h->type_id == TYPE_FRAME) {
-                    registers[pc->dst] = lm_frame_get_field(obj, 1);
-                } else {
-                    registers[pc->dst] = registers[pc->a];
+                    LmFrame* f = (LmFrame*)obj;
+                    if (f->name && (std::strcmp(f->name, "__lir_internal_ok__") == 0 ||
+                                    std::strcmp(f->name, "__lir_internal_error__") == 0)) {
+                        registers[pc->dst] = lm_frame_get_field(obj, 1);
+                    }
                 }
-            } else {
-                registers[pc->dst] = registers[pc->a];
             }
             break;
         }
@@ -75,22 +78,18 @@ void RegisterVM::execute_objects(const LIR::LIR_Inst* pc) {
             // pc->a = Ok/Error union, pc->b = default value (may be UINT32_MAX
             // meaning "no default supplied" -- in that case fall back to NIL).
             RegisterValue fallback = (pc->b != UINT32_MAX) ? registers[pc->b] : VAL_NIL;
+            registers[pc->dst] = registers[pc->a];
             if (IS_PTR(registers[pc->a])) {
                 void* obj = UNBOX_PTR(registers[pc->a]);
                 ObjHeader* h = (ObjHeader*)obj;
                 if (h && h->type_id == TYPE_FRAME) {
-                    LmValue is_err = lm_frame_get_field(obj, 0);
-                    if (as_i64(is_err) != 0) {
-                        registers[pc->dst] = fallback;
-                    } else {
-                        registers[pc->dst] = lm_frame_get_field(obj, 1);
+                    LmFrame* f = (LmFrame*)obj;
+                    if (f->name && (std::strcmp(f->name, "__lir_internal_ok__") == 0 ||
+                                    std::strcmp(f->name, "__lir_internal_error__") == 0)) {
+                        LmValue is_err = lm_frame_get_field(obj, 0);
+                        registers[pc->dst] = (as_i64(is_err) != 0) ? fallback : lm_frame_get_field(obj, 1);
                     }
-                } else {
-                    // Not an Ok/Error frame -- treat as a raw unwrapped value.
-                    registers[pc->dst] = registers[pc->a];
                 }
-            } else {
-                registers[pc->dst] = registers[pc->a];
             }
             break;
         }

@@ -1601,8 +1601,12 @@ void FyraBuiltinFunctions::emit_enum_ir(ir::Module* module, ir::IRBuilder* build
         builder->setInsertPoint(b_entry);
         ir::Value* enum_ptr = fn_payload->getParameters().front().get();
         ir::Value* header = builder->createLoadl(enum_ptr);
+        // ENUM boxes keep payload at +16; ok/err union boxes ("LYMAROK!") use
+        // the same payload offset — without this they yield the is_error flag.
         ir::Value* is_enum = builder->createCeq(header, ctx->getConstantInt(i64, 0x454E554D));
-        ir::Value* extra = builder->createMul(builder->createCast(is_enum, i64), ctx->getConstantInt(i64, 8));
+        ir::Value* is_union = builder->createCeq(header, ctx->getConstantInt(i64, 0x4C594D41524F4B21LL));
+        ir::Value* wide = builder->createOr(is_enum, is_union);
+        ir::Value* extra = builder->createMul(builder->createCast(wide, i64), ctx->getConstantInt(i64, 8));
         ir::Value* offset = builder->createAdd(extra, ctx->getConstantInt(i64, 8));
         ir::Value* pay_ptr = builder->createAdd(enum_ptr, offset);
         ir::Value* payload = builder->createLoadl(pay_ptr);

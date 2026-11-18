@@ -83,12 +83,14 @@ void lower_region_ownership(ir::Module& module, const std::unordered_map<std::st
     declare("lymar_aot_boolean", 1, i64);
     declare("lymar_aot_print_float", 1, void_type, ctx->getDoubleType());
     declare("lymar_aot_scalar_to_string", 2, i64);
+    declare("lymar_aot_bool_to_string", 1, i64);
     declare("lymar_aot_format_argument", 2, i64);
     declare("lymar_aot_print_value", 2, void_type);
     declare("lymar_aot_mark_dictionary", 1, i64);
     declare("lymar_aot_float_to_string", 1, i64, ctx->getDoubleType());
     declare("lymar_aot_float_bits_to_string", 1, i64);
     declare("lymar_aot_tuple_length", 2, i64);
+    declare("lymar_aot_probe_kind", 2, i64);
     declare("lymar_aot_string_hash", 2, i64);
     declare("lymar_aot_list_slice", 6, i64);
     declare("lymar_aot_substring", 3, i64);
@@ -104,6 +106,7 @@ void lower_region_ownership(ir::Module& module, const std::unordered_map<std::st
     declare("lymar_aot_numeric_compare", 4, i64);
     declare("lymar_aot_length", 2, i64);
     declare("lymar_aot_numeric_binary", 5, i64);
+    declare("lymar_aot_bitwise", 5, i64);
     declare("lymar_aot_is_print_object", 2, i64);
     declare("lymar_aot_is_nil", 2, i64);
     declare("lymar_aot_is_object", 2, i64);
@@ -161,6 +164,8 @@ void lower_region_ownership(ir::Module& module, const std::unordered_map<std::st
     declare("lymar_aot_finalize", 1, void_type);
     declare("lymar_aot_set_finalizer", 2, void_type);
     declare("lymar_aot_exit", 1, void_type);
+    declare("lymar_aot_union_is_error", 2, i64);
+    declare("lymar_aot_union_unwrap", 2, i64);
     declare("lymar_aot_resource_create", 2, i64);
     declare("lymar_aot_resource_call", 4, i64);
     declare("lymar_aot_resource_destroy", 1, void_type);
@@ -249,9 +254,11 @@ void lower_region_ownership(ir::Module& module, const std::unordered_map<std::st
                         inst->replaceAllUsesWith(call.get());
                         inst = call.get();
                         *it = std::move(call);
-                        if (name == "lymar_aot_channel_new" || name == "lymar_aot_scheduler_new" || name == "lymar_aot_alloc" || name == "lymar_aot_resize" || name == "lymar_aot_raw_alloc" || name == "lymar_aot_raw_resize" || name == "lymar_aot_ref_resolve" || name == "lymar_aot_nil" || name == "lymar_aot_copy_constant" || name == "lymar_aot_box_float" || name == "lymar_aot_list_slice" || name == "lymar_aot_substring" || name == "lymar_aot_string_case" || name == "lymar_aot_string_trim" || name == "lymar_aot_input" || name == "lymar_aot_format_argument" || name == "lymar_aot_mark_dictionary" || name == "lymar_aot_scalar_to_string" || name == "lymar_aot_float_to_string" || name == "lymar_aot_float_bits_to_string") flags[inst] = one;
+                        if (name == "lymar_aot_channel_new" || name == "lymar_aot_scheduler_new" || name == "lymar_aot_alloc" || name == "lymar_aot_resize" || name == "lymar_aot_raw_alloc" || name == "lymar_aot_raw_resize" || name == "lymar_aot_ref_resolve" || name == "lymar_aot_nil" || name == "lymar_aot_copy_constant" || name == "lymar_aot_box_float" || name == "lymar_aot_list_slice" || name == "lymar_aot_substring" || name == "lymar_aot_string_case" || name == "lymar_aot_string_trim" || name == "lymar_aot_input" || name == "lymar_aot_format_argument" || name == "lymar_aot_mark_dictionary" || name == "lymar_aot_scalar_to_string" || name == "lymar_aot_bool_to_string" || name == "lymar_aot_float_to_string" || name == "lymar_aot_float_bits_to_string") flags[inst] = one;
                         if (name == "lymar_aot_boolean") flags[inst] = boolean;
                         if (name == "lymar_aot_callable_receiver") flags[inst] = one;
+                        if (name == "lymar_aot_union_unwrap")
+                            flags[inst] = emit(block, after, "lymar_aot_return_pointer", {});
                     }
                 }
                 auto& current_operands = inst->getOperands();
@@ -306,7 +313,7 @@ void lower_region_ownership(ir::Module& module, const std::unordered_map<std::st
                     } else if (callee && callee->getName() == "lymar_aot_list_slice") {
                         for (size_t argument = 1; argument <= 3; ++argument)
                             current_operands[argument + 3]->set(flag(current_operands[argument]->get()));
-                    } else if (callee && (callee->getName() == "lymar_aot_string_hash" || callee->getName() == "lymar_aot_tuple_length" || callee->getName() == "lymar_aot_length" || callee->getName() == "lymar_aot_string_index" || callee->getName() == "lymar_aot_callable_receiver" || callee->getName() == "lymar_aot_is_nil" || callee->getName() == "lymar_aot_is_object" || callee->getName() == "lymar_aot_is_print_object" || callee->getName() == "lymar_aot_to_float" || callee->getName() == "lymar_aot_to_integer" || callee->getName() == "lymar_aot_to_boolean" || callee->getName() == "lymar_aot_print_integer" || callee->getName() == "lymar_aot_scalar_to_string" || callee->getName() == "lymar_aot_format_argument" || callee->getName() == "lymar_aot_print_value")) {
+                    } else if (callee && (callee->getName() == "lymar_aot_string_hash" || callee->getName() == "lymar_aot_tuple_length" || callee->getName() == "lymar_aot_probe_kind" || callee->getName() == "lymar_aot_length" || callee->getName() == "lymar_aot_string_index" || callee->getName() == "lymar_aot_callable_receiver" || callee->getName() == "lymar_aot_is_nil" || callee->getName() == "lymar_aot_is_object" || callee->getName() == "lymar_aot_is_print_object" || callee->getName() == "lymar_aot_to_float" || callee->getName() == "lymar_aot_to_integer" || callee->getName() == "lymar_aot_to_boolean" || callee->getName() == "lymar_aot_print_integer" || callee->getName() == "lymar_aot_scalar_to_string" || callee->getName() == "lymar_aot_format_argument" || callee->getName() == "lymar_aot_print_value")) {
                         current_operands[2]->set(flag(current_operands[1]->get()));
                     } else if (callee && (callee->getName() == "lymar_aot_raw_alloc" || callee->getName() == "lymar_aot_raw_free")) {
                         current_operands[2]->set(flag(current_operands[1]->get()));
@@ -340,7 +347,7 @@ void lower_region_ownership(ir::Module& module, const std::unordered_map<std::st
                     } else if (callee && (callee->getName() == "lymar_aot_value_equal" || callee->getName() == "lymar_aot_numeric_compare")) {
                         current_operands[3]->set(flag(current_operands[1]->get()));
                         current_operands[4]->set(flag(current_operands[2]->get()));
-                    } else if(callee && callee->getName()=="lymar_aot_numeric_binary") {
+                    } else if(callee && (callee->getName()=="lymar_aot_numeric_binary" || callee->getName()=="lymar_aot_bitwise")) {
                         current_operands[4]->set(flag(current_operands[1]->get()));
                         current_operands[5]->set(flag(current_operands[2]->get()));
                         flags[inst]=emit(block,after,"lymar_aot_return_pointer",{});

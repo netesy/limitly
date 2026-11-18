@@ -265,6 +265,14 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
                     }
                 }
 
+                // Keep the module's staged fns reachable for cross-module compile-time
+                // folding: `mod.staged_fn(args)` at a call site, and bare staged callees
+                // inside this module's own staged bodies.
+                for (const auto& [sname, sdecl] : checker.staged_functions_) {
+                    module_staged_functions_[path][sname] = sdecl;
+                    staged_fn_modules_[sdecl.get()] = path;
+                }
+
                 std::unordered_set<std::string> module_declared_names;
                 if (module && module->ast) {
                     for (const auto& stmt : module->ast->statements) {

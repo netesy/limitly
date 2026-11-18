@@ -1355,6 +1355,25 @@ Reg Generator::emit_binary_expr(LM::Frontend::AST::BinaryExpr& expr) {
 
 
 Reg Generator::emit_unary_expr(LM::Frontend::AST::UnaryExpr& expr) {
+    // Fold negation of integer literals into the literal text itself. Wide
+    // values such as i128 MIN cannot survive a Neg round-trip: the positive
+    // magnitude wraps to the MIN bit pattern and Neg then overflows to nil.
+    if (expr.op == LM::Frontend::TokenType::MINUS) {
+        if (auto lit = dynamic_cast<LM::Frontend::AST::LiteralExpr*>(expr.right.get())) {
+            if (lit->literalType == LM::Frontend::TokenType::INT_LITERAL &&
+                std::holds_alternative<std::string>(lit->value)) {
+                const std::string& digits = std::get<std::string>(lit->value);
+                size_t first = (!digits.empty() && digits[0] == '-') ? 1 : 0;
+                bool plain = first < digits.size() &&
+                    std::all_of(digits.begin() + first, digits.end(),
+                                [](char c) { return c >= '0' && c <= '9'; });
+                if (plain) {
+                    lit->value = (first == 1) ? digits.substr(1) : ("-" + digits);
+                    return emit_expr(*expr.right);
+                }
+            }
+        }
+    }
     Reg operand = emit_expr(*expr.right);
     Reg dst = allocate_register();
     TypePtr operand_type = get_register_type(operand);
@@ -2078,12 +2097,36 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
             }
 
             if (!trait_name.empty()) {
-                if (expr.inferred_type) {
-                    set_register_language_type(result, expr.inferred_type);
-                    set_register_abi_type(result, language_type_to_abi_type(expr.inferred_type));
+                TypePtr call_result_type = expr.inferred_type;
+                if (!call_result_type) {
+                    // Trait default bodies are not type-checked, so calls inside
+                    // them carry no inferred_type. Recover the declared return
+                    // type from the trait signature; otherwise the result
+                    // register is misclassified as a scalar and pointer returns
+                    // (str, frames, `any`) lose their kind under AOT.
+                    std::vector<std::string> worklist{trait_name};
+                    std::unordered_set<std::string> seen_traits;
+                    while (!worklist.empty() && !call_result_type) {
+                        std::string tname = worklist.back();
+                        worklist.pop_back();
+                        if (!seen_traits.insert(tname).second) continue;
+                        auto tit = trait_table_.find(tname);
+                        if (tit == trait_table_.end() || !tit->second.declaration) continue;
+                        for (const auto& tm : tit->second.declaration->methods) {
+                            if (tm->name == method_name && tm->returnType.has_value()) {
+                                call_result_type = convert_ast_type_to_lir_type(tm->returnType.value());
+                                break;
+                            }
+                        }
+                        for (const auto& parent : tit->second.extends) worklist.push_back(parent);
+                    }
+                }
+                if (call_result_type) {
+                    set_register_language_type(result, call_result_type);
+                    set_register_abi_type(result, language_type_to_abi_type(call_result_type));
                 }
                 LIR_Inst inst(LIR_Op::TraitCallMethod, result, 0, 0);
-                inst.result_type = (expr.inferred_type ? language_type_to_abi_type(expr.inferred_type) : Type::I64);
+                inst.result_type = (call_result_type ? language_type_to_abi_type(call_result_type) : Type::I64);
                 inst.func_name = method_name;
                 inst.type_name = trait_name;
                 inst.call_args = arg_regs;
@@ -2346,6 +2389,37 @@ Reg Generator::emit_assign_expr(LM::Frontend::AST::AssignExpr& expr) {
     } else if (expr.object) {
         // For member or index assignment
         if (expr.member.has_value()) {
+            // Module variable write (e.g., `state.counter = 41`): lower to a
+            // StoreGlobal on the qualified module symbol, mirroring the
+            // member-read path, instead of frame-field storage.
+            std::string assign_obj_path = get_expr_qualified_path(expr.object.get());
+            if (!assign_obj_path.empty()) {
+                auto alias_it = import_aliases_.find(assign_obj_path);
+                if (alias_it != import_aliases_.end()) {
+                    std::string qualified_name = alias_it->second + "." + expr.member.value();
+                    if (global_variables_.count(qualified_name)) {
+                        Reg stored = value;
+                        if (expr.op != LM::Frontend::TokenType::EQUAL) {
+                            Reg cur_val = allocate_register();
+                            LIR_Inst load_inst(LIR_Op::LoadGlobal, Type::Ptr, cur_val, 0, 0);
+                            load_inst.func_name = qualified_name;
+                            emit_instruction(load_inst);
+                            Type abi_type = language_type_to_abi_type(expr.inferred_type);
+                            LIR_Op bin_op = compound_binary_op(expr.op);
+                            if (bin_op == LIR_Op::Nop) {
+                                report_error("Unsupported compound assignment operator");
+                                return value;
+                            }
+                            emit_instruction(LIR_Inst(bin_op, abi_type, cur_val, cur_val, value));
+                            stored = cur_val;
+                        }
+                        LIR_Inst store_inst(LIR_Op::StoreGlobal, Type::Void, 0, stored, 0);
+                        store_inst.func_name = qualified_name;
+                        emit_instruction(store_inst);
+                        return stored;
+                    }
+                }
+            }
             // Field assignment: obj.field = value
             Reg object_reg = emit_checked_dereference(*expr.object, emit_expr(*expr.object), true);
             std::string field_name = expr.member.value();
@@ -2938,7 +3012,7 @@ Reg Generator::emit_member_expr(LM::Frontend::AST::MemberExpr& expr) {
                     if (eu->successType) success_type = eu->successType;
                 }
                 set_register_type(target_obj, success_type);
-                emit_instruction(LIR_Inst(LIR_Op::Unwrap, language_type_to_abi_type(success_type), target_obj, object_reg, 0));
+                emit_instruction(LIR_Inst(LIR_Op::Unwrap, language_type_to_abi_type(success_type), target_obj, object_reg, 0, 1));
             }
 
             LM::Frontend::AST::MemberExpr non_safe_expr = expr;
@@ -3427,7 +3501,20 @@ Reg Generator::emit_fallible_expr(LM::Frontend::AST::FallibleExpr& expr) {
     
     // Check if the result contains an error
     emit_instruction(LIR_Inst(LIR_Op::IsError, Type::Bool, is_error_reg, result_reg, 0));
-    
+
+    // Optional (T?) unions fail on nil as well as on error payloads. There is no
+    // logical-or LIR op (And/Or are bitwise and bool immediates don't survive
+    // as_i64), so the two checks become two conditional jumps to the same target.
+    Reg is_nil_reg = allocate_register();
+    auto nil_bool_type = std::make_shared<::Type>(::TypeTag::Bool);
+    set_register_type(is_nil_reg, nil_bool_type);
+    Reg nil_reg = allocate_register();
+    auto nil_type = std::make_shared<::Type>(::TypeTag::Nil);
+    Backend::Value nil_val = VAL_NIL;
+    emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, nil_reg, nil_val));
+    set_register_type(nil_reg, nil_type);
+    emit_instruction(LIR_Inst(LIR_Op::CmpEQ, Type::Bool, is_nil_reg, result_reg, nil_reg));
+
     if (cfg_context_.building_cfg) {
         // CFG mode: create blocks for error handling
         LIR_BasicBlock* error_block = create_basic_block("error_handling");
@@ -3437,8 +3524,9 @@ Reg Generator::emit_fallible_expr(LM::Frontend::AST::FallibleExpr& expr) {
         // Create a register to hold the final result (either unwrapped value or else block result)
         Reg final_result_reg = allocate_register();
         
-        // If it's an error, jump to error handling block
+        // If it's an error or nil, jump to error handling block
         emit_instruction(LIR_Inst(LIR_Op::JumpIf, Type::Void, 0, is_error_reg, 0, error_block->id));
+        emit_instruction(LIR_Inst(LIR_Op::JumpIf, Type::Void, 0, is_nil_reg, 0, error_block->id));
         
         // Explicit jump to success block to ensure correct control flow
         emit_instruction(LIR_Inst(LIR_Op::Jump, Type::Void, 0, 0, 0, success_block->id));
@@ -3476,7 +3564,13 @@ Reg Generator::emit_fallible_expr(LM::Frontend::AST::FallibleExpr& expr) {
             // ? else {} construct - execute the else block instead of propagating          
             // Allocate register for the else block result
             Reg default_reg = allocate_register();
-            
+
+            // Default to nil so a bare trailing expression (documented as
+            // discarded) yields nil rather than an uninitialized register.
+            Reg nil_default = allocate_register();
+            emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, nil_default, VAL_NIL));
+            emit_instruction(LIR_Inst(LIR_Op::Mov, Type::Ptr, default_reg, nil_default, 0));
+
             // Set up else block context
             else_context_.in_else_block = true;
             else_context_.result_register = default_reg;
@@ -3488,8 +3582,10 @@ Reg Generator::emit_fallible_expr(LM::Frontend::AST::FallibleExpr& expr) {
             else_context_.in_else_block = false;
             else_context_.result_register = UINT32_MAX;
             
-            // Move default value to final result register
-            emit_instruction(LIR_Inst(LIR_Op::Mov, Type::I64, final_result_reg, default_reg, 0));
+            // Move default value to final result register, preserving ABI kind
+            Type default_abi = get_register_abi_type(default_reg);
+            if (default_abi == Type::Void) default_abi = Type::Ptr;
+            emit_instruction(LIR_Inst(LIR_Op::Mov, default_abi, final_result_reg, default_reg, 0));
             
             // Jump to continue block
             emit_instruction(LIR_Inst(LIR_Op::Jump, Type::Void, 0, 0, 0, continue_block->id));
@@ -3511,8 +3607,9 @@ Reg Generator::emit_fallible_expr(LM::Frontend::AST::FallibleExpr& expr) {
         uint32_t error_label = generate_label();
         uint32_t continue_label = generate_label();
         
-        // If it's an error, jump to error handling
+        // If it's an error or nil, jump to error handling
         emit_label_jump(LIR_Op::JumpIf, is_error_reg, error_label);
+        emit_label_jump(LIR_Op::JumpIf, is_nil_reg, error_label);
         
         // Success path: unwrap the value
         Reg unwrapped_reg = allocate_register();
@@ -3648,6 +3745,30 @@ Reg Generator::emit_cast_expr(LM::Frontend::AST::CastExpr& expr) {
 
     TypePtr source_type = get_register_language_type(source);
     TypePtr target_type = expr.inferred_type;
+
+    // Narrowing a union/optional (`T?`, `T | nil`, `T?Err`) to a member type
+    // must unwrap ok/err boxes first; raw members pass through Unwrap unchanged.
+    if (source_type && (source_type->tag == TypeTag::Union || source_type->tag == TypeTag::ErrorUnion) &&
+        target_type && target_type->tag != TypeTag::Union && target_type->tag != TypeTag::ErrorUnion &&
+        target_type->tag != TypeTag::Nil && target_type->tag != TypeTag::Any) {
+        TypePtr success_type = type_system_->ANY_TYPE;
+        if (source_type->tag == TypeTag::ErrorUnion) {
+            if (auto* eu = std::get_if<ErrorUnionType>(&source_type->extra))
+                if (eu->successType) success_type = eu->successType;
+        } else if (auto* ut = std::get_if<UnionType>(&source_type->extra)) {
+            for (auto& member : ut->types)
+                if (member && member->tag != TypeTag::Nil) { success_type = member; break; }
+        }
+        Reg unwrapped = allocate_register();
+        Type abi = language_type_to_abi_type(target_type);
+        // imm=1 marks a value-level unwrap (union narrowing via `as`), not
+        // `?` error propagation; the CFG validator only polices the latter.
+        emit_instruction(LIR_Inst(LIR_Op::Unwrap, abi, unwrapped, source, 0, 1));
+        set_register_language_type(unwrapped, success_type);
+        set_register_type(unwrapped, success_type);
+        source = unwrapped;
+        source_type = success_type;
+    }
 
     if (is_decimal_type(source_type) || is_decimal_type(target_type)) {
         // Use DecRescale opcode for decimal rescaling

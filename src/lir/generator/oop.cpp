@@ -49,12 +49,16 @@ void Generator::lower_trait_method(const std::string& trait_name, LM::Frontend::
     cfg_context_.building_cfg = false;
     cfg_context_.current_block = nullptr;
     
-    // Register 'this' and 'self' parameter as first parameter (register 0)
+    // Register 'this' and 'self' parameter as first parameter (register 0).
+    // Type it as the trait itself so `self.otherMethod()` inside a default
+    // body resolves to a TraitCallMethod on the concrete receiver.
     this_register_ = 0;
     bind_variable("this", 0);
     bind_variable("self", 0);
-    auto any_type = std::make_shared<::Type>(::TypeTag::Any);
-    set_register_language_type(0, any_type);
+    TraitType self_trait;
+    self_trait.name = trait_name;
+    auto self_type = std::make_shared<::Type>(::TypeTag::Trait, self_trait);
+    set_register_language_type(0, self_type);
     set_register_abi_type(0, Type::Ptr);
     
     // Register method parameters

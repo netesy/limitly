@@ -328,9 +328,21 @@ void MemoryChecker::check_shift_safety(std::shared_ptr<LM::Frontend::AST::Binary
                            binary->line);
         }
         
-        if (shift_amount >= 64) {
+        // The legal shift range follows the shifted operand's bit width:
+        // i128/u128 allow amounts up to 127, narrower ints up to their width.
+        int bit_width = 64;
+        if (binary->left && binary->left->inferred_type) {
+            switch (binary->left->inferred_type->tag) {
+                case TypeTag::Int8: case TypeTag::UInt8: bit_width = 8; break;
+                case TypeTag::Int16: case TypeTag::UInt16: bit_width = 16; break;
+                case TypeTag::Int32: case TypeTag::UInt32: bit_width = 32; break;
+                case TypeTag::Int128: case TypeTag::UInt128: bit_width = 128; break;
+                default: break;
+            }
+        }
+        if (shift_amount >= bit_width) {
             add_memory_error("shift_error", "", 
-                           "Shift amount exceeds bit width (>= 64)",
+                           "Shift amount exceeds bit width",
                            binary->line);
         }
     }

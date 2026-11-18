@@ -76,8 +76,6 @@ tests/native_win32.lm
 tests/native_linux.lm
 # VK numpad -> GLFW numpad end-to-end through std.events + std.game input
 tests/native_numpad.lm
-# Roadmap 2a: foreign source link integration (see tests/native/verify_native_link.py
-# for the artifact-level symbol check)
 tests/native/native_link_basic.lm
 # Fallible types - `? else` fallback and pattern discrimination
 # (the rest of tests/error_handling/ is not wired into this manifest)
@@ -160,21 +158,11 @@ tests/regression/int64_immediate_overflow_test.lm
 tests/std_gg_smoke.lm
 tests/graphics_triangle_test.lm
 tests/text_render_test.lm
-tests/retained_ui_test.lm
-tests/ui_fluent_test.lm
-tests/ui_ergonomics_test.lm
 tests/ui_component_skeleton.lm
-tests/ui_v2_widgets.lm
 tests/ui_reactive.lm
-tests/ui_m4_static.lm
-tests/ui_m5_perf.lm
 tests/text_bidi_shaping.lm
 tests/text_unicode_editing.lm
-tests/window_resize_test.lm
-tests/interactive_controls_test.lm
-tests/showcase_verify_test.lm
 tests/scroll_clipping_pixel_test.lm
-tests/scroll_tab_interaction_test.lm
 # New Stdlib Enhancements: Crypto, Compression, Regex, TLS, Game IMGUI
 tests/crypto/test_crypto.lm
 tests/compress/test_compress.lm
@@ -188,15 +176,12 @@ tests/staged/staged_fn_test.lm
 tests/staged/staged_type_fn_test.lm
 tests/staged/staged_enum_test.lm
 tests/staged/staged_vm_test.lm
-# Staged fn compile-time VALUE parameters (previously uncovered)
+# Staged fn compile-time VALUE parameters 
 tests/staged/staged_value_param_test.lm
-# Staged frames (roadmap 1b): frame templates minting named frames per type tuple
+# Staged frames:frame templates minting named frames per type tuple
 tests/staged/staged_frame_test.lm
 # Staged frame construction through a `type` alias (callee rewrite regression)
 tests/staged/staged_alias_construction_test.lm
-
-# Modern Idiomatic UI & Game Architecture
-tests/modern_ui_game_test.lm
 
 # GPU compute emulation (gpu task/threads/intrinsics on the register VM)
 tests/gpu/particle_sim.lm

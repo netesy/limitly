@@ -188,6 +188,21 @@ void RegisterVM::execute_collections(const LIR::LIR_Inst* pc) {
                 registers[pc->dst] = make_i64(0);
             }
             break;
+        case LIR::LIR_Op::ProbeKind: {
+            // Match-arm type guard: 1=list, 2=dict, 3=tuple, 0=anything else.
+            RegisterValue probe = registers[pc->a];
+            int64_t kind = 0;
+            if (IS_PTR(probe)) {
+                auto* header = static_cast<ObjHeader*>(UNBOX_PTR(probe));
+                if (header) {
+                    if (header->type_id == TYPE_LIST) kind = 1;
+                    else if (header->type_id == TYPE_DICT) kind = 2;
+                    else if (header->type_id == TYPE_TUPLE) kind = 3;
+                }
+            }
+            registers[pc->dst] = make_i64(kind);
+            break;
+        }
         default:
             break;
     }

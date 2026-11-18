@@ -518,7 +518,9 @@ void Generator::collect_variables_from_statement(LM::Frontend::AST::Statement& s
             collect_variables_from_statement(*body_stmt, variables);
         }
     } else if (auto expr_stmt = dynamic_cast<LM::Frontend::AST::ExprStatement*>(&stmt)) {
-        collect_variables_from_expression(*expr_stmt->expression, variables);
+        if (expr_stmt->expression) {
+            collect_variables_from_expression(*expr_stmt->expression, variables);
+        }
     }
     // Add other statement types as needed
 }

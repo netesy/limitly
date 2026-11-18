@@ -7,6 +7,8 @@
 #include "backend/vm/vm_value.hh"
 #include "backend/vm/vm_list.hh"
 
+#include <cstring>
+
 namespace LM {
 namespace Backend {
 namespace VM {
@@ -19,7 +21,16 @@ inline __int128 parse_i128_literal(const std::string& text) {
         if (text[i] < '0' || text[i] > '9') break;
         value = value * 10 + static_cast<unsigned>(text[i] - '0');
     }
-    return negative ? -static_cast<__int128>(value) : static_cast<__int128>(value);
+    if (negative) {
+        // Negate in the unsigned domain: -2^127 (i128 MIN) has no positive
+        // __int128 counterpart, so signed negation would be undefined.
+        unsigned __int128 negated = 0 - value;
+        __int128 result;
+        static_assert(sizeof(result) == sizeof(negated));
+        std::memcpy(&result, &negated, sizeof(result));
+        return result;
+    }
+    return static_cast<__int128>(value);
 }
 
 inline unsigned __int128 parse_u128_literal(const std::string& text) {

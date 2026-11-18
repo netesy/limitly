@@ -502,7 +502,6 @@ bool Optimizer::remove_loop_region_ops() {
         case LIR_Op::ConstructError:
         case LIR_Op::ConstructOk:
         case LIR_Op::RefCreate:
-        case LIR_Op::EffectPerform:
             return true;
         default:
             return false;

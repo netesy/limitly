@@ -296,12 +296,15 @@ static char* int128_to_str(__int128 n) {
     char* buf = (char*)malloc(64);
     if (n == 0) { strcpy(buf, "0"); return buf; }
     int sign = 0;
-    if (n < 0) { sign = 1; n = -n; }
+    // Magnitude in the unsigned domain: -n overflows for i128 MIN.
+    unsigned __int128 mag = n < 0 ? 0 - static_cast<unsigned __int128>(n)
+                                  : static_cast<unsigned __int128>(n);
+    if (n < 0) sign = 1;
     int i = 62;
     buf[63] = '\0';
-    while (n > 0) {
-        buf[i--] = (char)((n % 10) + '0');
-        n /= 10;
+    while (mag > 0) {
+        buf[i--] = (char)((mag % 10) + '0');
+        mag /= 10;
     }
     if (sign) buf[i--] = '-';
     char* res = strdup(&buf[i+1]);

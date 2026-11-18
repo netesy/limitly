@@ -10,6 +10,7 @@
 #include <unordered_set>
 #include <string>
 #include <cstring>
+#include <functional>
 #include <optional>
 #include "symbol_database.hh"
 
@@ -132,6 +133,32 @@ public:
 
     // Staged functions ('staged fn'): registered for compile-time call folding.
     std::unordered_map<std::string, std::shared_ptr<LM::Frontend::AST::FunctionDeclaration>> staged_functions_;
+    // Staged fns exported by imported modules, populated during the PASS 0 module merge:
+    // module path -> bare fn name -> declaration. Lets `mod.staged_fn(args)` fold at the
+    // call site, and gives nested staged calls inside a module body a scoped lookup.
+    std::unordered_map<std::string, std::unordered_map<std::string, std::shared_ptr<LM::Frontend::AST::FunctionDeclaration>>> module_staged_functions_;
+    // Owning module path for each staged fn declaration seen during the module merge
+    // (absent = declared by the program currently being checked).
+    std::unordered_map<const LM::Frontend::AST::FunctionDeclaration*, std::string> staged_fn_modules_;
+    // Module scope for the staged body currently being folded or VM-checked; "" means the
+    // current program. Bare staged callees inside a module body resolve against that
+    // module's staged fns first.
+    std::string stage0_scope_module_;
+    // Resolves a staged fn by bare or module-qualified name. `scope_module` is the module
+    // that owns the call site; bare names prefer that module's staged fns over the current
+    // program's same-named ones. Module staged-fn tables are populated lazily from the
+    // ModuleManager ASTs so sub-module checkers resolve cross-module staged calls too.
+    std::shared_ptr<LM::Frontend::AST::FunctionDeclaration> find_staged_decl(
+            const std::string& name, const std::string& scope_module = "");
+    // Import aliases declared by a module (`import a.b as c` -> {"c": "a.b"}), read from
+    // the module's AST. Empty for unknown/root modules.
+    std::unordered_map<std::string, std::string> module_alias_map(const std::string& module_path) const;
+    // Populates module_staged_functions_[module_path] and staged_fn_modules_ from the
+    // module's AST on first use; later calls are no-ops.
+    void load_module_staged_fns(const std::string& module_path);
+    // Resolves the module path a staged-call callee object refers to: an import alias of
+    // the scope module, or a module path spelled directly. "" when unresolvable.
+    std::string resolve_module_alias(const std::string& obj_path) const;
     // Staged frame templates ('staged frame'): declared templates and their synthesized frames.
     std::unordered_map<std::string, std::shared_ptr<LM::Frontend::AST::FrameDeclaration>> staged_frame_templates_;
     std::unordered_map<std::string, TypePtr> generated_staged_frames_;   // mangled name -> frame type

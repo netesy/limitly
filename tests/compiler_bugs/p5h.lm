@@ -1,0 +1,3 @@
+import p5e;
+fn normal(x: int): int { return p5e.base(x) * 2; }
+fn main() { print(normal(5)); return 0; }

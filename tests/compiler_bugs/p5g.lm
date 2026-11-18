@@ -1,0 +1,6 @@
+import p5f;
+fn main() {
+    print(p5f.via_other(5));
+    print(p5f.local_loop(4));
+    return 0;
+}

@@ -152,6 +152,7 @@ enum class LIR_Op : uint8_t {
     ListCreate, ListAppend, ListIndex, ListSet, ListLen,
     DictCreate, DictSet, DictGet, DictHas, DictLen, DictItems,
     TupleCreate, TupleGet, TupleSet, TupleLen,
+    ProbeKind,
     
     // === Object-Oriented ===
     NewFrame, FrameGetField, FrameSetField, FrameGetFieldAtomic, FrameSetFieldAtomic,
@@ -207,9 +208,6 @@ enum class LIR_Op : uint8_t {
     RegionMove,         // Move register pointer ownership to another region
     
     // === Algebraic Effects ===
-    EffectPerform,      // Perform algebraic effect (tag in a, payload in b)
-    EffectHandle,       // Register effect handler
-    EffectResume,       // Resume effect handler continuation
     RefCreate,          // dst = checked capability for a; imm 0 read, 1 write
     RefResolve,         // dst = checked pointer from token a; imm 0 read, 1 write
     RefRelease,         // End capability a; a second release is an error
@@ -260,7 +258,7 @@ enum class LIR_Op : uint8_t {
     /* === Collections === */ \
     X(ListCreate) X(ListAppend) X(ListIndex) X(ListSet) X(ListLen) \
     X(DictCreate) X(DictSet) X(DictGet) X(DictHas) X(DictLen) X(DictItems) \
-    X(TupleCreate) X(TupleGet) X(TupleSet) X(TupleLen) \
+    X(TupleCreate) X(TupleGet) X(TupleSet) X(TupleLen) X(ProbeKind) \
     /* === Object-Oriented === */ \
     X(NewFrame) X(FrameGetField) X(FrameSetField) \
     X(FrameGetFieldAtomic) X(FrameSetFieldAtomic) \
@@ -289,7 +287,6 @@ enum class LIR_Op : uint8_t {
     /* === Region Operations === */ \
     X(RegionEnter) X(RegionExit) X(RegionMove) \
     /* === Algebraic Effects === */ \
-    X(EffectPerform) X(EffectHandle) X(EffectResume) \
     X(RefCreate) X(RefResolve) X(RefRelease) X(OwnershipConsume) X(RefMove) \
 
 struct LIR_SourceLoc {

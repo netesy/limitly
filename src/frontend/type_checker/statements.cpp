@@ -1130,19 +1130,36 @@ std::shared_ptr<LM::Frontend::AST::Expression> TypeChecker::fold_stage0_expr(
         return nu;
     }
     if (auto call = std::dynamic_pointer_cast<LM::Frontend::AST::CallExpr>(e)) {
-        auto callee = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(call->callee);
-        if (callee) {
-            auto it = staged_functions_.find(callee->name);
-            if (it != staged_functions_.end()) {
-                auto fn = it->second;
+        // Callee name for staged lookup: bare `fn(...)` or module-qualified `mod.fn(...)`.
+        // The object path of a member callee resolves through the import aliases of the
+        // module that owns the staged body being folded.
+        std::string callee_name;
+        std::function<std::string(const std::shared_ptr<LM::Frontend::AST::Expression>&)> obj_path =
+            [&](const std::shared_ptr<LM::Frontend::AST::Expression>& oe) -> std::string {
+            if (auto v = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(oe)) return v->name;
+            if (auto m = std::dynamic_pointer_cast<LM::Frontend::AST::MemberExpr>(oe)) {
+                std::string p = obj_path(m->object);
+                return p.empty() ? "" : (p + "." + m->name);
+            }
+            return "";
+        };
+        if (auto ve = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(call->callee)) {
+            callee_name = ve->name;
+        } else if (auto me = std::dynamic_pointer_cast<LM::Frontend::AST::MemberExpr>(call->callee)) {
+            std::string mod = resolve_module_alias(obj_path(me->object));
+            if (!mod.empty()) callee_name = mod + "." + me->name;
+        }
+        if (!callee_name.empty()) {
+            auto fn = find_staged_decl(callee_name, stage0_scope_module_);
+            if (fn) {
                 if (is_staged_type_fn(fn)) {
                     // A type constructor invoked from a value expression: no value exists
                     // to fold. resolve_staged_type_expr handles the type-position path.
-                    add_error("staged fn '" + callee->name + "' returns type and can only be used in a type position", call->line);
+                    add_error("staged fn '" + callee_name + "' returns type and can only be used in a type position", call->line);
                     return call;
                 }
                 if (call->arguments.size() != fn->params.size()) {
-                    add_error("staged fn '" + callee->name + "' expects " + std::to_string(fn->params.size()) + " argument(s)", call->line);
+                    add_error("staged fn '" + callee_name + "' expects " + std::to_string(fn->params.size()) + " argument(s)", call->line);
                     return call;
                 }
                 bool bind_ok = true;
@@ -1168,7 +1185,7 @@ std::shared_ptr<LM::Frontend::AST::Expression> TypeChecker::fold_stage0_expr(
                         continue;
                     }
                     if (!evaluate_const_expr(fa, avi, avd, aint, this)) {
-                        add_error("staged fn '" + callee->name + "' argument " + std::to_string(i + 1) + " must be a compile-time constant", call->line);
+                        add_error("staged fn '" + callee_name + "' argument " + std::to_string(i + 1) + " must be a compile-time constant", call->line);
                         bind_ok = false;
                         break;
                     }
@@ -1192,8 +1209,8 @@ std::shared_ptr<LM::Frontend::AST::Expression> TypeChecker::fold_stage0_expr(
         // Anything else is a host call. Stage 0 runs inside the type checker, which has no
         // system access, so there is nothing to execute here (docs/staged.md section 4,
         // Isolation Boundary). Report it rather than leaving a call the folder cannot reduce.
-        const std::string callee_name = callee ? callee->name : "<expression>";
-        add_error("staged evaluation error: cannot call '" + callee_name + "' at compile time -- stage 0 executes staged fns only and has no host access", call->line);
+        const std::string& shown = callee_name.empty() ? std::string("<expression>") : callee_name;
+        add_error("staged evaluation error: cannot call '" + shown + "' at compile time -- stage 0 executes staged fns only and has no host access", call->line);
         return call;
     }
     return e;
@@ -1327,6 +1344,16 @@ bool TypeChecker::fold_staged_body(std::shared_ptr<LM::Frontend::AST::FunctionDe
         return false;
     }
     ++staged_fold_depth_;
+    // Bare staged callees inside the body resolve in the module that declares `fn`;
+    // nested folds overwrite and restore this around their own bodies.
+    const std::string saved_scope_module = stage0_scope_module_;
+    if (fn) {
+        if (auto smit = staged_fn_modules_.find(fn.get()); smit != staged_fn_modules_.end()) {
+            stage0_scope_module_ = smit->second;
+        } else {
+            stage0_scope_module_.clear();
+        }
+    }
     // No internal environment snapshot: every call site snapshots BEFORE binding
     // parameters and restores after the fold, so callee bindings can never leak.
 
@@ -1342,6 +1369,7 @@ bool TypeChecker::fold_staged_body(std::shared_ptr<LM::Frontend::AST::FunctionDe
         failed = true;
     }
 
+    stage0_scope_module_ = saved_scope_module;
     --staged_fold_depth_;
 
     if (failed) return false;
@@ -1422,12 +1450,12 @@ TypePtr TypeChecker::resolve_staged_type_expr(std::shared_ptr<LM::Frontend::AST:
     if (auto call = std::dynamic_pointer_cast<LM::Frontend::AST::CallExpr>(e)) {
         auto callee = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(call->callee);
         if (!callee) return nullptr;
-        auto it = staged_functions_.find(callee->name);
-        if (it == staged_functions_.end() || !is_staged_type_fn(it->second)) {
+        auto it = find_staged_decl(callee->name, stage0_scope_module_);
+        if (!it || !is_staged_type_fn(it)) {
             add_error("staged fn '" + callee->name + "' does not return a type", e->line);
             return nullptr;
         }
-        auto fn = it->second;
+        auto fn = it;
         if (call->arguments.size() != fn->params.size()) {
             add_error("staged fn '" + callee->name + "' expects " + std::to_string(fn->params.size()) + " type argument(s)", e->line);
             return nullptr;
@@ -1537,12 +1565,12 @@ TypePtr TypeChecker::resolve_staged_call_annotation(std::shared_ptr<LM::Frontend
             return instantiate_staged_frame(annotation, annotation->stagedCallName, annotation->line);
         }
     }
-    auto it = staged_functions_.find(annotation->stagedCallName);
-    if (it == staged_functions_.end() || !is_staged_type_fn(it->second)) {
+    auto it = find_staged_decl(annotation->stagedCallName, stage0_scope_module_);
+    if (!it || !is_staged_type_fn(it)) {
         add_error("cannot find staged type constructor '" + annotation->stagedCallName + "'");
         return type_system.NIL_TYPE;
     }
-    auto fn = it->second;
+    auto fn = it;
     if (annotation->stagedCallArgs.size() != fn->params.size()) {
         add_error("staged type constructor '" + annotation->stagedCallName + "' expects " + std::to_string(fn->params.size()) + " argument(s)");
         return type_system.NIL_TYPE;

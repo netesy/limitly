@@ -31,6 +31,8 @@
 #include <condition_variable>
 #include <chrono>
 #include <functional>
+#include <cmath>
+#include <limits>
 #if defined(_WIN32)
 #if !defined(WIN32_LEAN_AND_MEAN)
 #define WIN32_LEAN_AND_MEAN
@@ -396,6 +398,30 @@ std::string integer_text(__int128 number) {
     if (negative) text.push_back('-');
     std::reverse(text.begin(), text.end()); return text;
 }
+// Renders a boxed i128/u128 (allocation type 7/8) respecting unsignedness.
+// integer_number() widens both into __int128, so u128 values at or above
+// 2^127 would print as negative without this dispatch. Disengaged for
+// non-wide values so callers keep the integer_number() path.
+std::optional<std::string> wide_box_text(Word value, Word kind) {
+    if (kind != object_kind || value <= 4096) return {};
+    auto found = heap().allocations.find(value);
+    if (found == heap().allocations.end() || found->second.raw_memory ||
+        found->second.dictionary || found->second.size < 32) return {};
+    auto type = read_word(value) & 0xffffffff;
+    if (type != 7 && type != 8) return {};
+    unsigned __int128 u;
+    std::memcpy(&u, reinterpret_cast<void*>(value + 16), sizeof(u));
+    if (type == 8) {
+        if (u == 0) return std::string("0");
+        std::string text;
+        do { text.push_back('0' + u % 10); u /= 10; } while (u);
+        std::reverse(text.begin(), text.end());
+        return text;
+    }
+    __int128 s;
+    std::memcpy(&s, &u, sizeof(s));
+    return integer_text(s);
+}
 }
 
 extern "C" {
@@ -606,6 +632,48 @@ uint64_t lymar_aot_is_object(uint64_t value, uint64_t is_pointer) {
         if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return 0;
+    }
+}
+// Ok/err union boxes are raw 24-byte allocations tagged with a magic word so
+// Unwrap/IsError can distinguish them from the raw scalars and frames that
+// optional (T?) and plain unions also carry. Layout: [magic][is_error][payload].
+constexpr Word union_box_magic = 0x4C594D41524F4B21ULL; // "LYMAROK!"
+
+static bool is_union_box(Word value, Word kind) {
+    if (kind != object_kind || value <= 4096 || value == 0 || value == 2) return false;
+    auto found = heap().containing(value);
+    if (found == heap().allocations.end() || found->first != value || found->second.size < 24) return false;
+    return read_word(value) == union_box_magic;
+}
+uint64_t lymar_aot_union_is_error(uint64_t value, uint64_t kind) {
+    try {
+    RuntimeGuard runtime_guard;
+
+    return is_union_box(value, kind) && read_word(value, 8) != 0 ? 1 : 0;
+
+    } catch (const std::exception& failure) {
+        if (runtime_lock_depth && heap().worker) throw;
+        if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
+        return 0;
+    }
+}
+uint64_t lymar_aot_union_unwrap(uint64_t value, uint64_t kind) {
+    try {
+    RuntimeGuard runtime_guard;
+
+    auto& h = heap();
+    if (is_union_box(value, kind)) {
+        h.return_pointer = read_word(value, 24);
+        return read_word(value, 16);
+    }
+    h.return_pointer = kind;
+    return value;
+
+    } catch (const std::exception& failure) {
+        if (runtime_lock_depth && heap().worker) throw;
+        if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
+        heap().return_pointer = kind;
+        return value;
     }
 }
 // Erased native integers are untagged, so pointer shape cannot validate a
@@ -841,6 +909,9 @@ void lymar_aot_print_integer(uint64_t value, uint64_t kind) {
     size_t length;
     if (lymar_aot_is_nil(value, kind)) { output = "nil"; length = 3; }
     else if (kind == boolean_kind) { output = value ? "true" : "false"; length = value ? 4 : 5; }
+    else if (auto wide = wide_box_text(value, kind)) {
+        lymar_stdout_write(wide->data(), wide->size()); return;
+    }
     else if (auto integer = integer_number(value, kind)) {
         auto number = integer_text(*integer); lymar_stdout_write(number.data(), number.size()); return;
     }
@@ -1287,8 +1358,29 @@ uint64_t lymar_aot_scalar_to_string(uint64_t value, uint64_t kind) {
     else if (kind == boolean_kind) { output = value ? "true" : "false"; length = value ? 4 : 5; }
     else if (kind == object_kind && value > 4096 && (read_word(value) & 0xffffffff) == 9)
         length = static_cast<size_t>(std::snprintf(text, sizeof(text), "%.6g", lymar_aot_to_float(value, kind)));
+    else if (auto wide = wide_box_text(value, kind)) { wide_text = *wide; output = wide_text.c_str(); length = wide_text.size(); }
     else if (auto integer = integer_number(value, kind)) { wide_text = integer_text(*integer); output = wide_text.c_str(); length = wide_text.size(); }
     else length = static_cast<size_t>(std::snprintf(text, sizeof(text), "%lld", static_cast<long long>(value)));
+    auto pointer = lymar_aot_alloc(24 + length + 1);
+    Word header[] = {11, length, length};
+    std::memcpy(reinterpret_cast<void*>(pointer), header, sizeof(header));
+    std::memcpy(reinterpret_cast<void*>(pointer + 24), output, length);
+    return pointer;
+
+    } catch (const std::exception& failure) {
+        if (runtime_lock_depth && heap().worker) throw;
+        if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
+        return 0;
+    }
+}
+// Statically-known booleans cannot ride the dynamic kind sidecar (integer
+// slots record kind 0), so `bool as str` needs a dedicated entry point.
+uint64_t lymar_aot_bool_to_string(uint64_t value) {
+    try {
+    RuntimeGuard runtime_guard;
+
+    const char* output = value ? "true" : "false";
+    size_t length = value ? 4 : 5;
     auto pointer = lymar_aot_alloc(24 + length + 1);
     Word header[] = {11, length, length};
     std::memcpy(reinterpret_cast<void*>(pointer), header, sizeof(header));
@@ -1334,6 +1426,7 @@ static uint64_t format_argument(uint64_t value, uint64_t kind, bool printable) {
             }
             if (!allocation.dictionary && type >= 5 && type <= 8) {
                 require(word, type <= 6 ? 16 : 32);
+                if (auto wide = wide_box_text(word, mode)) return *wide;
                 return integer_text(*integer_number(word, mode));
             }
             if (!allocation.dictionary && type == 9) {
@@ -1341,6 +1434,14 @@ static uint64_t format_argument(uint64_t value, uint64_t kind, bool printable) {
                 char buffer[64];
                 std::snprintf(buffer, sizeof(buffer), "%.6g", lymar_aot_to_float(word, mode));
                 return buffer;
+            }
+            if (!allocation.dictionary && read_word(word) == union_box_magic) {
+                require(word, 32);
+                auto flag = read_word(word, 8);
+                auto payload = read_word(word, 16);
+                auto payload_kind = read_word(word, 24);
+                auto inner = format(payload, payload_kind);
+                return flag ? "err(" + inner + ")" : "ok(" + inner + ")";
             }
             if (!visiting.insert(word).second) throw std::runtime_error("Cyclic value formatting");
             struct Visit { std::unordered_set<Word>& set; Word word; ~Visit() { set.erase(word); } } visit{visiting, word};
@@ -1518,9 +1619,31 @@ uint64_t lymar_aot_tuple_length(uint64_t pointer, uint64_t kind) {
         RuntimeGuard guard;
         if (!lymar_aot_is_object(pointer, kind)) return 0;
         auto record = heap().allocations.find(pointer);
+        // TupleLen is only emitted as a match-arm probe: non-tuple receivers
+        // must yield 0 (arm fails) rather than throw and poison worker_error.
         if (record == heap().allocations.end() || record->second.size < 32)
-            throw std::runtime_error("Invalid or expired tuple receiver");
+            return 0;
         return !record->second.dictionary && (read_word(pointer) & 0xffffffff) == 3 ? read_word(pointer, 16) : 0;
+    } catch (const std::exception& failure) {
+        if (runtime_lock_depth && heap().worker) throw;
+        if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
+        return 0;
+    }
+}
+// Match-arm type guard: reports the structural kind of an erased word so
+// list/tuple/dict patterns can fail cleanly instead of probing foreign layouts.
+// Returns 1=list, 2=dict, 3=tuple, 0=anything else (scalars, strings, frames).
+uint64_t lymar_aot_probe_kind(uint64_t value, uint64_t kind) {
+    try {
+        RuntimeGuard guard;
+        if (!lymar_aot_is_object(value, kind)) return 0;
+        auto record = heap().allocations.find(value);
+        if (record == heap().allocations.end() || record->second.size < 8) return 0;
+        if (record->second.dictionary) return 2;
+        Word tag = read_word(value) & 0xffffffff;
+        if (tag == 1) return 1;
+        if (tag == 3) return 3;
+        return 0;
     } catch (const std::exception& failure) {
         if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
@@ -3032,8 +3155,11 @@ uint64_t lymar_aot_numeric_binary(uint64_t left,uint64_t right,uint64_t operatio
     auto a=integer_number(left,left_kind),b=integer_number(right,right_kind);
     if(a && b) {
         __int128 value=0;bool valid=false;
+        constexpr __int128 kMin=std::numeric_limits<__int128>::min();
         if(operation<=1) valid=LM::Memory::add_integer(*a,*b,value,operation==1);
         else if(operation==2) valid=!__builtin_mul_overflow(*a,*b,&value);
+        else if(operation==3) {if(*b!=0 && !(*a==kMin && *b==-1)) {value=*a / *b;valid=true;}}
+        else if(operation==4) {if(*b!=0) {value=(*a==kMin && *b==-1)?0:*a % *b;valid=true;}}
         else throw std::runtime_error("Invalid numeric operation");
         if(valid) return number(value);
         h.return_pointer=object_kind;return lymar_aot_nil();
@@ -3041,6 +3167,9 @@ uint64_t lymar_aot_numeric_binary(uint64_t left,uint64_t right,uint64_t operatio
     auto floating=[&](Word value,Word kind) {auto found=h.allocations.find(value);return kind==object_kind && found!=h.allocations.end() && !found->second.raw_memory && !found->second.dictionary && found->second.size>=16 && read_word(value)==9;};
     if((a || floating(left,left_kind)) && (b || floating(right,right_kind))) {
         auto x=lymar_aot_to_float(left,left_kind),y=lymar_aot_to_float(right,right_kind);
+        auto nil_result=[&](){h.return_pointer=object_kind;return lymar_aot_nil();};
+        if(operation==3) {if(y==0.0) return nil_result();auto value=lymar_aot_box_float(x/y);h.return_pointer=object_kind;return value;}
+        if(operation==4) {if(y==0.0) return nil_result();auto value=lymar_aot_box_float(std::fmod(x,y));h.return_pointer=object_kind;return value;}
         auto value=lymar_aot_box_float(operation==0?x+y:operation==1?x-y:x*y);h.return_pointer=object_kind;return value;
     }
     if(operation==0 && left_kind==object_kind && right_kind==object_kind) {
@@ -3062,6 +3191,36 @@ uint64_t lymar_aot_numeric_binary(uint64_t left,uint64_t right,uint64_t operatio
         }
     }
     h.return_pointer=object_kind;return lymar_aot_nil();
+}
+
+// 128-bit bitwise/shift for erased-word operands. integer_number() widens raw
+// ints, u64/i64 boxes and i128/u128 boxes to __int128; results reuse the
+// numeric_binary boxing contract (raw word while the value fits i64, type-7
+// heap box beyond). operation: 0=& 1=| 2=^ 3=<< 4=>>. Shift counts outside
+// [0,128) yield zero, matching the VM's [0,64) convention at 64-bit width.
+uint64_t lymar_aot_bitwise(uint64_t left,uint64_t right,uint64_t operation,uint64_t left_kind,uint64_t right_kind) {
+    RuntimeGuard guard;
+    auto& h=heap();
+    auto a=integer_number(left,left_kind),b=integer_number(right,right_kind);
+    if(!a || !b) { h.return_pointer=0; return 0; }
+    int64_t amount=static_cast<int64_t>(*b);
+    __int128 value=0;
+    if(operation==0) value=*a & *b;
+    else if(operation==1) value=*a | *b;
+    else if(operation==2) value=*a ^ *b;
+    else if(operation==3) value=(amount<0||amount>=128)?__int128(0):static_cast<__int128>(static_cast<unsigned __int128>(*a)<<amount);
+    else if(operation==4) {
+        if(amount<0||amount>=128) value=0;
+        else {
+            bool uns=left_kind==object_kind;
+            if(uns) {auto f=h.allocations.find(left);uns=f!=h.allocations.end()&&!f->second.raw_memory&&!f->second.dictionary&&f->second.size>=16&&(read_word(left)&0xffffffff)==8;}
+            value=uns?static_cast<__int128>(static_cast<unsigned __int128>(*a)>>amount):(*a>>amount);
+        }
+    } else { h.return_pointer=0; return 0; }
+    if(value>=INT64_MIN && value<=INT64_MAX) {h.return_pointer=0;return static_cast<Word>(value);}
+    auto object=lymar_aot_alloc(32);Word type=7;
+    std::memcpy(reinterpret_cast<void*>(object),&type,8);std::memcpy(reinterpret_cast<void*>(object+16),&value,16);
+    h.return_pointer=object_kind;return object;
 }
 
 }

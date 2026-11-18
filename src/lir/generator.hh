@@ -113,6 +113,10 @@ public:
     void emit_region_enter_from_memory_info(const LM::Frontend::AST::Statement& stmt);
     void emit_region_exit_from_memory_info(const LM::Frontend::AST::Statement& stmt);
     void bind_variable(const std::string& name, Reg reg);
+    // Tags a register holding an erased word (match-pattern element, union
+    // payload) as `any` so backends keep pointer-classified slots and the
+    // dynamic value kind survives to consumers like print/format.
+    void tag_register_erased(Reg reg);
 private:
     void update_variable_binding(const std::string& name, Reg reg);
     Reg resolve_variable(const std::string& name);
@@ -309,6 +313,9 @@ private:
     void emit_match_stmt(LM::Frontend::AST::MatchStatement& stmt);
     void emit_pattern_match(std::shared_ptr<LM::Frontend::AST::Expression> pattern, Reg val_reg, LIR_BasicBlock* failure_target, uint32_t failure_label = 0);
     void emit_pattern_match_jump(LIR_Op op, Reg cond_reg, LIR_BasicBlock* failure_target, uint32_t failure_label);
+    // Emits a ProbeKind == expected guard so structural patterns (list/tuple/
+    // dict) fail cleanly on foreign receivers instead of dereferencing them.
+    void emit_match_kind_guard(Reg val_reg, int64_t expected_kind, LIR_BasicBlock* failure_target, uint32_t failure_label);
     void emit_module_stmt(LM::Frontend::AST::ModuleDeclaration& stmt);
     
     // Helper functions

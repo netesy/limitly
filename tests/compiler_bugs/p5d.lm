@@ -1,0 +1,6 @@
+import p5c;
+fn main() {
+    print(p5c.sum_to(10));
+    print(p5c.uses_helper(21));
+    return 0;
+}

@@ -384,12 +384,18 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
                 } else if (fname == "print") {
                     for (size_t i = 0; i < pc->call_args.size(); ++i) {
                         if (i > 0) std::cout << ' ';
-                        LmStringHeader* s = lm_value_to_string(registers[pc->call_args[i]]);
-                        if (s) {
-                            std::cout.write(s->data, s->len);
-                            lm_str_free(s);
+                        auto arg_lang = get_register_language_type(pc->call_args[i]);
+                        if (arg_lang && is_decimal_type(arg_lang)) {
+                            auto text = register_to_value_ptr(registers[pc->call_args[i]], arg_lang)->toString();
+                            std::cout.write(text.data(), text.size());
                         } else {
-                            std::cout << "nil";
+                            LmStringHeader* s = lm_value_to_string(registers[pc->call_args[i]]);
+                            if (s) {
+                                std::cout.write(s->data, s->len);
+                                lm_str_free(s);
+                            } else {
+                                std::cout << "nil";
+                            }
                         }
                     }
                     std::cout << std::endl;
@@ -477,12 +483,18 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
                 if (pc->func_name == "print") {
                     for (size_t i = 0; i < pc->call_args.size(); ++i) {
                         if (i > 0) std::cout << ' ';
-                        LmStringHeader* s = lm_value_to_string(registers[pc->call_args[i]]);
-                        if (s) {
-                            std::cout.write(s->data, s->len);
-                            lm_str_free(s);
+                        auto arg_lang = get_register_language_type(pc->call_args[i]);
+                        if (arg_lang && is_decimal_type(arg_lang)) {
+                            auto text = register_to_value_ptr(registers[pc->call_args[i]], arg_lang)->toString();
+                            std::cout.write(text.data(), text.size());
                         } else {
-                            std::cout << "nil";
+                            LmStringHeader* s = lm_value_to_string(registers[pc->call_args[i]]);
+                            if (s) {
+                                std::cout.write(s->data, s->len);
+                                lm_str_free(s);
+                            } else {
+                                std::cout << "nil";
+                            }
                         }
                     }
                     std::cout << '\n';
