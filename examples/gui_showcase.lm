@@ -289,7 +289,7 @@ fn build_gallery_page(): ui.Flow {
     var ov = ui.overlay(ui.label("Overlay child at offset", color.white), 12.0, 4.0);
     g.add(ov);
 
-    var tt = ui.tooltip(ui.button("Hover for tooltip", nil, nil, nil), "Tooltip label");
+    var tt = ui.tooltip(ui.button("Hover for tooltip", nil, nil), "Tooltip label");
     g.add(tt);
 
     // Display widgets
@@ -312,7 +312,7 @@ fn build_gallery_page(): ui.Flow {
     // Input widgets
     g.add(gallery_section("Inputs: button / checkbox / toggle / text_input / select / multi_select / slider / range_slider / stepper / filter / file_input / color_picker"));
     var in1 = ui.row(8.0);
-    in1.add(ui.button("Button", nil, nil, on_sync));
+    in1.add(ui.button("Button", nil, on_sync));
     in1.add(ui.checkbox("Checkbox", false));
     in1.add(ui.toggle("Toggle", true));
     in1.add(ui.stepper(3, 1, 0, 10));

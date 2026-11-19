@@ -37,7 +37,7 @@ def main():
         sources = ["src/memory/aot_runtime.cpp", "src/runtime/os_info.cpp"]
         # FFI components remain separate archive members, pulled only if used.
         if system != "wasi":
-            sources += ["src/memory/aot_ffi.cpp", "src/runtime/lymarrt/lymarrt.cpp", "src/runtime/sokol/sokol_app_runtime.cpp", "src/runtime/truetype.cpp"]
+            sources += ["src/memory/aot_graphics.cpp", "src/memory/aot_ffi.cpp", "src/runtime/lymarrt/lymarrt.cpp", "src/runtime/native_d3d11_window.cpp", "src/runtime/truetype.cpp"]
         objects = []
         for source in sources:
             obj = Path(temporary) / (Path(source).stem + ".o")

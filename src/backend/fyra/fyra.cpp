@@ -119,6 +119,15 @@ CompileResult FyraCompiler::compile(const LIR::LIR_Function& lir_func,
     }
 #endif
     LIRToFyraIRBuilder builder(context_);
+    // Filesystem resource ops lower to OS capability calls on every target
+    // whose OS backend implements them: Windows (Win32), Linux, macOS and
+    // FreeBSD (syscalls). WASM keeps the runtime resource dispatch.
+    builder.set_fs_capabilities(options.platform == Platform::Windows ||
+        options.platform == Platform::Linux || options.platform == Platform::MacOS);
+    // Syscall targets compose mkdir -p in the emitted fyrA_mkdir_p IR helper;
+    // Windows uses it too — SHCreateDirectoryExA rejects relative paths.
+    builder.set_fs_mkdirp_helper(options.platform == Platform::Windows ||
+        options.platform == Platform::Linux || options.platform == Platform::MacOS);
     auto module = builder.build(lir_func, options.exported_module);
     if (builder.has_errors()) {
         CompileResult result;

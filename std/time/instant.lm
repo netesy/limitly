@@ -27,9 +27,8 @@ frame Instant {
     ///
     /// @return Fresh Instant capturing the current moment.
     pub fn now(): Instant {
-        var current_time = time();
-        var current_float = current_time as float;
-        var result_ms = current_float * 1000.0;
+        var current_time = clock();
+        var result_ms = current_time * 1000.0;
         return Instant(result_ms);
     }
 
@@ -37,9 +36,8 @@ frame Instant {
     ///
     /// @return Duration elapsed between this Instant and the current moment.
     pub fn elapsed(): dur.Duration {
-        var current_time = time();
-        var current_float = current_time as float;
-        var elapsed_ms = (current_float * 1000.0) - self.timestamp_ms;
+        var current_time = clock();
+        var elapsed_ms = (current_time * 1000.0) - self.timestamp_ms;
         if (elapsed_ms < 0.0) elapsed_ms = 0.0;
         var elapsed_int = elapsed_ms as int;
         return dur.Duration.from_milliseconds(elapsed_int);

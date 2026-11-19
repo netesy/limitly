@@ -102,16 +102,18 @@ const VK_FORMAT_R8G8B8A8_UNORM: int = 37;
 const VK_COLORSPACE_SRGB_NONLINEAR: int = 0;
 const PRESENT_MODE_FIFO: int = 2;
 const PRESENT_MODE_IMMEDIATE: int = 0;
+const PRESENT_MODE_MAILBOX: int = 1;
 const IMAGE_USAGE_COLOR_ATTACHMENT: int = 0x10;
 const IMAGE_USAGE_TRANSFER_SRC: int = 0x1;
 const SHARING_MODE_EXCLUSIVE: int = 0;
 const COMPOSITE_ALPHA_OPAQUE: int = 0x1;
 const PRETRANSFORM_IDENTITY: int = 0x1;
 const SURFACE_TRANSFORM_IDENTITY: int = 0x1;
-const LOAD_OP_CLEAR: int = 0;
-const LOAD_OP_DONT_CARE: int = 1000301000;
-const STORE_OP_STORE: int = 1;
-const STORE_OP_DONT_CARE: int = 1000301000;
+const LOAD_OP_LOAD: int = 0;
+const LOAD_OP_CLEAR: int = 1;
+const LOAD_OP_DONT_CARE: int = 2;
+const STORE_OP_STORE: int = 0;
+const STORE_OP_DONT_CARE: int = 1;
 const LAYOUT_UNDEFINED: int = 0;
 const LAYOUT_COLOR_ATTACHMENT: int = 2;
 const LAYOUT_PRESENT_SRC: int = 1000001001;
@@ -139,6 +141,7 @@ const BUFFER_USAGE_VERTEX_BUFFER: int = 0x80;
 const IMAGE_USAGE_TRANSFER_DST: int = 0x2;
 const IMAGE_USAGE_SAMPLED: int = 0x4;
 const IMAGE_TILING_OPTIMAL: int = 0;
+const LAYOUT_TRANSFER_SRC_OPTIMAL: int = 6;
 const LAYOUT_TRANSFER_DST_OPTIMAL: int = 7;
 const LAYOUT_SHADER_READ_ONLY: int = 5;
 const ACCESS_SHADER_READ: int = 0x20;
@@ -146,6 +149,7 @@ const ACCESS_TRANSFER_READ: int = 0x800;
 const ACCESS_TRANSFER_WRITE: int = 0x1000;
 const STAGE_FRAGMENT_SHADER: int = 0x80;
 const STAGE_TRANSFER: int = 0x1000;
+const STAGE_BOTTOM_OF_PIPE: int = 0x2000;
 const STAGE_ALL_GRAPHICS: int = 0x8000;
 const STAGE_ALL_COMMANDS: int = 0x10000;
 const DESCRIPTOR_TYPE_UNIFORM_BUFFER: int = 6;
@@ -184,18 +188,18 @@ const BLEND_FACTOR_SRC_ALPHA_SATURATE: int = 10;
 const BLEND_OP_ADD: int = 0;
 const COLOR_WRITE_ALL: int = 15;
 const MEM_DEVICE_LOCAL: int = 0x1;
-const DXGI_FMT_R32G32B32A32_FLOAT: int = 0x02;
-const DXGI_FMT_R32G32B32_FLOAT: int = 0x06;
-const DXGI_FMT_R16G16B16A16_FLOAT: int = 0xa;
-const DXGI_FMT_R32G32_FLOAT: int = 0x10;
-const DXGI_FMT_R32G32_UINT: int = 0x11;
-const DXGI_FMT_R8G8B8A8_UNORM: int = 0x1c;
-const DXGI_FMT_R8G8B8A8_UINT: int = 0x1e;
-const DXGI_FMT_R32_FLOAT: int = 0x29;
-const DXGI_FMT_R32_UINT: int = 0x2a;
-const DXGI_FMT_R16_UINT: int = 0x39;
-const DXGI_FMT_R8_UINT: int = 0x3e;
-const DXGI_FMT_B8G8R8A8_UNORM: int = 0x57;
+pub const DXGI_FMT_R32G32B32A32_FLOAT: int = 0x02;
+pub const DXGI_FMT_R32G32B32_FLOAT: int = 0x06;
+pub const DXGI_FMT_R16G16B16A16_FLOAT: int = 0xa;
+pub const DXGI_FMT_R32G32_FLOAT: int = 0x10;
+pub const DXGI_FMT_R32G32_UINT: int = 0x11;
+pub const DXGI_FMT_R8G8B8A8_UNORM: int = 0x1c;
+pub const DXGI_FMT_R8G8B8A8_UINT: int = 0x1e;
+pub const DXGI_FMT_R32_FLOAT: int = 0x29;
+pub const DXGI_FMT_R32_UINT: int = 0x2a;
+pub const DXGI_FMT_R16_UINT: int = 0x39;
+pub const DXGI_FMT_R8_UINT: int = 0x3e;
+pub const DXGI_FMT_B8G8R8A8_UNORM: int = 0x57;
 const VK_FMT_R8_UINT: int = 13;
 const VK_FMT_R8G8B8A8_UNORM: int = 37;
 const VK_FMT_R8G8B8A8_UINT: int = 41;
@@ -241,6 +245,7 @@ var _sem_acquire: int = 0;
 var _sem_render: int = 0;
 var _gfx_fence: int = 0;
 var _cur_image: int = 0;
+var _readback_staging: int = 0;
 var _attached: int = 0;
 var _gfx_w: int = 0;
 var _gfx_h: int = 0;
@@ -331,6 +336,8 @@ var _vk_free_memory: int = 0;
 var _vk_destroy_buffer: int = 0;
 var _vk_cmd_pipeline_barrier: int = 0;
 var _vk_cmd_copy_buf_img: int = 0;
+var _vk_cmd_copy_img_buf: int = 0;
+var _vk_device_wait_idle: int = 0;
 var _vk_free_cmds: int = 0;
 var _gdpa: int = 0; // vkGetDeviceProcAddr
 
@@ -723,6 +730,10 @@ pub fn gpu_init(): int {
             if (p != 0) { _vk_cmd_pipeline_barrier = p; }
             p = vk_device("vkCmdCopyBufferToImage");
             if (p != 0) { _vk_cmd_copy_buf_img = p; }
+            p = vk_device("vkCmdCopyImageToBuffer");
+            if (p != 0) { _vk_cmd_copy_img_buf = p; }
+            p = vk_device("vkDeviceWaitIdle");
+            if (p != 0) { _vk_device_wait_idle = p; }
             p = vk_device("vkFreeCommandBuffers");
             if (p != 0) { _vk_free_cmds = p; }
         }
@@ -815,6 +826,7 @@ fn vk_buf_create(bytes: int, usage: int): int {
                          ffi.TYPE_VOID,
                          [ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_PTR]);
         var mem_size = ffi.load_u64(req);
+        var mem_type_bits = ffi.load_u32(ffi.ptr_add(req, 16));
         ffi.free(req);
 
         // Find a HOST_VISIBLE|HOST_COHERENT memory type.
@@ -1165,7 +1177,7 @@ pub fn gpu_dispatch(pipe: int, buffers: [int], x: int, y: int, z: int): int {
             [ffi.TYPE_U64, ffi.TYPE_U32, ffi.TYPE_U32, ffi.TYPE_U32]);
         var ecres = ffi.foreign_call(_vk_end_cmd, [_cmd_buf], ffi.TYPE_I32,
                          [ffi.TYPE_U64]) as int;
-        if (ecres != 0) { return 0; }
+        if (ecres != 0) { print("end_cmd FAILED: " + (ecres as str)); return 0; }
 
         // VkSubmitInfo (72B): commandBufferCount @40, pCommandBuffers @48.
         var si = ffi.alloc(72);
@@ -1215,6 +1227,9 @@ fn get_hinstance(): int {
         return _hinst;
     }
 }
+
+pub var _sync_interval: int = 1;
+pub fn gfx_set_vsync(sync: int): nil { _sync_interval = sync; }
 
 pub fn gfx_attached(): int { return _attached; }
 pub fn gfx_width(): int { return _gfx_w; }
@@ -1267,9 +1282,9 @@ fn swapchain_make_view(imgs_p: int, idx: int, fmt: int, dev: int): int {
         st_u64(iv, 24, image);
         st_u32(iv, 32, VIEW_TYPE_2D);
         st_u32(iv, 36, fmt);
-        // components @40: all VK_COMPONENT_SWIZZLE_IDENTITY (1)
-        st_u32(iv, 40, 1); st_u32(iv, 44, 1);
-        st_u32(iv, 48, 1); st_u32(iv, 52, 1);
+        // components @40: VK_COMPONENT_SWIZZLE_IDENTITY = 0
+        st_u32(iv, 40, 0); st_u32(iv, 44, 0);
+        st_u32(iv, 48, 0); st_u32(iv, 52, 0);
         // subresourceRange @56
         st_u32(iv, 56, IMAGE_ASPECT_COLOR);
         st_u32(iv, 64, 1);  // levelCount
@@ -1349,6 +1364,9 @@ fn swapchain_images_views(w: int, h: int): int {
         if (img_count < 2) { img_count = 2; }
         if (max_count != 0 and img_count > max_count) { img_count = max_count; }
         var usage = IMAGE_USAGE_COLOR_ATTACHMENT;
+        if ((usage_flags & IMAGE_USAGE_TRANSFER_SRC) != 0) {
+            usage = usage | IMAGE_USAGE_TRANSFER_SRC;
+        }
         if ((usage_flags & IMAGE_USAGE_COLOR_ATTACHMENT) == 0) {
             usage = usage_flags & (IMAGE_USAGE_COLOR_ATTACHMENT | IMAGE_USAGE_TRANSFER_SRC);
             if (usage == 0) { usage = IMAGE_USAGE_TRANSFER_SRC; }
@@ -1405,11 +1423,25 @@ fn swapchain_images_views(w: int, h: int): int {
             ffi.free(mcount);
             pmode = ffi.load_u32(modes);
             var mi = 0;
-            while (mi < nm) {
-                if (ffi.load_u32(ffi.ptr_add(modes, mi * 4)) == PRESENT_MODE_FIFO) {
-                    pmode = PRESENT_MODE_FIFO; break;
+            if (_sync_interval == 0) {
+                var has_mailbox = 0;
+                var has_imm = 0;
+                while (mi < nm) {
+                    var m = ffi.load_u32(ffi.ptr_add(modes, mi * 4));
+                    if (m == PRESENT_MODE_MAILBOX) { has_mailbox = 1; }
+                    if (m == PRESENT_MODE_IMMEDIATE) { has_imm = 1; }
+                    mi = mi + 1;
                 }
-                mi = mi + 1;
+                if (has_mailbox != 0) { pmode = PRESENT_MODE_MAILBOX; }
+                elif (has_imm != 0) { pmode = PRESENT_MODE_IMMEDIATE; }
+                else { pmode = PRESENT_MODE_FIFO; }
+            } else {
+                while (mi < nm) {
+                    if (ffi.load_u32(ffi.ptr_add(modes, mi * 4)) == PRESENT_MODE_FIFO) {
+                        pmode = PRESENT_MODE_FIFO; break;
+                    }
+                    mi = mi + 1;
+                }
             }
             ffi.free(modes);
         } else { ffi.free(mcount); }
@@ -1624,6 +1656,15 @@ pub fn gfx_attach(hwnd: int, width: int, height: int): int {
         if (fres != 0) { ffi.free(fslot); return 0; }
         _gfx_fence = ffi.load_i64(fslot);
         ffi.free(fslot);
+        if (_readback_staging != 0) {
+            gfx_buf_destroy(_readback_staging);
+            _readback_staging = 0;
+        }
+        _readback_staging = vk_buf_create(width * height * 4, BUFFER_USAGE_TRANSFER_DST);
+        if (_readback_staging != 0) {
+            var mp = ffi.load_i64(ffi.ptr_add(_readback_staging, 16));
+            ffi.store_u8(mp, 123);
+        }
         _attached = 1;
         return 1;
     }
@@ -1633,6 +1674,10 @@ pub fn gfx_detach(): nil {
     unsafe {
         if (_attached == 0) { return; }
         _attached = 0;
+        if (_readback_staging != 0) {
+            gfx_buf_destroy(_readback_staging);
+            _readback_staging = 0;
+        }
         swapchain_destroy();
         if (_render_pass != 0 and _vk_destroy_render_pass != 0) {
             ffi.foreign_call(_vk_destroy_render_pass, [_device, _render_pass, 0],
@@ -1691,6 +1736,11 @@ pub fn gfx_resize(width: int, height: int): int {
         _gfx_w = width; _gfx_h = height;
         if (swapchain_images_views(width, height) == 0) { return 0; }
         if (swapchain_framebuffers() == 0) { return 0; }
+        if (_readback_staging != 0) {
+            gfx_buf_destroy(_readback_staging);
+            _readback_staging = 0;
+        }
+        _readback_staging = vk_buf_create(width * height * 4, BUFFER_USAGE_TRANSFER_DST);
         return 1;
     }
 }
@@ -1755,11 +1805,44 @@ pub fn gfx_end_frame(): int {
         ffi.foreign_call(_vk_cmd_end_rp, [_cmd_buf], ffi.TYPE_VOID,
                          [ffi.TYPE_U64]);
         _rp_open = 0;
+
+        if (_readback_staging != 0 and _vk_cmd_copy_img_buf != 0) {
+            var cur_img = ffi.load_i64(ffi.ptr_add(_swap_images, _cur_image * 8));
+            gfx_barrier_image(_cmd_buf, cur_img, LAYOUT_PRESENT_SRC, LAYOUT_TRANSFER_SRC_OPTIMAL,
+                              ACCESS_COLOR_WRITE, ACCESS_TRANSFER_READ,
+                              STAGE_COLOR_OUTPUT, STAGE_TRANSFER);
+
+            var bci = ffi.alloc(56);
+            ffi.memset(bci, 0, 56);
+            st_u64(bci, 0, 0);
+            st_u32(bci, 8, 0);
+            st_u32(bci, 12, 0);
+            st_u32(bci, 16, IMAGE_ASPECT_COLOR);
+            st_u32(bci, 20, 0);
+            st_u32(bci, 24, 0);
+            st_u32(bci, 28, 1);
+            st_u32(bci, 32, 0);
+            st_u32(bci, 36, 0);
+            st_u32(bci, 40, 0);
+            st_u32(bci, 44, _swap_w);
+            st_u32(bci, 48, _swap_h);
+            st_u32(bci, 52, 1);
+            ffi.foreign_call(_vk_cmd_copy_img_buf,
+                [_cmd_buf, cur_img, LAYOUT_TRANSFER_SRC_OPTIMAL, buf_vk(_readback_staging), 1, bci],
+                ffi.TYPE_VOID,
+                [ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_U32, ffi.TYPE_U64, ffi.TYPE_U32, ffi.TYPE_PTR]);
+            ffi.free(bci);
+
+            gfx_barrier_image(_cmd_buf, cur_img, LAYOUT_TRANSFER_SRC_OPTIMAL, LAYOUT_PRESENT_SRC,
+                              ACCESS_TRANSFER_READ, 0,
+                              STAGE_TRANSFER, STAGE_BOTTOM_OF_PIPE);
+        }
+
         _frame_active = 0;
         _cmd_bound = 0;
         var ecres = ffi.foreign_call(_vk_end_cmd, [_cmd_buf], ffi.TYPE_I32,
                          [ffi.TYPE_U64]) as int;
-        if (ecres != 0) { return 0; }
+        if (ecres != 0) { print("end_cmd FAILED: " + (ecres as str)); return 0; }
 
         // VkSubmitInfo (72B) with acquire wait + render signal
         var si = ffi.alloc(72);
@@ -1785,7 +1868,7 @@ pub fn gfx_end_frame(): int {
             [ffi.TYPE_U64, ffi.TYPE_U32, ffi.TYPE_PTR, ffi.TYPE_U64]) as int;
         ffi.free(si); ffi.free(wsems); ffi.free(wstages);
         ffi.free(ssems); ffi.free(cbs);
-        if (subres != 0) { return 0; }
+        if (subres != 0) { print("queue_submit FAILED: " + (subres as str)); return 0; }
 
         // VkPresentInfoKHR (64B)
         var pi = ffi.alloc(64);
@@ -1806,8 +1889,86 @@ pub fn gfx_end_frame(): int {
             [_queue, pi], ffi.TYPE_I32,
             [ffi.TYPE_U64, ffi.TYPE_PTR]) as int;
         ffi.free(pi); ffi.free(psems); ffi.free(pchains); ffi.free(pidx);
-        if (pres == 0) { return 1; }
-        return 0;
+        if (pres != 0) { print("present FAILED: " + (pres as str)); return 0; }
+        return 1;
+    }
+}
+
+// gfx_backbuffer_pixel reads one pixel from the current backbuffer
+// through the frame readback staging buffer. Returns (r,g,b,a) or (-1,-1,-1,-1).
+pub fn gfx_backbuffer_pixel(x: int, y: int): (int, int, int, int) {
+    unsafe {
+        if (_swapchain == 0 or _readback_staging == 0) {
+            return (-1, -1, -1, -1);
+        }
+        if (x < 0 or x >= _swap_w or y < 0 or y >= _swap_h) {
+            return (-1, -1, -1, -1);
+        }
+        if (_vk_device_wait_idle != 0) {
+            ffi.foreign_call(_vk_device_wait_idle, [_device], ffi.TYPE_I32, [ffi.TYPE_U64]);
+        }
+        var mapptr = ffi.load_i64(ffi.ptr_add(_readback_staging, 16));
+        if (mapptr == 0) { return (-1, -1, -1, -1); }
+        var off = (y * _swap_w + x) * 4;
+        var b0 = ffi.load_u8(ffi.ptr_add(mapptr, off)) as int;
+        var b1 = ffi.load_u8(ffi.ptr_add(mapptr, off + 1)) as int;
+        var b2 = ffi.load_u8(ffi.ptr_add(mapptr, off + 2)) as int;
+        var b3 = ffi.load_u8(ffi.ptr_add(mapptr, off + 3)) as int;
+        if (_swap_format == VK_FORMAT_B8G8R8A8_UNORM) {
+            return (b2, b1, b0, b3);
+        } else {
+            return (b0, b1, b2, b3);
+        }
+    }
+}
+
+pub fn gfx_save_screenshot(filename: str): int {
+    unsafe {
+        if (_swapchain == 0 or _readback_staging == 0) { return 0; }
+        if (_vk_device_wait_idle != 0) {
+            ffi.foreign_call(_vk_device_wait_idle, [_device], ffi.TYPE_I32, [ffi.TYPE_U64]);
+        }
+        var mapptr = ffi.load_i64(ffi.ptr_add(_readback_staging, 16));
+        if (mapptr == 0) { return 0; }
+        var lib = ffi.library_load("");
+        if (lib != 0 and lib != nil) {
+            if (ffi.library_get_symbol(lib, "save_image_png") == 0 or ffi.library_get_symbol(lib, "save_image_png") == nil) { lib = 0; }
+        }
+        if (lib == 0 or lib == nil) {
+            lib = ffi.library_load("bin/libstb_image.dll");
+            if (lib == 0 or lib == nil) { lib = ffi.library_load("tests/ffi/libstb_image.dll"); }
+        }
+        if (lib == 0 or lib == nil) { return 0; }
+        var sym = ffi.library_get_symbol(lib, "save_image_png");
+        if (sym == nil) { return 0; }
+
+        var nbytes = _swap_w * _swap_h * 4;
+        var rgba = ffi.alloc(nbytes);
+        if (_swap_format == VK_FORMAT_B8G8R8A8_UNORM) {
+            var i = 0;
+            while (i < nbytes) {
+                var b = ffi.load_u8(ffi.ptr_add(mapptr, i));
+                var g = ffi.load_u8(ffi.ptr_add(mapptr, i + 1));
+                var r = ffi.load_u8(ffi.ptr_add(mapptr, i + 2));
+                var a = ffi.load_u8(ffi.ptr_add(mapptr, i + 3));
+                ffi.store_u8(ffi.ptr_add(rgba, i), r);
+                ffi.store_u8(ffi.ptr_add(rgba, i + 1), g);
+                ffi.store_u8(ffi.ptr_add(rgba, i + 2), b);
+                ffi.store_u8(ffi.ptr_add(rgba, i + 3), a);
+                i = i + 4;
+            }
+        } else {
+            ffi.memcpy(rgba, mapptr, nbytes);
+        }
+
+        var fn_cstr = ffi.string_to_cstring(filename);
+        var res = ffi.foreign_call(sym,
+            [ffi.cstring_as_ptr(fn_cstr), _swap_w, _swap_h, 4, rgba],
+            ffi.TYPE_I32,
+            [ffi.TYPE_PTR, ffi.TYPE_I32, ffi.TYPE_I32, ffi.TYPE_I32, ffi.TYPE_PTR]) as int;
+        ffi.cstring_free(fn_cstr);
+        ffi.free(rgba);
+        return res;
     }
 }
 
@@ -1854,9 +2015,9 @@ fn gfx_reg_add(ptr: int, typ: int): nil {
 
 fn gfx_sem_loc(name: str): int {
     if (name == "POSITION") { return 0; }
-    if (name == "COLOR") { return 1; }
-    if (name == "NORMAL") { return 2; }
-    if (name == "TEXCOORD0") { return 3; }
+    if (name == "TEXCOORD" or name == "TEXCOORD0") { return 1; }
+    if (name == "COLOR") { return 2; }
+    if (name == "NORMAL") { return 3; }
     if (name == "TEXCOORD1") { return 4; }
     if (name == "TEXCOORD2") { return 5; }
     if (name == "TEXCOORD3") { return 6; }
@@ -1970,8 +2131,9 @@ fn gfx_image_view(image: int, format: int): int {
         st_u64(iv, 24, image);
         st_u32(iv, 32, VIEW_TYPE_2D);
         st_u32(iv, 36, format);
-        st_u32(iv, 40, 1); st_u32(iv, 44, 1);
-        st_u32(iv, 48, 1); st_u32(iv, 52, 1);
+        // components @40: VK_COMPONENT_SWIZZLE_IDENTITY = 0
+        st_u32(iv, 40, 0); st_u32(iv, 44, 0);
+        st_u32(iv, 48, 0); st_u32(iv, 52, 0);
         st_u32(iv, 56, IMAGE_ASPECT_COLOR);
         st_u32(iv, 60, 0); st_u32(iv, 64, 1);
         st_u32(iv, 68, 0); st_u32(iv, 72, 1);
@@ -2002,8 +2164,8 @@ fn gfx_barrier_image(cb: int, image: int, oldl: int, newl: int,
         st_u32(mb, 36, 0xFFFFFFFF); // dstQueueFamilyIndex ignored
         st_u64(mb, 40, image);
         st_u32(mb, 48, IMAGE_ASPECT_COLOR);
-        st_u32(mb, 52, 0); st_u32(mb, 56, 0);
-        st_u32(mb, 60, 1); st_u32(mb, 64, 1);
+        st_u32(mb, 52, 0); st_u32(mb, 56, 1);
+        st_u32(mb, 60, 0); st_u32(mb, 64, 1);
         ffi.foreign_call(_vk_cmd_pipeline_barrier,
             [cb, srcstage, dststage, 0, 0, 0, 0, 0, 1, mb], ffi.TYPE_VOID,
             [ffi.TYPE_U64, ffi.TYPE_U32, ffi.TYPE_U32, ffi.TYPE_U32,
@@ -2086,7 +2248,7 @@ fn tex_upload(staging: int, image: int, w: int, h: int): int {
         ffi.foreign_call(_vk_cmd_copy_buf_img,
             [cb, buf_vk(staging), image, LAYOUT_TRANSFER_DST_OPTIMAL, 1, bci],
             ffi.TYPE_VOID,
-            [ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_U32, ffi.TYPE_PTR]);
+            [ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_U64, ffi.TYPE_U32, ffi.TYPE_U32, ffi.TYPE_PTR]);
         ffi.free(bci);
         gfx_barrier_image(cb, image, LAYOUT_TRANSFER_DST_OPTIMAL,
                           LAYOUT_SHADER_READ_ONLY, ACCESS_TRANSFER_WRITE,
@@ -2766,10 +2928,19 @@ fn gfx_bind_ib(): nil {
 
 pub fn gfx_input_layout_create(names: [str], formats: [int],
                                code_ptr: int, code_size: int): int {
+    return gfx_input_layout_create_ex(names, formats, [], code_ptr, code_size);
+}
+
+// gfx_input_layout_create_ex: explicit per-element byte offsets.
+// Empty `offsets` auto-packs elements back-to-back (legacy behavior).
+pub fn gfx_input_layout_create_ex(names: [str], formats: [int],
+                                  offsets: [int],
+                                  code_ptr: int, code_size: int): int {
     unsafe {
         if (ensure_device() == 0) { return 0; }
         var n = len(names);
         if (n == 0 or n != len(formats)) { return 0; }
+        var explicit = len(offsets) == n;
         // Single allocation: {count@0, stride@8, VkVertexInputAttributeDescription[]@16}.
         // ffi.alloc memory is region-owned; inlining keeps the attribute
         // array inside the promoted return block instead of dangling.
@@ -2784,8 +2955,13 @@ pub fn gfx_input_layout_create(names: [str], formats: [int],
             if (vkf == 0 or sz == 0) { ffi.free(rec); return 0; }
             var al = fmt_align_vk(formats[i]);
             if (al > maxal) { maxal = al; }
-            var aoff = offset;
-            while (aoff % al != 0) { aoff = aoff + 1; }
+            var aoff = 0;
+            if (explicit) {
+                aoff = offsets[i];
+            } else {
+                aoff = offset;
+                while (aoff % al != 0) { aoff = aoff + 1; }
+            }
             var ap = ffi.ptr_add(rec, 16 + i * 16);
             var loc = gfx_sem_loc(names[i]);
             if (loc < 0) { loc = i; }
@@ -2793,7 +2969,8 @@ pub fn gfx_input_layout_create(names: [str], formats: [int],
             ffi.store_u32(ffi.ptr_add(ap, 4), 0);
             ffi.store_u32(ffi.ptr_add(ap, 8), vkf);
             ffi.store_u32(ffi.ptr_add(ap, 12), aoff);
-            offset = aoff + sz;
+            var end = aoff + sz;
+            if (end > offset) { offset = end; }
             i = i + 1;
         }
         while (offset % maxal != 0) { offset = offset + 1; }
@@ -2905,7 +3082,8 @@ pub fn gfx_set_topology(topo: int): nil {
 
 pub fn gfx_draw(vertex_count: int, start_vertex: int): nil {
     unsafe {
-        if (gfx_ensure_draw_ready() == 0) { return; }
+        var rdy = gfx_ensure_draw_ready();
+        if (rdy == 0) { return; }
         gfx_bind_vb_slot(0);
         gfx_bind_vb_slot(1);
         gfx_bind_vb_slot(2);
@@ -3078,7 +3256,8 @@ pub fn gfx_sampler_create(filter: int, addr_u: int,
         ffi.store_f32(ffi.ptr_add(sci, 44), 0.0);
         st_u32(sci, 48, 0);
         st_u32(sci, 52, 0);
-        st_u32(sci, 56, COMPARE_OP_NEVER);
+        st_u32(sci, 56, 0);                 // compareEnable = VK_FALSE
+        st_u32(sci, 60, COMPARE_OP_NEVER);  // compareOp
         ffi.store_f32(ffi.ptr_add(sci, 64), 0.0);
         ffi.store_f32(ffi.ptr_add(sci, 68), 1000.0);
         st_u32(sci, 72, 0);

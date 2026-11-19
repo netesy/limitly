@@ -117,17 +117,17 @@ public:
     // payload) as `any` so backends keep pointer-classified slots and the
     // dynamic value kind survives to consumers like print/format.
     void tag_register_erased(Reg reg);
+    void set_register_type(Reg reg, TypePtr type);
+    TypePtr get_register_type(Reg reg) const;
+    void set_register_language_type(Reg reg, TypePtr lang_type);
+    TypePtr get_register_language_type(Reg reg) const;
 private:
     void update_variable_binding(const std::string& name, Reg reg);
     Reg resolve_variable(const std::string& name);
-    void set_register_type(Reg reg, TypePtr type);
-    TypePtr get_register_type(Reg reg) const;
     
     // New simplified type methods
     void set_register_abi_type(Reg reg, Type abi_type);
-    void set_register_language_type(Reg reg, TypePtr lang_type);
     Type get_register_abi_type(Reg reg) const;
-    TypePtr get_register_language_type(Reg reg) const;
     
     // Type conversion helpers
     Type language_type_to_abi_type(TypePtr lang_type);

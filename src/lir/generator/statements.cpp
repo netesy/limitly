@@ -127,6 +127,20 @@ void bind_all_vars(Generator* gen, std::shared_ptr<LM::Frontend::AST::Expression
         Reg payload = gen->allocate_register();
         gen->emit_instruction(LIR_Inst(LIR_Op::Unwrap, Type::Ptr, payload, val_reg, 0, 1));
         gen->tag_register_erased(payload);
+        TypePtr success_type = val_p->inferred_type;
+        if (!success_type) {
+            TypePtr val_type = gen->get_register_type(val_reg);
+            if (!val_type) val_type = gen->get_register_language_type(val_reg);
+            if (val_type) {
+                if (auto* eu = std::get_if<ErrorUnionType>(&val_type->extra)) {
+                    success_type = eu->successType;
+                }
+            }
+        }
+        if (success_type) {
+            gen->set_register_type(payload, success_type);
+            gen->set_register_language_type(payload, success_type);
+        }
         gen->bind_variable(val_p->variableName, payload);
     } else if (auto err_p = std::dynamic_pointer_cast<LM::Frontend::AST::ErrPatternExpr>(pattern)) {
         Reg payload = gen->allocate_register();
@@ -1055,7 +1069,7 @@ void Generator::emit_return_stmt(LM::Frontend::AST::ReturnStatement& stmt) {
         // Normal return statement
         if (stmt.value) {
             Reg value = emit_expr(*stmt.value);
-            
+            emit_instruction(LIR_Inst(LIR_Op::RegionMove, Type::Void, 0, value, 0, 0));
             LIR_Inst ret_inst(LIR_Op::Return);
             ret_inst.a = value;
             emit_instruction(ret_inst);
@@ -1538,13 +1552,21 @@ void Generator::emit_list_iter_stmt(LM::Frontend::AST::IterStatement& stmt, LM::
     
     // Get element at current index
     Reg elem_reg = allocate_register();
-    TypePtr raw_elem = raw_int_iter_type(get_register_type(list_reg), 0);
-    emit_instruction(LIR_Inst(LIR_Op::ListIndex, raw_elem ? Type::I64 : Type::Ptr, elem_reg, list_reg, index_reg));
-    set_register_type(elem_reg, raw_elem ? raw_elem : std::make_shared<::Type>(::TypeTag::Any));
+    TypePtr list_type = get_register_type(list_reg);
+    if (!list_type) list_type = get_register_language_type(list_reg);
+    TypePtr elem_type = (list_type && list_type->tag == TypeTag::List)
+        ? (std::get_if<ListType>(&list_type->extra) ? std::get_if<ListType>(&list_type->extra)->elementType : nullptr)
+        : nullptr;
+    TypePtr raw_elem = raw_int_iter_type(list_type, 0);
+    Type elem_abi = raw_elem ? Type::I64 : (elem_type && elem_type->tag == TypeTag::String ? Type::Ptr : (elem_type ? language_type_to_abi_type(elem_type) : Type::Ptr));
+    emit_instruction(LIR_Inst(LIR_Op::ListIndex, elem_abi, elem_reg, list_reg, index_reg));
+    set_register_type(elem_reg, elem_type ? elem_type : (raw_elem ? raw_elem : std::make_shared<::Type>(::TypeTag::Any)));
+    if (elem_type) set_register_language_type(elem_reg, elem_type);
     
     // Move element to loop variable
-    emit_instruction(LIR_Inst(LIR_Op::Mov, loop_var_reg, elem_reg, 0));
-    set_register_type(loop_var_reg, raw_elem ? raw_elem : std::make_shared<::Type>(::TypeTag::Any));
+    emit_instruction(LIR_Inst(LIR_Op::Mov, elem_abi, loop_var_reg, elem_reg));
+    set_register_type(loop_var_reg, elem_type ? elem_type : (raw_elem ? raw_elem : std::make_shared<::Type>(::TypeTag::Any)));
+    if (elem_type) set_register_language_type(loop_var_reg, elem_type);
     
     // Execute loop body
     emit_iter_binding_event(stmt);
@@ -1849,6 +1871,8 @@ void Generator::emit_list_var_iter_stmt(LM::Frontend::AST::IterStatement& stmt, 
 
     // Check if this is actually a tuple
     TypePtr iterable_type = get_register_type(list_reg);
+    if (!iterable_type) iterable_type = get_register_language_type(list_reg);
+    if (!iterable_type && stmt.iterable) iterable_type = stmt.iterable->inferred_type;
     bool is_tuple = iterable_type && iterable_type->tag == TypeTag::Tuple;
 
     LIR_BasicBlock* header_block = create_basic_block("list_var_iter_header");
@@ -1896,17 +1920,23 @@ void Generator::emit_list_var_iter_stmt(LM::Frontend::AST::IterStatement& stmt, 
     
     // Get element at current index
     Reg elem_reg = allocate_register();
+    TypePtr elem_type = (iterable_type && iterable_type->tag == TypeTag::List)
+        ? (std::get_if<ListType>(&iterable_type->extra) ? std::get_if<ListType>(&iterable_type->extra)->elementType : nullptr)
+        : nullptr;
     TypePtr raw_elem = is_tuple ? nullptr : raw_int_iter_type(iterable_type, 0);
+    Type elem_abi = raw_elem ? Type::I64 : (elem_type && elem_type->tag == TypeTag::String ? Type::Ptr : (elem_type ? language_type_to_abi_type(elem_type) : Type::Ptr));
     if (is_tuple) {
         emit_instruction(LIR_Inst(LIR_Op::TupleGet, Type::Ptr, elem_reg, list_reg, index_reg));
     } else {
-        emit_instruction(LIR_Inst(LIR_Op::ListIndex, raw_elem ? Type::I64 : Type::Ptr, elem_reg, list_reg, index_reg));
+        emit_instruction(LIR_Inst(LIR_Op::ListIndex, elem_abi, elem_reg, list_reg, index_reg));
     }
-    set_register_type(elem_reg, raw_elem ? raw_elem : std::make_shared<::Type>(::TypeTag::Any));
+    set_register_type(elem_reg, elem_type ? elem_type : (raw_elem ? raw_elem : std::make_shared<::Type>(::TypeTag::Any)));
+    if (elem_type) set_register_language_type(elem_reg, elem_type);
     
     // Move element to loop variable
-    emit_instruction(LIR_Inst(LIR_Op::Mov, loop_var_reg, elem_reg, 0));
-    set_register_type(loop_var_reg, raw_elem ? raw_elem : std::make_shared<::Type>(::TypeTag::Any));
+    emit_instruction(LIR_Inst(LIR_Op::Mov, elem_abi, loop_var_reg, elem_reg));
+    set_register_type(loop_var_reg, elem_type ? elem_type : (raw_elem ? raw_elem : std::make_shared<::Type>(::TypeTag::Any)));
+    if (elem_type) set_register_language_type(loop_var_reg, elem_type);
     
     // Execute loop body
     emit_iter_binding_event(stmt);

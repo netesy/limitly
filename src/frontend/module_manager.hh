@@ -107,6 +107,14 @@ public:
     static void set_target_os(int code) { target_os_code_ = code; }
     static int target_os() { return target_os_code_; }
 
+    // Compile-time graphics-backend preference for std.gg, sourced from the
+    // LYMAR_GG_BACKEND environment variable at compile time. Codes:
+    // 0=auto (runtime dispatch, both backends linked), 1=native, 2=sokol.
+    // load_module rewrites the std.os.identity GG_BACKEND const initializer so
+    // std.gg's backend dispatch folds and the unused backend is tree-shaken.
+    static void set_gg_backend(int code) { gg_backend_code_ = code; }
+    static int gg_backend() { return gg_backend_code_; }
+
     // Set search directories for module imports
     void set_include_dirs(const std::vector<std::string>& dirs);
     // Add a single search directory (used by c: scheme binding generation)
@@ -192,6 +200,9 @@ private:
 #else
         0;
 #endif
+    // Defaults to AUTO so tools that never call set_gg_backend keep runtime
+    // backend dispatch; lymar.cpp sets this from LYMAR_GG_BACKEND.
+    static inline int gg_backend_code_ = 0;
     static std::atomic<uint64_t>& compiled_modules_revision_counter() {
         static std::atomic<uint64_t> revision{0};
         return revision;

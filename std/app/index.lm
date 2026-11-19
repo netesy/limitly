@@ -46,6 +46,7 @@ import std.os as os;
 import std.native as native;
 import std.time.timer show Timer, Duration;
 import std.color as color;
+import std.os.environment as osenv;
 
 // ── Application state ────────────────────────────────────────────────────────
 // Windowing and the retained-component UI loop live here. OS event pumping
@@ -133,9 +134,13 @@ frame App {
         if (global_app_state.is_running == 0) {
             global_app_state.is_running = 1;
         }
+        var env_vsync = osenv.getenv_or("LYMAR_VSYNC", "1");
+        var uncapped = env_vsync == "0" or self.swap_interval == 0;
         while (global_app_state.is_running != 0) {
             self.step();
-            sleep(0.008);
+            if (not uncapped and self.swap_interval == 0) {
+                sleep(0.001);
+            }
         }
         _shutdown();
     }
@@ -169,6 +174,11 @@ frame App {
         _begin_pass();
         _end_pass();
         global_app_state.frame_count = global_app_state.frame_count + 1;
+        val shot_path = osenv.getenv_or("LYMAR_SCREENSHOT_EXIT", "");
+        if (shot_path != "" and global_app_state.frame_count >= 5) {
+            gg.save_screenshot(shot_path);
+            global_app_state.is_running = 0;
+        }
     }
 
     // Event phase only: pump raw events, dispatch to UI tree, tick

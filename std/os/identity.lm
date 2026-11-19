@@ -18,6 +18,17 @@ pub const OS_FREEBSD: int = 5;
 pub const OS_WASI: int = 6;
 pub const TARGET_OS: int = 0;
 
+// Compile-time graphics-backend preference for std.gg. GG_BACKEND is rewritten
+// by the compiler from the LYMAR_GG_BACKEND environment variable seen at
+// compile time ("native" -> GG_BACKEND_NATIVE, "sokol" -> GG_BACKEND_SOKOL,
+// anything else -> GG_BACKEND_AUTO). When it is not AUTO, std.gg's dispatch
+// folds at compile time and the unused backend's modules are tree-shaken out
+// of the artifact. AUTO keeps runtime dispatch (both backends linked).
+pub const GG_BACKEND_AUTO: int = 0;
+pub const GG_BACKEND_NATIVE: int = 1;
+pub const GG_BACKEND_SOKOL: int = 2;
+pub const GG_BACKEND: int = 0;
+
 /// Returns the operating system identifier string ("windows", "linux", "darwin", "android", "freebsd", "wasi", "unknown").
 ///
 /// @return OS name string.

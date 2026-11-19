@@ -227,9 +227,11 @@ void TypeChecker::validate_pattern_compatibility(std::shared_ptr<LM::Frontend::A
         if (is_error_union_type(match_type)) {
             auto* errorUnionPtr = std::get_if<ErrorUnionType>(&match_type->extra);
             if (errorUnionPtr) {
+                valPattern->inferred_type = errorUnionPtr->successType;
                 declare_variable(valPattern->variableName, errorUnionPtr->successType);
             }
         } else if (match_type->tag == TypeTag::Any) {
+            valPattern->inferred_type = type_system.ANY_TYPE;
             declare_variable(valPattern->variableName, type_system.ANY_TYPE);
         } else {
             add_error("val pattern can only be used with error union types " + match_type->toString(), line);

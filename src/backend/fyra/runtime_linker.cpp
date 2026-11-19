@@ -105,7 +105,7 @@ std::vector<std::string> windows_runtime_libraries() {
     // the self-contained image resolves the same symbols without a driver.
     const std::vector<std::string> wanted{"libstdc++.a", "libstdc++fs.a", "libwinpthread.a",
         "libmingwex.a", "libmsvcrt.a", "libmingw32.a",
-        "libws2_32.a", "libgdi32.a", "libuser32.a", "libshell32.a", "libopengl32.a",
+        "libws2_32.a", "libgdi32.a", "libuser32.a", "libshell32.a", "libkernel32.a", "libopengl32.a",
         "libd3d11.a", "libdxgi.a", "libd3dcompiler.a"};
     std::vector<std::string> found;
     std::vector<std::string> seen;
@@ -202,10 +202,21 @@ std::filesystem::path libffi_archive(const target::TargetDescriptor& t) {
         result.errors.push_back("LYMAR_AOT_LINKER must be auto, fyra, or driver");
         return result;
     }
+    // "auto" (and "fyra") always try the internal linker first — including
+    // Windows GUI builds, which now link correctly. On failure the code below
+    // falls back to the target C++ driver, so this can only regress to the
+    // previous behavior, never below it.
     if (linker != "driver") {
         // GUI-subsystem executables (std.gg/ui/game/d3/... in the module
         // graph) get PE subsystem 2 instead of the default console one.
-        if (options.gui_app) backend.peSubsystem(2);
+        if (options.gui_app) {
+            backend.peSubsystem(2);
+            // aot_runtime.o references aot_gfx_create weakly so console builds
+            // skip aot_graphics.o (sokol/truetype/d3d11). GUI builds seed the
+            // symbol as a strong undefined reference so archive extraction
+            // pulls the graphics member and its backend objects.
+            backend.addUndefinedSymbol("aot_gfx_create");
+        }
         backend.addStaticLibrary(runtime.string());
         // Contribute the target C/C++ runtime archives so the self-contained
         // Fyra image links without an external driver on Windows.
@@ -241,7 +252,21 @@ std::filesystem::path libffi_archive(const target::TargetDescriptor& t) {
     if (target.os == target::OS::Windows) {
         command.push_back("-static-libgcc");
         command.push_back("-static-libstdc++");
-        if (options.gui_app) command.push_back("-mwindows");
+        // Static libstdc++/libgcc members carry DWARF that the PE linker
+        // cannot map into sections: ~1.8MB lands as a headerless overlay plus
+        // ~0.3MB of named .debug_* sections. Lymar codegen emits no debug info
+        // of its own, so the only debug data in the image is this unusable
+        // archive baggage — strip it unconditionally. --strip-debug alone is
+        // NOT enough: it removes the named sections but leaves the overlay.
+        command.push_back("-Wl,--strip-all");
+        if (options.gui_app) {
+            command.push_back("-mwindows");
+            // aot_runtime.o references aot_gfx_create weakly so console builds
+            // skip aot_graphics.o (sokol/truetype/d3d11). GUI builds seed the
+            // symbol here to force the archive member — and its backend
+            // objects — to be extracted.
+            command.push_back("-Wl,-u,aot_gfx_create");
+        }
     }
     command.push_back(temporary);
     // Foreign toolchain objects (roadmap item 2a) sit next to the program

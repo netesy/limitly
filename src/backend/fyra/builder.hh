@@ -25,6 +25,11 @@ public:
 
     const std::vector<std::string>& get_errors() const { return errors_; }
     bool has_errors() const { return !errors_.empty(); }
+    void set_fs_capabilities(bool enabled) { fs_capabilities_ = enabled; }
+    // Syscall targets (Linux/macOS/FreeBSD) cannot express mkdir -p inline in
+    // the binary assembler, so their fs.mkdirp capability lowers to a call to
+    // the module-level `fyra_mkdir_p` IR helper this builder emits on demand.
+    void set_fs_mkdirp_helper(bool enabled) { fs_mkdirp_helper_ = enabled; }
 
 private:
     std::shared_ptr<ir::IRContext> context_;
@@ -35,6 +40,14 @@ private:
     std::unordered_map<std::string, LIR::Type> global_types_;
     std::vector<std::string> errors_;
     int label_counter_ = 0;
+    // Windows AOT targets lower std.fs resource ops to native Win32 capability
+    // calls (fs.get_attrs/fs.mkdir_p/fs.rename/fs.remove/fs.rmdir) instead of
+    // the runtime file service, keeping std::filesystem out of the image.
+    bool fs_capabilities_ = false;
+    bool fs_mkdirp_helper_ = false;
+    bool needs_service_dispatch_ = false;
+    bool needs_fs_dispatch_ = false;
+    bool needs_mkdirp_helper_ = false;
     // Trait dispatch dedupe: one shared helper per (trait, method, arity)
     // instead of inlining the frame_matches candidate chain at every call site.
     std::unordered_map<std::string, ir::Function*> trait_dispatch_helpers_;
@@ -45,6 +58,13 @@ private:
     // Reachable function set captured after the worklist fixpoint; used
     // by codegen to omit calls into tree-shaken (pure, unneeded) __init__s.
     std::unordered_set<std::string> reachable_funcs_;
+    // String literals occurring in reachable code. Indirect-call dispatch
+    // compares runtime callee names against candidate function names; every
+    // name that can reach a CallIndirect (fn values, lambdas, task/callback
+    // targets) materializes as a LoadConst string literal, so candidates whose
+    // qualified or unqualified name never appears as a literal can never
+    // match and are omitted from the dispatch chain.
+    std::unordered_set<std::string> indirect_literals_;
 
     ir::Type* lir_type_to_fyra_type(LIR::Type lir_type);
     std::string generate_label();

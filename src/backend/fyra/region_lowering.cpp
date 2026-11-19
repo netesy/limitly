@@ -69,9 +69,9 @@ void lower_region_ownership(ir::Module& module, const std::unordered_map<std::st
     declare("lymar_aot_ffi_list_integer",2,i64);
     declare("lymar_aot_ffi_kind",2,i64);
     declare("lymar_aot_ffi_infer_type",2,i64);
-    declare("lymar_aot_clock",0,ctx->getDoubleType());
-    declare("lymar_aot_time",0,i64);
     declare("lymar_aot_frame_field_address", 2, i64);
+    declare("lymar_aot_frame_get_field", 2, i64);
+    declare("lymar_aot_frame_set_field", 4, void_type);
     declare("lymar_aot_frame_matches", 3, i64);
     declare("lymar_aot_atomic_load", 2, i64);
     declare("lymar_aot_atomic_store", 4, void_type);
@@ -132,6 +132,8 @@ void lower_region_ownership(ir::Module& module, const std::unordered_map<std::st
     declare("lymar_aot_slot_pointer", 1, i64);
     declare("lymar_aot_edge", 3, void_type);
     declare("lymar_aot_global_edge", 3, void_type);
+    declare("lymar_aot_list_append", 2, void_type);
+    declare("lymar_aot_dict_grow", 1, void_type);
     declare("lymar_aot_alloc", 1, i64);
     declare("lymar_aot_free", 1, void_type);
     declare("lymar_aot_memory_load", 3, i64);
@@ -168,6 +170,9 @@ void lower_region_ownership(ir::Module& module, const std::unordered_map<std::st
     declare("lymar_aot_union_unwrap", 2, i64);
     declare("lymar_aot_resource_create", 2, i64);
     declare("lymar_aot_resource_call", 4, i64);
+    declare("lymar_aot_resource_str_arg", 3, i64);
+    declare("lymar_aot_env_get_result", 2, i64);
+    declare("lymar_aot_make_env_list", 1, i64);
     declare("lymar_aot_resource_destroy", 1, void_type);
     const std::unordered_map<std::string, std::string> memory_helpers{
         {"memory.alloc", "lymar_aot_alloc"}, {"memory.free", "lymar_aot_free"},
@@ -177,6 +182,33 @@ void lower_region_ownership(ir::Module& module, const std::unordered_map<std::st
 
     for (auto& fn : module.getFunctions()) {
         if (fn->getBasicBlocks().empty()) continue;
+        if (fn->getName() == "fyrA_service_dispatch" || fn->getName() == "fyrA_fs_dispatch" || fn->getName() == "fyra_mkdir_p") {
+            // Synthetic runtime capability trampolines do not participate in
+            // region memory tracking; lowering only replaces extern calls with
+            // direct helper calls and preserves the dynamic return-kind side
+            // channel without wiping it in call_leave.
+            for (auto& owner : fn->getBasicBlocks()) {
+                auto* block = owner.get();
+                for (auto it = block->getInstructions().begin(); it != block->getInstructions().end(); ++it) {
+                    auto* inst = it->get();
+                    auto* external = dynamic_cast<ir::ExternCallInstruction*>(inst);
+                    if (!external) continue;
+                    auto target = memory_helpers.find(external->getCapability());
+                    auto name = target != memory_helpers.end() ? target->second : external->getCapability();
+                    if (name.starts_with("lymar.aot."))
+                        for (auto& c : name) if (c == '.') c = '_';
+                    if (target != memory_helpers.end() || name.starts_with("lymar_aot_")) {
+                        std::vector<ir::Value*> args{helpers.at(name)};
+                        for (auto& operand : external->getOperands()) args.push_back(operand->get());
+                        auto call = std::make_unique<ir::Instruction>(helpers.at(name)->getReturnType(), ir::Instruction::Call, args, block);
+                        call->setName(external->getName());
+                        external->replaceAllUsesWith(call.get());
+                        *it = std::move(call);
+                    }
+                }
+            }
+            continue;
+        }
         if (region_free.count(fn->getName())) {
             // External capability normalization is executable lowering, not
             // memory bookkeeping. Boolean markers are identities here.
@@ -352,7 +384,10 @@ void lower_region_ownership(ir::Module& module, const std::unordered_map<std::st
                         current_operands[5]->set(flag(current_operands[2]->get()));
                         flags[inst]=emit(block,after,"lymar_aot_return_pointer",{});
                     } else if (callee && callee->getName() == "lymar_aot_region_move") {
-                        current_operands[4]->set(flag(current_operands[1]->get()));
+                        auto* existing_flag = dynamic_cast<ir::ConstantInt*>(current_operands[4]->get());
+                        if (!existing_flag || existing_flag->getValue() == 0) {
+                            current_operands[4]->set(flag(current_operands[1]->get()));
+                        }
                     } else if (callee && (callee->getName() == "lymar_aot_param_push" || callee->getName() == "lymar_aot_param_pop")) {
                         current_operands[2]->set(flag(current_operands[1]->get()));
                         if (callee->getName() == "lymar_aot_param_pop")
@@ -463,7 +498,8 @@ void lower_region_ownership(ir::Module& module, const std::unordered_map<std::st
                 auto* callee = dynamic_cast<ir::Function*>(operands[0]->get());
                 if (!callee || callee->getName() != "lymar_aot_region_move") continue;
                 auto* flag = dynamic_cast<ir::ConstantInt*>(operands[4]->get());
-                if (flag && flag->getValue() == 0) dead.push_back(inst);
+                auto* const_val = dynamic_cast<ir::ConstantInt*>(operands[1]->get());
+                if (flag && flag->getValue() == 0 && const_val) dead.push_back(inst);
             }
             for (auto* inst : dead) {
                 auto& instructions = block->getInstructions();

@@ -75,22 +75,23 @@ const CLEAR_STENCIL: int = 0x2;
 
 // D3D11 device-creation flags
 const FLAG_BGRA_SUPPORT: int = 0x20;
+const FLAG_DEBUG: int = 0x2;
 
 // DXGI formats / usage / swap-chain settings
-const DXGI_FMT_UNKNOWN: int = 0;
-const DXGI_FMT_R32G32B32A32_FLOAT: int = 0x02;
-const DXGI_FMT_R32G32B32_FLOAT: int = 0x06;
-const DXGI_FMT_R16G16B16A16_FLOAT: int = 0xa;
-const DXGI_FMT_R32G32_FLOAT: int = 0x10;
-const DXGI_FMT_R32G32_UINT: int = 0x11;
-const DXGI_FMT_R8G8B8A8_UNORM: int = 0x1c;
-const DXGI_FMT_R8G8B8A8_UINT: int = 0x1e;
-const DXGI_FMT_R32_FLOAT: int = 0x29;
-const DXGI_FMT_R32_UINT: int = 0x2a;
-const DXGI_FMT_D32_FLOAT: int = 0x28;
-const DXGI_FMT_R16_UINT: int = 0x39;
-const DXGI_FMT_R8_UINT: int = 0x3e;
-const DXGI_FMT_B8G8R8A8_UNORM: int = 0x57;
+pub const DXGI_FMT_UNKNOWN: int = 0;
+pub const DXGI_FMT_R32G32B32A32_FLOAT: int = 0x02;
+pub const DXGI_FMT_R32G32B32_FLOAT: int = 0x06;
+pub const DXGI_FMT_R16G16B16A16_FLOAT: int = 0xa;
+pub const DXGI_FMT_R32G32_FLOAT: int = 0x10;
+pub const DXGI_FMT_R32G32_UINT: int = 0x11;
+pub const DXGI_FMT_R8G8B8A8_UNORM: int = 0x1c;
+pub const DXGI_FMT_R8G8B8A8_UINT: int = 0x1e;
+pub const DXGI_FMT_R32_FLOAT: int = 0x29;
+pub const DXGI_FMT_R32_UINT: int = 0x2a;
+pub const DXGI_FMT_D32_FLOAT: int = 0x28;
+pub const DXGI_FMT_R16_UINT: int = 0x39;
+pub const DXGI_FMT_R8_UINT: int = 0x3e;
+pub const DXGI_FMT_B8G8R8A8_UNORM: int = 0x57;
 
 const DXGI_USAGE_RENDER_TARGET: int = 0x20;
 const DXGI_SWAP_FLIP_DISCARD: int = 4;
@@ -623,6 +624,277 @@ pub fn gpu_buffer_read(buf: int, dst: int, bytes: int): int {
     }
 }
 
+// gfx_debug_messages drains the D3D11 info queue (requires the device
+// to have been created with D3D11_CREATE_DEVICE_DEBUG) and prints each
+// stored message. Returns the number of messages retrieved.
+pub fn gfx_debug_messages(): int {
+    unsafe {
+        if (_device == 0) { return -1; }
+        // IID_ID3D11InfoQueue = {6543DBB6-1B48-42F5-AB82-E97EC74326F6}
+        w_guid(0x6543dbb6, 0x1b48, 0x42f5, 0x7ee982ab, 0xf62643c7);
+        var iq = qi(_device, _guid_buf);
+        if (iq == 0) { print("no infoqueue (debug layer off?)"); return -2; }
+        var cntbuf = ffi.alloc(8);
+        ffi.store_i64(cntbuf, 0);
+        // GetNumStoredMessages(UINT64*) -> UINT64, vtable index 8
+        var vt_iq = ffi.load_ptr(iq);
+        var f_cnt = ffi.load_ptr(ffi.ptr_add(vt_iq, 8 * 8));
+        ffi.foreign_call(f_cnt, [iq, cntbuf], ffi.TYPE_U64,
+            [ffi.TYPE_PTR, ffi.TYPE_PTR]);
+        var n = ffi.load_i64(cntbuf);
+        if (n == 0) {
+            release(iq);
+            ffi.free(cntbuf);
+            return 0;
+        }
+        var msg = ffi.alloc(64);
+        var lenbuf = ffi.alloc(8);
+        var shown = 0;
+        var i = 0;
+        while (i < n and shown < 24) {
+            ffi.store_i64(lenbuf, 64);
+            ffi.memset(msg, 0, 64);
+            // GetMessage(UINT64 index, D3D11_MESSAGE*, SIZE_T*) -> hr, vtable 5
+            var hr = com_i32(iq, 5, [i, msg, lenbuf]);
+            if (hr != 0) { break; }
+            var sev = ffi.load_u32(ffi.ptr_add(msg, 4));
+            var desc = ffi.load_i64(ffi.ptr_add(msg, 16));
+            var dlen = ffi.load_i64(ffi.ptr_add(msg, 24));
+            var text = "";
+            if (desc != 0 and dlen > 0) {
+                var t = ffi.cstring_to_string_bounded(desc, dlen);
+                if (t != nil) { text = t as str; }
+            }
+            print("D3D sev=" + (sev as str) + " " + text);
+            shown = shown + 1;
+            i = i + 1;
+        }
+        release(iq);
+        ffi.free(cntbuf); ffi.free(msg); ffi.free(lenbuf);
+        return shown;
+    }
+}
+
+// gfx_debug_ia dumps the currently-bound IA/shader state for diagnosis.
+pub fn gfx_debug_ia(): nil {
+    unsafe {
+        if (_context == 0) { return; }
+        var vt = ffi.load_ptr(_context);
+        // VSGetShader=76, PSGetShader=74, IAGetInputLayout=78,
+        // IAGetVertexBuffers=79, IAGetPrimitiveTopology=83
+        var vs_slot = ffi.alloc(8); ffi.store_i64(vs_slot, 0);
+        var ci_slot = ffi.alloc(8); ffi.store_i64(ci_slot, 0);
+        var nci = ffi.alloc(4); ffi.store_u32(nci, 0);
+        var f75 = ffi.load_ptr(ffi.ptr_add(vt, 76 * 8));
+        ffi.foreign_call(f75, [_context, vs_slot, ci_slot, nci], ffi.TYPE_VOID,
+            [ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_PTR]);
+        print("IA vs=" + (ffi.load_i64(vs_slot) as str));
+        var ps_slot = ffi.alloc(8); ffi.store_i64(ps_slot, 0);
+        var f73 = ffi.load_ptr(ffi.ptr_add(vt, 74 * 8));
+        ffi.foreign_call(f73, [_context, ps_slot, ci_slot, nci], ffi.TYPE_VOID,
+            [ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_PTR]);
+        print("IA ps=" + (ffi.load_i64(ps_slot) as str));
+        var il_slot = ffi.alloc(8); ffi.store_i64(il_slot, 0);
+        var f77 = ffi.load_ptr(ffi.ptr_add(vt, 78 * 8));
+        ffi.foreign_call(f77, [_context, il_slot], ffi.TYPE_VOID,
+            [ffi.TYPE_PTR, ffi.TYPE_PTR]);
+        print("IA il=" + (ffi.load_i64(il_slot) as str));
+        var vb_arr = ffi.alloc(8); ffi.store_i64(vb_arr, 0);
+        var st_arr = ffi.alloc(4); ffi.store_u32(st_arr, 0);
+        var off_arr = ffi.alloc(4); ffi.store_u32(off_arr, 0);
+        var f78 = ffi.load_ptr(ffi.ptr_add(vt, 79 * 8));
+        ffi.foreign_call(f78, [_context, 0, 1, vb_arr, st_arr, off_arr], ffi.TYPE_VOID,
+            [ffi.TYPE_PTR, ffi.TYPE_U32, ffi.TYPE_U32,
+             ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_PTR]);
+        print("IA vb=" + (ffi.load_i64(vb_arr) as str) +
+              " stride=" + (ffi.load_u32(st_arr) as str) +
+              " off=" + (ffi.load_u32(off_arr) as str));
+        var topo = ffi.alloc(4); ffi.store_u32(topo, 0);
+        var f82 = ffi.load_ptr(ffi.ptr_add(vt, 83 * 8));
+        ffi.foreign_call(f82, [_context, topo], ffi.TYPE_VOID,
+            [ffi.TYPE_PTR, ffi.TYPE_PTR]);
+        print("IA topo=" + (ffi.load_u32(topo) as str));
+        // OMGetBlendState=91, OMGetDepthStencilState=92, RSGetState=94,
+        // RSGetViewports=95 — verify the state objects are really bound.
+        var bs_slot = ffi.alloc(8); ffi.store_i64(bs_slot, 0);
+        var bf_slot = ffi.alloc(16); ffi.memset(bf_slot, 0, 16);
+        var bm_slot = ffi.alloc(4); ffi.store_u32(bm_slot, 0);
+        var f89 = ffi.load_ptr(ffi.ptr_add(vt, 91 * 8));
+        ffi.foreign_call(f89, [_context, bs_slot, bf_slot, bm_slot], ffi.TYPE_VOID,
+            [ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_PTR]);
+        print("ST blend=" + (ffi.load_i64(bs_slot) as str) +
+              " mask=" + (ffi.load_u32(bm_slot) as str));
+        var ds_slot = ffi.alloc(8); ffi.store_i64(ds_slot, 0);
+        var sr_slot = ffi.alloc(4); ffi.store_u32(sr_slot, 0);
+        var f90 = ffi.load_ptr(ffi.ptr_add(vt, 92 * 8));
+        ffi.foreign_call(f90, [_context, ds_slot, sr_slot], ffi.TYPE_VOID,
+            [ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_PTR]);
+        print("ST depth=" + (ffi.load_i64(ds_slot) as str) +
+              " sref=" + (ffi.load_u32(sr_slot) as str));
+        var rs_slot = ffi.alloc(8); ffi.store_i64(rs_slot, 0);
+        var f92 = ffi.load_ptr(ffi.ptr_add(vt, 94 * 8));
+        ffi.foreign_call(f92, [_context, rs_slot], ffi.TYPE_VOID,
+            [ffi.TYPE_PTR, ffi.TYPE_PTR]);
+        print("ST rast=" + (ffi.load_i64(rs_slot) as str));
+        // OMGetRenderTargets=89: what RTV/DSV are actually bound.
+        var rtv_arr2 = ffi.alloc(8 * 8); ffi.memset(rtv_arr2, 0, 64);
+        var dsv_slot2 = ffi.alloc(8); ffi.store_i64(dsv_slot2, 0);
+        var f88 = ffi.load_ptr(ffi.ptr_add(vt, 89 * 8));
+        ffi.foreign_call(f88, [_context, rtv_arr2, dsv_slot2], ffi.TYPE_VOID,
+            [ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_PTR]);
+        print("OM rtv0=" + (ffi.load_i64(rtv_arr2) as str) +
+              " dsv=" + (ffi.load_i64(dsv_slot2) as str) +
+              " (want rtv=" + (_rtv as str) + " dsv=" + (_dsv as str) + ")");
+        ffi.free(rtv_arr2); ffi.free(dsv_slot2);
+        ffi.free(vs_slot); ffi.free(ci_slot); ffi.free(nci);
+        ffi.free(ps_slot); ffi.free(il_slot);
+        ffi.free(vb_arr); ffi.free(st_arr); ffi.free(off_arr); ffi.free(topo);
+    }
+}
+
+// gfx_backbuffer_pixel reads one pixel from the current backbuffer
+// through a staging texture. Returns (r,g,b,a) or (-1,-1,-1,-1).
+pub fn gfx_backbuffer_pixel(x: int, y: int): (int, int, int, int) {
+    unsafe {
+        if (_swapchain == 0) { return (-1, -1, -1, -1); }
+        w_guid(0x6f15aaf2, 0xd208, 0x4e89, 0x9548b49a, 0x9c4fd335);
+        var out_slot = ffi.alloc(8);
+        ffi.store_i64(out_slot, 0);
+        if (com_i32(_swapchain, VT_SWAP_GET_BUFFER, [0, _guid_buf, out_slot]) != 0) {
+            ffi.free(out_slot); return (-1, -1, -1, -1);
+        }
+        var back = ffi.load_i64(out_slot);
+        ffi.free(out_slot);
+        if (back == 0) { return (-1, -1, -1, -1); }
+        var desc = ffi.alloc(48);
+        ffi.memset(desc, 0, 48);
+        ffi.store_u32(desc, _width);
+        ffi.store_u32(ffi.ptr_add(desc, 4), _height);
+        ffi.store_u32(ffi.ptr_add(desc, 8), 1);
+        ffi.store_u32(ffi.ptr_add(desc, 12), 1);
+        ffi.store_u32(ffi.ptr_add(desc, 16), DXGI_FMT_B8G8R8A8_UNORM);
+        ffi.store_u32(ffi.ptr_add(desc, 20), 1);
+        ffi.store_u32(ffi.ptr_add(desc, 28), USAGE_STAGING);
+        ffi.store_u32(ffi.ptr_add(desc, 32), 0);       // BindFlags
+        ffi.store_u32(ffi.ptr_add(desc, 36), CPU_READ); // CPUAccessFlags
+        var slot = ffi.alloc(8);
+        ffi.store_i64(slot, 0);
+        var hr = com_i32(_device, VT_DEVICE_CREATE_TEX2D, [desc, 0, slot]);
+        ffi.free(desc);
+        if (hr != 0) { ffi.free(slot); release(back); return (-1, -1, -1, -1); }
+        var stg = ffi.load_i64(slot);
+        ffi.free(slot);
+        com_void(_context, VT_CTX_COPY_RESOURCE, [stg, back]);
+        release(back);
+        var mapped = ffi.alloc(16);
+        hr = com_i32(_context, VT_CTX_MAP, [stg, 0, MAP_READ, 0, mapped]);
+        var px = (-1, -1, -1, -1);
+        if (hr == 0) {
+            var base = ffi.load_i64(mapped);
+            var pitch = ffi.load_u32(ffi.ptr_add(mapped, 8));
+            var p = ffi.ptr_add(ffi.ptr_add(base, y * pitch), x * 4);
+            // B8G8R8A8_UNORM byte order: B,G,R,A
+            var bb = ffi.load_u8(p) as int;
+            var gg = ffi.load_u8(ffi.ptr_add(p, 1)) as int;
+            var rr = ffi.load_u8(ffi.ptr_add(p, 2)) as int;
+            var aa = ffi.load_u8(ffi.ptr_add(p, 3)) as int;
+            px = (rr, gg, bb, aa);
+            com_void(_context, VT_CTX_UNMAP, [stg, 0]);
+        }
+        ffi.free(mapped);
+        release(stg);
+        return px;
+    }
+}
+
+pub fn gfx_save_screenshot(filename: str): int {
+    unsafe {
+        if (_swapchain == 0) { return 0; }
+        w_guid(0x6f15aaf2, 0xd208, 0x4e89, 0x9548b49a, 0x9c4fd335);
+        var out_slot = ffi.alloc(8);
+        ffi.store_i64(out_slot, 0);
+        if (com_i32(_swapchain, VT_SWAP_GET_BUFFER, [0, _guid_buf, out_slot]) != 0) {
+            ffi.free(out_slot); return 0;
+        }
+        var back = ffi.load_i64(out_slot);
+        ffi.free(out_slot);
+        if (back == 0) { return 0; }
+        var desc = ffi.alloc(48);
+        ffi.memset(desc, 0, 48);
+        ffi.store_u32(desc, _width);
+        ffi.store_u32(ffi.ptr_add(desc, 4), _height);
+        ffi.store_u32(ffi.ptr_add(desc, 8), 1);
+        ffi.store_u32(ffi.ptr_add(desc, 12), 1);
+        ffi.store_u32(ffi.ptr_add(desc, 16), DXGI_FMT_B8G8R8A8_UNORM);
+        ffi.store_u32(ffi.ptr_add(desc, 20), 1);
+        ffi.store_u32(ffi.ptr_add(desc, 28), USAGE_STAGING);
+        ffi.store_u32(ffi.ptr_add(desc, 32), 0);
+        ffi.store_u32(ffi.ptr_add(desc, 36), CPU_READ);
+        var slot = ffi.alloc(8);
+        ffi.store_i64(slot, 0);
+        var hr = com_i32(_device, VT_DEVICE_CREATE_TEX2D, [desc, 0, slot]);
+        ffi.free(desc);
+        if (hr != 0) { ffi.free(slot); release(back); return 0; }
+        var stg = ffi.load_i64(slot);
+        ffi.free(slot);
+        com_void(_context, VT_CTX_COPY_RESOURCE, [stg, back]);
+        release(back);
+        var mapped = ffi.alloc(16);
+        hr = com_i32(_context, VT_CTX_MAP, [stg, 0, MAP_READ, 0, mapped]);
+        var res = 0;
+        if (hr == 0) {
+            var base = ffi.load_i64(mapped);
+            var pitch = ffi.load_u32(ffi.ptr_add(mapped, 8));
+            var lib = ffi.library_load("");
+            if (lib != 0 and lib != nil) {
+                if (ffi.library_get_symbol(lib, "save_image_png") == 0 or ffi.library_get_symbol(lib, "save_image_png") == nil) { lib = 0; }
+            }
+            if (lib == 0 or lib == nil) {
+                lib = ffi.library_load("bin/libstb_image.dll");
+                if (lib == 0 or lib == nil) { lib = ffi.library_load("tests/ffi/libstb_image.dll"); }
+            }
+            if (lib != 0 and lib != nil) {
+                var sym = ffi.library_get_symbol(lib, "save_image_png");
+                if (sym != nil) {
+                    var nbytes = _width * _height * 4;
+                    var rgba = ffi.alloc(nbytes);
+                    var y = 0;
+                    while (y < _height) {
+                        var row_src = ffi.ptr_add(base, y * pitch);
+                        var row_dst = ffi.ptr_add(rgba, y * _width * 4);
+                        var x = 0;
+                        while (x < _width) {
+                            var sp = ffi.ptr_add(row_src, x * 4);
+                            var dp = ffi.ptr_add(row_dst, x * 4);
+                            var bb = ffi.load_u8(sp);
+                            var gg = ffi.load_u8(ffi.ptr_add(sp, 1));
+                            var rr = ffi.load_u8(ffi.ptr_add(sp, 2));
+                            var aa = ffi.load_u8(ffi.ptr_add(sp, 3));
+                            ffi.store_u8(dp, rr);
+                            ffi.store_u8(ffi.ptr_add(dp, 1), gg);
+                            ffi.store_u8(ffi.ptr_add(dp, 2), bb);
+                            ffi.store_u8(ffi.ptr_add(dp, 3), aa);
+                            x = x + 1;
+                        }
+                        y = y + 1;
+                    }
+                    var fn_cstr = ffi.string_to_cstring(filename);
+                    res = ffi.foreign_call(sym,
+                        [ffi.cstring_as_ptr(fn_cstr), _width, _height, 4, rgba],
+                        ffi.TYPE_I32,
+                        [ffi.TYPE_PTR, ffi.TYPE_I32, ffi.TYPE_I32, ffi.TYPE_I32, ffi.TYPE_PTR]) as int;
+                    ffi.cstring_free(fn_cstr);
+                    ffi.free(rgba);
+                }
+            }
+            com_void(_context, VT_CTX_UNMAP, [stg, 0]);
+        }
+        ffi.free(mapped);
+        release(stg);
+        return res;
+    }
+}
+
 // gpu_release drops a COM reference (buffers, views, shaders, device).
 pub fn gpu_release(obj: int): int {
     unsafe {
@@ -857,11 +1129,17 @@ pub fn gfx_clear_depth(depth: float): nil {
     }
 }
 
-// gfx_end_frame presents the backbuffer (vsync on, flags 0).
+pub var _sync_interval: int = 1;
+
+pub fn gfx_set_vsync(sync: int): nil {
+    _sync_interval = sync;
+}
+
+// gfx_end_frame presents the backbuffer (vsync configurable via gfx_set_vsync).
 pub fn gfx_end_frame(): nil {
     unsafe {
         if (_swapchain == 0) { return; }
-        com_void(_swapchain, VT_SWAP_PRESENT, [1, 0]);
+        com_void(_swapchain, VT_SWAP_PRESENT, [_sync_interval, 0]);
     }
 }
 
@@ -930,7 +1208,9 @@ pub fn gfx_set_topology(topo: int): nil {
 }
 
 pub fn gfx_draw(vertex_count: int, start_vertex: int): nil {
-    unsafe { com_void(_context, VT_CTX_DRAW, [vertex_count, start_vertex]); }
+    unsafe {
+        com_void(_context, VT_CTX_DRAW, [vertex_count, start_vertex]);
+    }
 }
 
 pub fn gfx_draw_indexed(index_count: int, start_index: int,
@@ -1104,10 +1384,21 @@ fn fmt_align(format: int): int {
 // validation (pass gfx_blob_ptr/gfx_blob_size of the VS blob).
 pub fn gfx_input_layout_create(names: [str], formats: [int],
                                code_ptr: int, code_size: int): int {
+    return gfx_input_layout_create_ex(names, formats, [], code_ptr, code_size);
+}
+
+// gfx_input_layout_create_ex is gfx_input_layout_create with explicit
+// per-element byte offsets. Pass an empty `offsets` list to auto-pack
+// (position elements back-to-back); otherwise offsets[i] is the
+// AlignedByteOffset for element i and must match the vertex layout.
+pub fn gfx_input_layout_create_ex(names: [str], formats: [int],
+                                  offsets: [int],
+                                  code_ptr: int, code_size: int): int {
     unsafe {
         if (ensure_device() == 0) { return 0; }
         var n = len(names);
         if (n == 0 or n != len(formats)) { return 0; }
+        var explicit = len(offsets) == n;
         var descs = ffi.alloc(n * 32);
         ffi.memset(descs, 0, n * 32);
         var cstrs: [any] = [] as [any];
@@ -1121,15 +1412,21 @@ pub fn gfx_input_layout_create(names: [str], formats: [int],
             ffi.store_u32(ffi.ptr_add(d, 8), 0);          // SemanticIndex
             ffi.store_u32(ffi.ptr_add(d, 12), formats[i]); // Format
             ffi.store_u32(ffi.ptr_add(d, 16), 0);         // InputSlot
-            var al = fmt_align(formats[i]);
-            var aoff = offset;
-            while (aoff % al != 0) { aoff = aoff + 1; }
+            var aoff = 0;
+            if (explicit) {
+                aoff = offsets[i];
+            } else {
+                var al = fmt_align(formats[i]);
+                aoff = offset;
+                while (aoff % al != 0) { aoff = aoff + 1; }
+            }
             ffi.store_u32(ffi.ptr_add(d, 20), aoff);     // AlignedByteOffset
             ffi.store_u32(ffi.ptr_add(d, 24), INPUT_PER_VERTEX);
             ffi.store_u32(ffi.ptr_add(d, 28), 0);         // InstanceStepRate
             var sz = fmt_size(formats[i]);
             if (sz == 0) { ffi.free(descs); return 0; }
-            offset = offset + sz;
+            var end = aoff + sz;
+            if (end > offset) { offset = end; }
             i = i + 1;
         }
         var slot = ffi.alloc(8);
@@ -1210,6 +1507,9 @@ pub fn gfx_blend_state_create_ex(enable: int): int {
         if (ensure_device() == 0) { return 0; }
         var desc = ffi.alloc(264);
         ffi.memset(desc, 0, 264);
+        // RenderTargetWriteMask must be ALL (15) even when blending is
+        // disabled — a zeroed mask discards all color output.
+        ffi.store_u32(ffi.ptr_add(desc, 8 + 28), 15);
         if (enable != 0) {
             // D3D11_BLEND_DESC.RenderTarget[0] @8:
             // BlendEnable@0, SrcBlend@4, DestBlend@8, BlendOp@12,
@@ -1270,8 +1570,9 @@ pub fn gfx_depth_state_create(enable: int, write_mask: int,
     }
 }
 
-// gfx_raster_state_create: 40-byte D3D11_RASTERIZER_DESC with
-// DepthClipEnable on (the D3D11 default), everything else zeroed.
+// gfx_raster_state_create: 40-byte D3D11_RASTERIZER_DESC.
+// D3D11_FILL_MODE: WIREFRAME=2, SOLID=3. D3D11_CULL_MODE:
+// NONE=1, FRONT=2, BACK=3 — callers pass the raw enum values.
 pub fn gfx_raster_state_create(fill: int, cull: int): int {
     unsafe {
         if (ensure_device() == 0) { return 0; }
@@ -1488,6 +1789,9 @@ pub fn gfx_device_ok(): int {
 // need direct COM access (advanced use; prefer the gfx_* helpers).
 pub fn gfx_context(): int { return _context; }
 pub fn gfx_device(): int { return _device; }
+pub fn gfx_rtv(): int { return _rtv; }
+pub fn gfx_dsv(): int { return _dsv; }
+pub fn gfx_swapchain(): int { return _swapchain; }
 
 // gfx_map_dynamic maps a DYNAMIC buffer for writing (Map WRITE_DISCARD).
 // Returns the mapped data pointer or 0. Pair with gfx_unmap.

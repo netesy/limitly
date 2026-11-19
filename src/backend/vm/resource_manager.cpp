@@ -336,14 +336,15 @@ public:
             }
             case ResourceOperation::EXISTS: {
                 const char* path = args.size() > 0 ? register_value_to_cstr(args[0]) : nullptr;
-                if (!path) return VAL_FALSE;
+                if (!path || !*path) return VAL_FALSE;
                 return std::filesystem::exists(path) ? VAL_TRUE : VAL_FALSE;
             }
             case ResourceOperation::DELETE: {
                 const char* path = args.size() > 0 ? register_value_to_cstr(args[0]) : nullptr;
-                if (!path) return VAL_FALSE;
+                if (!path || !*path) return VAL_FALSE;
                 try {
-                    return std::filesystem::remove_all(path) > 0 ? VAL_TRUE : VAL_FALSE;
+                    std::error_code ec;
+                    return std::filesystem::remove(path, ec) ? VAL_TRUE : VAL_FALSE;
                 } catch (...) { return VAL_FALSE; }
             }
             default:
@@ -980,6 +981,28 @@ public:
                 return text(os::hostname());
             case ResourceOperation::NUM_CPU:
                 return make_i64(os::num_cpu());
+            case ResourceOperation::TIME_NOW:
+                return make_i64(time(nullptr));
+            case ResourceOperation::TIME_MONOTONIC: {
+#ifdef _WIN32
+                return make_i64(GetTickCount64());
+#else
+                struct timespec ts;
+                clock_gettime(CLOCK_MONOTONIC, &ts);
+                return make_i64(static_cast<uint64_t>(ts.tv_sec) * 1000 + static_cast<uint64_t>(ts.tv_nsec / 1000000));
+#endif
+            }
+            case ResourceOperation::TIME_SLEEP: {
+                int64_t ms = args.size() > 0 ? register_value_to_i64(args[0]) : 0;
+                if (ms > 0) {
+#ifdef _WIN32
+                    Sleep(static_cast<DWORD>(ms));
+#else
+                    usleep(static_cast<useconds_t>(ms * 1000));
+#endif
+                }
+                return VAL_NIL;
+            }
             default:
                 return VAL_NIL;
         }

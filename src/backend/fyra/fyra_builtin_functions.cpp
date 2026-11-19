@@ -899,68 +899,12 @@ void FyraBuiltinFunctions::emit_list_ir(ir::Module* module, ir::IRBuilder* build
     if (!fn_app) fn_app = builder->createFunction("lm_list_append", void_ty, {i64, i64});
     if (fn_app->getBasicBlocks().empty()) {
         ir::BasicBlock* b_entry = builder->createBasicBlock("entry", fn_app);
-        ir::BasicBlock* b_realloc = builder->createBasicBlock("realloc", fn_app);
-        ir::BasicBlock* b_copy_loop = builder->createBasicBlock("copy_loop", fn_app);
-        ir::BasicBlock* b_copy_body = builder->createBasicBlock("copy_body", fn_app);
-        ir::BasicBlock* b_copy_done = builder->createBasicBlock("copy_done", fn_app);
-        ir::BasicBlock* b_insert = builder->createBasicBlock("insert", fn_app);
-
         builder->setInsertPoint(b_entry);
         auto it = fn_app->getParameters().begin();
         ir::Value* raw_list_ptr = it->get();
         it++;
         ir::Value* val = it->get();
-
-        ir::Value* list_ptr = builder->createAnd(raw_list_ptr, ctx->getConstantInt(i64, ~7ULL));
-        ir::Value* len = builder->createLoadl(builder->createAdd(list_ptr, ctx->getConstantInt(i64, 16)));
-        ir::Value* cap_ptr = builder->createAdd(list_ptr, ctx->getConstantInt(i64, 24));
-        ir::Value* cap = builder->createLoadl(cap_ptr);
-
-        ir::Value* need_grow = builder->createCsge(len, cap);
-        builder->createBr(need_grow, b_realloc, b_insert);
-
-        // Grow buffer: new_cap = cap * 2
-        builder->setInsertPoint(b_realloc);
-        ir::Value* new_cap = builder->createMul(cap, ctx->getConstantInt(i64, 2));
-        ir::Value* new_bytes = builder->createMul(new_cap, ctx->getConstantInt(i64, 8));
-        ir::Instruction* new_data = builder->createExternCall("memory.alloc", {new_bytes}, i64);
-
-        ir::Value* data_ptr_slot = builder->createAdd(list_ptr, ctx->getConstantInt(i64, 8));
-        ir::Value* old_data = builder->createLoadl(data_ptr_slot);
-
-        ir::Instruction* k_slot = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
-        builder->createStore(ctx->getConstantInt(i64, 0), k_slot);
-        builder->createJmp(b_copy_loop);
-
-        builder->setInsertPoint(b_copy_loop);
-        ir::Value* k = builder->createLoadl(k_slot);
-        ir::Value* cond = builder->createCslt(k, len);
-        builder->createBr(cond, b_copy_body, b_copy_done);
-
-        builder->setInsertPoint(b_copy_body);
-        ir::Value* k_off = builder->createMul(k, ctx->getConstantInt(i64, 8));
-        ir::Value* src_p = builder->createAdd(old_data, k_off);
-        ir::Value* item = builder->createLoadl(src_p);
-        ir::Value* dst_p = builder->createAdd(new_data, k_off);
-        builder->createStore(item, dst_p);
-        ir::Value* k_next = builder->createAdd(k, ctx->getConstantInt(i64, 1));
-        builder->createStore(k_next, k_slot);
-        builder->createJmp(b_copy_loop);
-
-        builder->setInsertPoint(b_copy_done);
-        builder->createStore(new_cap, cap_ptr);
-        builder->createStore(new_data, data_ptr_slot);
-        builder->createJmp(b_insert);
-
-        builder->setInsertPoint(b_insert);
-        ir::Value* cur_len = builder->createLoadl(builder->createAdd(list_ptr, ctx->getConstantInt(i64, 16)));
-        ir::Value* cur_data_slot = builder->createAdd(list_ptr, ctx->getConstantInt(i64, 8));
-        ir::Value* cur_data = builder->createLoadl(cur_data_slot);
-        ir::Value* ins_off = builder->createMul(cur_len, ctx->getConstantInt(i64, 8));
-        ir::Value* ins_ptr = builder->createAdd(cur_data, ins_off);
-        builder->createStore(val, ins_ptr);
-        ir::Value* next_len = builder->createAdd(cur_len, ctx->getConstantInt(i64, 1));
-        builder->createStore(next_len, builder->createAdd(list_ptr, ctx->getConstantInt(i64, 16)));
+        builder->createExternCall("lymar_aot_list_append", {raw_list_ptr, val}, void_ty);
         builder->createRet(nullptr);
     }
 
@@ -1341,9 +1285,23 @@ void FyraBuiltinFunctions::emit_dict_ir(ir::Module* module, ir::IRBuilder* build
 
         // Insertion at slot = count (insertion-order)
         builder->setInsertPoint(b_insert);
+        ir::Value* cap_slot = builder->createAdd(dict_ptr, ctx->getConstantInt(i64, 8));
+        ir::Value* cap_val = builder->createLoadl(cap_slot);
+        ir::Value* need_grow = builder->createCsge(count, cap_val);
+        ir::BasicBlock* b_grow = builder->createBasicBlock("dict_grow", fn_set);
+        ir::BasicBlock* b_do_insert = builder->createBasicBlock("dict_do_insert", fn_set);
+        builder->createBr(need_grow, b_grow, b_do_insert);
+
+        builder->setInsertPoint(b_grow);
+        builder->createExternCall("lymar_aot_dict_grow", {dict_ptr}, void_ty);
+        builder->createJmp(b_do_insert);
+
+        builder->setInsertPoint(b_do_insert);
+        ir::Value* cur_keys = builder->createLoadl(keys_slot);
+        ir::Value* cur_vals = builder->createLoadl(vals_slot);
         ir::Value* ins_off = builder->createMul(count, ctx->getConstantInt(i64, 8));
-        ir::Value* ins_k_addr = builder->createAdd(keys, ins_off);
-        ir::Value* ins_v_addr = builder->createAdd(vals, ins_off);
+        ir::Value* ins_k_addr = builder->createAdd(cur_keys, ins_off);
+        ir::Value* ins_v_addr = builder->createAdd(cur_vals, ins_off);
         builder->createStore(key, ins_k_addr);
         builder->createStore(val, ins_v_addr);
 

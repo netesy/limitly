@@ -101,6 +101,16 @@ pub fn _open_lib(): int {
             }
         }
 
+        // 1b. Check process handle (statically linked into executable)
+        var h_proc: int = ffi.library_load("");
+        if (h_proc != 0 and h_proc != nil) {
+            var sym_check = ffi.library_get_symbol(h_proc, "load_image");
+            if (sym_check != 0 and sym_check != nil) {
+                _lib_path = "";
+                return h_proc;
+            }
+        }
+
         // 2. Candidate paths beside the Lymar executable in bin/ and standard paths
         //    across all OS targets (Windows: .dll, Linux / Android: .so, macOS: .dylib)
         var candidates: [str] = [

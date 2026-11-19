@@ -1,4 +1,8 @@
 // Standalone canonical-LIR FFI adapter. Uses the same platform ABI engine as VM.
+#if defined(_WIN32)
+#define NOMINMAX
+#include <windows.h>
+#endif
 #include "aot_ffi_values.hh"
 #include "../runtime/lymarrt/lymarrt.h"
 #include <cstring>
@@ -176,6 +180,11 @@ Word lymar_aot_library_symbol(Word handle,Word name) {
 }
 void lymar_aot_library_close(Word handle) {
     std::lock_guard guard(mutex);auto* library=reinterpret_cast<void*>(lymar_aot_ffi_pointer(handle,1));
+#ifdef _WIN32
+    if (!library || library == GetModuleHandleA(NULL)) return;
+#else
+    if (!library) return;
+#endif
     auto found=libraries.find(library);if(found==libraries.end()) return;
     for(auto* pointer:found->second->symbols) lymar_aot_ffi_invalidate(reinterpret_cast<Word>(pointer));
     lymar_aot_ffi_invalidate(reinterpret_cast<Word>(library));libraries.erase(found);

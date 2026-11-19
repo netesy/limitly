@@ -33,6 +33,7 @@
 #include <fstream>
 #include <sstream>
 #include <filesystem>
+#include <cstdlib>
 
 namespace LM {
 
@@ -162,6 +163,18 @@ int Compiler::executeFile(const std::string& filename, const CompileOptions& opt
                 else if (options.target == "freebsd") target_os_code = 5;
                 else if (options.target == "wasm" || options.target == "wasi") target_os_code = 6;
                 LM::Frontend::ModuleManager::getInstance().set_target_os(target_os_code);
+            }
+
+            // Publish the compile-time graphics-backend preference so
+            // std.os.identity.GG_BACKEND specializes and std.gg's backend
+            // dispatch folds, letting the treeshaker drop the unused backend.
+            {
+                int gg_backend_code = 0;
+                if (const char* pref = std::getenv("LYMAR_GG_BACKEND")) {
+                    if (std::string(pref) == "native") gg_backend_code = 1;
+                    else if (std::string(pref) == "sokol") gg_backend_code = 2;
+                }
+                LM::Frontend::ModuleManager::getInstance().set_gg_backend(gg_backend_code);
             }
 
             const auto verification_policy = options.strict_verification

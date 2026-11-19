@@ -110,7 +110,12 @@ frame Tabs {
     pub fn measure(min_w: float, max_w: float, min_h: float, max_h: float): comp.Size {
         var body_h: float = 0.0;
         if (self.active_now() >= 0 and self.active_now() < len(self.pages)) {
-            val s = self.pages[self.active_now()].measure(0.0, comp.MEASURE_LOOSE, 0.0, comp.MEASURE_LOOSE);
+            var child_max_h: float = comp.MEASURE_LOOSE;
+            if (max_h < comp.MEASURE_LOOSE) {
+                child_max_h = max_h - self.header_h;
+                if (child_max_h < 0.0) { child_max_h = 0.0; }
+            }
+            val s = self.pages[self.active_now()].measure(min_w, max_w, 0.0, child_max_h);
             body_h = s.h;
         }
         var w: float = self.rect.w + 0.0;
@@ -170,7 +175,12 @@ frame Tabs {
             i = i + 1;
         }
         if (cur >= 0 and cur < len(self.pages)) {
-            self.pages[cur].paint();
+            var ch_h: float = self.rect.h - self.header_h;
+            if (ch_h > 0.0) {
+                dl.dl_push_clip(dl.paint_ctx.dl, self.rect.x, self.rect.y + self.header_h, self.rect.w, ch_h);
+                self.pages[cur].paint();
+                dl.dl_pop_clip(dl.paint_ctx.dl);
+            }
         }
     }
 
@@ -198,7 +208,10 @@ frame Tabs {
         if (cur >= 0 and cur < len(self.pages)) {
             val c = self.pages[cur];
             var inside: bool = true;
-            if (t != events.EventType.MouseMove and t != events.EventType.MouseUp and t != events.EventType.MouseWheel) {
+            if (t == events.EventType.MouseWheel) {
+                inside = (tree.pointer_x >= self.rect.x and tree.pointer_x < self.rect.x + self.rect.w and
+                          tree.pointer_y >= self.rect.y + self.header_h and tree.pointer_y < self.rect.y + self.rect.h);
+            } elif (t != events.EventType.MouseMove and t != events.EventType.MouseUp) {
                 inside = c.bounds().contains(x as float, y as float);
             }
             if (inside) {

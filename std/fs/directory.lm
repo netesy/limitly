@@ -22,3 +22,21 @@ pub fn list_dir(path_str: str): [str]? {
     contract(len(path_str) > 0, "Directory path must not be empty");
     return io.list_directory(path_str);
 }
+
+/// Recursively deletes a file or directory tree at the target path.
+///
+/// @pre len(path_str) > 0
+/// @param path_str Target path string.
+/// @return Fallible unit result.
+pub fn remove_all(path_str: str): nil? {
+    if (len(path_str) == 0) return err();
+    if (!io.delete_all(path_str)) {
+        return err();
+    }
+    return ok(nil);
+}
+
+/// Alias for remove_all to match std.io naming conventions.
+pub fn delete_all(path_str: str): nil? {
+    return remove_all(path_str);
+}

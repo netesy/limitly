@@ -41,7 +41,7 @@
     /// @param mode Access mode string.
     /// @return Fallible `File` handle.
     pub fn open(path: str, mode: str): file.File? {
-        contract(len(path) > 0 and len(mode) > 0, "Path and mode must not be empty");
+        if (len(path) == 0 or len(mode) == 0) return err();
         return file.open(path, mode);
     }
 
@@ -92,7 +92,7 @@
     /// @param path Candidate filesystem path.
     /// @return True if target exists, false otherwise.
     pub fn exists(path: str): bool {
-        contract(len(path) > 0, "Path must not be empty");
+        if (len(path) == 0) return false;
         match (res.create_fs_resource()) {
             val r => {
                 var fs = FileSystem(r);
@@ -106,11 +106,10 @@
 
     /// Deletes a file or empty directory at the given path.
     ///
-    /// @pre len(path) > 0
     /// @param path Path to delete.
     /// @return True if deletion succeeded, false otherwise.
     pub fn delete(path: str): bool {
-        contract(len(path) > 0, "Path must not be empty");
+        if (len(path) == 0) return false;
         match (res.create_fs_resource()) {
             val r => {
                 var fs = FileSystem(r);
@@ -120,6 +119,39 @@
             },
             err e => return false
         }
+    }
+
+    /// Deletes a file or directory tree recursively at the given path.
+    ///
+    /// @param path Path to delete recursively.
+    /// @return True if deletion succeeded, false otherwise.
+    pub fn delete_all(path: str): bool {
+        if (len(path) == 0) return false;
+        if (!exists(path)) {
+            return false;
+        }
+        if (delete(path)) {
+            return true;
+        }
+        match (list_directory(path)) {
+            val entries => {
+                iter (entry in entries) {
+                    var child = path + "/" + entry;
+                    if (!delete_all(child)) {
+                        return false;
+                    }
+                }
+                return delete(path);
+            },
+            err e => {
+                return false;
+            }
+        }
+    }
+
+    /// Alias for delete_all to match std.fs naming conventions.
+    pub fn remove_all(path: str): bool {
+        return delete_all(path);
     }
 
     /// Renames or moves a file or directory from `old_path` to `new_path`.

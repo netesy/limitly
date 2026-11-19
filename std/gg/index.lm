@@ -1,8 +1,10 @@
-// std.gg - Portable Sokol-GFX Style Low-Level Graphics Abstraction Module
+// std.gg - Portable GFX Style Low-Level Graphics Abstraction Module
 
 import std.internal.runtime as rt;
 import std.math as math;
 import std.gg.native as ggn;
+import std.os.environment as osenv;
+import std.os.identity as osid;
 
 enum PrimitiveType {
     Rect,
@@ -217,7 +219,7 @@ frame GraphicsContext {
     }
 
     pub fn flush_draw_batch(b: DrawBatch): nil {
-        if (_native_on != 0) {
+        if (osid.GG_BACKEND != osid.GG_BACKEND_SOKOL and _native_on != 0) {
             b.clear();
             return;
         }
@@ -339,7 +341,7 @@ pub fn setup_checked(): nil?GraphicsInitError {
 }
 
 pub fn shutdown(): nil {
-    if (_native_on != 0) {
+    if (osid.GG_BACKEND != osid.GG_BACKEND_SOKOL and _native_on != 0) {
         ggn.detach();
         _native_on = 0;
         global_graphics_context.backend = "none";
@@ -375,7 +377,7 @@ pub fn submit_batch(b: DrawBatch): nil {
 }
 
 pub fn spawn_window(width: int, height: int, title: str, resizable: int = 1): nil {
-    if (_native_on != 0) { return; }
+    if (osid.GG_BACKEND != osid.GG_BACKEND_SOKOL and _native_on != 0) { return; }
     if (global_graphics_context.handle != -1) {
         rt.call(global_graphics_context.handle, rt.OP_SPAWN, [width, height, title, resizable]);
     }
@@ -390,11 +392,47 @@ pub fn attach_window(hwnd: int, width: int, height: int): bool {
         // Native driver path first: pure-Lymar d3d11/vulkan attached to
         // the externally-owned window. Falls back to the rt resource
         // (sokol/CPU) path when no GPU driver is available or attach fails.
-        ggn.set_prefer(global_graphics_context.backend_prefer);
-        if (ggn.attach(hwnd, width, height) != 0) {
-            _native_on = 1;
-            global_graphics_context.backend = ggn.driver();
-            return true;
+        // Compile-time backend specialization: when the compiler baked
+        // LYMAR_GG_BACKEND into osid.GG_BACKEND (native/sokol), the matching
+        // branch folds and the unused backend's call graph is tree-shaken.
+        // GG_BACKEND_AUTO falls through to runtime dispatch below.
+        if (osid.GG_BACKEND == osid.GG_BACKEND_SOKOL) {
+            val res = rt.call(global_graphics_context.handle, rt.OP_ATTACH_WINDOW, [hwnd, width, height]);
+            if (res != nil) {
+                val ok_attach = res as bool;
+                if (ok_attach) { global_graphics_context.backend = "sokol"; }
+                return ok_attach;
+            }
+            return false;
+        }
+        if (osid.GG_BACKEND == osid.GG_BACKEND_NATIVE) {
+            ggn.set_prefer(global_graphics_context.backend_prefer);
+            if (ggn.attach(hwnd, width, height) != 0) {
+                _native_on = 1;
+                global_graphics_context.backend = ggn.driver();
+                return true;
+            }
+            return false;
+        }
+        // Backend override: LYMAR_GG_BACKEND=sokol forces the rt path,
+        // =native forces the native driver path (no fallback),
+        // =vulkan / =d3d11 selects that specific native driver,
+        // unset = try native first, fall back to sokol.
+        val backend_pref = osenv.getenv_or("LYMAR_GG_BACKEND", "");
+        if (backend_pref != "sokol") {
+            if (backend_pref == "vulkan" or backend_pref == "d3d11" or backend_pref == "metal") {
+                ggn.set_prefer(backend_pref);
+            } else {
+                ggn.set_prefer(global_graphics_context.backend_prefer);
+            }
+            if (ggn.attach(hwnd, width, height) != 0) {
+                _native_on = 1;
+                global_graphics_context.backend = ggn.driver();
+                return true;
+            }
+            if (backend_pref == "native" or backend_pref == "vulkan" or backend_pref == "d3d11") {
+                return false;
+            }
         }
         val res = rt.call(global_graphics_context.handle, rt.OP_ATTACH_WINDOW, [hwnd, width, height]);
         if (res != nil) {
@@ -407,7 +445,7 @@ pub fn attach_window(hwnd: int, width: int, height: int): bool {
 }
 
 pub fn detach_window(): nil {
-    if (_native_on != 0) {
+    if (osid.GG_BACKEND != osid.GG_BACKEND_SOKOL and _native_on != 0) {
         ggn.detach();
         _native_on = 0;
         global_graphics_context.backend = "none";
@@ -418,8 +456,15 @@ pub fn detach_window(): nil {
     }
 }
 
+pub fn save_screenshot(path: str): bool {
+    if (osid.GG_BACKEND != osid.GG_BACKEND_SOKOL and _native_on != 0) {
+        return ggn.save_screenshot(path);
+    }
+    return false;
+}
+
 pub fn push_clip(x: float, y: float, w: float, h: float, shape: int = 0, radius: float = 0.0): nil {
-    if (_native_on != 0) {
+    if (osid.GG_BACKEND != osid.GG_BACKEND_SOKOL and _native_on != 0) {
         ggn.push_clip(x, y, w, h, shape, radius);
         return;
     }
@@ -439,7 +484,7 @@ pub fn push_clip(x: float, y: float, w: float, h: float, shape: int = 0, radius:
 }
 
 pub fn pop_clip(): nil {
-    if (_native_on != 0) {
+    if (osid.GG_BACKEND != osid.GG_BACKEND_SOKOL and _native_on != 0) {
         ggn.pop_clip();
         return;
     }
@@ -453,7 +498,7 @@ pub fn pop_clip(): nil {
 }
 
 pub fn poll_events(): [int] | nil {
-    if (_native_on != 0) { return nil; }
+    if (osid.GG_BACKEND != osid.GG_BACKEND_SOKOL and _native_on != 0) { return nil; }
     if (global_graphics_context.handle != -1) {
         val res = rt.call(global_graphics_context.handle, rt.OP_POLL, global_graphics_context._args0);
         if (res != nil) {
@@ -559,7 +604,7 @@ pub fn make_bindings(vbuf_id: int, ibuf_id: int, tex_id: int, sampler_id: int): 
 }
 
 pub fn begin_pass(w: int, h: int, r: float, g: float, b: float, a: float): nil {
-    if (_native_on != 0) {
+    if (osid.GG_BACKEND != osid.GG_BACKEND_SOKOL and _native_on != 0) {
         ggn.begin_pass(w, h, r, g, b, a);
         return;
     }
@@ -570,7 +615,7 @@ pub fn begin_pass(w: int, h: int, r: float, g: float, b: float, a: float): nil {
 }
 
 pub fn set_window_size(width: int, height: int): nil {
-    if (_native_on != 0) {
+    if (osid.GG_BACKEND != osid.GG_BACKEND_SOKOL and _native_on != 0) {
         ggn.resize(width, height);
         return;
     }
@@ -582,7 +627,7 @@ pub fn set_window_size(width: int, height: int): nil {
 }
 
 pub fn draw_rect_primitive(x: float, y: float, w: float, h: float, r: float, g: float, b: float, a: float): nil {
-    if (_native_on != 0) {
+    if (osid.GG_BACKEND != osid.GG_BACKEND_SOKOL and _native_on != 0) {
         ggn.draw_rect(x, y, w, h, r, g, b, a);
         return;
     }
@@ -601,8 +646,8 @@ pub fn draw_rect_primitive(x: float, y: float, w: float, h: float, r: float, g: 
 }
 
 pub fn draw_rect_rounded_primitive(x: float, y: float, w: float, h: float, rad: float, r: float, g: float, b: float, a: float): nil {
-    if (_native_on != 0) {
-        ggn.draw_rect(x, y, w, h, r, g, b, a);
+    if (osid.GG_BACKEND != osid.GG_BACKEND_SOKOL and _native_on != 0) {
+        ggn.draw_rect_rounded(x, y, w, h, rad, r, g, b, a);
         return;
     }
     if (global_graphics_context.handle != -1) {
@@ -620,8 +665,8 @@ pub fn draw_rect_rounded_primitive(x: float, y: float, w: float, h: float, rad: 
 }
 
 pub fn draw_rect_border_primitive(x: float, y: float, w: float, h: float, rad: float, border_w: float, r: float, g: float, b: float, a: float): nil {
-    if (_native_on != 0) {
-        ggn.draw_rect(x, y, w, h, r, g, b, a);
+    if (osid.GG_BACKEND != osid.GG_BACKEND_SOKOL and _native_on != 0) {
+        ggn.draw_rect_border(x, y, w, h, rad, border_w, r, g, b, a);
         return;
     }
     if (global_graphics_context.handle != -1) {
@@ -722,7 +767,7 @@ pub var _sh_ex: float = 0.0;
 pub var _sh_la: float = 0.0;
 
 pub fn draw_shadow_primitive(x: float, y: float, w: float, h: float, r: float, g: float, b: float, a: float, off_x: float, off_y: float, blur: float, spread: float, radius: float = 6.0): nil {
-    if (_native_on != 0) {
+    if (osid.GG_BACKEND != osid.GG_BACKEND_SOKOL and _native_on != 0) {
         // native v1: translucent quad approximation of the shadow
         ggn.draw_shadow(x + off_x - spread, y + off_y - spread,
                         w + spread * 2.0, h + spread * 2.0,
@@ -760,7 +805,7 @@ pub fn draw_shadow_primitive(x: float, y: float, w: float, h: float, r: float, g
 }
 
 pub fn draw_triangle_primitive(x1: float, y1: float, x2: float, y2: float, x3: float, y3: float, r: float, g: float, b: float, a: float): nil {
-    if (_native_on != 0) {
+    if (osid.GG_BACKEND != osid.GG_BACKEND_SOKOL and _native_on != 0) {
         ggn.draw_tri(x1, y1, x2, y2, x3, y3, r, g, b, a);
         return;
     }
@@ -779,7 +824,7 @@ pub fn draw_triangle_primitive(x1: float, y1: float, x2: float, y2: float, x3: f
 }
 
 pub fn draw_text(text_str: str, x: float, y: float, r: float, g: float, b: float, a: float, scale: int = 1): nil {
-    if (_native_on != 0) {
+    if (osid.GG_BACKEND != osid.GG_BACKEND_SOKOL and _native_on != 0) {
         ggn.draw_text(text_str, x, y, r, g, b, a, scale);
         return;
     }
@@ -793,6 +838,9 @@ pub fn draw_text(text_str: str, x: float, y: float, r: float, g: float, b: float
 }
 
 pub fn measure_text(text_str: str, scale: int = 1): float {
+    if (osid.GG_BACKEND != osid.GG_BACKEND_SOKOL and _native_on != 0) {
+        return ggn.measure_text(text_str, scale);
+    }
     if (global_graphics_context.handle != -1) {
         val res = rt.call(global_graphics_context.handle, rt.OP_MEASURE_TEXT, [text_str, scale]);
         if (res != nil) {
@@ -803,6 +851,9 @@ pub fn measure_text(text_str: str, scale: int = 1): float {
 }
 
 pub fn get_line_height(scale: int = 1): float {
+    if (osid.GG_BACKEND != osid.GG_BACKEND_SOKOL and _native_on != 0) {
+        return ggn.get_line_height(scale);
+    }
     if (global_graphics_context.handle != -1) {
         global_graphics_context._args1i[0] = scale;
         val res = rt.call(global_graphics_context.handle, rt.OP_GET_FONT_METRICS, global_graphics_context._args1i);
@@ -814,7 +865,7 @@ pub fn get_line_height(scale: int = 1): float {
 }
 
 pub fn end_pass(): nil {
-    if (_native_on != 0) {
+    if (osid.GG_BACKEND != osid.GG_BACKEND_SOKOL and _native_on != 0) {
         ggn.end_pass();
         return;
     }
@@ -855,7 +906,7 @@ pub fn draw(base: int, count: int, instances: int): nil {
 }
 
 pub fn commit(): nil {
-    if (_native_on != 0) {
+    if (osid.GG_BACKEND != osid.GG_BACKEND_SOKOL and _native_on != 0) {
         ggn.commit();
         return;
     }

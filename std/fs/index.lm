@@ -16,7 +16,7 @@
 import std.io as io;
 import std.path.index show Path;
 
-pub import std.fs.directory show create_dir, list_dir;
+pub import std.fs.directory show create_dir, list_dir, remove_all, delete_all;
 pub import std.fs.permissions show Permissions;
 pub import std.path.index show Path;
 
@@ -55,6 +55,24 @@ frame FS {
             return err();
         }
         return ok(nil);
+    }
+
+    /// Deletes a file or directory tree recursively at path `p`.
+    ///
+    /// @pre p != nil
+    /// @param p Strongly-typed path handle.
+    /// @return Fallible unit result.
+    pub fn remove_all(p: Path): nil? {
+        contract(p != nil, "Path parameter must not be nil");
+        if (!io.delete_all(p.value)) {
+            return err();
+        }
+        return ok(nil);
+    }
+
+    /// Alias for remove_all to match std.io naming conventions.
+    pub fn delete_all(p: Path): nil? {
+        return self.remove_all(p);
     }
 
     /// Renames or moves a file or directory from `from_path` to `to_path`.

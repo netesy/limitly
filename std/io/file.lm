@@ -133,8 +133,8 @@ pub type IOError = FileNotFound | PermissionDenied | DiskFull | NetworkError | U
         ///     return;
         /// };
         pub fn open(path: str, mode: str): File?IOError {
-            contract(len(path) > 0, "File path must not be empty");
-            contract(len(mode) > 0, "File mode must not be empty");
+            if (len(path) == 0) return err(FileNotFound(path=path));
+            if (len(mode) == 0) return err(UnknownError(message="empty mode"));
             match (res.open_file(path=path, mode=mode)) {
                 val r => return ok(File(path, r)),
                 err e => {

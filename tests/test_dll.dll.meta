@@ -1,0 +1,12 @@
+module_name=tests.test_dll
+abi_version=0.0.1
+runtime_semantics=lymar-0.0.1-abi1-lir1-ownership-nullable
+target_triple=x86_64-windows
+architecture=x86_64
+os=windows
+artifact_kind=shared
+artifact_path=tests/test_dll.dll
+source_hash=9c7abcc5190f698c2c3c0eca9acfdd888e36c4f29290762cee3f78f98a801983
+exports=tests.test_dll.add_numbers
+dependencies=
+signatures=tests.test_dll.add_numbers:fn(a: int, b: int): int

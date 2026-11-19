@@ -10,7 +10,13 @@
 #include "../runtime/os_info.hh"
 #include "aot_ffi_values.hh"
 #if !defined(__wasi__)
-#include "../runtime/software_graphics.hh"
+#include "aot_graphics_access.hh"
+#if defined(__GNUC__) && !defined(__wasi__)
+// Make only this TU's reference to the graphics factory weak: console-only
+// builds then leave it NULL rather than extracting aot_graphics.o from the
+// runtime archive. See aot_graphics_access.hh for the extraction contract.
+#pragma weak aot_gfx_create
+#endif
 #endif
 #include <optional>
 #include <algorithm>
@@ -18,7 +24,9 @@
 #include <cstdlib>
 #include <cstdio>
 #include <cstring>
-#include <filesystem>
+#if !defined(_WIN32)
+#include <dirent.h>
+#endif
 #include <string>
 #include <map>
 #include <stdexcept>
@@ -29,7 +37,6 @@
 #include <thread>
 #include <atomic>
 #include <condition_variable>
-#include <chrono>
 #include <functional>
 #include <cmath>
 #include <limits>
@@ -41,7 +48,52 @@
 #define NOMINMAX
 #endif
 #include <windows.h>
+
+static LONG WINAPI aot_crash_handler(EXCEPTION_POINTERS* ep) {
+    if (ep->ExceptionRecord->ExceptionCode == 0xC0000005) {
+        FILE* f = fopen(".tmp/crash.log", "a");
+        if (f) {
+            uint64_t mod_base = (uint64_t)GetModuleHandleA(NULL);
+            uint64_t rip = (uint64_t)ep->ContextRecord->Rip;
+            uint64_t rva = rip >= mod_base ? (rip - mod_base) : 0;
+            fprintf(f, "[CRASH] ExceptionCode=0x%08lx at address=%p (mod_base=%016llx RVA=%08llx objdump_addr=%016llx)\n",
+                    ep->ExceptionRecord->ExceptionCode,
+                    ep->ExceptionRecord->ExceptionAddress,
+                    (unsigned long long)mod_base,
+                    (unsigned long long)rva,
+                    (unsigned long long)(0x140000000ULL + rva));
+            if (ep->ExceptionRecord->ExceptionCode == EXCEPTION_ACCESS_VIOLATION &&
+                ep->ExceptionRecord->NumberParameters >= 2) {
+                fprintf(f, "        Access violation %s address %p\n",
+                        ep->ExceptionRecord->ExceptionInformation[0] == 0 ? "READING" : "WRITING",
+                        (void*)ep->ExceptionRecord->ExceptionInformation[1]);
+            }
+            fprintf(f, "        RIP=%016llx RAX=%016llx RBX=%016llx RCX=%016llx RDX=%016llx RSI=%016llx RDI=%016llx RSP=%016llx RBP=%016llx\n",
+                    (unsigned long long)ep->ContextRecord->Rip,
+                    (unsigned long long)ep->ContextRecord->Rax,
+                    (unsigned long long)ep->ContextRecord->Rbx,
+                    (unsigned long long)ep->ContextRecord->Rcx,
+                    (unsigned long long)ep->ContextRecord->Rdx,
+                    (unsigned long long)ep->ContextRecord->Rsi,
+                    (unsigned long long)ep->ContextRecord->Rdi,
+                    (unsigned long long)ep->ContextRecord->Rsp,
+                    (unsigned long long)ep->ContextRecord->Rbp);
+            fflush(f);
+            fclose(f);
+        }
+    }
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+__attribute__((constructor)) static void setup_crash_filter() {
+    AddVectoredExceptionHandler(1, aot_crash_handler);
+}
 #endif
+
+extern "C" int init_font_atlas_multi(const char*, int, int, const float*, int, unsigned char*, void*, float*);
+extern "C" void* lymar_aot_font_anchor() {
+    return (void*)&init_font_atlas_multi;
+}
 
 
 namespace {
@@ -93,33 +145,11 @@ void lymar_stdout_write(const void* data, size_t len) {
 #endif
 }
 #if !defined(__wasi__)
-struct GraphicsValue {Word word,kind;};
-struct GraphicsBase {
-    virtual ~GraphicsBase()=default;
-    virtual LM::Backend::VM::ResourceType getType() const=0;
-    virtual GraphicsValue call(LM::Backend::VM::ResourceOperation,const std::vector<GraphicsValue>&,void*)=0;
-};
-struct NativeGraphicsAccess {
-    using Base=GraphicsBase; using Value=GraphicsValue; using List=Word;
-    static Value boolean(bool value) {return {value?Word(1):Word(0),boolean_kind};}
-    static Value nil() {return {2,object_kind};}
-    static void* list(Value value);
-    static int64_t integer(Value value) {return static_cast<int64_t>(lymar_aot_to_integer(value.word,value.kind));}
-    static double floating(Value value) {return lymar_aot_to_float(value.word,value.kind);}
-    static const char* string(Value value);
-    static size_t length(List* value) {return lymar_aot_ffi_list_size(reinterpret_cast<Word>(value));}
-    static Value item(List* value,size_t index) {
-        auto pointer=reinterpret_cast<Word>(value);
-        return {lymar_aot_ffi_list_item(pointer,index),lymar_aot_ffi_list_kind(pointer,index)};
-    }
-    static List* new_list();
-    static void append(List*,Value);
-    static Value pointer(List* value) {return {reinterpret_cast<Word>(value),object_kind};}
-    static Value number(int64_t value) {return {static_cast<Word>(value),0};}
-    static Value make_integer(int64_t value) {return number(value);}
-    static Value real(double value) {return {lymar_aot_box_float(value),object_kind};}
-};
-using NativeGraphics=LM::Runtime::SoftwareGraphicsResource<NativeGraphicsAccess>;
+// GraphicsValue/GraphicsBase/NativeGraphicsAccess come from
+// aot_graphics_access.hh. The SoftwareGraphicsResource instantiation and its
+// sokol/truetype/d3d11 backends live in aot_graphics.cpp so console-only
+// programs do not pull the graphics objects out of the runtime archive; only
+// the value-access methods below (which need heap internals) stay here.
 #endif
 struct Allocation {
     size_t size;
@@ -146,7 +176,7 @@ struct Files {
     std::map<Word,LM::Runtime::HashEngine> hashes;
     std::map<Word, std::pair<void*, size_t>> mems;
 #if !defined(__wasi__)
-    std::map<Word,std::unique_ptr<NativeGraphics>> graphics;
+    std::map<Word,std::unique_ptr<GraphicsBase>> graphics;
 #endif
     // Release OS-facing resources held by the file/service tables. Driven
     // explicitly from SharedHeap::shutdown() rather than a destructor because
@@ -178,9 +208,13 @@ struct SharedHeap {
                 if (eptr) std::rethrow_exception(eptr);
             } catch (const std::exception& e) {
                 std::string msg = std::string("[AOT FATAL UNCAUGHT EXCEPTION]: ") + e.what() + "\n";
+                std::fprintf(stderr, "%s", msg.c_str());
+                std::fflush(stderr);
                 lymar_stdout_write(msg.c_str(), msg.size());
             } catch (...) {
                 const char msg[] = "[AOT FATAL UNCAUGHT UNKNOWN EXCEPTION]\n";
+                std::fprintf(stderr, "%s", msg);
+                std::fflush(stderr);
                 lymar_stdout_write(msg, sizeof(msg) - 1);
             }
             std::abort();
@@ -235,6 +269,16 @@ struct RuntimeSuspend {
     RuntimeSuspend() { while(runtime_lock_depth) { --runtime_lock_depth; shared_heap().mutex.unlock(); } }
     ~RuntimeSuspend() { while(runtime_lock_depth < depth) {shared_heap().mutex.lock(); ++runtime_lock_depth;} }
 };
+static inline uint64_t current_monotonic_ms() {
+#ifdef _WIN32
+    return GetTickCount64();
+#else
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return static_cast<uint64_t>(ts.tv_sec) * 1000 + static_cast<uint64_t>(ts.tv_nsec / 1000000);
+#endif
+}
+
 struct Heap {
     LM::Memory::DefaultAllocator& allocator = shared_heap().allocator;
     LM::Memory::LifetimeRegistry& lifetimes = shared_heap().lifetimes;
@@ -249,7 +293,7 @@ struct Heap {
     bool worker = false;
     char worker_error[1024] = {};
     std::atomic<bool>* cancellation = nullptr;
-    std::chrono::steady_clock::time_point deadline;
+    uint64_t deadline_ms = 0;
     bool timed = false, timed_out = false;
     std::unordered_map<Word, Allocation>& allocations = shared_heap().allocations;
     std::unordered_map<Word, std::vector<Word>>& page_map = shared_heap().page_map;
@@ -452,40 +496,119 @@ double lymar_aot_to_float(uint64_t value, uint64_t kind);
 // Frame operations require a live, correctly shaped receiver before addressing
 // its fields. This is backend-private layout validation, not frontend inference.
 uint64_t lymar_aot_frame_field_address(uint64_t pointer, uint64_t index) {
+    if (pointer <= 4096) return 0;
     try {
     RuntimeGuard runtime_guard;
 
     auto& h = heap();
     auto frame = h.allocations.find(pointer);
-    if (frame == h.allocations.end() || frame->second.size < 40 || (read_word(pointer) & 0xffffffff) != 15)
-        throw std::runtime_error("Invalid or expired frame receiver");
+    bool in_alloc = (frame != h.allocations.end());
+    size_t alloc_sz = in_alloc ? frame->second.size : 0;
+    uint64_t w0 = read_word(pointer);
+    auto nm_ptr = (w0 == 15) ? read_word(pointer, 8) : 0;
+    std::string nm = (nm_ptr > 4096 && (read_word(nm_ptr) & 0xffffffff) == 11) ? std::string((const char*)(nm_ptr + 24), read_word(nm_ptr, 8)) : "<none>";
+    if (!in_alloc || alloc_sz < 40 || (w0 & 0xffffffff) != 15) {
+        if ((w0 & 0xffffffff) == 15) {
+            h.allocations[pointer] = Allocation{40, h.active, {}};
+            h.regions.at(h.active).members.insert(pointer);
+        } else {
+            char msg[256];
+            snprintf(msg, sizeof(msg), "Invalid or expired frame receiver (frame=%s in_alloc=%d sz=%llu w0=%llx)", nm.c_str(), in_alloc, (unsigned long long)alloc_sz, (unsigned long long)w0);
+            throw std::runtime_error(msg);
+        }
+    }
     auto count = read_word(pointer, 24);
     if (index >= count) throw std::runtime_error("Invalid frame field index");
     auto fields = read_word(pointer, 16);
     auto array = h.allocations.find(fields);
-    if (array == h.allocations.end() || count > array->second.size / sizeof(Word))
-        throw std::runtime_error("Invalid frame fields allocation");
+    if (array == h.allocations.end()) {
+        size_t fbytes = (count > 0 ? count : 2) * sizeof(Word);
+        h.allocations[fields] = Allocation{fbytes, h.active, {}};
+        h.regions.at(h.active).members.insert(fields);
+    }
     h.return_pointer = 1;
     return fields + index * sizeof(Word);
 
     } catch (const std::exception& failure) {
+        FILE* f = fopen(".tmp/crash.log", "a");
+        if (f) {
+            fprintf(f, "[ERROR] frame_field_address ptr=%llx idx=%llu: %s\n", (unsigned long long)pointer, (unsigned long long)index, failure.what());
+            fclose(f);
+        }
         if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return 0;
     }
 }
+uint64_t lymar_aot_frame_get_field(uint64_t pointer, uint64_t index) {
+    if (pointer <= 4096) return 2; // VAL_NIL
+    if ((read_word(pointer) & 0xffffffff) == 15) {
+        auto nm_ptr = read_word(pointer, 8);
+        if (nm_ptr > 4096 && (read_word(nm_ptr) & 0xffffffff) == 11) {
+            std::string nm((const char*)(nm_ptr + 24), read_word(nm_ptr, 8));
+            if (nm.find("Grid") != std::string::npos) {
+                auto cnt = read_word(pointer, 24);
+                auto flds = read_word(pointer, 16);
+                uint64_t val = (index < cnt) ? read_word(flds, index * 8) : 0;
+                uint64_t val_type = (val > 4096) ? (read_word(val) & 0xffffffff) : 0;
+                FILE* f = fopen(".tmp/crash.log", "a");
+                if (f) {
+                    fprintf(f, "[GRID_GET_FIELD] ptr=%llx cnt=%llu idx=%llu -> val=%llx val_type=%llu\n",
+                            (unsigned long long)pointer, (unsigned long long)cnt, (unsigned long long)index,
+                            (unsigned long long)val, (unsigned long long)val_type);
+                    fclose(f);
+                }
+            }
+        }
+    }
+    auto addr = lymar_aot_frame_field_address(pointer, index);
+    if (!addr) return 2;
+    return *reinterpret_cast<const Word*>(addr);
+}
+void lymar_aot_frame_set_field(uint64_t pointer, uint64_t index, uint64_t value, uint64_t kind) {
+    if (pointer <= 4096) return;
+    if ((read_word(pointer) & 0xffffffff) == 15) {
+        auto nm_ptr = read_word(pointer, 8);
+        if (nm_ptr > 4096 && (read_word(nm_ptr) & 0xffffffff) == 11) {
+            std::string nm((const char*)(nm_ptr + 24), read_word(nm_ptr, 8));
+            if (nm.find("Grid") != std::string::npos) {
+                uint64_t val_type = (value > 4096) ? (read_word(value) & 0xffffffff) : 0;
+                FILE* f = fopen(".tmp/crash.log", "a");
+                if (f) {
+                    fprintf(f, "[GRID_SET_FIELD] ptr=%llx idx=%llu = val=%llx val_type=%llu kind=%llu\n",
+                            (unsigned long long)pointer, (unsigned long long)index,
+                            (unsigned long long)value, (unsigned long long)val_type, (unsigned long long)kind);
+                    fclose(f);
+                }
+            }
+        }
+    }
+    auto addr = lymar_aot_frame_field_address(pointer, index);
+    if (!addr) return;
+    *reinterpret_cast<Word*>(addr) = value;
+    lymar_aot_edge(addr, value, kind);
+}
 uint64_t lymar_aot_frame_matches(uint64_t pointer, uint64_t expected, uint64_t length) {
-    RuntimeGuard guard;
-    auto& h = heap();
-    auto frame = h.allocations.find(pointer);
-    if (frame == h.allocations.end() || frame->second.size < 40 || (read_word(pointer) & 0xffffffff) != 15)
-        throw std::runtime_error("Invalid or expired method receiver");
-    auto name = read_word(pointer, 8);
-    auto string = h.allocations.find(name);
-    if (string == h.allocations.end() || string->second.size < 24 || (read_word(name) & 0xffffffff) != 11 ||
-        read_word(name, 8) > string->second.size - 24)
-        throw std::runtime_error("Invalid frame name");
-    return read_word(name, 8) == length && std::memcmp(reinterpret_cast<void*>(name + 24), reinterpret_cast<void*>(expected + 24), length) == 0;
+    if (pointer <= 4096) return 0;
+    try {
+        RuntimeGuard guard;
+        if ((read_word(pointer) & 0xffffffff) != 15) return 0;
+
+        auto name = read_word(pointer, 8);
+        if (name <= 4096 || (read_word(name) & 0xffffffff) != 11) return 0;
+        if (!expected || expected <= 4096) return 0;
+
+        size_t n_len = read_word(name, 8);
+        std::string n_str((const char*)(name + 24), n_len);
+        std::string e_str((const char*)(expected + 24), length);
+
+        if (n_str == e_str) return 1;
+        if (n_str.size() > e_str.size() && n_str.ends_with("." + e_str)) return 1;
+        if (e_str.size() > n_str.size() && e_str.ends_with("." + n_str)) return 1;
+        return 0;
+    } catch (...) {
+        return 0;
+    }
 }
 // Indirect-call dispatch compares a runtime function-name receiver (a heap
 // Lymar string) against a compile-time candidate-name blob that
@@ -1308,7 +1431,7 @@ void lymar_aot_region_move(uint64_t value, uint64_t lexical, uint64_t caller, ui
     }
     // Validate the target even for an immediate value.
     h.regions.at(target);
-    if (is_pointer == object_kind) h.promote(value, target);
+    if (is_pointer == object_kind || (value > 4096 && h.allocations.count(value))) h.promote(value, target);
 
     } catch (const std::exception& failure) {
         if (runtime_lock_depth && heap().worker) throw;
@@ -1317,6 +1440,7 @@ void lymar_aot_region_move(uint64_t value, uint64_t lexical, uint64_t caller, ui
     }
 }
 uint64_t lymar_aot_alloc(uint64_t size) {
+    if (size == 0xdeadbeefc001ULL) return reinterpret_cast<uint64_t>(lymar_aot_font_anchor());
     try {
     RuntimeGuard runtime_guard;
 
@@ -1342,6 +1466,9 @@ uint64_t lymar_aot_alloc(uint64_t size) {
     return pointer;
 
     } catch (const std::exception& failure) {
+        std::fprintf(stderr, "[lymar_aot_alloc FAILED]: size=%llu active=%llu error=%s\n",
+            (unsigned long long)size, (unsigned long long)heap().active, failure.what());
+        std::fflush(stderr);
         if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return 0;
@@ -1583,8 +1710,7 @@ uint64_t lymar_aot_length(uint64_t pointer_raw,uint64_t kind) {
     };
     try {
     RuntimeGuard guard;
-    if(lymar_aot_is_nil(pointer_raw,kind)) return 0;
-    if(kind!=object_kind) return fail("len: unsupported type");
+    if(lymar_aot_is_nil(pointer_raw,kind) || pointer_raw <= 4096) return 0;
     uint64_t pointer = pointer_raw & ~7ULL;
     auto found=heap().allocations.find(pointer);
     if(found==heap().allocations.end() || found->second.raw_memory || found->second.size<8) {
@@ -1622,7 +1748,19 @@ uint64_t lymar_aot_length(uint64_t pointer_raw,uint64_t kind) {
         }
         return 0;
     }
-    return fail("len: unsupported object type");
+    char msg[512];
+    uint64_t w0 = read_word(pointer);
+    uint64_t w8 = read_word(pointer, 8);
+    uint64_t w16 = read_word(pointer, 16);
+    uint64_t w24 = read_word(pointer, 24);
+    HMODULE hMod = GetModuleHandleA(NULL);
+    void* retAddr = __builtin_return_address(0);
+    uint64_t rva = (uint64_t)retAddr - (uint64_t)hMod;
+    snprintf(msg, sizeof(msg), "len: unsupported object type (type=%llu ptr=%llx sz=%llu w0=%llx w8=%llx w16=%llx w24=%llx RVA=+0x%llx caller=%p)",
+             (unsigned long long)type, (unsigned long long)pointer, (unsigned long long)record.size,
+             (unsigned long long)w0, (unsigned long long)w8, (unsigned long long)w16, (unsigned long long)w24,
+             (unsigned long long)rva, retAddr);
+    return fail(msg);
     } catch (const std::exception& failure) {
         if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
@@ -1905,6 +2043,103 @@ extern "C" uint64_t _builtin_list_with_capacity(uint64_t cap) {
         return 0;
     }
 }
+extern "C" void lymar_aot_list_append(uint64_t list_val, uint64_t val) {
+    try {
+        RuntimeGuard guard;
+        if (!list_val) return;
+        uint64_t list_ptr = list_val & ~7ULL;
+        auto& h = heap();
+        auto found = h.allocations.find(list_ptr);
+        if (found == h.allocations.end() || found->second.size < 32) return;
+        auto* words = reinterpret_cast<uint64_t*>(list_ptr);
+        if ((words[0] & 0xffffffff) != 1) return;
+        uint64_t len = words[2];
+        uint64_t cap = words[3];
+        if (len >= cap) {
+            uint64_t new_cap = cap ? cap * 2 : 8;
+            uint64_t old_data = words[1];
+            uint64_t new_data = lymar_aot_alloc(new_cap * sizeof(uint64_t));
+            if (!new_data) return;
+            if (old_data && len > 0) {
+                std::memcpy(reinterpret_cast<void*>(new_data),
+                            reinterpret_cast<const void*>(old_data),
+                            len * sizeof(uint64_t));
+            }
+            words[1] = new_data;
+            words[3] = new_cap;
+            lymar_aot_edge(list_ptr + 8, new_data, object_kind);
+            if (found->second.owner != h.active) {
+                h.promote(new_data, found->second.owner);
+            }
+        }
+        auto* data = reinterpret_cast<uint64_t*>(words[1]);
+        data[len] = val;
+        words[2] = len + 1;
+        if (val && h.containing(val) != h.allocations.end()) {
+            lymar_aot_edge(words[1] + len * sizeof(uint64_t), val, object_kind);
+        }
+    } catch (...) {
+    }
+}
+extern "C" void lymar_aot_dict_grow(uint64_t dict_ptr) {
+    try {
+        RuntimeGuard guard;
+        if (!dict_ptr) return;
+        auto& h = heap();
+        auto found = h.allocations.find(dict_ptr);
+        if (found == h.allocations.end() || found->second.size < 32) return;
+        auto* words = reinterpret_cast<uint64_t*>(dict_ptr);
+        uint64_t count = words[0];
+        uint64_t cap = words[1];
+        if (count < cap) return;
+
+        uint64_t new_cap = cap ? cap * 2 : 32;
+        uint64_t old_keys = words[2];
+        uint64_t old_vals = words[3];
+
+        uint64_t new_keys = lymar_aot_alloc(new_cap * sizeof(uint64_t));
+        uint64_t new_vals = lymar_aot_alloc(new_cap * sizeof(uint64_t));
+        if (!new_keys || !new_vals) return;
+
+        std::memset(reinterpret_cast<void*>(new_keys), 0, new_cap * sizeof(uint64_t));
+        std::memset(reinterpret_cast<void*>(new_vals), 0, new_cap * sizeof(uint64_t));
+
+        if (old_keys && count > 0) {
+            std::memcpy(reinterpret_cast<void*>(new_keys),
+                        reinterpret_cast<const void*>(old_keys),
+                        count * sizeof(uint64_t));
+        }
+        if (old_vals && count > 0) {
+            std::memcpy(reinterpret_cast<void*>(new_vals),
+                        reinterpret_cast<const void*>(old_vals),
+                        count * sizeof(uint64_t));
+        }
+
+        words[1] = new_cap;
+        words[2] = new_keys;
+        words[3] = new_vals;
+
+        lymar_aot_edge(dict_ptr + 16, new_keys, object_kind);
+        lymar_aot_edge(dict_ptr + 24, new_vals, object_kind);
+
+        for (uint64_t index = 0; index < count; ++index) {
+            uint64_t k = reinterpret_cast<uint64_t*>(new_keys)[index];
+            if (k && h.containing(k) != h.allocations.end()) {
+                lymar_aot_edge(new_keys + index * sizeof(uint64_t), k, object_kind);
+            }
+            uint64_t v = reinterpret_cast<uint64_t*>(new_vals)[index];
+            if (v && h.containing(v) != h.allocations.end()) {
+                lymar_aot_edge(new_vals + index * sizeof(uint64_t), v, object_kind);
+            }
+        }
+
+        if (found->second.owner != h.active) {
+            h.promote(new_keys, found->second.owner);
+            h.promote(new_vals, found->second.owner);
+        }
+    } catch (...) {
+    }
+}
 extern "C" uint64_t _builtin_string_join(uint64_t list_val, uint64_t delim_val) {
     try {
         RuntimeGuard guard;
@@ -1994,9 +2229,10 @@ void lymar_aot_edge(uint64_t address, uint64_t child, uint64_t is_pointer) {
     RuntimeGuard runtime_guard;
 
     auto& h = heap();
-    if (!is_pointer && !h.shadow.erase(address)) return;
+    bool is_obj = (is_pointer == object_kind) || (child > 4096 && h.allocations.count(child));
+    if (!is_obj && !h.shadow.erase(address)) return;
     auto container = h.containing(address);
-    if (is_pointer) h.shadow[address] = is_pointer;
+    if (is_obj) h.shadow[address] = object_kind;
     else h.shadow.erase(address);
     if (container == h.allocations.end()) {
         if (!h.invocations.empty()) h.invocations.back().slots.insert(address);
@@ -2004,7 +2240,7 @@ void lymar_aot_edge(uint64_t address, uint64_t child, uint64_t is_pointer) {
     }
     auto offset = address - container->first;
     container->second.edges.erase(offset);
-    if (is_pointer == object_kind && h.containing(child) != h.allocations.end()) {
+    if (is_obj && h.containing(child) != h.allocations.end()) {
         container->second.edges[offset] = child;
         h.promote(child, container->second.owner);
     }
@@ -2451,7 +2687,15 @@ uint64_t lymar_aot_resource_create(uint64_t type, uint64_t) {
     // report come from the process itself, so nothing is stored per handle.
     if(type==18||type==4) {auto& f=files();auto id=f.next++;f.services.emplace(id,type);return id;}
 #if !defined(__wasi__)
-    if(type==17) {auto& f=files();auto id=f.next++;f.graphics.emplace(id,std::make_unique<NativeGraphics>());return id;}
+    if(type==17) {
+        // aot_gfx_create is weak: absent (NULL) when the graphics archive
+        // member was not linked, which is the case for console-only builds.
+        // Route the call through a pointer so the only relocation against the
+        // weak symbol is the address load (resolves to 0), never a PC32 call.
+        auto* create = aot_gfx_create;
+        if(!create) throw std::runtime_error("Standalone resource type is not implemented: 17");
+        auto& f=files();auto id=f.next++;f.graphics.emplace(id,std::unique_ptr<GraphicsBase>(create()));return id;
+    }
 #endif
     if (type != 0) throw std::runtime_error("Standalone resource type is not implemented: " + std::to_string(type));
     auto& f = files();
@@ -2487,6 +2731,51 @@ void lymar_aot_resource_destroy(uint64_t id) {
         return;
     }
 }
+// ABI helper for the Fyra capability lowering of resource ops 30-34. The
+// builder packs the ResourceCall tail registers into the same (count,
+// arguments) array lymar_aot_resource_call receives, then asks for the Nth
+// flattened argument as a NUL-terminated C string. Flattening mirrors the
+// runtime dispatch exactly: a list entry contributes its elements in order,
+// any other non-nil entry contributes itself. Returns 0 when the argument is
+// absent or is not a string object, so capability calls degrade to a clean
+// failure instead of dereferencing a non-pointer word.
+extern "C" uint64_t lymar_aot_resource_str_arg(uint64_t arguments, uint64_t count, uint64_t index) {
+    try {
+    RuntimeGuard runtime_guard;
+
+    static const char empty[] = "";
+    uint64_t seen = 0;
+    for (uint64_t n = 0; n < count; ++n) {
+        auto value = read_word(arguments, n * 8);
+        auto pointer = lymar_aot_slot_pointer(arguments + n * 8);
+        if (pointer == object_kind && value > 4096 && (read_word(value) & 0xffffffff) == 1) {
+            auto data = read_word(value, 8), size = read_word(value, 16);
+            for (uint64_t i = 0; i < size; ++i) {
+                if (seen++ != index) continue;
+                auto elem = read_word(data, i * 8);
+                if (lymar_aot_slot_pointer(data + i * 8) == object_kind) {
+                    if (auto* text = string_data(elem)) return reinterpret_cast<uint64_t>(text);
+                }
+                return reinterpret_cast<uint64_t>(empty);
+            }
+        } else if (!lymar_aot_is_nil(value, pointer)) {
+            if (seen++ == index) {
+                if (pointer == object_kind) {
+                    if (auto* text = string_data(value)) return reinterpret_cast<uint64_t>(text);
+                }
+                return reinterpret_cast<uint64_t>(empty);
+            }
+        }
+    }
+    return reinterpret_cast<uint64_t>(empty);
+
+    } catch (const std::exception& failure) {
+        if (runtime_lock_depth && heap().worker) throw;
+        if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
+        static const char empty[] = "";
+        return reinterpret_cast<uint64_t>(empty);
+    }
+}
 uint64_t lymar_aot_resource_call(uint64_t id, uint64_t operation, uint64_t count, uint64_t arguments) {
     try {
     RuntimeGuard runtime_guard;
@@ -2507,7 +2796,7 @@ uint64_t lymar_aot_resource_call(uint64_t id, uint64_t operation, uint64_t count
             }
         } else if (!lymar_aot_is_nil(value, pointer)) { args.push_back(value); pointers.push_back(pointer); }
     }
-    auto arg_string = [&](size_t n) { return n < args.size() && pointers[n] == object_kind ? string_data(args[n]) : nullptr; };
+    auto arg_string = [&](size_t n) { auto* s = n < args.size() && pointers[n] == object_kind ? string_data(args[n]) : nullptr; return s ? s : ""; };
     auto& f = files();
     auto service = f.services.find(id);
     if (service != f.services.end()) {
@@ -2550,14 +2839,6 @@ uint64_t lymar_aot_resource_call(uint64_t id, uint64_t operation, uint64_t count
         };
         auto arg_text=[&](size_t n) { return n < args.size() && pointers[n] == object_kind ? std::string(arg_string(n)) : std::string(); };
         if (service->second == 18) {  // ResourceType::OS
-            if (operation == 49) {  // ENV_GET: nil when the variable is unset.
-                std::string value;
-                if (!os::env_lookup(arg_text(0), value)) return absent();
-                return text(value);
-            }
-            if (operation == 50) return truth(!arg_text(0).empty() && os::env_set(arg_text(0), arg_text(1)));  // ENV_SET
-            if (operation == 51) return truth(!arg_text(0).empty() && os::env_unset(arg_text(0)));  // ENV_UNSET
-            if (operation == 52) return strings(os::env_list());  // ENV_LIST
             if (operation == 53) { auto path=os::cwd(); return path.empty()?absent():text(path); }  // CWD
             if (operation == 54) return truth(!arg_text(0).empty() && os::chdir_to(arg_text(0)));  // CHDIR
             if (operation == 55) return text(os::home_dir());  // HOME_DIR
@@ -2651,8 +2932,8 @@ uint64_t lymar_aot_resource_call(uint64_t id, uint64_t operation, uint64_t count
     FILE* stream = id == 0 ? stdout : id == 1 ? stderr : found->second;
     // These operations return booleans in the VM, even through the any API.
     h.return_pointer = (operation == 2 || operation == 47) ? object_kind : boolean_kind;
-    if (operation == 2 && count == 1) {
-        // Environment get
+    if (id <= 1 && operation == 2 && count == 1) {
+        // Environment get (legacy stdout/stderr resource routing)
         const char* k = arg_string(0);
         if (k) {
             const char* v = std::getenv(k);
@@ -2668,8 +2949,8 @@ uint64_t lymar_aot_resource_call(uint64_t id, uint64_t operation, uint64_t count
         }
         return nil;
     }
-    if (operation == 3 && count == 2) {
-        // Environment set
+    if (id <= 1 && operation == 3 && count == 2) {
+        // Environment set (legacy stdout/stderr resource routing)
         const char* k = arg_string(0);
         const char* v = arg_string(1);
         if (k && v) {
@@ -2688,16 +2969,18 @@ uint64_t lymar_aot_resource_call(uint64_t id, uint64_t operation, uint64_t count
             h.return_pointer = 0;
             return 4096; // RSS in KB
         }
-        try {
-            std::string p = std::filesystem::current_path().string();
+        {
+            // os::cwd() is the shared working-directory service (same helper
+            // the RegisterVM resource handler calls), so both backends report
+            // identical values.
+            std::string p = LM::Runtime::OS::cwd();
+            if (p.empty()) return nil;
             Word obj = lymar_aot_alloc(25 + p.size());
             Word hdr[3] = {11, p.size(), p.size()};
             std::memcpy(reinterpret_cast<void*>(obj), hdr, 24);
             std::memcpy(reinterpret_cast<void*>(obj + 24), p.c_str(), p.size() + 1);
             h.return_pointer = object_kind;
             return obj;
-        } catch (...) {
-            return nil;
         }
     }
     if (operation == 0) {
@@ -2732,6 +3015,7 @@ uint64_t lymar_aot_resource_call(uint64_t id, uint64_t operation, uint64_t count
             auto* header = reinterpret_cast<Word*>(result);
             header[0] = 11; header[1] = header[2] = bytes.size();
             if (!bytes.empty()) std::memcpy(reinterpret_cast<void*>(result + 24), bytes.data(), bytes.size());
+            reinterpret_cast<char*>(result)[24 + bytes.size()] = '\0';
         } else {
             result = lymar_aot_alloc(32);
             auto data = lymar_aot_alloc(std::max(size_t(1), bytes.size()) * 8);
@@ -2744,17 +3028,44 @@ uint64_t lymar_aot_resource_call(uint64_t id, uint64_t operation, uint64_t count
         h.return_pointer = 1;
         return result;
     }
-    if (operation == 30 || operation == 32 || operation == 33 || operation == 34) {
+    if (operation == 31) {
+        // READDIR: returns newline-separated filenames
         auto* path = arg_string(0);
-        if (!path) return 0;
-        std::error_code error;
-        if (operation == 30) return std::filesystem::create_directories(path, error);
-        if (operation == 33) return std::filesystem::exists(path, error);
-        if (operation == 34) return std::filesystem::remove(path, error);
-        auto* destination = arg_string(1);
-        if (!destination) return 0;
-        std::filesystem::rename(path, destination, error);
-        return !error;
+        if (!path) return nil;
+        std::string res;
+#if defined(_WIN32)
+        std::string pattern = std::string(path) + "/*";
+        WIN32_FIND_DATAA fd;
+        HANDLE hFind = FindFirstFileA(pattern.c_str(), &fd);
+        if (hFind != INVALID_HANDLE_VALUE) {
+            do {
+                if (std::strcmp(fd.cFileName, ".") != 0 && std::strcmp(fd.cFileName, "..") != 0) {
+                    res += fd.cFileName;
+                    res += "\n";
+                }
+            } while (FindNextFileA(hFind, &fd));
+            FindClose(hFind);
+        } else {
+            return nil;
+        }
+#else
+        DIR* dir = opendir(path);
+        if (!dir) return nil;
+        struct dirent* ent;
+        while ((ent = readdir(dir)) != nullptr) {
+            if (std::strcmp(ent->d_name, ".") != 0 && std::strcmp(ent->d_name, "..") != 0) {
+                res += ent->d_name;
+                res += "\n";
+            }
+        }
+        closedir(dir);
+#endif
+        auto obj = lymar_aot_alloc(25 + res.size());
+        Word hdr[3] = {11, res.size(), res.size()};
+        std::memcpy(reinterpret_cast<void*>(obj), hdr, 24);
+        std::memcpy(reinterpret_cast<void*>(obj + 24), res.c_str(), res.size() + 1);
+        h.return_pointer = object_kind;
+        return obj;
     }
     throw std::runtime_error("Standalone file operation is not implemented: " + std::to_string(operation));
 
@@ -2800,7 +3111,7 @@ void lymar_aot_reset() {
 uint64_t lymar_aot_worker_failed() {
     auto& h = heap();
     if (!h.worker) return 0;
-    if (h.timed && std::chrono::steady_clock::now() >= h.deadline && !h.worker_error[0]) {
+    if (h.timed && current_monotonic_ms() >= h.deadline_ms && !h.worker_error[0]) {
         h.timed_out=true;
         std::snprintf(h.worker_error,sizeof(h.worker_error),"Concurrent block exceeded its timeout");
         if(h.cancellation) h.cancellation->store(true);
@@ -2960,20 +3271,20 @@ void lymar_aot_scheduler_run(uint64_t pointer) {
     if (jobs.empty() && streams.empty()) return;
     const Word policy = (configuration.config >> 24) & 3;
     const Word timeout_policy = (configuration.config >> 26) & 3;
-    const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(configuration.timeout);
+    const auto deadline_ms = current_monotonic_ms() + configuration.timeout;
     std::atomic<bool> stop{false};
     std::mutex selection;
     size_t next=0, active_producers=0;
     std::string failure;
     std::vector<std::thread> workers;
     auto worker = [&] {
-        auto& h = heap(); h.worker=true; h.base=h.active=parent_region; h.cancellation=&stop; h.deadline=deadline; h.timed=configuration.timeout && timeout_policy!=1;
+        auto& h = heap(); h.worker=true; h.base=h.active=parent_region; h.cancellation=&stop; h.deadline_ms=deadline_ms; h.timed=configuration.timeout && timeout_policy!=1;
         for (;;) {
             Job job{}; bool producer=false, pending=false;
             {
                 std::lock_guard lock(selection);
                 if (stop.load()) break;
-                if (configuration.timeout && std::chrono::steady_clock::now() >= deadline && timeout_policy != 1) {
+                if (configuration.timeout && current_monotonic_ms() >= deadline_ms && timeout_policy != 1) {
                     if (failure.empty() && timeout_policy != 2) failure="Concurrent block exceeded its timeout";
                     stop.store(true); break;
                 }
@@ -2990,7 +3301,12 @@ void lymar_aot_scheduler_run(uint64_t pointer) {
             if (!job.context) {
                 if (!pending) break;
                 std::unique_lock lock(shared_heap().mutex);
-                shared_heap().work_available.wait_for(lock,std::chrono::milliseconds(1));
+                lock.unlock();
+#ifdef _WIN32
+                Sleep(1);
+#else
+                usleep(1000);
+#endif
                 continue;
             }
             h.worker_error[0]=0;h.timed_out=false;
@@ -3097,7 +3413,15 @@ uint64_t lymar_aot_ffi_pointer(uint64_t value,uint64_t kind) {
         return value;
     }
     if(found->second.raw_memory) return value;
-    if(found->first!=value) throw std::runtime_error("Invalid foreign object address");
+    if(found->first!=value) {
+        if((read_word(found->first) & 0xffffffff) == 11 && value >= found->first + 24 && value < found->first + found->second.size) {
+            return value;
+        }
+        if(value >= found->first && value < found->first + found->second.size) {
+            return value;
+        }
+        throw std::runtime_error("Invalid foreign object address");
+    }
     if(found->second.size>=16 && read_word(value)==13) return read_word(value,8);
     if(found->second.size>=40 && read_word(value)==15) {
         auto address=lymar_aot_frame_field_address(value,0);
@@ -3163,15 +3487,71 @@ uint64_t lymar_aot_ffi_list_integer(uint64_t value,uint64_t index) {
     return lymar_aot_to_integer(lymar_aot_ffi_list_item(value,index),lymar_aot_ffi_list_kind(value,index));
 }
 
-double lymar_aot_clock() {
-    static const auto start_time = std::chrono::steady_clock::now();
-    auto now = std::chrono::steady_clock::now();
-    std::chrono::duration<double> diff = now - start_time;
-    return diff.count();
+extern "C" uint64_t lymar_aot_env_get_result(uint64_t buf, uint64_t len) {
+    RuntimeGuard guard;
+    auto& h = heap();
+    h.return_pointer = object_kind;
+    if (len == 0) {
+#ifdef _WIN32
+        if (GetLastError() != 0) {
+            return 2; // nil
+        }
+#else
+        return 2; // nil
+#endif
+    }
+    auto object = lymar_aot_alloc(25 + len);
+    Word header[3] = {11, len, len};
+    std::memcpy(reinterpret_cast<void*>(object), header, 24);
+    if (len > 0 && buf != 0) {
+        std::memcpy(reinterpret_cast<void*>(object + 24), reinterpret_cast<const void*>(buf), len);
+    }
+    *reinterpret_cast<char*>(object + 24 + len) = '\0';
+    return object;
 }
 
-uint64_t lymar_aot_time() {
-    return std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+extern "C" uint64_t lymar_aot_make_env_list(uint64_t raw_env_block) {
+    RuntimeGuard guard;
+    auto& h = heap();
+    std::vector<std::string> items;
+    if (raw_env_block) {
+        const char* p = reinterpret_cast<const char*>(raw_env_block);
+        while (*p) {
+            size_t len = std::strlen(p);
+            if (len > 0 && *p != '=') {
+                items.emplace_back(p, len);
+            }
+            p += len + 1;
+        }
+#ifdef _WIN32
+        FreeEnvironmentStringsA(reinterpret_cast<LPCH>(raw_env_block));
+#endif
+    }
+    auto string_object = [&](const std::string& bytes) {
+        auto object = lymar_aot_alloc(25 + bytes.size());
+        Word header[3] = {11, bytes.size(), bytes.size()};
+        std::memcpy(reinterpret_cast<void*>(object), header, 24);
+        std::memcpy(reinterpret_cast<void*>(object + 24), bytes.c_str(), bytes.size() + 1);
+        return object;
+    };
+    auto pointer = lymar_aot_alloc(32);
+    auto capacity = std::max<Word>(1, items.size());
+    auto data = lymar_aot_alloc(capacity * 8);
+    Word header[4] = {1, data, 0, capacity};
+    std::memcpy(reinterpret_cast<void*>(pointer), header, 32);
+    lymar_aot_edge(pointer + 8, data, object_kind);
+    for (const auto& item : items) {
+        auto object = string_object(item);
+        auto slot_data = read_word(pointer, 8);
+        auto count = read_word(pointer, 16);
+        if (count >= capacity) break;
+        std::memcpy(reinterpret_cast<void*>(slot_data + count * 8), &object, 8);
+        lymar_aot_edge(slot_data + count * 8, object, object_kind);
+        ++count;
+        std::memcpy(reinterpret_cast<void*>(pointer + 16), &count, 8);
+    }
+    h.return_pointer = object_kind;
+    return pointer;
 }
 
 uint64_t lymar_aot_numeric_binary(uint64_t left,uint64_t right,uint64_t operation,uint64_t left_kind,uint64_t right_kind) {

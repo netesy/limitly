@@ -5,10 +5,18 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef __cplusplus
+#ifdef _WIN32
+#define EXPORT extern "C" __declspec(dllexport)
+#else
+#define EXPORT extern "C"
+#endif
+#else
 #ifdef _WIN32
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT
+#endif
 #endif
 
 // Generic loading & query
@@ -532,4 +540,244 @@ EXPORT int detect_system_font_path(const char* preferred_name, char* out_path, i
     }
 
     return 0;
+}
+
+typedef struct {
+    float x0, y0, x1, y1;
+    float u0, v0, u1, v1;
+    float xadvance;
+} AtlasGlyph;
+
+typedef struct {
+    float x, y;
+    float u, v;
+    float r, g, b, a;
+    float p0, p1, p2, p3;
+} Vertex48;
+
+EXPORT int init_font_atlas_multi(const char* preferred_font,
+                                 int atlas_w, int atlas_h,
+                                 const float* font_sizes, int num_sizes,
+                                 unsigned char* out_rgba,
+                                 AtlasGlyph* out_all_glyphs,
+                                 float* out_metrics) {
+    if (!out_rgba || !out_all_glyphs || !font_sizes || num_sizes <= 0 || atlas_w < 64 || atlas_h < 64)
+        return 0;
+
+    char resolved_path[512];
+    resolved_path[0] = '\0';
+    if (preferred_font && preferred_font[0] != '\0') {
+        FILE* tf = fopen(preferred_font, "rb");
+        if (tf) {
+            fclose(tf);
+            strncpy(resolved_path, preferred_font, sizeof(resolved_path) - 1);
+            resolved_path[sizeof(resolved_path) - 1] = '\0';
+        }
+    }
+    if (resolved_path[0] == '\0') {
+        if (!detect_system_font_path(preferred_font, resolved_path, sizeof(resolved_path))) {
+            return 0;
+        }
+    }
+
+    FILE* f = fopen(resolved_path, "rb");
+    if (!f) return 0;
+    fseek(f, 0, SEEK_END);
+    long sz = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    if (sz <= 0) { fclose(f); return 0; }
+    unsigned char* data = (unsigned char*)malloc(sz);
+    if (!data) { fclose(f); return 0; }
+    if (fread(data, 1, sz, f) != (size_t)sz) {
+        free(data); fclose(f); return 0;
+    }
+    fclose(f);
+
+    stbtt_fontinfo info;
+    if (!stbtt_InitFont(&info, data, 0)) {
+        free(data); return 0;
+    }
+
+    int va, vd, vg;
+    stbtt_GetFontVMetrics(&info, &va, &vd, &vg);
+
+    for (int i = 0; i < num_sizes; i++) {
+        float sc = stbtt_ScaleForPixelHeight(&info, font_sizes[i]);
+        float asc = va * sc;
+        float desc = vd * sc;
+        float lh = (va - vd + vg) * sc;
+        if (lh < font_sizes[i]) lh = font_sizes[i];
+        if (out_metrics) {
+            out_metrics[i * 3 + 0] = asc;
+            out_metrics[i * 3 + 1] = desc;
+            out_metrics[i * 3 + 2] = lh;
+        }
+    }
+
+    unsigned char* alpha = (unsigned char*)calloc(atlas_w * atlas_h, 1);
+    if (!alpha) { free(data); return 0; }
+
+    int reserved_rows = 8;
+    stbtt_pack_context spc;
+    if (!stbtt_PackBegin(&spc, alpha + atlas_w * reserved_rows, atlas_w, atlas_h - reserved_rows, atlas_w, 1, NULL)) {
+        free(alpha); free(data); return 0;
+    }
+    stbtt_PackSetOversampling(&spc, 2, 2);
+
+    stbtt_packedchar** cdata = (stbtt_packedchar**)malloc(sizeof(stbtt_packedchar*) * num_sizes);
+    stbtt_pack_range* ranges = (stbtt_pack_range*)malloc(sizeof(stbtt_pack_range) * num_sizes);
+    for (int i = 0; i < num_sizes; i++) {
+        cdata[i] = (stbtt_packedchar*)malloc(sizeof(stbtt_packedchar) * 96);
+        ranges[i].font_size = font_sizes[i];
+        ranges[i].first_unicode_codepoint_in_range = 32;
+        ranges[i].array_of_unicode_codepoints = NULL;
+        ranges[i].num_chars = 96;
+        ranges[i].chardata_for_range = cdata[i];
+    }
+
+    int ok = stbtt_PackFontRanges(&spc, data, 0, ranges, num_sizes);
+    stbtt_PackEnd(&spc);
+    free(data);
+
+    if (!ok) {
+        for (int i = 0; i < num_sizes; i++) free(cdata[i]);
+        free(cdata); free(ranges); free(alpha); return 0;
+    }
+
+    // Reserve top 8x8 white block
+    for (int y = 0; y < 8; y++) {
+        for (int x = 0; x < 8; x++) {
+            alpha[y * atlas_w + x] = 255;
+        }
+    }
+
+    // Convert alpha to RGBA8
+    int total_pixels = atlas_w * atlas_h;
+    for (int i = 0; i < total_pixels; i++) {
+        unsigned char a = alpha[i];
+        out_rgba[i * 4 + 0] = 255;
+        out_rgba[i * 4 + 1] = 255;
+        out_rgba[i * 4 + 2] = 255;
+        out_rgba[i * 4 + 3] = a;
+    }
+    free(alpha);
+
+    // Populate glyph quads
+    int rem_h = atlas_h - reserved_rows;
+    for (int i = 0; i < num_sizes; i++) {
+        float asc = out_metrics ? out_metrics[i * 3 + 0] : 0.0f;
+        for (int c = 0; c < 96; c++) {
+            float xp = 0.0f, yp = 0.0f;
+            stbtt_aligned_quad q;
+            stbtt_GetPackedQuad(cdata[i], atlas_w, rem_h, c, &xp, &yp, &q, 1);
+            AtlasGlyph* gl = &out_all_glyphs[i * 96 + c];
+            gl->x0 = q.x0;
+            gl->y0 = q.y0 + asc;
+            gl->x1 = q.x1;
+            gl->y1 = q.y1 + asc;
+            gl->u0 = q.s0;
+            gl->v0 = (q.t0 * (float)rem_h + (float)reserved_rows) / (float)atlas_h;
+            gl->u1 = q.s1;
+            gl->v1 = (q.t1 * (float)rem_h + (float)reserved_rows) / (float)atlas_h;
+            gl->xadvance = xp;
+        }
+        free(cdata[i]);
+    }
+    free(cdata);
+    free(ranges);
+
+    return 1;
+}
+
+EXPORT int init_font_atlas(const char* preferred_font,
+                           int atlas_w, int atlas_h,
+                           unsigned char* out_rgba,
+                           AtlasGlyph* out_glyphs_scale1,
+                           AtlasGlyph* out_glyphs_scale2,
+                           float* out_metrics) {
+    float default_sizes[2] = { 13.0f, 20.0f };
+    AtlasGlyph combined_glyphs[2 * 96];
+    float metrics[6];
+    int ok = init_font_atlas_multi(preferred_font, atlas_w, atlas_h,
+                                   default_sizes, 2, out_rgba,
+                                   combined_glyphs, metrics);
+    if (!ok) return 0;
+    if (out_glyphs_scale1) {
+        memcpy(out_glyphs_scale1, &combined_glyphs[0], 96 * sizeof(AtlasGlyph));
+    }
+    if (out_glyphs_scale2) {
+        memcpy(out_glyphs_scale2, &combined_glyphs[96], 96 * sizeof(AtlasGlyph));
+    }
+    if (out_metrics) {
+        memcpy(out_metrics, metrics, 6 * sizeof(float));
+    }
+    return 1;
+}
+
+EXPORT int emit_text_quads(const char* text_str, float x, float y,
+                           float r, float g, float b, float a,
+                           const AtlasGlyph* glyphs, float line_h,
+                           float fw, float fh, int is_vulkan,
+                           Vertex48* out_vdata, int start_vtx, int max_verts) {
+    if (!text_str || !glyphs || !out_vdata || max_verts < start_vtx + 6) return start_vtx;
+    float cur_x = x;
+    float cur_y = y;
+    int vcount = start_vtx;
+
+    for (int i = 0; text_str[i] != '\0'; i++) {
+        unsigned char ch = (unsigned char)text_str[i];
+        if (ch == '\n') {
+            cur_y += line_h;
+            cur_x = x;
+        } else if (ch >= 32 && ch < 128) {
+            if (vcount + 6 > max_verts) break;
+            const AtlasGlyph* gl = &glyphs[ch - 32];
+            float sx = floorf(cur_x + 0.5f);
+            float sy = floorf(cur_y + 0.5f);
+            float gx0 = sx + gl->x0;
+            float gy0 = sy + gl->y0;
+            float gx1 = sx + gl->x1;
+            float gy1 = sy + gl->y1;
+
+            float nx0 = (gx0 / fw) * 2.0f - 1.0f;
+            float nx1 = (gx1 / fw) * 2.0f - 1.0f;
+            float ny0, ny1;
+            if (is_vulkan) {
+                ny0 = (gy0 / fh) * 2.0f - 1.0f;
+                ny1 = (gy1 / fh) * 2.0f - 1.0f;
+            } else {
+                ny0 = 1.0f - (gy0 / fh) * 2.0f;
+                ny1 = 1.0f - (gy1 / fh) * 2.0f;
+            }
+
+            Vertex48* v = &out_vdata[vcount];
+            v[0] = (Vertex48){ nx0, ny0, gl->u0, gl->v0, r, g, b, a, 0, 0, 0, 0 };
+            v[1] = (Vertex48){ nx1, ny0, gl->u1, gl->v0, r, g, b, a, 0, 0, 0, 0 };
+            v[2] = (Vertex48){ nx1, ny1, gl->u1, gl->v1, r, g, b, a, 0, 0, 0, 0 };
+            v[3] = (Vertex48){ nx0, ny0, gl->u0, gl->v0, r, g, b, a, 0, 0, 0, 0 };
+            v[4] = (Vertex48){ nx1, ny1, gl->u1, gl->v1, r, g, b, a, 0, 0, 0, 0 };
+            v[5] = (Vertex48){ nx0, ny1, gl->u0, gl->v1, r, g, b, a, 0, 0, 0, 0 };
+
+            vcount += 6;
+            cur_x += gl->xadvance;
+        }
+    }
+    return vcount;
+}
+
+EXPORT float measure_atlas_text_width(const char* text_str, const AtlasGlyph* glyphs) {
+    if (!text_str || !glyphs) return 0.0f;
+    float max_w = 0.0f;
+    float cur_w = 0.0f;
+    for (int i = 0; text_str[i] != '\0'; i++) {
+        unsigned char ch = (unsigned char)text_str[i];
+        if (ch == '\n') {
+            if (cur_w > max_w) max_w = cur_w;
+            cur_w = 0.0f;
+        } else if (ch >= 32 && ch < 128) {
+            cur_w += glyphs[ch - 32].xadvance;
+        }
+    }
+    if (cur_w > max_w) max_w = cur_w;
+    return max_w;
 }

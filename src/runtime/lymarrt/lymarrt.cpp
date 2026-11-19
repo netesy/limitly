@@ -137,19 +137,21 @@ uint32_t lymarrt_abi_version(void) {
 
 void* lymarrt_library_open(const char* path) {
     if (!path) return NULL;
+    void* handle = NULL;
     // Empty path: return the process handle (gives access to CRT/libc symbols)
     if (path[0] == '\0') {
 #ifdef _WIN32
-        return static_cast<void*>(GetModuleHandleA(NULL));
+        handle = static_cast<void*>(GetModuleHandleA(NULL));
 #else
-        return dlopen(NULL, RTLD_LAZY | RTLD_GLOBAL);
+        handle = dlopen(NULL, RTLD_LAZY | RTLD_GLOBAL);
+#endif
+    } else {
+#ifdef _WIN32
+        handle = static_cast<void*>(LoadLibraryA(path));
+#else
+        handle = dlopen(path, RTLD_LAZY | RTLD_LOCAL);
 #endif
     }
-#ifdef _WIN32
-    void* handle = static_cast<void*>(LoadLibraryA(path));
-#else
-    void* handle = dlopen(path, RTLD_LAZY | RTLD_LOCAL);
-#endif
     if (!handle) {
         if (const char* home = std::getenv("LYMAR_HOME")) {
             auto bundled = std::filesystem::path(home) / "bin" / std::filesystem::path(path).filename();
@@ -172,6 +174,9 @@ void lymarrt_library_close(void* handle) {
         std::lock_guard<std::mutex> lock(g_lymarrt_lib_mutex);
         auto it = g_lymarrt_libraries.find(reinterpret_cast<uintptr_t>(handle));
         if (it == g_lymarrt_libraries.end()) return;
+        if (it->second.empty()) {
+            return; // Never unload or erase the process handle
+        }
         g_lymarrt_libraries.erase(it);
     }
 #ifdef _WIN32

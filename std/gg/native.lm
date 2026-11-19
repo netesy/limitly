@@ -1,32 +1,44 @@
-// std.gg.native - Native GPU backend for std.gg.
+// std/gg/native.lm — Pure-Lymar hardware-accelerated 2D pipeline.
 //
-// Drives the pure-Lymar drivers in std.native (d3d11 / vulkan) through
-// the shared gfx_* surface instead of the rt resource path (sokol/CPU).
-// Selected by std.gg when gg.backend != "sokol" and
-// native.gfx_backend(prefer) reports a usable driver.
+// Drives std.native.vulkan on Linux/Windows and std.native.d3d11 on
+// Windows. Bypasses the C++ runtime's sokol_gfx layer entirely.
 //
-// Vertex format (32B stride, shared by both drivers):
-//   float2 POSITION @0  (x, y)
-//   float4 COLOR    @16 (r, g, b, a)
-// Input layout: ["POSITION","COLOR"], DXGI formats [R32G32_FLOAT=10,
-// R32G32B32A32_FLOAT=2]. Vulkan maps these to VkFormat internally.
+// Uses analytical Signed Distance Field (SDF) shaders for mathematically
+// smooth sub-pixel anti-aliasing, rounded corners, hollow borders, and
+// continuous Gaussian drop shadows in 1 single quad per primitive.
+//
+// Pipeline contract:
+//   - attach(hwnd, w, h): binds the driver to a platform window.
+//   - begin_pass(w, h, r, g, b, a): clears and opens a frame.
+//   - draw_rect(x, y, w, h, r, g, b, a): emits an anti-aliased rectangle.
+//   - draw_rect_rounded(x, y, w, h, rad, r, g, b, a): emits an anti-aliased rounded rectangle.
+//   - draw_rect_border(x, y, w, h, rad, border_w, r, g, b, a): emits an anti-aliased outline border.
+//   - draw_shadow(x, y, w, h, r, g, b, a, radius, blur): emits a soft Gaussian drop shadow.
+//   - draw_tri(x1, y1, x2, y2, x3, y3, r, g, b, a): emits a solid triangle.
+//   - draw_text(text, x, y, r, g, b, a, scale): emits glyphs from font atlas with pixel snapping.
+//   - measure_text(text, scale): measures text advance width.
+//   - get_line_height(scale): gets line height.
+//   - push_clip / pop_clip: manages hardware scissor clip stack.
+//   - end_pass(): finishes current pass.
+//   - commit(): submits draw calls to GPU and presents swapchain.
+//   - save_screenshot(path): saves current framebuffer to PNG.
 
-import std.native as native;
-import std.native.d3d11 as d3d;
-import std.native.vulkan as vk;
-import std.os.identity as osid;
 import std.ffi as ffi;
+import std.os.identity as osid;
 import std.string.replace as replace;
+import std.native.vulkan as vk;
+import std.native.d3d11 as d3d;
+import std.os.environment as osenv;
 
-// ── driver dispatch ─────────────────────────────────────────────────
+// ── state ────────────────────────────────────────────────────────────
 
-var _drv: str = "";
 var _prefer: str = "";
-var _attached: int = 0;
-var _pipe_ready: int = 0;
-var _frame_open: int = 0;
+var _drv: str = "";
 var _w: int = 0;
 var _h: int = 0;
+var _attached: int = 0;
+var _frame_open: int = 0;
+var _pipe_ready: int = 0;
 
 var _vs: int = 0;
 var _ps: int = 0;
@@ -37,40 +49,40 @@ var _depth: int = 0;
 var _vb: int = 0;
 var _vb_cap: int = 0;
 
+var _atlas_rgba: int = 0;
+var _atlas_tex: int = 0;
+var _atlas_smp: int = 0;
+var _glyphs_buf: int = 0;
+var _metrics_buf: int = 0;
+var _sizes_buf: int = 0;
+var _sym_emit_text: any = nil;
+var _sym_measure_text: any = nil;
+
 // persistent vertex scratch: raw ptr (p2i'd) + vert count
+// 48 bytes per vertex (12 floats)
 var _vdata: int = 0;
 var _vdata_cap: int = 0;
 var _vcount: int = 0;
 
-// clip stack: flat [x0,y0,x1,y1] quads; _clip_n is the active prefix
-// length (multiple of 4). Slots are reused on pop - no per-frame alloc.
+// scissor stack: flat array [x0, y0, x1, y1, ...]
 var _clip: [int] = [];
 var _clip_n: int = 0;
 
-// keep()/p2i(): ffi.alloc blocks that must outlive their creating call's
-// region (same contract as std.native.d3d11).
-var _keep: [any] = [] as [any];
+// ── persistent allocation tracking ───────────────────────────────────
 
-fn keep(p: pubptr): pubptr {
-    _keep.append(p);
-    return p;
-}
+var _persist_pages: [int] = [];
 
-fn p2i(p: pubptr): int {
+fn alloc_persist(bytes: int): int {
     unsafe {
-        var tmp = ffi.alloc(8);
-        ffi.store_ptr(tmp, p);
-        var v: int = ffi.load_i64(tmp);
-        ffi.free(tmp);
-        return v;
+        var p = ffi.alloc(bytes);
+        if (p == 0) { return 0; }
+        ffi.memset(p, 0, bytes);
+        _persist_pages.append(p);
+        return p;
     }
 }
 
-fn alloc_persist(size: int): int {
-    unsafe { return p2i(keep(ffi.alloc(size))); }
-}
-
-// ── driver wrappers (identical gfx_* surface on both modules) ───────
+// ── driver dispatch wrappers ─────────────────────────────────────────
 
 fn drv_attach(hwnd: int, w: int, h: int): int {
     if (_drv == "vulkan") { return vk.gfx_attach(hwnd, w, h); }
@@ -91,18 +103,14 @@ fn drv_begin_frame(): int {
     if (osid.TARGET_OS == osid.OS_WINDOWS) { return d3d.gfx_begin_frame(); }
     return 0;
 }
-fn drv_clear(r: float, g: float, b: float, a: float): nil {
-    if (_drv == "vulkan") { vk.gfx_clear(r, g, b, a); return; }
-    if (osid.TARGET_OS == osid.OS_WINDOWS) { d3d.gfx_clear(r, g, b, a); return; }
-}
 fn drv_end_frame(): int {
     if (_drv == "vulkan") { return vk.gfx_end_frame(); }
     if (osid.TARGET_OS == osid.OS_WINDOWS) { d3d.gfx_end_frame(); return 1; }
-    return 1;
+    return 0;
 }
-fn drv_set_topology(t: int): nil {
-    if (_drv == "vulkan") { vk.gfx_set_topology(t); return; }
-    if (osid.TARGET_OS == osid.OS_WINDOWS) { d3d.gfx_set_topology(t); return; }
+fn drv_clear(r: float, g: float, b: float, a: float): nil {
+    if (_drv == "vulkan") { vk.gfx_clear(r, g, b, a); return; }
+    if (osid.TARGET_OS == osid.OS_WINDOWS) { d3d.gfx_clear(r, g, b, a); return; }
 }
 fn drv_set_shaders(vs: int, ps: int): nil {
     if (_drv == "vulkan") { vk.gfx_set_shaders(vs, ps); return; }
@@ -112,17 +120,21 @@ fn drv_set_input_layout(il: int): nil {
     if (_drv == "vulkan") { vk.gfx_set_input_layout(il); return; }
     if (osid.TARGET_OS == osid.OS_WINDOWS) { d3d.gfx_set_input_layout(il); return; }
 }
-fn drv_set_blend_state(s: int): nil {
-    if (_drv == "vulkan") { vk.gfx_set_blend_state(s); return; }
-    if (osid.TARGET_OS == osid.OS_WINDOWS) { d3d.gfx_set_blend_state(s); return; }
+fn drv_set_blend_state(b: int): nil {
+    if (_drv == "vulkan") { vk.gfx_set_blend_state(b); return; }
+    if (osid.TARGET_OS == osid.OS_WINDOWS) { d3d.gfx_set_blend_state(b); return; }
 }
-fn drv_set_raster_state(s: int): nil {
-    if (_drv == "vulkan") { vk.gfx_set_raster_state(s); return; }
-    if (osid.TARGET_OS == osid.OS_WINDOWS) { d3d.gfx_set_raster_state(s); return; }
+fn drv_set_raster_state(r: int): nil {
+    if (_drv == "vulkan") { vk.gfx_set_raster_state(r); return; }
+    if (osid.TARGET_OS == osid.OS_WINDOWS) { d3d.gfx_set_raster_state(r); return; }
 }
-fn drv_set_depth_state(s: int, ref_: int): nil {
-    if (_drv == "vulkan") { vk.gfx_set_depth_state(s, ref_); return; }
-    if (osid.TARGET_OS == osid.OS_WINDOWS) { d3d.gfx_set_depth_state(s, ref_); return; }
+fn drv_set_depth_state(d: int, s: int): nil {
+    if (_drv == "vulkan") { vk.gfx_set_depth_state(d, s); return; }
+    if (osid.TARGET_OS == osid.OS_WINDOWS) { d3d.gfx_set_depth_state(d, s); return; }
+}
+fn drv_set_topology(t: int): nil {
+    if (_drv == "vulkan") { vk.gfx_set_topology(t); return; }
+    if (osid.TARGET_OS == osid.OS_WINDOWS) { d3d.gfx_set_topology(t); return; }
 }
 fn drv_dyn_buf(bytes: int, bind: int, stride: int): int {
     if (_drv == "vulkan") { return vk.gfx_buffer_create_dynamic(bytes, bind, stride); }
@@ -131,7 +143,9 @@ fn drv_dyn_buf(bytes: int, bind: int, stride: int): int {
 }
 fn drv_buf_update(buf: int, src: int, bytes: int): int {
     if (_drv == "vulkan") { return vk.gfx_buffer_update(buf, src, bytes, bytes); }
-    if (osid.TARGET_OS == osid.OS_WINDOWS) { return d3d.gfx_buffer_update(buf, src, bytes, bytes); }
+    if (osid.TARGET_OS == osid.OS_WINDOWS) {
+        return d3d.gpu_buffer_write(buf, src, bytes);
+    }
     return 0;
 }
 fn drv_set_vb(slot: int, buf: int, stride: int, off: int): nil {
@@ -147,14 +161,101 @@ fn drv_scissor(x: int, y: int, w: int, h: int): nil {
     if (osid.TARGET_OS == osid.OS_WINDOWS) { d3d.gfx_set_scissor(x, y, w, h); return; }
 }
 
+fn drv_create_tex_rgba(w: int, h: int, ptr: int): int {
+    if (_drv == "vulkan") { return vk.gfx_texture_create_rgba(w, h, ptr); }
+    if (osid.TARGET_OS == osid.OS_WINDOWS) {
+        var tex = d3d.gfx_texture_create_rgba(w, h, ptr);
+        if (tex == 0) { return 0; }
+        return d3d.gpu_srv_create(tex);
+    }
+    return 0;
+}
+fn drv_create_sampler(filter: int, addr_u: int, addr_v: int): int {
+    if (_drv == "vulkan") { return vk.gfx_sampler_create(filter, addr_u, addr_v); }
+    if (osid.TARGET_OS == osid.OS_WINDOWS) { return d3d.gfx_sampler_create(filter, addr_u, addr_v); }
+    return 0;
+}
+fn drv_set_texture(slot: int, srv: int): nil {
+    if (_drv == "vulkan") { vk.gfx_ps_set_shader_resource(slot, srv); return; }
+    if (osid.TARGET_OS == osid.OS_WINDOWS) { d3d.gfx_ps_set_shader_resource(slot, srv); return; }
+}
+fn drv_set_sampler(slot: int, smp: int): nil {
+    if (_drv == "vulkan") { vk.gfx_ps_set_sampler(slot, smp); return; }
+    if (osid.TARGET_OS == osid.OS_WINDOWS) { d3d.gfx_ps_set_sampler(slot, smp); return; }
+}
+
+fn ensure_font_atlas(): int {
+    unsafe {
+        if (_atlas_rgba == 0) {
+            var lib = ffi.library_load("");
+            if (lib != 0 and lib != nil) {
+                var sym_chk = ffi.library_get_symbol(lib, "init_font_atlas_multi");
+                if (sym_chk == 0 or sym_chk == nil) { lib = 0; }
+            }
+            if (lib == 0 or lib == nil) {
+                lib = ffi.library_load("bin/libstb_image.dll");
+                if (lib == 0 or lib == nil) { lib = ffi.library_load("tests/ffi/libstb_image.dll"); }
+            }
+            if (lib == 0 or lib == nil) { return 0; }
+            _sym_emit_text = ffi.library_get_symbol(lib, "emit_text_quads");
+            _sym_measure_text = ffi.library_get_symbol(lib, "measure_atlas_text_width");
+
+            var sym_multi = ffi.library_get_symbol(lib, "init_font_atlas_multi");
+
+            var atlas_w = 1024;
+            var atlas_h = 1024;
+            _atlas_rgba = alloc_persist(atlas_w * atlas_h * 4);
+            _glyphs_buf = alloc_persist(6 * 96 * 36);
+            _metrics_buf = alloc_persist(6 * 3 * 4);
+            _sizes_buf = alloc_persist(6 * 4);
+
+            // 6 typographic sizes: 11.0, 13.0, 15.0, 18.0, 22.0, 28.0
+            ffi.store_f32(_sizes_buf, 11.0);
+            ffi.store_f32(ffi.ptr_add(_sizes_buf, 4), 13.0);
+            ffi.store_f32(ffi.ptr_add(_sizes_buf, 8), 15.0);
+            ffi.store_f32(ffi.ptr_add(_sizes_buf, 12), 18.0);
+            ffi.store_f32(ffi.ptr_add(_sizes_buf, 16), 22.0);
+            ffi.store_f32(ffi.ptr_add(_sizes_buf, 20), 28.0);
+
+            var pref_cstr = ffi.string_to_cstring("");
+            if (sym_multi != nil) {
+                var res = ffi.foreign_call(sym_multi,
+                    [ffi.cstring_as_ptr(pref_cstr), atlas_w, atlas_h, _sizes_buf, 6, _atlas_rgba, _glyphs_buf, _metrics_buf],
+                    ffi.TYPE_I32,
+                    [ffi.TYPE_PTR, ffi.TYPE_I32, ffi.TYPE_I32, ffi.TYPE_PTR, ffi.TYPE_I32, ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_PTR]) as int;
+                ffi.cstring_free(pref_cstr);
+                if (res != 1) { return 0; }
+            } else {
+                var sym_legacy = ffi.library_get_symbol(lib, "init_font_atlas");
+                if (sym_legacy == nil) { ffi.cstring_free(pref_cstr); return 0; }
+                var res = ffi.foreign_call(sym_legacy,
+                    [ffi.cstring_as_ptr(pref_cstr), atlas_w, atlas_h, _atlas_rgba, _glyphs_buf, ffi.ptr_add(_glyphs_buf, 96 * 36), _metrics_buf],
+                    ffi.TYPE_I32,
+                    [ffi.TYPE_PTR, ffi.TYPE_I32, ffi.TYPE_I32, ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_PTR]) as int;
+                ffi.cstring_free(pref_cstr);
+                if (res != 1) { return 0; }
+            }
+        }
+
+        if (_atlas_tex == 0) {
+            _atlas_tex = drv_create_tex_rgba(1024, 1024, _atlas_rgba);
+            // 21 = linear filter (in both D3D11 and Vulkan)
+            // 3 = clamp to edge (in both D3D11 and Vulkan)
+            _atlas_smp = drv_create_sampler(21, 3, 3);
+        }
+        if (_atlas_tex == 0 or _atlas_smp == 0) { return 0; }
+        return 1;
+    }
+}
+
 // ── shader sources ──────────────────────────────────────────────────
 
-// SPIR-V words for the solid-color UI pipeline (assembled+validated with
-// spirv-as/spirv-val): VS consumes POSITION vec2 @loc0 + COLOR vec4
-// @loc1, PS passthrough. Position arrives as vec3 in the vertex layout;
-// the extra component is ignored by the shader.
-var _VS_SPV: [int] = [119734787,67072,458752,22,0,131089,1,196622,0,1,589839,0,1,1852399981,0,2,3,4,5,262215,2,30,0,262215,3,30,1,262215,4,11,0,262215,5,30,0,131091,6,196641,7,6,196630,8,32,262167,9,8,2,262167,10,8,4,262176,11,1,9,262176,12,1,10,262176,13,3,10,262187,8,14,0,262187,8,15,1065353216,262203,11,2,1,262203,12,3,1,262203,13,4,3,262203,13,5,3,327734,6,1,0,7,131320,16,262205,9,17,2,327761,8,18,17,0,327761,8,19,17,1,458832,10,20,18,19,14,15,196670,4,20,262205,10,21,3,196670,5,21,65789,65592];
-var _PS_SPV: [int] = [119734787,67072,458752,12,0,131089,1,196622,0,1,458767,4,1,1852399981,0,2,3,196624,1,7,262215,2,30,0,262215,3,30,0,131091,4,196641,5,4,196630,6,32,262167,7,6,4,262176,8,1,7,262176,9,3,7,262203,8,2,1,262203,9,3,3,327734,4,1,0,5,131320,10,262205,7,11,2,196670,3,11,65789,65592];
+// SPIR-V words for analytical SDF & text pipeline:
+// VS consumes: POSITION(vec2)@0, TEXCOORD(vec2)@1, COLOR(vec4)@2, NORMAL(vec4)@3
+// PS samples texture at set 0 binding 32 when params.z <= 0.0 (text/textured)
+// and evaluates analytical SDF with sub-pixel AA when params.z > 0.0 (shapes)
+var _VS_SPV: [int] = [119734787, 65536, 851978, 38, 0, 131089, 1, 393227, 1, 1280527431, 1685353262, 808793134, 0, 196622, 0, 1, 851983, 0, 4, 1852399981, 0, 13, 18, 28, 29, 31, 33, 35, 36, 196611, 2, 450, 655364, 1197427783, 1279741775, 1885560645, 1953718128, 1600482425, 1701734764, 1919509599, 1769235301, 25974, 524292, 1197427783, 1279741775, 1852399429, 1685417059, 1768185701, 1952671090, 6649449, 262149, 4, 1852399981, 0, 393221, 11, 1348430951, 1700164197, 2019914866, 0, 393222, 11, 0, 1348430951, 1953067887, 7237481, 458758, 11, 1, 1348430951, 1953393007, 1702521171, 0, 458758, 11, 2, 1130327143, 1148217708, 1635021673, 6644590, 458758, 11, 3, 1130327143, 1147956341, 1635021673, 6644590, 196613, 13, 0, 262149, 18, 1885302377, 29551, 262149, 28, 1601467759, 30325, 262149, 29, 1969188457, 118, 262149, 31, 1601467759, 7106403, 262149, 33, 1667198569, 27759, 327685, 35, 1601467759, 1634886000, 29549, 327685, 36, 1885302377, 1835102817, 115, 327752, 11, 0, 11, 0, 327752, 11, 1, 11, 1, 327752, 11, 2, 11, 3, 327752, 11, 3, 11, 4, 196679, 11, 2, 262215, 18, 30, 0, 262215, 28, 30, 0, 262215, 29, 30, 1, 262215, 31, 30, 1, 262215, 33, 30, 2, 262215, 35, 30, 2, 262215, 36, 30, 3, 131091, 2, 196641, 3, 2, 196630, 6, 32, 262167, 7, 6, 4, 262165, 8, 32, 0, 262187, 8, 9, 1, 262172, 10, 6, 9, 393246, 11, 7, 6, 10, 10, 262176, 12, 3, 11, 262203, 12, 13, 3, 262165, 14, 32, 1, 262187, 14, 15, 0, 262167, 16, 6, 2, 262176, 17, 1, 16, 262203, 17, 18, 1, 262187, 6, 20, 0, 262187, 6, 21, 1065353216, 262176, 25, 3, 7, 262176, 27, 3, 16, 262203, 27, 28, 3, 262203, 17, 29, 1, 262203, 25, 31, 3, 262176, 32, 1, 7, 262203, 32, 33, 1, 262203, 25, 35, 3, 262203, 32, 36, 1, 327734, 2, 4, 0, 3, 131320, 5, 262205, 16, 19, 18, 327761, 6, 22, 19, 0, 327761, 6, 23, 19, 1, 458832, 7, 24, 22, 23, 20, 21, 327745, 25, 26, 13, 15, 196670, 26, 24, 262205, 16, 30, 29, 196670, 28, 30, 262205, 7, 34, 33, 196670, 31, 34, 262205, 7, 37, 36, 196670, 35, 37, 65789, 65592];
+var _PS_SPV: [int] = [119734787, 65536, 851978, 162, 0, 131089, 1, 393227, 1, 1280527431, 1685353262, 808793134, 0, 196622, 0, 1, 589839, 4, 4, 1852399981, 0, 45, 61, 67, 68, 196624, 4, 7, 196611, 2, 450, 655364, 1197427783, 1279741775, 1885560645, 1953718128, 1600482425, 1701734764, 1919509599, 1769235301, 25974, 524292, 1197427783, 1279741775, 1852399429, 1685417059, 1768185701, 1952671090, 6649449, 262149, 4, 1852399981, 0, 589829, 14, 1853190002, 1701994340, 1935635555, 1982359140, 1983591014, 1715155558, 15153, 196613, 11, 112, 196613, 12, 98, 196613, 13, 114, 196613, 16, 113, 327685, 45, 1885302377, 1835102817, 115, 196613, 54, 97, 262149, 58, 1702125429, 120, 262149, 61, 1969188457, 118, 327685, 67, 1601467759, 1869377379, 114, 262149, 68, 1667198569, 27759, 262149, 81, 1768186226, 29557, 327685, 84, 1685221218, 2002743909, 0, 327685, 87, 1718378856, 2053731167, 101, 196613, 90, 112, 196613, 92, 100, 262149, 93, 1634886000, 109, 262149, 95, 1634886000, 109, 262149, 97, 1634886000, 109, 196613, 100, 7761763, 262149, 106, 1920298082, 0, 196613, 109, 116, 262149, 135, 1970233188, 7497076, 262149, 137, 1852399460, 7497070, 262215, 45, 30, 2, 262215, 58, 34, 0, 262215, 58, 33, 32, 262215, 61, 30, 0, 262215, 67, 30, 0, 262215, 68, 30, 1, 131091, 2, 196641, 3, 2, 196630, 6, 32, 262167, 7, 6, 2, 262176, 8, 7, 7, 262176, 9, 7, 6, 393249, 10, 6, 8, 8, 9, 262187, 6, 25, 0, 327724, 7, 26, 25, 25, 262165, 29, 32, 0, 262187, 29, 30, 0, 262187, 29, 33, 1, 262167, 43, 6, 4, 262176, 44, 1, 43, 262203, 44, 45, 1, 262187, 29, 46, 2, 262176, 47, 1, 6, 131092, 50, 589849, 55, 6, 1, 0, 0, 0, 1, 0, 196635, 56, 55, 262176, 57, 0, 56, 262203, 57, 58, 0, 262176, 60, 1, 7, 262203, 60, 61, 1, 262187, 29, 64, 3, 262176, 66, 3, 43, 262203, 66, 67, 3, 262203, 44, 68, 1, 262167, 69, 6, 3, 262187, 6, 102, 3129152111, 262187, 6, 119, 1065353216, 262187, 6, 125, 1075838976, 262187, 6, 131, 981668463, 262187, 6, 142, 1056964608, 327734, 2, 4, 0, 3, 131320, 5, 262203, 9, 54, 7, 262203, 9, 81, 7, 262203, 9, 84, 7, 262203, 8, 87, 7, 262203, 8, 90, 7, 262203, 9, 92, 7, 262203, 8, 93, 7, 262203, 8, 95, 7, 262203, 9, 97, 7, 262203, 9, 100, 7, 262203, 9, 106, 7, 262203, 9, 109, 7, 262203, 9, 116, 7, 262203, 9, 135, 7, 262203, 9, 137, 7, 327745, 47, 48, 45, 46, 262205, 6, 49, 48, 327868, 50, 51, 49, 25, 196855, 53, 0, 262394, 51, 52, 53, 131320, 52, 262205, 56, 59, 58, 262205, 7, 62, 61, 327767, 43, 63, 59, 62, 327761, 6, 65, 63, 3, 196670, 54, 65, 262205, 43, 70, 68, 524367, 69, 71, 70, 70, 0, 1, 2, 327745, 47, 72, 68, 64, 262205, 6, 73, 72, 262205, 6, 74, 54, 327813, 6, 75, 73, 74, 327761, 6, 76, 71, 0, 327761, 6, 77, 71, 1, 327761, 6, 78, 71, 2, 458832, 43, 79, 76, 77, 78, 75, 196670, 67, 79, 65789, 131320, 53, 327745, 47, 82, 45, 30, 262205, 6, 83, 82, 196670, 81, 83, 327745, 47, 85, 45, 33, 262205, 6, 86, 85, 196670, 84, 86, 262205, 43, 88, 45, 458831, 7, 89, 88, 88, 2, 3, 196670, 87, 89, 262205, 7, 91, 61, 196670, 90, 91, 262205, 7, 94, 90, 196670, 93, 94, 262205, 7, 96, 87, 196670, 95, 96, 262205, 6, 98, 81, 196670, 97, 98, 458809, 6, 99, 14, 93, 95, 97, 196670, 92, 99, 196670, 100, 25, 262205, 6, 101, 84, 327864, 50, 103, 101, 102, 196855, 105, 0, 262394, 103, 104, 129, 131320, 104, 262205, 6, 107, 84, 262271, 6, 108, 107, 196670, 106, 108, 262205, 6, 110, 92, 458764, 6, 111, 1, 40, 110, 25, 262205, 6, 112, 106, 327816, 6, 113, 111, 112, 196670, 109, 113, 262205, 6, 114, 92, 327864, 50, 115, 114, 25, 196855, 118, 0, 262394, 115, 117, 120, 131320, 117, 196670, 116, 119, 131321, 118, 131320, 120, 262205, 6, 121, 109, 262271, 6, 122, 121, 262205, 6, 123, 109, 327813, 6, 124, 122, 123, 327813, 6, 126, 124, 125, 393228, 6, 127, 1, 27, 126, 196670, 116, 127, 131321, 118, 131320, 118, 262205, 6, 128, 116, 196670, 100, 128, 131321, 105, 131320, 129, 262205, 6, 130, 84, 327866, 50, 132, 130, 131, 196855, 134, 0, 262394, 132, 133, 148, 131320, 133, 262205, 6, 136, 92, 196670, 135, 136, 262205, 6, 138, 84, 262271, 6, 139, 138, 262205, 6, 140, 92, 327811, 6, 141, 139, 140, 196670, 137, 141, 262205, 6, 143, 135, 262205, 6, 144, 137, 458764, 6, 145, 1, 40, 143, 144, 327811, 6, 146, 142, 145, 524300, 6, 147, 1, 43, 146, 25, 119, 196670, 100, 147, 131321, 134, 131320, 148, 262205, 6, 149, 92, 327811, 6, 150, 142, 149, 524300, 6, 151, 1, 43, 150, 25, 119, 196670, 100, 151, 131321, 134, 131320, 134, 131321, 105, 131320, 105, 262205, 43, 152, 68, 524367, 69, 153, 152, 152, 0, 1, 2, 327745, 47, 154, 68, 64, 262205, 6, 155, 154, 262205, 6, 156, 100, 327813, 6, 157, 155, 156, 327761, 6, 158, 153, 0, 327761, 6, 159, 153, 1, 327761, 6, 160, 153, 2, 458832, 43, 161, 158, 159, 160, 157, 196670, 67, 161, 65789, 65592, 327734, 6, 14, 0, 10, 196663, 8, 11, 196663, 8, 12, 196663, 9, 13, 131320, 15, 262203, 8, 16, 7, 262205, 7, 17, 11, 393228, 7, 18, 1, 4, 17, 262205, 7, 19, 12, 327811, 7, 20, 18, 19, 262205, 6, 21, 13, 327760, 7, 22, 21, 21, 327809, 7, 23, 20, 22, 196670, 16, 23, 262205, 7, 24, 16, 458764, 7, 27, 1, 40, 24, 26, 393228, 6, 28, 1, 66, 27, 327745, 9, 31, 16, 30, 262205, 6, 32, 31, 327745, 9, 34, 16, 33, 262205, 6, 35, 34, 458764, 6, 36, 1, 40, 32, 35, 458764, 6, 37, 1, 37, 36, 25, 327809, 6, 38, 28, 37, 262205, 6, 39, 13, 327811, 6, 40, 38, 39, 131326, 40, 65592];
 
 fn brace_src(tmpl: str): str {
     var lb = _builtin_string_from_bytes([123]);
@@ -166,8 +267,8 @@ fn brace_src(tmpl: str): str {
 }
 
 // HLSL equivalents for the d3d11 driver (compiled via D3DCompile).
-var _VS_HLSL: str = brace_src("struct VO @ float4 pos : SV_Position; float4 col : TEXCOORD0; #; VO main(float2 p : POSITION, float4 c : COLOR) @ VO o; o.pos = float4(p, 0.0, 1.0); o.col = c; return o; #");
-var _PS_HLSL: str = brace_src("float4 main(float4 pos : SV_Position, float4 c : TEXCOORD0) : SV_Target @ return c; #");
+var _VS_HLSL: str = brace_src("struct VI @ float2 p : POSITION; float2 uv : TEXCOORD0; float4 col : COLOR; float4 params : NORMAL; #; struct VO @ float4 pos : SV_Position; float2 uv : TEXCOORD0; float4 col : COLOR; float4 params : NORMAL; #; VO main(VI i) @ VO o; o.pos = float4(i.p, 0.0, 1.0); o.uv = i.uv; o.col = i.col; o.params = i.params; return o; #");
+var _PS_HLSL: str = brace_src("Texture2D tex : register(t0); SamplerState smp : register(s0); struct PI @ float4 pos : SV_Position; float2 uv : TEXCOORD0; float4 col : COLOR; float4 params : NORMAL; #; float round_rect_sdf(float2 p, float2 b, float r) @ float2 q = abs(p) - b + r; return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r; # float4 main(PI i) : SV_Target @ if (i.params.z <= 0.0) @ float a = tex.Sample(smp, i.uv).a; return float4(i.col.rgb, i.col.a * a); # float radius = i.params.x; float border_w = i.params.y; float2 half_size = i.params.zw; float2 p = i.uv; float d = round_rect_sdf(p, half_size, radius); float cov = 0.0; if (border_w < -0.001) @ float blur = -border_w; float t = max(d, 0.0) / blur; cov = (d < 0.0) ? 1.0 : exp(-t * t * 2.5); # else if (border_w > 0.001) @ float d_outer = d; float d_inner = -border_w - d; cov = saturate(0.5 - max(d_outer, d_inner)); # else @ cov = saturate(0.5 - d); # return float4(i.col.rgb, i.col.a * cov); #");
 
 // ── pipeline init ───────────────────────────────────────────────────
 
@@ -187,46 +288,57 @@ fn spv_upload(words: [int]): int {
 fn pipeline_init(): int {
     unsafe {
         if (_pipe_ready != 0) { return 1; }
-        var names: [str] = ["POSITION", "COLOR"];
+        var names: [str] = ["POSITION", "TEXCOORD", "COLOR", "NORMAL"];
         if (_drv == "vulkan") {
             var vp = spv_upload(_VS_SPV);
             var pp = spv_upload(_PS_SPV);
             _vs = vk.gfx_vs_create(vp, len(_VS_SPV) * 4);
             _ps = vk.gfx_ps_create(pp, len(_PS_SPV) * 4);
-            _il = vk.gfx_input_layout_create(names, [10, 2], 0, 0);
+            // POSITION@0 (8B), TEXCOORD@8 (8B), COLOR@16 (16B), NORMAL@32 (16B) = 48B stride
+            _il = vk.gfx_input_layout_create_ex(names,
+                [vk.DXGI_FMT_R32G32_FLOAT, vk.DXGI_FMT_R32G32_FLOAT, vk.DXGI_FMT_R32G32B32A32_FLOAT, vk.DXGI_FMT_R32G32B32A32_FLOAT],
+                [0, 8, 16, 32], 0, 0);
         } elif (osid.TARGET_OS == osid.OS_WINDOWS) {
             var vb_ = d3d.gfx_compile(_VS_HLSL, "main", "vs_5_0");
             var pb_ = d3d.gfx_compile(_PS_HLSL, "main", "ps_5_0");
             if (vb_ == 0 or pb_ == 0) { return 0; }
             _vs = d3d.gfx_vs_create(d3d.gfx_blob_ptr(vb_), d3d.gfx_blob_size(vb_));
             _ps = d3d.gfx_ps_create(d3d.gfx_blob_ptr(pb_), d3d.gfx_blob_size(pb_));
-            _il = d3d.gfx_input_layout_create(names, [10, 2],
-                                              d3d.gfx_blob_ptr(vb_),
-                                              d3d.gfx_blob_size(vb_));
+            // POSITION@0 (8B), TEXCOORD@8 (8B), COLOR@16 (16B), NORMAL@32 (16B) = 48B stride
+            _il = d3d.gfx_input_layout_create_ex(names,
+                [d3d.DXGI_FMT_R32G32_FLOAT, d3d.DXGI_FMT_R32G32_FLOAT, d3d.DXGI_FMT_R32G32B32A32_FLOAT, d3d.DXGI_FMT_R32G32B32A32_FLOAT],
+                [0, 8, 16, 32],
+                d3d.gfx_blob_ptr(vb_),
+                d3d.gfx_blob_size(vb_));
         }
         if (_vs == 0 or _ps == 0 or _il == 0) { return 0; }
         drv_set_shaders(_vs, _ps);
         drv_set_input_layout(_il);
         drv_set_topology(4); // D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST
+        if (ensure_font_atlas() != 0) {
+            drv_set_texture(0, _atlas_tex);
+            drv_set_sampler(0, _atlas_smp);
+        }
         if (_drv == "vulkan") {
             _blend = vk.gfx_blend_state_create_ex(1);
             _rast = vk.gfx_raster_state_create(0, 0);
             _depth = vk.gfx_depth_state_create(0, 0, 7);
         } elif (osid.TARGET_OS == osid.OS_WINDOWS) {
             _blend = d3d.gfx_blend_state_create_ex(1);
-            _rast = d3d.gfx_raster_state_create(0, 0);
+            // D3D11_FILL_MODE_SOLID=3, D3D11_CULL_MODE_NONE=1
+            _rast = d3d.gfx_raster_state_create(3, 1);
             _depth = d3d.gfx_depth_state_create(0, 0, 7);
         }
         if (_blend != 0) { drv_set_blend_state(_blend); }
         if (_rast != 0) { drv_set_raster_state(_rast); }
         if (_depth != 0) { drv_set_depth_state(_depth, 0); }
-        // dynamic vertex buffer, 32B stride; start at 256KB, grow on demand
-        _vb_cap = 262144;
-        _vb = drv_dyn_buf(_vb_cap, 1, 32);
+        // dynamic vertex buffer, 48B stride; start at 384KB, grow on demand
+        _vb_cap = 393216;
+        _vb = drv_dyn_buf(_vb_cap, 1, 48);
         if (_vb == 0) { return 0; }
-        drv_set_vb(0, _vb, 32, 0);
-        // vertex scratch: 8192 verts * 32B = 256KB persistent
-        _vdata_cap = 262144;
+        drv_set_vb(0, _vb, 48, 0);
+        // vertex scratch: 8192 verts * 48B = 393216 bytes persistent
+        _vdata_cap = 393216;
         _vdata = alloc_persist(_vdata_cap);
         _pipe_ready = 1;
         return 1;
@@ -235,46 +347,53 @@ fn pipeline_init(): int {
 
 // ── vertex emission ─────────────────────────────────────────────────
 
-fn vtx(x: float, y: float, r: float, g: float, b: float, a: float): nil {
+fn vtx(x: float, y: float, u: float, v: float,
+       r: float, g: float, b: float, a: float,
+       p0: float, p1: float, p2: float, p3: float): nil {
     unsafe {
-        if (_vcount * 32 + 32 > _vdata_cap) { flush_verts(); }
-        var p = ffi.ptr_add(_vdata, _vcount * 32);
-        ffi.store_f32(p, x);
-        ffi.store_f32(ffi.ptr_add(p, 4), y);
-        ffi.store_f32(ffi.ptr_add(p, 8), 0.0);
-        ffi.store_f32(ffi.ptr_add(p, 12), 0.0);
+        if (_vcount * 48 + 48 > _vdata_cap) { flush_verts(); }
+        // Callers emit top-left-origin pixel coordinates; the drivers expect
+        // clip-space position. D3D11 NDC has +y up (flip), Vulkan NDC has +y
+        // down like the framebuffer (no flip).
+        var fw = _w as float;
+        var fh = _h as float;
+        var nx = (x / fw) * 2.0 - 1.0;
+        var ny = 0.0;
+        if (_drv == "vulkan") {
+            ny = (y / fh) * 2.0 - 1.0;
+        } else {
+            ny = 1.0 - (y / fh) * 2.0;
+        }
+        var p = ffi.ptr_add(_vdata, _vcount * 48);
+        ffi.store_f32(p, nx);
+        ffi.store_f32(ffi.ptr_add(p, 4), ny);
+        ffi.store_f32(ffi.ptr_add(p, 8), u);
+        ffi.store_f32(ffi.ptr_add(p, 12), v);
         ffi.store_f32(ffi.ptr_add(p, 16), r);
         ffi.store_f32(ffi.ptr_add(p, 20), g);
         ffi.store_f32(ffi.ptr_add(p, 24), b);
         ffi.store_f32(ffi.ptr_add(p, 28), a);
+        ffi.store_f32(ffi.ptr_add(p, 32), p0);
+        ffi.store_f32(ffi.ptr_add(p, 36), p1);
+        ffi.store_f32(ffi.ptr_add(p, 40), p2);
+        ffi.store_f32(ffi.ptr_add(p, 44), p3);
         _vcount = _vcount + 1;
     }
-}
-
-fn quad(x: float, y: float, w: float, h: float,
-        r: float, g: float, b: float, a: float): nil {
-    // two triangles, 6 verts; winding irrelevant (cull none)
-    vtx(x, y, r, g, b, a);
-    vtx(x + w, y, r, g, b, a);
-    vtx(x + w, y + h, r, g, b, a);
-    vtx(x, y, r, g, b, a);
-    vtx(x + w, y + h, r, g, b, a);
-    vtx(x, y + h, r, g, b, a);
 }
 
 pub fn flush_verts(): int {
     unsafe {
         if (_vcount == 0) { return 1; }
         if (pipeline_init() == 0) { _vcount = 0; return 0; }
-        var bytes = _vcount * 32;
+        var bytes = _vcount * 48;
         if (bytes > _vb_cap) {
-            // grow: double until it fits (rare; batches are bounded)
+            // grow: double until it fits
             var ncap = _vb_cap * 2;
             while (ncap < bytes) { ncap = ncap * 2; }
-            var nvb = drv_dyn_buf(ncap, 1, 32);
+            var nvb = drv_dyn_buf(ncap, 1, 48);
             if (nvb == 0) { _vcount = 0; return 0; }
             _vb = nvb; _vb_cap = ncap;
-            drv_set_vb(0, _vb, 32, 0);
+            drv_set_vb(0, _vb, 48, 0);
         }
         if (drv_buf_update(_vb, _vdata, bytes) == 0) { _vcount = 0; return 0; }
         drv_draw(_vcount, 0);
@@ -285,8 +404,6 @@ pub fn flush_verts(): int {
 
 // ── clip stack ──────────────────────────────────────────────────────
 
-// clip rects stored flat as [x0,y0,x1,y1] quads; clip_rect returns
-// (x0, y0, x1, y1) in framebuffer pixels.
 fn clip_rect(): (int, int, int, int) {
     if (_clip_n == 0) { return (0, 0, _w, _h); }
     return (_clip[_clip_n - 4], _clip[_clip_n - 3],
@@ -304,22 +421,39 @@ fn clip_emit(): nil {
 // ── public ops (called by std.gg routing) ───────────────────────────
 
 pub fn set_prefer(p: str): nil { _prefer = p; }
-pub fn driver(): str { return _drv; }
-pub fn attached(): int { return _attached; }
 
-// attach binds the selected native driver to an externally-owned window.
-// Returns 1 on success; caller falls back to the rt path on 0.
+pub fn driver(): str { return _drv; }
+
 pub fn attach(hwnd: int, w: int, h: int): int {
     unsafe {
-        var b = native.gfx_backend(_prefer);
-        if (b == "none" or b == "metal") { return 0; }
-        _drv = b;
-        if (drv_attach(hwnd, w, h) == 0) { _drv = ""; return 0; }
-        _w = w; _h = h;
-        _attached = 1;
-        _vcount = 0;
-        _clip_n = 0;
-        return 1;
+        if (_attached != 0) { return 1; }
+        var env_vsync = osenv.getenv_or("LYMAR_VSYNC", "1");
+        var sync = 1;
+        if (env_vsync == "0") { sync = 0; }
+        if (osid.TARGET_OS == osid.OS_WINDOWS) { d3d.gfx_set_vsync(sync); }
+        vk.gfx_set_vsync(sync);
+
+        _drv = "";
+        var first = _prefer;
+        var second = "";
+        if (first == "vulkan") {
+            second = "d3d11";
+        } else {
+            first = "d3d11";
+            second = "vulkan";
+        }
+        _drv = first;
+        if (drv_attach(hwnd, w, h) != 0) {
+            _w = w; _h = h; _attached = 1;
+            return 1;
+        }
+        _drv = second;
+        if (drv_attach(hwnd, w, h) != 0) {
+            _w = w; _h = h; _attached = 1;
+            return 1;
+        }
+        _drv = "";
+        return 0;
     }
 }
 
@@ -330,6 +464,7 @@ pub fn detach(): nil {
         _attached = 0; _frame_open = 0; _pipe_ready = 0;
         _vcount = 0; _clip_n = 0;
         _vs = 0; _ps = 0; _il = 0; _blend = 0; _rast = 0; _depth = 0; _vb = 0;
+        _atlas_tex = 0; _atlas_smp = 0;
     }
 }
 
@@ -338,6 +473,16 @@ pub fn resize(w: int, h: int): int {
     var r = drv_resize(w, h);
     if (r != 0) { _w = w; _h = h; }
     return r;
+}
+
+pub fn save_screenshot(path: str): bool {
+    if (_drv == "vulkan") {
+        return vk.gfx_save_screenshot(path) == 1;
+    }
+    if (osid.TARGET_OS == osid.OS_WINDOWS) {
+        return d3d.gfx_save_screenshot(path) == 1;
+    }
+    return false;
 }
 
 // begin_pass equivalent: opens the driver frame and clears.
@@ -372,33 +517,128 @@ pub fn commit(): int {
     }
 }
 
+// ── geometric primitive emission (Analytical SDF with sub-pixel AA) ──
+
+pub fn draw_rect_rounded(x: float, y: float, w: float, h: float, rad: float,
+                         r: float, g: float, b: float, a: float): nil {
+    if (w <= 0.0 or h <= 0.0 or a <= 0.001) { return; }
+    var hw = w * 0.5;
+    var hh = h * 0.5;
+    var cr = rad;
+    if (cr > hw) { cr = hw; }
+    if (cr > hh) { cr = hh; }
+    if (cr < 0.0) { cr = 0.0; }
+
+    // Expand quad by 1.0px for complete sub-pixel anti-aliasing gradient
+    var qx0 = x - 1.0;
+    var qy0 = y - 1.0;
+    var qx1 = x + w + 1.0;
+    var qy1 = y + h + 1.0;
+    var u0 = 0.0 - hw - 1.0;
+    var v0 = 0.0 - hh - 1.0;
+    var u1 = hw + 1.0;
+    var v1 = hh + 1.0;
+
+    unsafe {
+        vtx(qx0, qy0, u0, v0, r, g, b, a, cr, 0.0, hw, hh);
+        vtx(qx1, qy0, u1, v0, r, g, b, a, cr, 0.0, hw, hh);
+        vtx(qx1, qy1, u1, v1, r, g, b, a, cr, 0.0, hw, hh);
+        vtx(qx0, qy0, u0, v0, r, g, b, a, cr, 0.0, hw, hh);
+        vtx(qx1, qy1, u1, v1, r, g, b, a, cr, 0.0, hw, hh);
+        vtx(qx0, qy1, u0, v1, r, g, b, a, cr, 0.0, hw, hh);
+    }
+}
+
 pub fn draw_rect(x: float, y: float, w: float, h: float,
                  r: float, g: float, b: float, a: float): nil {
-    unsafe { quad(x, y, w, h, r, g, b, a); }
+    draw_rect_rounded(x, y, w, h, 0.0, r, g, b, a);
+}
+
+pub fn draw_rect_border(x: float, y: float, w: float, h: float, rad: float, border_w: float,
+                        r: float, g: float, b: float, a: float): nil {
+    if (w <= 0.0 or h <= 0.0 or border_w <= 0.0 or a <= 0.001) { return; }
+    var hw = w * 0.5;
+    var hh = h * 0.5;
+    var cr = rad;
+    if (cr > hw) { cr = hw; }
+    if (cr > hh) { cr = hh; }
+    if (cr < 0.0) { cr = 0.0; }
+
+    var bw = border_w;
+    if (bw > hw) { bw = hw; }
+    if (bw > hh) { bw = hh; }
+
+    // Expand quad by 1.0px for outer sub-pixel anti-aliasing
+    var qx0 = x - 1.0;
+    var qy0 = y - 1.0;
+    var qx1 = x + w + 1.0;
+    var qy1 = y + h + 1.0;
+    var u0 = 0.0 - hw - 1.0;
+    var v0 = 0.0 - hh - 1.0;
+    var u1 = hw + 1.0;
+    var v1 = hh + 1.0;
+
+    unsafe {
+        vtx(qx0, qy0, u0, v0, r, g, b, a, cr, bw, hw, hh);
+        vtx(qx1, qy0, u1, v0, r, g, b, a, cr, bw, hw, hh);
+        vtx(qx1, qy1, u1, v1, r, g, b, a, cr, bw, hw, hh);
+        vtx(qx0, qy0, u0, v0, r, g, b, a, cr, bw, hw, hh);
+        vtx(qx1, qy1, u1, v1, r, g, b, a, cr, bw, hw, hh);
+        vtx(qx0, qy1, u0, v1, r, g, b, a, cr, bw, hw, hh);
+    }
+}
+
+pub fn draw_shadow(x: float, y: float, w: float, h: float,
+                   r: float, g: float, b: float, a: float,
+                   radius: float, blur: float): nil {
+    if (w <= 0.0 or h <= 0.0 or a <= 0.001) { return; }
+    var bl = blur;
+    if (bl < 0.5) { bl = 0.5; }
+
+    var hw = w * 0.5;
+    var hh = h * 0.5;
+    var cr = radius;
+    if (cr > hw) { cr = hw; }
+    if (cr > hh) { cr = hh; }
+    if (cr < 0.0) { cr = 0.0; }
+
+    // Expand quad by blur * 2.5 for Gaussian falloff reach
+    var ext = bl * 2.5;
+    var qx0 = x - ext;
+    var qy0 = y - ext;
+    var qx1 = x + w + ext;
+    var qy1 = y + h + ext;
+    var u0 = 0.0 - hw - ext;
+    var v0 = 0.0 - hh - ext;
+    var u1 = hw + ext;
+    var v1 = hh + ext;
+
+    unsafe {
+        // p1 = -bl encodes shadow mode (negative border_w)
+        vtx(qx0, qy0, u0, v0, r, g, b, a, cr, 0.0 - bl, hw, hh);
+        vtx(qx1, qy0, u1, v0, r, g, b, a, cr, 0.0 - bl, hw, hh);
+        vtx(qx1, qy1, u1, v1, r, g, b, a, cr, 0.0 - bl, hw, hh);
+        vtx(qx0, qy0, u0, v0, r, g, b, a, cr, 0.0 - bl, hw, hh);
+        vtx(qx1, qy1, u1, v1, r, g, b, a, cr, 0.0 - bl, hw, hh);
+        vtx(qx0, qy1, u0, v1, r, g, b, a, cr, 0.0 - bl, hw, hh);
+    }
 }
 
 pub fn draw_tri(x1: float, y1: float, x2: float, y2: float,
                 x3: float, y3: float,
                 r: float, g: float, b: float, a: float): nil {
     unsafe {
-        vtx(x1, y1, r, g, b, a);
-        vtx(x2, y2, r, g, b, a);
-        vtx(x3, y3, r, g, b, a);
+        // UV (0.002, 0.002) samples solid white pixel at (0, 0)
+        // p2 <= 0.0 signals text/textured mode (sample atlas)
+        vtx(x1, y1, 0.002, 0.002, r, g, b, a, 0.0, 0.0, 0.0, 0.0);
+        vtx(x2, y2, 0.002, 0.002, r, g, b, a, 0.0, 0.0, 0.0, 0.0);
+        vtx(x3, y3, 0.002, 0.002, r, g, b, a, 0.0, 0.0, 0.0, 0.0);
     }
-}
-
-// shadow approximates as a translucent quad (alpha blend); real blur
-// needs a shader pass - deferred.
-pub fn draw_shadow(x: float, y: float, w: float, h: float,
-                   r: float, g: float, b: float, a: float,
-                   radius: float, blur: float): nil {
-    unsafe { quad(x, y, w, h, r, g, b, a); }
 }
 
 pub fn push_clip(x: float, y: float, w: float, h: float,
                  shape: int, radius: float): nil {
     unsafe {
-        // intersect with current clip in pixel space
         var cur = clip_rect();
         var x0 = x as int; var y0 = y as int;
         var x1 = (x + w) as int; var y1 = (y + h) as int;
@@ -425,9 +665,135 @@ pub fn pop_clip(): nil {
     }
 }
 
-// text rendering needs a glyph atlas texture pipeline - deferred.
-// Kept as a no-op so callers do not crash; metrics still come from the
-// rt CPU path via gg.measure_text.
+fn size_index_for_scale(scale: int): int {
+    if (scale <= 0) { return 0; } // 11px
+    if (scale == 1) { return 1; } // 13px (standard UI)
+    if (scale == 2) { return 4; } // 22px (standard headings)
+    if (scale >= 3) { return 5; } // 28px (large display)
+    return 1;
+}
+
 pub fn draw_text(text_str: str, x: float, y: float,
                  r: float, g: float, b: float, a: float,
-                 scale: int): nil {}
+                 scale: int = 1): nil {
+    unsafe {
+        if (len(text_str) == 0 or a <= 0.001) { return; }
+        if (pipeline_init() == 0) { return; }
+        if (ensure_font_atlas() == 0) { return; }
+
+        var size_idx = size_index_for_scale(scale);
+        var gbuf = ffi.ptr_add(_glyphs_buf, size_idx * 3456); // 96 * 36 = 3456
+        var lh = ffi.load_f32(ffi.ptr_add(_metrics_buf, size_idx * 12 + 8));
+
+        var max_v = _vdata_cap / 48;
+        if (_vcount + len(text_str) * 6 > max_v) {
+            flush_verts();
+        }
+
+        if (_sym_emit_text != nil) {
+            var is_vk = 0;
+            if (_drv == "vulkan") { is_vk = 1; }
+            var cstr = ffi.string_to_cstring(text_str);
+            var new_vc = ffi.foreign_call(_sym_emit_text,
+                [ffi.cstring_as_ptr(cstr), x, y, r, g, b, a, gbuf, lh, _w as float, _h as float, is_vk, _vdata, _vcount, max_v],
+                ffi.TYPE_I32,
+                [ffi.TYPE_PTR, ffi.TYPE_F32, ffi.TYPE_F32, ffi.TYPE_F32, ffi.TYPE_F32, ffi.TYPE_F32, ffi.TYPE_F32, ffi.TYPE_PTR, ffi.TYPE_F32, ffi.TYPE_F32, ffi.TYPE_F32, ffi.TYPE_I32, ffi.TYPE_PTR, ffi.TYPE_I32, ffi.TYPE_I32]) as int;
+            ffi.cstring_free(cstr);
+            _vcount = new_vc;
+            return;
+        }
+
+        var cur_x = x;
+        var cur_y = y;
+        var n = len(text_str);
+        var i = 0;
+        while (i < n) {
+            var ch = _builtin_string_byte_at(text_str, i);
+            if (ch == 10) {
+                cur_y = cur_y + lh;
+                cur_x = x;
+            } elif (ch >= 32 and ch < 128) {
+                var idx = ch - 32;
+                var goff = idx * 36;
+                var p = ffi.ptr_add(gbuf, goff);
+                var ox0 = ffi.load_f32(p);
+                var oy0 = ffi.load_f32(ffi.ptr_add(p, 4));
+                var ox1 = ffi.load_f32(ffi.ptr_add(p, 8));
+                var oy1 = ffi.load_f32(ffi.ptr_add(p, 12));
+                var gu0 = ffi.load_f32(ffi.ptr_add(p, 16));
+                var gv0 = ffi.load_f32(ffi.ptr_add(p, 20));
+                var gu1 = ffi.load_f32(ffi.ptr_add(p, 24));
+                var gv1 = ffi.load_f32(ffi.ptr_add(p, 28));
+                var xadv = ffi.load_f32(ffi.ptr_add(p, 32));
+
+                // Snap glyph placement to whole physical pixels to eliminate bilinear blur
+                var sx = (cur_x + 0.5) as int as float;
+                var sy = (cur_y + 0.5) as int as float;
+                var gx0 = sx + ox0;
+                var gy0 = sy + oy0;
+                var gx1 = sx + ox1;
+                var gy1 = sy + oy1;
+
+                vtx(gx0, gy0, gu0, gv0, r, g, b, a, 0.0, 0.0, 0.0, 0.0);
+                vtx(gx1, gy0, gu1, gv0, r, g, b, a, 0.0, 0.0, 0.0, 0.0);
+                vtx(gx1, gy1, gu1, gv1, r, g, b, a, 0.0, 0.0, 0.0, 0.0);
+                vtx(gx0, gy0, gu0, gv0, r, g, b, a, 0.0, 0.0, 0.0, 0.0);
+                vtx(gx1, gy1, gu1, gv1, r, g, b, a, 0.0, 0.0, 0.0, 0.0);
+                vtx(gx0, gy1, gu0, gv1, r, g, b, a, 0.0, 0.0, 0.0, 0.0);
+
+                cur_x = cur_x + xadv;
+            }
+            i = i + 1;
+        }
+    }
+}
+
+pub fn measure_text(text_str: str, scale: int = 1): float {
+    unsafe {
+        if (len(text_str) == 0) { return 0.0; }
+        if (ensure_font_atlas() == 0) {
+            return (len(text_str) * 8 * scale) as float;
+        }
+        var size_idx = size_index_for_scale(scale);
+        var gbuf = ffi.ptr_add(_glyphs_buf, size_idx * 3456);
+
+        if (_sym_measure_text != nil) {
+            var cstr = ffi.string_to_cstring(text_str);
+            var w = ffi.foreign_call(_sym_measure_text,
+                [ffi.cstring_as_ptr(cstr), gbuf],
+                ffi.TYPE_F32,
+                [ffi.TYPE_PTR, ffi.TYPE_PTR]) as float;
+            ffi.cstring_free(cstr);
+            return w;
+        }
+
+        var max_w = 0.0;
+        var cur_w = 0.0;
+        var n = len(text_str);
+        var i = 0;
+        while (i < n) {
+            var ch = _builtin_string_byte_at(text_str, i);
+            if (ch == 10) {
+                if (cur_w > max_w) { max_w = cur_w; }
+                cur_w = 0.0;
+            } elif (ch >= 32 and ch < 128) {
+                var idx = ch - 32;
+                var xadv = ffi.load_f32(ffi.ptr_add(gbuf, idx * 36 + 32));
+                cur_w = cur_w + xadv;
+            }
+            i = i + 1;
+        }
+        if (cur_w > max_w) { max_w = cur_w; }
+        return max_w;
+    }
+}
+
+pub fn get_line_height(scale: int = 1): float {
+    unsafe {
+        if (ensure_font_atlas() == 0) {
+            return (16 * scale) as float;
+        }
+        var size_idx = size_index_for_scale(scale);
+        return ffi.load_f32(ffi.ptr_add(_metrics_buf, size_idx * 12 + 8));
+    }
+}

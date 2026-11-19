@@ -107,7 +107,10 @@ enum class ResourceOperation : uint32_t {
     // args = [handle:int, width:int, height:int]; returns bool.
     ATTACH_WINDOW = 68,
     DETACH_WINDOW = 69,
-    DRAW_SHADOW = 70
+    DRAW_SHADOW = 70,
+    TIME_NOW = 71,
+    TIME_MONOTONIC = 72,
+    TIME_SLEEP = 73
 };
 
 } // namespace VM
