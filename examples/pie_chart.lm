@@ -1,0 +1,128 @@
+// examples/pie_chart.lm
+// Standalone pie chart showcase — large wedges rendered through the
+// analytic SDF path (D3D11) for crispness checks, plus the stock
+// ui.pie_chart widget for comparison.
+
+import std.app as app;
+import std.ui as ui;
+import std.ui.component as comp;
+import std.ui.component show Placed;
+import std.ui.types as ui_types;
+import std.ui.event as uievent;
+import std.ui.draw_list as dl;
+import std.ui.theme as uitheme;
+import std.events as events;
+import std.color as color;
+
+// Large fixed-size pie drawn directly into the draw list — same wedge
+// command the Chart widget emits, at showcase scale.
+frame BigPie {
+    embed Placed;
+    pub var values: [float];
+    pub var pal_r: [float];
+    pub var pal_g: [float];
+    pub var pal_b: [float];
+    pub var fixed_w: float;
+    pub var fixed_h: float;
+    pub var surface: color.Color;
+    pub var text: color.Color;
+
+    pub init(vals: [float], w: float, h: float) {
+        val pal = uitheme.palette();
+        self.values = vals;
+        self.pal_r = [0.39, 0.06, 0.96, 0.94, 0.23, 0.55, 0.20, 0.80, 0.90, 0.45, 0.70, 0.35];
+        self.pal_g = [0.40, 0.72, 0.62, 0.27, 0.51, 0.36, 0.70, 0.30, 0.55, 0.75, 0.40, 0.65];
+        self.pal_b = [0.95, 0.50, 0.04, 0.27, 0.96, 0.96, 0.90, 0.60, 0.20, 0.85, 0.95, 0.55];
+        self.fixed_w = w;
+        self.fixed_h = h;
+        self.surface = pal.surface;
+        self.text = pal.text_primary;
+        self.id = comp.next_widget_id();
+    }
+
+    pub fn kind(): ui_types.WidgetKind { return ui_types.WidgetKind.PieChart; }
+    pub fn on_theme_changed(): nil { }
+    pub fn on_overlay_dismiss(): nil { }
+    pub fn wants_pointer_capture(): int { return 0; }
+
+    pub fn measure(min_w: float, max_w: float, min_h: float, max_h: float): comp.Size {
+        var w: float = self.fixed_w;
+        var h: float = self.fixed_h;
+        if (w < min_w) { w = min_w; }
+        if (w > max_w) { w = max_w; }
+        if (h < min_h) { h = min_h; }
+        if (h > max_h) { h = max_h; }
+        return comp.Size(w=w, h=h);
+    }
+
+    pub fn paint(): nil {
+        dl.dl_emit_rect_rounded(dl.paint_ctx.dl, self.rect.x, self.rect.y,
+            self.rect.w, self.rect.h, 8.0,
+            self.surface.r, self.surface.g, self.surface.b, self.surface.a);
+
+        var vals = self.values;
+        var total: float = 0.0;
+        var i = 0;
+        while (i < len(vals)) {
+            total = total + vals[i];
+            i = i + 1;
+        }
+        if (total <= 0.0) { total = 1.0; }
+
+        var pie_r: float = self.rect.h * 0.40;
+        if (pie_r > self.rect.w * 0.45) { pie_r = self.rect.w * 0.45; }
+        var cx: float = self.rect.x + self.rect.w * 0.5;
+        var cy: float = self.rect.y + self.rect.h * 0.5;
+
+        var cur: float = -1.5707963;
+        var si = 0;
+        while (si < len(vals)) {
+            var v = vals[si];
+            if (v > 0.0) {
+                var sweep: float = (v / total) * 6.2831853;
+                var end_ang: float = cur + sweep;
+                var pi: int = si % 12;
+                dl.dl_add(dl.paint_ctx.dl, dl.dcmd_wedge(cx, cy, pie_r,
+                    cur, end_ang, self.pal_r[pi], self.pal_g[pi], self.pal_b[pi], 1.0));
+                cur = end_ang;
+            }
+            si = si + 1;
+        }
+    }
+
+    pub fn on_event(t: events.EventType, x: int, y: int, key: int): uievent.EventResult {
+        return uievent.EventResult.Ignored;
+    }
+}
+
+fn big_pie(vals: [float], w: float, h: float): BigPie {
+    return BigPie(vals, w, h);
+}
+
+fn main(): int {
+    uitheme.set_dark();
+
+    var a = app.App("Pie Chart — SDF Wedge", 960, 640);
+
+    var root = ui.column(12.0);
+    root.pad_x = 16.0;
+    root.pad_y = 16.0;
+    root.add(ui.label("Pie Chart Showcase (analytic wedge SDF)", color.rgb(120, 160, 255)));
+
+    var gallery_vals = [12.0, 34.0, 21.0, 55.0, 42.0, 78.0];
+    var row1 = ui.row(14.0);
+    row1.add(big_pie(gallery_vals, 300.0, 260.0));
+    row1.add(big_pie([50.0], 300.0, 260.0));
+    row1.add(big_pie([8.0, 8.0, 8.0, 8.0, 8.0, 8.0, 8.0, 8.0, 8.0, 8.0, 8.0, 8.0], 300.0, 260.0));
+    root.add(row1);
+
+    var row2 = ui.row(14.0);
+    row2.add(ui.pie_chart("Stock widget (small)", gallery_vals));
+    row2.add(ui.pie_chart("Stock widget (small)", [90.0, 10.0]));
+    root.add(row2);
+
+    a.ui(root);
+    a.run();
+    print("pie_chart shutdown");
+    return 0;
+}

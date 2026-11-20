@@ -18,7 +18,8 @@ enum DrawCmdKind {
     ClipPop,
     Triangle,
     Image,
-    Shadow
+    Shadow,
+    Wedge
 }
 
 // ── DrawCmd ───────────────────────────────────────────────────────────────────
@@ -133,6 +134,17 @@ pub fn dcmd_shadow(x: float, y: float, w: float, h: float, r: float, g: float, b
     c.r = r; c.g = g; c.b = b; c.a = a;
     c.x2 = off_x; c.y2 = off_y; c.x3 = blur; c.y3 = spread;
     c.radius = radius;
+    return c;
+}
+
+// Pie slice wedge: x=cx, y=cy, w=radius, x2=a0 (rad), y2=a1 (rad).
+pub fn dcmd_wedge(cx: float, cy: float, radius: float, a0: float, a1: float,
+                  r: float, g: float, b: float, a: float): DrawCmd {
+    var c = DrawCmd();
+    c.kind = DrawCmdKind.Wedge;
+    c.x = cx; c.y = cy; c.w = radius;
+    c.x2 = a0; c.y2 = a1;
+    c.r = r; c.g = g; c.b = b; c.a = a;
     return c;
 }
 

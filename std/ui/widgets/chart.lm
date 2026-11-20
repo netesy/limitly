@@ -17,10 +17,7 @@ import std.ui.tree as tree;
 import std.events as events;
 import std.color as color;
 import std.ui.theme as uitheme;
-import std.math as math;
-import std.text.controller as text_ctrl;
 import std.text.shaping as textshape;
-import std.ui.text_metrics as tm;
 
 frame Chart {
     embed Placed;
@@ -197,18 +194,8 @@ frame Chart {
                 var cr = self.pal_r[pi];
                 var cg = self.pal_g[pi];
                 var cb = self.pal_b[pi];
-                var a = cur_angle;
-                while (a < end_ang) {
-                    var next_a: float = a + 0.08;
-                    if (next_a > end_ang) { next_a = end_ang; }
-                    var x1: float = pie_cx + pie_r * math.cos(a);
-                    var y1: float = pie_cy + pie_r * math.sin(a);
-                    var x2: float = pie_cx + pie_r * math.cos(next_a);
-                    var y2: float = pie_cy + pie_r * math.sin(next_a);
-                    dl.dl_add(dl.paint_ctx.dl, dl.dcmd_triangle(pie_cx, pie_cy, x1, y1, x2, y2,
-                        cr, cg, cb, 1.0));
-                    a = next_a;
-                }
+                dl.dl_add(dl.paint_ctx.dl, dl.dcmd_wedge(pie_cx, pie_cy, pie_r,
+                    cur_angle, end_ang, cr, cg, cb, 1.0));
                 cur_angle = end_ang;
             }
             si = si + 1;
