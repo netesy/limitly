@@ -75,7 +75,7 @@ namespace LIR {
 namespace {
 
 constexpr char kMagic[4] = {'L', 'I', 'R', '1'};
-constexpr uint8_t kVersion = 3; // v3: register_language_types payload appended
+constexpr uint8_t kVersion = 4; // v4: return_language_type payload appended
 
 enum class ConstTag : uint8_t {
     None         = 0,
@@ -787,6 +787,10 @@ std::vector<uint8_t> Serializer::serialize(const LIR_Function& func) {
         w.u32(kv.first);
         write_lang_type(w, kv.second, 0);
     }
+
+    // Declared language return type for erased-boundary tagging (version 4+)
+    w.u8(func.return_language_type ? 1 : 0);
+    if (func.return_language_type) write_lang_type(w, func.return_language_type, 0);
     return w.buf;
 }
 
@@ -949,6 +953,9 @@ LIR_Function Serializer::deserialize(const std::vector<uint8_t>& buffer) {
         if (reg >= func.register_count) throw std::runtime_error("LIR deserialize: invalid language-type register");
         func.register_language_types[reg] = read_lang_type(r, 0);
     }
+
+    // Declared language return type for erased-boundary tagging (version 4+)
+    if (r.u8()) func.return_language_type = read_lang_type(r, 0);
 
     if (r.pos != buffer.size()) throw std::runtime_error("LIR deserialize: trailing data");
     std::vector<std::string> ownership_errors;

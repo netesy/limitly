@@ -246,6 +246,7 @@ void Generator::lower_function_bodies(const LM::Frontend::TypeCheckResult& type_
         lir_func->ownership_captures_ = result->ownership_captures;
         lir_func->ownership_provenance_ = result->ownership_provenance;
         lir_func->register_count_ = result->register_count;
+    lir_func->return_language_type = result->return_language_type;
         lir_func->setRegisterLanguageTypes(result->register_language_types);
         lir_func->setRegisterTypes(result->register_types);
         lir_func->setInstructions(result->instructions);

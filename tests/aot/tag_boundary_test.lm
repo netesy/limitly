@@ -1,0 +1,100 @@
+// Option 2 Stage 1 boundary stress: tagged LmValue at managed-memory edges.
+frame Box {
+    pub v: any;
+    pub n: int;
+    pub init(x: any, i: int) {
+        self.v = x;
+        self.n = i;
+    }
+}
+
+fn main() {
+    // ---- SMI-range ints through [any] ----
+    var smis = [0, -1, 42, -999999];
+    iter (i in 0..4) {
+        var got = smis[i] as int;
+        print("smi[{i}] = {got}");
+    }
+
+    // ---- boundary ints ----
+    var big = 1152921504606846975;   // 2^60 - 1
+    var negbig = -1152921504606846976; // -2^60
+    var over = 1152921504606846976;  // 2^60 -> boxed TYPE_I64
+    var under = -1152921504606846977;
+    var maxv = 9223372036854775807;  // INT64_MAX
+    var minv = -9223372036854775807 - 1; // INT64_MIN
+    var boundary = [big, negbig, over, under, maxv, minv];
+    iter (i in 0..6) {
+        var got = boundary[i] as int;
+        print("big[{i}] = {got}");
+    }
+    // typed arithmetic readback
+    var sum: int = 0;
+    iter (i in 0..6) {
+        sum = sum + (boundary[i] as int);
+    }
+    print("bigsum = {sum}");
+
+    // ---- bool / nil / float / str / nested ----
+    var mixed = [true, false, nil, 3.5, "hello", [1, 2]];
+    iter (i in 0..6) {
+        print("mixed[{i}] = {mixed[i]}");
+    }
+    var tb = mixed[0] as bool;
+    var fb = mixed[1] as bool;
+    print("bools = {tb} {fb}");
+
+    // ---- dict {str: any} ----
+    var d = {} as {str: any};
+    d["a"] = 42;
+    d["b"] = over;
+    d["c"] = "str";
+    d["d"] = true;
+    print("dict a = {d["a"] as int}");
+    print("dict b = {d["b"] as int}");
+    print("dict c = {d["c"]}");
+    print("dict d = {d["d"] as bool}");
+
+    // ---- frame any field ----
+    var bx = Box(over, 7);
+    print("frame v = {bx.v as int}");
+    print("frame n = {bx.n}");
+    bx.v = -999999;
+    print("frame v2 = {bx.v as int}");
+
+    // ---- tuple ----
+    var t = (over, "tuple", true);
+    print("tuple0 = {t.0 as int}");
+    print("tuple1 = {t.1}");
+    print("tuple2 = {t.2 as bool}");
+
+    // ---- typed list fast path untouched ----
+    var typed = [10, 20, 30];
+    var tsum: int = 0;
+    iter (i in 0..3) { tsum = tsum + typed[i]; }
+    print("typed sum = {tsum}");
+
+    // ---- direct print(any) + interpolation: SMI / boxed / bool / nil / float / str ----
+    var pa: any = 42;
+    print(pa);
+    print("{pa}");
+    var pb: any = over;          // boxed TYPE_I64 (> 2^60)
+    print(pb);
+    print("{pb}");
+    var pc: any = true;
+    print(pc);
+    print("{pc}");
+    var pd: any = nil;
+    print(pd);
+    print("{pd}");
+    var pe: any = 2.5;
+    print(pe);
+    print("{pe}");
+    var pf: any = "dyn";
+    print(pf);
+    print("{pf}");
+    // any -> any aliasing keeps the tagged word
+    var pg: any = pa;
+    print(pg);
+    print("{pg}");
+}

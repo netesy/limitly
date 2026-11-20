@@ -720,6 +720,7 @@ void FyraBuiltinFunctions::emit_list_ir(ir::Module* module, ir::IRBuilder* build
         builder->setInsertPoint(b_entry);
         ir::Value* hint = fn_new->getParameters().front().get();
         ir::Instruction* cap_slot = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
+        cap_slot->setName("scalar_slot_cap");
         builder->createStore(hint, cap_slot);
         ir::Value* is_zero = builder->createCsle(hint, ctx->getConstantInt(i64, 0));
         builder->createBr(is_zero, b_default_cap, b_alloc);
@@ -774,7 +775,8 @@ void FyraBuiltinFunctions::emit_list_ir(ir::Module* module, ir::IRBuilder* build
         ir::Value* list_ptr = builder->createAnd(raw_list_ptr, ctx->getConstantInt(i64, ~7ULL));
         ir::Value* data_ptr_slot = builder->createAdd(list_ptr, ctx->getConstantInt(i64, 8));
         ir::Value* data = builder->createLoadl(data_ptr_slot);
-        ir::Value* kind = builder->createAnd(builder->createLoadl(list_ptr), ctx->getConstantInt(i64, 0xFFFFFFFF));
+        ir::Value* hdr = builder->createLoadl(list_ptr);
+        ir::Value* kind = builder->createAnd(hdr, ctx->getConstantInt(i64, 0xFFFFFFFF));
         ir::Value* is_tuple = builder->createCeq(kind, ctx->getConstantInt(i64, 3));
 
         ir::BasicBlock* b_list = builder->createBasicBlock("get_list", fn_get);
@@ -785,7 +787,11 @@ void FyraBuiltinFunctions::emit_list_ir(ir::Module* module, ir::IRBuilder* build
         ir::Value* offset = builder->createMul(index, ctx->getConstantInt(i64, 8));
         ir::Value* elem_ptr = builder->createAdd(data, offset);
         ir::Value* val = builder->createLoadl(elem_ptr);
-        builder->createRet(val);
+        // Primitive-storage lists keep raw int/bool elements; decode them into
+        // tagged LmValue words via the header's element-storage kind.
+        ir::Value* elem_kind = builder->createShr(hdr, ctx->getConstantInt(i64, 32));
+        ir::Value* decoded = builder->createExternCall("lymar_aot_list_elem_decode", {val, elem_kind}, i64);
+        builder->createRet(decoded);
 
         builder->setInsertPoint(b_tuple);
         ir::Value* t_offset = builder->createMul(index, ctx->getConstantInt(i64, 8));
@@ -890,7 +896,11 @@ void FyraBuiltinFunctions::emit_list_ir(ir::Module* module, ir::IRBuilder* build
         ir::Value* cur_data = builder->createLoadl(cur_data_slot);
         ir::Value* ins_off = builder->createMul(index, ctx->getConstantInt(i64, 8));
         ir::Value* ins_ptr = builder->createAdd(cur_data, ins_off);
-        builder->createStore(val, ins_ptr);
+        // Encode the tagged value into the list's element-storage kind so
+        // erased-view writes into primitive lists stay raw int/bool.
+        ir::Value* set_hdr = builder->createLoadl(list_ptr);
+        ir::Value* set_kind = builder->createShr(set_hdr, ctx->getConstantInt(i64, 32));
+        builder->createExternCall("lymar_aot_list_elem_store", {ins_ptr, val, set_kind}, void_ty);
         builder->createRet(nullptr);
     }
 
@@ -1023,12 +1033,12 @@ void FyraBuiltinFunctions::emit_list_ir(ir::Module* module, ir::IRBuilder* build
         ir::BasicBlock* b_e_done = builder->createBasicBlock("e_done", fn_l2s);
 
         ir::Value* is_valid_ptr = builder->createExternCall("lymar_aot_is_print_object",
-            {elem_val, ctx->getConstantInt(i64, 0)}, i64);
+            {elem_val}, i64);
 
         builder->createBr(is_valid_ptr, b_e_ptr, b_e_num);
 
         builder->setInsertPoint(b_e_num);
-        ir::Value* estr_num = builder->createExternCall("lymar_aot_scalar_to_string", {elem_val, ctx->getConstantInt(i64, 0)}, i64);
+        ir::Value* estr_num = builder->createExternCall("lymar_aot_scalar_to_string", {elem_val}, i64);
         builder->createStore(estr_num, elem_str_slot);
         builder->createJmp(b_e_done);
 
@@ -1113,13 +1123,15 @@ void FyraBuiltinFunctions::emit_tuple_ir(ir::Module* module, ir::IRBuilder* buil
         auto* bounds = builder->createBasicBlock("tuple_bounds", fn_get);
         auto* access = builder->createBasicBlock("tuple_access", fn_get);
         auto zero = ctx->getConstantInt(i64, 0);
-        auto valid_object = builder->createExternCall("lymar_aot_is_object", {tuple_ptr, zero}, i64);
+        auto valid_object = builder->createExternCall("lymar_aot_is_object", {tuple_ptr}, i64);
         builder->createBr(valid_object, typed, invalid);
         builder->setInsertPoint(typed);
         auto type = builder->createAnd(builder->createLoadl(tuple_ptr), ctx->getConstantInt(i64, 0xffffffff));
         builder->createBr(builder->createCeq(type, ctx->getConstantInt(i64, 3)), bounds, invalid);
         builder->setInsertPoint(bounds);
-        index = builder->createExternCall("lymar_aot_string_index", {index, zero}, i64);
+        // The index operand is a raw i64 (LIR index registers are unboxed);
+        // lymar_aot_string_index expects a tagged LmValue and would decode
+        // raw 1 as SMI 0.
         auto count = builder->createLoadl(builder->createAdd(tuple_ptr, ctx->getConstantInt(i64, 16)));
         // Unsigned comparison rejects negative indices as well as indices >= size.
         builder->createBr(builder->createCult(index, count), access, invalid);
@@ -1175,7 +1187,7 @@ void FyraBuiltinFunctions::emit_dict_ir(ir::Module* module, ir::IRBuilder* build
         // The ownership lowering pass supplies both operand kinds, including
         // dictionary keys and direct/indirect callable dispatch strings.
         builder->createRet(builder->createExternCall("lymar_aot_value_equal",
-            {left, right, ctx->getConstantInt(i64, 0), ctx->getConstantInt(i64, 0)}, i64));
+            {left, right}, i64));
     }
 
     // 1. lm_dict_new() -> i64
@@ -2987,7 +2999,7 @@ void FyraBuiltinFunctions::emit_string_from_bytes_ir(ir::Module* module, ir::IRB
     builder->setInsertPoint(b_body);
     ir::Value* elem_off = builder->createMul(i, ctx->getConstantInt(i64, 8));
     ir::Value* elem_addr = builder->createAdd(data_buf, elem_off);
-    ir::Value* elem_val = builder->createExternCall("lymar_aot_ffi_list_integer",{list_ptr,i},i64);
+    ir::Value* elem_val = builder->createExternCall("lymar_aot_ffi_list_integer",{list_ptr},i64);
     ir::Value* byte_val = builder->createCast(elem_val, ctx->getIntegerType(8));
 
     builder->createStoreb(byte_val, builder->createAdd(dst_data, i));

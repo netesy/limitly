@@ -239,6 +239,7 @@ void Generator::generate_function(LM::Frontend::AST::FunctionDeclaration& fn) {
 
     m_is_terminated = false;
     current_function_ = std::make_unique<LIR_Function>(fn.name, total_params);
+    current_function_->return_language_type = fn.returnType.has_value() ? convert_ast_type_to_lir_type(fn.returnType.value()) : nullptr;
     next_register_ = total_params;
 
     if (is_closure) {
@@ -373,6 +374,7 @@ void Generator::generate_function(LM::Frontend::AST::FunctionDeclaration& fn) {
     lir_func->ownership_captures_ = result->ownership_captures;
     lir_func->ownership_provenance_ = result->ownership_provenance;
     lir_func->register_count_ = result->register_count;
+    lir_func->return_language_type = result->return_language_type;
     lir_func->setInstructions(result->instructions);
     lir_func->setRegisterLanguageTypes(result->register_language_types);
     lir_func->setRegisterTypes(result->register_types);

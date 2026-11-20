@@ -497,6 +497,27 @@ void Generator::emit_var_stmt(LM::Frontend::AST::VarDeclaration& stmt) {
             Backend::Value nil_val = VAL_NIL;
             emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Void, val_reg, nil_val));
         }
+        // Erased-domain bindings (any/union/optional) must hold tagged LmValue
+        // words. Aliasing the producer register would relabel it and store the
+        // raw word unconverted; route through a fresh erased-typed Mov so the
+        // backend materializes the tagged representation at the boundary.
+        if (declared_type) {
+            TypePtr probe = declared_type;
+            if (stmt.type.has_value()) {
+                auto& ta = *stmt.type.value();
+                if (ta.isOptional || ta.isFallible) {
+                    ::UnionType ut;
+                    ut.types.push_back(declared_type);
+                    ut.types.push_back(std::make_shared<::Type>(::TypeTag::Nil));
+                    probe = std::make_shared<::Type>(::TypeTag::Union, ut);
+                }
+            }
+            if (language_type_to_abi_type(probe) == Type::Ptr && stmt.initializer) {
+                Reg tagged_reg = allocate_register();
+                emit_instruction(LIR_Inst(LIR_Op::Mov, Type::Ptr, tagged_reg, val_reg, 0));
+                val_reg = tagged_reg;
+            }
+        }
         bind_variable(stmt.name, val_reg);
         if (declared_type) {
             // declared_type is the bare base type; re-apply the ? / ?E modifiers

@@ -26,13 +26,14 @@ struct NativeGraphicsAccess {
     static Value boolean(bool value) { return {value ? uint64_t(1) : uint64_t(0), boolean_kind}; }
     static Value nil() { return {2, object_kind}; }
     static void* list(Value value);
-    static int64_t integer(Value value) { return static_cast<int64_t>(lymar_aot_to_integer(value.word, value.kind)); }
-    static double floating(Value value) { return lymar_aot_to_float(value.word, value.kind); }
+    static int64_t integer(Value value) { return static_cast<int64_t>(lymar_aot_to_integer(value.word)); }
+    static double floating(Value value) { return lymar_aot_to_float(value.word); }
     static const char* string(Value value);
     static size_t length(List* value) { return lymar_aot_ffi_list_size(reinterpret_cast<uint64_t>(value)); }
     static Value item(List* value, size_t index) {
         auto pointer = reinterpret_cast<uint64_t>(value);
-        return {lymar_aot_ffi_list_item(pointer, index), lymar_aot_ffi_list_kind(pointer, index)};
+        auto item_word = lymar_aot_ffi_list_item(pointer, index);
+        return {item_word, lymar_aot_word_kind(item_word)};
     }
     static List* new_list();
     static void append(List*, Value);

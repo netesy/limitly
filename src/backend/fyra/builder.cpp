@@ -824,7 +824,7 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
                     {args, count, c64(n)}, i64ty);
             };
             auto booleanize = [&](ir::Value* v) {
-                return builder_->createExternCall("lymar_aot_boolean", {v}, i64ty);
+                return builder_->createExternCall("lymar_aot_tag_bool", {v}, i64ty);
             };
 
             builder_->setInsertPoint(b_entry);
@@ -1075,6 +1075,7 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
 }
 
 void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::LIR_Function& lir_func) {
+    if (std::getenv("LYMAR_DUMP_LIR")) std::cerr << "=== LIR " << lir_func.name << " ===\n" << LIR::Disassembler(lir_func).disassemble();
     ir::BasicBlock* entry_bb = builder_->createBasicBlock("entry", main_fn);
     builder_->setInsertPoint(entry_bb);
     ir::Value* caller_region = Memory::runtime_regions_proven_unnecessary(lir_func)
@@ -1217,6 +1218,93 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
         for (auto arg : inst.call_args) max_reg = std::max(max_reg, (size_t)arg);
     }
     std::unordered_set<uint32_t> pointer_assigned_regs;
+    // Registers whose slot content is already a tagged LmValue word (SMI,
+    // immediate, or heap pointer produced by an erased-domain runtime call).
+    // Distinct from pointer_assigned_regs: foreign/raw pointers are
+    // pointer-assigned but NOT tagged — they still need tag_pointer boxing
+    // when they cross into an erased slot.
+    std::unordered_set<uint32_t> tagged_word_regs;
+    // A register whose declared language type is erased/dynamic (any, union,
+    // optional, nil, aggregate) holds a tagged LmValue word even when its LIR
+    // result_type is a scalar i64 — e.g. `var x: any = int_call()`. Without
+    // this, the Call/Mov dst stays scalar-classified and word_kind reports 0,
+    // so tagged SMIs reach consumers as "raw" ints (print shows 73 for 9).
+    auto lang_type_is_erased = [&](uint32_t reg) -> bool {
+        auto it = lir_func.register_language_types.find(reg);
+        if (it == lir_func.register_language_types.end() || !it->second) return false;
+        switch (it->second->tag) {
+            case ::TypeTag::Any: case ::TypeTag::Union: case ::TypeTag::ErrorUnion:
+            case ::TypeTag::Nil: case ::TypeTag::String: case ::TypeTag::List:
+            case ::TypeTag::Dict: case ::TypeTag::Tuple: case ::TypeTag::Frame:
+            case ::TypeTag::Enum: case ::TypeTag::Trait: case ::TypeTag::TraitObject:
+            case ::TypeTag::Sum: case ::TypeTag::Function: case ::TypeTag::Closure:
+            case ::TypeTag::Module: case ::TypeTag::Range: case ::TypeTag::Channel:
+            case ::TypeTag::Int128: case ::TypeTag::UInt128:
+                return true;
+            default:
+                return false;
+        }
+    };
+    // Registers whose content is still a tagged LmValue word after lowering.
+    // This is exactly the set untag_word passes through unchanged; scalar
+    // destinations (untag_int/untag_bool/to_float/untag_ptr outputs) hold raw
+    // domain values and must NOT be marked or tag_word would skip encoding.
+    auto lang_type_holds_tagged_word = [&](uint32_t reg) -> bool {
+        auto it = lir_func.register_language_types.find(reg);
+        if (it == lir_func.register_language_types.end() || !it->second) return false;
+        switch (it->second->tag) {
+            case ::TypeTag::Any: case ::TypeTag::Union: case ::TypeTag::ErrorUnion:
+            case ::TypeTag::Sum: case ::TypeTag::Function: case ::TypeTag::Closure:
+            case ::TypeTag::Module: case ::TypeTag::Range: case ::TypeTag::Channel:
+            case ::TypeTag::Int128: case ::TypeTag::UInt128:
+                return true;
+            default:
+                return false;
+        }
+    };
+    auto is_typed_primitive_list = [&](uint32_t r) -> bool {
+        auto it = lir_func.register_language_types.find(r);
+        if (it != lir_func.register_language_types.end() && it->second && it->second->tag == ::TypeTag::List) {
+            auto* lt = std::get_if<ListType>(&it->second->extra);
+            if (lt && lt->elementType) {
+                auto etag = lt->elementType->tag;
+                if (etag != ::TypeTag::List && etag != ::TypeTag::String &&
+                    etag != ::TypeTag::Frame && etag != ::TypeTag::Dict &&
+                    etag != ::TypeTag::Tuple && etag != ::TypeTag::Any &&
+                    etag != ::TypeTag::Enum && etag != ::TypeTag::Trait &&
+                    etag != ::TypeTag::TraitObject &&
+                    etag != ::TypeTag::Union && etag != ::TypeTag::ErrorUnion &&
+                    etag != ::TypeTag::Nil &&
+                    // Floats/decimals box to heap objects — element stores need
+                    // ownership edges, so they are not "primitive" lists.
+                    etag != ::TypeTag::Float32 && etag != ::TypeTag::Float64 &&
+                    etag != ::TypeTag::Decimal2 && etag != ::TypeTag::Decimal4 &&
+                    etag != ::TypeTag::Decimal6) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    };
+    // Typed primitive lists store raw scalar elements; the list header's high
+    // bits record the element-storage kind (0=tagged, 1=raw int, 2=raw bool)
+    // so runtime formatting can decode elements without a kind sidecar.
+    auto typed_list_element_kind = [&](uint32_t r) -> uint64_t {
+        if (!is_typed_primitive_list(r)) return 0;
+        auto it = lir_func.register_language_types.find(r);
+        if (it == lir_func.register_language_types.end() || !it->second) return 0;
+        auto* lt = std::get_if<ListType>(&it->second->extra);
+        if (!lt || !lt->elementType) return 0;
+        switch (lt->elementType->tag) {
+            case ::TypeTag::Bool: return 2;
+            case ::TypeTag::Int: case ::TypeTag::Int8: case ::TypeTag::Int16:
+            case ::TypeTag::Int32: case ::TypeTag::Int64:
+            case ::TypeTag::UInt: case ::TypeTag::UInt8: case ::TypeTag::UInt16:
+            case ::TypeTag::UInt32: case ::TypeTag::UInt64:
+                return 1;
+            default: return 0;
+        }
+    };
     // Bitwise/shift ops route through lymar_aot_bitwise only for erased-word
     // operands: boxed i128/u128 words (Ptr-classified or 128-bit language
     // types). Plain u64 stays on the native path -- its raw-word representation
@@ -1224,13 +1312,36 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
     // fast path would mis-box high-bit results.
     auto bitwise_operand_erased = [&](uint32_t reg, LIR::Type type) {
         if (reg == UINT32_MAX) return false;
-        if (pointer_assigned_regs.count(reg)) return true;
+        // Mirror bitwise_erased's lowering condition: Ptr words and boxed
+        // 128-bit integers only. pointer_assigned alone over-matches boxed
+        // integer constants, which still lower to raw i64 here.
         if (type == LIR::Type::Ptr) return true;
         auto rt = lir_func.register_types.find(reg);
         if (rt != lir_func.register_types.end() && rt->second == LIR::Type::Ptr) return true;
         auto lt = lir_func.register_language_types.find(reg);
         if (lt != lir_func.register_language_types.end() && lt->second &&
             (lt->second->tag == ::TypeTag::Int128 || lt->second->tag == ::TypeTag::UInt128)) return true;
+        return false;
+    };
+    // Scalar-declared destinations (int/uint/bool/float/decimal) hold raw
+    // words even when the producer is pointer-classified — e.g. `pubptr` is
+    // an `int` alias, so `ffi.alloc` results stay address scalars and must
+    // not be object-classified through the register.
+    auto declared_scalar = [&](uint32_t reg) -> bool {
+        auto it = lir_func.register_language_types.find(reg);
+        if (it != lir_func.register_language_types.end() && it->second) {
+            switch (it->second->tag) {
+                case ::TypeTag::Bool:
+                case ::TypeTag::Int: case ::TypeTag::Int8: case ::TypeTag::Int16:
+                case ::TypeTag::Int32: case ::TypeTag::Int64:
+                case ::TypeTag::UInt: case ::TypeTag::UInt8: case ::TypeTag::UInt16:
+                case ::TypeTag::UInt32: case ::TypeTag::UInt64:
+                case ::TypeTag::Float32: case ::TypeTag::Float64:
+                case ::TypeTag::Decimal2: case ::TypeTag::Decimal4: case ::TypeTag::Decimal6:
+                    return true;
+                default: break;
+            }
+        }
         return false;
     };
     for (const auto& inst : lir_func.instructions) {
@@ -1292,7 +1403,10 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                             break;
                     }
                 }
-                if (!scalar_global) pointer_assigned_regs.insert(inst.dst);
+                if (!scalar_global) {
+                    pointer_assigned_regs.insert(inst.dst);
+                    if (lang_type_is_erased(inst.dst)) tagged_word_regs.insert(inst.dst);
+                }
                 break;
             }
             case LIR::LIR_Op::LoadConst:
@@ -1304,13 +1418,27 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             case LIR::LIR_Op::DictGet:
             case LIR::LIR_Op::TupleGet:
             case LIR::LIR_Op::FrameGetField:
-                // Container/frame reads return erased words: floats are heap
-                // boxes and misses yield the nil word, so an F64/F32 result is
-                // an object word, not a native double. Marking it keeps nil
-                // comparisons (raw word == lymar_aot_nil()) and kind=1 float
-                // unboxing correct.
-                if (inst.result_type == LIR::Type::F64 || inst.result_type == LIR::Type::F32)
+                // Erased-typed destinations (`any`/union/frame fields) carry
+                // tagged LmValue words and need the object mark or word_kind
+                // reports 0 and consumers read tag bits as raw ints. Scalar
+                // destinations — including float fields, which untag_word
+                // decodes to native f64 — must stay scalar-classified or
+                // their slots mix boxed pointers with raw doubles.
+                if (lang_type_is_erased(inst.dst)) {
                     pointer_assigned_regs.insert(inst.dst);
+                    if (lang_type_holds_tagged_word(inst.dst)) tagged_word_regs.insert(inst.dst);
+                }
+                break;
+            case LIR::LIR_Op::ListIndex:
+                // Typed-primitive lists load raw unboxed elements; erased
+                // element types yield tagged LmValue words — but only when the
+                // destination is itself erased-typed (untag_word decodes for
+                // scalar destinations, leaving a raw i64 that must stay
+                // scalar-classified).
+                if (!is_typed_primitive_list(inst.a) && lang_type_holds_tagged_word(inst.dst)) {
+                    pointer_assigned_regs.insert(inst.dst);
+                    tagged_word_regs.insert(inst.dst);
+                }
                 break;
             case LIR::LIR_Op::IAdd_Unchecked:
             case LIR::LIR_Op::Add:
@@ -1326,20 +1454,35 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 // box pointer as a raw integer.
                 auto operand_may_be_erased = [&](uint32_t reg, LIR::Type type) {
                     if (reg == UINT32_MAX) return false;
-                    if (pointer_assigned_regs.count(reg)) return true;
+                    // Mirror erased_arithmetic's lowering condition: only Ptr/
+                    // U64 words and boxed 128-bit integers take the tagged
+                    // numeric_binary path. pointer_assigned alone is NOT
+                    // sufficient — boxed integer constants are pointer-classified
+                    // yet still produce raw i64 results here.
                     if (type == LIR::Type::Ptr || type == LIR::Type::U64) return true;
                     auto rt = lir_func.register_types.find(reg);
                     if (rt != lir_func.register_types.end() &&
                         (rt->second == LIR::Type::Ptr || rt->second == LIR::Type::U64)) return true;
                     auto lt = lir_func.register_language_types.find(reg);
-                    if (lt != lir_func.register_language_types.end() && lt->second &&
-                        (lt->second->tag == ::TypeTag::Int128 || lt->second->tag == ::TypeTag::UInt128))
-                        return true;
+                    if (lt != lir_func.register_language_types.end() && lt->second) {
+                        if (lt->second->tag == ::TypeTag::Int128 || lt->second->tag == ::TypeTag::UInt128)
+                            return true;
+                        switch (lt->second->tag) {
+                            case ::TypeTag::Any: case ::TypeTag::Union: case ::TypeTag::ErrorUnion:
+                            case ::TypeTag::Sum: case ::TypeTag::Function: case ::TypeTag::Closure:
+                            case ::TypeTag::Module: case ::TypeTag::Range: case ::TypeTag::Channel:
+                                return true;
+                            default: break;
+                        }
+                    }
                     return false;
                 };
-                if (operand_may_be_erased(inst.a, inst.type_a) ||
-                    operand_may_be_erased(inst.b, inst.type_b))
+                if ((operand_may_be_erased(inst.a, inst.type_a) ||
+                     operand_may_be_erased(inst.b, inst.type_b)) &&
+                    lang_type_holds_tagged_word(inst.dst)) {
                     pointer_assigned_regs.insert(inst.dst);
+                    tagged_word_regs.insert(inst.dst);
+                }
                 break;
             }
             case LIR::LIR_Op::Shl:
@@ -1350,14 +1493,57 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             case LIR::LIR_Op::IAnd_Unchecked:
             case LIR::LIR_Op::IOr_Unchecked:
             case LIR::LIR_Op::IXor_Unchecked:
-                if (bitwise_operand_erased(inst.a, inst.type_a) ||
-                    bitwise_operand_erased(inst.b, inst.type_b) ||
-                    bitwise_operand_erased(inst.dst, LIR::Type::I64))
+                if ((bitwise_operand_erased(inst.a, inst.type_a) ||
+                     bitwise_operand_erased(inst.b, inst.type_b) ||
+                     bitwise_operand_erased(inst.dst, LIR::Type::I64)) &&
+                    lang_type_holds_tagged_word(inst.dst)) {
+                    pointer_assigned_regs.insert(inst.dst);
+                    tagged_word_regs.insert(inst.dst);
+                }
+                break;
+            case LIR::LIR_Op::ChannelPop:
+            case LIR::LIR_Op::ChannelRecv:
+            case LIR::LIR_Op::ChannelPoll:
+                // channel_pop lowers through untag_word: only erased-typed
+                // destinations keep the tagged LmValue word.
+                if (lang_type_holds_tagged_word(inst.dst))
+                    tagged_word_regs.insert(inst.dst);
+                break;
+            case LIR::LIR_Op::Call:
+            case LIR::LIR_Op::CallVoid: {
+                if (!inst.func_name.empty()) {
+                    if (auto* cf = LIR::FunctionRegistry::getInstance().getFunction(inst.func_name)) {
+                        auto* rt = cf->return_language_type.get();
+                        if (rt) {
+                            switch (rt->tag) {
+                                case ::TypeTag::Int: case ::TypeTag::Int8: case ::TypeTag::Int16:
+                                case ::TypeTag::Int32: case ::TypeTag::Int64:
+                                case ::TypeTag::UInt: case ::TypeTag::UInt8: case ::TypeTag::UInt16:
+                                case ::TypeTag::UInt32: case ::TypeTag::UInt64:
+                                case ::TypeTag::Bool:
+                                case ::TypeTag::Float32: case ::TypeTag::Float64:
+                                case ::TypeTag::Decimal2: case ::TypeTag::Decimal4: case ::TypeTag::Decimal6:
+                                    break;
+                                default:
+                                    tagged_word_regs.insert(inst.dst);
+                                    break;
+                            }
+                        }
+                    }
+                }
+                break;
+            }
+            default:
+                if (inst.result_type == LIR::Type::Ptr || lang_type_is_erased(inst.dst))
                     pointer_assigned_regs.insert(inst.dst);
                 break;
-            default:
-                if (inst.result_type == LIR::Type::Ptr) pointer_assigned_regs.insert(inst.dst);
-                break;
+        }
+        // Unwrap/UnwrapOr already normalize through untag_word: scalar-typed
+        // destinations hold raw values, erased-typed destinations still hold
+        // tagged LmValue words. Only the erased case belongs in the tagged set.
+        if (inst.op == LIR::LIR_Op::Unwrap || inst.op == LIR::LIR_Op::UnwrapOr) {
+            if (lang_type_holds_tagged_word(inst.dst))
+                tagged_word_regs.insert(inst.dst);
         }
     }
     // A `Mov` copies the value *and* its dynamic kind (store_reg is called with
@@ -1370,7 +1556,20 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
     while (moved) {
         moved = false;
         for (const auto& inst : lir_func.instructions) {
-            if (inst.dst == UINT32_MAX || pointer_assigned_regs.count(inst.dst)) continue;
+            // Tagged-word domain propagates through Mov and erased-destination
+            // Movs produce tagged words themselves. This must run even for
+            // registers already pointer_assigned (the `continue` below would
+            // otherwise skip Ptr-typed Mov destinations entirely).
+            if (inst.op == LIR::LIR_Op::Mov && inst.dst != UINT32_MAX) {
+                bool dst_erased = false;
+                auto dlt = lir_func.register_language_types.find(inst.dst);
+                if (dlt != lir_func.register_language_types.end() && dlt->second &&
+                    lang_type_is_erased(inst.dst)) dst_erased = true;
+                if ((inst.a != UINT32_MAX && tagged_word_regs.count(inst.a)) || dst_erased) {
+                    if (tagged_word_regs.insert(inst.dst).second) moved = true;
+                }
+            }
+            if (inst.dst == UINT32_MAX || pointer_assigned_regs.count(inst.dst) || declared_scalar(inst.dst)) continue;
             bool propagate = false;
             if (inst.op == LIR::LIR_Op::Mov) {
                 // Mov's source is `a` only (registers[dst] = registers[a]); `b` is
@@ -1392,6 +1591,13 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             }
         }
     }
+    // Final veto: a register whose declared language type is scalar keeps raw
+    // words regardless of producer/propgation marks (pubptr = int alias,
+    // `int` receivers of pointer-producing calls).
+    for (auto it = pointer_assigned_regs.begin(); it != pointer_assigned_regs.end();) {
+        if (declared_scalar(*it)) it = pointer_assigned_regs.erase(it);
+        else ++it;
+    }
 
     std::unordered_map<uint32_t, ir::Instruction*> reg_slots;
     const bool scalar_registers = Memory::runtime_regions_proven_unnecessary(lir_func) && Memory::proven_scalar_leaf(lir_func);
@@ -1402,7 +1608,9 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             if (tag == ::TypeTag::List || tag == ::TypeTag::String || tag == ::TypeTag::Frame ||
                 tag == ::TypeTag::Dict || tag == ::TypeTag::Tuple || tag == ::TypeTag::Any ||
                 tag == ::TypeTag::Enum || tag == ::TypeTag::Trait || tag == ::TypeTag::TraitObject ||
-                tag == ::TypeTag::Union || tag == ::TypeTag::ErrorUnion ||
+                tag == ::TypeTag::Union || tag == ::TypeTag::ErrorUnion || tag == ::TypeTag::Sum ||
+                tag == ::TypeTag::Function || tag == ::TypeTag::Closure || tag == ::TypeTag::Module ||
+                tag == ::TypeTag::Range || tag == ::TypeTag::Channel ||
                 tag == ::TypeTag::Nil || tag == ::TypeTag::Int128 || tag == ::TypeTag::UInt128)
                 return true;
         }
@@ -1424,7 +1632,12 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
 
     auto entry_alloc = [&](ir::Type* type = nullptr, ir::Value* size = nullptr) -> ir::Instruction* {
         auto saved_ip = builder_->getInsertPoint();
-        builder_->setInsertPoint(entry_bb);
+        auto& instrs = entry_bb->getInstructions();
+        if (!instrs.empty() && instrs.back()->getOpcode() <= ir::Instruction::Hlt) {
+            builder_->setInsertPoint(entry_bb, std::prev(instrs.end()));
+        } else {
+            builder_->setInsertPoint(entry_bb);
+        }
         if (!size) size = context_->getConstantInt(context_->getIntegerType(64), 8);
         auto* inst = builder_->createAlloc(size, type ? type : context_->getIntegerType(64));
         if (saved_ip) builder_->setInsertPoint(saved_ip);
@@ -1447,29 +1660,6 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
         }
         param_idx++;
     }
-
-    auto is_typed_primitive_list = [&](uint32_t r) -> bool {
-        auto it = lir_func.register_language_types.find(r);
-        if (it != lir_func.register_language_types.end() && it->second && it->second->tag == ::TypeTag::List) {
-            auto* lt = std::get_if<ListType>(&it->second->extra);
-            if (lt && lt->elementType) {
-                auto etag = lt->elementType->tag;
-                if (etag != ::TypeTag::List && etag != ::TypeTag::String &&
-                    etag != ::TypeTag::Frame && etag != ::TypeTag::Dict &&
-                    etag != ::TypeTag::Tuple && etag != ::TypeTag::Any &&
-                    etag != ::TypeTag::Enum && etag != ::TypeTag::Trait &&
-                    etag != ::TypeTag::TraitObject &&
-                    // Floats/decimals box to heap objects — element stores need
-                    // ownership edges, so they are not "primitive" lists.
-                    etag != ::TypeTag::Float32 && etag != ::TypeTag::Float64 &&
-                    etag != ::TypeTag::Decimal2 && etag != ::TypeTag::Decimal4 &&
-                    etag != ::TypeTag::Decimal6) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    };
 
     std::unordered_map<uint32_t, ir::Value*> hoisted_data_ptrs;
     size_t num_params = main_fn->getParameters().size();
@@ -1547,18 +1737,123 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
         return context_->getConstantInt(context_->getIntegerType(64), 0);
     };
 
-    auto erased_word = [&](ir::Value* value) -> ir::Value* {
-        if (value->getType()->isFloatingPoint())
+    auto tag_word = [&](ir::Value* value, uint32_t reg = UINT32_MAX, LIR::Type type = LIR::Type::Void) -> ir::Value* {
+        if (!value) return context_->getConstantInt(context_->getIntegerType(64), 0);
+        if (value->getType()->isFloatingPoint()) {
             return builder_->createExternCall("lymar_aot_box_float", {value}, context_->getIntegerType(64));
+        }
+        if (value->getType() != context_->getIntegerType(64)) {
+            value = builder_->createCast(value, context_->getIntegerType(64));
+        }
+        if (reg != UINT32_MAX && tagged_word_regs.count(reg)) {
+            // Producer already emitted a tagged LmValue word; re-encoding
+            // would double-tag (SMI -> foreign box or shifted SMI).
+            return value;
+        }
+        if (reg != UINT32_MAX) {
+            auto it = lir_func.register_language_types.find(reg);
+            if (it != lir_func.register_language_types.end() && it->second) {
+                auto tag = it->second->tag;
+                if (tag == ::TypeTag::Bool) {
+                    return builder_->createExternCall("lymar_aot_tag_bool", {value}, context_->getIntegerType(64));
+                }
+                if (tag == ::TypeTag::Nil) {
+                    // VAL_NIL is self-describing in the tagged LmValue domain.
+                    return context_->getConstantInt(context_->getIntegerType(64), VAL_NIL);
+                }
+                if (tag == ::TypeTag::Int || tag == ::TypeTag::Int8 || tag == ::TypeTag::Int16 ||
+                    tag == ::TypeTag::Int32 || tag == ::TypeTag::Int64 ||
+                    tag == ::TypeTag::UInt || tag == ::TypeTag::UInt8 || tag == ::TypeTag::UInt16 ||
+                    tag == ::TypeTag::UInt32 || tag == ::TypeTag::UInt64) {
+                    return builder_->createExternCall("lymar_aot_tag_int", {value}, context_->getIntegerType(64));
+                }
+                if (tag == ::TypeTag::Float32 || tag == ::TypeTag::Float64 ||
+                    tag == ::TypeTag::Decimal2 || tag == ::TypeTag::Decimal4 || tag == ::TypeTag::Decimal6) {
+                    return value;
+                }
+                if (tag == ::TypeTag::String || tag == ::TypeTag::List || tag == ::TypeTag::Frame ||
+                    tag == ::TypeTag::Dict || tag == ::TypeTag::Tuple || tag == ::TypeTag::Trait ||
+                    tag == ::TypeTag::TraitObject) {
+                    return builder_->createExternCall("lymar_aot_tag_pointer", {value}, context_->getIntegerType(64));
+                }
+                if (tag == ::TypeTag::Any || tag == ::TypeTag::Union || tag == ::TypeTag::ErrorUnion ||
+                    tag == ::TypeTag::Sum || tag == ::TypeTag::Function || tag == ::TypeTag::Closure ||
+                    tag == ::TypeTag::Module || tag == ::TypeTag::Range || tag == ::TypeTag::Channel ||
+                    tag == ::TypeTag::Int128 || tag == ::TypeTag::UInt128) {
+                    // Erased words and boxed 128-bit integers already carry
+                    // LmValue tags; re-encoding would double-tag them.
+                    return value;
+                }
+            }
+        }
+        if (type == LIR::Type::Bool) {
+            return builder_->createExternCall("lymar_aot_tag_bool", {value}, context_->getIntegerType(64));
+        }
+        if (type == LIR::Type::Ptr || (reg != UINT32_MAX && pointer_assigned_regs.count(reg))) {
+            return builder_->createExternCall("lymar_aot_tag_pointer", {value}, context_->getIntegerType(64));
+        }
+        if (type == LIR::Type::I64 || type == LIR::Type::I32 || type == LIR::Type::I16 || type == LIR::Type::I8 ||
+            type == LIR::Type::U64 || type == LIR::Type::U32 || type == LIR::Type::U16 || type == LIR::Type::U8) {
+            return builder_->createExternCall("lymar_aot_tag_int", {value}, context_->getIntegerType(64));
+        }
+        if (reg != UINT32_MAX && !is_pointer_lang_type(reg)) {
+            return builder_->createExternCall("lymar_aot_tag_int", {value}, context_->getIntegerType(64));
+        }
         return value;
     };
 
-    // Kind argument for lymar_aot_to_float/to_integer/scalar_to_string: 1
-    // (object) when the register holds an erased word that may be a heap box
-    // or the nil word, 0 (scalar) for raw integers/doubles.
-    auto word_kind = [&](uint32_t r) -> ir::Value* {
-        bool object = pointer_assigned_regs.count(r) || is_pointer_lang_type(r);
-        return context_->getConstantInt(context_->getIntegerType(64), object ? 1 : 0);
+    auto untag_word = [&](ir::Value* word, uint32_t dst_reg = UINT32_MAX, LIR::Type target_type = LIR::Type::Void) -> ir::Value* {
+        if (!word) return word;
+        if (dst_reg != UINT32_MAX) {
+            auto it = lir_func.register_language_types.find(dst_reg);
+            if (it != lir_func.register_language_types.end() && it->second) {
+                auto tag = it->second->tag;
+                if (tag == ::TypeTag::Bool) {
+                    return builder_->createExternCall("lymar_aot_untag_bool", {word}, context_->getIntegerType(64));
+                }
+                if (tag == ::TypeTag::Int || tag == ::TypeTag::Int8 || tag == ::TypeTag::Int16 ||
+                    tag == ::TypeTag::Int32 || tag == ::TypeTag::Int64 ||
+                    tag == ::TypeTag::UInt || tag == ::TypeTag::UInt8 || tag == ::TypeTag::UInt16 ||
+                    tag == ::TypeTag::UInt32 || tag == ::TypeTag::UInt64) {
+                    return builder_->createExternCall("lymar_aot_untag_int", {word}, context_->getIntegerType(64));
+                }
+                if (tag == ::TypeTag::Float32 || tag == ::TypeTag::Float64 ||
+                    tag == ::TypeTag::Decimal2 || tag == ::TypeTag::Decimal4 || tag == ::TypeTag::Decimal6) {
+                    return builder_->createExternCall("lymar_aot_to_float", {word}, context_->getDoubleType());
+                }
+                if (tag == ::TypeTag::String || tag == ::TypeTag::List || tag == ::TypeTag::Frame ||
+                    tag == ::TypeTag::Dict || tag == ::TypeTag::Tuple || tag == ::TypeTag::Trait ||
+                    tag == ::TypeTag::TraitObject) {
+                    return builder_->createExternCall("lymar_aot_untag_ptr", {word}, context_->getIntegerType(64));
+                }
+                if (tag == ::TypeTag::Any || tag == ::TypeTag::Union || tag == ::TypeTag::ErrorUnion ||
+                    tag == ::TypeTag::Sum || tag == ::TypeTag::Function || tag == ::TypeTag::Closure ||
+                    tag == ::TypeTag::Module || tag == ::TypeTag::Range || tag == ::TypeTag::Channel) {
+                    return word;
+                }
+            }
+        }
+        if (target_type == LIR::Type::Bool) {
+            return builder_->createExternCall("lymar_aot_untag_bool", {word}, context_->getIntegerType(64));
+        }
+        if (target_type == LIR::Type::F32 || target_type == LIR::Type::F64) {
+            return builder_->createExternCall("lymar_aot_to_float", {word}, context_->getDoubleType());
+        }
+        if (target_type == LIR::Type::Ptr) {
+            return builder_->createExternCall("lymar_aot_untag_ptr", {word}, context_->getIntegerType(64));
+        }
+        if (target_type == LIR::Type::I64 || target_type == LIR::Type::I32 || target_type == LIR::Type::I16 || target_type == LIR::Type::I8 ||
+            target_type == LIR::Type::U64 || target_type == LIR::Type::U32 || target_type == LIR::Type::U16 || target_type == LIR::Type::U8) {
+            return builder_->createExternCall("lymar_aot_untag_int", {word}, context_->getIntegerType(64));
+        }
+        if (dst_reg != UINT32_MAX && !is_pointer_lang_type(dst_reg) && pointer_assigned_regs.count(dst_reg) == 0) {
+            return builder_->createExternCall("lymar_aot_untag_int", {word}, context_->getIntegerType(64));
+        }
+        return word;
+    };
+
+    auto erased_word = [&](ir::Value* value) -> ir::Value* {
+        return tag_word(value);
     };
 
     auto store_reg = [&](uint32_t r, ir::Value* v, LIR::Type t, bool preserve_kind = false) {
@@ -1575,7 +1870,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
         }
         if (v && t == LIR::Type::Ptr) v = erased_word(v);
         if (v && (t == LIR::Type::F64 || t == LIR::Type::F32) && !v->getType()->isFloatingPoint())
-            v = builder_->createExternCall("lymar_aot_to_float", {v, word_kind(r)}, context_->getDoubleType());
+            v = builder_->createExternCall("lymar_aot_to_float", {v}, context_->getDoubleType());
         if (v && t == LIR::Type::Bool && !preserve_kind) {
             if (v->getType() != context_->getIntegerType(64)) v = builder_->createCast(v, context_->getIntegerType(64));
             // Inlined lymar_aot_boolean (no external call or runtime mutex)
@@ -1596,12 +1891,53 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
         reg_types[r] = t;
     };
 
+    // lymar_aot_numeric_binary / lymar_aot_bitwise return tagged LmValue words
+    // (SMI or heap box). Erased destinations keep the tagged word object-
+    // classified; scalar destinations must untag exactly once or the SMI
+    // encoding leaks into raw-int consumers (and gets tagged a second time).
+    auto store_arith_word = [&](const LIR::LIR_Inst& inst, ir::Value* tagged) {
+        if (lang_type_holds_tagged_word(inst.dst)) {
+            store_reg(inst.dst, tagged, LIR::Type::Ptr, true);
+        } else {
+            store_reg(inst.dst, untag_word(tagged, inst.dst, inst.result_type), inst.result_type);
+        }
+    };
+
+    // CallIndirect dispatch contract: the result slot always holds a tagged
+    // LmValue word. A callee whose declared return type is scalar (int family,
+    // bool, float) hands back a raw domain value, so each matched target's
+    // result must be re-tagged per that callee's own return type. Callees with
+    // erased return types already produce tagged words (Return lowering) and
+    // pass through unchanged; unknown/untyped callees are assumed tagged.
+    auto tag_indirect_result = [&](ir::Value* value, const std::string& fname) -> ir::Value* {
+        if (!value) return value;
+        auto* lf = LIR::FunctionRegistry::getInstance().getFunction(fname);
+        if (!lf || !lf->return_language_type) return erased_word(value);
+        switch (lf->return_language_type->tag) {
+            case ::TypeTag::Bool:
+                return builder_->createExternCall("lymar_aot_tag_bool", {value}, context_->getIntegerType(64));
+            case ::TypeTag::Int: case ::TypeTag::Int8: case ::TypeTag::Int16:
+            case ::TypeTag::Int32: case ::TypeTag::Int64:
+            case ::TypeTag::UInt: case ::TypeTag::UInt8: case ::TypeTag::UInt16:
+            case ::TypeTag::UInt32: case ::TypeTag::UInt64:
+                if (value->getType()->isFloatingPoint())
+                    return builder_->createExternCall("lymar_aot_box_float", {value}, context_->getIntegerType(64));
+                return builder_->createExternCall("lymar_aot_tag_int", {value}, context_->getIntegerType(64));
+            case ::TypeTag::Float32: case ::TypeTag::Float64:
+                if (value->getType()->isFloatingPoint())
+                    return builder_->createExternCall("lymar_aot_box_float", {value}, context_->getIntegerType(64));
+                return value;
+            default:
+                return erased_word(value);
+        }
+    };
+
     auto load_float_reg = [&](uint32_t r, LIR::Type t) -> ir::Value* {
         // Cached SSA values may be erased even when the source register is
         // numerically typed. Convert the actual value, not just its annotation.
         ir::Value* v = load_reg(r, t);
         if (v && !v->getType()->isFloatingPoint()) {
-            return builder_->createExternCall("lymar_aot_to_float", {v, word_kind(r)}, context_->getDoubleType());
+            return builder_->createExternCall("lymar_aot_to_float", {v}, context_->getDoubleType());
         }
         return v;
     };
@@ -1651,11 +1987,11 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
         if (name == "time" && args.empty())
             return builder_->createExternCall("time.now", {}, context_->getIntegerType(64));
         if (name == "_builtin_string_hash_bytes" && args.size() == 1)
-            return builder_->createExternCall("lymar_aot_string_hash", {erased_word(args[0]), zero},
+            return builder_->createExternCall("lymar_aot_string_hash", {erased_word(args[0])},
                 context_->getIntegerType(64));
         if (name == "_builtin_list_slice" && args.size() == 3)
             return builder_->createExternCall("lymar_aot_list_slice",
-                {erased_word(args[0]), erased_word(args[1]), erased_word(args[2]), zero, zero, zero},
+                {erased_word(args[0]), erased_word(args[1]), erased_word(args[2])},
                 context_->getIntegerType(64));
         // String slice/case/trim builtins: the emit_*_ir versions miscompile
         // under Fyra (alloc-slot + loop shapes), so they lower to runtime
@@ -1758,40 +2094,77 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             case LIR::LIR_Op::RegionMove: {
                 bool is_obj = (inst.type_a == LIR::Type::Ptr) || pointer_assigned_regs.count(inst.a) || is_pointer_lang_type(inst.a);
                 builder_->createExternCall("lymar_aot_region_move", {load_reg(inst.a, inst.type_a),
-                    context_->getConstantInt(context_->getIntegerType(64), inst.imm), caller_region,
-                    context_->getConstantInt(context_->getIntegerType(64), is_obj ? 1 : 0)}, nullptr);
+                    context_->getConstantInt(context_->getIntegerType(64), inst.imm), caller_region}, nullptr);
                 break;
             }
             case LIR::LIR_Op::FrameCallDeinit:
                 builder_->createExternCall("lymar_aot_finalize", {load_reg(inst.a, inst.type_a)}, nullptr);
                 break;
             case LIR::LIR_Op::Mov: {
-                if (reg_decimal_scales.count(inst.a)) reg_decimal_scales[inst.dst] = reg_decimal_scales[inst.a];
-                if (reg_int_values.count(inst.a)) reg_int_values[inst.dst] = reg_int_values[inst.a];
-                if (reg_float_values.count(inst.a)) reg_float_values[inst.dst] = reg_float_values[inst.a];
+                auto dst_lang_it = lir_func.register_language_types.find(inst.dst);
+                const bool dst_is_erased = dst_lang_it != lir_func.register_language_types.end() && dst_lang_it->second &&
+                    (dst_lang_it->second->tag == ::TypeTag::Any || dst_lang_it->second->tag == ::TypeTag::Union ||
+                     dst_lang_it->second->tag == ::TypeTag::ErrorUnion);
+                // Scalar constant-folding metadata describes the raw domain.
+                // An erased destination holds a tagged LmValue word, so
+                // inheriting e.g. reg_int_values would make print/arithmetic
+                // consumers read the SMI encoding as a raw integer.
+                if (!dst_is_erased) {
+                    if (reg_decimal_scales.count(inst.a)) reg_decimal_scales[inst.dst] = reg_decimal_scales[inst.a];
+                    if (reg_int_values.count(inst.a)) reg_int_values[inst.dst] = reg_int_values[inst.a];
+                    if (reg_float_values.count(inst.a)) reg_float_values[inst.dst] = reg_float_values[inst.a];
+                }
                 if (reg_string_literals.count(inst.a)) reg_string_literals[inst.dst] = reg_string_literals[inst.a];
                 if (reg_types.count(inst.a)) reg_types[inst.dst] = reg_types[inst.a];
                 else if (inst.type_a != LIR::Type::Void) reg_types[inst.dst] = inst.type_a;
                 auto destination_type = reg_types.count(inst.dst) ? reg_types[inst.dst] : inst.result_type;
-                if (auto info = lir_func.register_language_types.find(inst.dst); info != lir_func.register_language_types.end() && info->second && info->second->tag == ::TypeTag::Any) {
-                    // An `any` binding must still carry the dynamic kind of a
-                    // concrete scalar source (e.g. a typed-list iter element):
-                    // the raw word is not a pointer, and object-kind consumers
-                    // would misread it. Erase to Ptr only for non-scalar sources.
-                    auto src = reg_types.find(inst.a);
-                    const bool src_is_scalar = src != reg_types.end() &&
-                        src->second != LIR::Type::Ptr && src->second != LIR::Type::Void;
-                    if (!src_is_scalar) destination_type = LIR::Type::Ptr;
+                ir::Value* mov_value = load_reg(inst.a, inst.type_a);
+                if (dst_is_erased) {
+                    // `any`/union registers hold tagged LmValue words: tag scalar
+                    // sources on entry; erased sources already carry tags and
+                    // pass through unchanged. A pointer-assigned source is
+                    // already an erased word — routing it through tag_word's
+                    // Ptr branch would tag_pointer() a tagged SMI into a
+                    // bogus TYPE_FOREIGN_PTR box.
+                    const bool src_is_erased_word = inst.a != UINT32_MAX &&
+                        tagged_word_regs.count(inst.a);
+                    mov_value = src_is_erased_word ? mov_value
+                        : tag_word(mov_value, inst.a, inst.type_a);
+                    // The destination now always holds a tagged LmValue word
+                    // (scalar sources were encoded above, erased sources pass
+                    // through), so erased arithmetic/bitwise lowering must see
+                    // the Ptr word domain regardless of the source's scalar
+                    // type.
+                    destination_type = LIR::Type::Ptr;
+                } else if (inst.a != UINT32_MAX && tagged_word_regs.count(inst.a)) {
+                    // Tagged LmValue word flowing into a scalar-typed
+                    // destination must be decoded back to the raw domain;
+                    // copying it verbatim would leak the SMI/tag bits into
+                    // int/float consumers (and double-tag on re-entry).
+                    mov_value = untag_word(mov_value, inst.dst, inst.type_a);
+                    if (inst.result_type != LIR::Type::Void) destination_type = inst.result_type;
                 }
                 // A move copies the value and its dynamic kind. In particular,
                 // a missing typed-container lookup remains nil through aliases.
-                store_reg(inst.dst, load_reg(inst.a, inst.type_a), destination_type, true);
+                store_reg(inst.dst, mov_value, destination_type, true);
                 break;
             }
             case LIR::LIR_Op::LoadConst: {
                 if (inst.type_name == "d2" || inst.type_name == "decimal") reg_decimal_scales[inst.dst] = 2;
                 else if (inst.type_name == "d4") reg_decimal_scales[inst.dst] = 4;
                 else if (inst.type_name == "d6") reg_decimal_scales[inst.dst] = 6;
+
+                // Erased (`any`/union) destinations hold tagged LmValue words.
+                // Scalar constants must be encoded (SMI/bool/immediate) or boxed
+                // (out-of-range int) here — a raw i64 like 2^60 aliases TAG_PTR
+                // and crashes erased-domain consumers.
+                auto dst_lang_it = lir_func.register_language_types.find(inst.dst);
+                const bool dst_erased = dst_lang_it != lir_func.register_language_types.end() && dst_lang_it->second &&
+                    (dst_lang_it->second->tag == ::TypeTag::Any || dst_lang_it->second->tag == ::TypeTag::Union ||
+                     dst_lang_it->second->tag == ::TypeTag::ErrorUnion);
+                auto erased_const = [&](ir::Value* scalar, LIR::Type scalar_type) -> ir::Value* {
+                    return dst_erased ? tag_word(scalar, UINT32_MAX, scalar_type) : scalar;
+                };
 
                 LmValue val = inst.const_val;
                 bool is_float_const = (inst.result_type == LIR::Type::F64 || inst.result_type == LIR::Type::F32 || is_float_op(inst));
@@ -1818,20 +2191,33 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     store_reg(inst.dst, c, LIR::Type::Ptr);
                 } else if (IS_INT(val) && (((val >> 3) << 3) | TAG_INT) == val) {
                     int64_t actual_val = UNBOX_INT(val);
-                    ir::Value* c = context_->getConstantInt(context_->getIntegerType(64), actual_val);
-                    reg_int_values[inst.dst] = actual_val;
-                    reg_types[inst.dst] = LIR::Type::I64;
-                    store_reg(inst.dst, c, LIR::Type::I64);
+                    ir::Value* c = erased_const(context_->getConstantInt(context_->getIntegerType(64), actual_val), LIR::Type::I64);
+                    if (dst_erased) {
+                        // The slot holds a tagged LmValue word, not a raw i64;
+                        // recording I64 would route consumers to the raw-int
+                        // print/arithmetic paths and leak the SMI encoding.
+                        reg_types[inst.dst] = LIR::Type::Ptr;
+                        store_reg(inst.dst, c, LIR::Type::Ptr);
+                    } else {
+                        reg_int_values[inst.dst] = actual_val;
+                        reg_types[inst.dst] = LIR::Type::I64;
+                        store_reg(inst.dst, c, LIR::Type::I64);
+                    }
                 } else if (IS_BOOL(val)) {
                     uint64_t actual_val = UNBOX_BOOL(val) ? 1 : 0;
-                    ir::Value* c = context_->getConstantInt(context_->getIntegerType(64), actual_val);
+                    ir::Value* c = erased_const(context_->getConstantInt(context_->getIntegerType(64), actual_val), LIR::Type::Bool);
                     store_reg(inst.dst, c, LIR::Type::Bool);
                 } else if (IS_PTR(val)) {
                     ObjHeader* h = (ObjHeader*)UNBOX_PTR(val);
                     if (h->type_id == TYPE_I64 || (h->type_id == TYPE_U64 && as_u128(val) <= INT64_MAX)) {
                         auto number = as_i64(val);
-                        reg_int_values[inst.dst] = number;
-                        store_reg(inst.dst, context_->getConstantInt(context_->getIntegerType(64), number), LIR::Type::I64);
+                        if (dst_erased) {
+                            reg_types[inst.dst] = LIR::Type::Ptr;
+                            store_reg(inst.dst, erased_const(context_->getConstantInt(context_->getIntegerType(64), number), LIR::Type::I64), LIR::Type::Ptr);
+                        } else {
+                            reg_int_values[inst.dst] = number;
+                            store_reg(inst.dst, erased_const(context_->getConstantInt(context_->getIntegerType(64), number), LIR::Type::I64), LIR::Type::I64);
+                        }
                     } else if (h->type_id == TYPE_I128 || h->type_id == TYPE_U128 || h->type_id == TYPE_U64) {
                         auto size = h->type_id == TYPE_U64 ? 16 : 32;
                         auto offset = h->type_id == TYPE_U64 ? 8 : 16;
@@ -1902,7 +2288,11 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                         } else if (box->type == LM_BOX_INT) {
                             uint64_t actual_val = (inst.result_type == LIR::Type::I64) ? box->value.as_int : BOX_INT(box->value.as_int);
                             if (inst.result_type == LIR::Type::I64) reg_int_values[inst.dst] = box->value.as_int;
-                            ir::Value* c = context_->getConstantInt(context_->getIntegerType(64), actual_val);
+                            // BOX_INT already yields a tagged SMI word; only the
+                            // raw i64 form needs erased-domain encoding.
+                            ir::Value* c = (inst.result_type == LIR::Type::I64)
+                                ? erased_const(context_->getConstantInt(context_->getIntegerType(64), actual_val), LIR::Type::I64)
+                                : context_->getConstantInt(context_->getIntegerType(64), actual_val);
                             store_reg(inst.dst, c, inst.result_type);
                         } else if (box->type == LM_BOX_FLOAT) {
                             double fval = box->value.as_float;
@@ -1911,7 +2301,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                             reg_float_values[inst.dst] = fval;
                             store_reg(inst.dst, c, LIR::Type::F64);
                         } else if (box->type == LM_BOX_BOOL) {
-                            ir::Value* c = context_->getConstantInt(context_->getIntegerType(64), box->value.as_bool ? 1 : 0);
+                            ir::Value* c = erased_const(context_->getConstantInt(context_->getIntegerType(64), box->value.as_bool ? 1 : 0), LIR::Type::Bool);
                             store_reg(inst.dst, c, LIR::Type::Bool);
                         } else {
                             ir::Value* c = builder_->createExternCall("lymar_aot_nil", {}, context_->getIntegerType(64));
@@ -1965,6 +2355,10 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 if (is_float_g) {
                     builder_->createStore(load_float_reg(inst.a, inst.type_a), gv);
                     global_types_[gname] = LIR::Type::F64;
+                } else if (lang_type_is_erased(inst.a)) {
+                    // Erased-typed globals hold tagged LmValue words; raw
+                    // scalars/pointers must be encoded at the store boundary.
+                    builder_->createStore(tag_word(load_reg(inst.a, inst.type_a), inst.a, inst.type_a), gv);
                 } else {
                     builder_->createStore(load_reg(inst.a, inst.type_a), gv);
                 }
@@ -2023,12 +2417,12 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 if (is_float_op(inst)) {
                     store_float_reg(inst.dst, builder_->createFAdd(load_float_reg(inst.a, inst.type_a), load_float_reg(inst.b, inst.type_b)));
                 } else if(erased_arithmetic(inst)) {
-                    auto* result=builder_->createExternCall("lymar_aot_numeric_binary",{erased_word(load_reg(inst.a,inst.type_a)),erased_word(load_reg(inst.b,inst.type_b)),context_->getConstantInt(context_->getIntegerType(64),0),context_->getConstantInt(context_->getIntegerType(64),0),context_->getConstantInt(context_->getIntegerType(64),0)},context_->getIntegerType(64));
+                    auto* result=builder_->createExternCall("lymar_aot_numeric_binary",{tag_word(load_reg(inst.a, inst.type_a), inst.a, inst.type_a),tag_word(load_reg(inst.b, inst.type_b), inst.b, inst.type_b),context_->getConstantInt(context_->getIntegerType(64),0)},context_->getIntegerType(64));
                     // The result is an erased word: raw integer or heap box with
                     // a runtime-tracked kind. Ptr keeps it object-classified so
                     // slots carry the dynamic kind instead of reading the box
                     // pointer as a scalar.
-                    store_reg(inst.dst,result,LIR::Type::Ptr,true);
+                    store_arith_word(inst,result);
                 } else {
                     store_reg(inst.dst, builder_->createAdd(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type);
                 }
@@ -2037,8 +2431,8 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 if (is_float_op(inst)) {
                     store_float_reg(inst.dst, builder_->createFSub(load_float_reg(inst.a, inst.type_a), load_float_reg(inst.b, inst.type_b)));
                 } else if(erased_arithmetic(inst)) {
-                    auto* result=builder_->createExternCall("lymar_aot_numeric_binary",{erased_word(load_reg(inst.a,inst.type_a)),erased_word(load_reg(inst.b,inst.type_b)),context_->getConstantInt(context_->getIntegerType(64),1),context_->getConstantInt(context_->getIntegerType(64),0),context_->getConstantInt(context_->getIntegerType(64),0)},context_->getIntegerType(64));
-                    store_reg(inst.dst,result,LIR::Type::Ptr,true);
+                    auto* result=builder_->createExternCall("lymar_aot_numeric_binary",{tag_word(load_reg(inst.a, inst.type_a), inst.a, inst.type_a),tag_word(load_reg(inst.b, inst.type_b), inst.b, inst.type_b),context_->getConstantInt(context_->getIntegerType(64),1)},context_->getIntegerType(64));
+                    store_arith_word(inst,result);
                 } else {
                     store_reg(inst.dst, builder_->createSub(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type);
                 }
@@ -2047,8 +2441,8 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 if (is_float_op(inst)) {
                     store_float_reg(inst.dst, builder_->createFMul(load_float_reg(inst.a, inst.type_a), load_float_reg(inst.b, inst.type_b)));
                 } else if(erased_arithmetic(inst)) {
-                    auto* result=builder_->createExternCall("lymar_aot_numeric_binary",{erased_word(load_reg(inst.a,inst.type_a)),erased_word(load_reg(inst.b,inst.type_b)),context_->getConstantInt(context_->getIntegerType(64),2),context_->getConstantInt(context_->getIntegerType(64),0),context_->getConstantInt(context_->getIntegerType(64),0)},context_->getIntegerType(64));
-                    store_reg(inst.dst,result,LIR::Type::Ptr,true);
+                    auto* result=builder_->createExternCall("lymar_aot_numeric_binary",{tag_word(load_reg(inst.a, inst.type_a), inst.a, inst.type_a),tag_word(load_reg(inst.b, inst.type_b), inst.b, inst.type_b),context_->getConstantInt(context_->getIntegerType(64),2)},context_->getIntegerType(64));
+                    store_arith_word(inst,result);
                 } else {
                     store_reg(inst.dst, builder_->createMul(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type);
                 }
@@ -2057,8 +2451,8 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 if (is_float_op(inst)) {
                     store_float_reg(inst.dst, builder_->createFDiv(load_float_reg(inst.a, inst.type_a), load_float_reg(inst.b, inst.type_b)));
                 } else if(erased_arithmetic(inst)) {
-                    auto* result=builder_->createExternCall("lymar_aot_numeric_binary",{erased_word(load_reg(inst.a,inst.type_a)),erased_word(load_reg(inst.b,inst.type_b)),context_->getConstantInt(context_->getIntegerType(64),3),context_->getConstantInt(context_->getIntegerType(64),0),context_->getConstantInt(context_->getIntegerType(64),0)},context_->getIntegerType(64));
-                    store_reg(inst.dst,result,LIR::Type::Ptr,true);
+                    auto* result=builder_->createExternCall("lymar_aot_numeric_binary",{tag_word(load_reg(inst.a, inst.type_a), inst.a, inst.type_a),tag_word(load_reg(inst.b, inst.type_b), inst.b, inst.type_b),context_->getConstantInt(context_->getIntegerType(64),3)},context_->getIntegerType(64));
+                    store_arith_word(inst,result);
                 } else {
                     ir::Value* num = load_reg(inst.a, inst.type_a);
                     ir::Value* den = load_reg(inst.b, inst.type_b);
@@ -2085,8 +2479,8 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 break;
             case LIR::LIR_Op::Mod: {
                 if(erased_arithmetic(inst)) {
-                    auto* result=builder_->createExternCall("lymar_aot_numeric_binary",{erased_word(load_reg(inst.a,inst.type_a)),erased_word(load_reg(inst.b,inst.type_b)),context_->getConstantInt(context_->getIntegerType(64),4),context_->getConstantInt(context_->getIntegerType(64),0),context_->getConstantInt(context_->getIntegerType(64),0)},context_->getIntegerType(64));
-                    store_reg(inst.dst,result,LIR::Type::Ptr,true);
+                    auto* result=builder_->createExternCall("lymar_aot_numeric_binary",{tag_word(load_reg(inst.a, inst.type_a), inst.a, inst.type_a),tag_word(load_reg(inst.b, inst.type_b), inst.b, inst.type_b),context_->getConstantInt(context_->getIntegerType(64),4)},context_->getIntegerType(64));
+                    store_arith_word(inst,result);
                     break;
                 }
                 ir::Value* num = load_reg(inst.a, inst.type_a);
@@ -2120,9 +2514,11 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 } else if(erased_arithmetic(inst)) {
                     // Negate through numeric_binary as 0 - x so boxed i128/u128
                     // words are unboxed, negated in 128 bits, and reboxed.
-                    auto* zero=context_->getConstantInt(context_->getIntegerType(64),0);
-                    auto* result=builder_->createExternCall("lymar_aot_numeric_binary",{zero,erased_word(load_reg(inst.a,inst.type_a)),context_->getConstantInt(context_->getIntegerType(64),1),context_->getConstantInt(context_->getIntegerType(64),0),context_->getConstantInt(context_->getIntegerType(64),0)},context_->getIntegerType(64));
-                    store_reg(inst.dst,result,LIR::Type::Ptr,true);
+                    // numeric_binary consumes tagged LmValue words only — a raw
+                    // 0 decodes as TAG_PTR/nil and the op returns VAL_NIL.
+                    auto* zero=tag_word(context_->getConstantInt(context_->getIntegerType(64),0),UINT32_MAX,LIR::Type::I64);
+                    auto* result=builder_->createExternCall("lymar_aot_numeric_binary",{zero,tag_word(load_reg(inst.a, inst.type_a), inst.a, inst.type_a),context_->getConstantInt(context_->getIntegerType(64),1)},context_->getIntegerType(64));
+                    store_arith_word(inst,result);
                 } else {
                     store_reg(inst.dst, builder_->createNeg(load_reg(inst.a, inst.type_a)), inst.result_type);
                 }
@@ -2166,10 +2562,9 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             case LIR::LIR_Op::Shl:
             case LIR::LIR_Op::Shr: {
                 if (bitwise_erased(inst)) {
-                    store_reg(inst.dst, builder_->createExternCall("lymar_aot_bitwise",
-                        {erased_word(load_reg(inst.a, inst.type_a)), erased_word(load_reg(inst.b, inst.type_b)),
-                         context_->getConstantInt(context_->getIntegerType(64), inst.op == LIR::LIR_Op::Shl ? 3 : 4),
-                         word_kind(inst.a), word_kind(inst.b)}, context_->getIntegerType(64)), inst.result_type);
+                    store_arith_word(inst, builder_->createExternCall("lymar_aot_bitwise",
+                        {tag_word(load_reg(inst.a, inst.type_a), inst.a, inst.type_a), tag_word(load_reg(inst.b, inst.type_b), inst.b, inst.type_b),
+                         context_->getConstantInt(context_->getIntegerType(64), inst.op == LIR::LIR_Op::Shl ? 3 : 4)}, context_->getIntegerType(64)));
                 } else if (inst.op == LIR::LIR_Op::Shl) {
                     store_reg(inst.dst, builder_->createShl(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type);
                 } else {
@@ -2180,10 +2575,9 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             case LIR::LIR_Op::IAnd_Unchecked:
             case LIR::LIR_Op::And:
                 if (bitwise_erased(inst)) {
-                    store_reg(inst.dst, builder_->createExternCall("lymar_aot_bitwise",
-                        {erased_word(load_reg(inst.a, inst.type_a)), erased_word(load_reg(inst.b, inst.type_b)),
-                         context_->getConstantInt(context_->getIntegerType(64), 0),
-                         word_kind(inst.a), word_kind(inst.b)}, context_->getIntegerType(64)), inst.result_type);
+                    store_arith_word(inst, builder_->createExternCall("lymar_aot_bitwise",
+                        {tag_word(load_reg(inst.a, inst.type_a), inst.a, inst.type_a), tag_word(load_reg(inst.b, inst.type_b), inst.b, inst.type_b),
+                         context_->getConstantInt(context_->getIntegerType(64), 0)}, context_->getIntegerType(64)));
                 } else {
                     store_reg(inst.dst, builder_->createAnd(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type);
                 }
@@ -2191,10 +2585,9 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             case LIR::LIR_Op::IOr_Unchecked:
             case LIR::LIR_Op::Or:
                 if (bitwise_erased(inst)) {
-                    store_reg(inst.dst, builder_->createExternCall("lymar_aot_bitwise",
-                        {erased_word(load_reg(inst.a, inst.type_a)), erased_word(load_reg(inst.b, inst.type_b)),
-                         context_->getConstantInt(context_->getIntegerType(64), 1),
-                         word_kind(inst.a), word_kind(inst.b)}, context_->getIntegerType(64)), inst.result_type);
+                    store_arith_word(inst, builder_->createExternCall("lymar_aot_bitwise",
+                        {tag_word(load_reg(inst.a, inst.type_a), inst.a, inst.type_a), tag_word(load_reg(inst.b, inst.type_b), inst.b, inst.type_b),
+                         context_->getConstantInt(context_->getIntegerType(64), 1)}, context_->getIntegerType(64)));
                 } else {
                     store_reg(inst.dst, builder_->createOr(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type);
                 }
@@ -2202,19 +2595,21 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             case LIR::LIR_Op::IXor_Unchecked:
             case LIR::LIR_Op::Xor:
                 if (bitwise_erased(inst)) {
-                    store_reg(inst.dst, builder_->createExternCall("lymar_aot_bitwise",
-                        {erased_word(load_reg(inst.a, inst.type_a)), erased_word(load_reg(inst.b, inst.type_b)),
-                         context_->getConstantInt(context_->getIntegerType(64), 2),
-                         word_kind(inst.a), word_kind(inst.b)}, context_->getIntegerType(64)), inst.result_type);
+                    store_arith_word(inst, builder_->createExternCall("lymar_aot_bitwise",
+                        {tag_word(load_reg(inst.a, inst.type_a), inst.a, inst.type_a), tag_word(load_reg(inst.b, inst.type_b), inst.b, inst.type_b),
+                         context_->getConstantInt(context_->getIntegerType(64), 2)}, context_->getIntegerType(64)));
                 } else {
                     store_reg(inst.dst, builder_->createXor(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type);
                 }
                 break;
             case LIR::LIR_Op::CmpEQ:
             case LIR::LIR_Op::CmpNEQ: {
+                // value_equal consumes tagged LmValue words only; raw scalar
+                // operands must be SMI/immediate-tagged first or small ints
+                // alias VAL_NIL/VAL_FALSE (e.g. raw 2 == nil).
                 auto* equal = builder_->createExternCall("lymar_aot_value_equal",
-                    {erased_word(load_reg(inst.a, inst.type_a)), erased_word(load_reg(inst.b, inst.type_b)),
-                     context_->getConstantInt(context_->getIntegerType(64), 0), context_->getConstantInt(context_->getIntegerType(64), 0)},
+                    {tag_word(load_reg(inst.a, inst.type_a), inst.a, inst.type_a),
+                     tag_word(load_reg(inst.b, inst.type_b), inst.b, inst.type_b)},
                     context_->getIntegerType(64));
                 store_reg(inst.dst, inst.op == LIR::LIR_Op::CmpEQ ? static_cast<ir::Value*>(equal)
                     : builder_->createCeq(equal, context_->getConstantInt(context_->getIntegerType(64), 0)), LIR::Type::Bool);
@@ -2255,8 +2650,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     store_reg(inst.dst, builder_->createCast(c, context_->getIntegerType(64)), LIR::Type::Bool);
                 } else {
                     auto* compared = builder_->createExternCall("lymar_aot_numeric_compare",
-                        {erased_word(load_reg(inst.a, inst.type_a)), erased_word(load_reg(inst.b, inst.type_b)),
-                         context_->getConstantInt(context_->getIntegerType(64), 0), context_->getConstantInt(context_->getIntegerType(64), 0)}, context_->getIntegerType(64));
+                        {tag_word(load_reg(inst.a, inst.type_a), inst.a, inst.type_a), tag_word(load_reg(inst.b, inst.type_b), inst.b, inst.type_b)}, context_->getIntegerType(64));
                     store_reg(inst.dst, builder_->createCslt(compared, context_->getConstantInt(context_->getIntegerType(64), 0)), LIR::Type::Bool);
                 }
                 break;
@@ -2296,8 +2690,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     store_reg(inst.dst, builder_->createCast(c, context_->getIntegerType(64)), LIR::Type::Bool);
                 } else {
                     auto* compared = builder_->createExternCall("lymar_aot_numeric_compare",
-                        {erased_word(load_reg(inst.a, inst.type_a)), erased_word(load_reg(inst.b, inst.type_b)),
-                         context_->getConstantInt(context_->getIntegerType(64), 0), context_->getConstantInt(context_->getIntegerType(64), 0)}, context_->getIntegerType(64));
+                        {tag_word(load_reg(inst.a, inst.type_a), inst.a, inst.type_a), tag_word(load_reg(inst.b, inst.type_b), inst.b, inst.type_b)}, context_->getIntegerType(64));
                     store_reg(inst.dst, builder_->createCsle(compared, context_->getConstantInt(context_->getIntegerType(64), 0)), LIR::Type::Bool);
                 }
                 break;
@@ -2337,8 +2730,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     store_reg(inst.dst, builder_->createCast(c, context_->getIntegerType(64)), LIR::Type::Bool);
                 } else {
                     auto* compared = builder_->createExternCall("lymar_aot_numeric_compare",
-                        {erased_word(load_reg(inst.a, inst.type_a)), erased_word(load_reg(inst.b, inst.type_b)),
-                         context_->getConstantInt(context_->getIntegerType(64), 0), context_->getConstantInt(context_->getIntegerType(64), 0)}, context_->getIntegerType(64));
+                        {tag_word(load_reg(inst.a, inst.type_a), inst.a, inst.type_a), tag_word(load_reg(inst.b, inst.type_b), inst.b, inst.type_b)}, context_->getIntegerType(64));
                     store_reg(inst.dst, builder_->createCsgt(compared, context_->getConstantInt(context_->getIntegerType(64), 0)), LIR::Type::Bool);
                 }
                 break;
@@ -2378,8 +2770,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     store_reg(inst.dst, builder_->createCast(c, context_->getIntegerType(64)), LIR::Type::Bool);
                 } else {
                     auto* compared = builder_->createExternCall("lymar_aot_numeric_compare",
-                        {erased_word(load_reg(inst.a, inst.type_a)), erased_word(load_reg(inst.b, inst.type_b)),
-                         context_->getConstantInt(context_->getIntegerType(64), 0), context_->getConstantInt(context_->getIntegerType(64), 0)}, context_->getIntegerType(64));
+                        {tag_word(load_reg(inst.a, inst.type_a), inst.a, inst.type_a), tag_word(load_reg(inst.b, inst.type_b), inst.b, inst.type_b)}, context_->getIntegerType(64));
                     store_reg(inst.dst, builder_->createCsge(compared, context_->getConstantInt(context_->getIntegerType(64), 0)), LIR::Type::Bool);
                 }
                 break;
@@ -2465,17 +2856,38 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 }
 
                 std::vector<ir::Value*> args;
+                // Erased (`any`/union/error-union) parameters hold tagged
+                // LmValue words. Scalar arguments must be encoded here or the
+                // callee's erased consumers read raw bits as tag payloads
+                // (e.g. `map.put(k, 42)` stored raw 42 = tag-2 immediate).
+                const LIR::LIR_Function* callee_lir = nullptr;
+                if (auto* cf = LIR::FunctionRegistry::getInstance().getFunction(name))
+                    callee_lir = cf;
+                auto param_takes_erased_word = [&](size_t idx) -> bool {
+                    if (!callee_lir || idx >= callee_lir->param_count) return false;
+                    auto it = callee_lir->register_language_types.find(static_cast<uint32_t>(idx));
+                    if (it == callee_lir->register_language_types.end() || !it->second) return false;
+                    switch (it->second->tag) {
+                        case ::TypeTag::Any: case ::TypeTag::Union: case ::TypeTag::ErrorUnion:
+                            return true;
+                        default: return false;
+                    }
+                };
                 for (size_t ai = 0; ai < inst.call_args.size(); ++ai) {
                     LIR::Type at = (ai < inst.call_arg_types.size()) ? inst.call_arg_types[ai] : LIR::Type::I64;
                     if (ai < inst.call_args.size() && reg_types.count(inst.call_args[ai])) {
                         LIR::Type rt = reg_types[inst.call_args[ai]];
                         if (rt == LIR::Type::F64 || rt == LIR::Type::F32) at = rt;
                     }
+                    ir::Value* arg_val;
                     if (at == LIR::Type::F64 || at == LIR::Type::F32) {
-                        args.push_back(load_float_reg(inst.call_args[ai], at));
+                        arg_val = load_float_reg(inst.call_args[ai], at);
                     } else {
-                        args.push_back(load_reg(inst.call_args[ai], at));
+                        arg_val = load_reg(inst.call_args[ai], at);
                     }
+                    if (param_takes_erased_word(ai) && arg_val)
+                        arg_val = tag_word(arg_val, inst.call_args[ai], at);
+                    args.push_back(arg_val);
                 }
 
                 // See CallBuiltin below: generic len() must not lower to the
@@ -2484,7 +2896,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 // wild offset-16 read.
                 if (name == "len" && args.size() == 1 && !inst.call_args.empty()) {
                     auto* len_res = builder_->createExternCall("lymar_aot_length",
-                        {erased_word(args[0]), word_kind(inst.call_args[0])},
+                        {erased_word(args[0])},
                         context_->getIntegerType(64));
                     if (inst.dst != UINT32_MAX)
                         store_reg(inst.dst, len_res, inst.result_type);
@@ -2532,19 +2944,25 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
 
                         uint32_t arg_r = (ai < inst.call_args.size()) ? inst.call_args[ai] : UINT32_MAX;
                         bool is_known_i64 = (arg_r != UINT32_MAX && (reg_int_values.count(arg_r) || (reg_types.count(arg_r) && reg_types[arg_r] == LIR::Type::I64)));
+                        if (std::getenv("LYMAR_DEBUG_PRINT") && name == "print")
+                            std::cerr << "[PRINT] arg_r=" << arg_r << " arg_type=" << (int)arg_type
+                                      << " reg_t=" << (reg_types.count(arg_r) ? (int)reg_types[arg_r] : -1)
+                                      << " cat=" << (inst.call_arg_types.size() > ai ? (int)inst.call_arg_types[ai] : -1)
+                                      << " tagged=" << (arg_r != UINT32_MAX && tagged_word_regs.count(arg_r))
+                                      << " lang=" << (arg_r != UINT32_MAX && lir_func.register_language_types.count(arg_r) && lir_func.register_language_types.at(arg_r) ? (int)lir_func.register_language_types.at(arg_r)->tag : -1) << "\n";
 
                         if (ai < inst.call_args.size() && decimal_scale_for_reg(inst.call_args[ai]) > 0) {
                             FyraBuiltinFunctions::emit_print_decimal_inline(current_module_.get(), builder_.get(), args[ai], decimal_scale_for_reg(inst.call_args[ai]));
                         } else if (arg_type == LIR::Type::I64 || is_known_i64) {
-                            builder_->createExternCall("lymar_aot_print_integer", {args[ai], context_->getConstantInt(context_->getIntegerType(64), 0)}, context_->getVoidType());
+                            builder_->createExternCall("lymar_aot_print_integer", {args[ai]}, context_->getVoidType());
                         } else if (arg_type == LIR::Type::Ptr) {
-                            builder_->createExternCall("lymar_aot_print_value", {erased_word(args[ai]), context_->getConstantInt(context_->getIntegerType(64), 0)}, context_->getVoidType());
+                            builder_->createExternCall("lymar_aot_print_value", {erased_word(args[ai])}, context_->getVoidType());
                         } else if (arg_type == LIR::Type::Bool) {
                             FyraBuiltinFunctions::emit_print_bool_inline(current_module_.get(), builder_.get(), args[ai]);
                         } else if (arg_type == LIR::Type::F64 || arg_type == LIR::Type::F32) {
                             builder_->createExternCall("lymar_aot_print_float", {args[ai]}, context_->getVoidType());
                         } else {
-                            builder_->createExternCall("lymar_aot_print_integer", {args[ai], context_->getConstantInt(context_->getIntegerType(64), 0)}, context_->getVoidType());
+                            builder_->createExternCall("lymar_aot_print_integer", {args[ai]}, context_->getVoidType());
                         }
                     }
                     ir::GlobalVariable* gv_nl = FyraBuiltinFunctions::get_or_create_global_str(current_module_.get(), builder_.get(), "nl", "\n");
@@ -2640,7 +3058,11 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 // every reachable target at each call site creates quadratic IR
                 // in imported higher-order/UI programs. The helper retains the
                 // same checked receiver and dynamic kind/cleanup protocol.
-                std::vector<ir::Value*> site_args{erased_word(load_reg(inst.a, inst.type_a))};
+                // The callee operand is already an erased callable word
+                // (frame field, closure tuple, or fn-name string). Reg
+                // language types are not populated for temporary FrameGetField
+                // destinations, so tag_word would SMI-encode the pointer.
+                std::vector<ir::Value*> site_args{load_reg(inst.a, inst.type_a)};
                 site_args.insert(site_args.end(), args.begin(), args.end());
                 std::string dispatch_name = "__lymar_indirect_dispatch_w";
                 std::vector<ir::Type*> dispatch_types{context_->getIntegerType(64)};
@@ -2659,7 +3081,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     args.clear();
                     for (; parameter != dispatch->getParameters().end(); ++parameter) args.push_back(parameter->get());
                 raw_callee = builder_->createExternCall("lymar_aot_callable_receiver",
-                    {erased_word(raw_callee), context_->getConstantInt(context_->getIntegerType(64), 0)},
+                    {erased_word(raw_callee)},
                     context_->getIntegerType(64));
 
                 std::string cid = std::to_string(label_counter_++);
@@ -2790,7 +3212,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                         call_args_matching.push_back(context_->getConstantInt(context_->getIntegerType(64), 0));
                     }
                     ir::Value* call_res = builder_->createCall(target_f, call_args_matching);
-                    builder_->createStore(erased_word(call_res), res_slot);
+                    builder_->createStore(tag_indirect_result(call_res, f_name), res_slot);
                     builder_->createJmp(b_done);
 
                     cur_cls_chk = b_next_check;
@@ -2850,7 +3272,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                         call_args_matching.push_back(context_->getConstantInt(context_->getIntegerType(64), 0));
                     }
                     ir::Value* call_res = builder_->createCall(target_f, call_args_matching);
-                    builder_->createStore(erased_word(call_res), res_slot);
+                    builder_->createStore(tag_indirect_result(call_res, f_name), res_slot);
                     builder_->createJmp(b_done);
 
                     cur_check_bb = b_next_check;
@@ -2872,7 +3294,9 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 auto* dispatched_result = builder_->createCall(dispatch, site_args);
                 if (inst.dst != UINT32_MAX) {
                     reg_types[inst.dst] = inst.result_type;
-                    store_reg(inst.dst, dispatched_result, inst.result_type, true);
+                    // The shared dispatch returns canonical tagged LmValue
+                    // words; scalar destinations untag exactly once.
+                    store_reg(inst.dst, untag_word(dispatched_result, inst.dst, inst.result_type), inst.result_type, true);
                 }
                 break;
             }
@@ -2904,7 +3328,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 // unsupported receivers the same way the VM does.
                 if (name == "len" && args.size() == 1 && !inst.call_args.empty()) {
                     auto* len_res = builder_->createExternCall("lymar_aot_length",
-                        {erased_word(args[0]), word_kind(inst.call_args[0])},
+                        {erased_word(args[0])},
                         context_->getIntegerType(64));
                     if (inst.dst != UINT32_MAX)
                         store_reg(inst.dst, len_res, inst.result_type);
@@ -2952,19 +3376,25 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
 
                         uint32_t arg_r = (ai < inst.call_args.size()) ? inst.call_args[ai] : UINT32_MAX;
                         bool is_known_i64 = (arg_r != UINT32_MAX && (reg_int_values.count(arg_r) || (reg_types.count(arg_r) && reg_types[arg_r] == LIR::Type::I64)));
+                        if (std::getenv("LYMAR_DEBUG_PRINT") && name == "print")
+                            std::cerr << "[PRINT] arg_r=" << arg_r << " arg_type=" << (int)arg_type
+                                      << " reg_t=" << (reg_types.count(arg_r) ? (int)reg_types[arg_r] : -1)
+                                      << " cat=" << (inst.call_arg_types.size() > ai ? (int)inst.call_arg_types[ai] : -1)
+                                      << " tagged=" << (arg_r != UINT32_MAX && tagged_word_regs.count(arg_r))
+                                      << " lang=" << (arg_r != UINT32_MAX && lir_func.register_language_types.count(arg_r) && lir_func.register_language_types.at(arg_r) ? (int)lir_func.register_language_types.at(arg_r)->tag : -1) << "\n";
 
                         if (ai < inst.call_args.size() && decimal_scale_for_reg(inst.call_args[ai]) > 0) {
                             FyraBuiltinFunctions::emit_print_decimal_inline(current_module_.get(), builder_.get(), args[ai], decimal_scale_for_reg(inst.call_args[ai]));
                         } else if (arg_type == LIR::Type::I64 || is_known_i64) {
-                            builder_->createExternCall("lymar_aot_print_integer", {args[ai], context_->getConstantInt(context_->getIntegerType(64), 0)}, context_->getVoidType());
+                            builder_->createExternCall("lymar_aot_print_integer", {args[ai]}, context_->getVoidType());
                         } else if (arg_type == LIR::Type::Ptr) {
-                            builder_->createExternCall("lymar_aot_print_value", {erased_word(args[ai]), context_->getConstantInt(context_->getIntegerType(64), 0)}, context_->getVoidType());
+                            builder_->createExternCall("lymar_aot_print_value", {erased_word(args[ai])}, context_->getVoidType());
                         } else if (arg_type == LIR::Type::Bool) {
                             FyraBuiltinFunctions::emit_print_bool_inline(current_module_.get(), builder_.get(), args[ai]);
                         } else if (arg_type == LIR::Type::F64 || arg_type == LIR::Type::F32) {
                             builder_->createExternCall("lymar_aot_print_float", {args[ai]}, context_->getVoidType());
                         } else {
-                            builder_->createExternCall("lymar_aot_print_integer", {args[ai], context_->getConstantInt(context_->getIntegerType(64), 0)}, context_->getVoidType());
+                            builder_->createExternCall("lymar_aot_print_integer", {args[ai]}, context_->getVoidType());
                         }
                     }
                     ir::GlobalVariable* gv_nl = FyraBuiltinFunctions::get_or_create_global_str(current_module_.get(), builder_.get(), "nl", "\n");
@@ -3009,38 +3439,36 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             case LIR::LIR_Op::Cast: {
                 auto* value = load_reg(inst.a, inst.type_a);
                 auto actual = reg_types.count(inst.a) ? reg_types[inst.a] : inst.type_a;
-                // Erased-word sources (containers, frames, `any`) need object
-                // kind so boxed floats unbox and nil reads as false/0; scalar
-                // registers keep kind 0.
-                auto* value_kind = word_kind(inst.a);
+                // The conversion helpers below consume tagged LmValue words;
+                // scalar sources must be encoded first or small raw ints alias
+                // SMI/immediate tags (raw 1 -> SMI 0, raw 2 -> VAL_NIL).
+                auto* tagged_src = tag_word(value, inst.a, inst.type_a);
                 if (inst.result_type == LIR::Type::Ptr) {
                     auto destination = lir_func.get_register_language_type(inst.dst);
                     if (destination && destination->tag == TypeTag::String) {
                         auto src_lang = lir_func.get_register_language_type(inst.a);
                         if (src_lang && src_lang->tag == TypeTag::Bool) {
-                            // Bool slots record kind 0 on the dynamic sidecar;
-                            // a dedicated entry point avoids the kind channel.
                             store_reg(inst.dst, builder_->createExternCall("lymar_aot_bool_to_string",
-                                {erased_word(value)}, context_->getIntegerType(64)), LIR::Type::Ptr);
+                                {tagged_src}, context_->getIntegerType(64)), LIR::Type::Ptr);
                         } else {
                             store_reg(inst.dst, builder_->createExternCall("lymar_aot_scalar_to_string",
-                                {erased_word(value), value_kind}, context_->getIntegerType(64)), LIR::Type::Ptr);
+                                {tagged_src}, context_->getIntegerType(64)), LIR::Type::Ptr);
                         }
                     }
-                    else store_reg(inst.dst, erased_word(value), LIR::Type::Ptr);
+                    else store_reg(inst.dst, tagged_src, LIR::Type::Ptr);
                 } else if (inst.result_type == LIR::Type::Bool) {
                     store_reg(inst.dst, builder_->createExternCall("lymar_aot_to_boolean",
-                        {erased_word(value), value_kind}, context_->getIntegerType(64)), LIR::Type::Bool);
+                        {tagged_src}, context_->getIntegerType(64)), LIR::Type::Bool);
                 } else if (inst.result_type == LIR::Type::F64 || inst.result_type == LIR::Type::F32) {
                     if (value->getType()->isFloatingPoint()) store_float_reg(inst.dst, value);
                     else store_float_reg(inst.dst, builder_->createExternCall("lymar_aot_to_float",
-                        {value, value_kind}, context_->getDoubleType()));
+                        {tagged_src}, context_->getDoubleType()));
                 } else if (inst.result_type == LIR::Type::I64) {
                     if (value->getType()->isFloatingPoint())
                         store_reg(inst.dst, builder_->createExternCall("lymar_aot_float_to_integer",
                             {value}, context_->getIntegerType(64)), LIR::Type::I64);
                     else store_reg(inst.dst, builder_->createExternCall("lymar_aot_to_integer",
-                        {value, value_kind}, context_->getIntegerType(64)), LIR::Type::I64);
+                        {tagged_src}, context_->getIntegerType(64)), LIR::Type::I64);
                 } else store_reg(inst.dst, builder_->createCast(value, lir_type_to_fyra_type(inst.result_type)), inst.result_type);
                 break;
             }
@@ -3079,7 +3507,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     store_reg(inst.dst, FyraBuiltinFunctions::emit_float_to_str_inline(current_module_.get(), builder_.get(), load_float_reg(inst.a, inst.type_a)), LIR::Type::Ptr);
                 } else {
                     store_reg(inst.dst, builder_->createExternCall("lymar_aot_format_argument",
-                        {erased_word(load_reg(inst.a, inst.type_a)), word_kind(inst.a)},
+                        {tag_word(load_reg(inst.a, inst.type_a), inst.a, inst.type_a)},
                         context_->getIntegerType(64)), inst.result_type);
                 }
                 break;
@@ -3126,7 +3554,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     value_arg = FyraBuiltinFunctions::emit_bool_to_str_inline(current_module_.get(), builder_.get(), value_arg);
                 } else {
                     value_arg = builder_->createExternCall("lymar_aot_format_argument",
-                        {erased_word(value_arg), word_kind(inst.b)},
+                        {tag_word(value_arg, inst.b, inst.type_b)},
                         context_->getIntegerType(64));
                 }
                 LIR::Type res_t = (inst.result_type != LIR::Type::Void) ? inst.result_type : LIR::Type::Ptr;
@@ -3134,46 +3562,50 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 break;
             }
             case LIR::LIR_Op::Param:
-                builder_->createExternCall("lymar_aot_param_push", {load_reg(inst.dst, inst.result_type),
-                    context_->getConstantInt(context_->getIntegerType(64), 0)}, nullptr);
+                builder_->createExternCall("lymar_aot_param_push", {load_reg(inst.dst, inst.result_type)}, nullptr);
                 break;
             case LIR::LIR_Op::ConstructError: {
-                ir::Value* payload = (inst.a != UINT32_MAX) ? load_reg(inst.a, inst.type_a) : context_->getConstantInt(context_->getIntegerType(64), VAL_NIL);
-                payload = builder_->createExternCall("lymar_aot_param_pop", {payload,
-                    context_->getConstantInt(context_->getIntegerType(64), 0)}, context_->getIntegerType(64));
+                ir::Value* payload = (inst.a != UINT32_MAX) ? tag_word(load_reg(inst.a, inst.type_a), inst.a, inst.type_a) : context_->getConstantInt(context_->getIntegerType(64), VAL_NIL);
+                payload = builder_->createExternCall("lymar_aot_param_pop", {payload}, context_->getIntegerType(64));
                 ir::Value* err_box = builder_->createExternCall("memory.alloc", {context_->getConstantInt(context_->getIntegerType(64), 32)}, context_->getIntegerType(64));
                 builder_->createStore(context_->getConstantInt(context_->getIntegerType(64), 0x4C594D41524F4B21LL), err_box);
                 builder_->createStore(context_->getConstantInt(context_->getIntegerType(64), 1), builder_->createAdd(err_box, context_->getConstantInt(context_->getIntegerType(64), 8)));
                 ir::Value* payload_addr = builder_->createAdd(err_box, context_->getConstantInt(context_->getIntegerType(64), 16));
                 builder_->createStore(payload, payload_addr);
-                builder_->createStore(word_kind(inst.a), builder_->createAdd(err_box, context_->getConstantInt(context_->getIntegerType(64), 24)));
+                // The payload slot always holds a tagged LmValue word
+                // (tag_word output), so its kind is the erased domain —
+                // word_kind(inst.a) would report the *source* scalar kind
+                // and consumers would read the SMI tag bits as a raw int.
+                builder_->createStore(context_->getConstantInt(context_->getIntegerType(64), 1), builder_->createAdd(err_box, context_->getConstantInt(context_->getIntegerType(64), 24)));
                 store_reg(inst.dst, err_box, inst.result_type);
                 break;
             }
             case LIR::LIR_Op::ConstructOk: {
-                ir::Value* payload = load_reg(inst.a, inst.type_a);
+                ir::Value* payload = tag_word(load_reg(inst.a, inst.type_a), inst.a, inst.type_a);
                 ir::Value* ok_box = builder_->createExternCall("memory.alloc", {context_->getConstantInt(context_->getIntegerType(64), 32)}, context_->getIntegerType(64));
                 builder_->createStore(context_->getConstantInt(context_->getIntegerType(64), 0x4C594D41524F4B21LL), ok_box);
                 builder_->createStore(context_->getConstantInt(context_->getIntegerType(64), 0), builder_->createAdd(ok_box, context_->getConstantInt(context_->getIntegerType(64), 8)));
                 ir::Value* payload_addr = builder_->createAdd(ok_box, context_->getConstantInt(context_->getIntegerType(64), 16));
                 builder_->createStore(payload, payload_addr);
-                builder_->createStore(word_kind(inst.a), builder_->createAdd(ok_box, context_->getConstantInt(context_->getIntegerType(64), 24)));
+                builder_->createStore(context_->getConstantInt(context_->getIntegerType(64), 1), builder_->createAdd(ok_box, context_->getConstantInt(context_->getIntegerType(64), 24)));
                 store_reg(inst.dst, ok_box, inst.result_type);
                 break;
             }
             case LIR::LIR_Op::IsError: {
                 ir::Value* container = load_reg(inst.a, inst.type_a);
-                store_reg(inst.dst, builder_->createExternCall("lymar_aot_union_is_error", {container, word_kind(inst.a)}, context_->getIntegerType(64)), inst.result_type);
+                store_reg(inst.dst, builder_->createExternCall("lymar_aot_union_is_error", {container}, context_->getIntegerType(64)), inst.result_type);
                 break;
             }
             case LIR::LIR_Op::Unwrap: {
                 ir::Value* container = load_reg(inst.a, inst.type_a);
-                store_reg(inst.dst, builder_->createExternCall("lymar_aot_union_unwrap", {container, word_kind(inst.a)}, context_->getIntegerType(64)), inst.result_type);
+                ir::Value* unwrapped = builder_->createExternCall("lymar_aot_union_unwrap", {container}, context_->getIntegerType(64));
+                unwrapped = untag_word(unwrapped, inst.dst, inst.result_type);
+                store_reg(inst.dst, unwrapped, inst.result_type);
                 break;
             }
             case LIR::LIR_Op::UnwrapOr: {
                 ir::Value* container = load_reg(inst.a, inst.type_a);
-                ir::Value* is_err = builder_->createExternCall("lymar_aot_union_is_error", {container, word_kind(inst.a)}, context_->getIntegerType(64));
+                ir::Value* is_err = builder_->createExternCall("lymar_aot_union_is_error", {container}, context_->getIntegerType(64));
 
                 ir::Function* cur_fn = builder_->getInsertPoint()->getParent();
                 std::string uoid = std::to_string(label_counter_++);
@@ -3190,25 +3622,40 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 builder_->createJmp(b_done);
 
                 builder_->setInsertPoint(b_ok);
-                builder_->createStore(builder_->createExternCall("lymar_aot_union_unwrap", {container, word_kind(inst.a)}, context_->getIntegerType(64)), res_slot);
+                builder_->createStore(builder_->createExternCall("lymar_aot_union_unwrap", {container}, context_->getIntegerType(64)), res_slot);
                 builder_->createJmp(b_done);
 
                 builder_->setInsertPoint(b_done);
-                store_reg(inst.dst, builder_->createLoadl(res_slot), inst.result_type);
+                ir::Value* unwrapped = builder_->createLoadl(res_slot);
+                unwrapped = untag_word(unwrapped, inst.dst, inst.result_type);
+                store_reg(inst.dst, unwrapped, inst.result_type);
                 break;
             }
             case LIR::LIR_Op::ListCreate: {
                 used_builtins_.insert("lm_list_new");
                 ir::Function* fn = current_module_->getFunction("lm_list_new");
                 if (!fn) fn = builder_->createFunction("lm_list_new", context_->getIntegerType(64), {context_->getIntegerType(64)});
-                store_reg(inst.dst, builder_->createCall(fn, {context_->getConstantInt(context_->getIntegerType(64), (long long)inst.imm)}), inst.result_type);
+                ir::Value* new_list = builder_->createCall(fn, {context_->getConstantInt(context_->getIntegerType(64), (long long)inst.imm)});
+                uint64_t elem_kind = typed_list_element_kind(inst.dst);
+                if (elem_kind)
+                    builder_->createExternCall("lymar_aot_list_set_element_kind",
+                        {new_list, context_->getConstantInt(context_->getIntegerType(64), elem_kind)}, context_->getVoidType());
+                store_reg(inst.dst, new_list, inst.result_type);
                 break;
             }
             case LIR::LIR_Op::ListAppend: {
-                builder_->createExternCall("lymar_aot_list_append", {load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)}, context_->getVoidType());
-                // Append can reallocate `data`, invalidating any cached data_ptr
-                // for the receiver. Drop it so a subsequent ListIndex re-loads
-                // the current pointer.
+                ir::Value* list_val = load_reg(inst.a, inst.type_a);
+                ir::Value* elem_val = load_reg(inst.b, inst.type_b);
+                uint64_t elem_kind = typed_list_element_kind(inst.a);
+                if (elem_kind)
+                    builder_->createExternCall("lymar_aot_list_set_element_kind",
+                        {list_val, context_->getConstantInt(context_->getIntegerType(64), elem_kind)}, context_->getVoidType());
+                if (!is_typed_primitive_list(inst.a)) {
+                    elem_val = tag_word(elem_val, inst.b, inst.type_b);
+                    builder_->createExternCall("lymar_aot_list_append_tagged", {list_val, elem_val}, context_->getVoidType());
+                } else {
+                    builder_->createExternCall("lymar_aot_list_append", {list_val, elem_val}, context_->getVoidType());
+                }
                 hoisted_data_ptrs.erase(inst.a);
                 break;
             }
@@ -3270,8 +3717,15 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                         }
                     }
                     if (elem_type == LIR::Type::F64 || elem_type == LIR::Type::F32) {
-                        ir::Value* fval = builder_->createExternCall("lymar_aot_to_float", {elem, context_->getConstantInt(context_->getIntegerType(64), 1)}, context_->getDoubleType());
+                        ir::Value* fval = builder_->createExternCall("lymar_aot_to_float", {elem}, context_->getDoubleType());
                         store_reg(inst.dst, fval, elem_type);
+                    } else if (lang_type_holds_tagged_word(inst.dst)) {
+                        // Erased destination: the raw stored element must cross
+                        // the boundary as a tagged LmValue word.
+                        uint64_t ekind = typed_list_element_kind(inst.a);
+                        ir::Value* decoded = builder_->createExternCall("lymar_aot_list_elem_decode",
+                            {elem, context_->getConstantInt(context_->getIntegerType(64), ekind)}, context_->getIntegerType(64));
+                        store_reg(inst.dst, decoded, inst.result_type);
                     } else {
                         store_reg(inst.dst, elem, elem_type);
                     }
@@ -3322,19 +3776,19 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 ir::Value* elem_addr = builder_->createAdd(data_ptr, offset);
                 ir::Instruction* elem = builder_->createLoadl(elem_addr);
                 elem->setName("lidx_elem_" + lidx_id);
-                ir::Value* final_elem = elem;
-                if (inst.result_type == LIR::Type::F64 || inst.result_type == LIR::Type::F32) {
-                    final_elem = builder_->createExternCall("lymar_aot_to_float", {elem, context_->getConstantInt(context_->getIntegerType(64), 1)}, context_->getDoubleType());
-                }
+                // Primitive-storage lists keep raw int/bool elements; decode them
+                // into tagged LmValue words using the header's element kind before
+                // the destination-domain untag decides the final representation.
+                ir::Value* elem_kind = builder_->createShr(hdr_val, context_->getConstantInt(context_->getIntegerType(64), 32));
+                ir::Value* decoded = builder_->createExternCall("lymar_aot_list_elem_decode", {elem, elem_kind}, context_->getIntegerType(64));
+                ir::Value* final_elem = untag_word(decoded, inst.dst, inst.result_type);
                 store_reg(inst.dst, final_elem, inst.result_type);
                 builder_->createJmp(b_done);
 
                 // Step 4: Slow path fallback
                 builder_->setInsertPoint(b_slow);
                 ir::Value* slow_res = builder_->createCall(fn, {list_val, idx_val});
-                if (inst.result_type == LIR::Type::F64 || inst.result_type == LIR::Type::F32) {
-                    slow_res = builder_->createExternCall("lymar_aot_to_float", {slow_res, context_->getConstantInt(context_->getIntegerType(64), 1)}, context_->getDoubleType());
-                }
+                slow_res = untag_word(slow_res, inst.dst, inst.result_type);
                 store_reg(inst.dst, slow_res, inst.result_type);
                 builder_->createJmp(b_done);
 
@@ -3412,111 +3866,28 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 ir::Value* offset = builder_->createMul(idx_val, context_->getConstantInt(context_->getIntegerType(64), 8));
                 ir::Value* elem_addr = builder_->createAdd(data_ptr, offset);
 
-                // Scalar elements are stored as raw words needing no ownership
-                // edge. Floats/decimals box to heap objects (erased_word /
-                // box_float), so they must take the object path or the stored
-                // box dies with the enclosing region, leaving a dangling
-                // element — the [float]-param corruption.
-                auto lir_scalar = [](LIR::Type t) {
-                    return t != LIR::Type::Ptr && t != LIR::Type::Void &&
-                           t != LIR::Type::F32 && t != LIR::Type::F64;
-                };
-                // A [float]/[decimal] (or nested) element always stores a boxed
-                // heap object via erased_word — decide this from the *element*
-                // type first so value-type heuristics cannot reclassify it as a
-                // raw scalar word and skip the ownership edge.
-                auto elem_boxes_impl = [&](const auto* t, auto&& self) -> bool {
-                    if (!t) return false;
-                    switch (t->tag) {
-                        case ::TypeTag::Float32: case ::TypeTag::Float64:
-                        case ::TypeTag::Decimal2: case ::TypeTag::Decimal4:
-                        case ::TypeTag::Decimal6:
-                            return true;
-                        case ::TypeTag::List: {
-                            auto* lt = std::get_if<ListType>(&t->extra);
-                            return lt && lt->elementType && self(lt->elementType.get(), self);
-                        }
-                        default: return false;
-                    }
-                };
-                auto elem_boxes = [&](const auto* t) { return elem_boxes_impl(t, elem_boxes_impl); };
-                bool elem_may_box = false;
-                {
-                    auto it_list = lir_func.register_language_types.find(inst.dst);
-                    if (it_list != lir_func.register_language_types.end() && it_list->second &&
-                        it_list->second->tag == ::TypeTag::List) {
-                        auto* lt = std::get_if<ListType>(&it_list->second->extra);
-                        if (lt && lt->elementType) elem_may_box = elem_boxes(lt->elementType.get());
-                    }
-                }
-                if (!elem_may_box) {
-                    auto it_b = lir_func.register_language_types.find(inst.b);
-                    if (it_b != lir_func.register_language_types.end() && it_b->second)
-                        elem_may_box = elem_boxes(it_b->second.get());
-                }
-                if (!elem_may_box) {
-                    auto it_rv = lir_func.register_types.find(inst.b);
-                    if (it_rv != lir_func.register_types.end() &&
-                        (it_rv->second == LIR::Type::F32 || it_rv->second == LIR::Type::F64))
-                        elem_may_box = true;
-                }
-                bool is_scalar_elem = !elem_may_box && lir_scalar(inst.type_b);
-                if (!is_scalar_elem) {
-                    auto it_b = lir_func.register_types.find(inst.b);
-                    if (it_b != lir_func.register_types.end() && lir_scalar(it_b->second)) {
-                        is_scalar_elem = true;
-                    }
-                }
-                if (!is_scalar_elem) {
-                    auto it_list = lir_func.register_language_types.find(inst.dst);
-                    if (it_list != lir_func.register_language_types.end() && it_list->second && it_list->second->tag == ::TypeTag::List) {
-                        auto* lt = std::get_if<ListType>(&it_list->second->extra);
-                        if (lt && lt->elementType) {
-                            auto etag = lt->elementType->tag;
-                            if (etag != ::TypeTag::List && etag != ::TypeTag::String &&
-                                etag != ::TypeTag::Frame && etag != ::TypeTag::Dict &&
-                                etag != ::TypeTag::Tuple && etag != ::TypeTag::Any &&
-                                etag != ::TypeTag::Enum && etag != ::TypeTag::Trait &&
-                                etag != ::TypeTag::TraitObject &&
-                                etag != ::TypeTag::Float32 && etag != ::TypeTag::Float64 &&
-                                etag != ::TypeTag::Decimal2 && etag != ::TypeTag::Decimal4 &&
-                                etag != ::TypeTag::Decimal6) {
-                                is_scalar_elem = true;
-                            }
-                        }
-                    }
-                }
-                if (!is_scalar_elem && pointer_assigned_regs.count(inst.b) == 0 && !is_pointer_lang_type(inst.b)) {
-                    // Boxed scalar language types (float/decimal) produce heap
-                    // objects via erased_word — they are not raw scalar words.
-                    auto it_lv = lir_func.register_language_types.find(inst.b);
-                    bool boxed_scalar = it_lv != lir_func.register_language_types.end() && it_lv->second &&
-                        (it_lv->second->tag == ::TypeTag::Float32 || it_lv->second->tag == ::TypeTag::Float64 ||
-                         it_lv->second->tag == ::TypeTag::Decimal2 || it_lv->second->tag == ::TypeTag::Decimal4 ||
-                         it_lv->second->tag == ::TypeTag::Decimal6);
-                    auto it_rv = lir_func.register_types.find(inst.b);
-                    boxed_scalar = boxed_scalar ||
-                        (it_rv != lir_func.register_types.end() &&
-                         (it_rv->second == LIR::Type::F32 || it_rv->second == LIR::Type::F64));
-                    if (!boxed_scalar) is_scalar_elem = true;
-                }
+                bool is_scalar_elem = is_typed_primitive_list(inst.dst);
 
                 if (is_scalar_elem) {
                     if (auto* add_inst = dynamic_cast<ir::Instruction*>(elem_addr)) {
                         add_inst->setName("scalar_elem_" + lset_id);
                     }
-                    auto* store_inst = builder_->createStore(erased_word(elem_val), elem_addr);
+                    auto* store_inst = builder_->createStore(elem_val, elem_addr);
                     store_inst->setName("scalar_store_" + lset_id);
                 } else {
-                    ir::Value* stored_val = erased_word(elem_val);
-                    builder_->createStore(stored_val, elem_addr);
-                    builder_->createExternCall("lymar_aot_edge", {elem_addr, stored_val, context_->getConstantInt(context_->getIntegerType(64), 1)}, context_->getVoidType());
+                    // Erased-view write: encode the tagged value into the list's
+                    // element-storage kind (raw int/bool for primitive lists,
+                    // tagged word otherwise) and record edges only for tagged
+                    // heap references.
+                    ir::Value* elem_kind = builder_->createShr(hdr_val, context_->getConstantInt(context_->getIntegerType(64), 32));
+                    builder_->createExternCall("lymar_aot_list_elem_store",
+                        {elem_addr, tag_word(elem_val, inst.b, inst.type_b), elem_kind}, context_->getVoidType());
                 }
                 builder_->createJmp(b_done);
 
                 // Step 4: Slow path
                 builder_->setInsertPoint(b_slow);
-                builder_->createCall(fn, {list_val, idx_val, elem_val});
+                builder_->createCall(fn, {list_val, idx_val, tag_word(elem_val, inst.b, inst.type_b)});
                 builder_->createJmp(b_done);
 
                 builder_->setInsertPoint(b_done);
@@ -3555,13 +3926,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 used_builtins_.insert("lm_tuple_set");
                 ir::Function* fn = current_module_->getFunction("lm_tuple_set");
                 if (!fn) fn = builder_->createFunction("lm_tuple_set", context_->getVoidType(), {context_->getIntegerType(64), context_->getIntegerType(64), context_->getIntegerType(64)});
-                // Float elements box to heap objects, matching DictSet — raw
-                // double bits in the tuple word are misread on TupleGet.
-                LIR::Type vt = inst.type_b;
-                if (reg_types.count(inst.b)) vt = reg_types[inst.b];
-                ir::Value* val = (vt == LIR::Type::F64 || vt == LIR::Type::F32)
-                    ? builder_->createExternCall("lymar_aot_box_float", {load_float_reg(inst.b, vt)}, context_->getIntegerType(64))
-                    : load_reg(inst.b, inst.type_b);
+                ir::Value* val = tag_word(load_reg(inst.b, inst.type_b), inst.b, inst.type_b);
                 builder_->createCall(fn, {load_reg(inst.dst, inst.result_type), load_reg(inst.a, inst.type_a), val});
                 break;
             }
@@ -3569,24 +3934,21 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 used_builtins_.insert("lm_tuple_get");
                 ir::Function* fn = current_module_->getFunction("lm_tuple_get");
                 if (!fn) fn = builder_->createFunction("lm_tuple_get", context_->getIntegerType(64), {context_->getIntegerType(64), context_->getIntegerType(64)});
-                // lm_tuple_get returns a raw i64 word (boxed float / scalar /
-                // nil). Store it unconverted: coercing to double here loses
-                // nil and bit-reinterprets box pointers. Float consumers
-                // unbox via word_kind=1 in load_float_reg/store_reg.
                 ir::Value* raw = builder_->createCall(fn, {load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)}, context_->getIntegerType(64));
-                store_reg(inst.dst, raw, (inst.result_type == LIR::Type::F64 || inst.result_type == LIR::Type::F32) ? LIR::Type::Ptr : inst.result_type);
+                raw = untag_word(raw, inst.dst, inst.result_type);
+                store_reg(inst.dst, raw, inst.result_type);
                 break;
             }
             case LIR::LIR_Op::TupleLen: {
                 // Canonical tuple header: kind, elements, size, capacity.
                 ir::Value* len = builder_->createExternCall("lymar_aot_tuple_length",
-                    {load_reg(inst.a, inst.type_a), context_->getConstantInt(context_->getIntegerType(64), 0)}, context_->getIntegerType(64));
+                    {load_reg(inst.a, inst.type_a)}, context_->getIntegerType(64));
                 store_reg(inst.dst, len, inst.result_type);
                 break;
             }
             case LIR::LIR_Op::ProbeKind: {
                 ir::Value* kind = builder_->createExternCall("lymar_aot_probe_kind",
-                    {load_reg(inst.a, inst.type_a), context_->getConstantInt(context_->getIntegerType(64), 0)}, context_->getIntegerType(64));
+                    {load_reg(inst.a, inst.type_a)}, context_->getIntegerType(64));
                 store_reg(inst.dst, kind, inst.result_type);
                 break;
             }
@@ -3602,32 +3964,19 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 used_builtins_.insert("lm_dict_set");
                 ir::Function* fn = current_module_->getFunction("lm_dict_set");
                 if (!fn) fn = builder_->createFunction("lm_dict_set", context_->getVoidType(), {context_->getIntegerType(64), context_->getIntegerType(64), context_->getIntegerType(64)});
-                // Float values must be heap-boxed before entering the dict:
-                // storing raw double bits makes DictGet return an int-word that
-                // `as float`/print misinterpret (denormal garbage).
-                LIR::Type vt = inst.type_b;
-                if (reg_types.count(inst.b)) vt = reg_types[inst.b];
-                ir::Value* val = (vt == LIR::Type::F64 || vt == LIR::Type::F32)
-                    ? builder_->createExternCall("lymar_aot_box_float", {load_float_reg(inst.b, vt)}, context_->getIntegerType(64))
-                    : load_reg(inst.b, inst.type_b);
-                builder_->createCall(fn, {load_reg(inst.dst, inst.result_type), load_reg(inst.a, inst.type_a), val});
+                ir::Value* key = tag_word(load_reg(inst.a, inst.type_a), inst.a, inst.type_a);
+                ir::Value* val = tag_word(load_reg(inst.b, inst.type_b), inst.b, inst.type_b);
+                builder_->createCall(fn, {load_reg(inst.dst, inst.result_type), key, val});
                 break;
             }
             case LIR::LIR_Op::DictGet: {
                 used_builtins_.insert("lm_dict_get");
                 ir::Function* fn = current_module_->getFunction("lm_dict_get");
                 if (!fn) fn = builder_->createFunction("lm_dict_get", context_->getIntegerType(64), {context_->getIntegerType(64), context_->getIntegerType(64)});
-                // A typed dictionary lookup can still return nil for a missing
-                // key. Preserve the returned slot kind instead of asserting
-                // the dictionary's nominal Boolean element type.
-                // lm_dict_get returns a raw i64 word (pointer/scalar/nil), never
-                // a double — declaring the call's return type from result_type
-                // made F64 gets bit-reinterpret the word as a double (denormal
-                // garbage). Store the word unconverted so a missing key keeps
-                // the nil word (== lymar_aot_nil()); boxed floats unbox later
-                // via word_kind=1 in load_float_reg/store_reg/Cast.
-                ir::Value* raw = builder_->createCall(fn, {load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)}, context_->getIntegerType(64));
-                store_reg(inst.dst, raw, (inst.result_type == LIR::Type::F64 || inst.result_type == LIR::Type::F32) ? LIR::Type::Ptr : inst.result_type, true);
+                ir::Value* key = tag_word(load_reg(inst.b, inst.type_b), inst.b, inst.type_b);
+                ir::Value* raw = builder_->createCall(fn, {load_reg(inst.a, inst.type_a), key}, context_->getIntegerType(64));
+                raw = untag_word(raw, inst.dst, inst.result_type);
+                store_reg(inst.dst, raw, inst.result_type, true);
                 break;
             }
             case LIR::LIR_Op::DictLen: {
@@ -3639,7 +3988,8 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 used_builtins_.insert("lm_dict_has");
                 ir::Function* fn = current_module_->getFunction("lm_dict_has");
                 if (!fn) fn = builder_->createFunction("lm_dict_has", context_->getIntegerType(64), {context_->getIntegerType(64), context_->getIntegerType(64)});
-                store_reg(inst.dst, builder_->createCall(fn, {load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)}, lir_type_to_fyra_type(inst.result_type)), inst.result_type);
+                ir::Value* key = tag_word(load_reg(inst.b, inst.type_b), inst.b, inst.type_b);
+                store_reg(inst.dst, builder_->createCall(fn, {load_reg(inst.a, inst.type_a), key}, lir_type_to_fyra_type(inst.result_type)), inst.result_type);
                 break;
             }
             case LIR::LIR_Op::DictItems: {
@@ -3711,7 +4061,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 // Store fields array pointer at offset 16
                 ir::Value* fields_ptr_addr = builder_->createAdd(frame_ptr, context_->getConstantInt(context_->getIntegerType(64), 16));
                 builder_->createStore(fields_array, fields_ptr_addr);
-                builder_->createExternCall("lymar_aot_edge", {fields_ptr_addr, fields_array, context_->getConstantInt(context_->getIntegerType(64), 1)}, context_->getVoidType());
+                builder_->createExternCall("lymar_aot_edge", {fields_ptr_addr, fields_array}, context_->getVoidType());
 
                 // Store field_count at offset 24
                 ir::Value* cnt_addr = builder_->createAdd(frame_ptr, context_->getConstantInt(context_->getIntegerType(64), 24));
@@ -3734,15 +4084,24 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 ir::Value* frame_ptr = load_reg(inst.a, LIR::Type::Ptr);
                 ir::Value* word = builder_->createExternCall("lymar_aot_frame_get_field",
                     {frame_ptr, context_->getConstantInt(context_->getIntegerType(64), field_idx)}, context_->getIntegerType(64));
-                store_reg(inst.dst, word, (inst.result_type == LIR::Type::F64 || inst.result_type == LIR::Type::F32) ? LIR::Type::Ptr : inst.result_type, true);
+                word = untag_word(word, inst.dst, inst.result_type);
+                // Float results unbox to native f64 via untag_word. Only
+                // erased-typed destinations keep the boxed/object word —
+                // storing a box pointer into a scalar float local's slot
+                // while later assignments write raw f64 bits leaves the slot
+                // with a mixed representation (reads see pointer bits as
+                // doubles).
+                const bool float_result = inst.result_type == LIR::Type::F64 || inst.result_type == LIR::Type::F32;
+                const bool dst_erased = lang_type_is_erased(inst.dst);
+                store_reg(inst.dst, word,
+                    float_result && !dst_erased ? inst.result_type : (float_result ? LIR::Type::Ptr : inst.result_type), true);
                 break;
             }
             case LIR::LIR_Op::FrameSetFieldAtomic:
             case LIR::LIR_Op::FrameFieldAtomicAdd:
             case LIR::LIR_Op::FrameFieldAtomicSub: {
                 std::vector<ir::Value*> arguments{load_reg(inst.dst, LIR::Type::Ptr),
-                    context_->getConstantInt(context_->getIntegerType(64), inst.a), erased_word(load_reg(inst.b, inst.type_b)),
-                    context_->getConstantInt(context_->getIntegerType(64), 0)};
+                    context_->getConstantInt(context_->getIntegerType(64), inst.a), tag_word(load_reg(inst.b, inst.type_b), inst.b, inst.type_b)};
                 if (inst.op != LIR::LIR_Op::FrameSetFieldAtomic)
                     arguments.push_back(context_->getConstantInt(context_->getIntegerType(64), inst.op == LIR::LIR_Op::FrameFieldAtomicSub));
                 builder_->createExternCall(inst.op == LIR::LIR_Op::FrameSetFieldAtomic ? "lymar_aot_atomic_store" : "lymar_aot_atomic_update", arguments, context_->getVoidType());
@@ -3751,9 +4110,14 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             case LIR::LIR_Op::FrameSetField: {
                 ir::Value* frame_ptr = load_reg(inst.dst, LIR::Type::Ptr);
                 uint32_t field_idx = inst.a;
-                ir::Value* val = erased_word(load_reg(inst.b, inst.type_b));
+                ir::Value* val = tag_word(load_reg(inst.b, inst.type_b), inst.b, inst.type_b);
+                // tag_word always yields a tagged LmValue word (SMI, immediate,
+                // heap pointer, or >SMI box). The slot kind must describe that
+                // tagged domain — word_kind(inst.b) would report the *source*
+                // scalar kind, so a boxed >SMI int would be stored with kind 0
+                // and never promoted into the frame's region (dangling box).
                 builder_->createExternCall("lymar_aot_frame_set_field",
-                    {frame_ptr, context_->getConstantInt(context_->getIntegerType(64), field_idx), val, word_kind(inst.b)}, context_->getVoidType());
+                    {frame_ptr, context_->getConstantInt(context_->getIntegerType(64), field_idx), val}, context_->getVoidType());
                 break;
             }
             case LIR::LIR_Op::TraitCallMethod: {
@@ -3886,7 +4250,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
 
                         builder_->setInsertPoint(b_match);
                         ir::Value* call_res = builder_->createCall(candidates[ci].second, h_args);
-                        builder_->createStore(erased_word(call_res), res_slot);
+                        builder_->createStore(tag_indirect_result(call_res, candidates[ci].first), res_slot);
                         builder_->createJmp(b_join);
 
                         if (ci + 1 < candidates.size()) {
@@ -3914,7 +4278,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 if (res_t == LIR::Type::F64 || res_t == LIR::Type::F32) {
                     // erased_word boxed the callee's double return; unbox it.
                     store_float_reg(inst.dst, builder_->createExternCall("lymar_aot_to_float",
-                        {joined, context_->getConstantInt(context_->getIntegerType(64), 1)}, context_->getDoubleType()));
+                        {joined}, context_->getDoubleType()));
                 } else {
                     store_reg(inst.dst, joined, res_t, true);
                 }
@@ -3932,7 +4296,28 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     if (ret_val && !ret_val->getType()->isFloatingPoint() && main_fn->getReturnType() &&
                         (main_fn->getReturnType()->isDoubleTy() || main_fn->getReturnType()->isFloatTy()))
                         ret_val = builder_->createExternCall("lymar_aot_to_float",
-                            {ret_val, word_kind(inst.a)}, context_->getDoubleType());
+                            {ret_val}, context_->getDoubleType());
+                    // Functions declared with an erased return type (any,
+                    // unions, error unions, containers, frames) return tagged
+                    // LmValue words. A raw scalar return must be tagged here
+                    // or it aliases VAL_NIL/SMI patterns in the callee slot.
+                    if (ret_val && lir_func.return_language_type &&
+                        !ret_val->getType()->isFloatingPoint()) {
+                        switch (lir_func.return_language_type->tag) {
+                            case ::TypeTag::Any: case ::TypeTag::Union: case ::TypeTag::Sum:
+                            case ::TypeTag::ErrorUnion: case ::TypeTag::Nil:
+                            case ::TypeTag::String: case ::TypeTag::List: case ::TypeTag::Dict:
+                            case ::TypeTag::Tuple: case ::TypeTag::Frame: case ::TypeTag::Enum:
+                            case ::TypeTag::Trait: case ::TypeTag::TraitObject:
+                            case ::TypeTag::Function: case ::TypeTag::Closure:
+                            case ::TypeTag::Module: case ::TypeTag::Range:
+                            case ::TypeTag::Channel: case ::TypeTag::UserDefined:
+                            case ::TypeTag::Int128: case ::TypeTag::UInt128:
+                                ret_val = tag_word(ret_val, inst.a, inst.type_a);
+                                break;
+                            default: break;
+                        }
+                    }
                     builder_->createRet(ret_val);
                 } else {
                     builder_->createRet(builder_->createExternCall("lymar_aot_nil", {}, context_->getIntegerType(64)));
@@ -3986,7 +4371,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                                 auto* address=builder_->createAdd(context,context_->getConstantInt(word,field*8));
                                 value=builder_->createLoadl(address);
                                 if (parameter->getType()->isFloatingPoint())
-                                    value=builder_->createExternCall("lymar_aot_to_float",{value,builder_->createExternCall("lymar_aot_slot_pointer",{address},word)},context_->getDoubleType());
+                                    value=builder_->createExternCall("lymar_aot_to_float",{value},context_->getDoubleType());
                             }
                             arguments.push_back(value); ++index;
                         }
@@ -4028,7 +4413,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 auto* word=context_->getIntegerType(64);
                 uint32_t scheduler = (inst.dst != UINT32_MAX && inst.dst != 0) ? inst.dst : inst.a;
                 uint32_t task = (inst.a != UINT32_MAX && inst.a != scheduler) ? inst.a : inst.b;
-                builder_->createExternCall("lymar_aot_channel_push",{load_reg(scheduler,LIR::Type::Ptr),load_reg(task,LIR::Type::Ptr),context_->getConstantInt(word,1)},nullptr);
+                builder_->createExternCall("lymar_aot_channel_push",{load_reg(scheduler,LIR::Type::Ptr),load_reg(task,LIR::Type::Ptr)},nullptr);
                 break;
             }
             case LIR::LIR_Op::SchedulerRun: {
@@ -4096,8 +4481,8 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             case LIR::LIR_Op::ChannelOffer:
             case LIR::LIR_Op::ChannelPush: {
                 auto* channel = (inst.a != UINT32_MAX && inst.a != 0) ? load_reg(inst.a,LIR::Type::Ptr) : load_reg(inst.dst,LIR::Type::Ptr);
-                auto* value = (inst.b != UINT32_MAX) ? erased_word(load_reg(inst.b,inst.type_b)) : erased_word(load_reg(inst.a,inst.type_a));
-                builder_->createExternCall("lymar_aot_channel_push",{channel,value,context_->getConstantInt(context_->getIntegerType(64),0)},nullptr);
+                auto* value = (inst.b != UINT32_MAX) ? tag_word(load_reg(inst.b,inst.type_b), inst.b, inst.type_b) : tag_word(load_reg(inst.a,inst.type_a), inst.a, inst.type_a);
+                builder_->createExternCall("lymar_aot_channel_push",{channel,value},nullptr);
                 if(inst.dst != UINT32_MAX && inst.dst != inst.a) store_reg(inst.dst,context_->getConstantInt(context_->getIntegerType(64),1),inst.result_type);
                 break;
             }
@@ -4105,7 +4490,9 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             case LIR::LIR_Op::ChannelPop:
             case LIR::LIR_Op::ChannelPoll: {
                 auto* channel = (inst.a != UINT32_MAX && inst.a != 0) ? load_reg(inst.a,LIR::Type::Ptr) : load_reg(inst.dst,LIR::Type::Ptr);
-                store_reg(inst.dst,builder_->createExternCall("lymar_aot_channel_pop",{channel},context_->getIntegerType(64)),inst.result_type,true);
+                ir::Value* popped = builder_->createExternCall("lymar_aot_channel_pop",{channel},context_->getIntegerType(64));
+                popped = untag_word(popped, inst.dst, inst.result_type);
+                store_reg(inst.dst, popped, inst.result_type, true);
                 break;
             }
             case LIR::LIR_Op::ChannelHasData: {
@@ -4121,8 +4508,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 if (inst.imm > 10)
                     throw std::runtime_error("Invalid MemoryLoad element kind");
                 auto* value = builder_->createExternCall("lymar_aot_memory_load",
-                    {load_reg(inst.a, inst.type_a), context_->getConstantInt(context_->getIntegerType(64), inst.imm),
-                     context_->getConstantInt(context_->getIntegerType(64), 0)},
+                    {load_reg(inst.a, inst.type_a), context_->getConstantInt(context_->getIntegerType(64), inst.imm)},
                     context_->getIntegerType(64));
                 // Float loads use an erased word at the runtime boundary. Kind
                 // propagation supplies the conversion and ownership facts.
@@ -4135,25 +4521,22 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 if (inst.imm > 10)
                     throw std::runtime_error("Invalid MemoryStore element kind");
                 builder_->createExternCall("lymar_aot_memory_store",
-                    {load_reg(inst.a, inst.type_a), erased_word(load_reg(inst.b, inst.type_b)),
-                     context_->getConstantInt(context_->getIntegerType(64), inst.imm),
-                     context_->getConstantInt(context_->getIntegerType(64), 0),
-                     context_->getConstantInt(context_->getIntegerType(64), 0)}, nullptr);
+                    {load_reg(inst.a, inst.type_a), tag_word(load_reg(inst.b, inst.type_b), inst.b, inst.type_b),
+                     context_->getConstantInt(context_->getIntegerType(64), inst.imm)}, nullptr);
                 break;
             }
             case LIR::LIR_Op::MemoryAlloc:
                 store_reg(inst.dst, builder_->createExternCall("lymar_aot_raw_alloc",
-                    {erased_word(load_reg(inst.a, inst.type_a)), context_->getConstantInt(context_->getIntegerType(64), 0)},
+                    {tag_word(load_reg(inst.a, inst.type_a), inst.a, inst.type_a)},
                     context_->getIntegerType(64)), LIR::Type::Ptr);
                 break;
             case LIR::LIR_Op::MemoryFree:
                 builder_->createExternCall("lymar_aot_raw_free",
-                    {erased_word(load_reg(inst.a, inst.type_a)), context_->getConstantInt(context_->getIntegerType(64), 0)}, nullptr);
+                    {tag_word(load_reg(inst.a, inst.type_a), inst.a, inst.type_a)}, nullptr);
                 break;
             case LIR::LIR_Op::MemoryResize:
                 store_reg(inst.dst, builder_->createExternCall("lymar_aot_raw_resize",
-                    {erased_word(load_reg(inst.a, inst.type_a)), erased_word(load_reg(inst.b, inst.type_b)),
-                     context_->getConstantInt(context_->getIntegerType(64), 0), context_->getConstantInt(context_->getIntegerType(64), 0)},
+                    {tag_word(load_reg(inst.a, inst.type_a), inst.a, inst.type_a), tag_word(load_reg(inst.b, inst.type_b), inst.b, inst.type_b)},
                     context_->getIntegerType(64)), LIR::Type::Ptr);
                 break;
             case LIR::LIR_Op::MemoryCopy:
@@ -4165,8 +4548,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 const char* name = inst.op == LIR::LIR_Op::MemoryCopy ? "lymar_aot_raw_copy_checked" :
                     inst.op == LIR::LIR_Op::MemoryFill ? "lymar_aot_raw_fill_checked" : "lymar_aot_raw_compare_checked";
                 auto* result = builder_->createExternCall(name,
-                    {erased_word(load_reg(inst.a, inst.type_a)), erased_word(load_reg(inst.b, inst.type_b)), size,
-                     context_->getConstantInt(i64, 0), context_->getConstantInt(i64, 0), context_->getConstantInt(i64, 0)},
+                    {tag_word(load_reg(inst.a, inst.type_a), inst.a, inst.type_a), tag_word(load_reg(inst.b, inst.type_b), inst.b, inst.type_b), size},
                     inst.op == LIR::LIR_Op::MemoryCompare ? i64 : nullptr);
                 if (inst.op == LIR::LIR_Op::MemoryCompare) store_reg(inst.dst, result, LIR::Type::I64);
                 break;
@@ -4208,12 +4590,12 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 ir::Value* result=nullptr;
                 if(inst.func_name=="std.ffi.foreign_call" || inst.func_name=="ffi.foreign_call") {
                     if(inst.call_args.size()!=4) throw std::runtime_error("Malformed canonical foreign_call arguments");
-                    result=builder_->createExternCall("lymar_aot_foreign_call_list",{load_reg(inst.call_args[0],LIR::Type::Ptr),load_reg(inst.call_args[1],LIR::Type::Ptr),load_reg(inst.call_args[2],LIR::Type::I64),load_reg(inst.call_args[3],LIR::Type::Ptr),zero},context_->getIntegerType(64));
+                    result=builder_->createExternCall("lymar_aot_foreign_call_list",{load_reg(inst.call_args[0],LIR::Type::Ptr),load_reg(inst.call_args[1],LIR::Type::Ptr),load_reg(inst.call_args[2],LIR::Type::I64),load_reg(inst.call_args[3],LIR::Type::Ptr)},context_->getIntegerType(64));
                 } else {
                     if(inst.call_args.empty()) throw std::runtime_error("Foreign call missing target");
                     size_t count=inst.call_args.size()-1;
                     auto* size=context_->getConstantInt(context_->getIntegerType(64),std::max<size_t>(8,count*8));
-                    auto* values=entry_alloc(context_->getPointerType(context_->getIntegerType(64)), size);auto* kinds=entry_alloc(context_->getPointerType(context_->getIntegerType(64)), size);auto* types=entry_alloc(context_->getPointerType(context_->getIntegerType(64)), size);
+                    auto* values=entry_alloc(context_->getPointerType(context_->getIntegerType(64)), size);auto* types=entry_alloc(context_->getPointerType(context_->getIntegerType(64)), size);
                     auto ffi_type=[](LIR::Type type)->uint64_t {switch(type) {
                         case LIR::Type::I8:return 0;case LIR::Type::U8:case LIR::Type::Bool:return 1;case LIR::Type::I16:return 2;case LIR::Type::U16:return 3;
                         case LIR::Type::I32:return 4;case LIR::Type::U32:return 5;case LIR::Type::I64:return 6;case LIR::Type::U64:return 7;
@@ -4226,12 +4608,10 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                         if(inferred) type=original->getType()->isFloatingPoint()?LIR::Type::F64:LIR::Type::I64;
                         auto* value=erased_word(original);auto* offset=context_->getConstantInt(context_->getIntegerType(64),index*8);
                         builder_->createStore(value,builder_->createAdd(values,offset));
-                        auto* kind=builder_->createExternCall("lymar_aot_ffi_kind",{value,zero},context_->getIntegerType(64));
-                        builder_->createStore(kind,builder_->createAdd(kinds,offset));
-                        auto* type_id=inferred?builder_->createExternCall("lymar_aot_ffi_infer_type",{value,zero},context_->getIntegerType(64)):static_cast<ir::Value*>(context_->getConstantInt(context_->getIntegerType(64),ffi_type(type)));
+                        auto* type_id=inferred?builder_->createExternCall("lymar_aot_ffi_infer_type",{value},context_->getIntegerType(64)):static_cast<ir::Value*>(context_->getConstantInt(context_->getIntegerType(64),ffi_type(type)));
                         builder_->createStore(type_id,builder_->createAdd(types,offset));
                     }
-                    result=builder_->createExternCall("lymar_aot_foreign_call",{load_reg(inst.call_args[0],LIR::Type::Ptr),values,kinds,types,context_->getConstantInt(context_->getIntegerType(64),count),context_->getConstantInt(context_->getIntegerType(64),ffi_type(inst.result_type)),zero},context_->getIntegerType(64));
+                    result=builder_->createExternCall("lymar_aot_foreign_call",{load_reg(inst.call_args[0],LIR::Type::Ptr),values,types,context_->getConstantInt(context_->getIntegerType(64),count),context_->getConstantInt(context_->getIntegerType(64),ffi_type(inst.result_type))},context_->getIntegerType(64));
                 }
                 if(inst.dst!=UINT32_MAX) store_reg(inst.dst,result,inst.result_type,true);
                 break;

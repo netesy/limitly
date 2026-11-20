@@ -49,45 +49,6 @@
 #endif
 #include <windows.h>
 
-static LONG WINAPI aot_crash_handler(EXCEPTION_POINTERS* ep) {
-    if (ep->ExceptionRecord->ExceptionCode == 0xC0000005) {
-        FILE* f = fopen(".tmp/crash.log", "a");
-        if (f) {
-            uint64_t mod_base = (uint64_t)GetModuleHandleA(NULL);
-            uint64_t rip = (uint64_t)ep->ContextRecord->Rip;
-            uint64_t rva = rip >= mod_base ? (rip - mod_base) : 0;
-            fprintf(f, "[CRASH] ExceptionCode=0x%08lx at address=%p (mod_base=%016llx RVA=%08llx objdump_addr=%016llx)\n",
-                    ep->ExceptionRecord->ExceptionCode,
-                    ep->ExceptionRecord->ExceptionAddress,
-                    (unsigned long long)mod_base,
-                    (unsigned long long)rva,
-                    (unsigned long long)(0x140000000ULL + rva));
-            if (ep->ExceptionRecord->ExceptionCode == EXCEPTION_ACCESS_VIOLATION &&
-                ep->ExceptionRecord->NumberParameters >= 2) {
-                fprintf(f, "        Access violation %s address %p\n",
-                        ep->ExceptionRecord->ExceptionInformation[0] == 0 ? "READING" : "WRITING",
-                        (void*)ep->ExceptionRecord->ExceptionInformation[1]);
-            }
-            fprintf(f, "        RIP=%016llx RAX=%016llx RBX=%016llx RCX=%016llx RDX=%016llx RSI=%016llx RDI=%016llx RSP=%016llx RBP=%016llx\n",
-                    (unsigned long long)ep->ContextRecord->Rip,
-                    (unsigned long long)ep->ContextRecord->Rax,
-                    (unsigned long long)ep->ContextRecord->Rbx,
-                    (unsigned long long)ep->ContextRecord->Rcx,
-                    (unsigned long long)ep->ContextRecord->Rdx,
-                    (unsigned long long)ep->ContextRecord->Rsi,
-                    (unsigned long long)ep->ContextRecord->Rdi,
-                    (unsigned long long)ep->ContextRecord->Rsp,
-                    (unsigned long long)ep->ContextRecord->Rbp);
-            fflush(f);
-            fclose(f);
-        }
-    }
-    return EXCEPTION_CONTINUE_SEARCH;
-}
-
-__attribute__((constructor)) static void setup_crash_filter() {
-    AddVectoredExceptionHandler(1, aot_crash_handler);
-}
 #endif
 
 extern "C" int init_font_atlas_multi(const char*, int, int, const float*, int, unsigned char*, void*, float*);
@@ -100,6 +61,18 @@ namespace {
 using Word = uint64_t;
 constexpr Word object_kind = static_cast<Word>(LM::Memory::AOTValueKind::Object);
 constexpr Word boolean_kind = static_cast<Word>(LM::Memory::AOTValueKind::Boolean);
+
+constexpr Word TAG_PTR = 0x0ULL;
+constexpr Word TAG_INT = 0x1ULL;
+constexpr Word TAG_IMMEDIATE = 0x2ULL;
+constexpr Word TAG_MASK = 0x7ULL;
+
+constexpr Word VAL_NIL = (0ULL << 3) | TAG_IMMEDIATE;
+constexpr Word VAL_FALSE = (1ULL << 3) | TAG_IMMEDIATE;
+constexpr Word VAL_TRUE = (2ULL << 3) | TAG_IMMEDIATE;
+
+constexpr int64_t MAX_SMI = (int64_t)((1ULL << 60) - 1);
+constexpr int64_t MIN_SMI = (-(int64_t)(1ULL << 60));
 
 // Standalone-AOT stdout writer. The self-contained PE entry point (_start) calls
 // main directly and never runs the C-runtime startup, so on Windows the UCRT
@@ -228,11 +201,6 @@ struct SharedHeap {
     std::unordered_map<Word, Allocation> allocations;
     std::unordered_map<Word, std::vector<Word>> page_map;
     ConcurrentRegions regions;
-    // Ordered map: value-kind shadow needs range queries (forget_kinds, copy
-    // snapshot) which are O(log n + k) via lower_bound. unordered_map forced
-    // full O(n) scans and was more fragile under memory corruption (a corrupted
-    // bucket_count turned its internal hash % bucket_count into a div-by-zero).
-    std::map<Word,Word> shadow;
     std::map<Word,ReferenceOwner> reference_owners;
     Files files;
     std::map<Word,SchedulerConfiguration> schedulers;
@@ -284,9 +252,7 @@ struct Heap {
     LM::Memory::LifetimeRegistry& lifetimes = shared_heap().lifetimes;
     struct Invocation {
         Word region = 0;
-        std::vector<Word> args;
-        std::unordered_set<Word> slots;
-        std::vector<std::pair<Word, Word>> staged_params;
+        std::vector<Word> staged_params;
     };
     Word active = 0, base = 0;
     Word& next = shared_heap().next;
@@ -298,23 +264,9 @@ struct Heap {
     std::unordered_map<Word, Allocation>& allocations = shared_heap().allocations;
     std::unordered_map<Word, std::vector<Word>>& page_map = shared_heap().page_map;
     ConcurrentRegions& regions = shared_heap().regions;
-    std::map<Word, Word>& shadow = shared_heap().shadow;
     std::vector<Invocation> invocations;
-    std::vector<Word> pending_args;
-    Word return_pointer = 0;
     Files& files = shared_heap().files;
 
-    void forget_kinds(Word address, Word size, bool overlapping = false) {
-        if (!size) return;
-        // An entry at key p spans [p, p+8); it overlaps the target range when
-        // p + 8 > address, i.e. p >= address - 7. Only widen the lower bound
-        // when the caller explicitly wants partial-overlap removal.
-        Word lo = (overlapping && address >= sizeof(Word) - 1) ? address - (sizeof(Word) - 1) : address;
-        Word hi = address + size;
-        auto it = shadow.lower_bound(lo);
-        while (it != shadow.end() && it->first < hi)
-            it = shadow.erase(it);
-    }
     auto containing(Word address) {
         auto exact = allocations.find(address);
         if (exact != allocations.end()) return exact;
@@ -368,7 +320,6 @@ struct Heap {
         auto found = allocations.find(pointer);
         if (found == allocations.end()) throw std::runtime_error("AOT free of unowned allocation");
         regions.at(found->second.owner).members.erase(pointer);
-        forget_kinds(pointer, found->second.size);
         lifetimes.revoke(pointer);
         shared_heap().schedulers.erase(pointer);
         shared_heap().closed_channels.erase(pointer);
@@ -432,23 +383,39 @@ Word read_word(Word address, size_t offset = 0) {
     return value;
 }
 const char* string_data(Word value) {
-    auto found=heap().allocations.find(value);
-    if(found==heap().allocations.end() || found->second.raw_memory || found->second.dictionary || found->second.size<25 || (read_word(value)&0xffffffff)!=11 || read_word(value,8)>found->second.size-25) return nullptr;
-    return reinterpret_cast<const char*>(value + 24);
-}
-std::optional<__int128> integer_number(Word value, Word kind) {
-    if (!kind) return static_cast<int64_t>(value);
-    if (kind != object_kind) return {};
+    if (value <= 4096 || (value & TAG_MASK) != TAG_PTR) return nullptr;
     auto found = heap().allocations.find(value);
-    if (found == heap().allocations.end()) {
-        if (value == 0 || value == 2) return {};
-        return static_cast<int64_t>(value);
+    if (found != heap().allocations.end()) {
+        if (found->second.raw_memory || found->second.dictionary || found->second.size < 25 || (read_word(value) & 0xffffffff) != 11 || read_word(value, 8) > found->second.size - 25) return nullptr;
+        return reinterpret_cast<const char*>(value + 24);
     }
+    if ((read_word(value) & 0xffffffff) == 11) {
+        return reinterpret_cast<const char*>(value + 24);
+    }
+    return nullptr;
+}
+// LmValue tag inspection: every managed word is self-describing.
+//   (word & 7) == 0  -> TAG_PTR: heap object pointer (validated via allocations)
+//   (word & 7) == 1  -> TAG_INT: SMI, payload = word >> 3
+//   (word & 7) == 2  -> TAG_IMMEDIATE: VAL_NIL(2) / VAL_FALSE(10) / VAL_TRUE(18)
+static inline bool is_heap_word(Word value) {
+    return (value & TAG_MASK) == TAG_PTR && value > 4096 && heap().allocations.count(value);
+}
+static inline Word word_tag(Word value) { return value & TAG_MASK; }
+// Numeric decode shared by to_integer/to_float/numeric_*. Returns disengaged
+// for non-numeric tagged words (strings, lists, frames, nil, booleans).
+std::optional<__int128> integer_number(Word value) {
+    Word tag = word_tag(value);
+    if (tag == TAG_INT) return static_cast<int64_t>(value) >> 3;
+    if (tag == TAG_IMMEDIATE) return {};
+    if (tag != TAG_PTR || value <= 4096) return {};
+    auto found = heap().allocations.find(value);
+    if (found == heap().allocations.end()) return {};
     if (found->second.raw_memory || found->second.dictionary || found->second.size < 16) return {};
     auto type = read_word(value) & 0xffffffff;
     if ((type==7 || type==8) && found->second.size<32) return {};
     if (type == 5) return static_cast<int64_t>(read_word(value, 8));
-    if (type == 6) return read_word(value, 8);
+    if (type == 6 || type == 13) return read_word(value, 8);
     if (type == 7 || type == 8) {
         __int128 number; std::memcpy(&number, reinterpret_cast<void*>(value + 16), sizeof(number)); return number;
     }
@@ -466,8 +433,8 @@ std::string integer_text(__int128 number) {
 // integer_number() widens both into __int128, so u128 values at or above
 // 2^127 would print as negative without this dispatch. Disengaged for
 // non-wide values so callers keep the integer_number() path.
-std::optional<std::string> wide_box_text(Word value, Word kind) {
-    if (kind != object_kind || value <= 4096) return {};
+std::optional<std::string> wide_box_text(Word value) {
+    if (!is_heap_word(value)) return {};
     auto found = heap().allocations.find(value);
     if (found == heap().allocations.end() || found->second.raw_memory ||
         found->second.dictionary || found->second.size < 32) return {};
@@ -491,8 +458,17 @@ std::optional<std::string> wide_box_text(Word value, Word kind) {
 extern "C" {
 uint64_t lymar_aot_alloc(uint64_t size);
 uint64_t lymar_aot_box_float(double number);
-void lymar_aot_edge(uint64_t address, uint64_t child, uint64_t kind);
-double lymar_aot_to_float(uint64_t value, uint64_t kind);
+uint64_t lymar_aot_box_i64(int64_t v);
+uint64_t lymar_aot_tag_int(int64_t v);
+int64_t lymar_aot_untag_int(uint64_t word);
+uint64_t lymar_aot_tag_bool(uint64_t val);
+uint64_t lymar_aot_untag_bool(uint64_t word);
+uint64_t lymar_aot_tag_pointer(uint64_t ptr);
+uint64_t lymar_aot_untag_ptr(uint64_t word);
+uint64_t lymar_aot_untag_at(uint64_t word);
+void lymar_aot_edge(uint64_t address, uint64_t child);
+double lymar_aot_to_float(uint64_t value);
+
 // Frame operations require a live, correctly shaped receiver before addressing
 // its fields. This is backend-private layout validation, not frontend inference.
 uint64_t lymar_aot_frame_field_address(uint64_t pointer, uint64_t index) {
@@ -526,15 +502,9 @@ uint64_t lymar_aot_frame_field_address(uint64_t pointer, uint64_t index) {
         h.allocations[fields] = Allocation{fbytes, h.active, {}};
         h.regions.at(h.active).members.insert(fields);
     }
-    h.return_pointer = 1;
     return fields + index * sizeof(Word);
 
     } catch (const std::exception& failure) {
-        FILE* f = fopen(".tmp/crash.log", "a");
-        if (f) {
-            fprintf(f, "[ERROR] frame_field_address ptr=%llx idx=%llu: %s\n", (unsigned long long)pointer, (unsigned long long)index, failure.what());
-            fclose(f);
-        }
         if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return 0;
@@ -542,51 +512,18 @@ uint64_t lymar_aot_frame_field_address(uint64_t pointer, uint64_t index) {
 }
 uint64_t lymar_aot_frame_get_field(uint64_t pointer, uint64_t index) {
     if (pointer <= 4096) return 2; // VAL_NIL
-    if ((read_word(pointer) & 0xffffffff) == 15) {
-        auto nm_ptr = read_word(pointer, 8);
-        if (nm_ptr > 4096 && (read_word(nm_ptr) & 0xffffffff) == 11) {
-            std::string nm((const char*)(nm_ptr + 24), read_word(nm_ptr, 8));
-            if (nm.find("Grid") != std::string::npos) {
-                auto cnt = read_word(pointer, 24);
-                auto flds = read_word(pointer, 16);
-                uint64_t val = (index < cnt) ? read_word(flds, index * 8) : 0;
-                uint64_t val_type = (val > 4096) ? (read_word(val) & 0xffffffff) : 0;
-                FILE* f = fopen(".tmp/crash.log", "a");
-                if (f) {
-                    fprintf(f, "[GRID_GET_FIELD] ptr=%llx cnt=%llu idx=%llu -> val=%llx val_type=%llu\n",
-                            (unsigned long long)pointer, (unsigned long long)cnt, (unsigned long long)index,
-                            (unsigned long long)val, (unsigned long long)val_type);
-                    fclose(f);
-                }
-            }
-        }
-    }
     auto addr = lymar_aot_frame_field_address(pointer, index);
     if (!addr) return 2;
+    // Slot holds a tagged LmValue; builder-side untag_word decodes it and
+    // erased consumers read the self-describing word directly.
     return *reinterpret_cast<const Word*>(addr);
 }
-void lymar_aot_frame_set_field(uint64_t pointer, uint64_t index, uint64_t value, uint64_t kind) {
+void lymar_aot_frame_set_field(uint64_t pointer, uint64_t index, uint64_t value) {
     if (pointer <= 4096) return;
-    if ((read_word(pointer) & 0xffffffff) == 15) {
-        auto nm_ptr = read_word(pointer, 8);
-        if (nm_ptr > 4096 && (read_word(nm_ptr) & 0xffffffff) == 11) {
-            std::string nm((const char*)(nm_ptr + 24), read_word(nm_ptr, 8));
-            if (nm.find("Grid") != std::string::npos) {
-                uint64_t val_type = (value > 4096) ? (read_word(value) & 0xffffffff) : 0;
-                FILE* f = fopen(".tmp/crash.log", "a");
-                if (f) {
-                    fprintf(f, "[GRID_SET_FIELD] ptr=%llx idx=%llu = val=%llx val_type=%llu kind=%llu\n",
-                            (unsigned long long)pointer, (unsigned long long)index,
-                            (unsigned long long)value, (unsigned long long)val_type, (unsigned long long)kind);
-                    fclose(f);
-                }
-            }
-        }
-    }
     auto addr = lymar_aot_frame_field_address(pointer, index);
     if (!addr) return;
     *reinterpret_cast<Word*>(addr) = value;
-    lymar_aot_edge(addr, value, kind);
+    lymar_aot_edge(addr, value);
 }
 uint64_t lymar_aot_frame_matches(uint64_t pointer, uint64_t expected, uint64_t length) {
     if (pointer <= 4096) return 0;
@@ -639,10 +576,8 @@ uint64_t lymar_aot_atomic_load(uint64_t pointer, uint64_t index) {
     RuntimeGuard runtime_guard;
 
     auto address = lymar_aot_frame_field_address(pointer, index);
-    auto result = LM::Memory::atomic_field_load(reinterpret_cast<Word*>(address));
-    auto found = heap().shadow.find(address);
-    heap().return_pointer = found == heap().shadow.end() ? 0 : found->second;
-    return result;
+    // Return the tagged slot word; the consumer's untag_word decodes it.
+    return LM::Memory::atomic_field_load(reinterpret_cast<Word*>(address));
 
     } catch (const std::exception& failure) {
         if (runtime_lock_depth && heap().worker) throw;
@@ -650,14 +585,15 @@ uint64_t lymar_aot_atomic_load(uint64_t pointer, uint64_t index) {
         return 0;
     }
 }
-void lymar_aot_atomic_store(uint64_t pointer, uint64_t index, uint64_t value, uint64_t kind) {
+void lymar_aot_atomic_store(uint64_t pointer, uint64_t index, uint64_t value) {
     try {
     RuntimeGuard runtime_guard;
 
     auto address = lymar_aot_frame_field_address(pointer, index);
-    // Publish ownership/kind before publishing the field value.
+    // Publish ownership before publishing the field value. The slot
+    // receives the tagged LmValue word so readers see a self-describing value.
     std::lock_guard lock(LM::Memory::atomic_field_mutex(reinterpret_cast<void*>(address)));
-    lymar_aot_edge(address, value, kind);
+    lymar_aot_edge(address, value);
     std::atomic_ref<Word>(*reinterpret_cast<Word*>(address)).store(value, std::memory_order_seq_cst);
 
     } catch (const std::exception& failure) {
@@ -666,41 +602,43 @@ void lymar_aot_atomic_store(uint64_t pointer, uint64_t index, uint64_t value, ui
         return;
     }
 }
-void lymar_aot_atomic_update(uint64_t pointer, uint64_t index, uint64_t value, uint64_t kind, uint64_t subtract) {
+void lymar_aot_atomic_update(uint64_t pointer, uint64_t index, uint64_t value, uint64_t subtract) {
     try {
     RuntimeGuard runtime_guard;
 
     auto address = lymar_aot_frame_field_address(pointer, index);
     LM::Memory::atomic_field_update(reinterpret_cast<Word*>(address), [&](Word old) {
-        auto found = heap().shadow.find(address);
-        Word old_kind = found == heap().shadow.end() ? 0 : found->second;
-        Word result = 2, result_kind = object_kind;
-        auto left = integer_number(old, old_kind), right = integer_number(value, kind);
+        // Both operands are tagged LmValue words; results are re-tagged below.
+        auto is_float_box = [](Word word) {
+            return is_heap_word(word) && (read_word(word) & 0xffffffff) == 9;
+        };
+        auto left = integer_number(old), right = integer_number(value);
+        Word result = VAL_NIL;
         if (left && right) {
             __int128 number;
             if (LM::Memory::add_integer(*left, *right, number, subtract != 0)) {
-                if (number >= INT64_MIN && number <= INT64_MAX) { result = static_cast<Word>(number); result_kind = 0; }
-                else { result = lymar_aot_alloc(32); *reinterpret_cast<Word*>(result) = 7;
-                    std::memcpy(reinterpret_cast<void*>(result + 16), &number, sizeof(number)); }
+                if (number >= MIN_SMI && number <= MAX_SMI)
+                    result = (static_cast<Word>(number) << 3) | TAG_INT;
+                else {
+                    result = lymar_aot_alloc(32); *reinterpret_cast<Word*>(result) = 7;
+                    std::memcpy(reinterpret_cast<void*>(result + 16), &number, sizeof(number));
+                }
             }
-        } else {
-            auto is_float = [](Word word, Word mode) { return mode == object_kind && word > 4096 && (read_word(word) & 0xffffffff) == 9; };
-            if ((left || is_float(old, old_kind)) && (right || is_float(value, kind))) {
-                auto a = lymar_aot_to_float(old, old_kind), b = lymar_aot_to_float(value, kind);
-                result = lymar_aot_box_float(subtract ? a - b : a + b);
-            } else if (!subtract && old_kind == object_kind && kind == object_kind && old > 4096 && value > 4096 &&
-                       (read_word(old) & 0xffffffff) == 11 && (read_word(value) & 0xffffffff) == 11) {
-                auto a = read_word(old, 8), b = read_word(value, 8);
-                if (b > UINT64_MAX - 25 || a > UINT64_MAX - b - 25) throw std::overflow_error("Atomic string length overflow");
-                result = lymar_aot_alloc(25 + a + b);
-                *reinterpret_cast<Word*>(result) = 11; *reinterpret_cast<Word*>(result + 8) = a + b;
-                *reinterpret_cast<Word*>(result + 16) = a + b;
-                std::memcpy(reinterpret_cast<void*>(result + 24), reinterpret_cast<void*>(old + 24), a);
-                std::memcpy(reinterpret_cast<void*>(result + 24 + a), reinterpret_cast<void*>(value + 24), b);
-                *reinterpret_cast<char*>(result + 24 + a + b) = 0;
-            }
+        } else if ((left || is_float_box(old)) && (right || is_float_box(value))) {
+            auto a = lymar_aot_to_float(old), b = lymar_aot_to_float(value);
+            result = lymar_aot_box_float(subtract ? a - b : a + b);
+        } else if (!subtract && is_heap_word(old) && is_heap_word(value) &&
+                   (read_word(old) & 0xffffffff) == 11 && (read_word(value) & 0xffffffff) == 11) {
+            auto a = read_word(old, 8), b = read_word(value, 8);
+            if (b > UINT64_MAX - 25 || a > UINT64_MAX - b - 25) throw std::overflow_error("Atomic string length overflow");
+            result = lymar_aot_alloc(25 + a + b);
+            *reinterpret_cast<Word*>(result) = 11; *reinterpret_cast<Word*>(result + 8) = a + b;
+            *reinterpret_cast<Word*>(result + 16) = a + b;
+            std::memcpy(reinterpret_cast<void*>(result + 24), reinterpret_cast<void*>(old + 24), a);
+            std::memcpy(reinterpret_cast<void*>(result + 24 + a), reinterpret_cast<void*>(value + 24), b);
+            *reinterpret_cast<char*>(result + 24 + a + b) = 0;
         }
-        lymar_aot_edge(address, result, result_kind);
+        lymar_aot_edge(address, result);
         return result;
     });
 
@@ -726,11 +664,9 @@ uint64_t lymar_aot_ref_create(uint64_t pointer, uint64_t writable) {
 
     auto& h = heap();
     if (writable & ~(LM::Memory::ReferenceWritable | LM::Memory::ReferenceNullable)) throw std::runtime_error("Invalid AOT reference mode");
-    h.return_pointer = 0;
-    if ((pointer == 0 || pointer == 2) && (writable & LM::Memory::ReferenceNullable)) return 0;
+    if ((pointer == 0 || pointer == VAL_NIL) && (writable & LM::Memory::ReferenceNullable)) return 0;
     if (!h.allocations.count(pointer)) throw std::runtime_error("AOT borrow of unowned object");
     h.lifetimes.adopt(pointer);
-    h.return_pointer = 0;
     auto token = h.lifetimes.borrow(pointer, (writable & LM::Memory::ReferenceWritable) != 0, h.active);
     shared_heap().reference_owners[token] = {std::this_thread::get_id(),h.active};
     return token;
@@ -753,11 +689,13 @@ uint64_t lymar_aot_nil() {
         return 0;
     }
 }
-uint64_t lymar_aot_is_nil(uint64_t value, uint64_t is_pointer) {
+uint64_t lymar_aot_is_nil(uint64_t value) {
     try {
     RuntimeGuard runtime_guard;
 
-    return is_pointer == object_kind && (value == 0 || value == 2);
+    // Managed words are tagged LmValues: VAL_NIL (and the 0 sentinel produced
+    // by failed slot lookups) are the only nil representations.
+    return value == VAL_NIL || value == 0;
 
     } catch (const std::exception& failure) {
         if (runtime_lock_depth && heap().worker) throw;
@@ -765,11 +703,11 @@ uint64_t lymar_aot_is_nil(uint64_t value, uint64_t is_pointer) {
         return 0;
     }
 }
-uint64_t lymar_aot_is_object(uint64_t value, uint64_t is_pointer) {
+uint64_t lymar_aot_is_object(uint64_t value) {
     try {
     RuntimeGuard runtime_guard;
 
-    return is_pointer == object_kind && value > 4096;
+    return is_heap_word(value) ? 1 : 0;
 
     } catch (const std::exception& failure) {
         if (runtime_lock_depth && heap().worker) throw;
@@ -782,17 +720,17 @@ uint64_t lymar_aot_is_object(uint64_t value, uint64_t is_pointer) {
 // optional (T?) and plain unions also carry. Layout: [magic][is_error][payload].
 constexpr Word union_box_magic = 0x4C594D41524F4B21ULL; // "LYMAROK!"
 
-static bool is_union_box(Word value, Word kind) {
-    if (kind != object_kind || value <= 4096 || value == 0 || value == 2) return false;
+static bool is_union_box(Word value) {
+    if (!is_heap_word(value)) return false;
     auto found = heap().containing(value);
     if (found == heap().allocations.end() || found->first != value || found->second.size < 24) return false;
     return read_word(value) == union_box_magic;
 }
-uint64_t lymar_aot_union_is_error(uint64_t value, uint64_t kind) {
+uint64_t lymar_aot_union_is_error(uint64_t value) {
     try {
     RuntimeGuard runtime_guard;
 
-    return is_union_box(value, kind) && read_word(value, 8) != 0 ? 1 : 0;
+    return is_union_box(value) && read_word(value, 8) != 0 ? 1 : 0;
 
     } catch (const std::exception& failure) {
         if (runtime_lock_depth && heap().worker) throw;
@@ -800,33 +738,24 @@ uint64_t lymar_aot_union_is_error(uint64_t value, uint64_t kind) {
         return 0;
     }
 }
-uint64_t lymar_aot_union_unwrap(uint64_t value, uint64_t kind) {
+uint64_t lymar_aot_union_unwrap(uint64_t value) {
     try {
     RuntimeGuard runtime_guard;
 
-    auto& h = heap();
-    if (is_union_box(value, kind)) {
-        h.return_pointer = read_word(value, 24);
-        return read_word(value, 16);
-    }
-    h.return_pointer = kind;
+    if (is_union_box(value)) return read_word(value, 16);
     return value;
 
     } catch (const std::exception& failure) {
         if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
-        heap().return_pointer = kind;
         return value;
     }
 }
-// Erased native integers are untagged, so pointer shape cannot validate a
-// string receiver. The existing kind sidecar is authoritative at this boundary.
-uint64_t lymar_aot_string_receiver(uint64_t value, uint64_t kind) {
+uint64_t lymar_aot_string_receiver(uint64_t value) {
     try {
     RuntimeGuard runtime_guard;
 
-    if (!lymar_aot_is_object(value, kind)) return 0;
-    return (read_word(value) & 0xffffffff) == 11 ? value : 0;
+    return is_heap_word(value) && (read_word(value) & 0xffffffff) == 11 ? value : 0;
 
     } catch (const std::exception& failure) {
         if (runtime_lock_depth && heap().worker) throw;
@@ -834,20 +763,11 @@ uint64_t lymar_aot_string_receiver(uint64_t value, uint64_t kind) {
         return 0;
     }
 }
-uint64_t lymar_aot_callable_receiver(uint64_t value, uint64_t kind) {
+uint64_t lymar_aot_callable_receiver(uint64_t value) {
     try {
     RuntimeGuard runtime_guard;
 
-    // The kind sidecar is a compile-time hint. Values reloaded from a closure
-    // capture reach this boundary as erased i64 words with kind==0 even when
-    // they are genuine heap objects (a captured fn-name string, for example),
-    // because the region pass derives the flag from the IR type and tuple
-    // elements are i64. A callable receiver must be a real allocation, so
-    // validate against the allocator instead of trusting the lossy sidecar
-    // alone; true scalars are never tracked and are still rejected.
-    bool object = lymar_aot_is_object(value, kind) ||
-                  (value > 4096 && heap().allocations.find(value) != heap().allocations.end());
-    if (!object) return 0;
+    if (!is_heap_word(value)) return 0;
     auto type = read_word(value) & 0xffffffff;
     if (type == 11) return value; // canonical function-name string
     auto& h = heap();
@@ -856,10 +776,8 @@ uint64_t lymar_aot_callable_receiver(uint64_t value, uint64_t kind) {
     auto elements = read_word(value,8);
     auto array = h.allocations.find(elements);
     if (array == h.allocations.end() || array->second.size < 8) return 0;
-    auto origin = h.shadow.find(elements);
     auto name = read_word(elements);
-    if (origin == h.shadow.end() || !lymar_aot_is_object(name,origin->second) ||
-        (read_word(name) & 0xffffffff) != 11) return 0;
+    if (!is_heap_word(name) || (read_word(name) & 0xffffffff) != 11) return 0;
     return value;
 
     } catch (const std::exception& failure) {
@@ -868,12 +786,14 @@ uint64_t lymar_aot_callable_receiver(uint64_t value, uint64_t kind) {
         return 0;
     }
 }
-uint64_t lymar_aot_string_index(uint64_t value, uint64_t kind) {
+uint64_t lymar_aot_string_index(uint64_t value) {
     try {
     RuntimeGuard runtime_guard;
 
-    if (kind == 0) return value;
-    if (!lymar_aot_is_object(value, kind)) return 0;
+    if ((value & TAG_MASK) == TAG_INT) return static_cast<uint64_t>(static_cast<int64_t>(value) >> 3);
+    if (value == VAL_FALSE || value == VAL_NIL || value == 0) return 0;
+    if (value == VAL_TRUE) return 1;
+    if (!is_heap_word(value)) return 0;
     auto type = read_word(value) & 0xffffffff;
     if (type >= 5 && type <= 8) return read_word(value + 8);
     if (type == 9) {
@@ -889,21 +809,11 @@ uint64_t lymar_aot_string_index(uint64_t value, uint64_t kind) {
         return 0;
     }
 }
-uint64_t lymar_aot_boolean(uint64_t value) {
-    try {
-    RuntimeGuard runtime_guard;
- return value;
-    } catch (const std::exception& failure) {
-        if (runtime_lock_depth && heap().worker) throw;
-        if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
-        return 0;
-    }
-}
-uint64_t lymar_aot_is_print_object(uint64_t value, uint64_t kind) {
+uint64_t lymar_aot_is_print_object(uint64_t value) {
     try {
     RuntimeGuard runtime_guard;
 
-    return lymar_aot_is_object(value, kind) && (read_word(value) & 0xffffffff) != 9;
+    return is_heap_word(value) && (read_word(value) & 0xffffffff) != 9 ? 1 : 0;
 
     } catch (const std::exception& failure) {
         if (runtime_lock_depth && heap().worker) throw;
@@ -911,13 +821,16 @@ uint64_t lymar_aot_is_print_object(uint64_t value, uint64_t kind) {
         return 0;
     }
 }
-double lymar_aot_to_float(uint64_t value, uint64_t kind) {
+double lymar_aot_to_float(uint64_t value) {
     try {
     RuntimeGuard runtime_guard;
 
-    if (kind == boolean_kind || lymar_aot_is_nil(value, kind)) return 0.0;
+    Word tag = word_tag(value);
+    if (tag == TAG_IMMEDIATE) return value == VAL_TRUE ? 1.0 : 0.0;
+    if (tag == TAG_INT) return static_cast<double>(static_cast<int64_t>(value) >> 3);
+    if (tag != TAG_PTR || value <= 4096) return static_cast<double>(static_cast<int64_t>(value));
     auto found = heap().allocations.find(value);
-    if (found != heap().allocations.end() && !found->second.raw_memory && found->second.size >= 16) {
+    if (found != heap().allocations.end() && !found->second.raw_memory && !found->second.dictionary && found->second.size >= 16) {
         if ((read_word(value) & 0xffffffff) == 9) {
             double number;
             std::memcpy(&number, reinterpret_cast<void*>(value + 8), sizeof(number));
@@ -925,7 +838,7 @@ double lymar_aot_to_float(uint64_t value, uint64_t kind) {
         }
         if (auto* text = string_data(value)) { try { return std::stod(text); } catch (...) {} }
     }
-    if (auto integer = integer_number(value, kind)) return static_cast<double>(*integer);
+    if (auto integer = integer_number(value)) return static_cast<double>(*integer);
     return static_cast<double>(static_cast<int64_t>(value));
 
     } catch (const std::exception& failure) {
@@ -934,13 +847,17 @@ double lymar_aot_to_float(uint64_t value, uint64_t kind) {
         return 0.0;
     }
 }
-uint64_t lymar_aot_to_integer(uint64_t value, uint64_t kind) {
+uint64_t lymar_aot_to_integer(uint64_t value) {
     try {
     RuntimeGuard runtime_guard;
 
-    if (auto integer = integer_number(value, kind)) return static_cast<Word>(*integer);
-    if (!kind) return value;
-    if (kind == boolean_kind || lymar_aot_is_nil(value, kind)) return 0;
+    Word tag = word_tag(value);
+    if (tag == TAG_INT) return static_cast<uint64_t>(static_cast<int64_t>(value) >> 3);
+    if (value == VAL_FALSE || value == VAL_NIL || value == 0) return 0;
+    if (value == VAL_TRUE) return 1;
+    if (tag == TAG_IMMEDIATE) return 0;
+    if (tag != TAG_PTR || value <= 4096) return value;
+    if (auto integer = integer_number(value)) return static_cast<Word>(*integer);
     auto found = heap().allocations.find(value);
     if (found != heap().allocations.end() && !found->second.raw_memory) {
         if (auto* text = string_data(value)) {
@@ -948,7 +865,10 @@ uint64_t lymar_aot_to_integer(uint64_t value, uint64_t kind) {
             catch (...) { return static_cast<unsigned char>(text[0]); }
         }
         if (found->second.size >= 16 && (read_word(value) & 0xffffffff) == 9) {
-            return static_cast<uint64_t>(LM::Memory::truncate_i64(lymar_aot_to_float(value, kind)));
+            return static_cast<uint64_t>(LM::Memory::truncate_i64(lymar_aot_to_float(value)));
+        }
+        if (found->second.size >= 16 && (read_word(value) & 0xffffffff) == 5) {
+            return read_word(value, 8);
         }
     }
     return value;
@@ -971,16 +891,17 @@ uint64_t lymar_aot_float_to_integer(double number) {
         return 0;
     }
 }
-uint64_t lymar_aot_to_boolean(uint64_t value, uint64_t kind) {
+uint64_t lymar_aot_to_boolean(uint64_t value) {
     try {
     RuntimeGuard runtime_guard;
 
-    if (lymar_aot_is_nil(value, kind)) return 0;
-    if (kind != object_kind) return value != 0;
-    // Small raw words (ints/bools stored unboxed in erased containers) are not
-    // heap pointers; read_word on them would fault. Treat them as scalars.
+    if (value == VAL_FALSE || value == VAL_NIL || value == 0) return 0;
+    if (value == VAL_TRUE) return 1;
+    if ((value & TAG_MASK) == TAG_INT) return (static_cast<int64_t>(value) >> 3) != 0;
+    if ((value & TAG_MASK) == TAG_IMMEDIATE) return value != VAL_FALSE && value != VAL_NIL && value != 0;
     if (value <= 4096) return value != 0;
-    if ((read_word(value) & 0xffffffff) == 9) return lymar_aot_to_float(value, kind) != 0.0;
+    if (!is_heap_word(value)) return value != 0;
+    if ((read_word(value) & 0xffffffff) == 9) return lymar_aot_to_float(value) != 0.0;
     return 1;
 
     } catch (const std::exception& failure) {
@@ -989,14 +910,10 @@ uint64_t lymar_aot_to_boolean(uint64_t value, uint64_t kind) {
         return 0;
     }
 }
-int64_t lymar_aot_numeric_compare(uint64_t left, uint64_t right, uint64_t left_kind, uint64_t right_kind) {
-    if (!left_kind && !right_kind) {
-        int64_t a = static_cast<int64_t>(left), b = static_cast<int64_t>(right);
-        return a < b ? -1 : a > b ? 1 : 0;
-    }
+int64_t lymar_aot_numeric_compare(uint64_t left, uint64_t right) {
     RuntimeGuard guard;
-    auto classify = [&](Word value, Word kind) -> Word {
-        if (kind != object_kind || lymar_aot_is_nil(value, kind) || value <= 4096) return 0;
+    auto classify = [&](Word value) -> Word {
+        if (!is_heap_word(value)) return 0;
         auto found = heap().containing(value);
         if (found == heap().allocations.end())
             throw std::runtime_error("Invalid or expired comparison operand");
@@ -1007,15 +924,16 @@ int64_t lymar_aot_numeric_compare(uint64_t left, uint64_t right, uint64_t left_k
             throw std::runtime_error("Invalid numeric allocation");
         return type;
     };
-    auto ltype = classify(left, left_kind), rtype = classify(right, right_kind);
-    bool lnumeric = left_kind == 0 || (ltype >= 5 && ltype <= 9);
-    bool rnumeric = right_kind == 0 || (rtype >= 5 && rtype <= 9);
+    auto ltype = classify(left), rtype = classify(right);
+    // Numeric operands: SMI/immediate-decoded integers and heap number boxes.
+    bool lnumeric = integer_number(left).has_value() || (ltype >= 5 && ltype <= 9);
+    bool rnumeric = integer_number(right).has_value() || (rtype >= 5 && rtype <= 9);
     if (lnumeric && rnumeric) {
         if (ltype == 9 || rtype == 9) {
-            auto a = lymar_aot_to_float(left, left_kind), b = lymar_aot_to_float(right, right_kind);
+            auto a = lymar_aot_to_float(left), b = lymar_aot_to_float(right);
             return a < b ? -1 : a > b ? 1 : 0;
         }
-        auto a = *integer_number(left, left_kind), b = *integer_number(right, right_kind);
+        auto a = *integer_number(left), b = *integer_number(right);
         return a < b ? -1 : a > b ? 1 : 0;
     }
     // Lexicographic string ordering (type-id 11): length at +8, bytes at +24.
@@ -1032,36 +950,20 @@ int64_t lymar_aot_numeric_compare(uint64_t left, uint64_t right, uint64_t left_k
         if (la > lb) return 1;
         return 0;
     }
-    // Match the VM's tagged ordering for nonnumeric, non-string immediates.
-    // Object ordering remains identity ordering, as in numeric_compare in the VM.
-    auto tagged = [&](Word value, Word kind) -> Word {
-        if (kind == 0) return (value << 3) | 1;
-        if (kind == boolean_kind) return value ? 18 : 10;
-        if (lymar_aot_is_nil(value, kind)) return 2;
-        return value;
-    };
-    auto a = tagged(left, left_kind), b = tagged(right, right_kind);
-    return a < b ? -1 : a > b ? 1 : 0;
+    // Tagged words already carry the VM ordering encoding: SMI (v<<3)|1,
+    // immediates 2/10/18, heap pointers by address.
+    return left < right ? -1 : left > right ? 1 : 0;
 }
-void lymar_aot_print_integer(uint64_t value, uint64_t kind) {
+static uint64_t format_argument(uint64_t value, bool printable);
+void lymar_aot_print_integer(uint64_t value) {
     try {
     RuntimeGuard runtime_guard;
 
+    // Raw scalar-domain printer: callers only route unboxed i64 words here.
+    // Tagged LmValue words go through lymar_aot_print_value instead.
     char text[64];
-    const char* output = text;
-    size_t length;
-    if (lymar_aot_is_nil(value, kind)) { output = "nil"; length = 3; }
-    else if (kind == boolean_kind) { output = value ? "true" : "false"; length = value ? 4 : 5; }
-    else if (auto wide = wide_box_text(value, kind)) {
-        lymar_stdout_write(wide->data(), wide->size()); return;
-    }
-    else if (auto integer = integer_number(value, kind)) {
-        auto number = integer_text(*integer); lymar_stdout_write(number.data(), number.size()); return;
-    }
-    else if (kind == object_kind && value > 4096 && (read_word(value) & 0xffffffff) == 9)
-        length = static_cast<size_t>(std::snprintf(text, sizeof(text), "%.6g", lymar_aot_to_float(value, kind)));
-    else length = static_cast<size_t>(std::snprintf(text, sizeof(text), "%lld", static_cast<long long>(value)));
-    lymar_stdout_write(output, length);
+    const auto length = std::snprintf(text, sizeof(text), "%lld", static_cast<long long>(value));
+    lymar_stdout_write(text, static_cast<size_t>(length));
 
     } catch (const std::exception& failure) {
         if (runtime_lock_depth && heap().worker) throw;
@@ -1083,49 +985,53 @@ void lymar_aot_print_float(double value) {
         return;
     }
 }
-uint64_t lymar_aot_value_equal(uint64_t left, uint64_t right, uint64_t left_kind, uint64_t right_kind) {
+uint64_t lymar_aot_value_equal(uint64_t left, uint64_t right) {
     try {
     RuntimeGuard runtime_guard;
 
-    // Nil-ness is decided per-side by provenance (kind==object && value in
-    // {0,2}). A proven-scalar 0 or 2 is a number, not nil — VM parity requires
-    // `0 == nil` to be false, so no cross-kind heuristic is applied here.
-    const bool left_nil = lymar_aot_is_nil(left, left_kind);
-    const bool right_nil = lymar_aot_is_nil(right, right_kind);
+    // Both operands are tagged LmValue words; nil-ness is word identity.
+    const bool left_nil = left == VAL_NIL || left == 0;
+    const bool right_nil = right == VAL_NIL || right == 0;
     if (left_nil || right_nil) return left_nil && right_nil;
-    if (left_kind == boolean_kind || right_kind == boolean_kind) {
-        if ((left_kind == boolean_kind || (left_kind == object_kind && left <= 1) || (!left_kind && left <= 1)) &&
-            (right_kind == boolean_kind || (right_kind == object_kind && right <= 1) || (!right_kind && right <= 1))) {
-            return (left != 0) == (right != 0);
-        }
-        return left_kind == right_kind && left == right;
+    auto is_bool_word = [](uint64_t v) {
+        return v == VAL_TRUE || v == VAL_FALSE ||
+               ((v & TAG_MASK) == TAG_IMMEDIATE && v != VAL_NIL) ||
+               (v <= 1 && (v & TAG_MASK) != TAG_PTR);
+    };
+    if (left == VAL_TRUE || left == VAL_FALSE || right == VAL_TRUE || right == VAL_FALSE) {
+        auto to_b = [](uint64_t v) -> int {
+            if (v == VAL_TRUE || v == 1 || v == VAL_TRUE) return 1;
+            if (v == VAL_FALSE || v == 0) return 0;
+            if ((v & TAG_MASK) == TAG_IMMEDIATE) return v == VAL_TRUE ? 1 : 0;
+            if ((v & TAG_MASK) == TAG_INT) return (static_cast<int64_t>(v) >> 3) != 0;
+            return v != 0 ? 1 : 0;
+        };
+        if (is_bool_word(left) && is_bool_word(right)) return to_b(left) == to_b(right);
+        return left == right;
     }
-    if (left == right) {
-        if (left_kind == right_kind) return 1;
-        auto& allocs = heap().allocations;
-        if (allocs.find(left) == allocs.end() && allocs.find(right) == allocs.end()) return 1;
-    }
-    auto get_object_type = [&](Word value, Word kind) -> Word {
-        if (kind != object_kind || value <= 4096) return UINT64_MAX;
+    if (left == right) return 1;
+    auto get_object_type = [&](Word value) -> Word {
+        if (!is_heap_word(value)) return UINT64_MAX;
         auto found = heap().allocations.find(value);
         if (found == heap().allocations.end() || found->second.raw_memory || found->second.size < 8) return UINT64_MAX;
         return read_word(value) & 0xffffffff;
     };
-    const Word left_type = get_object_type(left, left_kind);
-    const Word right_type = get_object_type(right, right_kind);
-    if (auto left_integer = integer_number(left, left_kind))
-        if (auto right_integer = integer_number(right, right_kind)) return *left_integer == *right_integer;
-    if ((integer_number(left, left_kind) || left_type == 9) && (integer_number(right, right_kind) || right_type == 9))
+    const Word left_type = get_object_type(left);
+    const Word right_type = get_object_type(right);
+    if (auto left_integer = integer_number(left))
+        if (auto right_integer = integer_number(right)) return *left_integer == *right_integer;
+    if ((integer_number(left) || left_type == 9) && (integer_number(right) || right_type == 9))
         return left_type == 9 || right_type == 9
-            ? lymar_aot_to_float(left, left_kind) == lymar_aot_to_float(right, right_kind) : left == right;
+            ? lymar_aot_to_float(left) == lymar_aot_to_float(right) : left == right;
     if (left_type == 11 && right_type == 11) {
         auto size = read_word(left, 8);
         return size == read_word(right, 8) && std::memcmp(reinterpret_cast<void*>(left + 24), reinterpret_cast<void*>(right + 24), size) == 0;
     }
-    if (!left_kind && right_type == 11)
-        return read_word(right, 8) == 1 && static_cast<uint8_t>(left) == *reinterpret_cast<uint8_t*>(right + 24);
-    if (!right_kind && left_type == 11)
-        return read_word(left, 8) == 1 && static_cast<uint8_t>(right) == *reinterpret_cast<uint8_t*>(left + 24);
+    // Char-vs-string: a SMI operand compares against a one-character string.
+    if ((left & TAG_MASK) == TAG_INT && right_type == 11)
+        return read_word(right, 8) == 1 && static_cast<uint8_t>(static_cast<int64_t>(left) >> 3) == *reinterpret_cast<uint8_t*>(right + 24);
+    if ((right & TAG_MASK) == TAG_INT && left_type == 11)
+        return read_word(left, 8) == 1 && static_cast<uint8_t>(static_cast<int64_t>(right) >> 3) == *reinterpret_cast<uint8_t*>(left + 24);
     // Preserve the existing native enum representation and payload equality.
     if (left_type == 0x454e554d && right_type == 0x454e554d)
         return read_word(left, 8) == read_word(right, 8) && read_word(left, 16) == read_word(right, 16);
@@ -1137,11 +1043,11 @@ uint64_t lymar_aot_value_equal(uint64_t left, uint64_t right, uint64_t left_kind
         return 0;
     }
 }
-uint64_t lymar_aot_ref_create_checked(uint64_t pointer, uint64_t mode, uint64_t is_pointer) {
+uint64_t lymar_aot_ref_create_checked(uint64_t pointer, uint64_t mode) {
     try {
     RuntimeGuard runtime_guard;
 
-    if (is_pointer != object_kind) throw std::runtime_error("Borrow requires a managed object");
+    if (!is_heap_word(pointer)) throw std::runtime_error("Borrow requires a managed object");
     return lymar_aot_ref_create(pointer, mode);
 
     } catch (const std::exception& failure) {
@@ -1156,7 +1062,6 @@ uint64_t lymar_aot_ref_resolve(uint64_t token, uint64_t writable) {
 
     auto& h = heap();
     if (writable & ~(LM::Memory::ReferenceWritable | LM::Memory::ReferenceNullable)) throw std::runtime_error("Invalid AOT reference mode");
-    h.return_pointer = 1;
     if (!token && (writable & LM::Memory::ReferenceNullable)) return 2;
     if ((writable & LM::Memory::ReferenceWritable) && h.worker && shared_heap().reference_owners.at(token).thread != std::this_thread::get_id())
         throw std::runtime_error("Worker cannot write through a captured reference");
@@ -1174,7 +1079,6 @@ uint64_t lymar_aot_ref_move(uint64_t token, uint64_t lexical, uint64_t caller) {
 
     if (lexical & ~LM::Memory::ReferenceMoveMask) throw std::runtime_error("Invalid AOT reference move mode");
     auto& h = heap();
-    h.return_pointer = 0;
     if (!token && (lexical & LM::Memory::ReferenceMoveNullable)) return 0;
     if (h.worker && shared_heap().reference_owners.at(token).thread != std::this_thread::get_id())
         throw std::runtime_error("Worker cannot move a captured reference");
@@ -1190,7 +1094,6 @@ uint64_t lymar_aot_ref_move(uint64_t token, uint64_t lexical, uint64_t caller) {
         throw std::runtime_error("AOT reference promotion requires owner promotion");
     auto origin = h.lifetimes.reference_region(token);
     if (h.regions.at(origin).depth < h.regions.at(target).depth) target = origin;
-    h.return_pointer = 0;
     auto owner = shared_heap().reference_owners.at(token).thread;
     auto moved = h.lifetimes.move_reference(token, target);
     shared_heap().reference_owners.erase(token);
@@ -1248,8 +1151,7 @@ uint64_t lymar_aot_call_enter() {
     RuntimeGuard runtime_guard;
 
     auto& h = heap();
-    h.invocations.push_back({h.active, std::move(h.pending_args), {}, {}});
-    h.pending_args.clear();
+    h.invocations.push_back({h.active, {}});
     return h.active;
 
     } catch (const std::exception& failure) {
@@ -1258,55 +1160,13 @@ uint64_t lymar_aot_call_enter() {
         return 0;
     }
 }
-void lymar_aot_arg_set(uint64_t index, uint64_t pointer) {
-    try {
-    RuntimeGuard runtime_guard;
-
-    auto& args = heap().pending_args;
-    if (args.size() <= index) args.resize(index + 1);
-    args[index] = pointer;
-
-    } catch (const std::exception& failure) {
-        if (runtime_lock_depth && heap().worker) throw;
-        if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
-        return;
-    }
-}
-uint64_t lymar_aot_arg_kind(uint64_t index, uint64_t fallback) {
-    try {
-    RuntimeGuard runtime_guard;
-
-    auto& h = heap();
-    return h.invocations.empty() || index >= h.invocations.back().args.size() ? fallback : h.invocations.back().args[index];
-
-    } catch (const std::exception& failure) {
-        if (runtime_lock_depth && heap().worker) throw;
-        if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
-        return 0;
-    }
-}
-uint64_t lymar_aot_arg_get(uint64_t index) {
-    try {
-    RuntimeGuard runtime_guard;
-
-    auto& h = heap();
-    return h.invocations.empty() || index >= h.invocations.back().args.size() ? 0 : h.invocations.back().args[index];
-
-    } catch (const std::exception& failure) {
-        if (runtime_lock_depth && heap().worker) throw;
-        if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
-        return 0;
-    }
-}
-void lymar_aot_call_leave(uint64_t pointer) {
+void lymar_aot_call_leave() {
     try {
     RuntimeGuard runtime_guard;
 
     auto& h = heap();
     if (h.invocations.empty()) throw std::runtime_error("AOT invocation stack underflow");
-    for (auto slot : h.invocations.back().slots) h.shadow.erase(slot);
     h.invocations.pop_back();
-    h.return_pointer = pointer;
 
     } catch (const std::exception& failure) {
         if (runtime_lock_depth && heap().worker) throw;
@@ -1314,23 +1174,14 @@ void lymar_aot_call_leave(uint64_t pointer) {
         return;
     }
 }
-uint64_t lymar_aot_return_pointer() {
-    try {
-    RuntimeGuard runtime_guard;
- return heap().return_pointer;
-    } catch (const std::exception& failure) {
-        if (runtime_lock_depth && heap().worker) throw;
-        if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
-        return 0;
-    }
-}
-void lymar_aot_param_push(uint64_t value, uint64_t is_pointer) {
+void lymar_aot_param_push(uint64_t value) {
     try {
     RuntimeGuard runtime_guard;
 
     auto& h = heap();
     if (h.invocations.empty()) throw std::runtime_error("AOT Param outside invocation");
-    h.invocations.back().staged_params.emplace_back(value, is_pointer);
+
+    h.invocations.back().staged_params.push_back(value);
 
     } catch (const std::exception& failure) {
         if (runtime_lock_depth && heap().worker) throw;
@@ -1338,34 +1189,17 @@ void lymar_aot_param_push(uint64_t value, uint64_t is_pointer) {
         return;
     }
 }
-uint64_t lymar_aot_param_pop(uint64_t fallback, uint64_t is_pointer) {
+uint64_t lymar_aot_param_pop(uint64_t fallback) {
     try {
     RuntimeGuard runtime_guard;
 
     auto& h = heap();
     if (h.invocations.empty()) throw std::runtime_error("AOT ConstructError outside invocation");
     auto& params = h.invocations.back().staged_params;
-    h.return_pointer = is_pointer;
     if (params.empty()) return fallback;
-    auto [value, pointer] = params.back();
+    auto value = params.back();
     params.pop_back();
-    h.return_pointer = pointer;
     return value;
-
-    } catch (const std::exception& failure) {
-        if (runtime_lock_depth && heap().worker) throw;
-        if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
-        return 0;
-    }
-}
-uint64_t lymar_aot_slot_pointer(uint64_t address) {
-    try {
-    RuntimeGuard runtime_guard;
-
-    auto& flags = heap().shadow;
-    auto found = flags.find(address);
-    auto result = found != flags.end() ? found->second : 0;
-    return result;
 
     } catch (const std::exception& failure) {
         if (runtime_lock_depth && heap().worker) throw;
@@ -1418,7 +1252,7 @@ void lymar_aot_region_exit(uint64_t lexical) {
         return;
     }
 }
-void lymar_aot_region_move(uint64_t value, uint64_t lexical, uint64_t caller, uint64_t is_pointer) {
+void lymar_aot_region_move(uint64_t value, uint64_t lexical, uint64_t caller) {
     try {
     RuntimeGuard runtime_guard;
 
@@ -1431,7 +1265,7 @@ void lymar_aot_region_move(uint64_t value, uint64_t lexical, uint64_t caller, ui
     }
     // Validate the target even for an immediate value.
     h.regions.at(target);
-    if (is_pointer == object_kind || (value > 4096 && h.allocations.count(value))) h.promote(value, target);
+    if (is_heap_word(value)) h.promote(value, target);
 
     } catch (const std::exception& failure) {
         if (runtime_lock_depth && heap().worker) throw;
@@ -1491,22 +1325,116 @@ uint64_t lymar_aot_box_float(double number) {
         return 0;
     }
 }
-uint64_t lymar_aot_scalar_to_string(uint64_t value, uint64_t kind) {
+uint64_t lymar_aot_box_i64(int64_t v) {
+    try {
+        RuntimeGuard runtime_guard;
+        auto pointer = lymar_aot_alloc(32);
+        Word* words = reinterpret_cast<Word*>(pointer);
+        words[0] = 5; // TYPE_I64
+        words[1] = static_cast<Word>(v);
+        words[2] = 0;
+        words[3] = static_cast<Word>(v);
+        return pointer;
+    } catch (...) {
+        return 0;
+    }
+}
+uint64_t lymar_aot_tag_int(int64_t v) {
+    if (v >= MIN_SMI && v <= MAX_SMI) {
+        return (static_cast<uint64_t>(v) << 3) | TAG_INT;
+    }
+    return lymar_aot_box_i64(v);
+}
+int64_t lymar_aot_untag_int(uint64_t word) {
+    if (word == VAL_NIL) return VAL_NIL;
+    if ((word & TAG_MASK) == TAG_INT) {
+        return static_cast<int64_t>(word) >> 3;
+    }
+    if ((word & TAG_MASK) == TAG_PTR && word > 4096) {
+        try {
+            RuntimeGuard runtime_guard;
+            auto found = heap().allocations.find(word);
+            if (found != heap().allocations.end() && !found->second.raw_memory && found->second.size >= 16) {
+                uint64_t type = *reinterpret_cast<const Word*>(word) & 0xffffffff;
+                if (type == 5 || type == 6 || type == 13) {
+                    return static_cast<int64_t>(*reinterpret_cast<const Word*>(word + 8));
+                }
+            }
+        } catch (...) {}
+    }
+    return static_cast<int64_t>(word);
+}
+uint64_t lymar_aot_tag_bool(uint64_t val) {
+    return (val == 1 || val == VAL_TRUE) ? VAL_TRUE : VAL_FALSE;
+}
+uint64_t lymar_aot_untag_bool(uint64_t word) {
+    if (word == VAL_TRUE) return 1;
+    if (word == VAL_FALSE) return 0;
+    if ((word & TAG_MASK) == TAG_IMMEDIATE) {
+        return (word >> 3) ? 1 : 0;
+    }
+    return word ? 1 : 0;
+}
+uint64_t lymar_aot_tag_pointer(uint64_t ptr) {
+    if (!ptr) return 0;
+    if (ptr == VAL_NIL) return VAL_NIL;
+    try {
+        RuntimeGuard runtime_guard;
+        if ((ptr & TAG_MASK) == 0 && ptr > 4096) {
+            auto& h = heap();
+            if (h.allocations.find(ptr) != h.allocations.end()) {
+                return ptr; // Safe Lymar heap pointer
+            }
+        }
+        // Foreign or unaligned pointer: wrap in TYPE_FOREIGN_PTR (13)
+        auto box = lymar_aot_alloc(32);
+        Word* words = reinterpret_cast<Word*>(box);
+        words[0] = 13;
+        words[1] = ptr;
+        words[2] = 0;
+        words[3] = ptr;
+        heap().promote(box, 0); // Pin wrapper in permanent region
+        return box;
+    } catch (...) {
+        return ptr;
+    }
+}
+uint64_t lymar_aot_untag_ptr(uint64_t word) {
+    if (!word) return 0;
+    if (word == VAL_NIL) return 0;
+    if ((word & TAG_MASK) == TAG_PTR && word > 4096) {
+        try {
+            RuntimeGuard runtime_guard;
+            auto found = heap().allocations.find(word);
+            if (found != heap().allocations.end() && !found->second.raw_memory && found->second.size >= 16) {
+                uint64_t type = *reinterpret_cast<const Word*>(word) & 0xffffffff;
+                if (type == 13) {
+                    return *reinterpret_cast<const Word*>(word + 8);
+                }
+            }
+        } catch (...) {}
+        return word;
+    }
+    return word & ~TAG_MASK;
+}
+uint64_t lymar_aot_scalar_to_string(uint64_t value) {
     try {
     RuntimeGuard runtime_guard;
 
-    if (kind == object_kind && !lymar_aot_is_nil(value, kind) && value > 4096 && (read_word(value) & 0xffffffff) == 11)
+    if (is_heap_word(value) && (read_word(value) & 0xffffffff) == 11)
         return value;
     std::string wide_text;
     char text[64];
     const char* output = text;
     size_t length;
-    if (lymar_aot_is_nil(value, kind)) { output = "nil"; length = 3; }
-    else if (kind == boolean_kind) { output = value ? "true" : "false"; length = value ? 4 : 5; }
-    else if (kind == object_kind && value > 4096 && (read_word(value) & 0xffffffff) == 9)
-        length = static_cast<size_t>(std::snprintf(text, sizeof(text), "%.6g", lymar_aot_to_float(value, kind)));
-    else if (auto wide = wide_box_text(value, kind)) { wide_text = *wide; output = wide_text.c_str(); length = wide_text.size(); }
-    else if (auto integer = integer_number(value, kind)) { wide_text = integer_text(*integer); output = wide_text.c_str(); length = wide_text.size(); }
+    if (value == VAL_NIL || value == 0) { output = "nil"; length = 3; }
+    else if (value == VAL_TRUE) { output = "true"; length = 4; }
+    else if (value == VAL_FALSE) { output = "false"; length = 5; }
+    else if (is_heap_word(value) && (read_word(value) & 0xffffffff) == 9)
+        length = static_cast<size_t>(std::snprintf(text, sizeof(text), "%.6g", lymar_aot_to_float(value)));
+    else if (auto wide = wide_box_text(value)) { wide_text = *wide; output = wide_text.c_str(); length = wide_text.size(); }
+    else if (auto integer = integer_number(value)) { wide_text = integer_text(*integer); output = wide_text.c_str(); length = wide_text.size(); }
+    else if ((value & TAG_MASK) == TAG_INT) { wide_text = integer_text(static_cast<int64_t>(value) >> 3); output = wide_text.c_str(); length = wide_text.size(); }
     else length = static_cast<size_t>(std::snprintf(text, sizeof(text), "%lld", static_cast<long long>(value)));
     auto pointer = lymar_aot_alloc(24 + length + 1);
     Word header[] = {11, length, length};
@@ -1542,8 +1470,9 @@ uint64_t lymar_aot_bool_to_string(uint64_t value) {
 }
 // Erased scalar arguments must become strings before the generated formatter
 // inspects object layouts. A float box is not a list, and a Boolean is not an
-// integer. Compound objects retain their existing formatting path.
-static uint64_t format_argument(uint64_t value, uint64_t kind, bool printable) {
+// integer. Compound objects retain their existing formatting path. Every word
+// is a self-describing LmValue: `word & 7` selects the decode.
+static uint64_t format_argument(uint64_t value, bool printable) {
     try {
         RuntimeGuard guard;
         auto& h = heap();
@@ -1553,17 +1482,23 @@ static uint64_t format_argument(uint64_t value, uint64_t kind, bool printable) {
             if (allocation == h.allocations.end() || bytes > allocation->second.size)
                 throw std::runtime_error("Invalid or expired formatting receiver");
         };
-        auto element_kind = [&](Word address) {
-            auto found = h.shadow.find(address);
-            return found == h.shadow.end() ? Word{0} : found->second;
-        };
-        std::function<std::string(Word, Word)> format = [&](Word word, Word mode) -> std::string {
-            if (lymar_aot_is_nil(word, mode)) return "nil";
-            if (mode == boolean_kind) return word ? "true" : "false";
-            if (mode != object_kind) return integer_text(static_cast<int64_t>(word));
-            if (word <= 4096) return word <= 1 ? (word ? "true" : "false") : integer_text(static_cast<int64_t>(word));
+        std::function<std::string(Word)> format = [&](Word word) -> std::string {
+            if (word == VAL_FALSE) return "false";
+            if (word == VAL_TRUE) return "true";
+            if (word == VAL_NIL || word == 0) return "nil";
+            if ((word & TAG_MASK) == TAG_INT) return integer_text(static_cast<int64_t>(word) >> 3);
+            if ((word & TAG_MASK) == TAG_IMMEDIATE) return integer_text(static_cast<int64_t>(word));
+            if (word <= 4096) return integer_text(static_cast<int64_t>(word));
+            auto alloc_it = h.allocations.find(word);
+            if (alloc_it == h.allocations.end()) {
+                // Foreign/untracked pointer word: render the address.
+                return integer_text(static_cast<int64_t>(word));
+            }
             require(word, 8);
-            auto& allocation = h.allocations.at(word);
+            auto& allocation = alloc_it->second;
+            // ffi.alloc/raw buffers are address scalars (pubptr = int), not
+            // formattable objects — render the address like the VM does.
+            if (allocation.raw_memory) return integer_text(static_cast<int64_t>(word));
             auto type = read_word(word) & 0xffffffff;
             if (!allocation.dictionary && type == 11) {
                 require(word, 24);
@@ -1573,42 +1508,46 @@ static uint64_t format_argument(uint64_t value, uint64_t kind, bool printable) {
             }
             if (!allocation.dictionary && type >= 5 && type <= 8) {
                 require(word, type <= 6 ? 16 : 32);
-                if (auto wide = wide_box_text(word, mode)) return *wide;
-                return integer_text(*integer_number(word, mode));
+                if (auto wide = wide_box_text(word)) return *wide;
+                return integer_text(*integer_number(word));
+            }
+            if (!allocation.dictionary && type == 13) {
+                require(word, 16);
+                return integer_text(static_cast<int64_t>(read_word(word, 8)));
             }
             if (!allocation.dictionary && type == 9) {
                 require(word, 16);
                 char buffer[64];
-                std::snprintf(buffer, sizeof(buffer), "%.6g", lymar_aot_to_float(word, mode));
+                std::snprintf(buffer, sizeof(buffer), "%.6g", lymar_aot_to_float(word));
                 return buffer;
             }
             if (!allocation.dictionary && read_word(word) == union_box_magic) {
                 require(word, 32);
                 auto flag = read_word(word, 8);
                 auto payload = read_word(word, 16);
-                auto payload_kind = read_word(word, 24);
-                auto inner = format(payload, payload_kind);
+                auto inner = format(payload);
                 return flag ? "err(" + inner + ")" : "ok(" + inner + ")";
             }
             if (!visiting.insert(word).second) throw std::runtime_error("Cyclic value formatting");
             struct Visit { std::unordered_set<Word>& set; Word word; ~Visit() { set.erase(word); } } visit{visiting, word};
             require(word, 32);
             if (!allocation.dictionary && type == 0x454e554d) {
-                auto name = format(read_word(word, 24), element_kind(word + 24));
-                auto payload = read_word(word, 16), payload_kind = element_kind(word + 16);
-                if (lymar_aot_is_nil(payload, payload_kind)) return name;
-                return name + "(" + format(payload, payload_kind) + ")";
+                auto name = format(read_word(word, 24));
+                auto payload = read_word(word, 16);
+                if (lymar_aot_is_nil(payload)) return name;
+                return name + "(" + format(payload) + ")";
             }
-            auto nested = [&](Word child, Word child_kind) {
-                auto rendered = format(child, child_kind);
+            auto nested = [&](Word child) {
+                auto rendered = format(child);
                 auto found = h.allocations.find(child);
-                if (printable && child_kind == object_kind && found != h.allocations.end() &&
+                if (printable && is_heap_word(child) && found != h.allocations.end() &&
                     !found->second.raw_memory && !found->second.dictionary &&
                     found->second.size >= 24 && (read_word(child) & 0xffffffff) == 11)
                     return std::string("\"") + rendered + "\"";
                 return rendered;
             };
             Word elements, count;
+            uint64_t element_kind = 0;
             std::string text;
             if (allocation.dictionary) {
                 count = read_word(word); auto capacity = read_word(word, 8);
@@ -1618,7 +1557,7 @@ static uint64_t format_argument(uint64_t value, uint64_t kind, bool printable) {
                 std::vector<std::pair<std::string, std::string>> entries;
                 for (Word index = 0; index < count; ++index) {
                     auto key = elements + index * sizeof(Word), value = values + index * sizeof(Word);
-                    entries.emplace_back(nested(read_word(key), element_kind(key)), nested(read_word(value), element_kind(value)));
+                    entries.emplace_back(nested(read_word(key)), nested(read_word(value)));
                 }
                 if (printable) std::sort(entries.begin(), entries.end());
                 text = "{";
@@ -1631,20 +1570,28 @@ static uint64_t format_argument(uint64_t value, uint64_t kind, bool printable) {
             if (type == 1 || type == 3) {
                 elements = read_word(word, 8); count = read_word(word, 16);
                 text = type == 1 ? "[" : "(";
+                if (type == 1) element_kind = read_word(word) >> 32;
             } else if (type == 15) {
                 require(word, 40); elements = read_word(word, 16); count = read_word(word, 24);
-                text = format(read_word(word, 8), object_kind) + "{";
+                text = format(read_word(word, 8)) + "{";
             } else throw std::runtime_error("Unsupported object formatting kind");
             if (count > UINT64_MAX / sizeof(Word)) throw std::runtime_error("Invalid aggregate length");
             require(elements, count * sizeof(Word));
             for (Word index = 0; index < count; ++index) {
                 if (index) text += ", ";
                 auto address = elements + index * sizeof(Word);
-                text += nested(read_word(address), element_kind(address));
+                auto element = read_word(address);
+                if (element_kind == 1) {
+                    text += integer_text(static_cast<int64_t>(element));
+                } else if (element_kind == 2) {
+                    text += element ? "true" : "false";
+                } else {
+                    text += nested(element);
+                }
             }
             return text + (type == 1 ? "]" : type == 3 ? ")" : "}");
         };
-        auto text = format(value, kind);
+        auto text = format(value);
         auto pointer = lymar_aot_alloc(24 + text.size() + 1);
         Word header[] = {11, text.size(), text.size()};
         std::memcpy(reinterpret_cast<void*>(pointer), header, sizeof(header));
@@ -1656,8 +1603,8 @@ static uint64_t format_argument(uint64_t value, uint64_t kind, bool printable) {
         return 0;
     }
 }
-uint64_t lymar_aot_format_argument(uint64_t value, uint64_t kind) {
-    return format_argument(value, kind, false);
+uint64_t lymar_aot_format_argument(uint64_t value) {
+    return format_argument(value, false);
 }
 uint64_t lymar_aot_mark_dictionary(uint64_t pointer) {
     RuntimeGuard guard;
@@ -1667,9 +1614,9 @@ uint64_t lymar_aot_mark_dictionary(uint64_t pointer) {
     found->second.dictionary = true;
     return pointer;
 }
-void lymar_aot_print_value(uint64_t value, uint64_t kind) {
+void lymar_aot_print_value(uint64_t value) {
     RuntimeGuard guard;
-    auto string = format_argument(value, kind, true);
+    auto string = format_argument(value, true);
     if (!string) return;
     lymar_stdout_write(reinterpret_cast<const void*>(string + 24), read_word(string, 8));
 }
@@ -1694,7 +1641,7 @@ uint64_t lymar_aot_float_bits_to_string(uint64_t bits) {
     std::memcpy(&number, &bits, sizeof(number));
     return lymar_aot_float_to_string(number);
 }
-uint64_t lymar_aot_length(uint64_t pointer_raw,uint64_t kind) {
+uint64_t lymar_aot_length(uint64_t pointer_raw) {
     // Standalone-AOT machine code carries no C++ unwind metadata, so a throw
     // here would crash the process before any catch could run. Report failures
     // directly: workers record worker_error for the scheduler; the main thread
@@ -1710,8 +1657,8 @@ uint64_t lymar_aot_length(uint64_t pointer_raw,uint64_t kind) {
     };
     try {
     RuntimeGuard guard;
-    if(lymar_aot_is_nil(pointer_raw,kind) || pointer_raw <= 4096) return 0;
-    uint64_t pointer = pointer_raw & ~7ULL;
+    if(lymar_aot_is_nil(pointer_raw) || pointer_raw <= 4096 || (pointer_raw & TAG_MASK) != TAG_PTR) return 0;
+    uint64_t pointer = pointer_raw;
     auto found=heap().allocations.find(pointer);
     if(found==heap().allocations.end() || found->second.raw_memory || found->second.size<8) {
         if (pointer > 4096) {
@@ -1744,7 +1691,7 @@ uint64_t lymar_aot_length(uint64_t pointer_raw,uint64_t kind) {
         // Preserve the VM's existing frame-length interpretation.
         if(name && std::strcmp(name,"LinkedList")==0 && read_word(pointer,24)>2) {
             auto address=lymar_aot_frame_field_address(pointer,2);
-            return lymar_aot_to_integer(read_word(address),lymar_aot_slot_pointer(address));
+            return lymar_aot_to_integer(read_word(address));
         }
         return 0;
     }
@@ -1772,10 +1719,10 @@ uint64_t lymar_aot_length(uint64_t pointer_raw,uint64_t kind) {
         return 0;
     }
 }
-uint64_t lymar_aot_tuple_length(uint64_t pointer, uint64_t kind) {
+uint64_t lymar_aot_tuple_length(uint64_t pointer) {
     try {
         RuntimeGuard guard;
-        if (!lymar_aot_is_object(pointer, kind)) return 0;
+        if (!lymar_aot_is_object(pointer)) return 0;
         auto record = heap().allocations.find(pointer);
         // TupleLen is only emitted as a match-arm probe: non-tuple receivers
         // must yield 0 (arm fails) rather than throw and poison worker_error.
@@ -1791,10 +1738,24 @@ uint64_t lymar_aot_tuple_length(uint64_t pointer, uint64_t kind) {
 // Match-arm type guard: reports the structural kind of an erased word so
 // list/tuple/dict patterns can fail cleanly instead of probing foreign layouts.
 // Returns 1=list, 2=dict, 3=tuple, 0=anything else (scalars, strings, frames).
-uint64_t lymar_aot_probe_kind(uint64_t value, uint64_t kind) {
+uint64_t lymar_aot_word_kind(uint64_t word) {
     try {
         RuntimeGuard guard;
-        if (!lymar_aot_is_object(value, kind)) return 0;
+        Word t = word & TAG_MASK;
+        if (t == TAG_PTR && word > 4096 && heap().allocations.count(word)) return object_kind;
+        if (t == TAG_INT) return object_kind;
+        if (word == VAL_TRUE || word == VAL_FALSE) return boolean_kind;
+        return 0;
+    } catch (const std::exception& failure) {
+        if (runtime_lock_depth && heap().worker) throw;
+        if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
+        return 0;
+    }
+}
+uint64_t lymar_aot_probe_kind(uint64_t value) {
+    try {
+        RuntimeGuard guard;
+        if (!lymar_aot_is_object(value)) return 0;
         auto record = heap().allocations.find(value);
         if (record == heap().allocations.end() || record->second.size < 8) return 0;
         if (record->second.dictionary) return 2;
@@ -1808,10 +1769,10 @@ uint64_t lymar_aot_probe_kind(uint64_t value, uint64_t kind) {
         return 0;
     }
 }
-uint64_t lymar_aot_string_hash(uint64_t value, uint64_t kind) {
+uint64_t lymar_aot_string_hash(uint64_t value) {
     try {
         RuntimeGuard guard;
-        if (!lymar_aot_string_receiver(value, kind))
+        if (!lymar_aot_string_receiver(value))
             throw std::runtime_error("_builtin_string_hash_bytes expects str");
         Word hash = 5381, length = read_word(value, 8);
         auto* bytes = reinterpret_cast<const unsigned char*>(value + 24);
@@ -1823,15 +1784,14 @@ uint64_t lymar_aot_string_hash(uint64_t value, uint64_t kind) {
         return 0;
     }
 }
-uint64_t lymar_aot_list_slice(uint64_t value, uint64_t start, uint64_t end,
-                              uint64_t kind, uint64_t start_kind, uint64_t end_kind) {
+uint64_t lymar_aot_list_slice(uint64_t value, uint64_t start, uint64_t end) {
     try {
         RuntimeGuard guard;
         auto& h = heap();
         Word source = 0, count = 0;
-        if (!lymar_aot_is_nil(value, kind)) {
+        if (!lymar_aot_is_nil(value)) {
             auto record = h.allocations.find(value);
-            if (kind != object_kind || record == h.allocations.end() ||
+            if (!is_heap_word(value) || record == h.allocations.end() ||
                 record->second.size < 32 || (read_word(value) & 0xffffffff) != 1)
                 throw std::runtime_error("_builtin_list_slice expects list");
             source = read_word(value, 8); count = read_word(value, 16);
@@ -1839,25 +1799,28 @@ uint64_t lymar_aot_list_slice(uint64_t value, uint64_t start, uint64_t end,
             if (data == h.allocations.end() || count > data->second.size / sizeof(Word))
                 throw std::runtime_error("Invalid list elements allocation");
         }
-        auto first = static_cast<int64_t>(lymar_aot_string_index(start, start_kind));
-        auto last = static_cast<int64_t>(lymar_aot_string_index(end, end_kind));
+        auto first = static_cast<int64_t>(lymar_aot_string_index(start));
+        auto last = static_cast<int64_t>(lymar_aot_string_index(end));
         Word begin = std::min(count, static_cast<Word>(std::max<int64_t>(0, first)));
         Word limit = std::min(count, static_cast<Word>(std::max<int64_t>(0, last)));
         Word length = limit > begin ? limit - begin : 0;
         auto pointer = lymar_aot_alloc(32);
         auto elements = lymar_aot_alloc(std::max<Word>(1, length) * sizeof(Word));
-        Word header[] = {1, elements, length, std::max<Word>(1, length)};
+        // Preserve the source header word so the element-storage kind (high
+        // 32 bits: 0=tagged, 1=raw int, 2=raw bool) survives the slice.
+        Word header_word = source ? read_word(value) : 1;
+        uint64_t slice_kind = header_word >> 32;
+        Word header[] = {header_word, elements, length, std::max<Word>(1, length)};
         std::memcpy(reinterpret_cast<void*>(pointer), header, sizeof(header));
-        lymar_aot_edge(pointer + 8, elements, object_kind);
+        lymar_aot_edge(pointer + 8, elements);
         for (Word index = 0; index < length; ++index) {
             auto address = source + (begin + index) * sizeof(Word);
             auto copied = read_word(address);
-            auto found = h.shadow.find(address);
-            Word mode = found == h.shadow.end() ? 0 : found->second;
             std::memcpy(reinterpret_cast<void*>(elements + index * sizeof(Word)), &copied, sizeof(copied));
-            lymar_aot_edge(elements + index * sizeof(Word), copied, mode);
+            // Only tagged-word (kind 0) elements can be object references;
+            // raw int/bool elements are scalars and take no ownership edge.
+            if (slice_kind == 0) lymar_aot_edge(elements + index * sizeof(Word), copied);
         }
-        h.return_pointer = object_kind;
         return pointer;
     } catch (const std::exception& failure) {
         if (runtime_lock_depth && heap().worker) throw;
@@ -1872,7 +1835,12 @@ uint64_t lymar_aot_list_slice(uint64_t value, uint64_t start, uint64_t end,
 // arrive as erased words; string-ness is proven by the heap tag, not the
 // lossy kind sidecar, and integer args accept boxed payloads.
 static Word aot_str_arg_int(Word value) {
-    if (auto number = integer_number(value, object_kind)) return static_cast<Word>(static_cast<int64_t>(*number));
+    if ((value & TAG_MASK) == TAG_PTR && value > 4096) {
+        auto found = heap().allocations.find(value);
+        if (found != heap().allocations.end() && (read_word(value) & 0xffffffff) == 5) {
+            return read_word(value, 8);
+        }
+    }
     return value;
 }
 static Word aot_string_view(Word value, Word& length) {
@@ -1880,11 +1848,18 @@ static Word aot_string_view(Word value, Word& length) {
     if (value <= 4096) return 0;
     auto& h = heap();
     auto found = h.allocations.find(value);
-    if (found == h.allocations.end() || found->second.raw_memory || found->second.dictionary ||
-        found->second.size < 25 || (read_word(value) & 0xffffffff) != 11) return 0;
-    length = read_word(value, 8);
-    if (length > found->second.size - 25) return 0;
-    return value;
+    if (found != h.allocations.end()) {
+        if (found->second.raw_memory || found->second.dictionary ||
+            found->second.size < 25 || (read_word(value) & 0xffffffff) != 11) return 0;
+        length = read_word(value, 8);
+        if (length > found->second.size - 25) return 0;
+        return value;
+    }
+    if ((read_word(value) & 0xffffffff) == 11) {
+        length = read_word(value, 8);
+        return value;
+    }
+    return 0;
 }
 static Word aot_string_make(const char* data, Word length) {
     auto pointer = lymar_aot_alloc(24 + length + 1);
@@ -1956,7 +1931,7 @@ extern "C" uint64_t lymar_aot_string_trim(uint64_t value) {
 }
 // input(prompt): print the prompt (if a string), read one line from stdin,
 // return it as a fresh string. Mirrors the VM builtin (ops: std::getline).
-extern "C" uint64_t lymar_aot_input(uint64_t prompt, uint64_t kind) {
+extern "C" uint64_t lymar_aot_input(uint64_t prompt) {
     try {
     RuntimeGuard runtime_guard;
     Word length = 0;
@@ -2014,7 +1989,7 @@ extern "C" uint64_t _builtin_list_reserve(uint64_t list_val, uint64_t new_cap) {
                 }
                 words[1] = new_data;
                 words[3] = new_cap;
-                lymar_aot_edge(list_ptr + 8, new_data, object_kind);
+                lymar_aot_edge(list_ptr + 8, new_data);
                 if (found->second.owner != h.active) {
                     h.promote(new_data, found->second.owner);
                 }
@@ -2036,8 +2011,7 @@ extern "C" uint64_t _builtin_list_with_capacity(uint64_t cap) {
         words[1] = data;
         words[2] = 0;
         words[3] = actual_cap;
-        lymar_aot_edge(list_ptr + 8, data, object_kind);
-        heap().return_pointer = object_kind;
+        lymar_aot_edge(list_ptr + 8, data);
         return list_ptr;
     } catch (...) {
         return 0;
@@ -2067,7 +2041,7 @@ extern "C" void lymar_aot_list_append(uint64_t list_val, uint64_t val) {
             }
             words[1] = new_data;
             words[3] = new_cap;
-            lymar_aot_edge(list_ptr + 8, new_data, object_kind);
+            lymar_aot_edge(list_ptr + 8, new_data);
             if (found->second.owner != h.active) {
                 h.promote(new_data, found->second.owner);
             }
@@ -2075,8 +2049,103 @@ extern "C" void lymar_aot_list_append(uint64_t list_val, uint64_t val) {
         auto* data = reinterpret_cast<uint64_t*>(words[1]);
         data[len] = val;
         words[2] = len + 1;
-        if (val && h.containing(val) != h.allocations.end()) {
-            lymar_aot_edge(words[1] + len * sizeof(uint64_t), val, object_kind);
+        // Exact-match only: interior pointers (e.g. ffi ptr+N offsets stored
+        // in typed [int] lists) are address scalars, not ownable object refs —
+        // edge() would misread their low tag bits as LmValue tags.
+        if (val && h.allocations.find(val) != h.allocations.end()) {
+            lymar_aot_edge(words[1] + len * sizeof(uint64_t), val);
+        }
+    } catch (...) {
+    }
+}
+// Element-storage kind for TYPE_LIST objects, kept in the high 32 bits of the
+// header word (low 32 bits hold the object type). 0 = tagged LmValue elements
+// (default), 1 = raw int elements, 2 = raw bool elements. Typed primitive
+// lists store unboxed scalars; the formatter needs this to decode them.
+extern "C" void lymar_aot_list_set_element_kind(uint64_t list_val, uint64_t kind) {
+    try {
+        RuntimeGuard guard;
+        if (!list_val) return;
+        uint64_t list_ptr = list_val & ~7ULL;
+        auto& h = heap();
+        auto found = h.allocations.find(list_ptr);
+        if (found == h.allocations.end() || found->second.size < 32) return;
+        auto* words = reinterpret_cast<uint64_t*>(list_ptr);
+        if ((words[0] & 0xffffffff) != 1) return;
+        words[0] = (words[0] & 0xffffffffULL) | ((kind & 0xffffffffULL) << 32);
+    } catch (...) {
+    }
+}
+// Decode a raw stored list element into the canonical tagged LmValue word using
+// the header's element-storage kind (high 32 bits of words[0]):
+//   0 = elements already tagged LmValue words -> passthrough
+//   1 = raw int64 elements -> tag_int
+//   2 = raw bool elements (0/1) -> tag_bool
+extern "C" uint64_t lymar_aot_list_elem_decode(uint64_t elem, uint64_t elem_kind) {
+    if (elem_kind == 1) return lymar_aot_tag_int(static_cast<int64_t>(elem));
+    if (elem_kind == 2) return lymar_aot_tag_bool(elem);
+    return elem;
+}
+// Encode a tagged LmValue into element-storage form for kind 1/2 lists; kind 0
+// passes the tagged word through unchanged.
+extern "C" uint64_t lymar_aot_list_elem_encode(uint64_t tagged, uint64_t elem_kind) {
+    if (elem_kind == 1) return static_cast<uint64_t>(lymar_aot_untag_int(tagged));
+    if (elem_kind == 2) return static_cast<uint64_t>(lymar_aot_untag_bool(tagged));
+    return tagged;
+}
+// Kind-aware element store for erased-view writes: encodes the tagged value per
+// the list's storage kind, stores it, and records an ownership edge only for
+// kind-0 (tagged-word) elements that reference a live heap allocation.
+extern "C" void lymar_aot_list_elem_store(uint64_t addr, uint64_t tagged, uint64_t elem_kind) {
+    try {
+        RuntimeGuard guard;
+        uint64_t stored = lymar_aot_list_elem_encode(tagged, elem_kind);
+        *reinterpret_cast<uint64_t*>(addr) = stored;
+        if (elem_kind == 0 && stored && heap().allocations.find(stored) != heap().allocations.end()) {
+            lymar_aot_edge(addr, stored);
+        }
+    } catch (...) {
+    }
+}
+// Erased-view append: like lymar_aot_list_append but encodes the tagged value
+// into the list's element-storage kind before storing. Typed primitive appends
+// keep calling lymar_aot_list_append with already-raw elements.
+extern "C" void lymar_aot_list_append_tagged(uint64_t list_val, uint64_t tagged) {
+    try {
+        RuntimeGuard guard;
+        if (!list_val) return;
+        uint64_t list_ptr = list_val & ~7ULL;
+        auto& h = heap();
+        auto found = h.allocations.find(list_ptr);
+        if (found == h.allocations.end() || found->second.size < 32) return;
+        auto* words = reinterpret_cast<uint64_t*>(list_ptr);
+        if ((words[0] & 0xffffffff) != 1) return;
+        uint64_t elem_kind = words[0] >> 32;
+        uint64_t len = words[2];
+        uint64_t cap = words[3];
+        if (len >= cap) {
+            uint64_t new_cap = cap ? cap * 2 : 8;
+            uint64_t old_data = words[1];
+            uint64_t new_data = lymar_aot_alloc(new_cap * sizeof(uint64_t));
+            if (!new_data) return;
+            if (old_data && len > 0) {
+                std::memcpy(reinterpret_cast<void*>(new_data),
+                            reinterpret_cast<const void*>(old_data),
+                            len * sizeof(uint64_t));
+            }
+            words[1] = new_data;
+            words[3] = new_cap;
+            lymar_aot_edge(list_ptr + 8, new_data);
+            if (found->second.owner != h.active) {
+                h.promote(new_data, found->second.owner);
+            }
+        }
+        auto* data = reinterpret_cast<uint64_t*>(words[1]);
+        uint64_t stored = lymar_aot_list_elem_encode(tagged, elem_kind);
+        data[len] = stored;
+        words[2] = len + 1;
+        if (elem_kind == 0 && tagged && h.allocations.find(tagged) != h.allocations.end()) {
+            lymar_aot_edge(words[1] + len * sizeof(uint64_t), tagged);
         }
     } catch (...) {
     }
@@ -2119,18 +2188,16 @@ extern "C" void lymar_aot_dict_grow(uint64_t dict_ptr) {
         words[2] = new_keys;
         words[3] = new_vals;
 
-        lymar_aot_edge(dict_ptr + 16, new_keys, object_kind);
-        lymar_aot_edge(dict_ptr + 24, new_vals, object_kind);
+        lymar_aot_edge(dict_ptr + 16, new_keys);
+        lymar_aot_edge(dict_ptr + 24, new_vals);
 
         for (uint64_t index = 0; index < count; ++index) {
+            // Element words are tagged LmValues; edge derives ownership from
+            // the word's own LmValue tag.
             uint64_t k = reinterpret_cast<uint64_t*>(new_keys)[index];
-            if (k && h.containing(k) != h.allocations.end()) {
-                lymar_aot_edge(new_keys + index * sizeof(uint64_t), k, object_kind);
-            }
+            lymar_aot_edge(new_keys + index * sizeof(uint64_t), k);
             uint64_t v = reinterpret_cast<uint64_t*>(new_vals)[index];
-            if (v && h.containing(v) != h.allocations.end()) {
-                lymar_aot_edge(new_vals + index * sizeof(uint64_t), v, object_kind);
-            }
+            lymar_aot_edge(new_vals + index * sizeof(uint64_t), v);
         }
 
         if (found->second.owner != h.active) {
@@ -2171,7 +2238,6 @@ extern "C" uint64_t _builtin_string_join(uint64_t list_val, uint64_t delim_val) 
         Word header[3] = {11, static_cast<Word>(result.size()), static_cast<Word>(result.size())};
         std::memcpy(reinterpret_cast<void*>(object), header, 24);
         std::memcpy(reinterpret_cast<void*>(object + 24), result.c_str(), result.size() + 1);
-        h.return_pointer = object_kind;
         return object;
     } catch (...) {
         return 0;
@@ -2187,7 +2253,6 @@ extern "C" uint64_t _builtin_string_from_cstr(uint64_t cstr_val) {
         Word header[3] = {11, static_cast<Word>(len), static_cast<Word>(len)};
         std::memcpy(reinterpret_cast<void*>(object), header, 24);
         std::memcpy(reinterpret_cast<void*>(object + 24), cstr, len + 1);
-        heap().return_pointer = object_kind;
         return object;
     } catch (...) {
         return 0;
@@ -2224,25 +2289,77 @@ void lymar_aot_free(uint64_t pointer) {
         return;
     }
 }
-void lymar_aot_edge(uint64_t address, uint64_t child, uint64_t is_pointer) {
+// ---------------------------------------------------------------------------
+// LmValue boundary tagging (Option 2)
+// Managed-memory slots hold self-describing tagged words: SMI ints (v<<3)|1,
+// immediates (VAL_NIL/VAL_FALSE/VAL_TRUE), and TAG_PTR heap pointers. There
+// is no kind sidecar: consumers decode `word & 7` directly.
+// ---------------------------------------------------------------------------
+static Word tag_int_word(Word value) {
+    return lymar_aot_tag_int(static_cast<int64_t>(value));
+}
+// Decode a managed-slot word for a typed (raw-domain) consumer: SMI -> int,
+// immediates -> 1/0, heap number/foreign-pointer boxes -> payload, everything
+// else passes through as the tagged word itself.
+extern "C" uint64_t lymar_aot_untag_at(uint64_t word) {
+    try {
+    RuntimeGuard runtime_guard;
+
+    Word tag = word & TAG_MASK;
+    if (tag == TAG_INT) return static_cast<uint64_t>(static_cast<int64_t>(word) >> 3);
+    if (word == VAL_TRUE) return 1;
+    if (word == VAL_FALSE || word == VAL_NIL || word == 0) return 0;
+    if (tag == TAG_PTR && word > 4096 && heap().allocations.count(word)) {
+        Word type = read_word(word) & 0xffffffff;
+        if (type == 5 || type == 13) return read_word(word, 8);
+    }
+    return word;
+
+    } catch (...) { return word; }
+}
+void lymar_aot_edge(uint64_t address, uint64_t child) {
     try {
     RuntimeGuard runtime_guard;
 
     auto& h = heap();
-    bool is_obj = (is_pointer == object_kind) || (child > 4096 && h.allocations.count(child));
-    if (!is_obj && !h.shadow.erase(address)) return;
+
+    // Ownership is derived solely from the child's LmValue tag: only a live
+    // heap allocation (TAG_PTR + allocations membership) can be a child edge.
+    Word ptr = is_heap_word(child) ? child : 0;
+
     auto container = h.containing(address);
-    if (is_obj) h.shadow[address] = object_kind;
-    else h.shadow.erase(address);
-    if (container == h.allocations.end()) {
-        if (!h.invocations.empty()) h.invocations.back().slots.insert(address);
-        return;
+    if (container != h.allocations.end() && !container->second.raw_memory && child != 0) {
+        auto offset = address - container->first;
+        uint64_t w0 = read_word(container->first) & 0xffffffff;
+        bool is_header_field = (offset == 0) ||
+            (w0 == 1 && (offset == 16 || offset == 24)) || // List len, cap
+            (w0 == 3 && (offset == 16 || offset == 24)) || // Tuple len, cap
+            (w0 == 15 && offset == 24) ||                  // Frame field count
+            (w0 == 11 && (offset == 8 || offset == 16)) || // String len, hash
+            (container->second.dictionary && (offset == 0 || offset == 8)) || // Dict count, cap
+            (container->second.size == 32 && w0 == 0x4C594D41524F4B21LL && (offset == 8 || offset == 24)); // Ok/Err box tag and kind
+        if (!is_header_field && child != 0) {
+            uint64_t tag = child & TAG_MASK;
+            bool ok = (tag == TAG_INT) ||
+                      (tag == TAG_PTR) ||
+                      (child == VAL_NIL || child == VAL_FALSE || child == VAL_TRUE);
+            if (!ok) {
+                std::fprintf(stderr, "[TAG ASSERTION FAILED] lymar_aot_edge: addr=0x%llx (base=0x%llx size=%llu off=%llu w0=%llu) child=0x%llx (tag=%llu)\n",
+                    (unsigned long long)address, (unsigned long long)container->first, (unsigned long long)container->second.size, (unsigned long long)offset, (unsigned long long)w0,
+                    (unsigned long long)child, (unsigned long long)tag);
+                std::fflush(stderr);
+                std::abort();
+            }
+        }
     }
+
+    if (ptr) h.promote(ptr, 0);
+    if (container == h.allocations.end()) return;
     auto offset = address - container->first;
     container->second.edges.erase(offset);
-    if (is_obj && h.containing(child) != h.allocations.end()) {
-        container->second.edges[offset] = child;
-        h.promote(child, container->second.owner);
+    if (ptr && h.containing(ptr) != h.allocations.end()) {
+        container->second.edges[offset] = ptr;
+        h.promote(ptr, container->second.owner);
     }
 
     } catch (const std::exception& failure) {
@@ -2254,11 +2371,11 @@ void lymar_aot_edge(uint64_t address, uint64_t child, uint64_t is_pointer) {
 // Raw access is explicitly unsafe in source. Preserve external/FFI addresses;
 // use memcpy so valid byte-addressed unaligned accesses do not acquire C++ UB.
 // Raw bytes do not transfer pointee ownership; managed stores publish edges separately.
-uint64_t lymar_aot_channel_length(uint64_t value, uint64_t kind) {
+uint64_t lymar_aot_channel_length(uint64_t value) {
     try {
     RuntimeGuard runtime_guard;
 
-    if (kind != object_kind || lymar_aot_is_nil(value, kind)) return 0;
+    if (lymar_aot_is_nil(value) || !is_heap_word(value)) return 0;
     auto& h = heap();
     auto found = h.allocations.find(value);
     if (found == h.allocations.end() || found->second.size < 32 || (read_word(value) & 0xffffffff) != 1)
@@ -2271,30 +2388,30 @@ uint64_t lymar_aot_channel_length(uint64_t value, uint64_t kind) {
         return 0;
     }
 }
-static uint64_t raw_address(uint64_t value, uint64_t kind) {
-    if (kind == boolean_kind || lymar_aot_is_nil(value, kind)) return 0;
-    if (kind != 0 && kind != object_kind) throw std::runtime_error("Invalid raw pointer kind");
+// Decode a tagged word to a raw address for unsafe memory access. Heap
+// objects pass through (their address is the pointer); foreign-pointer and
+// boxed-integer wrappers yield their payload; SMI/immediate words decode to
+// their integer value; anything else is already a raw address.
+static uint64_t raw_address(uint64_t value) {
+    if (value == VAL_NIL || value == VAL_FALSE || value == 0) return 0;
+    if (value == VAL_TRUE) return 1;
+    Word tag = value & TAG_MASK;
+    if (tag == TAG_INT) return static_cast<uint64_t>(static_cast<int64_t>(value) >> 3);
+    if (tag == TAG_PTR && value > 4096) {
+        auto found = heap().allocations.find(value);
+        if (found != heap().allocations.end() && !found->second.raw_memory &&
+            !found->second.dictionary && found->second.size >= 16) {
+            Word type = read_word(value) & 0xffffffff;
+            if (type == 13 || type == 5) return read_word(value, 8);
+        }
+    }
     return value;
 }
-uint64_t lymar_aot_memory_load_kind(uint64_t pointer, uint64_t element, uint64_t pointer_kind) {
+uint64_t lymar_aot_memory_load(uint64_t pointer, uint64_t element) {
     try {
     RuntimeGuard runtime_guard;
 
-    pointer = raw_address(pointer, pointer_kind);
-    if (!pointer || element >= 8) return object_kind;
-    return 0;
-
-    } catch (const std::exception& failure) {
-        if (runtime_lock_depth && heap().worker) throw;
-        if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
-        return 0;
-    }
-}
-uint64_t lymar_aot_memory_load(uint64_t pointer, uint64_t element, uint64_t pointer_kind) {
-    try {
-    RuntimeGuard runtime_guard;
-
-    pointer = raw_address(pointer, pointer_kind);
+    pointer = raw_address(pointer);
     if (element > 10) throw std::runtime_error("Invalid raw memory element kind");
     if (!pointer) return lymar_aot_nil();
     const auto* address = reinterpret_cast<const void*>(pointer);
@@ -2319,29 +2436,44 @@ uint64_t lymar_aot_memory_load(uint64_t pointer, uint64_t element, uint64_t poin
 }
 // Raw stores use the VM's physical numeric conversion, not string parsing or
 // arbitrary object-header heuristics. Raw buffers may themselves begin with 9.
-static double raw_numeric_value(uint64_t value, uint64_t kind) {
-    if (kind == 0) return static_cast<double>(static_cast<int64_t>(value));
-    if (kind != object_kind || lymar_aot_is_nil(value, kind)) return 0.0;
+static double raw_numeric_value(uint64_t value) {
+    Word tag = value & TAG_MASK;
+    if (tag == TAG_INT) return static_cast<double>(static_cast<int64_t>(value) >> 3);
+    if (value == VAL_TRUE) return 1.0;
+    if (value == VAL_FALSE || value == VAL_NIL || value == 0) return 0.0;
+    if (tag == TAG_IMMEDIATE) return 0.0;
     auto found = heap().allocations.find(value);
-    if (found != heap().allocations.end() && !found->second.raw_memory && found->second.float_box &&
+    if (found != heap().allocations.end() && !found->second.raw_memory && !found->second.dictionary &&
         found->second.size >= 16 && (read_word(value) & 0xffffffff) == 9) {
         double result; std::memcpy(&result, reinterpret_cast<void*>(value + 8), sizeof(result));
         return result;
     }
-    // Object-kind values that are not boxed floats carry raw bits: module
-    // constants and fnptr/pubptr aliases are GlobalVariables/ints reported as
-    // object kind, ffi.alloc buffers are raw_memory, and foreign pointers live
-    // outside the heap entirely. Store the address/scalar, not zero.
+    if (auto integer = integer_number(value)) return static_cast<double>(*integer);
+    // Non-numeric words carry raw bits: foreign pointers, module constants and
+    // fnptr/pubptr aliases. Store the address/scalar, not zero.
     return static_cast<double>(static_cast<int64_t>(value));
 }
-static uint64_t raw_integer_value(uint64_t value, uint64_t kind) {
-    return kind == 0 ? value : static_cast<Word>(static_cast<int64_t>(raw_numeric_value(value, kind)));
+static uint64_t raw_integer_value(uint64_t value) {
+    Word tag = value & TAG_MASK;
+    if (tag == TAG_INT) return static_cast<uint64_t>(static_cast<int64_t>(value) >> 3);
+    if (value == VAL_TRUE) return 1;
+    if (value == VAL_FALSE || value == VAL_NIL || value == 0) return 0;
+    if (tag == TAG_IMMEDIATE) return 0;
+    auto found = heap().allocations.find(value);
+    if (found != heap().allocations.end() && !found->second.raw_memory && !found->second.dictionary &&
+        found->second.size >= 16) {
+        auto type = read_word(value) & 0xffffffff;
+        if (type == 5 || type == 6 || type == 13) return read_word(value, 8);
+        if (type == 9) return static_cast<uint64_t>(LM::Memory::truncate_i64(raw_numeric_value(value)));
+    }
+    if (auto integer = integer_number(value)) return static_cast<Word>(*integer);
+    return value;
 }
-uint64_t lymar_aot_raw_alloc(uint64_t size, uint64_t kind) {
+uint64_t lymar_aot_raw_alloc(uint64_t size) {
     try {
     RuntimeGuard runtime_guard;
 
-    size = raw_integer_value(size, kind);
+    size = raw_integer_value(size);
     if (static_cast<int64_t>(size) < 0) return lymar_aot_nil();
     auto pointer = lymar_aot_alloc(size);
     heap().allocations.at(pointer).raw_memory = true;
@@ -2359,11 +2491,11 @@ uint64_t lymar_aot_raw_alloc(uint64_t size, uint64_t kind) {
         return 0;
     }
 }
-void lymar_aot_raw_free(uint64_t pointer, uint64_t kind) {
+void lymar_aot_raw_free(uint64_t pointer) {
     try {
     RuntimeGuard runtime_guard;
 
-    pointer = raw_address(pointer, kind);
+    pointer = raw_address(pointer);
     auto found = heap().allocations.find(pointer);
     if (found != heap().allocations.end() && found->second.raw_memory) heap().release(pointer);
 
@@ -2373,22 +2505,22 @@ void lymar_aot_raw_free(uint64_t pointer, uint64_t kind) {
         return;
     }
 }
-void lymar_aot_memory_store(uint64_t pointer, uint64_t value, uint64_t element, uint64_t kind, uint64_t pointer_kind) {
+void lymar_aot_memory_store(uint64_t pointer, uint64_t value, uint64_t element) {
     try {
     RuntimeGuard runtime_guard;
 
-    pointer = raw_address(pointer, pointer_kind);
+    pointer = raw_address(pointer);
     if (element > 10) throw std::runtime_error("Invalid raw memory element kind");
     if (!pointer) return;
     auto* address = reinterpret_cast<void*>(pointer);
-    const Word integer = element < 8 ? raw_integer_value(value, kind) : value;
+    const Word integer = element < 8 ? raw_integer_value(value) : value;
     // Pointer stores must persist the raw address, not the tag-13 wrapper
     // object: ffi.fnptr/pubptr values are heap boxes whose payload (offset 8)
     // is the real pointer. Storing the wrapper address hands consumers (e.g. a
     // WNDCLASSEX.lpfnWndProc consumed by CreateWindowExA) a heap pointer that
     // faults when called.
-    Word pointer_value = value;
-    if (element == 10 && (kind == 0 || (kind == object_kind && !lymar_aot_is_nil(value, kind)))) {
+    Word pointer_value = raw_integer_value(value);
+    if (element == 10 && value != VAL_NIL && value != 0 && value != VAL_FALSE) {
         auto wrapped = heap().allocations.find(value);
         if (wrapped != heap().allocations.end() && !wrapped->second.raw_memory &&
             wrapped->second.size >= 16 && read_word(value) == 13)
@@ -2401,15 +2533,12 @@ void lymar_aot_memory_store(uint64_t pointer, uint64_t value, uint64_t element, 
         LM_RAW_STORE(2, int16_t, integer) LM_RAW_STORE(3, uint16_t, integer)
         LM_RAW_STORE(4, int32_t, integer) LM_RAW_STORE(5, uint32_t, integer)
         LM_RAW_STORE(6, int64_t, integer) LM_RAW_STORE(7, uint64_t, integer)
-        LM_RAW_STORE(8, float, raw_numeric_value(value, kind))
-        LM_RAW_STORE(9, double, raw_numeric_value(value, kind))
-        LM_RAW_STORE(10, Word, (kind == 0 || (kind == object_kind && !lymar_aot_is_nil(value, kind))) ? pointer_value : 0)
+        LM_RAW_STORE(8, float, raw_numeric_value(value))
+        LM_RAW_STORE(9, double, raw_numeric_value(value))
+        LM_RAW_STORE(10, Word, (value != VAL_NIL && value != 0 && value != VAL_FALSE) ? pointer_value : 0)
 #undef LM_RAW_STORE
     }
     auto& h = heap();
-    // At most fifteen byte-addressed word slots overlap an eight-byte write;
-    // do not scan unrelated stack/object kind metadata on every raw store.
-    h.forget_kinds(pointer, width, true);
     auto owner = h.containing(pointer);
     if (owner != h.allocations.end()) {
         auto start = pointer - owner->first;
@@ -2429,13 +2558,13 @@ void lymar_aot_memory_store(uint64_t pointer, uint64_t value, uint64_t element, 
         return;
     }
 }
-void lymar_aot_global_edge(uint64_t address, uint64_t child, uint64_t is_pointer) {
+void lymar_aot_global_edge(uint64_t address, uint64_t child) {
     try {
     RuntimeGuard runtime_guard;
 
-    auto& h = heap();
-    if (is_pointer) { h.shadow[address] = is_pointer; if (is_pointer == object_kind) h.promote(child, 0); }
-    else h.shadow.erase(address);
+    // Global slots hold tagged LmValue words; only live heap allocations
+    // create ownership edges (promoted into the permanent region 0).
+    if (is_heap_word(child)) heap().promote(child, 0);
 
     } catch (const std::exception& failure) {
         if (runtime_lock_depth && heap().worker) throw;
@@ -2448,21 +2577,23 @@ void lymar_aot_copy(uint64_t destination, uint64_t source, uint64_t size) {
     RuntimeGuard runtime_guard;
 
     auto& h = heap();
-    // Snapshot every value kind before memmove, including overlapping ranges.
-    // std::map lower_bound gives an O(log n + k) range walk over only the
-    // entries that actually live in [source, source + size).
-    std::vector<std::pair<Word, Word>> kinds;
-    Word src_end = source + size;
-    for (auto it = h.shadow.lower_bound(source); it != h.shadow.end() && it->first + sizeof(Word) <= src_end; ++it)
-        kinds.emplace_back(destination + (it->first - source), it->second);
     std::memmove(reinterpret_cast<void*>(destination), reinterpret_cast<void*>(source), size);
-    h.forget_kinds(destination, size, true);
     auto dst = h.containing(destination);
     if (dst != h.allocations.end()) {
         auto start = destination - dst->first;
         std::erase_if(dst->second.edges, [&](auto edge) { return edge.first >= start ? edge.first - start < size : start - edge.first < sizeof(Word); });
+        // Re-publish ownership for every tagged heap word now in the
+        // destination range. Managed copies are word-aligned.
+        if ((destination & (sizeof(Word) - 1)) == 0 && size % sizeof(Word) == 0) {
+            for (Word offset = 0; offset + sizeof(Word) <= size; offset += sizeof(Word)) {
+                Word word = read_word(destination + offset);
+                if (is_heap_word(word)) {
+                    dst->second.edges[start + offset] = word;
+                    h.promote(word, dst->second.owner);
+                }
+            }
+        }
     }
-    for (auto [address, kind] : kinds) lymar_aot_edge(address, read_word(address), kind);
 
     } catch (const std::exception& failure) {
         if (runtime_lock_depth && heap().worker) throw;
@@ -2477,8 +2608,7 @@ void lymar_aot_raw_copy(uint64_t destination, uint64_t source, uint64_t size) {
     if (!destination || !source || static_cast<int64_t>(size) <= 0) return;
     auto& h = heap();
     // Raw byte copies carry no ownership contract. Managed aggregate copies
-    // use lymar_aot_copy and explicitly preserve their edges/kinds instead.
-    h.forget_kinds(destination, size, true);
+    // use lymar_aot_copy and explicitly preserve their edges instead.
     auto owner = h.containing(destination);
     if (owner != h.allocations.end()) {
         auto start = destination - owner->first;
@@ -2500,9 +2630,8 @@ void lymar_aot_raw_fill(uint64_t destination, uint64_t value, uint64_t size) {
 
     if (!destination || static_cast<int64_t>(size) <= 0) return;
     auto& h = heap();
-    // Invalidate overlapping kinds/edges; byte filling must not retain a
+    // Invalidate overlapping edges; byte filling must not retain a
     // pointer edge whose bytes have been replaced by unrelated data.
-    h.forget_kinds(destination, size, true);
     auto owner = h.containing(destination);
     if (owner != h.allocations.end()) {
         auto start = destination - owner->first;
@@ -2557,14 +2686,14 @@ uint64_t lymar_aot_resize(uint64_t pointer, uint64_t size) {
         return 0;
     }
 }
-uint64_t lymar_aot_raw_resize(uint64_t pointer, uint64_t size, uint64_t pointer_kind, uint64_t size_kind) {
+uint64_t lymar_aot_raw_resize(uint64_t pointer, uint64_t size) {
     try {
     RuntimeGuard runtime_guard;
 
-    pointer = raw_address(pointer, pointer_kind);
-    size = raw_integer_value(size, size_kind);
+    pointer = raw_address(pointer);
+    size = raw_integer_value(size);
     if (static_cast<int64_t>(size) < 0) return lymar_aot_nil();
-    if (!pointer) return lymar_aot_raw_alloc(size, 0);
+    if (!pointer) return lymar_aot_raw_alloc(size);
     auto found = heap().allocations.find(pointer);
     if (found == heap().allocations.end() || !found->second.raw_memory) return lymar_aot_nil();
     if (!size) { heap().release(pointer); return lymar_aot_nil(); }
@@ -2576,12 +2705,11 @@ uint64_t lymar_aot_raw_resize(uint64_t pointer, uint64_t size, uint64_t pointer_
         return 0;
     }
 }
-void lymar_aot_raw_copy_checked(uint64_t destination, uint64_t source, uint64_t size,
-                               uint64_t destination_kind, uint64_t source_kind, uint64_t size_kind) {
+void lymar_aot_raw_copy_checked(uint64_t destination, uint64_t source, uint64_t size) {
     try {
     RuntimeGuard runtime_guard;
 
-    lymar_aot_raw_copy(raw_address(destination, destination_kind), raw_address(source, source_kind), raw_integer_value(size, size_kind));
+    lymar_aot_raw_copy(raw_address(destination), raw_address(source), raw_integer_value(size));
 
     } catch (const std::exception& failure) {
         if (runtime_lock_depth && heap().worker) throw;
@@ -2589,12 +2717,11 @@ void lymar_aot_raw_copy_checked(uint64_t destination, uint64_t source, uint64_t 
         return;
     }
 }
-void lymar_aot_raw_fill_checked(uint64_t destination, uint64_t value, uint64_t size,
-                               uint64_t destination_kind, uint64_t value_kind, uint64_t size_kind) {
+void lymar_aot_raw_fill_checked(uint64_t destination, uint64_t value, uint64_t size) {
     try {
     RuntimeGuard runtime_guard;
 
-    lymar_aot_raw_fill(raw_address(destination, destination_kind), raw_integer_value(value, value_kind), raw_integer_value(size, size_kind));
+    lymar_aot_raw_fill(raw_address(destination), raw_integer_value(value), raw_integer_value(size));
 
     } catch (const std::exception& failure) {
         if (runtime_lock_depth && heap().worker) throw;
@@ -2602,12 +2729,11 @@ void lymar_aot_raw_fill_checked(uint64_t destination, uint64_t value, uint64_t s
         return;
     }
 }
-uint64_t lymar_aot_raw_compare_checked(uint64_t left, uint64_t right, uint64_t size,
-                                     uint64_t left_kind, uint64_t right_kind, uint64_t size_kind) {
+uint64_t lymar_aot_raw_compare_checked(uint64_t left, uint64_t right, uint64_t size) {
     try {
     RuntimeGuard runtime_guard;
 
-    return lymar_aot_raw_compare(raw_address(left, left_kind), raw_address(right, right_kind), raw_integer_value(size, size_kind));
+    return lymar_aot_raw_compare(raw_address(left), raw_address(right), raw_integer_value(size));
 
     } catch (const std::exception& failure) {
         if (runtime_lock_depth && heap().worker) throw;
@@ -2641,7 +2767,7 @@ void lymar_aot_finalize(uint64_t pointer) {
 void* NativeGraphicsAccess::list(Value value) {
     auto& allocations=heap().allocations;auto found=allocations.find(value.word);
     if(value.kind!=object_kind || found==allocations.end() || found->second.raw_memory ||
-       found->second.dictionary || found->second.size<32 || read_word(value.word)!=1) return nullptr;
+       found->second.dictionary || found->second.size<32 || (read_word(value.word)&0xffffffff)!=1) return nullptr;
     lymar_aot_ffi_list_size(value.word);
     return reinterpret_cast<void*>(value.word);
 }
@@ -2651,7 +2777,7 @@ const char* NativeGraphicsAccess::string(Value value) {
 NativeGraphicsAccess::List* NativeGraphicsAccess::new_list() {
     auto pointer=lymar_aot_alloc(32),data=lymar_aot_alloc(32);
     Word header[4]={1,data,0,4};std::memcpy(reinterpret_cast<void*>(pointer),header,32);
-    lymar_aot_edge(pointer+8,data,object_kind);
+    lymar_aot_edge(pointer+8,data);
     return reinterpret_cast<List*>(pointer);
 }
 void NativeGraphicsAccess::append(List* list,Value value) {
@@ -2661,17 +2787,21 @@ void NativeGraphicsAccess::append(List* list,Value value) {
         if(capacity>UINT64_MAX/16) throw std::runtime_error("Graphics event list capacity overflow");
         auto next=std::max<Word>(4,capacity*2),replacement=lymar_aot_alloc(next*8);
         for(Word index=0;index<count;++index) {
-            auto item=lymar_aot_ffi_list_item(pointer,index),kind=lymar_aot_ffi_list_kind(pointer,index);
+            auto item=lymar_aot_ffi_list_item(pointer,index);
             std::memcpy(reinterpret_cast<void*>(replacement+index*8),&item,8);
-            lymar_aot_edge(replacement+index*8,item,kind);
+            lymar_aot_edge(replacement+index*8,item);
         }
         std::memcpy(reinterpret_cast<void*>(pointer+8),&replacement,8);
         std::memcpy(reinterpret_cast<void*>(pointer+24),&next,8);
-        lymar_aot_edge(pointer+8,replacement,object_kind);
+        lymar_aot_edge(pointer+8,replacement);
         lymar_aot_free(data);data=replacement;
     }
-    std::memcpy(reinterpret_cast<void*>(data+count*8),&value.word,8);
-    lymar_aot_edge(data+count*8,value.word,value.kind);
+    // Fold the legacy (word,kind) pair into a self-describing LmValue word.
+    Word tagged = value.word;
+    if (value.kind == boolean_kind) tagged = value.word ? VAL_TRUE : VAL_FALSE;
+    else if (value.kind == 0) tagged = tag_int_word(static_cast<int64_t>(value.word));
+    std::memcpy(reinterpret_cast<void*>(data+count*8),&tagged,8);
+    lymar_aot_edge(data+count*8,tagged);
     ++count;std::memcpy(reinterpret_cast<void*>(pointer+16),&count,8);
 }
 #endif
@@ -2747,22 +2877,17 @@ extern "C" uint64_t lymar_aot_resource_str_arg(uint64_t arguments, uint64_t coun
     uint64_t seen = 0;
     for (uint64_t n = 0; n < count; ++n) {
         auto value = read_word(arguments, n * 8);
-        auto pointer = lymar_aot_slot_pointer(arguments + n * 8);
-        if (pointer == object_kind && value > 4096 && (read_word(value) & 0xffffffff) == 1) {
+        if (value > 4096 && (value & TAG_MASK) == TAG_PTR && (read_word(value) & 0xffffffff) == 1) {
             auto data = read_word(value, 8), size = read_word(value, 16);
             for (uint64_t i = 0; i < size; ++i) {
                 if (seen++ != index) continue;
                 auto elem = read_word(data, i * 8);
-                if (lymar_aot_slot_pointer(data + i * 8) == object_kind) {
-                    if (auto* text = string_data(elem)) return reinterpret_cast<uint64_t>(text);
-                }
+                if (auto* text = string_data(elem)) return reinterpret_cast<uint64_t>(text);
                 return reinterpret_cast<uint64_t>(empty);
             }
-        } else if (!lymar_aot_is_nil(value, pointer)) {
+        } else if (value != 0 && value != VAL_NIL && value != 2) {
             if (seen++ == index) {
-                if (pointer == object_kind) {
-                    if (auto* text = string_data(value)) return reinterpret_cast<uint64_t>(text);
-                }
+                if (auto* text = string_data(value)) return reinterpret_cast<uint64_t>(text);
                 return reinterpret_cast<uint64_t>(empty);
             }
         }
@@ -2782,29 +2907,39 @@ uint64_t lymar_aot_resource_call(uint64_t id, uint64_t operation, uint64_t count
 
     constexpr Word nil = 2;
     auto& h = heap();
-    h.return_pointer = object_kind; // Default failure is nil.
+    // Derive the legacy kind classification from the LmValue tag itself so the
+    // graphics Value ABI (word+kind pairs) keeps working without a sidecar.
+    auto derive_kind = [](Word w) -> Word {
+        Word t = w & TAG_MASK;
+        if (t == TAG_PTR && w > 4096 && heap().allocations.count(w)) return object_kind;
+        if (t == TAG_INT) return object_kind;
+        if (w == VAL_TRUE || w == VAL_FALSE) return boolean_kind;
+        if (w == VAL_NIL || w == 0) return object_kind;
+        return 0;
+    };
     std::vector<Word> args;
     std::vector<Word> pointers;
     for (Word n = 0; n < count; ++n) {
         auto value = read_word(arguments, n * 8);
-        Word pointer = lymar_aot_slot_pointer(arguments + n * 8);
-        if (pointer == object_kind && value > 4096 && (read_word(value) & 0xffffffff) == 1) {
+        Word pointer = derive_kind(value);
+        if (is_heap_word(value) && (read_word(value) & 0xffffffff) == 1) {
             auto data = read_word(value, 8), size = read_word(value, 16);
             for (Word i = 0; i < size; ++i) {
-                args.push_back(read_word(data, i * 8));
-                pointers.push_back(lymar_aot_slot_pointer(data + i * 8));
+                auto element = read_word(data, i * 8);
+                args.push_back(element);
+                pointers.push_back(derive_kind(element));
             }
-        } else if (!lymar_aot_is_nil(value, pointer)) { args.push_back(value); pointers.push_back(pointer); }
+        } else if (!lymar_aot_is_nil(value)) { args.push_back(value); pointers.push_back(pointer); }
     }
-    auto arg_string = [&](size_t n) { auto* s = n < args.size() && pointers[n] == object_kind ? string_data(args[n]) : nullptr; return s ? s : ""; };
+    auto arg_string = [&](size_t n) { auto* s = n < args.size() ? string_data(args[n]) : nullptr; return s ? s : ""; };
     auto& f = files();
     auto service = f.services.find(id);
     if (service != f.services.end()) {
         // Shares LM::Runtime::OS with the RegisterVM resource handlers, so both
         // backends report identical values for the same operation.
         namespace os = LM::Runtime::OS;
-        auto truth=[&](bool yes) {h.return_pointer=boolean_kind;return Word(yes?1:0);};
-        auto number=[&](int64_t value) {h.return_pointer=0;return static_cast<Word>(value);};
+        auto truth=[&](bool yes) {return yes?VAL_TRUE:VAL_FALSE;};
+        auto number=[&](int64_t value) {return tag_int_word(value);};
         auto string_object=[&](const std::string& bytes) {
             auto object=lymar_aot_alloc(25+bytes.size());
             Word header[3]={11,bytes.size(),bytes.size()};
@@ -2812,8 +2947,8 @@ uint64_t lymar_aot_resource_call(uint64_t id, uint64_t operation, uint64_t count
             std::memcpy(reinterpret_cast<void*>(object+24),bytes.c_str(),bytes.size()+1);
             return object;
         };
-        auto text=[&](const std::string& bytes) {h.return_pointer=object_kind;return string_object(bytes);};
-        auto absent=[&]() {h.return_pointer=object_kind;return nil;};
+        auto text=[&](const std::string& bytes) {return string_object(bytes);};
+        auto absent=[&]() {return nil;};
         auto strings=[&](const std::vector<std::string>& items) {
             // Same [str] layout the graphics event list uses: a 32-byte header
             // of {TYPE_LIST, data, count, capacity} plus the element slots.
@@ -2822,7 +2957,7 @@ uint64_t lymar_aot_resource_call(uint64_t id, uint64_t operation, uint64_t count
             auto data=lymar_aot_alloc(capacity*8);
             Word header[4]={1,data,0,capacity};
             std::memcpy(reinterpret_cast<void*>(pointer),header,32);
-            lymar_aot_edge(pointer+8,data,object_kind);
+            lymar_aot_edge(pointer+8,data);
             for (const auto& item : items) {
                 auto object=string_object(item);
                 // Elements are written back through the header: an allocation
@@ -2831,11 +2966,11 @@ uint64_t lymar_aot_resource_call(uint64_t id, uint64_t operation, uint64_t count
                 auto count=read_word(pointer,16);
                 if (count>=capacity) break;
                 std::memcpy(reinterpret_cast<void*>(slot_data+count*8),&object,8);
-                lymar_aot_edge(slot_data+count*8,object,object_kind);
+                lymar_aot_edge(slot_data+count*8,object);
                 ++count;
                 std::memcpy(reinterpret_cast<void*>(pointer+16),&count,8);
             }
-            h.return_pointer=object_kind;return pointer;
+            return pointer;
         };
         auto arg_text=[&](size_t n) { return n < args.size() && pointers[n] == object_kind ? std::string(arg_string(n)) : std::string(); };
         if (service->second == 18) {  // ResourceType::OS
@@ -2858,7 +2993,7 @@ uint64_t lymar_aot_resource_call(uint64_t id, uint64_t operation, uint64_t count
             if (operation == 66) return number(os::peak_rss_kb());  // PROC_PEAK_RSS
             if (operation == 63) {  // PROC_EXIT: never returns.
                 int64_t code = 0;
-                if (!args.empty()) { auto value = integer_number(args[0], pointers[0]); if (value) code = *value; }
+                if (!args.empty()) { auto value = integer_number(args[0]); if (value) code = *value; }
                 os::terminate(static_cast<int>(code));
                 return number(code);
             }
@@ -2877,12 +3012,16 @@ uint64_t lymar_aot_resource_call(uint64_t id, uint64_t operation, uint64_t count
         std::vector<GraphicsValue> values;
         for(size_t index=0;index<args.size();++index) values.push_back({args[index],pointers[index]});
         auto returned=graphics->second->call(static_cast<LM::Backend::VM::ResourceOperation>(operation),values,nullptr);
-        h.return_pointer=returned.kind;return returned.word;
+        // GraphicsValue carries the legacy (word,kind) pair; fold it back into
+        // a self-describing LmValue word for erased consumers.
+        if (returned.kind == boolean_kind) return returned.word ? VAL_TRUE : VAL_FALSE;
+        if (returned.kind == 0) return tag_int_word(static_cast<int64_t>(returned.word));
+        return returned.word;
     }
 #endif
     if(auto hash=f.hashes.find(id);hash!=f.hashes.end()) {
-        auto truth=[&](bool yes) {h.return_pointer=boolean_kind;return yes?Word(1):Word(0);};
-        auto text=[&](const std::string& bytes) {auto object=lymar_aot_alloc(25+bytes.size());Word header[3]={11,bytes.size(),bytes.size()};std::memcpy(reinterpret_cast<void*>(object),header,24);std::memcpy(reinterpret_cast<void*>(object+24),bytes.c_str(),bytes.size()+1);h.return_pointer=object_kind;return object;};
+        auto truth=[&](bool yes) {return yes?VAL_TRUE:VAL_FALSE;};
+        auto text=[&](const std::string& bytes) {auto object=lymar_aot_alloc(25+bytes.size());Word header[3]={11,bytes.size(),bytes.size()};std::memcpy(reinterpret_cast<void*>(object),header,24);std::memcpy(reinterpret_cast<void*>(object+24),bytes.c_str(),bytes.size()+1);return object;};
         if(operation==0) {auto* algorithm=args.empty()?"sha256":arg_string(0);return truth(algorithm && hash->second.open(algorithm));}
         if(operation==3) {auto* bytes=arg_string(0);if(!bytes) return truth(false);hash->second.write(bytes,std::strlen(bytes));return truth(true);}
         if(operation==2) return text(hash->second.read());
@@ -2892,10 +3031,10 @@ uint64_t lymar_aot_resource_call(uint64_t id, uint64_t operation, uint64_t count
     }
     if(auto mem=f.mems.find(id);mem!=f.mems.end()) {
         auto& buf = mem->second;
-        auto truth=[&](bool yes) {h.return_pointer=boolean_kind;return yes?Word(1):Word(0);};
+        auto truth=[&](bool yes) {return yes?VAL_TRUE:VAL_FALSE;};
         if(operation==0) { // OPEN: allocate / resize the byte buffer to the requested size.
             size_t n = buf.second;
-            if (!args.empty()) { auto v = integer_number(args[0], pointers[0]); if (v) n = static_cast<size_t>(*v); }
+            if (!args.empty()) { auto v = integer_number(args[0]); if (v) n = static_cast<size_t>(*v); }
             if (buf.first) std::free(buf.first);
             buf.first = n ? std::malloc(n) : nullptr;
             buf.second = buf.first ? n : 0;
@@ -2909,13 +3048,13 @@ uint64_t lymar_aot_resource_call(uint64_t id, uint64_t operation, uint64_t count
             return truth(true);
         }
         if(operation==2) { // READ: return the buffer contents as a string.
-            if (!buf.first || buf.second == 0) { h.return_pointer=object_kind; return nil; }
+            if (!buf.first || buf.second == 0) {  return nil; }
             auto object=lymar_aot_alloc(25+buf.second);
             Word header[3]={11,buf.second,buf.second};
             std::memcpy(reinterpret_cast<void*>(object),header,24);
             std::memcpy(reinterpret_cast<void*>(object+24),buf.first,buf.second);
             reinterpret_cast<char*>(object)[24+buf.second]='\0';
-            h.return_pointer=object_kind;return object;
+            return object;
         }
         if(operation==1) { // CLOSE: release the buffer, keep the resource handle alive.
             if (buf.first) std::free(buf.first);
@@ -2923,15 +3062,14 @@ uint64_t lymar_aot_resource_call(uint64_t id, uint64_t operation, uint64_t count
             return truth(true);
         }
         if(operation==48) { // SIZE: memory measurement - report allocated byte count.
-            h.return_pointer=0;return static_cast<Word>(buf.second);
+            return tag_int_word(static_cast<int64_t>(buf.second));
         }
-        h.return_pointer=object_kind;return nil;
+        return nil;
     }
     auto found = f.handles.find(id);
     if (id > 1 && found == f.handles.end()) return nil;
     FILE* stream = id == 0 ? stdout : id == 1 ? stderr : found->second;
     // These operations return booleans in the VM, even through the any API.
-    h.return_pointer = (operation == 2 || operation == 47) ? object_kind : boolean_kind;
     if (id <= 1 && operation == 2 && count == 1) {
         // Environment get (legacy stdout/stderr resource routing)
         const char* k = arg_string(0);
@@ -2943,7 +3081,6 @@ uint64_t lymar_aot_resource_call(uint64_t id, uint64_t operation, uint64_t count
                 Word hdr[3] = {11, len, len};
                 std::memcpy(reinterpret_cast<void*>(obj), hdr, 24);
                 std::memcpy(reinterpret_cast<void*>(obj + 24), v, len + 1);
-                h.return_pointer = object_kind;
                 return obj;
             }
         }
@@ -2959,15 +3096,14 @@ uint64_t lymar_aot_resource_call(uint64_t id, uint64_t operation, uint64_t count
 #else
             setenv(k, v, 1);
 #endif
-            return 1;
+            return VAL_TRUE;
         }
-        return 0;
+        return VAL_FALSE;
     }
     if (operation == 13 || operation == 49 || operation == 50) {
         // CWD / RSS / PID
         if (operation == 49 || operation == 50) {
-            h.return_pointer = 0;
-            return 4096; // RSS in KB
+            return tag_int_word(4096); // RSS in KB
         }
         {
             // os::cwd() is the shared working-directory service (same helper
@@ -2979,27 +3115,26 @@ uint64_t lymar_aot_resource_call(uint64_t id, uint64_t operation, uint64_t count
             Word hdr[3] = {11, p.size(), p.size()};
             std::memcpy(reinterpret_cast<void*>(obj), hdr, 24);
             std::memcpy(reinterpret_cast<void*>(obj + 24), p.c_str(), p.size() + 1);
-            h.return_pointer = object_kind;
             return obj;
         }
     }
     if (operation == 0) {
-        if (id <= 1) return 0;
+        if (id <= 1) return VAL_FALSE;
         if (stream) std::fclose(stream);
         const auto* path = arg_string(0);
         const auto* mode = arg_string(1);
         found->second = path && mode ? std::fopen(path, mode) : nullptr;
-        return found->second != nullptr;
+        return found->second ? VAL_TRUE : VAL_FALSE;
     }
-    if (operation == 1) { lymar_aot_resource_destroy(id); return 1; }
-    if (operation == 10) return stream != nullptr;
-    if (operation == 29) return stream && std::fflush(stream) == 0;
+    if (operation == 1) { lymar_aot_resource_destroy(id); return VAL_TRUE; }
+    if (operation == 10) return stream ? VAL_TRUE : VAL_FALSE;
+    if (operation == 29) return (stream && std::fflush(stream) == 0) ? VAL_TRUE : VAL_FALSE;
     if (operation == 3) {
         auto* data = arg_string(0);
-        if (!stream || !data) return 0;
+        if (!stream || !data) return VAL_FALSE;
         auto length = read_word(args[0], 8);
         auto written = std::fwrite(data, 1, length, stream);
-        return std::fflush(stream) == 0 && written == length;
+        return (std::fflush(stream) == 0 && written == length) ? VAL_TRUE : VAL_FALSE;
     }
     if (operation == 2 || operation == 47) {
         if (!stream) return nil;
@@ -3021,11 +3156,10 @@ uint64_t lymar_aot_resource_call(uint64_t id, uint64_t operation, uint64_t count
             auto data = lymar_aot_alloc(std::max(size_t(1), bytes.size()) * 8);
             auto* header = reinterpret_cast<Word*>(result);
             header[0] = 1; header[1] = data; header[2] = bytes.size(); header[3] = std::max(size_t(1), bytes.size());
-            lymar_aot_edge(result + 8, data, 1);
+            lymar_aot_edge(result + 8, data);
             auto* elements = reinterpret_cast<Word*>(data);
             for (size_t i = 0; i < bytes.size(); ++i) elements[i] = bytes[i];
         }
-        h.return_pointer = 1;
         return result;
     }
     if (operation == 31) {
@@ -3064,7 +3198,6 @@ uint64_t lymar_aot_resource_call(uint64_t id, uint64_t operation, uint64_t count
         Word hdr[3] = {11, res.size(), res.size()};
         std::memcpy(reinterpret_cast<void*>(obj), hdr, 24);
         std::memcpy(reinterpret_cast<void*>(obj + 24), res.c_str(), res.size() + 1);
-        h.return_pointer = object_kind;
         return obj;
     }
     throw std::runtime_error("Standalone file operation is not implemented: " + std::to_string(operation));
@@ -3093,11 +3226,8 @@ void lymar_aot_reset() {
     auto& h = heap();
     if (h.active || !h.invocations.empty()) throw std::runtime_error("AOT reset with active invocation");
     h.cleanup(0);
-    h.shadow.clear();
     h.lifetimes.reset();
     while (!h.files.handles.empty()) lymar_aot_resource_destroy(h.files.handles.begin()->first);
-    h.pending_args.clear();
-    h.return_pointer = 0;
 
     } catch (const std::exception& failure) {
         if (runtime_lock_depth && heap().worker) throw;
@@ -3129,9 +3259,7 @@ void lymar_aot_call_abort() {
         auto current = h.active, parent = h.regions.at(current).parent;
         h.cleanup(current); h.regions.erase(current); h.active = parent;
     }
-    for (auto slot : h.invocations.back().slots) h.shadow.erase(slot);
-    h.invocations.pop_back(); h.pending_args.clear(); h.return_pointer = 0;
-}
+    h.invocations.pop_back();}
 void lymar_aot_assert(uint64_t condition, uint64_t message) {
     if (condition == 1 || condition == 18) return;
     auto text = message > 4096 ? string_data(message) : nullptr;
@@ -3165,8 +3293,7 @@ uint64_t lymar_aot_channel_new() {
     *reinterpret_cast<Word*>(pointer) = 1;
     *reinterpret_cast<Word*>(pointer+8) = data;
     *reinterpret_cast<Word*>(pointer+24) = 16;
-    lymar_aot_edge(pointer+8,data,object_kind);
-    heap().return_pointer = object_kind;
+    lymar_aot_edge(pointer+8,data);
     return pointer;
 
     } catch (const std::exception& failure) {
@@ -3175,7 +3302,7 @@ uint64_t lymar_aot_channel_new() {
         return 0;
     }
 }
-void lymar_aot_channel_push(uint64_t pointer, uint64_t value, uint64_t kind) {
+void lymar_aot_channel_push(uint64_t pointer, uint64_t value) {
     try {
         RuntimeGuard guard; checked_queue(pointer);
         if (shared_heap().closed_channels.count(pointer)) throw std::runtime_error("Send to closed channel");
@@ -3185,11 +3312,13 @@ void lymar_aot_channel_push(uint64_t pointer, uint64_t value, uint64_t kind) {
             data = lymar_aot_resize(data, capacity * 16);
             *reinterpret_cast<Word*>(pointer+8) = data;
             *reinterpret_cast<Word*>(pointer+24) = capacity * 2;
-            lymar_aot_edge(pointer+8,data,object_kind);
+            lymar_aot_edge(pointer+8,data);
         }
         auto address = data + length * 8;
-        lymar_aot_edge(address,value,kind);
         *reinterpret_cast<Word*>(address) = value;
+        // `value` arrives already tagged by the builder's tag_word; edge
+        // publishes it without re-encoding so the slot keeps the LmValue word.
+        lymar_aot_edge(address,value);
         *reinterpret_cast<Word*>(pointer+16) = length + 1;
         shared_heap().work_available.notify_all();
     } catch (const std::exception& failure) {
@@ -3201,18 +3330,18 @@ uint64_t lymar_aot_channel_pop(uint64_t pointer) {
     try {
         RuntimeGuard guard; checked_queue(pointer);
         auto length = read_word(pointer,16), data = read_word(pointer,8);
-        if (!length) { heap().return_pointer = object_kind; return 2; }
-        auto value = read_word(data), kind = heap().shadow.count(data) ? heap().shadow.at(data) : 0;
+        if (!length) return 2; // VAL_NIL
+        // Channel slots hold tagged LmValue words; the popped word is
+        // self-describing and needs no kind sidecar.
+        auto value = read_word(data);
         for (Word index = 1; index < length; ++index) {
             auto old_address = data + index * 8, address = old_address - 8;
             auto element = read_word(old_address);
-            auto mode = heap().shadow.count(old_address) ? heap().shadow.at(old_address) : 0;
             *reinterpret_cast<Word*>(address) = element;
-            lymar_aot_edge(address,element,mode);
+            lymar_aot_edge(address,element);
         }
-        lymar_aot_edge(data+(length-1)*8,0,0);
+        lymar_aot_edge(data+(length-1)*8,0);
         *reinterpret_cast<Word*>(pointer+16) = length-1;
-        heap().return_pointer = kind;
         return value;
     } catch (const std::exception& failure) {
         if (runtime_lock_depth && heap().worker) throw;
@@ -3221,7 +3350,7 @@ uint64_t lymar_aot_channel_pop(uint64_t pointer) {
     }
 }
 uint64_t lymar_aot_channel_has_data(uint64_t pointer) {
-    try { RuntimeGuard guard; checked_queue(pointer); heap().return_pointer=0; return read_word(pointer,16)!=0; }
+    try { RuntimeGuard guard; checked_queue(pointer); return read_word(pointer,16)!=0 ? VAL_TRUE : VAL_FALSE; }
     catch (const std::exception& failure) {
         if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error,sizeof(heap().worker_error),"%s",failure.what());
@@ -3250,7 +3379,7 @@ uint64_t lymar_aot_scheduler_new(uint64_t cores, uint64_t timeout, uint64_t conf
 }
 void lymar_aot_scheduler_run(uint64_t pointer) {
     RuntimeSuspend release_parent_lock;
-    struct Job { Word context, item, kind; };
+    struct Job { Word context, item; };
     std::vector<Job> jobs;
     std::vector<Word> streams;
     Word parent_region;
@@ -3265,7 +3394,7 @@ void lymar_aot_scheduler_run(uint64_t pointer) {
             if (found == heap().allocations.end() || found->second.size < 64 || !read_word(context,32))
                 throw std::runtime_error("Invalid native task context");
             if (read_word(context,24)==1) { checked_queue(read_word(context,8)); streams.push_back(context); }
-            else jobs.push_back({context,read_word(context,8),heap().shadow.count(context+8)?heap().shadow.at(context+8):0});
+            else jobs.push_back({context,read_word(context,8)});
         }
     }
     if (jobs.empty() && streams.empty()) return;
@@ -3293,7 +3422,7 @@ void lymar_aot_scheduler_run(uint64_t pointer) {
                     RuntimeGuard guard;
                     for (auto context : streams) {
                         auto queue = read_word(context,8);
-                        if (read_word(queue,16)) { auto value=lymar_aot_channel_pop(queue); job={context,value,h.return_pointer}; break; }
+                        if (read_word(queue,16)) { auto value=lymar_aot_channel_pop(queue); job={context,value}; break; }
                     }
                     pending = active_producers != 0;
                 }
@@ -3310,7 +3439,6 @@ void lymar_aot_scheduler_run(uint64_t pointer) {
                 continue;
             }
             h.worker_error[0]=0;h.timed_out=false;
-            h.pending_args={object_kind,job.kind,0};
             auto callback = reinterpret_cast<Word(*)(Word,Word)>(read_word(job.context,32));
             callback(job.context,job.item);
             const bool failed = h.worker_error[0]!=0;
@@ -3358,7 +3486,8 @@ void lymar_aot_scheduler_run(uint64_t pointer) {
 // These adapters validate canonical native objects before any foreign access.
 const char* lymar_aot_ffi_string(uint64_t value) {
     RuntimeGuard guard;
-    lymar_aot_string_receiver(value, object_kind);
+    if (!lymar_aot_string_receiver(value))
+        throw std::runtime_error("FFI string argument must be a string");
     auto& record=heap().allocations.at(value);
     auto length=read_word(value,8);
     if(length>=record.size-24 || reinterpret_cast<const char*>(value+24)[length]!=0)
@@ -3368,7 +3497,9 @@ const char* lymar_aot_ffi_string(uint64_t value) {
 uint64_t lymar_aot_ffi_list_size(uint64_t value) {
     RuntimeGuard guard;
     auto found=heap().allocations.find(value);
-    if(found==heap().allocations.end() || found->second.dictionary || found->second.size<32 || read_word(value)!=1)
+    // The low 32 bits hold the object type; typed primitive lists keep their
+    // element kind in the high 32 bits, so compare the masked type only.
+    if(found==heap().allocations.end() || found->second.dictionary || found->second.size<32 || (read_word(value)&0xffffffff)!=1)
         throw std::runtime_error("FFI arguments require a list");
     auto length=read_word(value,16), capacity=read_word(value,24), data=read_word(value,8);
     auto storage=heap().allocations.find(data);
@@ -3381,26 +3512,17 @@ uint64_t lymar_aot_ffi_list_item(uint64_t value,uint64_t index) {
     if(index>=lymar_aot_ffi_list_size(value)) throw std::runtime_error("FFI argument index out of bounds");
     return read_word(read_word(value,8),index*8);
 }
-uint64_t lymar_aot_ffi_list_kind(uint64_t value,uint64_t index) {
+uint64_t lymar_aot_ffi_pointer(uint64_t value) {
     RuntimeGuard guard;
-    if(index>=lymar_aot_ffi_list_size(value)) throw std::runtime_error("FFI argument index out of bounds");
-    auto found=heap().shadow.find(read_word(value,8)+index*8);
-    return found==heap().shadow.end()?0:found->second;
-}
-uint64_t lymar_aot_ffi_pointer(uint64_t value,uint64_t kind) {
-    RuntimeGuard guard;
-    if(lymar_aot_is_nil(value,kind) || kind==boolean_kind) return 0;
-    if(!kind) {
-        // Scalar-typed registers can still carry wrapped foreign pointers:
-        // ffi.fnptr/pubptr are `type` aliases of int, so slot classification
-        // may report kind=0 for a live tag-13 wrapper object. Detect the
-        // wrapper by its heap tag rather than trusting the kind alone;
-        // anything else is a genuine raw address and passes through.
-        auto scalar_found=heap().allocations.find(value);
-        if(scalar_found!=heap().allocations.end() && !scalar_found->second.raw_memory &&
-           scalar_found->second.size>=16 && read_word(value)==13)
-            return read_word(value,8);
-        return value; // Explicit unsafe integer addresses remain supported.
+    if(lymar_aot_is_nil(value) || value == VAL_FALSE) return 0;
+    if(value == VAL_TRUE) return 1;
+    Word tag = value & TAG_MASK;
+    if(tag == TAG_INT) return static_cast<uint64_t>(static_cast<int64_t>(value) >> 3);
+    if(tag == TAG_IMMEDIATE) return 0;
+    {
+        // SMI/immediate words and unboxed scalars are explicit unsafe integer
+        // addresses; heap words are validated below. Foreign pointers are
+        // expected outside the managed heap and pass through raw.
     }
     auto found=heap().containing(value);
     if(found==heap().allocations.end()) {
@@ -3423,10 +3545,10 @@ uint64_t lymar_aot_ffi_pointer(uint64_t value,uint64_t kind) {
         throw std::runtime_error("Invalid foreign object address");
     }
     if(found->second.size>=16 && read_word(value)==13) return read_word(value,8);
+    if(found->second.size>=16 && (read_word(value)&0xffffffff)==5) return read_word(value,8);
     if(found->second.size>=40 && read_word(value)==15) {
         auto address=lymar_aot_frame_field_address(value,0);
-        auto flag=heap().shadow.find(address);
-        return lymar_aot_ffi_pointer(read_word(address),flag==heap().shadow.end()?0:flag->second);
+        return lymar_aot_ffi_pointer(read_word(address));
     }
     if(found->second.size>=24 && read_word(value)==11) return value+24;
     throw std::runtime_error("Invalid foreign pointer object");
@@ -3454,7 +3576,6 @@ void lymar_aot_ffi_invalidate(uint64_t pointer) {
             Word zero=0;std::memcpy(reinterpret_cast<void*>(value+8),&zero,8);
         }
 }
-void lymar_aot_ffi_result_kind(uint64_t kind) { RuntimeGuard guard;heap().return_pointer=kind; }
 
 // Bounds-checked raw read of a tracked heap allocation for the FFI adapter.
 // Returns the byte count copied (0 when ptr is not a live heap object or the
@@ -3469,10 +3590,9 @@ uint64_t lymar_aot_heap_read(uint64_t ptr, uint64_t offset, void* out, uint64_t 
     return size;
 }
 
-uint64_t lymar_aot_ffi_kind(uint64_t, uint64_t kind) {return kind;}
-uint64_t lymar_aot_ffi_infer_type(uint64_t value,uint64_t kind) {
+uint64_t lymar_aot_ffi_infer_type(uint64_t value) {
     RuntimeGuard guard;
-    if(kind!=object_kind || lymar_aot_is_nil(value,kind)) return 6;
+    if(lymar_aot_is_nil(value) || !is_heap_word(value)) return 6;
     auto found=heap().allocations.find(value);
     if(found!=heap().allocations.end() && !found->second.raw_memory && !found->second.dictionary && found->second.size>=16) {
         auto type=read_word(value);
@@ -3484,13 +3604,12 @@ uint64_t lymar_aot_ffi_infer_type(uint64_t value,uint64_t kind) {
 
 uint64_t lymar_aot_ffi_list_integer(uint64_t value,uint64_t index) {
     RuntimeGuard guard;
-    return lymar_aot_to_integer(lymar_aot_ffi_list_item(value,index),lymar_aot_ffi_list_kind(value,index));
+    return lymar_aot_to_integer(lymar_aot_ffi_list_item(value,index));
 }
 
 extern "C" uint64_t lymar_aot_env_get_result(uint64_t buf, uint64_t len) {
     RuntimeGuard guard;
     auto& h = heap();
-    h.return_pointer = object_kind;
     if (len == 0) {
 #ifdef _WIN32
         if (GetLastError() != 0) {
@@ -3539,31 +3658,30 @@ extern "C" uint64_t lymar_aot_make_env_list(uint64_t raw_env_block) {
     auto data = lymar_aot_alloc(capacity * 8);
     Word header[4] = {1, data, 0, capacity};
     std::memcpy(reinterpret_cast<void*>(pointer), header, 32);
-    lymar_aot_edge(pointer + 8, data, object_kind);
+    lymar_aot_edge(pointer + 8, data);
     for (const auto& item : items) {
         auto object = string_object(item);
         auto slot_data = read_word(pointer, 8);
         auto count = read_word(pointer, 16);
         if (count >= capacity) break;
         std::memcpy(reinterpret_cast<void*>(slot_data + count * 8), &object, 8);
-        lymar_aot_edge(slot_data + count * 8, object, object_kind);
+        lymar_aot_edge(slot_data + count * 8, object);
         ++count;
         std::memcpy(reinterpret_cast<void*>(pointer + 16), &count, 8);
     }
-    h.return_pointer = object_kind;
     return pointer;
 }
 
-uint64_t lymar_aot_numeric_binary(uint64_t left,uint64_t right,uint64_t operation,uint64_t left_kind,uint64_t right_kind) {
+uint64_t lymar_aot_numeric_binary(uint64_t left,uint64_t right,uint64_t operation) {
     RuntimeGuard guard;
     auto& h=heap();
     auto number=[&](__int128 value) {
-        if(value>=INT64_MIN && value<=INT64_MAX) {h.return_pointer=0;return static_cast<Word>(value);}
+        if(value>=MIN_SMI && value<=MAX_SMI) return tag_int_word(static_cast<int64_t>(value));
         auto object=lymar_aot_alloc(32);Word type=7;
         std::memcpy(reinterpret_cast<void*>(object),&type,8);std::memcpy(reinterpret_cast<void*>(object+16),&value,16);
-        h.return_pointer=object_kind;return object;
+        return object;
     };
-    auto a=integer_number(left,left_kind),b=integer_number(right,right_kind);
+    auto a=integer_number(left),b=integer_number(right);
     if(a && b) {
         __int128 value=0;bool valid=false;
         constexpr __int128 kMin=std::numeric_limits<__int128>::min();
@@ -3573,35 +3691,35 @@ uint64_t lymar_aot_numeric_binary(uint64_t left,uint64_t right,uint64_t operatio
         else if(operation==4) {if(*b!=0) {value=(*a==kMin && *b==-1)?0:*a % *b;valid=true;}}
         else throw std::runtime_error("Invalid numeric operation");
         if(valid) return number(value);
-        h.return_pointer=object_kind;return lymar_aot_nil();
+        return lymar_aot_nil();
     }
-    auto floating=[&](Word value,Word kind) {auto found=h.allocations.find(value);return kind==object_kind && found!=h.allocations.end() && !found->second.raw_memory && !found->second.dictionary && found->second.size>=16 && read_word(value)==9;};
-    if((a || floating(left,left_kind)) && (b || floating(right,right_kind))) {
-        auto x=lymar_aot_to_float(left,left_kind),y=lymar_aot_to_float(right,right_kind);
-        auto nil_result=[&](){h.return_pointer=object_kind;return lymar_aot_nil();};
-        if(operation==3) {if(y==0.0) return nil_result();auto value=lymar_aot_box_float(x/y);h.return_pointer=object_kind;return value;}
-        if(operation==4) {if(y==0.0) return nil_result();auto value=lymar_aot_box_float(std::fmod(x,y));h.return_pointer=object_kind;return value;}
-        auto value=lymar_aot_box_float(operation==0?x+y:operation==1?x-y:x*y);h.return_pointer=object_kind;return value;
+    auto floating=[&](Word value) {return is_heap_word(value) && !heap().allocations.at(value).raw_memory && !heap().allocations.at(value).dictionary && heap().allocations.at(value).size>=16 && (read_word(value)&0xffffffff)==9;};
+    if((a || floating(left)) && (b || floating(right))) {
+        auto x=lymar_aot_to_float(left),y=lymar_aot_to_float(right);
+        auto nil_result=[&](){return lymar_aot_nil();};
+        if(operation==3) {if(y==0.0) return nil_result();return lymar_aot_box_float(x/y);}
+        if(operation==4) {if(y==0.0) return nil_result();return lymar_aot_box_float(std::fmod(x,y));}
+        return lymar_aot_box_float(operation==0?x+y:operation==1?x-y:x*y);
     }
-    if(operation==0 && left_kind==object_kind && right_kind==object_kind) {
+    if(operation==0 && is_heap_word(left) && is_heap_word(right)) {
         auto* x=string_data(left);auto* y=string_data(right);
         if(x && y) {
             auto nx=read_word(left,8),ny=read_word(right,8);
             if(nx>SIZE_MAX-25-ny) throw std::overflow_error("String concatenation size overflow");
             auto value=lymar_aot_alloc(25+nx+ny);Word header[3]={11,nx+ny,nx+ny};std::memcpy(reinterpret_cast<void*>(value),header,24);
-            std::memcpy(reinterpret_cast<void*>(value+24),x,nx);std::memcpy(reinterpret_cast<void*>(value+24+nx),y,ny+1);h.return_pointer=object_kind;return value;
+            std::memcpy(reinterpret_cast<void*>(value+24),x,nx);std::memcpy(reinterpret_cast<void*>(value+24+nx),y,ny+1);return value;
         }
         auto list=[&](Word value) {auto found=h.allocations.find(value);return found!=h.allocations.end() && !found->second.raw_memory && !found->second.dictionary && found->second.size>=32 && read_word(value)==1;};
         if(list(left) && list(right)) {
             auto nx=lymar_aot_ffi_list_size(left),ny=lymar_aot_ffi_list_size(right);
             if(nx>SIZE_MAX/8-ny) throw std::overflow_error("List concatenation size overflow");
             auto count=nx+ny,storage=lymar_aot_alloc(std::max<Word>(8,count*8)),value=lymar_aot_alloc(32);
-            Word header[4]={1,storage,count,count};std::memcpy(reinterpret_cast<void*>(value),header,32);lymar_aot_edge(value+8,storage,object_kind);
-            for(Word index=0;index<count;++index) {auto source=index<nx?left:right,position=index<nx?index:index-nx;auto word=lymar_aot_ffi_list_item(source,position),kind=lymar_aot_ffi_list_kind(source,position);std::memcpy(reinterpret_cast<void*>(storage+8*index),&word,8);lymar_aot_edge(storage+8*index,word,kind);}
-            h.return_pointer=object_kind;return value;
+            Word header[4]={1,storage,count,count};std::memcpy(reinterpret_cast<void*>(value),header,32);lymar_aot_edge(value+8,storage);
+            for(Word index=0;index<count;++index) {auto source=index<nx?left:right,position=index<nx?index:index-nx;auto word=lymar_aot_ffi_list_item(source,position);std::memcpy(reinterpret_cast<void*>(storage+8*index),&word,8);lymar_aot_edge(storage+8*index,word);}
+            return value;
         }
     }
-    h.return_pointer=object_kind;return lymar_aot_nil();
+    return lymar_aot_nil();
 }
 
 // 128-bit bitwise/shift for erased-word operands. integer_number() widens raw
@@ -3609,11 +3727,11 @@ uint64_t lymar_aot_numeric_binary(uint64_t left,uint64_t right,uint64_t operatio
 // numeric_binary boxing contract (raw word while the value fits i64, type-7
 // heap box beyond). operation: 0=& 1=| 2=^ 3=<< 4=>>. Shift counts outside
 // [0,128) yield zero, matching the VM's [0,64) convention at 64-bit width.
-uint64_t lymar_aot_bitwise(uint64_t left,uint64_t right,uint64_t operation,uint64_t left_kind,uint64_t right_kind) {
+uint64_t lymar_aot_bitwise(uint64_t left,uint64_t right,uint64_t operation) {
     RuntimeGuard guard;
     auto& h=heap();
-    auto a=integer_number(left,left_kind),b=integer_number(right,right_kind);
-    if(!a || !b) { h.return_pointer=0; return 0; }
+    auto a=integer_number(left),b=integer_number(right);
+    if(!a || !b) { return 0; }
     int64_t amount=static_cast<int64_t>(*b);
     __int128 value=0;
     if(operation==0) value=*a & *b;
@@ -3623,15 +3741,15 @@ uint64_t lymar_aot_bitwise(uint64_t left,uint64_t right,uint64_t operation,uint6
     else if(operation==4) {
         if(amount<0||amount>=128) value=0;
         else {
-            bool uns=left_kind==object_kind;
-            if(uns) {auto f=h.allocations.find(left);uns=f!=h.allocations.end()&&!f->second.raw_memory&&!f->second.dictionary&&f->second.size>=16&&(read_word(left)&0xffffffff)==8;}
+            bool uns=is_heap_word(left) && (read_word(left)&0xffffffff)==8;
             value=uns?static_cast<__int128>(static_cast<unsigned __int128>(*a)>>amount):(*a>>amount);
         }
-    } else { h.return_pointer=0; return 0; }
-    if(value>=INT64_MIN && value<=INT64_MAX) {h.return_pointer=0;return static_cast<Word>(value);}
+    } else { return 0; }
+    if(value>=MIN_SMI && value<=MAX_SMI) return tag_int_word(static_cast<int64_t>(value));
+    if(value>=INT64_MIN && value<=INT64_MAX) return tag_int_word(static_cast<int64_t>(value));
     auto object=lymar_aot_alloc(32);Word type=7;
     std::memcpy(reinterpret_cast<void*>(object),&type,8);std::memcpy(reinterpret_cast<void*>(object+16),&value,16);
-    h.return_pointer=object_kind;return object;
+    return object;
 }
 
 }

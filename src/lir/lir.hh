@@ -438,6 +438,10 @@ public:
     std::unordered_map<std::string, Reg> variable_to_reg;
     std::unordered_map<Reg, Type> register_types;
     std::unordered_map<Reg, TypePtr> register_language_types;
+    // Declared function return language type. Erased-domain returns (any,
+    // unions, error unions, nil) carry tagged LmValue words; scalar returns
+    // stay raw. The AOT backend needs this to tag raw scalars at Return.
+    TypePtr return_language_type;
 
     // GPU stage metadata for `gpu task|vertex|pixel|mesh` declarations.
     // gpu_stage: 0 = ordinary function, 1 = task (compute), 2 = vertex, 3 = pixel, 4 = mesh.
@@ -457,6 +461,7 @@ public:
           ownership_provenance(other.ownership_provenance), optimizations(other.optimizations),
           variable_to_reg(other.variable_to_reg), register_types(other.register_types),
           register_language_types(other.register_language_types),
+          return_language_type(other.return_language_type),
           gpu_stage(other.gpu_stage), gpu_threads{other.gpu_threads[0], other.gpu_threads[1], other.gpu_threads[2]},
           gpu_max_vertices(other.gpu_max_vertices), gpu_max_primitives(other.gpu_max_primitives) {}
           
@@ -469,6 +474,7 @@ public:
             ownership_provenance = other.ownership_provenance; optimizations = other.optimizations;
             variable_to_reg = other.variable_to_reg; register_types = other.register_types;
             register_language_types = other.register_language_types;
+            return_language_type = other.return_language_type;
             gpu_stage = other.gpu_stage;
             gpu_threads[0] = other.gpu_threads[0]; gpu_threads[1] = other.gpu_threads[1]; gpu_threads[2] = other.gpu_threads[2];
             gpu_max_vertices = other.gpu_max_vertices; gpu_max_primitives = other.gpu_max_primitives;

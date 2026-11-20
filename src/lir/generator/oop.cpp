@@ -36,6 +36,7 @@ void Generator::lower_trait_method(const std::string& trait_name, LM::Frontend::
     checked_references_.clear();
     m_is_terminated = false;
     current_function_ = std::make_unique<LIR_Function>(full_method_name, total_params);
+    current_function_->return_language_type = method.returnType.has_value() ? convert_ast_type_to_lir_type(method.returnType.value()) : nullptr;
     next_register_ = total_params;
     next_label_ = 0;
     scope_stack_.clear();
@@ -121,6 +122,7 @@ void Generator::lower_trait_method(const std::string& trait_name, LM::Frontend::
     lir_func->ownership_captures_ = result->ownership_captures;
     lir_func->ownership_provenance_ = result->ownership_provenance;
     lir_func->register_count_ = result->register_count;
+    lir_func->return_language_type = result->return_language_type;
     lir_func->setInstructions(result->instructions);
     lir_func->setRegisterLanguageTypes(result->register_language_types);
     lir_func->setRegisterTypes(result->register_types);
@@ -166,6 +168,7 @@ void Generator::lower_frame_method(const std::string& frame_name, LM::Frontend::
     checked_references_.clear();
     m_is_terminated = false;
     current_function_ = std::make_unique<LIR_Function>(full_method_name, total_params);
+    current_function_->return_language_type = method.returnType ? convert_ast_type_to_lir_type(method.returnType) : nullptr;
     next_register_ = total_params;
     next_label_ = 0;
     scope_stack_.clear();
@@ -289,6 +292,7 @@ void Generator::lower_frame_method(const std::string& frame_name, LM::Frontend::
     lir_func->ownership_captures_ = result->ownership_captures;
     lir_func->ownership_provenance_ = result->ownership_provenance;
     lir_func->register_count_ = result->register_count;
+    lir_func->return_language_type = result->return_language_type;
     lir_func->setInstructions(result->instructions);
     lir_func->setRegisterLanguageTypes(result->register_language_types);
     lir_func->setRegisterTypes(result->register_types);
@@ -435,6 +439,7 @@ void Generator::lower_frame_init_method(const std::string& frame_name, LM::Front
     lir_func->ownership_captures_ = result->ownership_captures;
     lir_func->ownership_provenance_ = result->ownership_provenance;
     lir_func->register_count_ = result->register_count;
+    lir_func->return_language_type = result->return_language_type;
     lir_func->setInstructions(result->instructions);
     lir_func->setRegisterLanguageTypes(result->register_language_types);
     lir_func->setRegisterTypes(result->register_types);
@@ -560,6 +565,7 @@ void Generator::lower_frame_deinit_method(const std::string& frame_name, LM::Fro
     lir_func->ownership_captures_ = result->ownership_captures;
     lir_func->ownership_provenance_ = result->ownership_provenance;
     lir_func->register_count_ = result->register_count;
+    lir_func->return_language_type = result->return_language_type;
     lir_func->setInstructions(result->instructions);
     func_manager.registerFunction(lir_func);
 

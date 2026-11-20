@@ -417,6 +417,7 @@ std::unique_ptr<LIR_Function> CacheManager::try_load_program_cache(
             lir_f->ownership_captures_ = func.ownership_captures;
             lir_f->ownership_provenance_ = func.ownership_provenance;
             lir_f->register_count_ = func.register_count;
+            lir_f->return_language_type = func.return_language_type;
             lir_f->setRegisterLanguageTypes(func.register_language_types);
             lir_f->setRegisterTypes(func.register_types);
             lir_f->setInstructions(func.instructions);

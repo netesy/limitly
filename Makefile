@@ -18,6 +18,7 @@ ifeq ($(OS),Windows_NT)
 	LYMAR_SSL_LIB := bin/liblymar_ssl.dll
 	SSL_SHARED_FLAGS := -shared -O2 -I $(MSYS2_PATH)/mingw64/include -L $(MSYS2_PATH)/mingw64/lib
 	SSL_LIBS := -lssl -lcrypto -lz -lregex -lcrypt32 -lws2_32
+	RUNTIME_KEY := x64-windows
 else ifeq ($(shell uname),Darwin)
 	PLATFORM := linux
 	EXE_EXT :=
@@ -32,6 +33,7 @@ else ifeq ($(shell uname),Darwin)
 	LYMAR_SSL_LIB := bin/liblymar_ssl.dylib
 	SSL_SHARED_FLAGS := -shared -fPIC -O2
 	SSL_LIBS := -lssl -lcrypto -lz
+	RUNTIME_KEY := x64-macos
 else
 	PLATFORM := linux
 	EXE_EXT :=
@@ -46,6 +48,7 @@ else
 	LYMAR_SSL_LIB := bin/liblymar_ssl.so
 	SSL_SHARED_FLAGS := -shared -fPIC -O2
 	SSL_LIBS := -lssl -lcrypto -lz
+	RUNTIME_KEY := x64-linux
 endif
 
 # =============================
@@ -297,6 +300,9 @@ $(BIN_DIR)/liblymar_aot.a: $(OBJ_DIR)/src/memory/aot_runtime.o $(OBJ_DIR)/src/me
 	$(AR) rcs $@.tmp $(filter %.o,$^)
 	$(PYTHON) scripts/merge_archive_members.py $@.tmp "$(LIBFFI_A)" $(AR)
 	mv $@.tmp $@
+	# The AOT linker prefers runtimes/<target-key>/liblymar_aot.a over this
+	# archive; keep the per-target copy in sync so it can never go stale.
+	@if [ -n "$(RUNTIME_KEY)" ]; then mkdir -p "$(BIN_DIR)/runtimes/$(RUNTIME_KEY)" && cp $@ "$(BIN_DIR)/runtimes/$(RUNTIME_KEY)/liblymar_aot.a"; fi
 
 # =============================
 # Precompilation targets

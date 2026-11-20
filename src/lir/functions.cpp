@@ -127,6 +127,7 @@ void LIRFunctionManager::registerFunction(std::shared_ptr<LIRFunction> function)
     lir_func->ownership_captures = function->ownership_captures_;
     lir_func->ownership_provenance = function->ownership_provenance_;
     lir_func->register_count = function->register_count_;
+    lir_func->return_language_type = function->return_language_type;
     lir_func->register_types = function->getRegisterTypes();
     // Fill parameter types without discarding metadata for temporary registers.
     for (size_t i = 0; i < function->getParameters().size(); ++i) {
