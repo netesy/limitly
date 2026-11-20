@@ -1,0 +1,18 @@
+pub var di: {str: int} = {};
+pub var df: {str: float} = {};
+pub var da: {str: any} = {};
+
+pub fn t(): int {
+    di["a"] = 7;
+    df["a"] = 1.5;
+    da["a"] = 9;
+    val mi = di["zzz"];
+    val mf = df["zzz"];
+    val ma = da["zzz"];
+    print("mi==nil: " + ((mi == nil) as str) + " raw:" + (mi as str));
+    print("mf==nil: " + ((mf == nil) as str) + " raw:" + (mf as str));
+    print("ma==nil: " + ((ma == nil) as str) + " raw:" + (ma as str));
+    print("hit i: " + ((di["a"] + 1) as str));
+    print("hit f: " + ((df["a"] * 2.0) as str));
+    return 0;
+}

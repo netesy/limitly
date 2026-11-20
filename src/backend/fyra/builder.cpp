@@ -1373,6 +1373,16 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             case LIR::LIR_Op::ForeignCall:
             case LIR::LIR_Op::CallbackCreate:
                 pointer_assigned_regs.insert(inst.dst);
+                // ffi_wrap/ffi_symbol results are canonical tagged LmValue
+                // words (tag-13 box or VAL_NIL), not raw addresses — even
+                // when the declared return is an int-alias (pubptr/fnptr =
+                // int). Without the tagged mark, tag_word re-encodes VAL_NIL
+                // as SMI and `sym != nil` misfires. callback_ptr (imm==1)
+                // wraps too; callback_create (imm==0) returns a raw handle.
+                if (inst.op == LIR::LIR_Op::LibraryLoad ||
+                    inst.op == LIR::LIR_Op::LibrarySymbol ||
+                    (inst.op == LIR::LIR_Op::CallbackCreate && inst.imm == 1))
+                    tagged_word_regs.insert(inst.dst);
                 break;
             case LIR::LIR_Op::MemoryLoad:
                 if (inst.imm >= 8) pointer_assigned_regs.insert(inst.dst);
@@ -3022,6 +3032,17 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 if (func && func->getType() && (func->getReturnType()->isDoubleTy() || func->getReturnType()->isFloatTy())) {
                     res_t = LIR::Type::F64;
                 }
+                // region_lowering decodes string-builtin index operands with
+                // lymar_aot_string_index, which expects tagged LmValue words;
+                // scalar args arrive raw and must be encoded here first.
+                if (name == "_builtin_string_byte_at" || name == "_builtin_substring" || name == "substring") {
+                    for (size_t ai = 1; ai < args.size(); ++ai) {
+                        if (param_takes_erased_word(ai)) continue;
+                        LIR::Type at = (ai < inst.call_arg_types.size()) ? inst.call_arg_types[ai] : LIR::Type::I64;
+                        uint32_t ar = (ai < inst.call_args.size()) ? inst.call_args[ai] : UINT32_MAX;
+                        args[ai] = tag_word(args[ai], ar, at);
+                    }
+                }
                 ir::Value* res = func ? static_cast<ir::Value*>(builder_->createCall(func, args)) : static_cast<ir::Value*>(context_->getConstantInt(context_->getIntegerType(64), 0));
                 if (inst.op == LIR::LIR_Op::Call) {
                     reg_types[inst.dst] = res_t;
@@ -3430,6 +3451,15 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     std::vector<ir::Type*> pts;
                     for (size_t k = 0; k < args.size(); ++k) pts.push_back(args[k]->getType());
                     func = builder_->createFunction(name, lir_type_to_fyra_type(inst.result_type), pts);
+                }
+                // region_lowering decodes string-builtin index operands with
+                // lymar_aot_string_index, which expects tagged LmValue words;
+                // scalar args arrive raw and must be encoded here first.
+                if (name == "_builtin_string_byte_at" || name == "_builtin_substring" || name == "substring") {
+                    for (size_t ai = 1; ai < args.size(); ++ai) {
+                        uint32_t ar = (ai < inst.call_args.size()) ? inst.call_args[ai] : UINT32_MAX;
+                        args[ai] = tag_word(args[ai], ar, LIR::Type::I64);
+                    }
                 }
                 if (func) store_reg(inst.dst, builder_->createCall(func, args), inst.result_type);
                 break;
@@ -3915,17 +3945,22 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 break;
             }
             case LIR::LIR_Op::StringIndex: {
+                // region_lowering converts index operands with
+                // lymar_aot_string_index, which expects a tagged LmValue —
+                // raw scalar ints must be SMI-tagged here first.
+                ir::Value* idx_word = tag_word(load_reg(inst.b, inst.type_b), inst.b, inst.type_b);
                 if (inst.result_type == LIR::Type::Ptr) {
                     FyraBuiltinFunctions::emit_substring_ir(current_module_.get(), builder_.get());
                     ir::Function* fn = current_module_->getFunction("_builtin_substring");
                     ir::Value* idx_val = load_reg(inst.b, inst.type_b);
                     ir::Value* end_val = builder_->createAdd(idx_val, context_->getConstantInt(context_->getIntegerType(64), 1));
-                    store_reg(inst.dst, builder_->createCall(fn, {load_reg(inst.a, inst.type_a), idx_val, end_val}), LIR::Type::Ptr);
+                    store_reg(inst.dst, builder_->createCall(fn, {load_reg(inst.a, inst.type_a), idx_word,
+                        tag_word(end_val, inst.b, inst.type_b)}), LIR::Type::Ptr);
                 } else {
                     used_builtins_.insert("_builtin_string_byte_at");
                     ir::Function* fn = current_module_->getFunction("_builtin_string_byte_at");
                     if (!fn) fn = builder_->createFunction("_builtin_string_byte_at", context_->getIntegerType(64), {context_->getPointerType(context_->getIntegerType(8)), context_->getIntegerType(64)});
-                    store_reg(inst.dst, builder_->createCall(fn, {load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)}), inst.result_type);
+                    store_reg(inst.dst, builder_->createCall(fn, {load_reg(inst.a, inst.type_a), idx_word}), inst.result_type);
                 }
                 break;
             }
@@ -4556,7 +4591,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 if (inst.imm > 10)
                     throw std::runtime_error("Invalid MemoryLoad element kind");
                 auto* value = builder_->createExternCall("lymar_aot_memory_load",
-                    {load_reg(inst.a, inst.type_a), context_->getConstantInt(context_->getIntegerType(64), inst.imm)},
+                    {tag_word(load_reg(inst.a, inst.type_a), inst.a, inst.type_a), context_->getConstantInt(context_->getIntegerType(64), inst.imm)},
                     context_->getIntegerType(64));
                 // Float loads use an erased word at the runtime boundary. Kind
                 // propagation supplies the conversion and ownership facts.
@@ -4569,7 +4604,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 if (inst.imm > 10)
                     throw std::runtime_error("Invalid MemoryStore element kind");
                 builder_->createExternCall("lymar_aot_memory_store",
-                    {load_reg(inst.a, inst.type_a), tag_word(load_reg(inst.b, inst.type_b), inst.b, inst.type_b),
+                    {tag_word(load_reg(inst.a, inst.type_a), inst.a, inst.type_a), tag_word(load_reg(inst.b, inst.type_b), inst.b, inst.type_b),
                      context_->getConstantInt(context_->getIntegerType(64), inst.imm)}, nullptr);
                 break;
             }
