@@ -110,6 +110,7 @@ fn main(): int {
     root.add(ui.label("Pie Chart Showcase (analytic wedge SDF)", color.rgb(120, 160, 255)));
 
     var gallery_vals = [12.0, 34.0, 21.0, 55.0, 42.0, 78.0];
+    var gallery_lbls = ["Jan", "Feb", "Mar", "Apr", "May", "Jun"];
     var row1 = ui.row(14.0);
     row1.add(big_pie(gallery_vals, 300.0, 260.0));
     row1.add(big_pie([50.0], 300.0, 260.0));
@@ -117,8 +118,8 @@ fn main(): int {
     root.add(row1);
 
     var row2 = ui.row(14.0);
-    row2.add(ui.pie_chart("Stock widget (small)", gallery_vals));
-    row2.add(ui.pie_chart("Stock widget (small)", [90.0, 10.0]));
+    row2.add(ui.pie_chart("Stock widget (small)", gallery_vals, gallery_lbls));
+    row2.add(ui.pie_chart("Stock widget (small)", [90.0, 10.0], ["Alpha", "Beta"]));
     root.add(row2);
 
     a.ui(root);

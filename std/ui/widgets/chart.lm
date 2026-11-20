@@ -2,9 +2,9 @@
 // Widget — ported from legacy Fluent Chart (+ chart factories).
 // kinds: BarChart, LineChart, PieChart (PlotHistogram renders as bars,
 // matching the legacy emit which aliases histogram→bar).
-// values: [float] series; labels: [str] optional category labels (unused
-// in v1 paint, kept for API parity). min_val/max_val accepted for parity;
-// v1 auto-scales to the data max like the legacy emit.
+// values: [float] series; labels: [str] optional category labels — shown in
+// the legend (pie slices / bars) when provided. min_val/max_val accepted for
+// parity; v1 auto-scales to the data max like the legacy emit.
 
 import std.ui.component as comp;
 import std.ui.component show Placed;
@@ -18,6 +18,7 @@ import std.events as events;
 import std.color as color;
 import std.ui.theme as uitheme;
 import std.text.shaping as textshape;
+import std.ui.text_metrics as tm;
 
 frame Chart {
     embed Placed;
@@ -31,6 +32,7 @@ frame Chart {
     pub var accent: color.Color;
     pub var line_color: color.Color;
     pub var text: color.Color;
+    pub var text2: color.Color;
     pub var font_scale: float;
     // Pie palette (legacy emit colors).
     pub var pal_r: [float];
@@ -41,6 +43,10 @@ frame Chart {
     pub var _ch: float = 0.0;
     pub var _maxv: float = 1.0;
     pub var _total: float = 0.0;
+    pub var _plot_x: float = 0.0;
+    pub var _plot_y: float = 0.0;
+    pub var _plot_w: float = 0.0;
+    pub var _plot_h: float = 0.0;
 
     pub init(kind: ui_types.WidgetKind, lbl: str = "", vals: [float] = [] as [float],
              lbls: [str] = [] as [str], min_v: float = 0.0, max_v: float = 1.0) {
@@ -55,6 +61,7 @@ frame Chart {
         self.accent = pal.accent;
         self.line_color = pal.info;
         self.text = pal.text_primary;
+        self.text2 = pal.text_muted;
         self.font_scale = 0.9;
         self.pal_r = [0.39, 0.06, 0.96, 0.94, 0.23, 0.55];
         self.pal_g = [0.40, 0.72, 0.62, 0.27, 0.51, 0.36];
@@ -69,6 +76,7 @@ frame Chart {
         self.accent = p.accent;
         self.line_color = p.info;
         self.text = p.text_primary;
+        self.text2 = p.text_muted;
         tree.request_repaint();
     }
     pub fn on_overlay_dismiss(): nil { }
@@ -103,8 +111,11 @@ frame Chart {
     pub fn wants_pointer_capture(): int { return 0; }
 
     pub fn measure(min_w: float, max_w: float, min_h: float, max_h: float): comp.Size {
+        var avail: float = max_w - 20.0;
+        if (avail > 200.0) { avail = 200.0; }
+        if (avail < 40.0) { avail = 40.0; }
         var w: float = 220.0;
-        var h: float = 110.0;
+        var h: float = 96.0 + self.legend_height(avail);
         if (w < min_w) { w = min_w; }
         if (w > max_w) { w = max_w; }
         if (h < min_h) { h = min_h; }
@@ -117,11 +128,19 @@ frame Chart {
         self._ch = self.rect.h;
         dl.dl_emit_rect_rounded(dl.paint_ctx.dl, self.rect.x, self.rect.y, self._cw, self._ch,
             6.0, self.surface.r, self.surface.g, self.surface.b, self.surface.a);
+        var leg_h: float = self.legend_height(self._cw - 20.0);
+        var top_pad: float = 8.0;
         if (len(self.label) > 0) {
+            top_pad = 8.0 + tm.line_height(self.font_scale) + 4.0;
             dl.dl_emit_text(dl.paint_ctx.dl, textshape.prepare_display(self.label),
                 self.rect.x + 10.0, self.rect.y + 8.0,
                 self.text.r, self.text.g, self.text.b, 1.0, self.font_scale);
         }
+        self._plot_x = self.rect.x + 12.0;
+        self._plot_y = self.rect.y + top_pad;
+        self._plot_w = self._cw - 24.0;
+        self._plot_h = self._ch - top_pad - leg_h - 8.0;
+        if (self._plot_h < 12.0) { self._plot_h = 12.0; }
         if (self.is_bar() != 0) {
             self.paint_bars();
         } elif (self.is_line() != 0) {
@@ -129,21 +148,171 @@ frame Chart {
         } else {
             self.paint_pie();
         }
+        self.paint_legend();
+    }
+
+    // Effective pie values — paint_pie falls back to a demo series when the
+    // caller passes none; the legend must describe the same slices.
+    fn pie_values(): [float] {
+        if (len(self.values) == 0) {
+            return [65.0, 25.0, 10.0];
+        }
+        return self.values;
+    }
+
+    // Index of the li-th positive pie slice within the raw values list —
+    // palette slots are assigned by raw index, so legend entries must map
+    // back through the same numbering.
+    fn pie_pos_index(li: int): int {
+        var vals = self.pie_values();
+        var seen: int = 0;
+        var si: int = 0;
+        while (si < len(vals)) {
+            if (vals[si] > 0.0) {
+                if (seen == li) { return si; }
+                seen = seen + 1;
+            }
+            si = si + 1;
+        }
+        return 0;
+    }
+
+    fn pal_color(i: int): (float, float, float) {
+        var pi: int = i % 6;
+        return (self.pal_r[pi], self.pal_g[pi], self.pal_b[pi]);
+    }
+
+    fn legend_count(): int {
+        if (self.is_bar() != 0) {
+            return len(self.values);
+        }
+        if (self.is_line() != 0) {
+            if (len(self.values) > 1) { return 1; }
+            return 0;
+        }
+        var vals = self.pie_values();
+        var n: int = 0;
+        var i: int = 0;
+        while (i < len(vals)) {
+            if (vals[i] > 0.0) { n = n + 1; }
+            i = i + 1;
+        }
+        return n;
+    }
+
+    fn legend_text(i: int): str {
+        if (self.is_bar() != 0) {
+            if (i < len(self.labels) and len(self.labels[i]) > 0) {
+                return self.labels[i];
+            }
+            return "Item " + ((i + 1) as str);
+        }
+        if (self.is_line() != 0) {
+            if (len(self.label) > 0) { return self.label; }
+            return "Series";
+        }
+        var si: int = self.pie_pos_index(i);
+        var vals = self.pie_values();
+        if (si < len(self.labels) and len(self.labels[si]) > 0) {
+            return self.labels[si];
+        }
+        var total: float = 0.0;
+        var j: int = 0;
+        while (j < len(vals)) {
+            total = total + vals[j];
+            j = j + 1;
+        }
+        if (total <= 0.0) { total = 1.0; }
+        var pct: float = (vals[si] / total) * 100.0;
+        return (((pct + 0.5) as int) as str) + "%";
+    }
+
+    fn legend_color(i: int): (float, float, float) {
+        if (self.is_line() != 0) {
+            return (self.line_color.r, self.line_color.g, self.line_color.b);
+        }
+        if (self.is_bar() != 0) {
+            return self.pal_color(i);
+        }
+        return self.pal_color(self.pie_pos_index(i));
+    }
+
+    // Greedy row packing over the legend strip; returns 0 when the entries
+    // would need more than 3 rows (legend is skipped rather than clipped).
+    fn legend_rows(avail: float): int {
+        var n: int = self.legend_count();
+        if (n <= 0) { return 0; }
+        if (avail < 40.0) { avail = 40.0; }
+        var row_w: float = 0.0;
+        var rows: int = 1;
+        var i: int = 0;
+        while (i < n) {
+            var tw: float = tm.text_width(textshape.prepare_display(self.legend_text(i)),
+                self.font_scale * 0.85);
+            var ew: float = tw + 18.0;
+            if (row_w > 0.0 and row_w + ew > avail) {
+                rows = rows + 1;
+                row_w = ew;
+            } else {
+                row_w = row_w + ew;
+            }
+            i = i + 1;
+        }
+        if (rows > 3) { return 0; }
+        return rows;
+    }
+
+    fn legend_height(avail: float): float {
+        var rows: int = self.legend_rows(avail);
+        if (rows <= 0) { return 0.0; }
+        return (rows as float) * 13.0 + 8.0;
+    }
+
+    fn paint_legend(): nil {
+        var n: int = self.legend_count();
+        if (n <= 0) { return; }
+        var avail: float = self._cw - 20.0;
+        var rows: int = self.legend_rows(avail);
+        if (rows <= 0) { return; }
+        var sx: float = self.rect.x + 10.0;
+        var sy: float = self.rect.y + self._ch - ((rows as float) * 13.0 + 8.0) + 4.0;
+        var row_w: float = 0.0;
+        var i: int = 0;
+        while (i < n) {
+            var txt: str = self.legend_text(i);
+            var tw: float = tm.text_width(textshape.prepare_display(txt),
+                self.font_scale * 0.85);
+            var ew: float = tw + 18.0;
+            if (row_w > 0.0 and row_w + ew > avail) {
+                sy = sy + 13.0;
+                sx = self.rect.x + 10.0;
+                row_w = 0.0;
+            }
+            var lc = self.legend_color(i);
+            dl.dl_emit_rect_rounded(dl.paint_ctx.dl, sx, sy + 2.0, 8.0, 8.0, 2.0,
+                lc.0, lc.1, lc.2, 1.0);
+            dl.dl_emit_text(dl.paint_ctx.dl, textshape.prepare_display(txt),
+                sx + 12.0, sy, self.text2.r, self.text2.g, self.text2.b, 0.9,
+                self.font_scale * 0.85);
+            sx = sx + ew;
+            row_w = row_w + ew;
+            i = i + 1;
+        }
     }
 
     fn paint_bars(): nil {
         var nv = len(self.values);
         if (nv <= 0) { return; }
         self.compute_max();
-        var bar_w: float = (self._cw - 24.0) / (nv as float);
-        var plot_h: float = self._ch - 36.0;
+        var bar_w: float = self._plot_w / (nv as float);
         var i = 0;
         while (i < nv) {
-            var bh: float = (self.values[i] / self._maxv) * plot_h;
-            var bx: float = self.rect.x + 12.0 + (i as float) * bar_w + 2.0;
-            var by: float = self.rect.y + self._ch - 8.0 - bh;
+            var bh: float = (self.values[i] / self._maxv) * self._plot_h;
+            var bx: float = self._plot_x + (i as float) * bar_w + 2.0;
+            var by: float = self._plot_y + self._plot_h - bh;
+            var pc = self.pal_color(i);
             dl.dl_emit_rect_rounded(dl.paint_ctx.dl, bx, by, bar_w - 4.0, bh,
-                2.0, self.accent.r, self.accent.g, self.accent.b, 1.0);
+                2.0, pc.0, pc.1, pc.2, 1.0);
             i = i + 1;
         }
     }
@@ -152,25 +321,26 @@ frame Chart {
         var nv = len(self.values);
         if (nv <= 1) { return; }
         self.compute_max();
-        var dx: float = (self._cw - 24.0) / ((nv - 1) as float);
-        var plot_h: float = self._ch - 36.0;
+        var dx: float = self._plot_w / ((nv - 1) as float);
+        var base_y: float = self._plot_y + self._plot_h;
         var i = 0;
-        while (i < nv - 1) {
-            var x1: float = self.rect.x + 12.0 + (i as float) * dx;
-            var y1: float = self.rect.y + self._ch - 10.0 - (self.values[i] / self._maxv) * plot_h;
-            var x2: float = self.rect.x + 12.0 + ((i + 1) as float) * dx;
-            var y2: float = self.rect.y + self._ch - 10.0 - (self.values[i + 1] / self._maxv) * plot_h;
-            dl.dl_add(dl.paint_ctx.dl, dl.dcmd_line(x1, y1, x2, y2,
-                self.line_color.r, self.line_color.g, self.line_color.b, 1.0));
+        while (i < nv) {
+            var px: float = self._plot_x + (i as float) * dx;
+            var py: float = base_y - (self.values[i] / self._maxv) * self._plot_h;
+            dl.dl_emit_rect_rounded(dl.paint_ctx.dl, px - 2.0, py - 2.0, 4.0, 4.0,
+                2.0, self.line_color.r, self.line_color.g, self.line_color.b, 1.0);
+            if (i < nv - 1) {
+                var x2: float = self._plot_x + ((i + 1) as float) * dx;
+                var y2: float = base_y - (self.values[i + 1] / self._maxv) * self._plot_h;
+                dl.dl_add(dl.paint_ctx.dl, dl.dcmd_line(px, py, x2, y2,
+                    self.line_color.r, self.line_color.g, self.line_color.b, 1.0));
+            }
             i = i + 1;
         }
     }
 
     fn paint_pie(): nil {
-        var vals = self.values;
-        if (len(vals) == 0) {
-            vals = [65.0, 25.0, 10.0];
-        }
+        var vals = self.pie_values();
         self._total = 0.0;
         var i = 0;
         while (i < len(vals)) {
@@ -178,11 +348,13 @@ frame Chart {
             i = i + 1;
         }
         if (self._total <= 0.0) { self._total = 1.0; }
-        var pie_r: float = (self._ch - 44.0) * 0.48;
+        var pie_r: float = self._plot_h * 0.5;
+        var rw: float = self._plot_w * 0.5;
+        if (pie_r > rw) { pie_r = rw; }
         if (pie_r > 64.0) { pie_r = 64.0; }
-        if (pie_r < 28.0) { pie_r = 28.0; }
-        var pie_cx: float = self.rect.x + pie_r + 22.0;
-        var pie_cy: float = self.rect.y + self._ch * 0.5 + 8.0;
+        if (pie_r < 10.0) { pie_r = 10.0; }
+        var pie_cx: float = self._plot_x + self._plot_w * 0.5;
+        var pie_cy: float = self._plot_y + self._plot_h * 0.5;
         var cur_angle: float = -1.5707963;
         var si = 0;
         while (si < len(vals)) {
@@ -212,22 +384,22 @@ pub fn chart(kind: ui_types.WidgetKind, lbl: str = "", vals: [float] = [] as [fl
     return Chart(kind, lbl, vals, lbls, min_v, max_v);
 }
 
-pub fn bar_chart(lbl: str = "", vals: [float] = [] as [float]): Chart {
-    return Chart(ui_types.WidgetKind.BarChart, lbl, vals);
+pub fn bar_chart(lbl: str = "", vals: [float] = [] as [float], lbls: [str] = [] as [str]): Chart {
+    return Chart(ui_types.WidgetKind.BarChart, lbl, vals, lbls);
 }
 
-pub fn line_chart(lbl: str = "", vals: [float] = [] as [float]): Chart {
-    return Chart(ui_types.WidgetKind.LineChart, lbl, vals);
+pub fn line_chart(lbl: str = "", vals: [float] = [] as [float], lbls: [str] = [] as [str]): Chart {
+    return Chart(ui_types.WidgetKind.LineChart, lbl, vals, lbls);
 }
 
-pub fn pie_chart(lbl: str = "", vals: [float] = [] as [float]): Chart {
-    return Chart(ui_types.WidgetKind.PieChart, lbl, vals);
+pub fn pie_chart(lbl: str = "", vals: [float] = [] as [float], lbls: [str] = [] as [str]): Chart {
+    return Chart(ui_types.WidgetKind.PieChart, lbl, vals, lbls);
 }
 
-pub fn plot_histogram(lbl: str = "", vals: [float] = [] as [float]): Chart {
-    return Chart(ui_types.WidgetKind.PlotHistogram, lbl, vals);
+pub fn plot_histogram(lbl: str = "", vals: [float] = [] as [float], lbls: [str] = [] as [str]): Chart {
+    return Chart(ui_types.WidgetKind.PlotHistogram, lbl, vals, lbls);
 }
 
-pub fn plot_lines(lbl: str = "", vals: [float] = [] as [float]): Chart {
-    return Chart(ui_types.WidgetKind.PlotLines, lbl, vals);
+pub fn plot_lines(lbl: str = "", vals: [float] = [] as [float], lbls: [str] = [] as [str]): Chart {
+    return Chart(ui_types.WidgetKind.PlotLines, lbl, vals, lbls);
 }

@@ -221,6 +221,14 @@ frame Tabs {
                 }
             }
         }
+        // The header strip is a scroll dead-zone: swallow wheel events over
+        // the tab buttons so an enclosing scroll view can't scroll the page
+        // out from under them.
+        if (t == events.EventType.MouseWheel
+            and tree.pointer_x >= self.rect.x and tree.pointer_x < self.rect.x + self.rect.w
+            and tree.pointer_y >= self.rect.y and tree.pointer_y < self.rect.y + self.header_h) {
+            return uievent.EventResult.Handled;
+        }
         return uievent.EventResult.Ignored;
     }
 }

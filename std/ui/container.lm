@@ -377,18 +377,27 @@ frame ScrollView {
         if (t == events.EventType.MouseWheel) {
             // Wheel contract: delta rides in Event.y (~120/notch, positive
             // = wheel up); the pointer's y is not delivered, so hit-test
-            // against the last tracked pointer position instead.
+            // against the last tracked pointer position instead. The wheel
+            // only applies while the pointer is actually over this viewport.
             var inside: bool = self.rect.contains(tree.pointer_x, tree.pointer_y);
-            if (inside) {
-                self.scroll_target = self.scroll_target - (y as float) * 0.5;
-                if (self.scroll_target < 0.0) { self.scroll_target = 0.0; }
-                if (self.scroll_target > self.max_scroll) { self.scroll_target = self.max_scroll; }
-                if (self.scroll_sig != nil) {
-                    (self.scroll_sig as state.FloatSignal).set(self.scroll_target);
-                }
-                tree.request_repaint();
+            if (not inside) {
+                return uievent.EventResult.Ignored;
+            }
+            // Content gets first refusal: nested scrollers and chrome like
+            // tab headers nearer the pointer consume the wheel before this
+            // viewport scrolls.
+            val res = self.child.on_event(t, x, y, key);
+            if (res == uievent.EventResult.Handled) {
                 return uievent.EventResult.Handled;
             }
+            self.scroll_target = self.scroll_target - (y as float) * 0.5;
+            if (self.scroll_target < 0.0) { self.scroll_target = 0.0; }
+            if (self.scroll_target > self.max_scroll) { self.scroll_target = self.max_scroll; }
+            if (self.scroll_sig != nil) {
+                (self.scroll_sig as state.FloatSignal).set(self.scroll_target);
+            }
+            tree.request_repaint();
+            return uievent.EventResult.Handled;
         }
         // Child rects are already in screen space — arrange() placed the
         // content at y - scroll_y, so pointer coords pass through unchanged.
@@ -397,7 +406,7 @@ frame ScrollView {
         // skips the gate so hover state can clear when the pointer leaves;
         // MouseUp is exempt for pointer-capture release.
         var inside: bool = self.rect.contains(x as float, y as float);
-        if (t == events.EventType.MouseMove or t == events.EventType.MouseUp or t == events.EventType.MouseWheel) {
+        if (t == events.EventType.MouseMove or t == events.EventType.MouseUp) {
             inside = true;
         }
         if (not inside) {
