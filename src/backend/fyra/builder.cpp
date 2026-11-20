@@ -3450,6 +3450,11 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                         if (src_lang && src_lang->tag == TypeTag::Bool) {
                             store_reg(inst.dst, builder_->createExternCall("lymar_aot_bool_to_string",
                                 {tagged_src}, context_->getIntegerType(64)), LIR::Type::Ptr);
+                        } else if (src_lang && src_lang->tag == TypeTag::Enum) {
+                            used_builtins_.insert("lm_enum_to_str");
+                            ir::Function* etfn = current_module_->getFunction("lm_enum_to_str");
+                            if (!etfn) etfn = builder_->createFunction("lm_enum_to_str", context_->getIntegerType(64), {context_->getIntegerType(64)});
+                            store_reg(inst.dst, builder_->createCall(etfn, {tagged_src}), LIR::Type::Ptr);
                         } else {
                             store_reg(inst.dst, builder_->createExternCall("lymar_aot_scalar_to_string",
                                 {tagged_src}, context_->getIntegerType(64)), LIR::Type::Ptr);
@@ -3650,7 +3655,11 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 if (elem_kind)
                     builder_->createExternCall("lymar_aot_list_set_element_kind",
                         {list_val, context_->getConstantInt(context_->getIntegerType(64), elem_kind)}, context_->getVoidType());
-                if (!is_typed_primitive_list(inst.a)) {
+                // A typed-primitive list still needs the kind-aware append when
+                // the appended register holds a tagged LmValue word (erased
+                // `any`/union element): storing it raw would leak SMI/box tag
+                // bits into the raw element slot.
+                if (!is_typed_primitive_list(inst.a) || lang_type_holds_tagged_word(inst.b)) {
                     elem_val = tag_word(elem_val, inst.b, inst.type_b);
                     builder_->createExternCall("lymar_aot_list_append_tagged", {list_val, elem_val}, context_->getVoidType());
                 } else {
@@ -3662,6 +3671,9 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             case LIR::LIR_Op::ListIndex: {
                 ir::Value* list_val = load_reg(inst.a, inst.type_a);
                 ir::Value* idx_val = load_reg(inst.b, inst.type_b);
+                if (std::getenv("LYMAR_DEBUG_LIDX")) {
+                    builder_->createExternCall("lymar_aot_dbg_lidx", {list_val, idx_val}, context_->getVoidType());
+                }
                 std::string lidx_id = std::to_string(label_counter_++);
 
                 // Bound-proven hint (stream_fusion scope): lazily cache the
@@ -3674,6 +3686,9 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 // mutation as a defense in depth.
                 const bool bound_proven = (inst.imm & 0x1u) != 0u;
                 if (hoisted_data_ptrs.count(inst.a) || is_typed_primitive_list(inst.a)) {
+                    if (std::getenv("LYMAR_DEBUG_LIDX")) {
+                        builder_->createExternCall("lymar_aot_dbg_lidx", {list_val, idx_val}, context_->getVoidType());
+                    }
                     ir::Value* data_ptr = nullptr;
                     if (hoisted_data_ptrs.count(inst.a)) {
                         data_ptr = hoisted_data_ptrs[inst.a];
@@ -3769,6 +3784,8 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
 
                 // Step 3: Fast path array access
                 builder_->setInsertPoint(b_fast);
+                if (std::getenv("LYMAR_DEBUG_LIDX")) {
+                }
                 ir::Value* data_addr = builder_->createAdd(unboxed_ptr, context_->getConstantInt(context_->getIntegerType(64), 8));
                 ir::Instruction* data_ptr = builder_->createLoadl(data_addr);
                 data_ptr->setName("lidx_data_ptr_" + lidx_id);
@@ -3805,7 +3822,11 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 // re-loads from the (possibly new) header.
                 hoisted_data_ptrs.erase(inst.dst);
 
-                if (hoisted_data_ptrs.count(inst.dst) || is_typed_primitive_list(inst.dst)) {
+                // Typed-primitive lists take the raw store only when the value
+                // register is itself raw; an erased (tagged-word) element must
+                // fall through to the kind-aware encode path below.
+                if ((hoisted_data_ptrs.count(inst.dst) || is_typed_primitive_list(inst.dst)) &&
+                    !lang_type_holds_tagged_word(inst.b)) {
                     ir::Value* data_ptr = nullptr;
                     if (hoisted_data_ptrs.count(inst.dst)) {
                         data_ptr = hoisted_data_ptrs[inst.dst];
@@ -3866,7 +3887,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 ir::Value* offset = builder_->createMul(idx_val, context_->getConstantInt(context_->getIntegerType(64), 8));
                 ir::Value* elem_addr = builder_->createAdd(data_ptr, offset);
 
-                bool is_scalar_elem = is_typed_primitive_list(inst.dst);
+                bool is_scalar_elem = is_typed_primitive_list(inst.dst) && !lang_type_holds_tagged_word(inst.b);
 
                 if (is_scalar_elem) {
                     if (auto* add_inst = dynamic_cast<ir::Instruction*>(elem_addr)) {
@@ -4297,6 +4318,33 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                         (main_fn->getReturnType()->isDoubleTy() || main_fn->getReturnType()->isFloatTy()))
                         ret_val = builder_->createExternCall("lymar_aot_to_float",
                             {ret_val}, context_->getDoubleType());
+                    // Erased-typed return expressions carry tagged LmValue
+                    // words. When the declared return type is scalar the
+                    // callee slot must hold the raw domain value — untag
+                    // exactly once, mirroring the erased-side tag_word below.
+                    // Only fires when the source register is provably erased
+                    // (lang_type_holds_tagged_word); raw scalar returns are
+                    // already domain values and untag_int would corrupt them.
+                    if (ret_val && lir_func.return_language_type &&
+                        lang_type_holds_tagged_word(inst.a) &&
+                        !ret_val->getType()->isFloatingPoint()) {
+                        switch (lir_func.return_language_type->tag) {
+                            case ::TypeTag::Bool:
+                                ret_val = builder_->createExternCall("lymar_aot_untag_bool", {ret_val}, context_->getIntegerType(64));
+                                break;
+                            case ::TypeTag::Int: case ::TypeTag::Int8: case ::TypeTag::Int16:
+                            case ::TypeTag::Int32: case ::TypeTag::Int64:
+                            case ::TypeTag::UInt: case ::TypeTag::UInt8: case ::TypeTag::UInt16:
+                            case ::TypeTag::UInt32: case ::TypeTag::UInt64:
+                                ret_val = builder_->createExternCall("lymar_aot_untag_int", {ret_val}, context_->getIntegerType(64));
+                                break;
+                            case ::TypeTag::Float32: case ::TypeTag::Float64:
+                            case ::TypeTag::Decimal2: case ::TypeTag::Decimal4: case ::TypeTag::Decimal6:
+                                ret_val = builder_->createExternCall("lymar_aot_to_float", {ret_val}, context_->getDoubleType());
+                                break;
+                            default: break;
+                        }
+                    }
                     // Functions declared with an erased return type (any,
                     // unions, error unions, containers, frames) return tagged
                     // LmValue words. A raw scalar return must be tagged here
@@ -4613,7 +4661,19 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     }
                     result=builder_->createExternCall("lymar_aot_foreign_call",{load_reg(inst.call_args[0],LIR::Type::Ptr),values,types,context_->getConstantInt(context_->getIntegerType(64),count),context_->getConstantInt(context_->getIntegerType(64),ffi_type(inst.result_type))},context_->getIntegerType(64));
                 }
-                if(inst.dst!=UINT32_MAX) store_reg(inst.dst,result,inst.result_type,true);
+                // lymar_aot_foreign_call*/foreign_call_impl always return a
+                // tagged LmValue word (SMI, float box, string, ffi ptr box, or
+                // nil). Erased destinations keep the tagged word; scalar and
+                // object destinations must untag exactly once or the SMI
+                // encoding leaks into raw-int consumers (and gets tagged a
+                // second time on the next erased boundary).
+                if(inst.dst!=UINT32_MAX) {
+                    if (lang_type_holds_tagged_word(inst.dst)) {
+                        store_reg(inst.dst, result, inst.result_type, true);
+                    } else {
+                        store_reg(inst.dst, untag_word(result, inst.dst, inst.result_type), inst.result_type);
+                    }
+                }
                 break;
             }
             case LIR::LIR_Op::CallbackCreate: {

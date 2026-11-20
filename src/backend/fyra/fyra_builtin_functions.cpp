@@ -1537,7 +1537,11 @@ void FyraBuiltinFunctions::emit_enum_ir(ir::Module* module, ir::IRBuilder* build
         ir::Value* vname = it->get();
 
         // Enum header: 32 bytes (magic: 0x454E554D, tag: i64, payload: i64, vname: i64)
-        ir::Instruction* ptr = builder->createExternCall("memory.alloc", {ctx->getConstantInt(i64, 32)}, i64);
+        // lymar_aot_alloc (not memory.alloc/VirtualAlloc) so the object lives in
+        // heap().allocations: tag_pointer then passes the raw pointer through
+        // instead of wrapping it in a foreign-ptr box that hides the magic word
+        // from lm_enum_tag/lm_enum_to_str (all enum == comparisons went true).
+        ir::Instruction* ptr = builder->createExternCall("lymar_aot_alloc", {ctx->getConstantInt(i64, 32)}, i64);
         builder->createStore(ctx->getConstantInt(i64, 0x454E554D), ptr);
         ir::Value* tag_ptr = builder->createAdd(ptr, ctx->getConstantInt(i64, 8));
         builder->createStore(tag, tag_ptr);
@@ -1613,7 +1617,8 @@ void FyraBuiltinFunctions::emit_enum_ir(ir::Module* module, ir::IRBuilder* build
 
         ir::Value* is_no_pay1 = builder->createCeq(payload, ctx->getConstantInt(i64, 0));
         ir::Value* is_no_pay2 = builder->createCeq(payload, ctx->getConstantInt(i64, UINT64_MAX));
-        ir::Value* is_no_pay = builder->createOr(is_no_pay1, is_no_pay2);
+        ir::Value* is_no_pay_nil = builder->createCeq(payload, ctx->getConstantInt(i64, 2)); // VAL_NIL
+        ir::Value* is_no_pay = builder->createOr(builder->createOr(is_no_pay1, is_no_pay2), is_no_pay_nil);
         builder->createBr(is_no_pay, b_no_pay, b_has_pay);
 
         builder->setInsertPoint(b_no_pay);
@@ -2980,8 +2985,6 @@ void FyraBuiltinFunctions::emit_string_from_bytes_ir(ir::Module* module, ir::IRB
     ir::Value* list_ptr = fn->getParameters().front().get();
 
     ir::Value* count = builder->createExternCall("lymar_aot_ffi_list_size",{list_ptr},i64);
-    ir::Value* data_slot = builder->createAdd(list_ptr, ctx->getConstantInt(i64, 8));
-    ir::Value* data_buf = builder->createLoadl(data_slot);
 
     ir::Value* new_hdr = builder->createCall(alloc_fn, {count});
     ir::Value* dst_data = builder->createAdd(new_hdr, ctx->getConstantInt(i64, StringABI::DATA_OFFSET));
@@ -2997,9 +3000,8 @@ void FyraBuiltinFunctions::emit_string_from_bytes_ir(ir::Module* module, ir::IRB
     builder->createBr(loop_done, b_done, b_body);
 
     builder->setInsertPoint(b_body);
-    ir::Value* elem_off = builder->createMul(i, ctx->getConstantInt(i64, 8));
-    ir::Value* elem_addr = builder->createAdd(data_buf, elem_off);
-    ir::Value* elem_val = builder->createExternCall("lymar_aot_ffi_list_integer",{list_ptr},i64);
+    ir::Value* item = builder->createExternCall("lymar_aot_ffi_list_item",{list_ptr, i},i64);
+    ir::Value* elem_val = builder->createExternCall("lymar_aot_to_integer",{item},i64);
     ir::Value* byte_val = builder->createCast(elem_val, ctx->getIntegerType(8));
 
     builder->createStoreb(byte_val, builder->createAdd(dst_data, i));

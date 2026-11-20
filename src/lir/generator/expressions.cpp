@@ -2764,12 +2764,13 @@ Reg Generator::emit_index_expr(LM::Frontend::AST::IndexExpr& expr) {
         set_register_language_type(result_reg, result_type);
         return result_reg;
     } else if (object_type && object_type->tag == ::TypeTag::Dict) {
-        // Use DictGet for dictionaries
+        // Use DictGet for dictionaries. Dict storage is uniformly tagged
+        // LmValue words and a missing key yields nil, so the result must
+        // stay in the erased domain even when the declared value type is
+        // scalar — a raw int/float register cannot represent nil.
         Reg result_reg = allocate_register();
-        Type abi_type = language_type_to_abi_type(result_type);
-        emit_instruction(LIR_Inst(LIR_Op::DictGet, abi_type, result_reg, object_reg, index_reg));
-        set_register_type(result_reg, result_type);
-        set_register_language_type(result_reg, result_type);  // Ensure language type is set
+        emit_instruction(LIR_Inst(LIR_Op::DictGet, Type::Ptr, result_reg, object_reg, index_reg));
+        tag_register_erased(result_reg);
         return result_reg;
     } else if (object_type && object_type->tag == ::TypeTag::String) {
         // Use StringIndex for strings

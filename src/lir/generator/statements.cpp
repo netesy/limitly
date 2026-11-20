@@ -566,11 +566,20 @@ void Generator::emit_var_stmt(LM::Frontend::AST::VarDeclaration& stmt) {
         bool is_immutable = stmt.isConst;
         bool is_var_alias = is_variable_alias_expr(stmt.initializer.get());
 
+        // The initializer register's language type is the lowering source of
+        // truth: dynamic boundaries (dict element access, indirect calls)
+        // legitimately produce erased words that can hold nil even when the
+        // expression's inferred type is scalar. Relabeling with the inferred
+        // type would route those words through scalar untagging and destroy
+        // the nil representation.
+        TypePtr producer_type = get_register_language_type(value);
+        TypePtr bind_type = producer_type ? producer_type : stmt.initializer->inferred_type;
+
         if (is_literal || (is_immutable && !is_var_alias)) {
             value_reg = value;
         } else {
             value_reg = allocate_register();
-            Type abi_type = language_type_to_abi_type(stmt.inferred_type);
+            Type abi_type = language_type_to_abi_type(bind_type);
             emit_instruction(LIR_Inst(LIR_Op::Mov, abi_type, value_reg, value, 0));
         }
         
@@ -595,7 +604,7 @@ void Generator::emit_var_stmt(LM::Frontend::AST::VarDeclaration& stmt) {
             }
             set_register_language_type(value_reg, effective_type);
         } else {
-            set_register_type(value_reg, stmt.initializer->inferred_type);
+            set_register_type(value_reg, bind_type);
         }
     } else {
         // Initialize with nil

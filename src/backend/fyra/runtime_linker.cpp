@@ -209,7 +209,13 @@ std::filesystem::path libffi_archive(const target::TargetDescriptor& t) {
     if (linker != "driver") {
         // GUI-subsystem executables (std.gg/ui/game/d3/... in the module
         // graph) get PE subsystem 2 instead of the default console one.
-        if (options.gui_app) {
+        // LYMAR_CONSOLE=1 forces the console subsystem for debugging: stderr
+        // stays visible while all other GUI linking behavior is unchanged.
+        const bool console_override = [] {
+            const char* v = std::getenv("LYMAR_CONSOLE");
+            return v && *v && v[0] != '0';
+        }();
+        if (options.gui_app && !console_override) {
             backend.peSubsystem(2);
             // aot_runtime.o references aot_gfx_create weakly so console builds
             // skip aot_graphics.o (sokol/truetype/d3d11). GUI builds seed the
@@ -258,14 +264,20 @@ std::filesystem::path libffi_archive(const target::TargetDescriptor& t) {
         // of its own, so the only debug data in the image is this unusable
         // archive baggage — strip it unconditionally. --strip-debug alone is
         // NOT enough: it removes the named sections but leaves the overlay.
-        command.push_back("-Wl,--strip-all");
+        if (!std::getenv("LYMAR_KEEP_SYMBOLS")) command.push_back("-Wl,--strip-all");
+        const bool console_override = [] {
+            const char* v = std::getenv("LYMAR_CONSOLE");
+            return v && *v && v[0] != '0';
+        }();
         if (options.gui_app) {
-            command.push_back("-mwindows");
             // aot_runtime.o references aot_gfx_create weakly so console builds
             // skip aot_graphics.o (sokol/truetype/d3d11). GUI builds seed the
             // symbol here to force the archive member — and its backend
-            // objects — to be extracted.
+            // objects — to be extracted. This must stay unconditional for GUI
+            // programs: LYMAR_CONSOLE only swaps the PE subsystem below, it
+            // must not drop graphics extraction or resource type 17 fails.
             command.push_back("-Wl,-u,aot_gfx_create");
+            if (!console_override) command.push_back("-mwindows");
         }
     }
     command.push_back(temporary);

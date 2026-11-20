@@ -1,0 +1,29 @@
+// Regression: Fyra LICM must not hoist an instruction that an inner loop
+// already moved to its own preheader when that preheader sits inside an
+// outer loop.  Previously the shared "already hoisted" exemption let the
+// outer loop treat the inner-preheader value as invariant and move uses
+// above their definitions, producing a wild pointer in the list fast path.
+fn main(): int {
+    var dp: [[int]] = [];
+    var ii = 2;
+    while (ii >= 0) {
+        var row: [int] = [];
+        var jj = 2;
+        while (jj >= 0) { row.append(0); jj = jj - 1; }
+        dp.append(row);
+        ii = ii - 1;
+    }
+    ii = 1;
+    while (ii >= 0) {
+        var jj = 1;
+        while (jj >= 0) {
+            var x = dp[ii + 1][jj];
+            var y = dp[ii][jj + 1];
+            if (x > y) { dp[ii][jj] = x; } else { dp[ii][jj] = y; }
+            jj = jj - 1;
+        }
+        ii = ii - 1;
+    }
+    print("s3 dp00=" + (dp[0][0] as str));
+    return 0;
+}

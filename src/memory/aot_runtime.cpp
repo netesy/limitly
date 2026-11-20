@@ -955,6 +955,24 @@ int64_t lymar_aot_numeric_compare(uint64_t left, uint64_t right) {
     return left < right ? -1 : left > right ? 1 : 0;
 }
 static uint64_t format_argument(uint64_t value, bool printable);
+void lymar_aot_dbg_lidx(uint64_t list_val, uint64_t idx_val) {
+    uint64_t lp = list_val & ~7ULL;
+    uint64_t hdr = 0, size = 0, data = 0;
+    bool tracked = false;
+    try {
+        RuntimeGuard g;
+        auto f = heap().allocations.find(lp);
+        if (f != heap().allocations.end() && f->second.size >= 32) {
+            tracked = true;
+            auto* w = reinterpret_cast<uint64_t*>(lp);
+            hdr = w[0]; size = w[2]; data = w[1];
+        }
+    } catch (...) {}
+    std::fprintf(stderr, "[lidx] list=%llx idx=%lld tracked=%d hdr=%llx size=%lld data=%llx\n",
+        (unsigned long long)list_val, (long long)idx_val, (int)tracked,
+        (unsigned long long)hdr, (long long)size, (unsigned long long)data);
+    std::fflush(stderr);
+}
 void lymar_aot_print_integer(uint64_t value) {
     try {
     RuntimeGuard runtime_guard;
@@ -1387,6 +1405,7 @@ uint64_t lymar_aot_tag_pointer(uint64_t ptr) {
             }
         }
         // Foreign or unaligned pointer: wrap in TYPE_FOREIGN_PTR (13)
+        if (std::getenv("LYMAR_TRACE_TAGPTR")) std::fprintf(stderr, "[tagptr-wrap] ptr=%llx\n", (unsigned long long)ptr);
         auto box = lymar_aot_alloc(32);
         Word* words = reinterpret_cast<Word*>(box);
         words[0] = 13;
@@ -1454,8 +1473,11 @@ uint64_t lymar_aot_bool_to_string(uint64_t value) {
     try {
     RuntimeGuard runtime_guard;
 
-    const char* output = value ? "true" : "false";
-    size_t length = value ? 4 : 5;
+    // Tagged bool words are VAL_TRUE(18)/VAL_FALSE(10) — both nonzero, so a
+    // raw `value ?` test prints "true" for false. Decode via to_boolean.
+    const bool truth = lymar_aot_to_boolean(value) != 0;
+    const char* output = truth ? "true" : "false";
+    size_t length = truth ? 4 : 5;
     auto pointer = lymar_aot_alloc(24 + length + 1);
     Word header[] = {11, length, length};
     std::memcpy(reinterpret_cast<void*>(pointer), header, sizeof(header));
@@ -2337,7 +2359,8 @@ void lymar_aot_edge(uint64_t address, uint64_t child) {
             (w0 == 15 && offset == 24) ||                  // Frame field count
             (w0 == 11 && (offset == 8 || offset == 16)) || // String len, hash
             (container->second.dictionary && (offset == 0 || offset == 8)) || // Dict count, cap
-            (container->second.size == 32 && w0 == 0x4C594D41524F4B21LL && (offset == 8 || offset == 24)); // Ok/Err box tag and kind
+            (container->second.size == 32 && w0 == 0x4C594D41524F4B21LL && (offset == 8 || offset == 24)) || // Ok/Err box tag and kind
+            (container->second.size == 32 && w0 == 0x454E554D && offset == 8); // Enum ordinal tag (payload/vname stay edged)
         if (!is_header_field && child != 0) {
             uint64_t tag = child & TAG_MASK;
             bool ok = (tag == TAG_INT) ||
@@ -2520,11 +2543,14 @@ void lymar_aot_memory_store(uint64_t pointer, uint64_t value, uint64_t element) 
     // WNDCLASSEX.lpfnWndProc consumed by CreateWindowExA) a heap pointer that
     // faults when called.
     Word pointer_value = raw_integer_value(value);
-    if (element == 10 && value != VAL_NIL && value != 0 && value != VAL_FALSE) {
-        auto wrapped = heap().allocations.find(value);
+    if (element == 10 && pointer_value > 4096) {
+        // pubptr/fnptr are int aliases, so an int-held tag-13 box address can
+        // arrive SMI-tagged (tag_word) or raw. raw_integer_value decodes the
+        // SMI back to the box address; unwrap one more level to the payload.
+        auto wrapped = heap().allocations.find(pointer_value);
         if (wrapped != heap().allocations.end() && !wrapped->second.raw_memory &&
-            wrapped->second.size >= 16 && read_word(value) == 13)
-            pointer_value = read_word(value, 8);
+            wrapped->second.size >= 16 && read_word(pointer_value) == 13)
+            pointer_value = read_word(pointer_value, 8);
     }
     size_t width = 0;
     switch (element) {
@@ -2879,9 +2905,10 @@ extern "C" uint64_t lymar_aot_resource_str_arg(uint64_t arguments, uint64_t coun
         auto value = read_word(arguments, n * 8);
         if (value > 4096 && (value & TAG_MASK) == TAG_PTR && (read_word(value) & 0xffffffff) == 1) {
             auto data = read_word(value, 8), size = read_word(value, 16);
+            auto elem_kind = read_word(value) >> 32;
             for (uint64_t i = 0; i < size; ++i) {
                 if (seen++ != index) continue;
-                auto elem = read_word(data, i * 8);
+                auto elem = lymar_aot_list_elem_decode(read_word(data, i * 8), elem_kind);
                 if (auto* text = string_data(elem)) return reinterpret_cast<uint64_t>(text);
                 return reinterpret_cast<uint64_t>(empty);
             }
@@ -2924,8 +2951,9 @@ uint64_t lymar_aot_resource_call(uint64_t id, uint64_t operation, uint64_t count
         Word pointer = derive_kind(value);
         if (is_heap_word(value) && (read_word(value) & 0xffffffff) == 1) {
             auto data = read_word(value, 8), size = read_word(value, 16);
+            auto elem_kind = read_word(value) >> 32;
             for (Word i = 0; i < size; ++i) {
-                auto element = read_word(data, i * 8);
+                auto element = lymar_aot_list_elem_decode(read_word(data, i * 8), elem_kind);
                 args.push_back(element);
                 pointers.push_back(derive_kind(element));
             }
@@ -3509,8 +3537,22 @@ uint64_t lymar_aot_ffi_list_size(uint64_t value) {
 }
 uint64_t lymar_aot_ffi_list_item(uint64_t value,uint64_t index) {
     RuntimeGuard guard;
-    if(index>=lymar_aot_ffi_list_size(value)) throw std::runtime_error("FFI argument index out of bounds");
-    return read_word(read_word(value,8),index*8);
+    auto sz = lymar_aot_ffi_list_size(value);
+    if(index>=sz) {
+        HMODULE hMod = GetModuleHandleA(NULL);
+        void* ra = __builtin_return_address(0);
+        uint64_t rva = (uint64_t)ra - (uint64_t)hMod;
+        char msg[256];
+        snprintf(msg, sizeof(msg), "FFI argument index out of bounds (index=%llu size=%llu val=%llx hdr=%llx RVA=+0x%llx)",
+                 (unsigned long long)index, (unsigned long long)sz, (unsigned long long)value,
+                 (unsigned long long)read_word(value), (unsigned long long)rva);
+        throw std::runtime_error(msg);
+    }
+    // Return the canonical tagged LmValue word: typed primitive lists keep
+    // raw int/bool elements that must be decoded via the header's
+    // element-storage kind (high 32 bits of the header word).
+    auto elem = read_word(read_word(value,8),index*8);
+    return lymar_aot_list_elem_decode(elem, read_word(value) >> 32);
 }
 uint64_t lymar_aot_ffi_pointer(uint64_t value) {
     RuntimeGuard guard;

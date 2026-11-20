@@ -193,7 +193,8 @@ void lymar_aot_library_close(Word handle) {
 // mirroring the VM's lymarrt_ffi_call_ex path.
 static Word foreign_call_impl(Word function,Word* words,Word* ids,Word count,Word return_type,
                               const lymarrt_struct_layout* layouts,size_t num_layouts) {
-    std::unique_lock guard(mutex);auto* pointer=reinterpret_cast<void*>(lymar_aot_ffi_pointer(function));
+    std::unique_lock guard(mutex);
+    auto* pointer=reinterpret_cast<void*>(lymar_aot_ffi_pointer(function));
     if(!pointer) return lymar_aot_nil();
     std::vector<lymarrt_type> signature;std::vector<lymarrt_value> arguments;
     for(Word index=0;index<count;++index) {signature.push_back(type(ids[index]));arguments.push_back(argument(words[index],signature.back()));}
@@ -206,7 +207,8 @@ static Word foreign_call_impl(Word function,Word* words,Word* ids,Word count,Wor
     for(const auto& entry:libraries) library_pins.push_back(entry.second);
     guard.unlock();
     lymarrt_value returned{};
-    if(!lymarrt_ffi_call_ex(pointer,type(return_type,true),signature.data(),arguments.data(),count,layouts,num_layouts,&returned)) return lymar_aot_nil();
+    auto okcall=lymarrt_ffi_call_ex(pointer,type(return_type,true),signature.data(),arguments.data(),count,layouts,num_layouts,&returned);
+    if(!okcall) return lymar_aot_nil();
     return result(returned);
 }
 Word lymar_aot_foreign_call(Word function,Word values,Word types,Word count,Word return_type) {
@@ -252,7 +254,7 @@ Word lymar_aot_callback_create(Word name,Word arguments,Word return_type) {
     auto count=lymar_aot_ffi_list_size(arguments);
     if(count!=found->second.arguments.size() || count>64) throw std::runtime_error("Callback parameter count mismatch");
     std::vector<lymarrt_type> signature;
-    for(Word index=0;index<count;++index) signature.push_back(type(lymar_aot_ffi_list_item(arguments,index)));
+    for(Word index=0;index<count;++index) signature.push_back(type(lymar_aot_to_integer(lymar_aot_ffi_list_item(arguments,index))));
     auto context=std::make_shared<Callback>(found->second,type(return_type,true));
     auto handle=lymarrt_callback_create(callback,context.get(),signature.data(),count,context->result);
     if(handle>0) {context->handle=handle;callbacks[handle]=std::move(context);register_shutdown();}return handle;

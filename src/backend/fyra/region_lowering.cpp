@@ -65,6 +65,7 @@ void lower_region_ownership(ir::Module& module, const std::unordered_map<std::st
     declare("lymar_aot_gpu_dispatch",5,i64);
     declare("lymar_aot_ffi_list_size",1,i64);
     declare("lymar_aot_ffi_list_integer",1,i64);
+    declare("lymar_aot_ffi_list_item",2,i64);
     declare("lymar_aot_ffi_infer_type",1,i64);
     declare("lymar_aot_frame_field_address", 2, i64);
     declare("lymar_aot_frame_get_field", 2, i64);
@@ -111,6 +112,7 @@ void lower_region_ownership(ir::Module& module, const std::unordered_map<std::st
     declare("lymar_aot_string_name_eq", 3, i64);
     declare("lymar_aot_string_index", 1, i64);
     declare("lymar_aot_print_integer", 1, void_type);
+    declare("lymar_aot_dbg_lidx", 2, void_type);
     declare("lymar_aot_copy_constant", 2, i64);
     declare("lymar_aot_ref_resolve", 2, i64);
     declare("lymar_aot_ref_move", 3, i64);
