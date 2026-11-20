@@ -1,0 +1,28 @@
+// Regression: float locals carried through nested loops and if-joins must
+// keep f64 SSA phi types.  Fyra allocas are i64-typed regardless of the stored
+// domain, so float phis start as i64; the SSARenamer type fixup used to require
+// every operand to agree, and phi cycles (loop header <-> if-merge) deadlocked
+// on each other's unresolved i64 type, leaving f64 values flowing through i64
+// phis (read back as 0).  This mirrors the pie-chart angle accumulation shape.
+fn main(): int {
+    var vals = [65.0, 25.0];
+    var cur: float = -1.5707963;
+    var si = 0;
+    while (si < len(vals)) {
+        var v = vals[si];
+        if (si >= 0) {
+            var end_ang: float = cur + 1.0;
+            var a = cur;
+            var cnt = 0;
+            while (a < end_ang and cnt < 3) {
+                print("a=" + (a as str));
+                a = a + 0.4;
+                cnt = cnt + 1;
+            }
+            cur = cur + 1.0;
+        }
+        si = si + 1;
+    }
+    print("done");
+    return 0;
+}
