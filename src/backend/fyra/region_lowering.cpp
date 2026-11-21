@@ -338,6 +338,12 @@ void lower_region_ownership(ir::Module& module, const std::unordered_map<std::st
                     // the call a guaranteed no-op. Floats keep the existing
                     // edge(addr, 0) stale-edge clear below.
                     auto provably_scalar = [&](ir::Value* v) -> bool {
+                        // Code/data addresses are never heap words: direct
+                        // function references (task-entry thunks stored into
+                        // task contexts) and global variable addresses cannot
+                        // alias a managed allocation, so edge() would assert
+                        // on their non-LmValue tag bits.
+                        if (dynamic_cast<ir::Function*>(v) || dynamic_cast<ir::GlobalVariable*>(v)) return true;
                         if (auto* c = dynamic_cast<ir::ConstantInt*>(v)) {
                             // Mirror is_heap_word's shape check: only values
                             // that could alias a live allocation stay dynamic.
