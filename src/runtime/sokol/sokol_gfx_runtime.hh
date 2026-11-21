@@ -77,7 +77,7 @@ public:
 
 private:
     void execute(const GfxCommand& cmd);
-    void flush_text();   // draw deferred DrawTextCmds: one atlas upload + one sgl_draw
+    void flush_text();   // draw deferred DrawTextCmds: one atlas upload + quad draws
     Impl* impl_ = nullptr;
 
     std::mutex mutex_;
@@ -86,7 +86,7 @@ private:
     std::atomic<bool> ready_{false};
     bool pass_open_ = false;
     uint64_t frame_id_ = 0;
-    uint64_t last_text_flush_ = ~0ull; // frame id of last sfons_flush (1 atlas upload/frame max)
+    uint64_t last_text_flush_ = ~0ull; // frame id of last atlas upload (1 upload/frame max)
     int cur_pipeline_ = -1;   // lymar pipeline id currently applied
     int cur_vbuf_ = -1;
     int cur_ibuf_ = -1;
@@ -98,8 +98,8 @@ SokolGfxRuntime& sokol_gfx_runtime();
 // the VM-thread metrics helpers below.
 float gfx_font_size_for_scale(int scale);
 
-// VM-thread text metrics via a dedicated CPU-only fontstash context (no GPU
-// resources). Return false until the GPU backend has loaded a font.
+// VM-thread text metrics via the native font engine (no GPU resources).
+// Return false until a system font has been located and parsed.
 bool gfx_text_metrics_ready();
 float gfx_measure_text(const char* text, int scale);
 float gfx_line_height(int scale);

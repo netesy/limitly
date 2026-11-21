@@ -15,7 +15,7 @@
 #include "sokol/sokol_gfx_runtime.hh"
 #include "native_d3d11_window.h"
 #include "../backend/vm/font8x8_basic.h"
-#include "../../vendor/stb/stb_truetype.h"
+#include "native_font.hh"
 namespace LM::Runtime {
 using LM::Backend::VM::ResourceType;
 using LM::Backend::VM::ResourceOperation;
@@ -24,7 +24,7 @@ using LM::Backend::VM::SokolAppConfig;
 using LM::Backend::VM::sokol_app_runtime;
 struct SystemFontEngine {
     std::vector<uint8_t> font_bytes;
-    stbtt_fontinfo info;
+    NativeFont font;
     bool is_ready = false;
     bool attempted = false;
 
@@ -82,9 +82,8 @@ struct SystemFontEngine {
                     if (sz > 0) {
                         font_bytes.resize(sz);
                         if (fread(font_bytes.data(), 1, sz, f) == (size_t)sz) {
-                            int offset = stbtt_GetFontOffsetForIndex(font_bytes.data(), 0);
-                            if (offset < 0) offset = 0;
-                            if (stbtt_InitFont(&info, font_bytes.data(), offset)) {
+                            // TTC index 0 offset is resolved inside NativeFont::init.
+                            if (font.init(font_bytes.data(), font_bytes.size(), 0)) {
                                 is_ready = true;
                             }
                         }
@@ -919,12 +918,21 @@ public:
                     else if (scale > 3 && scale <= 7) font_size = static_cast<float>(scale * 9);
                     else if (scale > 7) font_size = static_cast<float>(scale);
 
-                    float fscale = stbtt_ScaleForPixelHeight(&s_system_font_engine.info, font_size);
+                    NativeFont& nfont = s_system_font_engine.font;
+                    float fscale = nfont.scale_for_pixel_height(font_size);
                     int ascent = 0, descent = 0, line_gap = 0;
-                    stbtt_GetFontVMetrics(&s_system_font_engine.info, &ascent, &descent, &line_gap);
+                    nfont.vmetrics(ascent, descent, line_gap);
 
-                    int c_x1 = 0, c_y1 = 0, c_x2 = 0, c_y2 = 0;
-                    stbtt_GetCodepointBitmapBox(&s_system_font_engine.info, 'A', fscale, fscale, &c_x1, &c_y1, &c_x2, &c_y2);
+                    // Baseline reference: top edge of 'A' ink. The old code
+                    // passed stb's box y0 (top, negative above baseline) here
+                    // via the misleadingly-named c_y1, so replicate that.
+                    int c_y1 = 0;
+                    {
+                        GlyphBitmap abmp;
+                        if (nfont.rasterize_codepoint('A', fscale, abmp) && abmp.height > 0) {
+                            c_y1 = abmp.y_offset;
+                        }
+                    }
 
                     int cursor_x = static_cast<int>(x);
                     int start_y = static_cast<int>(y);
@@ -932,33 +940,41 @@ public:
                     int line_height = static_cast<int>((ascent - descent + line_gap) * fscale + 0.5f);
                     if (line_height < static_cast<int>(font_size)) line_height = static_cast<int>(font_size);
 
-                    for (size_t i = 0; i < text.size(); ++i) {
-                        char ch = text[i];
-                        if (ch == '\r') continue;
-                        if (ch == '\n') {
+                    const char* tptr = text.data();
+                    const char* tend = tptr + text.size();
+                    int prev_gid = -1;
+                    while (tptr < tend) {
+                        uint32_t cp = utf8_next(tptr, tend);
+                        if (cp == '\r') continue;
+                        if (cp == '\n') {
                             start_y += line_height;
                             baseline_y = start_y - c_y1;
                             cursor_x = static_cast<int>(x);
+                            prev_gid = -1;
                             continue;
                         }
 
-                        int advance = 0, lsb = 0;
-                        stbtt_GetCodepointHMetrics(&s_system_font_engine.info, static_cast<unsigned char>(ch), &advance, &lsb);
+                        int gid = (int)nfont.glyph_index(cp);
+                        int advance = nfont.hmetrics(gid).advance;
 
-                        int b_w = 0, b_h = 0, b_xoff = 0, b_yoff = 0;
-                        unsigned char* bmp = stbtt_GetCodepointBitmap(&s_system_font_engine.info, 0, fscale, static_cast<unsigned char>(ch), &b_w, &b_h, &b_xoff, &b_yoff);
-                        if (bmp) {
-                            int glyph_ox = cursor_x + b_xoff;
-                            int glyph_oy = baseline_y + b_yoff;
+                        if (prev_gid >= 0) {
+                            int kern = nfont.kern_advance(prev_gid, gid);
+                            cursor_x += static_cast<int>(kern * fscale + 0.5f);
+                        }
 
-                            for (int gy = 0; gy < b_h; ++gy) {
+                        GlyphBitmap bmp;
+                        if (nfont.rasterize_glyph(gid, fscale, bmp) && bmp.width > 0 && bmp.height > 0) {
+                            int glyph_ox = cursor_x + bmp.x_offset;
+                            int glyph_oy = baseline_y + bmp.y_offset;
+
+                            for (int gy = 0; gy < bmp.height; ++gy) {
                                 int py = glyph_oy + gy;
                                 if (py < clip.y0 || py >= clip.y1) continue;
-                                for (int gx = 0; gx < b_w; ++gx) {
+                                for (int gx = 0; gx < bmp.width; ++gx) {
                                     int px = glyph_ox + gx;
                                     if (px < clip.x0 || px >= clip.x1) continue;
 
-                                    unsigned char cov = bmp[gy * b_w + gx];
+                                    unsigned char cov = bmp.pixels[(size_t)gy * bmp.width + gx];
                                     if (cov == 0) continue;
 
                                     size_t idx = static_cast<size_t>(py * width_ + px) * 4;
@@ -969,14 +985,10 @@ public:
                                     pixels_[idx + 3] = std::max(pixels_[idx + 3], static_cast<uint8_t>(au * (cov / 255.0f)));
                                 }
                             }
-                            stbtt_FreeBitmap(bmp, nullptr);
                         }
 
                         cursor_x += static_cast<int>(advance * fscale + 0.5f);
-                        if (i + 1 < text.size() && text[i + 1] != '\n') {
-                            int kern = stbtt_GetCodepointKernAdvance(&s_system_font_engine.info, static_cast<unsigned char>(ch), static_cast<unsigned char>(text[i + 1]));
-                            cursor_x += static_cast<int>(kern * fscale + 0.5f);
-                        }
+                        prev_gid = gid;
                     }
                     return value_true;
                 }

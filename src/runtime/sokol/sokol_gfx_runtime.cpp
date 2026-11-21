@@ -27,13 +27,9 @@
 #include "sokol_gfx.h"
 #include "sokol_glue.h"
 
-// Stage 2: immediate-mode text via sokol_gl + fontstash (atlas -> R8 texture).
-#define SOKOL_GL_IMPL
-#include "util/sokol_gl.h"
-#define FONTSTASH_IMPLEMENTATION
-#include "util/fontstash.h"
-#define SOKOL_FONTSTASH_IMPL
-#include "util/sokol_fontstash.h"
+// Immediate-mode text: native std/font coverage pipeline (native_font.hh)
+// rasterizes glyphs into an R8 atlas drawn through a dedicated sg pipeline.
+// (Replaces the vendored fontstash/fons + stb_truetype stack.)
 
 #include <algorithm>
 #include <chrono>
@@ -41,6 +37,12 @@
 #include <cstdio>
 #include <cstring>
 #include <map>
+#include <unordered_map>
+#include "../native_font.hh"
+
+using LM::Runtime::NativeFont;
+using LM::Runtime::GlyphBitmap;
+using LM::Runtime::utf8_next;
 
 namespace {
 
@@ -495,6 +497,60 @@ float4 fs_main(VSOut i) : SV_TARGET {
 }
 )";
 
+// --- text: R8 coverage atlas * vertex color, pixel-space positions ----------
+static const char* kTextVS = R"(
+cbuffer TextVS : register(b0) {
+    float2 u_viewport;
+    float2 u_pad;
+};
+struct VSIn {
+    float2 pos : TEXCOORD0;
+    float2 uv  : TEXCOORD1;
+    float4 col : TEXCOORD2;
+};
+struct VSOut {
+    float4 pos : SV_POSITION;
+    float2 uv  : TEXCOORD0;
+    float4 col : TEXCOORD1;
+};
+VSOut vs_main(VSIn i) {
+    VSOut o;
+    o.pos = float4(i.pos.x / u_viewport.x * 2.0 - 1.0,
+                   1.0 - i.pos.y / u_viewport.y * 2.0, 0.0, 1.0);
+    o.uv = i.uv;
+    o.col = i.col;
+    return o;
+}
+)";
+
+static const char* kTextFS = R"(
+Texture2D u_tex : register(t0);
+SamplerState u_smp : register(s0);
+struct VSOut {
+    float4 pos : SV_POSITION;
+    float2 uv  : TEXCOORD0;
+    float4 col : TEXCOORD1;
+};
+float4 fs_main(VSOut i) : SV_TARGET {
+    float a = u_tex.Sample(u_smp, i.uv).r * i.col.a;
+    return float4(i.col.rgb, a);
+}
+)";
+
+// ---------------------------------------------------------------------------
+// Native text glyph record + atlas constants (fontstash FONSglyph equivalent)
+// ---------------------------------------------------------------------------
+struct TextGlyphRec {
+    float u0 = 0, v0 = 0, u1 = 0, v1 = 0; // atlas UVs over the bitmap region
+    float xoff = 0, yoff = 0;             // quad offset rel pen/baseline (px)
+    float xadv = 0;                       // advance width in px
+    int gw = 0, gh = 0;                   // bitmap size (0 = advance-only glyph)
+};
+
+static const int TEXT_ATLAS_W = 1024;
+static const int TEXT_ATLAS_H = 1024;
+static const int TEXT_ATLAS_PAD = 1;
+
 // ---------------------------------------------------------------------------
 // Impl: sg objects, maps, pipeline cache (render thread only)
 // ---------------------------------------------------------------------------
@@ -506,6 +562,7 @@ struct SokolGfxRuntime::Impl {
     sg_shader sh_vstream = {SG_INVALID_ID};
     sg_shader sh_blit = {SG_INVALID_ID};
     sg_shader sh_shadow = {SG_INVALID_ID};
+    sg_shader sh_text = {SG_INVALID_ID};
 
     sg_pipeline pipe_rect = {SG_INVALID_ID};
     sg_pipeline pipe_tri = {SG_INVALID_ID};
@@ -543,15 +600,27 @@ struct SokolGfxRuntime::Impl {
     sg_sampler blit_smp = {SG_INVALID_ID};
     int blit_w = 0, blit_h = 0;
 
-    // fontstash text (render thread only)
-    FONScontext* fons = nullptr;
-    int fons_font = -1;
+    // native text (render thread only)
+    NativeFont text_font;
+    bool text_font_tried = false;
+    bool text_font_ok = false;
     std::vector<GfxCommand> deferred_text; // text waits for end-of-pass: single atlas upload
+    sg_image text_img = {SG_INVALID_ID};
+    sg_view text_view = {SG_INVALID_ID};
+    sg_pipeline pipe_text = {SG_INVALID_ID};
+    sg_buffer text_vbuf = {SG_INVALID_ID};
+    std::vector<uint8_t> text_atlas_px; // R8 atlas pixels (CPU copy)
+    bool text_atlas_dirty = false;
+    int text_atlas_x = 0, text_atlas_y = 0, text_atlas_rowh = 0;
+    std::unordered_map<uint64_t, TextGlyphRec> text_glyphs;
+    std::vector<float> text_verts;     // staged vertex floats (8 per vert)
+    struct TextDrawRange { size_t v0, v1; std::vector<int> clip; };
+    std::vector<TextDrawRange> text_draws;
 
     // Clip stack entries: rect (already intersected with ancestors) plus an
     // optional shape (0=rect, 1=rounded-rect, 2=ellipse) consumed by the
     // custom rect/tri fragment shaders as a coverage mask. Text keeps
-    // rect-only clipping (fons pipeline is vendored bytecode).
+    // rect-only clipping (text uses scissor rects, no shader clip mask).
     struct ClipEntry { int x, y, w, h; int shape; float radius; };
     std::vector<ClipEntry> clip_stack;
     // Innermost shaped clip (or shape=0 when none) — pushed to shader
@@ -624,6 +693,77 @@ static sg_buffer ensure_buffer(SokolGfxRuntime::Impl* im, int id, bool is_index)
 }
 
 // ---------------------------------------------------------------------------
+// Native text atlas: shelf-packed R8 coverage bitmaps + glyph cache.
+// Rasterizes through NativeFont (std/font pipeline port); advances/kerns are
+// resolved by the caller which owns the pen position.
+// ---------------------------------------------------------------------------
+
+// Rasterize `cp` at `size_px` into the atlas. Returns the cached record
+// (advance-only records have gw == gh == 0). `scratch` is caller-owned reuse.
+static const TextGlyphRec* text_glyph(SokolGfxRuntime::Impl* im, uint32_t cp,
+                                      int isize, float size_px, float scale,
+                                      GlyphBitmap& scratch) {
+    const uint64_t key = ((uint64_t)(uint32_t)isize << 32) | (uint64_t)cp;
+    auto it = im->text_glyphs.find(key);
+    if (it != im->text_glyphs.end()) return &it->second;
+
+    TextGlyphRec g{};
+    const int gid = (int)im->text_font.glyph_index(cp);
+    g.xadv = im->text_font.advance_px(gid, scale);
+    if (im->text_font.rasterize_glyph(gid, scale, scratch) &&
+        scratch.width > 0 && scratch.height > 0) {
+        const int cw = scratch.width + TEXT_ATLAS_PAD * 2;
+        const int ch = scratch.height + TEXT_ATLAS_PAD * 2;
+        if (cw <= TEXT_ATLAS_W && ch <= TEXT_ATLAS_H) {
+            if (im->text_atlas_x + cw > TEXT_ATLAS_W) {
+                im->text_atlas_x = 0;
+                im->text_atlas_y += im->text_atlas_rowh;
+                im->text_atlas_rowh = 0;
+            }
+            if (im->text_atlas_y + ch <= TEXT_ATLAS_H) {
+                const int gx = im->text_atlas_x + TEXT_ATLAS_PAD;
+                const int gy = im->text_atlas_y + TEXT_ATLAS_PAD;
+                for (int yy = 0; yy < scratch.height; ++yy) {
+                    uint8_t* dst = &im->text_atlas_px[(size_t)(gy + yy) * TEXT_ATLAS_W + gx];
+                    memcpy(dst, &scratch.pixels[(size_t)yy * scratch.width],
+                           (size_t)scratch.width);
+                }
+                g.u0 = (float)gx / (float)TEXT_ATLAS_W;
+                g.v0 = (float)gy / (float)TEXT_ATLAS_H;
+                g.u1 = (float)(gx + scratch.width) / (float)TEXT_ATLAS_W;
+                g.v1 = (float)(gy + scratch.height) / (float)TEXT_ATLAS_H;
+                g.xoff = (float)scratch.x_offset;
+                g.yoff = (float)scratch.y_offset;
+                g.gw = scratch.width;
+                g.gh = scratch.height;
+                im->text_atlas_x += cw;
+                if (ch > im->text_atlas_rowh) im->text_atlas_rowh = ch;
+                im->text_atlas_dirty = true;
+            }
+        }
+    }
+    auto res = im->text_glyphs.emplace(key, g);
+    return &res.first->second;
+}
+
+// Push one textured quad (2 triangles, 6 verts) into the staged vertex blob.
+// Vertex layout: float2 pos(px), float2 uv, float4 color — 32 bytes.
+static void text_emit_quad(std::vector<float>& verts, float x, float y,
+                           float w, float h, float u0, float v0, float u1, float v1,
+                           float r, float g, float b, float a) {
+    const float quad[6][8] = {
+        {x,     y,     u0, v0, r, g, b, a},
+        {x + w, y,     u1, v0, r, g, b, a},
+        {x + w, y + h, u1, v1, r, g, b, a},
+        {x,     y,     u0, v0, r, g, b, a},
+        {x + w, y + h, u1, v1, r, g, b, a},
+        {x,     y + h, u0, v1, r, g, b, a},
+    };
+    for (const auto& v : quad)
+        for (float f : v) verts.push_back(f);
+}
+
+// ---------------------------------------------------------------------------
 // Font loading + VM-thread text metrics
 // ---------------------------------------------------------------------------
 
@@ -681,48 +821,50 @@ float gfx_font_size_for_scale(int scale) {
     return 13.0f;
 }
 
-// VM-thread metrics context: pure CPU fontstash (all render callbacks NULL),
-// used for measure_text / line_height without touching GPU objects.
-static FONScontext* g_metrics_ctx = nullptr;
-static int g_metrics_font = -1;
+// VM-thread text metrics via the native font engine (no GPU resources).
+// Advance math mirrors the draw path: per-glyph int-rounded advances and
+// kern pairs, UTF-8 decoded — same totals fonsDrawText produced.
+static NativeFont g_metrics_font;
 static bool g_metrics_tried = false;
 
 static bool ensure_metrics() {
-    if (g_metrics_tried) return g_metrics_ctx != nullptr;
+    if (g_metrics_tried) return g_metrics_font.valid;
     g_metrics_tried = true;
     if (!load_font_data()) return false;
-    FONSparams params{};
-    params.width = 256;
-    params.height = 256;
-    params.flags = FONS_ZERO_TOPLEFT;
-    g_metrics_ctx = fonsCreateInternal(&params);
-    if (!g_metrics_ctx) return false;
-    g_metrics_font = fonsAddFontMem(g_metrics_ctx, "lymar",
-        g_font_data.data(), (int)g_font_data.size(), 0);
-    if (g_metrics_font < 0) { fonsDeleteInternal(g_metrics_ctx); g_metrics_ctx = nullptr; return false; }
-    fonsSetFont(g_metrics_ctx, g_metrics_font);
-    fonsSetAlign(g_metrics_ctx, FONS_ALIGN_LEFT | FONS_ALIGN_TOP);
-    return true;
+    return g_metrics_font.init(g_font_data.data(), g_font_data.size(), 0);
 }
 
 bool gfx_text_metrics_ready() { return ensure_metrics(); }
 
 float gfx_measure_text(const char* text, int scale) {
     if (!text || !ensure_metrics()) return 0.0f;
-    fonsSetSize(g_metrics_ctx, gfx_font_size_for_scale(scale));
-    // Advance width (pen position after the last glyph), NOT tight ink
-    // bounds — caret/selection math needs where the next glyph starts.
-    // fonsDrawText returns the advanced x; the metrics context has NULL
-    // render callbacks so nothing is drawn.
-    return fonsDrawText(g_metrics_ctx, 0.0f, 0.0f, text, text + strlen(text));
+    const float size_px = gfx_font_size_for_scale(scale);
+    const float fscale = g_metrics_font.scale_for_pixel_height(size_px);
+    float pen = 0.0f;
+    int prev_gid = -1;
+    const char* p = text;
+    const char* end = p + strlen(text);
+    while (p < end) {
+        uint32_t cp = utf8_next(p, end);
+        if (cp == '\n' || cp == '\r') { prev_gid = -1; continue; }
+        int gid = (int)g_metrics_font.glyph_index(cp);
+        if (prev_gid >= 0) {
+            int kern = g_metrics_font.kern_advance(prev_gid, gid);
+            pen += (float)(int)(kern * fscale + 0.5f);
+        }
+        pen += (float)(int)(g_metrics_font.advance_px(gid, fscale) + 0.5f);
+        prev_gid = gid;
+    }
+    return pen;
 }
 
 float gfx_line_height(int scale) {
     if (!ensure_metrics()) return 0.0f;
-    fonsSetSize(g_metrics_ctx, gfx_font_size_for_scale(scale));
-    float asc = 0, desc = 0, lineh = 0;
-    fonsVertMetrics(g_metrics_ctx, &asc, &desc, &lineh);
-    return lineh;
+    const float size_px = gfx_font_size_for_scale(scale);
+    // fontstash normalized lineh: (ascent - descent + lineGap) / (ascent - descent) * size
+    const float fh = (float)(g_metrics_font.ascent - g_metrics_font.descent);
+    if (fh <= 0.0f) return size_px;
+    return (fh + (float)g_metrics_font.line_gap) / fh * size_px;
 }
 
 static sg_shader make_rect_shader() {
@@ -916,6 +1058,74 @@ static sg_pipeline make_vstream_pipe(sg_shader sh, sg_primitive_type prim) {
     return sg_make_pipeline(&d);
 }
 
+static sg_shader make_text_shader() {
+    sg_shader_desc d{};
+    d.vertex_func.source = kTextVS;
+    d.vertex_func.entry = "vs_main";
+    d.vertex_func.d3d11_target = "vs_5_0";
+    d.fragment_func.source = kTextFS;
+    d.fragment_func.entry = "fs_main";
+    d.fragment_func.d3d11_target = "ps_5_0";
+    d.attrs[0].base_type = SG_SHADERATTRBASETYPE_FLOAT;
+    d.attrs[0].hlsl_sem_name = "TEXCOORD";
+    d.attrs[0].hlsl_sem_index = 0;
+    d.attrs[1].base_type = SG_SHADERATTRBASETYPE_FLOAT;
+    d.attrs[1].hlsl_sem_name = "TEXCOORD";
+    d.attrs[1].hlsl_sem_index = 1;
+    d.attrs[2].base_type = SG_SHADERATTRBASETYPE_FLOAT;
+    d.attrs[2].hlsl_sem_name = "TEXCOORD";
+    d.attrs[2].hlsl_sem_index = 2;
+    d.uniform_blocks[0].stage = SG_SHADERSTAGE_VERTEX;
+    d.uniform_blocks[0].size = 16;   // viewport float2 + pad float2
+    d.uniform_blocks[0].hlsl_register_b_n = 0;
+    sg_shader_view tv{};
+    tv.texture.stage = SG_SHADERSTAGE_FRAGMENT;
+    tv.texture.image_type = SG_IMAGETYPE_2D;
+    tv.texture.sample_type = SG_IMAGESAMPLETYPE_FLOAT;
+    tv.texture.hlsl_register_t_n = 0;
+    d.views[0] = tv;
+    sg_shader_sampler sm{};
+    sm.stage = SG_SHADERSTAGE_FRAGMENT;
+    sm.sampler_type = SG_SAMPLERTYPE_FILTERING;
+    sm.hlsl_register_s_n = 0;
+    d.samplers[0] = sm;
+    sg_shader_texture_sampler_pair pair{};
+    pair.stage = SG_SHADERSTAGE_FRAGMENT;
+    pair.view_slot = 0;
+    pair.sampler_slot = 0;
+    d.texture_sampler_pairs[0] = pair;
+    d.label = "lymar_text";
+    return sg_make_shader(&d);
+}
+
+static sg_pipeline make_text_pipe(sg_shader sh) {
+    sg_pipeline_desc d{};
+    d.shader = sh;
+    d.primitive_type = SG_PRIMITIVETYPE_TRIANGLES;
+    d.index_type = SG_INDEXTYPE_NONE;
+    d.colors[0].blend.enabled = true;
+    d.colors[0].blend.src_factor_rgb = SG_BLENDFACTOR_SRC_ALPHA;
+    d.colors[0].blend.dst_factor_rgb = SG_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
+    d.colors[0].blend.op_rgb = SG_BLENDOP_ADD;
+    d.colors[0].blend.src_factor_alpha = SG_BLENDFACTOR_ONE;
+    d.colors[0].blend.dst_factor_alpha = SG_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
+    d.colors[0].blend.op_alpha = SG_BLENDOP_ADD;
+    d.colors[0].write_mask = SG_COLORMASK_RGBA;
+    // vertex buffer 0: stride 32, attrs pos@0 (float2), uv@8 (float2), col@16 (float4)
+    d.layout.buffers[0].stride = 32;
+    d.layout.attrs[0].buffer_index = 0;
+    d.layout.attrs[0].offset = 0;
+    d.layout.attrs[0].format = SG_VERTEXFORMAT_FLOAT2;
+    d.layout.attrs[1].buffer_index = 0;
+    d.layout.attrs[1].offset = 8;
+    d.layout.attrs[1].format = SG_VERTEXFORMAT_FLOAT2;
+    d.layout.attrs[2].buffer_index = 0;
+    d.layout.attrs[2].offset = 16;
+    d.layout.attrs[2].format = SG_VERTEXFORMAT_FLOAT4;
+    d.label = "lymar_text_pipe";
+    return sg_make_pipeline(&d);
+}
+
 // ---------------------------------------------------------------------------
 
 static void sg_log_stderr(const char* tag, uint32_t level, uint32_t item,
@@ -994,6 +1204,8 @@ bool SokolGfxRuntime::setup() {
     impl_->pipe_shadow = make_pipe(impl_->sh_shadow, false, true, 0);
     impl_->pipe_vstream = make_vstream_pipe(impl_->sh_vstream, SG_PRIMITIVETYPE_TRIANGLES);
     impl_->pipe_vlines = make_vstream_pipe(impl_->sh_vstream, SG_PRIMITIVETYPE_LINES);
+    impl_->sh_text = make_text_shader();
+    impl_->pipe_text = make_text_pipe(impl_->sh_text);
 
     sg_sampler_desc sd{};
     sd.min_filter = SG_FILTER_LINEAR;
@@ -1036,18 +1248,21 @@ bool SokolGfxRuntime::setup() {
         impl_->pipe_blit = sg_make_pipeline(&d);
     }
 
-    // immediate-mode text: sokol_gl + fontstash atlas
-    sgl_desc_t sgl_desc{};
-    sgl_setup(&sgl_desc);
-    if (load_font_data()) {
-        sfons_desc_t fd{};
-        fd.width = 512;
-        fd.height = 512;
-        impl_->fons = sfons_create(&fd);
-        if (impl_->fons) {
-            impl_->fons_font = fonsAddFontMem(impl_->fons, "lymar",
-                g_font_data.data(), (int)g_font_data.size(), 0);
-        }
+    // immediate-mode text: native coverage atlas (R8) + dedicated pipeline
+    if (load_font_data() && impl_->text_font.init(g_font_data.data(), g_font_data.size(), 0)) {
+        impl_->text_font_ok = true;
+        impl_->text_atlas_px.assign((size_t)TEXT_ATLAS_W * TEXT_ATLAS_H, 0);
+        sg_image_desc id{};
+        id.width = TEXT_ATLAS_W;
+        id.height = TEXT_ATLAS_H;
+        id.pixel_format = SG_PIXELFORMAT_R8;
+        id.num_mipmaps = 1;
+        id.usage.dynamic_update = true;
+        id.label = "lymar_text_atlas";
+        impl_->text_img = sg_make_image(&id);
+        sg_view_desc vd{};
+        vd.texture.image = impl_->text_img;
+        impl_->text_view = sg_make_view(&vd);
     }
 
     ready_ = true;
@@ -1058,10 +1273,14 @@ void SokolGfxRuntime::shutdown() {
     if (!ready_) return;
     ready_ = false;
     if (impl_) {
-        if (impl_->fons) { sfons_destroy(impl_->fons); impl_->fons = nullptr; }
-        impl_->fons_font = -1;
+        if (impl_->text_img.id != SG_INVALID_ID) sg_destroy_image(impl_->text_img);
+        if (impl_->text_view.id != SG_INVALID_ID) sg_destroy_view(impl_->text_view);
+        if (impl_->text_vbuf.id != SG_INVALID_ID) sg_destroy_buffer(impl_->text_vbuf);
+        impl_->text_img = {SG_INVALID_ID};
+        impl_->text_view = {SG_INVALID_ID};
+        impl_->text_vbuf = {SG_INVALID_ID};
+        impl_->text_font_ok = false;
     }
-    sgl_shutdown();
     sg_shutdown();
     if (impl_) {
         delete impl_;
@@ -1435,9 +1654,9 @@ void SokolGfxRuntime::execute(const GfxCommand& cmd) {
             break;
         }
         case GfxCommand::Type::DrawTextCmd: {
-            // Defer: glyphs rasterize lazily inside fonsDrawText and dirty the
-            // atlas; sokol allows only ONE sg_update_image per image per frame,
-            // so all text must rasterize before a single sfons_flush+sgl_draw.
+            // Defer: glyphs rasterize lazily into the atlas and dirty it;
+            // sokol allows only ONE sg_update_image per image per frame,
+            // so all text must rasterize before the single atlas upload.
             if (!pass_open_ || cmd.s.empty()) break;
             GfxCommand d = cmd;
             if (!im->clip_stack.empty()) {
@@ -1485,61 +1704,114 @@ void SokolGfxRuntime::execute(const GfxCommand& cmd) {
 void SokolGfxRuntime::flush_text() {
     Impl* im = impl_;
     if (im->deferred_text.empty()) return;
-    if (!pass_open_ || !im->fons || im->fons_font < 0) {
+    if (!pass_open_ || !im->text_font_ok || im->text_img.id == SG_INVALID_ID) {
         im->deferred_text.clear();
         return;
     }
-    FONScontext* f = im->fons;
-    // sgl's projection matrix defaults to identity and sgl_ortho MULTIPLIES
-    // into the current matrix (it does not replace), so the stack must be
-    // reset to identity first or the transform degenerates after ~2 flushes.
-    sgl_matrix_mode_projection();
-    sgl_load_identity();
-    sgl_ortho(0.0f, (float)im->pass_w, (float)im->pass_h, 0.0f, -1.0f, 1.0f);
-    sgl_matrix_mode_modelview();
-    sgl_load_identity();
+    NativeFont& font = im->text_font;
+
+    // Pass 1: rasterize every glyph into the atlas and stage all quads.
+    // Atlas upload is deferred to a single sg_update_image below.
+    im->text_verts.clear();
+    im->text_draws.clear();
+    GlyphBitmap scratch;
     for (const GfxCommand& cmd : im->deferred_text) {
-        // scissor state is recorded into sgl's ordered command stream before
-        // this text's draw commands, so per-text clips survive the batch
-        if (cmd.clip.size() >= 4) {
-            sgl_scissor_rect(cmd.clip[0], cmd.clip[1], cmd.clip[2], cmd.clip[3], true);
-        } else {
-            sgl_scissor_rect(0, 0, im->pass_w, im->pass_h, true);
-        }
-        const float size = gfx_font_size_for_scale((int)cmd.f[6]);
-        const uint32_t col = sfons_rgba(
-            (uint8_t)std::clamp(cmd.f[2] * 255.0, 0.0, 255.0),
-            (uint8_t)std::clamp(cmd.f[3] * 255.0, 0.0, 255.0),
-            (uint8_t)std::clamp(cmd.f[4] * 255.0, 0.0, 255.0),
-            (uint8_t)std::clamp(cmd.f[5] * 255.0, 0.0, 255.0));
-        fonsPushState(f);
-        fonsSetFont(f, im->fons_font);
-        fonsSetSize(f, size);
-        fonsSetColor(f, col);
-        fonsSetAlign(f, FONS_ALIGN_LEFT | FONS_ALIGN_TOP);
-        float asc = 0, desc = 0, lineh = 0;
-        fonsVertMetrics(f, &asc, &desc, &lineh);
-        if (lineh <= 0) lineh = size;
-        const char* p = cmd.s.c_str();
+        if (cmd.s.empty()) continue;
+        const float size_px = gfx_font_size_for_scale((int)cmd.f[6]);
+        const int isize = (int)(size_px * 10.0f);
+        const float fscale = font.scale_for_pixel_height(size_px);
+        // fontstash normalized metrics: lineh = (fh + gap)/fh * size,
+        // baseline sits `ascent * fscale` below the line top.
+        const float fh = (float)(font.ascent - font.descent);
+        const float lineh = (fh > 0.0f)
+            ? (fh + (float)font.line_gap) / fh * size_px : size_px;
+        const float asc_off = (float)font.ascent * fscale;
+        const float cr = (float)std::clamp(cmd.f[2] * 255.0, 0.0, 255.0) / 255.0f;
+        const float cg = (float)std::clamp(cmd.f[3] * 255.0, 0.0, 255.0) / 255.0f;
+        const float cb = (float)std::clamp(cmd.f[4] * 255.0, 0.0, 255.0) / 255.0f;
+        const float ca = (float)std::clamp(cmd.f[5] * 255.0, 0.0, 255.0) / 255.0f;
+
+        const size_t vstart = im->text_verts.size() / 8;
+        const char* p = cmd.s.data();
         const char* end = p + cmd.s.size();
         float ty = (float)cmd.f[1];
         while (p < end) {
             const char* nl = (const char*)memchr(p, '\n', (size_t)(end - p));
             if (!nl) nl = end;
-            fonsDrawText(f, (float)cmd.f[0], ty, p, nl);
+            float pen = (float)cmd.f[0];
+            const float baseline = ty + asc_off;
+            int prev_gid = -1;
+            const char* lp = p;
+            while (lp < nl) {
+                const uint32_t cp = utf8_next(lp, nl);
+                if (cp == '\r') continue;
+                const int gid = (int)font.glyph_index(cp);
+                if (prev_gid >= 0) {
+                    const int kern = font.kern_advance(prev_gid, gid);
+                    pen += (float)(int)(kern * fscale + 0.5f);
+                }
+                const TextGlyphRec* g = text_glyph(im, cp, isize, size_px, fscale, scratch);
+                if (g != nullptr && g->gw > 0) {
+                    const float qx = (float)(int)(pen + g->xoff);
+                    const float qy = (float)(int)(baseline + g->yoff);
+                    text_emit_quad(im->text_verts, qx, qy, (float)g->gw, (float)g->gh,
+                                   g->u0, g->v0, g->u1, g->v1, cr, cg, cb, ca);
+                }
+                if (g != nullptr) pen += (float)(int)(g->xadv + 0.5f);
+                prev_gid = gid;
+            }
             ty += lineh;
             p = (nl < end) ? nl + 1 : end;
         }
-        fonsPopState(f);
+        im->text_draws.push_back({vstart, im->text_verts.size() / 8, cmd.clip});
     }
     im->deferred_text.clear();
+    if (im->text_draws.empty()) return;
+
     // ONE atlas upload per frame max (sokol allows a single sg_update_image
-    // per image per frame); replay sgl's ordered scissor+draw commands and
-    // restore the raw sg scissor afterwards
-    if (last_text_flush_ != frame_id_) {
+    // per image per frame); glyphs rasterized after this frame's upload show
+    // up on the next frame, matching the old fontstash dirty-rect behavior.
+    if (im->text_atlas_dirty && last_text_flush_ != frame_id_) {
         last_text_flush_ = frame_id_;
-        sfons_flush(f);
+        im->text_atlas_dirty = false;
+        sg_image_data idata{};
+        idata.mip_levels[0].ptr = im->text_atlas_px.data();
+        idata.mip_levels[0].size = im->text_atlas_px.size();
+        sg_update_image(im->text_img, &idata);
     }
-    sgl_draw();
+
+    // Vertex buffer: rebuilt per flush (sokol allows one buffer update per
+    // resource per frame; recreating sidesteps multi-pass frames entirely).
+    const size_t nverts = im->text_verts.size() / 8;
+    if (nverts == 0) return;
+    if (im->text_vbuf.id != SG_INVALID_ID) sg_destroy_buffer(im->text_vbuf);
+    {
+        sg_buffer_desc bd{};
+        bd.usage.immutable = true;
+        bd.usage.vertex_buffer = true;
+        bd.size = nverts * 32;
+        bd.data.ptr = im->text_verts.data();
+        bd.data.size = bd.size;
+        bd.label = "lymar_text_vbuf";
+        im->text_vbuf = sg_make_buffer(&bd);
+    }
+
+    // Pass 2: draw each text run under its recorded clip.
+    sg_apply_pipeline(im->pipe_text);
+    float ub[4] = {(float)im->pass_w, (float)im->pass_h, 0.0f, 0.0f};
+    sg_range vrng{ub, sizeof(ub)};
+    sg_apply_uniforms(0, &vrng);
+    sg_bindings tb{};
+    tb.views[0] = im->text_view;
+    tb.samplers[0] = im->tex_smp;
+    sg_apply_bindings(&tb);
+    for (const auto& dr : im->text_draws) {
+        if (dr.clip.size() >= 4) {
+            sg_apply_scissor_rect(dr.clip[0], dr.clip[1], dr.clip[2], dr.clip[3], true);
+        } else {
+            sg_apply_scissor_rect(0, 0, im->pass_w, im->pass_h, true);
+        }
+        sg_draw((int)dr.v0, (int)(dr.v1 - dr.v0), 1);
+    }
     apply_scissor(im);
 }
