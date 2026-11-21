@@ -2104,19 +2104,25 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             case LIR::LIR_Op::RegionMove: {
                 // Escape analysis: region_move only promotes heap words
                 // (is_heap_word gate in the runtime). A register whose slot
-                // holds a raw scalar — unboxed float/double, bool — can never
-                // be a heap word, so the call (and the box_float the boundary
+                // holds a raw scalar — unboxed int/float/bool — can never be
+                // a heap word, so the call (and the box_float the boundary
                 // normalization would insert for the float argument) is pure
-                // overhead. Pointer-assigned, tagged-word, and integer
-                // registers may still carry pubptr/raw addresses and keep the
-                // call for region validation + promotion.
+                // overhead. U64 stays dynamic: 128-bit boxing routes heap
+                // boxes through it. Pointer-assigned, tagged-word, and
+                // pointer-language registers may still carry pubptr/raw
+                // addresses and heap objects and keep the call for region
+                // validation + promotion.
                 LIR::Type mv_type = inst.type_a != LIR::Type::Void ? inst.type_a : LIR::Type::I64;
                 if (mv_type == LIR::Type::I64 || mv_type == LIR::Type::Void) {
                     auto rt = lir_func.register_types.find(inst.a);
                     if (rt != lir_func.register_types.end()) mv_type = rt->second;
                 }
                 const bool mv_scalar =
-                    (mv_type == LIR::Type::F64 || mv_type == LIR::Type::F32 || mv_type == LIR::Type::Bool) &&
+                    (mv_type == LIR::Type::F64 || mv_type == LIR::Type::F32 || mv_type == LIR::Type::Bool ||
+                     mv_type == LIR::Type::I8 || mv_type == LIR::Type::U8 ||
+                     mv_type == LIR::Type::I16 || mv_type == LIR::Type::U16 ||
+                     mv_type == LIR::Type::I32 || mv_type == LIR::Type::U32 ||
+                     mv_type == LIR::Type::I64) &&
                     !pointer_assigned_regs.count(inst.a) && !is_pointer_lang_type(inst.a) &&
                     !tagged_word_regs.count(inst.a);
                 if (!mv_scalar) {
@@ -2367,7 +2373,13 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 for (const auto& item : current_module_->getGlobalVariables()) {
                     if (item->getName() == gname) { gv = item.get(); break; }
                 }
+                auto lang_is_float = [&](uint32_t reg) {
+                    auto it = lir_func.register_language_types.find(reg);
+                    return it != lir_func.register_language_types.end() && it->second &&
+                        (it->second->tag == ::TypeTag::Float64 || it->second->tag == ::TypeTag::Float32);
+                };
                 bool is_float_g = (inst.type_a == LIR::Type::F64 || inst.type_a == LIR::Type::F32 ||
+                                  lang_is_float(inst.a) ||
                                   (reg_types.count(inst.a) && (reg_types[inst.a] == LIR::Type::F64 || reg_types[inst.a] == LIR::Type::F32)) ||
                                   (global_types_.count(gname) && (global_types_[gname] == LIR::Type::F64 || global_types_[gname] == LIR::Type::F32)));
                 if (!gv) {
@@ -2407,7 +2419,11 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 for (const auto& item : current_module_->getGlobalVariables()) {
                     if (item->getName() == gname) { gv = item.get(); break; }
                 }
-                bool is_float_g = ((global_types_.count(gname) && (global_types_[gname] == LIR::Type::F64 || global_types_[gname] == LIR::Type::F32)) ||
+                auto dst_lang = lir_func.register_language_types.find(inst.dst);
+                bool dst_is_float = dst_lang != lir_func.register_language_types.end() && dst_lang->second &&
+                    (dst_lang->second->tag == ::TypeTag::Float64 || dst_lang->second->tag == ::TypeTag::Float32);
+                bool is_float_g = (dst_is_float ||
+                                  (global_types_.count(gname) && (global_types_[gname] == LIR::Type::F64 || global_types_[gname] == LIR::Type::F32)) ||
                                   inst.result_type == LIR::Type::F64 || inst.result_type == LIR::Type::F32);
                 if (!gv) {
                     ir::Type* gv_type = is_float_g ? (ir::Type*)context_->getDoubleType() : (ir::Type*)context_->getIntegerType(64);
@@ -2425,7 +2441,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     loaded_type = global_types_[gname];
                 }
                 if (is_float_g) {
-                    store_reg(inst.dst, loaded, inst.result_type);
+                    store_reg(inst.dst, loaded, LIR::Type::F64);
                 } else {
                     store_reg(inst.dst, loaded, loaded_type);
                 }

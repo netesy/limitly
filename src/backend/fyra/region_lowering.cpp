@@ -330,12 +330,40 @@ void lower_region_ownership(ir::Module& module, const std::unordered_map<std::st
                                                          addr_inst->getName().starts_with("scalar_"))) ||
                                           inst->getName().starts_with("scalar_store_") ||
                                           inst->getName().starts_with("scalar_");
+                    // Escape analysis: edge() promotes only validated heap
+                    // allocations and ignores everything else, but still pays
+                    // a containing() page-map walk per store. Integer-domain
+                    // values that cannot be heap words — small/tagged
+                    // constants and reloads from proven-scalar slots — make
+                    // the call a guaranteed no-op. Floats keep the existing
+                    // edge(addr, 0) stale-edge clear below.
+                    auto provably_scalar = [&](ir::Value* v) -> bool {
+                        if (auto* c = dynamic_cast<ir::ConstantInt*>(v)) {
+                            // Mirror is_heap_word's shape check: only values
+                            // that could alias a live allocation stay dynamic.
+                            return c->getValue() <= 4096 || (c->getValue() & 7) != 0;
+                        }
+                        auto* producer = dynamic_cast<ir::Instruction*>(v);
+                        if (!producer) return false;
+                        if (producer->getOpcode() == ir::Instruction::Load ||
+                            producer->getOpcode() == ir::Instruction::Loadl ||
+                            producer->getOpcode() == ir::Instruction::Loadd ||
+                            producer->getOpcode() == ir::Instruction::Loads) {
+                            if (!producer->getOperands().empty()) {
+                                auto* home = dynamic_cast<ir::Instruction*>(producer->getOperands()[0]->get());
+                                if (home && home->getName().starts_with("scalar_slot_")) return true;
+                            }
+                        }
+                        return false;
+                    };
                     if (is_scalar_dest) {
                         // Scalar slot allocations and scalar list element stores need no region GC edge.
                     } else if (value->getType()->isFloatingPoint()) {
                         // Primitive scalar values cannot carry pointers; clear any stale edge.
                         emit(block, after, dynamic_cast<ir::GlobalVariable*>(address) ? "lymar_aot_global_edge" : "lymar_aot_edge",
                              {address, static_cast<ir::Value*>(zero)});
+                    } else if (provably_scalar(value)) {
+                        // Provably non-heap value: edge() would be a no-op.
                     } else {
                         // The stored word is self-describing: edge() promotes only
                         // validated heap allocations and ignores raw/tagged scalars.
