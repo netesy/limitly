@@ -67,6 +67,9 @@ frame Chart {
         self.pal_g = [0.40, 0.72, 0.62, 0.27, 0.51, 0.36];
         self.pal_b = [0.95, 0.50, 0.04, 0.27, 0.96, 0.96];
         self.id = comp.next_widget_id();
+        // Charts flex to fill leftover flow space (rows share width,
+        // lone charts in a column stretch vertically).
+        self.expand = 1.0;
     }
 
     pub fn kind(): ui_types.WidgetKind { return self.chart_kind; }

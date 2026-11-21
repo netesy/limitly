@@ -894,6 +894,45 @@ pub fn get_line_height(scale: int = 1): float {
     return (16 * scale) as float;
 }
 
+// ── Pixel-sized text variants ────────────────────────────────────────────────
+// px is the physical font size. The native atlas snaps to the nearest baked
+// glyph size; the sokol/fons path receives the exact size because runtime
+// scale ints > 7 are treated as pixel sizes (gfx_font_size_for_scale).
+
+fn px_scale_arg(px: float): int {
+    var px_i = (px + 0.5) as int;
+    if (px_i < 8) { px_i = 8; }
+    return px_i;
+}
+
+pub fn draw_text_px(text_str: str, x: float, y: float, r: float, g: float, b: float, a: float, px: float): nil {
+    if (osid.GG_BACKEND != osid.GG_BACKEND_SOKOL and _native_on != 0) {
+        ggn.draw_text_px(text_str, x, y, r, g, b, a, px);
+        return;
+    }
+    draw_text(text_str, x, y, r, g, b, a, px_scale_arg(px));
+}
+
+pub fn measure_text_px(text_str: str, px: float): float {
+    if (osid.GG_BACKEND != osid.GG_BACKEND_SOKOL and _native_on != 0) {
+        return ggn.measure_text_px(text_str, px);
+    }
+    if (global_graphics_context.handle != -1) {
+        return measure_text(text_str, px_scale_arg(px));
+    }
+    return (len(text_str) * px * 0.6) as float;
+}
+
+pub fn get_line_height_px(px: float): float {
+    if (osid.GG_BACKEND != osid.GG_BACKEND_SOKOL and _native_on != 0) {
+        return ggn.get_line_height_px(px);
+    }
+    if (global_graphics_context.handle != -1) {
+        return get_line_height(px_scale_arg(px));
+    }
+    return px * 1.25;
+}
+
 pub fn end_pass(): nil {
     if (osid.GG_BACKEND != osid.GG_BACKEND_SOKOL and _native_on != 0) {
         ggn.end_pass();

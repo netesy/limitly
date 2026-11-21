@@ -203,25 +203,30 @@ fn ensure_font_atlas(): int {
 
             var sym_multi = ffi.library_get_symbol(lib, "init_font_atlas_multi");
 
-            var atlas_w = 1024;
-            var atlas_h = 1024;
+            // Atlas: 2048x2048 packs 39 integer-px tiers (10..48) — verified
+            // against init_font_atlas_multi. Glyph/metric buffers are sized
+            // for the tier count; size_idx*3456 stride is per-tier.
+            var atlas_w = 2048;
+            var atlas_h = 2048;
             _atlas_rgba = alloc_persist(atlas_w * atlas_h * 4);
-            _glyphs_buf = alloc_persist(6 * 96 * 36);
-            _metrics_buf = alloc_persist(6 * 3 * 4);
-            _sizes_buf = alloc_persist(6 * 4);
+            _glyphs_buf = alloc_persist(39 * 96 * 36);
+            _metrics_buf = alloc_persist(39 * 3 * 4);
+            _sizes_buf = alloc_persist(39 * 4);
 
-            // 6 typographic sizes: 11.0, 13.0, 15.0, 18.0, 22.0, 28.0
-            ffi.store_f32(_sizes_buf, 11.0);
-            ffi.store_f32(ffi.ptr_add(_sizes_buf, 4), 13.0);
-            ffi.store_f32(ffi.ptr_add(_sizes_buf, 8), 15.0);
-            ffi.store_f32(ffi.ptr_add(_sizes_buf, 12), 18.0);
-            ffi.store_f32(ffi.ptr_add(_sizes_buf, 16), 22.0);
-            ffi.store_f32(ffi.ptr_add(_sizes_buf, 20), 28.0);
+            // One baked tier per integer pixel size 10..48 — near-free
+            // font sizing: any requested px snaps to the nearest 1px tier.
+            var ti = 0;
+            var tpx = 10;
+            while (tpx <= 48) {
+                ffi.store_f32(ffi.ptr_add(_sizes_buf, ti * 4), tpx as float);
+                ti = ti + 1;
+                tpx = tpx + 1;
+            }
 
             var pref_cstr = ffi.string_to_cstring("");
             if (sym_multi != nil) {
                 var res = ffi.foreign_call(sym_multi,
-                    [ffi.cstring_as_ptr(pref_cstr), atlas_w, atlas_h, _sizes_buf, 6, _atlas_rgba, _glyphs_buf, _metrics_buf],
+                    [ffi.cstring_as_ptr(pref_cstr), atlas_w, atlas_h, _sizes_buf, 39, _atlas_rgba, _glyphs_buf, _metrics_buf],
                     ffi.TYPE_I32,
                     [ffi.TYPE_PTR, ffi.TYPE_I32, ffi.TYPE_I32, ffi.TYPE_PTR, ffi.TYPE_I32, ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_PTR]) as int;
                 ffi.cstring_free(pref_cstr);
@@ -239,7 +244,7 @@ fn ensure_font_atlas(): int {
         }
 
         if (_atlas_tex == 0) {
-            _atlas_tex = drv_create_tex_rgba(1024, 1024, _atlas_rgba);
+            _atlas_tex = drv_create_tex_rgba(2048, 2048, _atlas_rgba);
             // 21 = linear filter (in both D3D11 and Vulkan)
             // 3 = clamp to edge (in both D3D11 and Vulkan)
             _atlas_smp = drv_create_sampler(21, 3, 3);
@@ -707,23 +712,39 @@ pub fn pop_clip(): nil {
     }
 }
 
+// Atlas tiers are integer px 10..48 (39 tiers, index = px - 10).
 fn size_index_for_scale(scale: int): int {
-    if (scale <= 0) { return 0; } // 11px
-    if (scale == 1) { return 1; } // 13px (standard UI)
-    if (scale == 2) { return 4; } // 22px (standard headings)
-    if (scale >= 3) { return 5; } // 28px (large display)
-    return 1;
+    if (scale <= 0) { return 1; }  // 11px
+    if (scale == 1) { return 3; }  // 13px (standard UI)
+    if (scale == 2) { return 12; } // 22px (standard headings)
+    if (scale >= 3) { return 18; } // 28px (large display)
+    return 3;
 }
 
-pub fn draw_text(text_str: str, x: float, y: float,
-                 r: float, g: float, b: float, a: float,
-                 scale: int = 1): nil {
+// Baked atlas pixel size for a size index (tier = index + 10).
+fn atlas_px(size_idx: int): float {
+    if (size_idx < 0) { return 10.0; }
+    if (size_idx > 38) { return 48.0; }
+    return (size_idx + 10) as float;
+}
+
+// Atlas size index for an explicit pixel size — snaps to the nearest
+// integer-px tier (10..48), clamped at both ends.
+fn size_index_for_px(px: float): int {
+    var i = ((px + 0.5) as int) - 10;
+    if (i < 0) { i = 0; }
+    if (i > 38) { i = 38; }
+    return i;
+}
+
+fn draw_text_at(text_str: str, x: float, y: float,
+                r: float, g: float, b: float, a: float,
+                size_idx: int): nil {
     unsafe {
         if (len(text_str) == 0 or a <= 0.001) { return; }
         if (pipeline_init() == 0) { return; }
         if (ensure_font_atlas() == 0) { return; }
 
-        var size_idx = size_index_for_scale(scale);
         var gbuf = ffi.ptr_add(_glyphs_buf, size_idx * 3456); // 96 * 36 = 3456
         var lh = ffi.load_f32(ffi.ptr_add(_metrics_buf, size_idx * 12 + 8));
 
@@ -790,13 +811,25 @@ pub fn draw_text(text_str: str, x: float, y: float,
     }
 }
 
-pub fn measure_text(text_str: str, scale: int = 1): float {
+pub fn draw_text(text_str: str, x: float, y: float,
+                 r: float, g: float, b: float, a: float,
+                 scale: int = 1): nil {
+    draw_text_at(text_str, x, y, r, g, b, a, size_index_for_scale(scale));
+}
+
+// Pixel-sized variant: snaps to the nearest baked atlas glyph size.
+pub fn draw_text_px(text_str: str, x: float, y: float,
+                    r: float, g: float, b: float, a: float,
+                    px: float): nil {
+    draw_text_at(text_str, x, y, r, g, b, a, size_index_for_px(px));
+}
+
+fn measure_text_at(text_str: str, size_idx: int): float {
     unsafe {
         if (len(text_str) == 0) { return 0.0; }
         if (ensure_font_atlas() == 0) {
-            return (len(text_str) * 8 * scale) as float;
+            return (len(text_str) * atlas_px(size_idx) * 0.6) as float;
         }
-        var size_idx = size_index_for_scale(scale);
         var gbuf = ffi.ptr_add(_glyphs_buf, size_idx * 3456);
 
         if (_sym_measure_text != nil) {
@@ -830,12 +863,27 @@ pub fn measure_text(text_str: str, scale: int = 1): float {
     }
 }
 
-pub fn get_line_height(scale: int = 1): float {
+pub fn measure_text(text_str: str, scale: int = 1): float {
+    return measure_text_at(text_str, size_index_for_scale(scale));
+}
+
+pub fn measure_text_px(text_str: str, px: float): float {
+    return measure_text_at(text_str, size_index_for_px(px));
+}
+
+fn line_height_at(size_idx: int): float {
     unsafe {
         if (ensure_font_atlas() == 0) {
-            return (16 * scale) as float;
+            return atlas_px(size_idx) * 1.25;
         }
-        var size_idx = size_index_for_scale(scale);
         return ffi.load_f32(ffi.ptr_add(_metrics_buf, size_idx * 12 + 8));
     }
+}
+
+pub fn get_line_height(scale: int = 1): float {
+    return line_height_at(size_index_for_scale(scale));
+}
+
+pub fn get_line_height_px(px: float): float {
+    return line_height_at(size_index_for_px(px));
 }

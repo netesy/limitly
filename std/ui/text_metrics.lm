@@ -36,18 +36,23 @@ pub var _font_state: int = 0; // 0 = untried, 1 = loaded, 2 = unavailable
 pub var _width_cache: {str: float} = {};
 pub var _height_cache: {str: float} = {};
 
-// Map widget font_scale to the renderer's integer scale, mirroring
-// std/ui/replay.lm: scale_i = font_scale >= 1.5 ? 2 : 1.
-fn render_scale(font_scale: float): int {
-    if (font_scale >= 1.5) { return 2; }
-    return 1;
+// Root font scale — the "rem" unit for all UI text. Widget font_scale
+// values are em-style multipliers of BASE_FONT_PX; root_scale multiplies
+// every one of them (1.0 = 13px body text). Set once at startup via
+// ui.set_font_scale() to scale the entire UI's typography.
+pub var root_scale: float = 1.0;
+
+pub fn set_root_scale(f: float): nil {
+    if (f > 0.0) { root_scale = f; }
 }
 
-// Pixel size the renderer will use for a widget font_scale.
-// Mirrors gfx_font_size_for_scale for the two scales replay emits.
-fn render_px(font_scale: float): float {
-    if (render_scale(font_scale) == 2) { return 20.0; }
-    return 13.0;
+pub fn font_scale(): float {
+    return root_scale;
+}
+
+// Effective em multiplier: widget font_scale (em) × root_scale (rem).
+fn eff_scale(font_scale: float): float {
+    return font_scale * root_scale;
 }
 
 fn ensure_font(): int {
@@ -74,23 +79,26 @@ pub fn using_real_font(): bool {
     return ensure_font() == 1;
 }
 
-// Advance width of a display string at the given font_scale.
+// Advance width of a display string at the given font_scale (em units;
+// multiplied by root_scale internally).
 pub fn text_width(text: str, font_scale: float = 1.0): float {
-    var key: str = text + "#" + (((font_scale * 1000.0) as int) as str);
+    var eff: float = eff_scale(font_scale);
+    var px: float = BASE_FONT_PX * eff;
+    var key: str = text + "#" + (((eff * 1000.0) as int) as str);
     val hit = _width_cache[key];
     if (hit != nil) {
         return hit as float;
     }
     var w: float = 0.0;
     if (using_renderer_metrics()) {
-        // Exact: fons measures with the same font+size the draw uses.
-        w = gg.measure_text(text, render_scale(font_scale));
+        // Exact: measures with the same font+size the draw uses.
+        w = gg.measure_text_px(text, px);
     }
     if (w <= 0.0 and ensure_font() == 1) {
-        w = (_ui_font as imgfont.Font).text_width(text, render_px(font_scale));
+        w = (_ui_font as imgfont.Font).text_width(text, px);
     }
     if (w <= 0.0) {
-        w = layout.measure_width(text, FALLBACK_CHAR_W * font_scale);
+        w = layout.measure_width(text, FALLBACK_CHAR_W * eff);
     }
     _width_cache[key] = w;
     return w;
@@ -98,20 +106,22 @@ pub fn text_width(text: str, font_scale: float = 1.0): float {
 
 // Line height for single-line widgets at the given font_scale.
 pub fn line_height(font_scale: float = 1.0): float {
-    var key: str = "lh#" + (((font_scale * 1000.0) as int) as str);
+    var eff: float = eff_scale(font_scale);
+    var px: float = BASE_FONT_PX * eff;
+    var key: str = "lh#" + (((eff * 1000.0) as int) as str);
     val hit = _height_cache[key];
     if (hit != nil) {
         return hit as float;
     }
     var h: float = 0.0;
     if (using_renderer_metrics()) {
-        h = gg.get_line_height(render_scale(font_scale));
+        h = gg.get_line_height_px(px);
     }
     if (h <= 0.0 and ensure_font() == 1) {
-        h = (_ui_font as imgfont.Font).text_height("Ag", render_px(font_scale));
+        h = (_ui_font as imgfont.Font).text_height("Ag", px);
     }
     if (h <= 0.0) {
-        h = FALLBACK_CHAR_W * 1.25 * font_scale;
+        h = FALLBACK_CHAR_W * 1.25 * eff;
     }
     _height_cache[key] = h;
     return h;

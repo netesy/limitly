@@ -77,6 +77,10 @@ frame Rect {
 frame Placed {
     pub var rect: Rect = Rect();
     pub var id: int = 0;
+    // Flex weight for Flow containers: children with expand > 0 share the
+    // leftover main-axis space proportionally (row -> width, column ->
+    // height). 0 = natural/measured size only.
+    pub var expand: float = 0.0;
 
     // Stable int identity, assigned at construction. Scalar fields are
     // copied into the trait snapshot, so the id observed through Component
@@ -105,6 +109,12 @@ frame Placed {
 
     pub fn child_at(i: int): any {
         return nil;
+    }
+
+    // Flex weight exposed to Flow.arrange through the Component trait.
+    // Promoted into every Placed widget; the trait default covers the rest.
+    pub fn expand_weight(): float {
+        return self.expand;
     }
 }
 
@@ -143,6 +153,8 @@ trait Component {
     // defaults; containers override with their real children.
     fn child_count(): int { return 0; }
     fn child_at(i: int): any;
+    // Flex weight for Flow leftover distribution (see Placed.expand).
+    fn expand_weight(): float { return 0.0; }
     // Called by tree.apply_theme after a theme swap. Widgets that
     // snapshot uitheme.palette() re-apply theme-derived fields here;
     // leaves/containers use an empty body.

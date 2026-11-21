@@ -44,6 +44,12 @@ frame Flow {
     pub var _ah: float = 0.0;
     pub var _rw: float = 0.0;
     pub var _rh: float = 0.0;
+    // Flex scratch: per-child measured main-axis size, total expand weight,
+    // leftover main-axis space, and the current child's share.
+    pub var _msz: [float] = [] as [float];
+    pub var _wsum: float = 0.0;
+    pub var _leftover: float = 0.0;
+    pub var _share: float = 0.0;
 
     pub init(v: int = 0, sp: float = 4.0) {
         self.children = [];
@@ -127,12 +133,17 @@ frame Flow {
         self._aw = w - self.pad_x * 2.0;
         self._ah = h - self.pad_y * 2.0;
         self._cur = 0.0;
+        // Grow _msz to child count once; entries are overwritten each pass.
+        while (len(self._msz) < len(self.children)) {
+            self._msz.append(0.0);
+        }
+        // Pass 1: measure every child at its natural size (clamped to the
+        // remaining space, so expandable children like ScrollView still cap
+        // at the leftover), record main-axis sizes, and total expand weight.
+        self._wsum = 0.0;
         var i = 0;
         while (i < len(self.children)) {
             val c = self.children[i];
-            // Remaining space along each axis after the consumed offset —
-            // expandable children (e.g. ScrollView) clamp to the leftover
-            // instead of overflowing.
             // Remaining space lives in fields, not locals: AOT Mov-copies of
             // erased-word float fields read back as denormal garbage.
             if (self.vertical != 0) {
@@ -146,11 +157,41 @@ frame Flow {
             if (self._rh < 0.0) { self._rh = 0.0; }
             val s = c.measure(0.0, self._rw, 0.0, self._rh);
             if (self.vertical != 0) {
-                c.arrange(self._ox, self._oy + self._cur, self._aw, s.h);
+                self._msz[i] = s.h;
                 self._cur = self._cur + s.h + self.spacing;
             } else {
-                c.arrange(self._ox + self._cur, self._oy, s.w, self._ah);
+                self._msz[i] = s.w;
                 self._cur = self._cur + s.w + self.spacing;
+            }
+            val ew = c.expand_weight();
+            if (ew > 0.0) { self._wsum = self._wsum + ew; }
+            i = i + 1;
+        }
+        // Leftover main-axis space is shared by expand>0 children in
+        // proportion to their weight; the rest keep natural size.
+        if (len(self.children) > 0) { self._cur = self._cur - self.spacing; }
+        if (self.vertical != 0) {
+            self._leftover = self._ah - self._cur;
+        } else {
+            self._leftover = self._aw - self._cur;
+        }
+        if (self._leftover < 0.0) { self._leftover = 0.0; }
+        // Pass 2: place children, adding each expand child's share.
+        self._cur = 0.0;
+        i = 0;
+        while (i < len(self.children)) {
+            val c = self.children[i];
+            val ew = c.expand_weight();
+            self._share = 0.0;
+            if (ew > 0.0 and self._wsum > 0.0) {
+                self._share = self._leftover * ew / self._wsum;
+            }
+            if (self.vertical != 0) {
+                c.arrange(self._ox, self._oy + self._cur, self._aw, self._msz[i] + self._share);
+                self._cur = self._cur + self._msz[i] + self._share + self.spacing;
+            } else {
+                c.arrange(self._ox + self._cur, self._oy, self._msz[i] + self._share, self._ah);
+                self._cur = self._cur + self._msz[i] + self._share + self.spacing;
             }
             i = i + 1;
         }

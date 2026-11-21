@@ -38,6 +38,8 @@ frame Stat {
         self.text2 = pal.text_muted;
         self.accent = pal.accent;
         self.font_scale = 1.0;
+        // Stat cards flex to fill leftover row/column space.
+        self.expand = 1.0;
         self.id = comp.next_widget_id();
     }
 

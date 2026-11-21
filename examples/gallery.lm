@@ -148,6 +148,8 @@ fn build_gallery_page(): ui.Flow {
 
 fn main(): int {
     uitheme.set_dark();
+    // Root font scale (rem): 1.25x body text across the whole UI.
+    ui.set_font_scale(1.25);
 
     var a = app.App("Lymar Widget Gallery", 860, 640);
 

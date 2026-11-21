@@ -21,6 +21,7 @@
 // add() and the tree sees live values across the trait snapshot.
 
 import std.ui.file_dialog as filedlg;
+import std.ui.text_metrics as text_metrics;
 
 pub import std.ui.component show Component, Placed, TextBound, Size, Rect, MEASURE_LOOSE, next_widget_id, label;
 
@@ -69,4 +70,14 @@ pub fn pick_save(owner: int = 0, title: str = "Save File"): str? {
 }
 pub fn file_dialog_owner(hwnd: int): nil {
     filedlg.set_owner(hwnd);
+}
+
+// Root font scale ("rem"): multiplies every widget's em font_scale, so the
+// whole UI's typography scales together. 1.0 = 13px body text.
+// Call once at startup, e.g. ui.set_font_scale(1.25).
+pub fn set_font_scale(f: float): nil {
+    text_metrics.set_root_scale(f);
+}
+pub fn font_scale(): float {
+    return text_metrics.font_scale();
 }

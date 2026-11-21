@@ -452,7 +452,10 @@ The §4 end-state is now partially real:
   currently rectangular), `overlay` (single child at an absolute
   offset), and `tooltip` (hover bubble). `row`/`column`/`scroll_view`
   stay in `std.ui.container`; legacy `join` is just a horizontal
-  container (= `row`).
+  container (= `row`). `Flow` (row/column) distributes leftover
+  main-axis space to children with `expand > 0` proportionally to
+  their weight — `Stat` and `Chart` ship with `expand = 1.0`, so cards
+  fill their row/column; set `widget.expand` to opt other widgets in.
 - **Theming** — `std.ui.theme.palette()` snapshots
   `std.ui.theme.global_theme` (ColorPalette + Spacing/Typography/Shape
   tokens) into a flat `Palette` at widget `init` time; widget color

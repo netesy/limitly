@@ -5,6 +5,7 @@
 
 import std.gg as gg;
 import std.ui.draw_list as dl;
+import std.ui.text_metrics as tm;
 
 // Replays a DrawList to the GPU — pure linear iteration, zero recursion.
 pub fn replay(draw_list: dl.DrawList): nil {
@@ -27,9 +28,10 @@ pub fn replay(draw_list: dl.DrawList): nil {
                 }
             },
             dl.DrawCmdKind.Text => {
-                var scale_i: int = 1;
-                if (cmd.font_scale >= 1.5) { scale_i = 2; }
-                gg.draw_text(cmd.text, cmd.x, cmd.y, cmd.r, cmd.g, cmd.b, cmd.a, scale_i);
+                // cmd.font_scale is the widget's em value; root_scale is the
+                // rem multiplier. px = BASE_FONT_PX * em * rem.
+                gg.draw_text_px(cmd.text, cmd.x, cmd.y, cmd.r, cmd.g, cmd.b, cmd.a,
+                    tm.BASE_FONT_PX * cmd.font_scale * tm.font_scale());
             },
             dl.DrawCmdKind.Line => {
                 gg.draw_line_primitive(cmd.x, cmd.y, cmd.x2, cmd.y2, cmd.r, cmd.g, cmd.b, cmd.a, 1.5);
