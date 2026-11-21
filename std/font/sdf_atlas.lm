@@ -518,6 +518,21 @@ pub fn measure_text_px(text: str, px: float): float {
     return max_w;
 }
 
+// emit_text_sum runs emit_text with an internal accumulating sink and
+// returns the summed quad coordinates — a callback-free variant for
+// benchmarks and for callers behind native/DLL boundaries where a Lymar
+// fn value cannot cross.
+var _emit_acc: float = 0.0;
+fn _emit_sum(qx0: float, qy0: float, qx1: float, qy1: float,
+             u0: float, v0: float, u1: float, v1: float): nil {
+    _emit_acc = _emit_acc + qx0 + qy0 + qx1 + qy1 + u0 + v0 + u1 + v1;
+}
+pub fn emit_text_sum(text: str, x: float, y: float, px: float): float {
+    _emit_acc = 0.0;
+    emit_text(text, x, y, px, _emit_sum);
+    return _emit_acc;
+}
+
 // glyph_rec(cp) returns 1 when a record exists (baking on first use).
 fn glyph_rec(cp: int): int {
     if (cp < 0 or cp >= CP_MAX) { return 0; }
