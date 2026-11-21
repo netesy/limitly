@@ -2102,9 +2102,27 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     {context_->getConstantInt(context_->getIntegerType(64), inst.imm)}, nullptr);
                 break;
             case LIR::LIR_Op::RegionMove: {
-                bool is_obj = (inst.type_a == LIR::Type::Ptr) || pointer_assigned_regs.count(inst.a) || is_pointer_lang_type(inst.a);
-                builder_->createExternCall("lymar_aot_region_move", {load_reg(inst.a, inst.type_a),
-                    context_->getConstantInt(context_->getIntegerType(64), inst.imm), caller_region}, nullptr);
+                // Escape analysis: region_move only promotes heap words
+                // (is_heap_word gate in the runtime). A register whose slot
+                // holds a raw scalar — unboxed float/double, bool — can never
+                // be a heap word, so the call (and the box_float the boundary
+                // normalization would insert for the float argument) is pure
+                // overhead. Pointer-assigned, tagged-word, and integer
+                // registers may still carry pubptr/raw addresses and keep the
+                // call for region validation + promotion.
+                LIR::Type mv_type = inst.type_a != LIR::Type::Void ? inst.type_a : LIR::Type::I64;
+                if (mv_type == LIR::Type::I64 || mv_type == LIR::Type::Void) {
+                    auto rt = lir_func.register_types.find(inst.a);
+                    if (rt != lir_func.register_types.end()) mv_type = rt->second;
+                }
+                const bool mv_scalar =
+                    (mv_type == LIR::Type::F64 || mv_type == LIR::Type::F32 || mv_type == LIR::Type::Bool) &&
+                    !pointer_assigned_regs.count(inst.a) && !is_pointer_lang_type(inst.a) &&
+                    !tagged_word_regs.count(inst.a);
+                if (!mv_scalar) {
+                    builder_->createExternCall("lymar_aot_region_move", {load_reg(inst.a, inst.type_a),
+                        context_->getConstantInt(context_->getIntegerType(64), inst.imm), caller_region}, nullptr);
+                }
                 break;
             }
             case LIR::LIR_Op::FrameCallDeinit:

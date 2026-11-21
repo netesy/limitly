@@ -429,33 +429,37 @@ fn _emit_sdf(cov: rast.GlyphBitmap, w: int, h: int, cw: int, ch: int, total: int
     }
 }
 
-// _utf8_next decodes one codepoint at byte index i into _uu_cp/_uu_i.
-// Tuple returns allocate a boxed pair per call under AOT — hot loops must
-// use module-var out-params instead.
-var _uu_cp: int = 0;
-var _uu_i: int = 0;
+// _utf8_next decodes one codepoint at byte index i into raw out-cells.
+// Tuple returns allocate a boxed pair per call under AOT, and tagged
+// module-var out-params cost tag_int + global_edge per write plus
+// value_equal per read — raw i64 cells lower to plain loads/stores.
+var _uu_mem: int = 0;
 fn _utf8_next(s: str, i: int): nil {
     unsafe {
+        if (_uu_mem == 0) { _uu_mem = ffi.alloc(16); }
+        var cp = 0;
+        var ni = i + 1;
         var b0 = _builtin_string_byte_at(s, i);
-        if (b0 < 128) { _uu_cp = b0; _uu_i = i + 1; return; }
-        if (b0 < 224) {
+        if (b0 < 128) {
+            cp = b0;
+        } elif (b0 < 224) {
             var b1 = _builtin_string_byte_at(s, i + 1);
-            _uu_cp = ((b0 & 31) << 6) | (b1 & 63);
-            _uu_i = i + 2;
-            return;
-        }
-        if (b0 < 240) {
+            cp = ((b0 & 31) << 6) | (b1 & 63);
+            ni = i + 2;
+        } elif (b0 < 240) {
             var b1 = _builtin_string_byte_at(s, i + 1);
             var b2 = _builtin_string_byte_at(s, i + 2);
-            _uu_cp = ((b0 & 15) << 12) | ((b1 & 63) << 6) | (b2 & 63);
-            _uu_i = i + 3;
-            return;
+            cp = ((b0 & 15) << 12) | ((b1 & 63) << 6) | (b2 & 63);
+            ni = i + 3;
+        } else {
+            var b1 = _builtin_string_byte_at(s, i + 1);
+            var b2 = _builtin_string_byte_at(s, i + 2);
+            var b3 = _builtin_string_byte_at(s, i + 3);
+            cp = ((b0 & 7) << 18) | ((b1 & 63) << 12) | ((b2 & 63) << 6) | (b3 & 63);
+            ni = i + 4;
         }
-        var b1 = _builtin_string_byte_at(s, i + 1);
-        var b2 = _builtin_string_byte_at(s, i + 2);
-        var b3 = _builtin_string_byte_at(s, i + 3);
-        _uu_cp = ((b0 & 7) << 18) | ((b1 & 63) << 12) | ((b2 & 63) << 6) | (b3 & 63);
-        _uu_i = i + 4;
+        ffi.store_i64(_uu_mem, cp);
+        ffi.store_i64(ffi.ptr_add(_uu_mem, 8), ni);
     }
 }
 
@@ -476,8 +480,11 @@ pub fn emit_text(text: str, x: float, y: float, px: float,
     var n = len(text);
     while (i < n) {
         _utf8_next(text, i);
-        var cp = _uu_cp;
-        i = _uu_i;
+        var cp = 0;
+        unsafe {
+            cp = ffi.load_i64(_uu_mem);
+            i = ffi.load_i64(ffi.ptr_add(_uu_mem, 8));
+        }
         if (cp == 10) {
             cur_y = cur_y + lh;
             cur_x = x;
@@ -515,8 +522,11 @@ pub fn measure_text_px(text: str, px: float): float {
     var n = len(text);
     while (i < n) {
         _utf8_next(text, i);
-        var cp = _uu_cp;
-        i = _uu_i;
+        var cp = 0;
+        unsafe {
+            cp = ffi.load_i64(_uu_mem);
+            i = ffi.load_i64(ffi.ptr_add(_uu_mem, 8));
+        }
         if (cp == 10) {
             if (cur_w > max_w) { max_w = cur_w; }
             cur_w = 0.0;
