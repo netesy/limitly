@@ -1,0 +1,515 @@
+// std/font/vector.lm
+// Resolution-independent vector glyph tessellation.
+//
+// TrueType outlines (std.font.glyph) are flattened to polygons in font
+// units once per glyph, triangulated with ear clipping (holes bridged into
+// their containing outer contour), and cached as a flat triangle soup.
+// Emitters scale vertices by px / units_per_em — any size, no atlas, no
+// rasterization at any point.
+//
+// Coordinates: font units, Y-up (TrueType convention). Callers flip Y at
+// emit time (screen_y = baseline - y * scale). Triangles are stored CW in
+// font space, which becomes CCW in screen space after the Y flip — the
+// winding both D3D11 (CULL_FRONT) and sokol keep.
+
+import std.font.glyph as glyph;
+import std.font.tables as tables;
+import std.font.reader as reader;
+
+frame Poly {
+    pub var xs: [float];
+    pub var ys: [float];
+    pub init() {
+        self.xs = [] as [float];
+        self.ys = [] as [float];
+    }
+}
+
+// glyph_idx -> flat triangle soup in font units (Y-up, CW-wound):
+// [x0,y0, x1,y1, x2,y2, ...]
+pub var _tri_cache: {int: [float]} = {};
+// glyph_idx -> advance width in font units
+pub var _adv_cache: {int: float} = {};
+
+// Flatten tolerance in font units, derived from units_per_em so curve
+// quality is resolution independent (~1/650 em — smooth well past 100px).
+fn flat_tol(info: tables.Info): float {
+    var upem = info.units_per_em;
+    if (upem <= 0) { upem = 1000; }
+    return (upem as float) / 100.0;
+}
+
+// Recursive quadratic Bézier flatten by flatness (control-point distance
+// to chord, compared squared — no sqrt). Appends on-curve points.
+fn quad_flat(x0: float, y0: float, cx: float, cy: float,
+             x1: float, y1: float, depth: int, tol2: float,
+             xs: [float], ys: [float]): nil {
+    var dx = x1 - x0;
+    var dy = y1 - y0;
+    var len2 = dx * dx + dy * dy;
+    if (len2 < 0.0001 or depth <= 0) {
+        xs.append(x1);
+        ys.append(y1);
+        return;
+    }
+    // dist(control, chord)^2 = cross^2 / |chord|^2
+    var cross = dx * (y0 - cy) - (x0 - cx) * dy;
+    var dist2 = (cross * cross) / len2;
+    if (dist2 <= tol2) {
+        xs.append(x1);
+        ys.append(y1);
+        return;
+    }
+    var abx = (x0 + cx) * 0.5;
+    var aby = (y0 + cy) * 0.5;
+    var bcx = (cx + x1) * 0.5;
+    var bcy = (cy + y1) * 0.5;
+    var mxx = (abx + bcx) * 0.5;
+    var myy = (aby + bcy) * 0.5;
+    quad_flat(x0, y0, abx, aby, mxx, myy, depth - 1, tol2, xs, ys);
+    quad_flat(mxx, myy, bcx, bcy, x1, y1, depth - 1, tol2, xs, ys);
+}
+
+// Flatten one glyph contour into a Poly of polygon vertices (font units).
+// Port of GlyphOutline's implied on-curve expansion, emitting points.
+fn flatten_contour(pts: [glyph.Point], tol2: float): Poly {
+    var out = Poly();
+    var count = len(pts);
+    if (count < 2) { return out; }
+
+    // Extract to primitive arrays (avoid holding linear frames).
+    var rx: [float] = [];
+    var ry: [float] = [];
+    var ron: [bool] = [];
+    var k = 0;
+    while (k < count) {
+        rx.append(pts[k].x);
+        ry.append(pts[k].y);
+        ron.append(pts[k].on_curve);
+        k = k + 1;
+    }
+
+    // Normalize start: contour must begin on an on-curve point.
+    var fx: [float] = [];
+    var fy: [float] = [];
+    var fon: [bool] = [];
+    if (!ron[0]) {
+        if (ron[count - 1]) {
+            fx.append(rx[count - 1]);
+            fy.append(ry[count - 1]);
+            fon.append(true);
+            k = 0;
+            while (k < count - 1) {
+                fx.append(rx[k]);
+                fy.append(ry[k]);
+                fon.append(ron[k]);
+                k = k + 1;
+            }
+        } else {
+            // Both ends off-curve: implied midpoint is the on-curve start.
+            fx.append((rx[0] + rx[count - 1]) * 0.5);
+            fy.append((ry[0] + ry[count - 1]) * 0.5);
+            fon.append(true);
+            k = 0;
+            while (k < count) {
+                fx.append(rx[k]);
+                fy.append(ry[k]);
+                fon.append(ron[k]);
+                k = k + 1;
+            }
+        }
+    } else {
+        fx = rx;
+        fy = ry;
+        fon = ron;
+    }
+
+    var n = len(fx);
+    var seed_x = fx[0];
+    var seed_y = fy[0];
+    var lxs: [float] = [];
+    var lys: [float] = [];
+    lxs.append(seed_x);
+    lys.append(seed_y);
+
+    var i = 0;
+    var cur_x = seed_x;
+    var cur_y = seed_y;
+    while (i < n) {
+        var ni = (i + 1) % n;
+        var p1x = fx[ni];
+        var p1y = fy[ni];
+        if (fon[ni]) {
+            if (p1x != seed_x or p1y != seed_y or len(lxs) == 1) {
+                lxs.append(p1x);
+                lys.append(p1y);
+            }
+            cur_x = p1x;
+            cur_y = p1y;
+            i = i + 1;
+        } else {
+            // Quadratic: control = p1; end = next on-curve point, or the
+            // implied midpoint of two consecutive off-curve points.
+            var n2 = (i + 2) % n;
+            var ex = fx[n2];
+            var ey = fy[n2];
+            if (!fon[n2]) {
+                ex = (p1x + ex) * 0.5;
+                ey = (p1y + ey) * 0.5;
+                i = i + 1;
+            } else {
+                i = i + 2;
+            }
+            quad_flat(cur_x, cur_y, p1x, p1y, ex, ey, 10, tol2, lxs, lys);
+            cur_x = ex;
+            cur_y = ey;
+        }
+    }
+    // The walk can still close on the seed via a quad endpoint — drop a
+    // trailing duplicate so the polygon has no zero-length edge.
+    var m = len(lxs);
+    if (m > 1 and lxs[m - 1] == lxs[0] and lys[m - 1] == lys[0]) {
+        m = m - 1;
+    }
+    var w = 0;
+    while (w < m) {
+        out.xs.append(lxs[w]);
+        out.ys.append(lys[w]);
+        w = w + 1;
+    }
+    return out;
+}
+
+// Signed area * 2 of a polygon (positive = CCW in Y-up space).
+fn poly_area2(xs: [float], ys: [float]): float {
+    var a = 0.0;
+    var n = len(xs);
+    var i = 0;
+    while (i < n) {
+        var j = (i + 1) % n;
+        a = a + xs[i] * ys[j] - xs[j] * ys[i];
+        i = i + 1;
+    }
+    return a;
+}
+
+// Ray-cast point-in-polygon.
+fn point_in_poly(px: float, py: float, xs: [float], ys: [float]): bool {
+    var inside = false;
+    var n = len(xs);
+    var i = 0;
+    var j = n - 1;
+    while (i < n) {
+        if ((ys[i] > py) != (ys[j] > py)) {
+            var xint = xs[i] + (py - ys[i]) * (xs[j] - xs[i]) / (ys[j] - ys[i]);
+            if (px < xint) { inside = !inside; }
+        }
+        j = i;
+        i = i + 1;
+    }
+    return inside;
+}
+
+// Winding-agnostic point-in-triangle (all edge functions same sign).
+fn point_in_tri(px: float, py: float,
+                ax: float, ay: float, bx: float, by: float,
+                cx: float, cy: float): bool {
+    var e1 = (bx - ax) * (py - ay) - (by - ay) * (px - ax);
+    var e2 = (cx - bx) * (py - by) - (cy - by) * (px - bx);
+    var e3 = (ax - cx) * (py - cy) - (ay - cy) * (px - cx);
+    var has_neg = (e1 < 0.0) or (e2 < 0.0) or (e3 < 0.0);
+    var has_pos = (e1 > 0.0) or (e2 > 0.0) or (e3 > 0.0);
+    return not (has_neg and has_pos);
+}
+
+// Ear-clipping triangulation of a simple polygon, emitted CW in font
+// space (becomes CCW on screen after the Y flip). Appends triangle soup.
+fn ear_clip_into(xs: [float], ys: [float], out: [float]): nil {
+    var n = len(xs);
+    if (n < 3) { return; }
+
+    // Enforce CW winding (negative signed area in Y-up space).
+    if (poly_area2(xs, ys) > 0.0) {
+        var i = 0;
+        var j = n - 1;
+        while (i < j) {
+            var tx = xs[i]; xs[i] = xs[j]; xs[j] = tx;
+            var ty = ys[i]; ys[i] = ys[j]; ys[j] = ty;
+            i = i + 1;
+            j = j - 1;
+        }
+    }
+
+    var idx: [int] = [];
+    var i = 0;
+    while (i < n) { idx.append(i); i = i + 1; }
+    var remaining = n;
+
+    var guard = n * n + 8;
+    while (remaining > 3 and guard > 0) {
+        guard = guard - 1;
+        var m = len(idx);
+        var clipped = false;
+        var ear_pos = -1;
+        var k = 0;
+        while (k < m and not clipped) {
+            var i0 = idx[(k + m - 1) % m];
+            var i1 = idx[k];
+            var i2 = idx[(k + 1) % m];
+            var ax = xs[i0]; var ay = ys[i0];
+            var bx = xs[i1]; var by = ys[i1];
+            var cx = xs[i2]; var cy = ys[i2];
+            // CW polygon: convex vertices have negative cross.
+            var cross = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
+            if (cross < -0.0001) {
+                var blocked = false;
+                var j = 0;
+                while (j < m and not blocked) {
+                    var vi = idx[j];
+                    if (vi != i0 and vi != i1 and vi != i2) {
+                        if (point_in_tri(xs[vi], ys[vi], ax, ay, bx, by, cx, cy)) {
+                            blocked = true;
+                        }
+                    }
+                    j = j + 1;
+                }
+                if (!blocked) {
+                    ear_pos = k;
+                    clipped = true;
+                }
+            }
+            k = k + 1;
+        }
+        if (!clipped) { break; }
+        var p0 = idx[(ear_pos + m - 1) % m];
+        var p1 = idx[ear_pos];
+        var p2 = idx[(ear_pos + 1) % m];
+        out.append(xs[p0]); out.append(ys[p0]);
+        out.append(xs[p1]); out.append(ys[p1]);
+        out.append(xs[p2]); out.append(ys[p2]);
+        // Rebuild idx without the clipped vertex.
+        var nidx: [int] = [];
+        var w = 0;
+        while (w < len(idx)) {
+            if (w != ear_pos) { nidx.append(idx[w]); }
+            w = w + 1;
+        }
+        idx = nidx;
+        remaining = remaining - 1;
+    }
+    if (remaining == 3) {
+        var a0 = idx[0]; var a1 = idx[1]; var a2 = idx[2];
+        out.append(xs[a0]); out.append(ys[a0]);
+        out.append(xs[a1]); out.append(ys[a1]);
+        out.append(xs[a2]); out.append(ys[a2]);
+    }
+}
+
+// Merge a hole polygon into its containing outer polygon via a horizontal
+// bridge from the hole's rightmost vertex to the nearest outer edge.
+// Returns the merged polygon.
+fn bridge_hole(ox: [float], oy: [float], hx: [float], hy: [float]): Poly {
+    var res = Poly();
+    var nh = len(hx);
+    if (nh < 3) { return res; }
+    var no = len(ox);
+    if (no < 3) { return res; }
+
+    // Rightmost hole vertex (tie: highest y).
+    var mi = 0;
+    var k = 1;
+    while (k < nh) {
+        if (hx[k] > hx[mi] or (hx[k] == hx[mi] and hy[k] > hy[mi])) {
+            mi = k;
+        }
+        k = k + 1;
+    }
+    var mx = hx[mi];
+    var my = hy[mi];
+
+    // Cast +x ray; find nearest edge intersection on the outer polygon.
+    var best_x = -1.0;
+    var best_edge = -1;
+    var ex = 0.0;
+    k = 0;
+    while (k < no) {
+        var j = (k + 1) % no;
+        var ax = ox[k]; var ay = oy[k];
+        var bx = ox[j]; var by = oy[j];
+        if ((ay > my) != (by > my)) {
+            var t = (my - ay) / (by - ay);
+            var ix = ax + t * (bx - ax);
+            if (ix > mx + 0.0001 and (best_edge < 0 or ix < best_x)) {
+                best_x = ix;
+                best_edge = k;
+                ex = ix;
+            }
+        }
+        k = k + 1;
+    }
+    if (best_edge < 0) { return res; } // degenerate — skip bridge
+    var ey = my;
+
+    // Merged: outer[0..ei] + P + hole[m..wrap..m] + P + outer[ei+1..]
+    k = 0;
+    while (k <= best_edge) {
+        res.xs.append(ox[k]);
+        res.ys.append(oy[k]);
+        k = k + 1;
+    }
+    res.xs.append(ex); res.ys.append(ey);            // bridge point P
+    k = 0;
+    while (k < nh) {
+        var hi = (mi + k) % nh;
+        res.xs.append(hx[hi]);
+        res.ys.append(hy[hi]);
+        k = k + 1;
+    }
+    res.xs.append(ex); res.ys.append(ey);            // P again (return)
+    k = best_edge + 1;
+    while (k < no) {
+        res.xs.append(ox[k]);
+        res.ys.append(oy[k]);
+        k = k + 1;
+    }
+    return res;
+}
+
+// Triangulate a glyph outline into a triangle soup (font units, Y-up, CW).
+fn triangulate_outline(outline: glyph.GlyphOutline, info: tables.Info,
+                       tris: [float]): nil {
+    var ncont = len(outline.contours);
+    if (ncont == 0) { return; }
+
+    var tol = flat_tol(info);
+    var tol2 = tol * tol;
+
+    // Flatten each contour.
+    var cxs: [Poly] = [];
+    var carea: [float] = [];
+    var c = 0;
+    while (c < ncont) {
+        var p = flatten_contour(outline.contours[c], tol2);
+        cxs.append(p);
+        if (len(p.xs) >= 3) {
+            carea.append(poly_area2(p.xs, p.ys));
+        } else {
+            carea.append(0.0);
+        }
+        c = c + 1;
+    }
+
+    // Outer sign = sign of the largest-|area| contour.
+    var max_a = 0.0;
+    var outer_sign = 1.0;
+    c = 0;
+    while (c < ncont) {
+        var a = carea[c];
+        var aa = a;
+        if (aa < 0.0) { aa = -aa; }
+        if (aa > max_a) {
+            max_a = aa;
+            if (a < 0.0) { outer_sign = -1.0; } else { outer_sign = 1.0; }
+        }
+        c = c + 1;
+    }
+
+    // Classify contours; assign each hole to the outer containing it.
+    var outers: [int] = [];
+    var holes_of: {int: [int]} = {};
+    c = 0;
+    while (c < ncont) {
+        var a = carea[c];
+        if (a == 0.0 or len(cxs[c].xs) < 3) {
+            c = c + 1;
+        } else {
+            var sgn = 1.0;
+            if (a < 0.0) { sgn = -1.0; }
+            if (sgn == outer_sign) {
+                outers.append(c);
+            } else {
+                var host = -1;
+                var oi = 0;
+                while (oi < len(outers)) {
+                    var oc = outers[oi];
+                    if (point_in_poly(cxs[c].xs[0], cxs[c].ys[0], cxs[oc].xs, cxs[oc].ys)) {
+                        host = oc;
+                        break;
+                    }
+                    oi = oi + 1;
+                }
+                if (host < 0) {
+                    outers.append(c); // no container — keep the ink
+                } else {
+                    var lst = holes_of[host];
+                    if (lst == nil) {
+                        lst = [] as [int];
+                        holes_of[host] = lst;
+                    }
+                    lst.append(c);
+                }
+            }
+            c = c + 1;
+        }
+    }
+
+    // Working polygons per outer (holes merged in sequentially).
+    var workx: {int: [float]} = {};
+    var worky: {int: [float]} = {};
+    var oi = 0;
+    while (oi < len(outers)) {
+        var oc = outers[oi];
+        workx[oc] = cxs[oc].xs;
+        worky[oc] = cxs[oc].ys;
+        oi = oi + 1;
+    }
+    oi = 0;
+    while (oi < len(outers)) {
+        var oc2 = outers[oi];
+        var hl = holes_of[oc2];
+        if (hl != nil) {
+            var hi = 0;
+            while (hi < len(hl)) {
+                var hc = hl[hi];
+                var mp = bridge_hole(workx[oc2], worky[oc2], cxs[hc].xs, cxs[hc].ys);
+                if (len(mp.xs) > 0) {
+                    workx[oc2] = mp.xs;
+                    worky[oc2] = mp.ys;
+                }
+                hi = hi + 1;
+            }
+        }
+        ear_clip_into(workx[oc2], worky[oc2], tris);
+        oi = oi + 1;
+    }
+}
+
+// Advance width (font units) for a glyph, cached.
+pub fn glyph_advance(info: tables.Info, rdr: reader.ByteReader, gid: int): float {
+    val hit = _adv_cache[gid];
+    if (hit != nil) { return hit; }
+    var hmet = info.get_glyph_hmetrics(rdr, gid);
+    var adv = hmet[0] as float;
+    _adv_cache[gid] = adv;
+    return adv;
+}
+
+// Triangle soup for a glyph in font units (Y-up, CW-wound). Empty list for
+// whitespace/missing glyphs. Cached per glyph index.
+pub fn glyph_tris(info: tables.Info, rdr: reader.ByteReader, gid: int): [float] {
+    val hit = _tri_cache[gid];
+    if (hit != nil) { return hit; }
+    var tris: [float] = [];
+    var outline = glyph.parse_glyph(rdr, info, gid);
+    if (!outline.is_empty and len(outline.contours) > 0) {
+        triangulate_outline(outline, info, tris);
+    }
+    _tri_cache[gid] = tris;
+    return tris;
+}
+
+// Clear all caches (e.g. after loading a different font).
+pub fn reset(): nil {
+    _tri_cache = {};
+    _adv_cache = {};
+}

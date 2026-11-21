@@ -327,6 +327,12 @@ If a backend cannot faithfully implement an LIR instruction, the backend must be
 
 Behavioral equivalence across all supported backends is mandatory.
 
+#### Native Performance Helpers — Lymar AOT over C
+- [ ] **DO NOT add C helper functions** (`.c`/`.cpp` shims, FFI exports) to accelerate hot paths when the work can be expressed in Lymar.
+- [x] **Write performance-critical helpers in Lymar and compile them through the Fyra/AOT backend** — the same way C code is compiled to native, Lymar AOT produces native code fast enough for inner loops (vertex emission, glyph tessellation, geometry generation).
+- Rationale: every C helper is a second language to maintain, a marshalling boundary, and a VM/AOT parity hazard. Lymar-compiled helpers keep one language, one semantics, one backend matrix.
+- Legitimate exceptions: wrapping genuinely external native libraries (stb_image, system APIs, GPU drivers) that cannot be reimplemented — not helpers that duplicate what Lymar can already do.
+
 ---
 
 ### **8. Library-Specific Guidelines: std/ui and std/game**
