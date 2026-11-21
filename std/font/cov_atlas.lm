@@ -1,0 +1,204 @@
+// std/font/cov_atlas.lm
+// Native coverage-atlas baker — drop-in replacement for the stb
+// init_font_atlas_multi C entry point. Produces the same buffer
+// layouts consumed by std.gg.native:
+//
+//   rgba_ptr    : atlas_w*atlas_h*4 bytes, RGBA8 (white rgb, coverage a)
+//   glyphs_ptr  : num_tiers*96 records of 9 f32
+//                 {x0,y0,x1,y1,u0,v0,u1,v1,xadvance} — ASCII 32..127
+//   metrics_ptr : num_tiers records of 3 f32 {ascent, descent, line_h}
+//
+// Atlas layout matches stb: top 8 rows reserved (white 8x8 block at
+// the origin), shelf-packed coverage bitmaps below. Glyph quad offsets
+// are relative to the pen position with y measured down from the
+// ascender line (record.y = bitmap_top_rel_baseline + ascent_px),
+// matching stbtt_GetPackedQuad + the +asc shift in init_font_atlas_multi.
+//
+// Scaling uses hhea ascent-descent pixel height (stb
+// ScaleForPixelHeight parity, verified in std/image/font.lm).
+
+import std.font.tables as tables;
+import std.font.reader as reader;
+import std.font.glyph as glyph;
+import std.font.rasterizer as rast;
+import std.image.font as imgfont;
+import std.io.file as _iof;
+import std.ffi as ffi;
+
+const REC_F32: int = 9;      // floats per AtlasGlyph record
+const TIER_GLYPHS: int = 96; // ASCII 32..127
+const RESERVED_ROWS: int = 8;
+
+var _info: tables.Info = tables.Info();
+var _rdr: reader.ByteReader = reader.ByteReader([] as [int]);
+var _upem_v: float = 1000.0;
+var _ascent_v: int = 800;
+var _descent_v: int = -200;
+var _line_gap_v: int = 0;
+var _ready: int = 0;
+
+fn _load(preferred: str): int {
+    if (_ready != 0) { return 1; }
+    var path = imgfont.detect_system_font(preferred);
+    if (path == "") { return 0; }
+    var file = _iof.open(path, "rb")? else { return 0; };
+    var bytes = file.read_bytes()? else { return 0; };
+    file.close()? else { return 0; };
+    var rdr = reader.ByteReader(bytes);
+    var off = tables.get_font_offset(rdr, 0);
+    if (off < 0) { return 0; }
+    rdr.seek(off);
+    match (tables.parse_tables(rdr)) {
+        val info => {
+            var a = info.ascent - info.descent;
+            if (a <= 0) { a = 1000; }
+            var asc_v = info.ascent;
+            var desc_v = info.descent;
+            var gap_v = info.line_gap;
+            _info = info;
+            _rdr = rdr;
+            _upem_v = a as float;
+            _ascent_v = asc_v;
+            _descent_v = desc_v;
+            _line_gap_v = gap_v;
+            _ready = 1;
+            return 1;
+        },
+        err e => { return 0; }
+    }
+}
+
+// _pack_blit writes one coverage bitmap into the RGBA atlas at (px,py)
+// and returns nothing; caller computes UVs from px,py,w,h.
+fn _blit(rgba: int, atlas_w: int, px: int, py: int, cov: rast.GlyphBitmap): nil {
+    unsafe {
+        var cw = cov.width;
+        var ch = cov.height;
+        var gy = 0;
+        while (gy < ch) {
+            var sy = py + gy;
+            var gx = 0;
+            var row = (sy * atlas_w + px) * 4;
+            while (gx < cw) {
+                var v = cov.pixels[gy * cw + gx];
+                if (v > 0) {
+                    ffi.store_u8(rgba + row + gx * 4, 255);
+                    ffi.store_u8(rgba + row + gx * 4 + 1, 255);
+                    ffi.store_u8(rgba + row + gx * 4 + 2, 255);
+                    ffi.store_u8(rgba + row + gx * 4 + 3, v);
+                }
+                gx = gx + 1;
+            }
+            gy = gy + 1;
+        }
+    }
+}
+
+fn _store_rec(glyphs: int, rec: int, x0: float, y0: float, x1: float, y1: float,
+              u0: float, v0: float, u1: float, v1: float, adv: float): nil {
+    unsafe {
+        var p = glyphs + rec * REC_F32 * 4;
+        ffi.store_f32(p, x0);
+        ffi.store_f32(ffi.ptr_add(p, 4), y0);
+        ffi.store_f32(ffi.ptr_add(p, 8), x1);
+        ffi.store_f32(ffi.ptr_add(p, 12), y1);
+        ffi.store_f32(ffi.ptr_add(p, 16), u0);
+        ffi.store_f32(ffi.ptr_add(p, 20), v0);
+        ffi.store_f32(ffi.ptr_add(p, 24), u1);
+        ffi.store_f32(ffi.ptr_add(p, 28), v1);
+        ffi.store_f32(ffi.ptr_add(p, 32), adv);
+    }
+}
+
+// bake() fills caller-provided buffers. Returns 1 on success.
+pub fn bake(preferred: str, atlas_w: int, atlas_h: int,
+            tier_px_ptr: int, num_tiers: int,
+            rgba_ptr: int, glyphs_ptr: int, metrics_ptr: int): int {
+    if (_load(preferred) == 0) { return 0; }
+    unsafe {
+        // Clear atlas + reserved top rows; white 8x8 block at origin
+        // (stb parity — used as a fallback texel).
+        ffi.memset(rgba_ptr, 0, atlas_w * atlas_h * 4);
+        var by = 0;
+        while (by < 8) {
+            var bx = 0;
+            while (bx < 8) {
+                var p = rgba_ptr + ((by * atlas_w) + bx) * 4;
+                ffi.store_u8(p, 255);
+                ffi.store_u8(p + 1, 255);
+                ffi.store_u8(p + 2, 255);
+                ffi.store_u8(p + 3, 255);
+                bx = bx + 1;
+            }
+            by = by + 1;
+        }
+
+        var cursor_x = 0;
+        var cursor_y = RESERVED_ROWS;
+        var row_h = 0;
+        var aw = atlas_w as float;
+        var ah = atlas_h as float;
+
+        var t = 0;
+        while (t < num_tiers) {
+            var px = ffi.load_f32(tier_px_ptr + t * 4);
+            var sc = px / _upem_v;
+            var asc = (_ascent_v as float) * sc;
+            var desc = (_descent_v as float) * sc;
+            var lh = ((_ascent_v - _descent_v + _line_gap_v) as float) * sc;
+            if (lh < px) { lh = px; }
+
+            var mp = metrics_ptr + t * 12;
+            ffi.store_f32(mp, asc);
+            ffi.store_f32(mp + 4, desc);
+            ffi.store_f32(mp + 8, lh);
+
+            var c = 0;
+            while (c < TIER_GLYPHS) {
+                var cp = c + 32;
+                var rec = t * TIER_GLYPHS + c;
+                var gid = _info.get_glyph_index(_rdr, cp);
+                var hmet = _info.get_glyph_hmetrics(_rdr, gid);
+                var adv = (hmet[0] as float) * sc;
+
+                var outline = glyph.parse_glyph(_rdr, _info, gid);
+                var cov = rast.rasterize_glyph_subpixel(outline, sc, 2, 2, 0.0, 0.0);
+
+                if (cov.width > 0 and cov.height > 0) {
+                    var w = cov.width;
+                    var h = cov.height;
+                    if (cursor_x + w > atlas_w) {
+                        cursor_x = 0;
+                        cursor_y = cursor_y + row_h;
+                        row_h = 0;
+                    }
+                    if (cursor_y + h <= atlas_h) {
+                        _blit(rgba_ptr, atlas_w, cursor_x, cursor_y, cov);
+                        var u0 = (cursor_x as float) / aw;
+                        var v0 = (cursor_y as float) / ah;
+                        var u1 = ((cursor_x + w) as float) / aw;
+                        var v1 = ((cursor_y + h) as float) / ah;
+                        var x0 = cov.x_offset as float;
+                        var y0 = (cov.y_offset as float) + asc;
+                        _store_rec(glyphs_ptr, rec, x0, y0,
+                                   x0 + w as float, y0 + h as float,
+                                   u0, v0, u1, v1, adv);
+                        cursor_x = cursor_x + w;
+                        if (h > row_h) { row_h = h; }
+                    } else {
+                        _store_rec(glyphs_ptr, rec, 0.0, 0.0, 0.0, 0.0,
+                                   0.0, 0.0, 0.0, 0.0, adv);
+                    }
+                } else {
+                    _store_rec(glyphs_ptr, rec, 0.0, 0.0, 0.0, 0.0,
+                               0.0, 0.0, 0.0, 0.0, adv);
+                }
+                c = c + 1;
+            }
+            t = t + 1;
+        }
+        return 1;
+    }
+}
+
+pub fn ready(): int { return _ready; }

@@ -30,6 +30,7 @@ import std.string.replace as replace;
 import std.native.vulkan as vk;
 import std.native.d3d11 as d3d;
 import std.font.sdf_atlas as sdfatlas;
+import std.font.cov_atlas as covatlas;
 import std.text.utf8 as utf8;
 import std.os.environment as osenv;
 
@@ -65,8 +66,7 @@ var _sdf_on: int = 0;
 var _glyphs_buf: int = 0;
 var _metrics_buf: int = 0;
 var _sizes_buf: int = 0;
-var _sym_emit_text: any = nil;
-var _sym_measure_text: any = nil;
+
 
 // persistent vertex scratch: raw ptr (p2i'd) + vert count
 // 48 bytes per vertex (12 floats)
@@ -204,30 +204,18 @@ fn drv_set_sampler(slot: int, smp: int): nil {
 fn ensure_font_atlas(): int {
     unsafe {
         if (_atlas_rgba == 0) {
-            var lib = ffi.library_load("");
-            if (lib != 0 and lib != nil) {
-                var sym_chk = ffi.library_get_symbol(lib, "init_font_atlas_multi");
-                if (sym_chk == 0 or sym_chk == nil) { lib = 0; }
-            }
-            if (lib == 0 or lib == nil) {
-                lib = ffi.library_load("bin/libstb_image.dll");
-                if (lib == 0 or lib == nil) { lib = ffi.library_load("tests/ffi/libstb_image.dll"); }
-            }
-            if (lib == 0 or lib == nil) { return 0; }
-            _sym_emit_text = ffi.library_get_symbol(lib, "emit_text_quads");
-            _sym_measure_text = ffi.library_get_symbol(lib, "measure_atlas_text_width");
-
-            var sym_multi = ffi.library_get_symbol(lib, "init_font_atlas_multi");
-
-            // Atlas: 2048x2048 packs 39 integer-px tiers (10..48) — verified
-            // against init_font_atlas_multi. Glyph/metric buffers are sized
-            // for the tier count; size_idx*3456 stride is per-tier.
+            // Atlas: 2048x2048 packs 39 integer-px tiers (10..48).
+            // Glyph/metric buffers are sized for the tier count;
+            // size_idx*3456 stride is per-tier (96 records * 36 bytes).
             var atlas_w = 2048;
             var atlas_h = 2048;
             _atlas_rgba = alloc_persist(atlas_w * atlas_h * 4);
             _glyphs_buf = alloc_persist(39 * 96 * 36);
             _metrics_buf = alloc_persist(39 * 3 * 4);
             _sizes_buf = alloc_persist(39 * 4);
+            if (_atlas_rgba == 0 or _glyphs_buf == 0 or _metrics_buf == 0 or _sizes_buf == 0) {
+                return 0;
+            }
 
             // One baked tier per integer pixel size 10..48 — near-free
             // font sizing: any requested px snaps to the nearest 1px tier.
@@ -239,24 +227,11 @@ fn ensure_font_atlas(): int {
                 tpx = tpx + 1;
             }
 
-            var pref_cstr = ffi.string_to_cstring("");
-            if (sym_multi != nil) {
-                var res = ffi.foreign_call(sym_multi,
-                    [ffi.cstring_as_ptr(pref_cstr), atlas_w, atlas_h, _sizes_buf, 39, _atlas_rgba, _glyphs_buf, _metrics_buf],
-                    ffi.TYPE_I32,
-                    [ffi.TYPE_PTR, ffi.TYPE_I32, ffi.TYPE_I32, ffi.TYPE_PTR, ffi.TYPE_I32, ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_PTR]) as int;
-                ffi.cstring_free(pref_cstr);
-                if (res != 1) { return 0; }
-            } else {
-                var sym_legacy = ffi.library_get_symbol(lib, "init_font_atlas");
-                if (sym_legacy == nil) { ffi.cstring_free(pref_cstr); return 0; }
-                var res = ffi.foreign_call(sym_legacy,
-                    [ffi.cstring_as_ptr(pref_cstr), atlas_w, atlas_h, _atlas_rgba, _glyphs_buf, ffi.ptr_add(_glyphs_buf, 96 * 36), _metrics_buf],
-                    ffi.TYPE_I32,
-                    [ffi.TYPE_PTR, ffi.TYPE_I32, ffi.TYPE_I32, ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_PTR]) as int;
-                ffi.cstring_free(pref_cstr);
-                if (res != 1) { return 0; }
-            }
+            // Native bake — same buffers/semantics as the former stb
+            // init_font_atlas_multi FFI call.
+            var baked = covatlas.bake("", atlas_w, atlas_h, _sizes_buf, 39,
+                                      _atlas_rgba, _glyphs_buf, _metrics_buf);
+            if (baked != 1) { return 0; }
         }
 
         if (_atlas_tex == 0) {
@@ -795,19 +770,6 @@ fn draw_text_at(text_str: str, x: float, y: float,
             flush_verts();
         }
 
-        if (_sym_emit_text != nil) {
-            var is_vk = 0;
-            if (_is_vk != 0) { is_vk = 1; }
-            var cstr = ffi.string_to_cstring(text_str);
-            var new_vc = ffi.foreign_call(_sym_emit_text,
-                [ffi.cstring_as_ptr(cstr), x, y, r, g, b, a, gbuf, lh, _w as float, _h as float, is_vk, _vdata, _vcount, max_v],
-                ffi.TYPE_I32,
-                [ffi.TYPE_PTR, ffi.TYPE_F32, ffi.TYPE_F32, ffi.TYPE_F32, ffi.TYPE_F32, ffi.TYPE_F32, ffi.TYPE_F32, ffi.TYPE_PTR, ffi.TYPE_F32, ffi.TYPE_F32, ffi.TYPE_F32, ffi.TYPE_I32, ffi.TYPE_PTR, ffi.TYPE_I32, ffi.TYPE_I32]) as int;
-            ffi.cstring_free(cstr);
-            _vcount = new_vc;
-            return;
-        }
-
         var cur_x = x;
         var cur_y = y;
         var n = len(text_str);
@@ -919,16 +881,6 @@ fn measure_text_at(text_str: str, size_idx: int): float {
             return (len(text_str) * atlas_px(size_idx) * 0.6) as float;
         }
         var gbuf = ffi.ptr_add(_glyphs_buf, size_idx * 3456);
-
-        if (_sym_measure_text != nil) {
-            var cstr = ffi.string_to_cstring(text_str);
-            var w = ffi.foreign_call(_sym_measure_text,
-                [ffi.cstring_as_ptr(cstr), gbuf],
-                ffi.TYPE_F32,
-                [ffi.TYPE_PTR, ffi.TYPE_PTR]) as float;
-            ffi.cstring_free(cstr);
-            return w;
-        }
 
         var max_w = 0.0;
         var cur_w = 0.0;
