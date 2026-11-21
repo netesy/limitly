@@ -1,0 +1,528 @@
+// std/font/sdf_atlas.lm
+// Resolution-independent SDF glyph atlas, baked on demand in pure Lymar.
+//
+// Each glyph outline (std.font.glyph) is rasterized once into a signed
+// distance field at BAKE_PX pixels per em and shelf-packed into a single
+// RGBA atlas. Distance is stored in the alpha channel as
+//   v = 128 +/- dist_bake_px   (clamped 0..255)
+// Emitters draw one quad per glyph; the pixel shader reconstructs coverage
+// with smoothstep, giving analytic anti-aliased edges at ANY font size —
+// the same technique as the rounded-rect/pie SDF shapes in std.gg.
+//
+// The CPU atlas lives in raw persistent memory so it can be handed directly
+// to texture create/update without a copy. Glyphs are baked lazily:
+// glyph(cp) rasterizes on first use and marks the atlas dirty; the renderer
+// uploads once via take_dirty().
+//
+// Holds tables.Info + reader.ByteReader directly (like std.font.vector)
+// rather than a Font frame — avoids cross-module frame-type resolution.
+
+import std.font as fnt;
+import std.font.tables as tables;
+import std.font.reader as reader;
+import std.font.glyph as glyph;
+import std.font.rasterizer as rast;
+import std.math as math;
+import std.ffi as ffi;
+import std.os.environment as osenv;
+
+pub const ATLAS_W: int = 2048;
+pub const ATLAS_H: int = 2048;
+// Bake resolution: pixels per em. 96 gives ~2-6x oversampling for typical
+// UI sizes (10-48px) while keeping the brute-force SDF bake fast enough
+// for lazy per-glyph use.
+pub const BAKE_PX: float = 64.0;
+// Padding (bake px) around each glyph bbox — bounds the usable SDF range.
+pub const SDF_PAD: int = 10;
+const ONEDGE: float = 128.0;
+
+var _persist: [int] = [];
+
+fn alloc_persist(bytes: int): int {
+    unsafe {
+        var p = ffi.alloc(bytes);
+        if (p == 0) { return 0; }
+        ffi.memset(p, 0, bytes);
+        _persist.append(p);
+        return p;
+    }
+}
+
+var _info: tables.Info = tables.Info();
+var _rdr: reader.ByteReader = reader.ByteReader([] as [int]);
+var _atlas: int = 0;          // raw RGBA buffer, ATLAS_W*ATLAS_H*4 bytes
+var _ready: int = 0;
+var _dirty: int = 0;
+var _pack_x: int = 0;
+var _pack_y: int = 0;
+var _pack_row_h: int = 0;
+var _last_bx: int = 0;
+var _last_by: int = 0;
+// Glyph records, gid and advance caches live in raw ffi arenas, NOT
+// Lymar collections: dict/list element access allocates a boxed value per
+// read under AOT (~50-150MB/s in hot loops — verified). ffi.load/store are
+// plain memory ops and allocation-free. CP_MAX covers Latin, Vietnamese,
+// Greek, Cyrillic, Arabic, Hebrew and Indic blocks; higher planes (CJK,
+// emoji) fall back to .notdef advance — adequate for UI text.
+const CP_MAX: int = 12288;      // 0x3000
+const G_F: int = 10;            // f64 slots per glyph record
+// record: 0 u0, 1 v0, 2 u1, 3 v1, 4 ox, 5 oy, 6 w, 7 h, 8 adv, 9 has
+const KERN_N: int = 8192;       // direct-mapped kern cache, power of two
+
+var _glyph_mem: int = 0;        // CP_MAX * G_F f64, zeroed (has=0)
+var _gid_mem: int = 0;          // CP_MAX i32, -1 = unknown
+var _adv_mem: int = 0;          // CP_MAX f64, -1.0 = unknown
+var _kern_mem: int = 0;         // KERN_N * 16B: i64 key + f64 val, key=-1 empty
+
+fn _gload(cp: int, f: int): float {
+    unsafe { return ffi.load_f64(ffi.ptr_add(_glyph_mem + cp * G_F * 8, f * 8)); }
+}
+fn _gstore(cp: int, f: int, v: float): nil {
+    unsafe { ffi.store_f64(ffi.ptr_add(_glyph_mem + cp * G_F * 8, f * 8), v); }
+}
+
+fn _candidates(): [str] {
+    var c: [str] = [];
+    var env_path = osenv.getenv_or("LYMAR_FONT", "");
+    if (env_path != "") { c.append(env_path); }
+    // Bundled example fonts first (repo), then common system fonts.
+    c.append("examples/BeVietnamPro-Regular.ttf");
+    c.append("examples/Epilogue-Regular.ttf");
+    c.append("examples/BeVietnamPro-Medium.ttf");
+    c.append("C:/Windows/Fonts/segoeui.ttf");
+    c.append("C:/Windows/Fonts/arial.ttf");
+    c.append("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf");
+    return c;
+}
+
+fn _try_one(path: str): int {
+    var f = fnt.load_font(path)? else { return 0; };
+    if (!f.is_valid) { return 0; }
+    _info = f.info;
+    _rdr = f.reader;
+    return 1;
+}
+
+// ensure() loads the font and allocates the atlas. Returns 1 on success.
+pub fn ensure(): int {
+    unsafe {
+        if (_ready != 0) { return 1; }
+        var cands = _candidates();
+        var i = 0;
+        var loaded = 0;
+        while (i < len(cands) and loaded == 0) {
+            loaded = _try_one(cands[i]);
+            i = i + 1;
+        }
+        if (loaded == 0) { return 0; }
+        _atlas = alloc_persist(ATLAS_W * ATLAS_H * 4);
+        if (_atlas == 0) { return 0; }
+        _glyph_mem = alloc_persist(CP_MAX * G_F * 8);
+        _gid_mem = alloc_persist(CP_MAX * 4);
+        _adv_mem = alloc_persist(CP_MAX * 8);
+        _kern_mem = alloc_persist(KERN_N * 16);
+        if (_glyph_mem == 0 or _gid_mem == 0 or _adv_mem == 0 or _kern_mem == 0) { return 0; }
+        unsafe {
+            ffi.memset(_gid_mem, 0xFF, CP_MAX * 4);
+            ffi.memset(_kern_mem, 0xFF, KERN_N * 16);
+            var ai = 0;
+            while (ai < CP_MAX) {
+                ffi.store_f64(ffi.ptr_add(_adv_mem, ai * 8), -1.0);
+                ai = ai + 1;
+            }
+        }
+        _ready = 1;
+        return 1;
+    }
+}
+
+pub fn ready(): int { return _ready; }
+
+pub fn atlas_ptr(): int { return _atlas; }
+
+// take_dirty() returns 1 once after the CPU atlas changed — caller should
+// re-upload the texture; the flag clears on read.
+pub fn take_dirty(): int {
+    var d = _dirty;
+    _dirty = 0;
+    return d;
+}
+
+fn _upem(): float {
+    var u = _info.units_per_em;
+    if (u <= 0) { u = 1000; }
+    return u as float;
+}
+
+// _gid(cp): cmap lookup, cached in the i32 arena (get_glyph_index
+// allocates internally). Out-of-range codepoints map to gid 0 (.notdef).
+fn _gid(cp: int): int {
+    unsafe {
+        if (cp < 0 or cp >= CP_MAX) { return 0; }
+        var g = ffi.load_i32(ffi.ptr_add(_gid_mem, cp * 4));
+        if (g >= 0) { return g; }
+        var r = _info.get_glyph_index(_rdr, cp);
+        ffi.store_i32(ffi.ptr_add(_gid_mem, cp * 4), r);
+        return r;
+    }
+}
+
+// _adv_bake(cp): advance width in bake px, cached in the f64 arena.
+fn _adv_bake(cp: int): float {
+    unsafe {
+        var hit = ffi.load_f64(ffi.ptr_add(_adv_mem, cp * 8));
+        if (hit >= 0.0) { return hit; }
+        var hmet = _info.get_glyph_hmetrics(_rdr, _gid(cp));
+        var adv = (hmet[0] as float) * (BAKE_PX / _upem());
+        ffi.store_f64(ffi.ptr_add(_adv_mem, cp * 8), adv);
+        return adv;
+    }
+}
+
+// advance_px(cp, px): advance width in screen px — cached, no baking.
+pub fn advance_px(cp: int, px: float): float {
+    if (_ready == 0) { return px * 0.5; }
+    if (cp < 0 or cp >= CP_MAX) { return px * 0.5; }
+    return _adv_bake(cp) * (px / BAKE_PX);
+}
+
+// kern_px(prev_cp, cp, px): kerning adjustment in screen px. Direct-mapped
+// i64-key/f64-val cache in raw memory; misses compute once and stay cached.
+pub fn kern_px(prev_cp: int, cp: int, px: float): float {
+    if (_ready == 0 or prev_cp < 0 or !_info.has_kern) { return 0.0; }
+    var key = prev_cp * 1114112 + cp;
+    var slot = (key & (KERN_N - 1)) * 16;
+    unsafe {
+        var kptr = ffi.ptr_add(_kern_mem, slot);
+        if (ffi.load_i64(kptr) == key) {
+            return ffi.load_f64(ffi.ptr_add(kptr, 8)) * (px / _upem());
+        }
+        var k = _info.get_kern_advance(_gid(prev_cp), _gid(cp));
+        var kv = k as float;
+        ffi.store_i64(kptr, key);
+        ffi.store_f64(ffi.ptr_add(kptr, 8), kv);
+        return kv * (px / _upem());
+    }
+}
+
+// ascent_px / line_height_px in screen px for a given font size.
+pub fn ascent_px(px: float): float {
+    if (_ready == 0) { return px * 0.8; }
+    return (_info.ascent as float) * (px / _upem());
+}
+
+pub fn line_height_px(px: float): float {
+    if (_ready == 0) { return px * 1.25; }
+    var lh = ((_info.ascent - _info.descent + _info.line_gap) as float) * (px / _upem());
+    if (lh < px) { lh = px; }
+    return lh;
+}
+
+// sdf_range(px): smoothstep half-width in 0-255 SDF units for ~1 screen px
+// of edge feather, clamped to the baked padding.
+pub fn sdf_range(px: float): float {
+    var r = BAKE_PX / px;
+    if (r < 0.75) { r = 0.75; }
+    if (r > (SDF_PAD as float) * 0.8) { r = (SDF_PAD as float) * 0.8; }
+    return r;
+}
+
+// _pack_bitmap places a w×h bitmap into the atlas (shelf packing) and
+// returns (u0,v0,u1,v1) normalized, or (-1,-1,-1,-1) if full.
+fn _pack_bitmap(w: int, h: int): (float, float, float, float) {
+    if (w <= 0 or h <= 0) { return (-1.0, -1.0, -1.0, -1.0); }
+    if (_pack_x + w > ATLAS_W) {
+        _pack_x = 0;
+        _pack_y = _pack_y + _pack_row_h;
+        _pack_row_h = 0;
+    }
+    if (_pack_y + h > ATLAS_H) { return (-1.0, -1.0, -1.0, -1.0); }
+    if (h > _pack_row_h) { _pack_row_h = h; }
+    var x0 = _pack_x;
+    var y0 = _pack_y;
+    _last_bx = x0;
+    _last_by = y0;
+    _pack_x = _pack_x + w;
+    var u0 = (x0 as float) / (ATLAS_W as float);
+    var v0 = (y0 as float) / (ATLAS_H as float);
+    var u1 = ((x0 + w) as float) / (ATLAS_W as float);
+    var v1 = ((y0 + h) as float) / (ATLAS_H as float);
+    return (u0, v0, u1, v1);
+}
+// _bake(cp) rasterizes one glyph's SDF into the atlas and stores its nine
+// record fields in the per-field dicts. Returns 1 on success.
+fn _bake(cp: int): int {
+    unsafe {
+        var u0 = 0.0; var v0 = 0.0; var u1 = 0.0; var v1 = 0.0;
+        var ox = 0.0; var oy = 0.0; var rw = 0.0; var rh = 0.0;
+        var adv = _adv_bake(cp);
+
+        var outline = glyph.parse_glyph(_rdr, _info, _gid(cp));
+        var cov = rast.rasterize_glyph(outline, BAKE_PX / _upem());
+        if (cov.width > 0 and cov.height > 0) {
+            var cw = cov.width;
+            var ch = cov.height;
+            var w = cw + SDF_PAD * 2;
+            var h = ch + SDF_PAD * 2;
+            var total = w * h;
+
+            var uv = _pack_bitmap(w, h);
+            if (uv.0 >= 0.0) {
+                u0 = uv.0; v0 = uv.1; u1 = uv.2; v1 = uv.3;
+                ox = (cov.x_offset - SDF_PAD) as float;
+                oy = (cov.y_offset - SDF_PAD) as float;
+                rw = w as float;
+                rh = h as float;
+                _emit_sdf(cov, w, h, cw, ch, total);
+                _dirty = 1;
+            }
+        }
+
+        _gstore(cp, 0, u0); _gstore(cp, 1, v0); _gstore(cp, 2, u1); _gstore(cp, 3, v1);
+        _gstore(cp, 4, ox); _gstore(cp, 5, oy); _gstore(cp, 6, rw); _gstore(cp, 7, rh);
+        _gstore(cp, 8, adv); _gstore(cp, 9, 1.0);
+        return 1;
+    }
+}
+
+// _emit_sdf writes the JFA distance field for coverage bitmap `cov`
+// (cw×ch) into the padded w×h canvas at the last-packed atlas origin.
+fn _emit_sdf(cov: rast.GlyphBitmap, w: int, h: int, cw: int, ch: int, total: int): nil {
+    unsafe {
+        var inside: [int] = [];
+        var i = 0;
+        while (i < total) { inside.append(0); i = i + 1; }
+        var cy = 0;
+        while (cy < ch) {
+            var cx = 0;
+            while (cx < cw) {
+                var vv = cov.pixels[cy * cw + cx];
+                if (vv > 127) {
+                    inside[(cy + SDF_PAD) * w + (cx + SDF_PAD)] = 1;
+                }
+                cx = cx + 1;
+            }
+            cy = cy + 1;
+        }
+
+        var seeds: [int] = [];
+        i = 0;
+        while (i < total) { seeds.append(-1); i = i + 1; }
+        var py = 0;
+        while (py < h) {
+            var px_i = 0;
+            while (px_i < w) {
+                var idx = py * w + px_i;
+                var ins = inside[idx];
+                var boundary = 0;
+                var dy = -1;
+                while (dy <= 1 and boundary == 0) {
+                    var dx = -1;
+                    while (dx <= 1 and boundary == 0) {
+                        if (dx != 0 or dy != 0) {
+                            var nx = px_i + dx;
+                            var ny = py + dy;
+                            if (nx >= 0 and nx < w and ny >= 0 and ny < h) {
+                                if (ins != inside[ny * w + nx]) { boundary = 1; }
+                            } elif (ins == 1) {
+                                boundary = 1;
+                            }
+                        }
+                        dx = dx + 1;
+                    }
+                    dy = dy + 1;
+                }
+                if (boundary == 1) { seeds[idx] = idx; }
+                px_i = px_i + 1;
+            }
+            py = py + 1;
+        }
+
+        var step = 1;
+        var maxdim = w;
+        if (h > maxdim) { maxdim = h; }
+        while (step * 2 <= maxdim) { step = step * 2; }
+        while (step >= 1) {
+            py = 0;
+            while (py < h) {
+                var qx = 0;
+                while (qx < w) {
+                    var idx = py * w + qx;
+                    var cur = seeds[idx];
+                    var best_d2 = 999999999;
+                    if (cur >= 0) {
+                        var cdx = cur % w - qx;
+                        var cdy = cur / w - py;
+                        best_d2 = cdx * cdx + cdy * cdy;
+                    }
+                    var oy = -1;
+                    while (oy <= 1) {
+                        var ox = -1;
+                        while (ox <= 1) {
+                            if (ox != 0 or oy != 0) {
+                                var nx = qx + ox * step;
+                                var ny = py + oy * step;
+                                if (nx >= 0 and nx < w and ny >= 0 and ny < h) {
+                                    var nseed = seeds[ny * w + nx];
+                                    if (nseed >= 0) {
+                                        var ndx = nseed % w - qx;
+                                        var ndy = nseed / w - py;
+                                        var nd2 = ndx * ndx + ndy * ndy;
+                                        if (nd2 < best_d2) {
+                                            best_d2 = nd2;
+                                            seeds[idx] = nseed;
+                                        }
+                                    }
+                                }
+                            }
+                            ox = ox + 1;
+                        }
+                        oy = oy + 1;
+                    }
+                    qx = qx + 1;
+                }
+                py = py + 1;
+            }
+            step = step / 2;
+        }
+
+        py = 0;
+        while (py < h) {
+            var ex = 0;
+            while (ex < w) {
+                var idx = py * w + ex;
+                var seed = seeds[idx];
+                var dist = 0.0;
+                if (seed >= 0) {
+                    var sdx = seed % w - ex;
+                    var sdy = seed / w - py;
+                    dist = math.sqrt_approx((sdx * sdx + sdy * sdy) as float);
+                }
+                var sdfv = 0.0;
+                if (inside[idx] == 1) {
+                    sdfv = ONEDGE + dist;
+                } else {
+                    sdfv = ONEDGE - dist;
+                }
+                if (sdfv < 0.0) { sdfv = 0.0; }
+                if (sdfv > 255.0) { sdfv = 255.0; }
+                var row = _last_by + py;
+                var col = _last_bx + ex;
+                ffi.store_u8(_atlas + (row * ATLAS_W * 4) + (col * 4) + 3, sdfv as int);
+                ex = ex + 1;
+            }
+            py = py + 1;
+        }
+    }
+}
+
+// _utf8_next decodes one codepoint at byte index i into _uu_cp/_uu_i.
+// Tuple returns allocate a boxed pair per call under AOT — hot loops must
+// use module-var out-params instead.
+var _uu_cp: int = 0;
+var _uu_i: int = 0;
+fn _utf8_next(s: str, i: int): nil {
+    unsafe {
+        var b0 = _builtin_string_byte_at(s, i);
+        if (b0 < 128) { _uu_cp = b0; _uu_i = i + 1; return; }
+        if (b0 < 224) {
+            var b1 = _builtin_string_byte_at(s, i + 1);
+            _uu_cp = ((b0 & 31) << 6) | (b1 & 63);
+            _uu_i = i + 2;
+            return;
+        }
+        if (b0 < 240) {
+            var b1 = _builtin_string_byte_at(s, i + 1);
+            var b2 = _builtin_string_byte_at(s, i + 2);
+            _uu_cp = ((b0 & 15) << 12) | ((b1 & 63) << 6) | (b2 & 63);
+            _uu_i = i + 3;
+            return;
+        }
+        var b1 = _builtin_string_byte_at(s, i + 1);
+        var b2 = _builtin_string_byte_at(s, i + 2);
+        var b3 = _builtin_string_byte_at(s, i + 3);
+        _uu_cp = ((b0 & 7) << 18) | ((b1 & 63) << 12) | ((b2 & 63) << 6) | (b3 & 63);
+        _uu_i = i + 4;
+    }
+}
+
+// emit_text lays out `text` at (x, y-line-top) in screen px and calls
+// emit(qx0,qy0,qx1,qy1,u0,v0,u1,v1) once per visible glyph quad. All glyph
+// field reads stay inside this module — scalar fn args cross the boundary,
+// never frames or module vars (both leak under AOT).
+pub fn emit_text(text: str, x: float, y: float, px: float,
+                 emit: fn(qx0: float, qy0: float, qx1: float, qy1: float,
+                          u0: float, v0: float, u1: float, v1: float): nil): int {
+    if (_ready == 0 or len(text) == 0) { return 0; }
+    var sx = px / BAKE_PX;
+    var cur_x = x;
+    var cur_y = y + ascent_px(px);
+    var lh = line_height_px(px);
+    var prev = -1;
+    var i = 0;
+    var n = len(text);
+    while (i < n) {
+        _utf8_next(text, i);
+        var cp = _uu_cp;
+        i = _uu_i;
+        if (cp == 10) {
+            cur_y = cur_y + lh;
+            cur_x = x;
+            prev = -1;
+        } else {
+            if (prev >= 0) { cur_x = cur_x + kern_px(prev, cp, px); }
+            if (glyph_rec(cp) != 0) {
+                if (_gload(cp, 6) > 0.0) {
+                    var gx0 = cur_x + _gload(cp, 4) * sx;
+                    var gy0 = cur_y + _gload(cp, 5) * sx;
+                    var gx1 = gx0 + _gload(cp, 6) * sx;
+                    var gy1 = gy0 + _gload(cp, 7) * sx;
+                    emit(gx0, gy0, gx1, gy1,
+                         _gload(cp, 0), _gload(cp, 1),
+                         _gload(cp, 2), _gload(cp, 3));
+                }
+                cur_x = cur_x + _gload(cp, 8) * sx;
+            } else {
+                cur_x = cur_x + advance_px(cp, px);
+            }
+            prev = cp;
+        }
+    }
+    return 1;
+}
+
+// measure_text_px returns the advance width of `text` in screen px,
+// honouring newlines (returns the widest line). Scalar-only hot path.
+pub fn measure_text_px(text: str, px: float): float {
+    if (_ready == 0 or len(text) == 0) { return 0.0; }
+    var max_w = 0.0;
+    var cur_w = 0.0;
+    var prev = -1;
+    var i = 0;
+    var n = len(text);
+    while (i < n) {
+        _utf8_next(text, i);
+        var cp = _uu_cp;
+        i = _uu_i;
+        if (cp == 10) {
+            if (cur_w > max_w) { max_w = cur_w; }
+            cur_w = 0.0;
+            prev = -1;
+        } else {
+            if (prev >= 0) { cur_w = cur_w + kern_px(prev, cp, px); }
+            cur_w = cur_w + advance_px(cp, px);
+            prev = cp;
+        }
+    }
+    if (cur_w > max_w) { max_w = cur_w; }
+    return max_w;
+}
+
+// glyph_rec(cp) returns 1 when a record exists (baking on first use).
+fn glyph_rec(cp: int): int {
+    if (cp < 0 or cp >= CP_MAX) { return 0; }
+    if (_gload(cp, 9) == 0.0) {
+        if (_bake(cp) == 0) { return 0; }
+    }
+    return 1;
+}

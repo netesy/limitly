@@ -333,6 +333,15 @@ Behavioral equivalence across all supported backends is mandatory.
 - Rationale: every C helper is a second language to maintain, a marshalling boundary, and a VM/AOT parity hazard. Lymar-compiled helpers keep one language, one semantics, one backend matrix.
 - Legitimate exceptions: wrapping genuinely external native libraries (stb_image, system APIs, GPU drivers) that cannot be reimplemented — not helpers that duplicate what Lymar can already do.
 
+#### AOT Allocation Discipline — Hot Loops Must Avoid Managed Values
+Under the Fyra/AOT backend, several seemingly-scalar operations **allocate per call** and leak under the region allocator (~10–150 MB/s measured). Verified by micro-benchmark:
+- [ ] **`str == str` allocates** — never compare strings in per-vertex/per-glyph/per-frame hot loops. Cache a bool/int flag (e.g. `_is_vk`) set once at init.
+- [ ] **Tuple returns `(a, b)` allocate** a boxed pair per call — hot loops must use module-var out-params (`fn _next(...): nil` writing `_uu_cp`/`_uu_i`).
+- [ ] **Dict/list element reads allocate** — `{int: float}` gets and `[float]` index reads box the value per access. For per-codepoint/per-index hot data use raw `ffi.alloc` arenas + `ffi.load_f64`/`store_f64`/`load_i32`/`store_i64` (see `std/font/sdf_atlas.lm`).
+- [ ] **Closures created per call allocate** a captured environment — pass module-level `fn` values instead, with params staged in module vars.
+- [ ] **Frame-valued dict entries deep-copy per lookup** — never store frames in dicts on hot paths.
+- Cold paths (init, first-use bake) may use lists/frames/dicts freely — the cost is bounded by distinct items, not frames rendered.
+
 ---
 
 ### **8. Library-Specific Guidelines: std/ui and std/game**

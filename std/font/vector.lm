@@ -36,7 +36,7 @@ pub var _adv_cache: {int: float} = {};
 fn flat_tol(info: tables.Info): float {
     var upem = info.units_per_em;
     if (upem <= 0) { upem = 1000; }
-    return (upem as float) / 100.0;
+    return (upem as float) / 250.0;
 }
 
 // Recursive quadratic Bézier flatten by flatness (control-point distance

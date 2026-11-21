@@ -29,12 +29,17 @@ import std.os.identity as osid;
 import std.string.replace as replace;
 import std.native.vulkan as vk;
 import std.native.d3d11 as d3d;
+import std.font.sdf_atlas as sdfatlas;
+import std.text.utf8 as utf8;
 import std.os.environment as osenv;
 
 // ── state ────────────────────────────────────────────────────────────
 
 var _prefer: str = "";
 var _drv: str = "";
+// _is_vk mirrors (_drv == "vulkan") as an int: str == allocates a boxed
+// comparison result per call under AOT (~90MB/s in per-vertex hot loops).
+var _is_vk: int = 0;
 var _w: int = 0;
 var _h: int = 0;
 var _attached: int = 0;
@@ -53,6 +58,10 @@ var _vb_cap: int = 0;
 var _atlas_rgba: int = 0;
 var _atlas_tex: int = 0;
 var _atlas_smp: int = 0;
+var _sdf_tex: int = 0;      // SRV bound at slot 1
+var _sdf_tex_raw: int = 0;  // ID3D11Texture2D for UpdateSubresource
+var _sdf_smp: int = 0;
+var _sdf_on: int = 0;
 var _glyphs_buf: int = 0;
 var _metrics_buf: int = 0;
 var _sizes_buf: int = 0;
@@ -86,84 +95,84 @@ fn alloc_persist(bytes: int): int {
 // ── driver dispatch wrappers ─────────────────────────────────────────
 
 fn drv_attach(hwnd: int, w: int, h: int): int {
-    if (_drv == "vulkan") { return vk.gfx_attach(hwnd, w, h); }
+    if (_is_vk != 0) { return vk.gfx_attach(hwnd, w, h); }
     if (osid.TARGET_OS == osid.OS_WINDOWS) { return d3d.gfx_attach(hwnd, w, h); }
     return 0;
 }
 fn drv_detach(): nil {
-    if (_drv == "vulkan") { vk.gfx_detach(); return; }
+    if (_is_vk != 0) { vk.gfx_detach(); return; }
     if (osid.TARGET_OS == osid.OS_WINDOWS) { d3d.gfx_detach(); return; }
 }
 fn drv_resize(w: int, h: int): int {
-    if (_drv == "vulkan") { return vk.gfx_resize(w, h); }
+    if (_is_vk != 0) { return vk.gfx_resize(w, h); }
     if (osid.TARGET_OS == osid.OS_WINDOWS) { return d3d.gfx_resize(w, h); }
     return 0;
 }
 fn drv_begin_frame(): int {
-    if (_drv == "vulkan") { return vk.gfx_begin_frame(); }
+    if (_is_vk != 0) { return vk.gfx_begin_frame(); }
     if (osid.TARGET_OS == osid.OS_WINDOWS) { return d3d.gfx_begin_frame(); }
     return 0;
 }
 fn drv_end_frame(): int {
-    if (_drv == "vulkan") { return vk.gfx_end_frame(); }
+    if (_is_vk != 0) { return vk.gfx_end_frame(); }
     if (osid.TARGET_OS == osid.OS_WINDOWS) { d3d.gfx_end_frame(); return 1; }
     return 0;
 }
 fn drv_clear(r: float, g: float, b: float, a: float): nil {
-    if (_drv == "vulkan") { vk.gfx_clear(r, g, b, a); return; }
+    if (_is_vk != 0) { vk.gfx_clear(r, g, b, a); return; }
     if (osid.TARGET_OS == osid.OS_WINDOWS) { d3d.gfx_clear(r, g, b, a); return; }
 }
 fn drv_set_shaders(vs: int, ps: int): nil {
-    if (_drv == "vulkan") { vk.gfx_set_shaders(vs, ps); return; }
+    if (_is_vk != 0) { vk.gfx_set_shaders(vs, ps); return; }
     if (osid.TARGET_OS == osid.OS_WINDOWS) { d3d.gfx_set_shaders(vs, ps); return; }
 }
 fn drv_set_input_layout(il: int): nil {
-    if (_drv == "vulkan") { vk.gfx_set_input_layout(il); return; }
+    if (_is_vk != 0) { vk.gfx_set_input_layout(il); return; }
     if (osid.TARGET_OS == osid.OS_WINDOWS) { d3d.gfx_set_input_layout(il); return; }
 }
 fn drv_set_blend_state(b: int): nil {
-    if (_drv == "vulkan") { vk.gfx_set_blend_state(b); return; }
+    if (_is_vk != 0) { vk.gfx_set_blend_state(b); return; }
     if (osid.TARGET_OS == osid.OS_WINDOWS) { d3d.gfx_set_blend_state(b); return; }
 }
 fn drv_set_raster_state(r: int): nil {
-    if (_drv == "vulkan") { vk.gfx_set_raster_state(r); return; }
+    if (_is_vk != 0) { vk.gfx_set_raster_state(r); return; }
     if (osid.TARGET_OS == osid.OS_WINDOWS) { d3d.gfx_set_raster_state(r); return; }
 }
 fn drv_set_depth_state(d: int, s: int): nil {
-    if (_drv == "vulkan") { vk.gfx_set_depth_state(d, s); return; }
+    if (_is_vk != 0) { vk.gfx_set_depth_state(d, s); return; }
     if (osid.TARGET_OS == osid.OS_WINDOWS) { d3d.gfx_set_depth_state(d, s); return; }
 }
 fn drv_set_topology(t: int): nil {
-    if (_drv == "vulkan") { vk.gfx_set_topology(t); return; }
+    if (_is_vk != 0) { vk.gfx_set_topology(t); return; }
     if (osid.TARGET_OS == osid.OS_WINDOWS) { d3d.gfx_set_topology(t); return; }
 }
 fn drv_dyn_buf(bytes: int, bind: int, stride: int): int {
-    if (_drv == "vulkan") { return vk.gfx_buffer_create_dynamic(bytes, bind, stride); }
+    if (_is_vk != 0) { return vk.gfx_buffer_create_dynamic(bytes, bind, stride); }
     if (osid.TARGET_OS == osid.OS_WINDOWS) { return d3d.gfx_buffer_create_dynamic(bytes, bind, stride); }
     return 0;
 }
 fn drv_buf_update(buf: int, src: int, bytes: int): int {
-    if (_drv == "vulkan") { return vk.gfx_buffer_update(buf, src, bytes, bytes); }
+    if (_is_vk != 0) { return vk.gfx_buffer_update(buf, src, bytes, bytes); }
     if (osid.TARGET_OS == osid.OS_WINDOWS) {
         return d3d.gpu_buffer_write(buf, src, bytes);
     }
     return 0;
 }
 fn drv_set_vb(slot: int, buf: int, stride: int, off: int): nil {
-    if (_drv == "vulkan") { vk.gfx_set_vertex_buffer(slot, buf, stride, off); return; }
+    if (_is_vk != 0) { vk.gfx_set_vertex_buffer(slot, buf, stride, off); return; }
     if (osid.TARGET_OS == osid.OS_WINDOWS) { d3d.gfx_set_vertex_buffer(slot, buf, stride, off); return; }
 }
 fn drv_draw(count: int, start: int): nil {
-    if (_drv == "vulkan") { vk.gfx_draw(count, start); return; }
+    if (_is_vk != 0) { vk.gfx_draw(count, start); return; }
     if (osid.TARGET_OS == osid.OS_WINDOWS) { d3d.gfx_draw(count, start); return; }
 }
 fn drv_scissor(x: int, y: int, w: int, h: int): nil {
-    if (_drv == "vulkan") { vk.gfx_set_scissor(x, y, w, h); return; }
+    if (_is_vk != 0) { vk.gfx_set_scissor(x, y, w, h); return; }
     if (osid.TARGET_OS == osid.OS_WINDOWS) { d3d.gfx_set_scissor(x, y, w, h); return; }
 }
 
 fn drv_create_tex_rgba(w: int, h: int, ptr: int): int {
-    if (_drv == "vulkan") { return vk.gfx_texture_create_rgba(w, h, ptr); }
+    if (_is_vk != 0) { return vk.gfx_texture_create_rgba(w, h, ptr); }
     if (osid.TARGET_OS == osid.OS_WINDOWS) {
         var tex = d3d.gfx_texture_create_rgba(w, h, ptr);
         if (tex == 0) { return 0; }
@@ -172,16 +181,23 @@ fn drv_create_tex_rgba(w: int, h: int, ptr: int): int {
     return 0;
 }
 fn drv_create_sampler(filter: int, addr_u: int, addr_v: int): int {
-    if (_drv == "vulkan") { return vk.gfx_sampler_create(filter, addr_u, addr_v); }
+    if (_is_vk != 0) { return vk.gfx_sampler_create(filter, addr_u, addr_v); }
     if (osid.TARGET_OS == osid.OS_WINDOWS) { return d3d.gfx_sampler_create(filter, addr_u, addr_v); }
     return 0;
 }
+
+fn drv_update_tex_rgba(tex: int, w: int, h: int, ptr: int): int {
+    if (_is_vk != 0) { return vk.gfx_update_texture_rgba(tex, w, h, ptr); }
+    if (osid.TARGET_OS == osid.OS_WINDOWS) { return d3d.gfx_update_texture_rgba(tex, w, h, ptr); }
+    return 0;
+}
+
 fn drv_set_texture(slot: int, srv: int): nil {
-    if (_drv == "vulkan") { vk.gfx_ps_set_shader_resource(slot, srv); return; }
+    if (_is_vk != 0) { vk.gfx_ps_set_shader_resource(slot, srv); return; }
     if (osid.TARGET_OS == osid.OS_WINDOWS) { d3d.gfx_ps_set_shader_resource(slot, srv); return; }
 }
 fn drv_set_sampler(slot: int, smp: int): nil {
-    if (_drv == "vulkan") { vk.gfx_ps_set_sampler(slot, smp); return; }
+    if (_is_vk != 0) { vk.gfx_ps_set_sampler(slot, smp); return; }
     if (osid.TARGET_OS == osid.OS_WINDOWS) { d3d.gfx_ps_set_sampler(slot, smp); return; }
 }
 
@@ -274,7 +290,7 @@ fn brace_src(tmpl: str): str {
 
 // HLSL equivalents for the d3d11 driver (compiled via D3DCompile).
 var _VS_HLSL: str = brace_src("struct VI @ float2 p : POSITION; float2 uv : TEXCOORD0; float4 col : COLOR; float4 params : NORMAL; #; struct VO @ float4 pos : SV_Position; float2 uv : TEXCOORD0; float4 col : COLOR; float4 params : NORMAL; #; VO main(VI i) @ VO o; o.pos = float4(i.p, 0.0, 1.0); o.uv = i.uv; o.col = i.col; o.params = i.params; return o; #");
-var _PS_HLSL: str = brace_src("Texture2D tex : register(t0); SamplerState smp : register(s0); struct PI @ float4 pos : SV_Position; float2 uv : TEXCOORD0; float4 col : COLOR; float4 params : NORMAL; #; float round_rect_sdf(float2 p, float2 b, float r) @ float2 q = abs(p) - b + r; return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r; # float4 main(PI i) : SV_Target @ if (i.params.w < -0.5) @ float R = i.params.x; float a0 = i.params.y; float a1 = i.params.z; float2 p = i.uv; float r = length(p); float ang = atan2(p.y, p.x); float rel = ang - a0; rel = rel - 6.2831853 * floor(rel / 6.2831853); float sweep = a1 - a0; float d_ang; if (sweep >= 6.2831853) @ d_ang = -1000.0; # else if (rel <= sweep) @ d_ang = -min(rel, sweep - rel); # else @ d_ang = min(rel - sweep, 6.2831853 - rel); # float d = max(r - R, d_ang * R); return float4(i.col.rgb, i.col.a * saturate(0.5 - d * 0.7)); # if (i.params.z <= 0.0) @ float a = tex.Sample(smp, i.uv).a; return float4(i.col.rgb, i.col.a * a); # float radius = i.params.x; float border_w = i.params.y; float2 half_size = i.params.zw; float2 p = i.uv; float d = round_rect_sdf(p, half_size, radius); float cov = 0.0; if (border_w < -0.001) @ float blur = -border_w; float t = max(d, 0.0) / blur; cov = (d < 0.0) ? 1.0 : exp(-t * t * 2.5); # else if (border_w > 0.001) @ float d_outer = d; float d_inner = -border_w - d; cov = saturate(0.5 - max(d_outer, d_inner)); # else @ cov = saturate(0.5 - d); # return float4(i.col.rgb, i.col.a * cov); #");
+var _PS_HLSL: str = brace_src("Texture2D tex : register(t0); SamplerState smp : register(s0); Texture2D sdftex : register(t1); SamplerState sdfsmp : register(s1); struct PI @ float4 pos : SV_Position; float2 uv : TEXCOORD0; float4 col : COLOR; float4 params : NORMAL; #; float round_rect_sdf(float2 p, float2 b, float r) @ float2 q = abs(p) - b + r; return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r; # float4 main(PI i) : SV_Target @ if (i.params.w < -0.5) @ float R = i.params.x; float a0 = i.params.y; float a1 = i.params.z; float2 p = i.uv; float r = length(p); float ang = atan2(p.y, p.x); float rel = ang - a0; rel = rel - 6.2831853 * floor(rel / 6.2831853); float sweep = a1 - a0; float d_ang; if (sweep >= 6.2831853) @ d_ang = -1000.0; # else if (rel <= sweep) @ d_ang = -min(rel, sweep - rel); # else @ d_ang = min(rel - sweep, 6.2831853 - rel); # float d = max(r - R, d_ang * R); return float4(i.col.rgb, i.col.a * saturate(0.5 - d * 0.7)); # if (i.params.w > 0.5) @ float v = sdftex.Sample(sdfsmp, i.uv).a * 255.0; float rr = i.params.x; float cov = saturate((v - (128.0 - rr)) / (2.0 * rr)); return float4(i.col.rgb, i.col.a * cov); # if (i.params.z <= 0.0) @ float a = tex.Sample(smp, i.uv).a; return float4(i.col.rgb, i.col.a * a); # float radius = i.params.x; float border_w = i.params.y; float2 half_size = i.params.zw; float2 p = i.uv; float d = round_rect_sdf(p, half_size, radius); float cov = 0.0; if (border_w < -0.001) @ float blur = -border_w; float t = max(d, 0.0) / blur; cov = (d < 0.0) ? 1.0 : exp(-t * t * 2.5); # else if (border_w > 0.001) @ float d_outer = d; float d_inner = -border_w - d; cov = saturate(0.5 - max(d_outer, d_inner)); # else @ cov = saturate(0.5 - d); # return float4(i.col.rgb, i.col.a * cov); #");
 
 // ── pipeline init ───────────────────────────────────────────────────
 
@@ -295,7 +311,7 @@ fn pipeline_init(): int {
     unsafe {
         if (_pipe_ready != 0) { return 1; }
         var names: [str] = ["POSITION", "TEXCOORD", "COLOR", "NORMAL"];
-        if (_drv == "vulkan") {
+        if (_is_vk != 0) {
             var vp = spv_upload(_VS_SPV);
             var pp = spv_upload(_PS_SPV);
             _vs = vk.gfx_vs_create(vp, len(_VS_SPV) * 4);
@@ -325,7 +341,26 @@ fn pipeline_init(): int {
             drv_set_texture(0, _atlas_tex);
             drv_set_sampler(0, _atlas_smp);
         }
-        if (_drv == "vulkan") {
+        // SDF glyph atlas on slot 1 — D3D11 only (the Vulkan SPIR-V blob has
+        // no t1 binding; the SDF text path is gated to d3d11 in draw_text_px).
+        if (_is_vk == 0 and _sdf_tex == 0) {
+            if (sdfatlas.ensure() != 0) {
+                // Keep the raw texture for UpdateSubresource AND the SRV
+                // for slot-1 binding — drv_create_tex_rgba only returns SRV.
+                _sdf_tex_raw = d3d.gfx_texture_create_rgba(
+                    sdfatlas.ATLAS_W, sdfatlas.ATLAS_H, sdfatlas.atlas_ptr());
+                if (_sdf_tex_raw != 0) {
+                    _sdf_tex = d3d.gpu_srv_create(_sdf_tex_raw);
+                }
+                _sdf_smp = drv_create_sampler(21, 3, 3);
+                if (_sdf_tex != 0 and _sdf_smp != 0) {
+                    drv_set_texture(1, _sdf_tex);
+                    drv_set_sampler(1, _sdf_smp);
+                    _sdf_on = 1;
+                }
+            }
+        }
+        if (_is_vk != 0) {
             _blend = vk.gfx_blend_state_create_ex(1);
             _rast = vk.gfx_raster_state_create(0, 0);
             _depth = vk.gfx_depth_state_create(0, 0, 7);
@@ -365,7 +400,7 @@ fn vtx(x: float, y: float, u: float, v: float,
         var fh = _h as float;
         var nx = (x / fw) * 2.0 - 1.0;
         var ny = 0.0;
-        if (_drv == "vulkan") {
+        if (_is_vk != 0) {
             ny = (y / fh) * 2.0 - 1.0;
         } else {
             ny = 1.0 - (y / fh) * 2.0;
@@ -440,6 +475,7 @@ pub fn attach(hwnd: int, w: int, h: int): int {
         vk.gfx_set_vsync(sync);
 
         _drv = "";
+        _is_vk = 0;
         var first = _prefer;
         var second = "";
         if (first == "vulkan") {
@@ -449,16 +485,21 @@ pub fn attach(hwnd: int, w: int, h: int): int {
             second = "vulkan";
         }
         _drv = first;
+        _is_vk = 0;
+        if (first == "vulkan") { _is_vk = 1; }
         if (drv_attach(hwnd, w, h) != 0) {
             _w = w; _h = h; _attached = 1;
             return 1;
         }
         _drv = second;
+        _is_vk = 0;
+        if (second == "vulkan") { _is_vk = 1; }
         if (drv_attach(hwnd, w, h) != 0) {
             _w = w; _h = h; _attached = 1;
             return 1;
         }
         _drv = "";
+        _is_vk = 0;
         return 0;
     }
 }
@@ -471,6 +512,7 @@ pub fn detach(): nil {
         _vcount = 0; _clip_n = 0;
         _vs = 0; _ps = 0; _il = 0; _blend = 0; _rast = 0; _depth = 0; _vb = 0;
         _atlas_tex = 0; _atlas_smp = 0;
+        _sdf_tex = 0; _sdf_tex_raw = 0; _sdf_smp = 0; _sdf_on = 0;
     }
 }
 
@@ -482,7 +524,7 @@ pub fn resize(w: int, h: int): int {
 }
 
 pub fn save_screenshot(path: str): bool {
-    if (_drv == "vulkan") {
+    if (_is_vk != 0) {
         return vk.gfx_save_screenshot(path) == 1;
     }
     if (osid.TARGET_OS == osid.OS_WINDOWS) {
@@ -648,7 +690,7 @@ pub fn draw_tri(x1: float, y1: float, x2: float, y2: float,
 pub fn draw_pie_slice(cx: float, cy: float, radius: float, a0: float, a1: float,
                       r: float, g: float, b: float, a: float): nil {
     if (radius <= 0.0 or a <= 0.001) { return; }
-    if (_drv == "vulkan") {
+    if (_is_vk != 0) {
         var sweep = a1 - a0;
         var n: float = sweep / 0.04;
         if (n < 2.0) { n = 2.0; }
@@ -755,7 +797,7 @@ fn draw_text_at(text_str: str, x: float, y: float,
 
         if (_sym_emit_text != nil) {
             var is_vk = 0;
-            if (_drv == "vulkan") { is_vk = 1; }
+            if (_is_vk != 0) { is_vk = 1; }
             var cstr = ffi.string_to_cstring(text_str);
             var new_vc = ffi.foreign_call(_sym_emit_text,
                 [ffi.cstring_as_ptr(cstr), x, y, r, g, b, a, gbuf, lh, _w as float, _h as float, is_vk, _vdata, _vcount, max_v],
@@ -817,10 +859,56 @@ pub fn draw_text(text_str: str, x: float, y: float,
     draw_text_at(text_str, x, y, r, g, b, a, size_index_for_scale(scale));
 }
 
-// Pixel-sized variant: snaps to the nearest baked atlas glyph size.
+// SDF glyph path (D3D11 only — the Vulkan SPIR-V has no t1 binding):
+// one quad per glyph sampling the pure-Lymar SDF atlas; the pixel shader
+// reconstructs coverage with smoothstep → analytic AA at any px size.
+// SDF emit sink: module fn + module-var params. A closure created per
+// draw call allocates a captured environment every frame under AOT.
+var _se_r: float = 0.0;
+var _se_g: float = 0.0;
+var _se_b: float = 0.0;
+var _se_a: float = 0.0;
+var _se_srange: float = 0.0;
+
+fn _sdf_emit(qx0: float, qy0: float, qx1: float, qy1: float,
+             u0: float, v0: float, u1: float, v1: float): nil {
+    if (_vcount + 6 > _vdata_cap / 48) { flush_verts(); }
+    vtx(qx0, qy0, u0, v0, _se_r, _se_g, _se_b, _se_a, _se_srange, 0.0, 0.0, 1.0);
+    vtx(qx1, qy0, u1, v0, _se_r, _se_g, _se_b, _se_a, _se_srange, 0.0, 0.0, 1.0);
+    vtx(qx1, qy1, u1, v1, _se_r, _se_g, _se_b, _se_a, _se_srange, 0.0, 0.0, 1.0);
+    vtx(qx0, qy0, u0, v0, _se_r, _se_g, _se_b, _se_a, _se_srange, 0.0, 0.0, 1.0);
+    vtx(qx1, qy1, u1, v1, _se_r, _se_g, _se_b, _se_a, _se_srange, 0.0, 0.0, 1.0);
+    vtx(qx0, qy1, u0, v1, _se_r, _se_g, _se_b, _se_a, _se_srange, 0.0, 0.0, 1.0);
+}
+
+fn draw_text_sdf_px(text_str: str, x: float, y: float,
+                    r: float, g: float, b: float, a: float,
+                    px: float): nil {
+    unsafe {
+        if (len(text_str) == 0 or a <= 0.001) { return; }
+        if (pipeline_init() == 0 or _sdf_on == 0) { return; }
+
+        _se_r = r; _se_g = g; _se_b = b; _se_a = a;
+        _se_srange = sdfatlas.sdf_range(px);
+        // Layout + glyph lookup happen inside sdf_atlas; emit receives
+        // scalar quad args — no frames or closures cross the boundary.
+        sdfatlas.emit_text(text_str, x, y, px, _sdf_emit);
+        var was_dirty = sdfatlas.take_dirty();
+        if (was_dirty != 0) {
+            d3d.gfx_update_texture_rgba(_sdf_tex_raw, sdfatlas.ATLAS_W, sdfatlas.ATLAS_H, sdfatlas.atlas_ptr());
+        }
+    }
+}
+
+// Pixel-sized variant: SDF glyph atlas when available (D3D11), else the
+// nearest baked coverage-atlas tier.
 pub fn draw_text_px(text_str: str, x: float, y: float,
                     r: float, g: float, b: float, a: float,
                     px: float): nil {
+    if (pipeline_init() != 0 and _sdf_on != 0) {
+        draw_text_sdf_px(text_str, x, y, r, g, b, a, px);
+        return;
+    }
     draw_text_at(text_str, x, y, r, g, b, a, size_index_for_px(px));
 }
 
@@ -868,6 +956,9 @@ pub fn measure_text(text_str: str, scale: int = 1): float {
 }
 
 pub fn measure_text_px(text_str: str, px: float): float {
+    if (pipeline_init() != 0 and _sdf_on != 0) {
+        return sdfatlas.measure_text_px(text_str, px);
+    }
     return measure_text_at(text_str, size_index_for_px(px));
 }
 
@@ -885,5 +976,6 @@ pub fn get_line_height(scale: int = 1): float {
 }
 
 pub fn get_line_height_px(px: float): float {
+    if (pipeline_init() != 0 and _sdf_on != 0) { return sdfatlas.line_height_px(px); }
     return line_height_at(size_index_for_px(px));
 }
