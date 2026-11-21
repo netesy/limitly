@@ -73,6 +73,14 @@ var _glyph_mem: int = 0;        // CP_MAX * G_F f64, zeroed (has=0)
 var _gid_mem: int = 0;          // CP_MAX i32, -1 = unknown
 var _adv_mem: int = 0;          // CP_MAX f64, -1.0 = unknown
 var _kern_mem: int = 0;         // KERN_N * 16B: i64 key + f64 val, key=-1 empty
+// Font metrics cached as scalars at ensure() — frame field reads
+// (_info.x) allocate a boxed value per access under AOT (~190MB/s
+// measured), so the hot path must never touch _info fields.
+var _upem_v: float = 1000.0;
+var _has_kern_v: int = 0;
+var _ascent_v: int = 800;
+var _descent_v: int = -200;
+var _line_gap_v: int = 0;
 
 fn _gload(cp: int, f: int): float {
     unsafe { return ffi.load_f64(ffi.ptr_add(_glyph_mem + cp * G_F * 8, f * 8)); }
@@ -115,6 +123,13 @@ pub fn ensure(): int {
             i = i + 1;
         }
         if (loaded == 0) { return 0; }
+        _upem_v = _info.units_per_em as float;
+        if (_upem_v <= 0.0) { _upem_v = 1000.0; }
+        _has_kern_v = 0;
+        if (_info.has_kern) { _has_kern_v = 1; }
+        _ascent_v = _info.ascent;
+        _descent_v = _info.descent;
+        _line_gap_v = _info.line_gap;
         _atlas = alloc_persist(ATLAS_W * ATLAS_H * 4);
         if (_atlas == 0) { return 0; }
         _glyph_mem = alloc_persist(CP_MAX * G_F * 8);
@@ -149,9 +164,7 @@ pub fn take_dirty(): int {
 }
 
 fn _upem(): float {
-    var u = _info.units_per_em;
-    if (u <= 0) { u = 1000; }
-    return u as float;
+    return _upem_v;
 }
 
 // _gid(cp): cmap lookup, cached in the i32 arena (get_glyph_index
@@ -189,7 +202,7 @@ pub fn advance_px(cp: int, px: float): float {
 // kern_px(prev_cp, cp, px): kerning adjustment in screen px. Direct-mapped
 // i64-key/f64-val cache in raw memory; misses compute once and stay cached.
 pub fn kern_px(prev_cp: int, cp: int, px: float): float {
-    if (_ready == 0 or prev_cp < 0 or !_info.has_kern) { return 0.0; }
+    if (_ready == 0 or prev_cp < 0 or _has_kern_v == 0) { return 0.0; }
     var key = prev_cp * 1114112 + cp;
     var slot = (key & (KERN_N - 1)) * 16;
     unsafe {
@@ -208,12 +221,12 @@ pub fn kern_px(prev_cp: int, cp: int, px: float): float {
 // ascent_px / line_height_px in screen px for a given font size.
 pub fn ascent_px(px: float): float {
     if (_ready == 0) { return px * 0.8; }
-    return (_info.ascent as float) * (px / _upem());
+    return (_ascent_v as float) * (px / _upem());
 }
 
 pub fn line_height_px(px: float): float {
     if (_ready == 0) { return px * 1.25; }
-    var lh = ((_info.ascent - _info.descent + _info.line_gap) as float) * (px / _upem());
+    var lh = (((_ascent_v - _descent_v + _line_gap_v) as float) * (px / _upem()));
     if (lh < px) { lh = px; }
     return lh;
 }

@@ -4590,6 +4590,75 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             case LIR::LIR_Op::MemoryLoad: {
                 if (inst.imm > 10)
                     throw std::runtime_error("Invalid MemoryLoad element kind");
+                // Raw fast path: integer/pointer operands already hold the
+                // untagged address (pubptr is an int alias; tagging only
+                // happens at extern boundaries), so i64/u64/f64 loads lower
+                // to a native load behind the same null->nil guard the
+                // runtime extern provides, instead of paying RuntimeGuard +
+                // tag decode + memcpy + float box on every access. Narrower
+                // kinds and f32 keep the extern path (no fp narrowing opcode).
+                // Intrinsic MemoryLoad/Store leave type_a/type_b Void; the
+                // operand ABI type lives in register_types instead.
+                auto operand_type = [&](uint32_t r, LIR::Type declared) -> LIR::Type {
+                    if (declared != LIR::Type::Void) return declared;
+                    auto it = lir_func.register_types.find(r);
+                    return it != lir_func.register_types.end() ? it->second : LIR::Type::I64;
+                };
+                const LIR::Type eff_a = operand_type(inst.a, inst.type_a);
+                const bool raw_ptr_a =
+                    (eff_a == LIR::Type::Ptr || eff_a == LIR::Type::I64 ||
+                     eff_a == LIR::Type::U64 || eff_a == LIR::Type::I32 ||
+                     eff_a == LIR::Type::U32 || eff_a == LIR::Type::I16 ||
+                     eff_a == LIR::Type::U16 || eff_a == LIR::Type::I8 ||
+                     eff_a == LIR::Type::U8) && !lang_type_holds_tagged_word(inst.a);
+                if (raw_ptr_a && inst.imm != 8 && inst.imm != 10) {
+                    auto* i64ty = context_->getIntegerType(64);
+                    auto* i32ty = context_->getIntegerType(32);
+                    ir::Value* addr = load_reg(inst.a, eff_a);
+                    ir::Function* cur_fn = builder_->getInsertPoint()->getParent();
+                    std::string mid = "mload_" + std::to_string(label_counter_++);
+                    ir::BasicBlock* b_ok = builder_->createBasicBlock(mid + "_ok", cur_fn);
+                    ir::BasicBlock* b_nil = builder_->createBasicBlock(mid + "_nil", cur_fn);
+                    ir::BasicBlock* b_done = builder_->createBasicBlock(mid + "_done", cur_fn);
+                    builder_->createBr(builder_->createCeq(addr, context_->getConstantInt(i64ty, 0)), b_nil, b_ok);
+                    builder_->setInsertPoint(b_nil);
+                    if (inst.imm == 9) {
+                        // Nil must match the slot representation store_reg
+                        // fixes for this register: erased slots take the
+                        // VAL_NIL word, scalar float slots take 0.0 (the
+                        // same value to_float(VAL_NIL) yields in the VM).
+                        if (pointer_assigned_regs.count(inst.dst) || is_pointer_lang_type(inst.dst))
+                            store_reg(inst.dst, context_->getConstantInt(i64ty, VAL_NIL), LIR::Type::Ptr);
+                        else
+                            store_reg(inst.dst, context_->getConstantFP(context_->getDoubleType(), 0.0), LIR::Type::F64);
+                    } else {
+                        store_reg(inst.dst, context_->getConstantInt(i64ty, VAL_NIL), inst.result_type);
+                    }
+                    builder_->createJmp(b_done);
+                    builder_->setInsertPoint(b_ok);
+                    ir::Value* v = nullptr;
+                    switch (inst.imm) {
+                        case 0: v = builder_->createExtSW(builder_->createLoadsb(addr), i64ty); break;
+                        case 1: v = builder_->createExtUW(builder_->createLoadub(addr), i64ty); break;
+                        case 2: v = builder_->createExtSW(builder_->createLoadsh(addr), i64ty); break;
+                        case 3: v = builder_->createExtUW(builder_->createLoaduh(addr), i64ty); break;
+                        case 4: v = builder_->createExtSW(builder_->createLoaduw(addr), i64ty); break;
+                        case 5: v = builder_->createExtUW(builder_->createLoaduw(addr), i64ty); break;
+                        case 6: case 7: v = builder_->createLoadl(addr); break;
+                        case 9: {
+                            // store_reg applies the standard float discipline:
+                            // raw double for scalar float slots, boxed tagged
+                            // word only when the destination is erased.
+                            store_reg(inst.dst, builder_->createLoadd(addr), LIR::Type::F64);
+                            v = nullptr;
+                            break;
+                        }
+                    }
+                    if (v) store_reg(inst.dst, v, inst.result_type);
+                    builder_->createJmp(b_done);
+                    builder_->setInsertPoint(b_done);
+                    break;
+                }
                 auto* value = builder_->createExternCall("lymar_aot_memory_load",
                     {tag_word(load_reg(inst.a, inst.type_a), inst.a, inst.type_a), context_->getConstantInt(context_->getIntegerType(64), inst.imm)},
                     context_->getIntegerType(64));
@@ -4603,6 +4672,57 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             case LIR::LIR_Op::MemoryStore: {
                 if (inst.imm > 10)
                     throw std::runtime_error("Invalid MemoryStore element kind");
+                // Raw fast path mirrors MemoryLoad: Ptr address + raw scalar
+                // value (untagged, non-erased) lowers to a native store behind
+                // the null no-op guard. f32 stores and tagged values keep the
+                // extern path which performs numeric conversion/tag decoding.
+                auto operand_type = [&](uint32_t r, LIR::Type declared) -> LIR::Type {
+                    if (declared != LIR::Type::Void) return declared;
+                    auto it = lir_func.register_types.find(r);
+                    return it != lir_func.register_types.end() ? it->second : LIR::Type::I64;
+                };
+                const LIR::Type eff_a = operand_type(inst.a, inst.type_a);
+                const LIR::Type eff_b = operand_type(inst.b, inst.type_b);
+                const bool raw_int_val =
+                    eff_b == LIR::Type::I64 || eff_b == LIR::Type::U64 ||
+                    eff_b == LIR::Type::I32 || eff_b == LIR::Type::U32 ||
+                    eff_b == LIR::Type::I16 || eff_b == LIR::Type::U16 ||
+                    eff_b == LIR::Type::I8 || eff_b == LIR::Type::U8 ||
+                    eff_b == LIR::Type::Ptr;
+                const bool raw_ptr_a =
+                    (eff_a == LIR::Type::Ptr || eff_a == LIR::Type::I64 ||
+                     eff_a == LIR::Type::U64 || eff_a == LIR::Type::I32 ||
+                     eff_a == LIR::Type::U32 || eff_a == LIR::Type::I16 ||
+                     eff_a == LIR::Type::U16 || eff_a == LIR::Type::I8 ||
+                     eff_a == LIR::Type::U8) && !lang_type_holds_tagged_word(inst.a);
+                const bool raw_store = raw_ptr_a &&
+                    !lang_type_holds_tagged_word(inst.b) &&
+                    (((inst.imm <= 7) && raw_int_val) ||
+                     (inst.imm == 9 && eff_b == LIR::Type::F64));
+                if (raw_store) {
+                    auto* i64ty = context_->getIntegerType(64);
+                    auto* i32ty = context_->getIntegerType(32);
+                    ir::Value* addr = load_reg(inst.a, eff_a);
+                    ir::Value* val = load_reg(inst.b, eff_b);
+                    if (val->getType() != i64ty && inst.imm != 9)
+                        val = builder_->createCast(val, i64ty);
+                    ir::Function* cur_fn = builder_->getInsertPoint()->getParent();
+                    std::string mid = "mstore_" + std::to_string(label_counter_++);
+                    ir::BasicBlock* b_ok = builder_->createBasicBlock(mid + "_ok", cur_fn);
+                    ir::BasicBlock* b_done = builder_->createBasicBlock(mid + "_done", cur_fn);
+                    builder_->createBr(builder_->createCeq(addr, context_->getConstantInt(i64ty, 0)), b_done, b_ok);
+                    builder_->setInsertPoint(b_ok);
+                    switch (inst.imm) {
+                        case 0: case 1: builder_->createStoreb(val, addr); break;
+                        case 2: case 3: builder_->createStoreh(val, addr); break;
+                        case 4: case 5: builder_->createStore(builder_->createSToSI(val, i32ty), addr); break;
+                        case 6: case 7: builder_->createStorel(val, addr); break;
+                        case 9: builder_->createStored(val, addr); break;
+                    }
+                    builder_->createJmp(b_done);
+                    builder_->setInsertPoint(b_done);
+                    break;
+                }
                 builder_->createExternCall("lymar_aot_memory_store",
                     {tag_word(load_reg(inst.a, inst.type_a), inst.a, inst.type_a), tag_word(load_reg(inst.b, inst.type_b), inst.b, inst.type_b),
                      context_->getConstantInt(context_->getIntegerType(64), inst.imm)}, nullptr);
