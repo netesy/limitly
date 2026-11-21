@@ -204,7 +204,7 @@ bool CacheManager::save_program_cache(
 
         CacheWriter w;
         w.bytes("LMC1", 4);
-        w.u8(1); // cache format version (v1: compile-target OS byte)
+        w.u8(1); // cache format version (v1: compile-target OS + gg backend bytes)
         w.u8(1); // ABI version
         w.u8(static_cast<uint8_t>(LM::Frontend::ModuleManager::target_os())); // compile-target specialization
         w.u8(static_cast<uint8_t>(LM::Frontend::ModuleManager::gg_backend())); // compile-time gg backend specialization
@@ -312,7 +312,7 @@ std::unique_ptr<LIR_Function> CacheManager::try_load_program_cache(
 
         uint8_t version = r.u8();
         uint8_t abi_version = r.u8();
-        if (version != 5 || abi_version != 1) return nullptr;
+        if (version != 1 || abi_version != 1) return nullptr;
 
         // Compile-target specialization: TARGET_OS/GG_BACKEND-dependent LIR differs per target/backend.
         if (r.u8() != static_cast<uint8_t>(LM::Frontend::ModuleManager::target_os())) return nullptr;
