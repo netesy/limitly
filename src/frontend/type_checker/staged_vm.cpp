@@ -341,7 +341,30 @@ bool TypeChecker::check_staged_body_for_vm(
         declare_variable(fn->optionalParams[i].first, type);
     }
 
+    // The call site binds this fn's parameters into constant_ints/
+    // constant_doubles/constant_enums_ for the AST folder. The VM-lowered
+    // body is parametric — parameters arrive in registers — so those
+    // bindings must not be visible while the body is checked: otherwise
+    // evaluate_const_expr folds `if (n > 0)` against the *call argument*
+    // and const_branch erases the guard, turning e.g. `down(4)` into
+    // unconditional self-recursion. True constants (module consts, literal
+    // locals) still fold; only the parameter names are masked.
+    auto saved_ints = constant_ints;
+    auto saved_doubles = constant_doubles;
+    auto saved_enums = constant_enums_;
+    auto mask_param = [&](const std::string& pname) {
+        constant_ints.erase(pname);
+        constant_doubles.erase(pname);
+        constant_enums_.erase(pname);
+    };
+    for (const auto& p : fn->params) mask_param(p.first);
+    for (const auto& p : fn->optionalParams) mask_param(p.first);
+
     check_statement(fn->body);
+
+    constant_ints = saved_ints;
+    constant_doubles = saved_doubles;
+    constant_enums_ = saved_enums;
 
     exit_scope();
     current_function = saved_function;

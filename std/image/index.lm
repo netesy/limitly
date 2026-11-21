@@ -158,15 +158,17 @@ frame Image {
     pub var pixels:   int;   // raw u8 pixel buffer pointer (pubptr = int)
     pub var is_hdr:   bool;
     pub var _lib:     int;   // library handle
+    pub var lib_pixels: bool; // true when pixels were allocated by the image library (stb)
 
     pub init(w: int = 0, h: int = 0, c: int = 4,
-    p: int = 0, lib: int = 0) {
+    p: int = 0, lib: int = 0, lib_pixels: bool = false) {
         self.width    = w;
         self.height   = h;
         self.channels = c;
         self.pixels   = p;
         self.is_hdr   = false;
         self._lib     = lib;
+        self.lib_pixels = lib_pixels;
     }
 
     pub fn pixel_offset(x: int, y: int): int {
@@ -347,7 +349,7 @@ pub fn load(path: str): Image? {
         ffi.free(w_p); ffi.free(h_p); ffi.free(c_p);
 
         if (data_ptr == nil) { ffi.library_unload(lib); return err(); }
-        return ok(Image(w=w, h=h, c=c, p=data_ptr, lib=lib));
+        return ok(Image(w=w, h=h, c=c, p=data_ptr, lib=lib, lib_pixels=true));
     }
 }
 
@@ -381,7 +383,7 @@ pub fn load_forced(path: str, channels: int): Image? {
         ffi.free(w_p); ffi.free(h_p); ffi.free(c_p);
 
         if (data_ptr == nil) { ffi.library_unload(lib); return err(); }
-        return ok(Image(w=w, h=h, c=channels, p=data_ptr, lib=lib));
+        return ok(Image(w=w, h=h, c=channels, p=data_ptr, lib=lib, lib_pixels=true));
     }
 }
 
@@ -483,17 +485,21 @@ r: int, g: int, b: int, a: int = 255): nil {
 pub fn free_image(img: Image): nil {
     if (img.pixels == nil) { return; }
     unsafe {
-        var freed: bool = false;
-        if (img._lib != nil) {
-            var fn_free: int = ffi.library_get_symbol(img._lib, "free_image");
-            if (fn_free != nil) {
-                ffi.call_void_1(fn_free, img.pixels);
-                freed = true;
-            }
-            ffi.library_unload(img._lib);
+        // Only stb-allocated pixels may go through stbi_image_free —
+        // create/clone/resize buffers come from ffi.alloc and must be
+        // released with ffi.free or the C runtime free() corrupts the
+        // Lymar heap (observed as a crash at process exit).
+        var fn_free: int = 0;
+        if (img.lib_pixels and img._lib != nil) {
+            fn_free = ffi.library_get_symbol(img._lib, "free_image");
         }
-        if (not freed) {
+        if (fn_free != nil) {
+            ffi.call_void_1(fn_free, img.pixels);
+        } else {
             ffi.free(img.pixels);
+        }
+        if (img._lib != nil) {
+            ffi.library_unload(img._lib);
         }
     }
 }

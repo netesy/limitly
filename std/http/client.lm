@@ -253,11 +253,14 @@ frame Client {
         var response_data = "";
         var reading = true;
         while (reading) {
-            var chunk = sock.recv()? else {
-                reading = false;
-                "";
-            };
-            if (reading) {
+            var recv_res = sock.recv();
+            var chunk = "";
+            var got_chunk = false;
+            match (recv_res) {
+                val data => { chunk = data; got_chunk = true; },
+                _ => { reading = false; }
+            }
+            if (got_chunk) {
                 if (len(chunk) == 0) {
                     reading = false;
                 } else {
