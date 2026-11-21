@@ -408,18 +408,14 @@ void lower_worker_failures(ir::Module& module) {
         if (function && !function->getBasicBlocks().empty() && reachable.insert(function).second)
             pending.push_back(function);
     };
+    // Worker-failure checks are only meaningful while a concurrent block is
+    // active (lymar_aot_worker_failed early-outs otherwise). Seed reachability
+    // solely from task entries and follow every function-valued operand —
+    // direct callees and address-taken targets alike — so closures and
+    // finalizer callbacks reachable from worker code stay checked, while
+    // ordinary single-threaded code pays no per-branch check calls.
     for (auto& owner : module.getFunctions()) {
         if (owner->getName().starts_with("__lymar_task_entry_")) root(owner.get());
-        for (auto& block : owner->getBasicBlocks()) for (auto& instruction : block->getInstructions()) {
-            const auto& operands = instruction->getOperands();
-            for (size_t index = 0; index < operands.size(); ++index) {
-                // Every address-taken definition is a conservative indirect
-                // worker target, including closures and finalizer callbacks.
-                // A direct callee alone is reached by the worklist below.
-                if (instruction->getOpcode() == ir::Instruction::Call && index == 0) continue;
-                root(dynamic_cast<ir::Function*>(operands[index]->get()));
-            }
-        }
     }
     for(size_t index=0;index<pending.size();++index)
         for(auto& block:pending[index]->getBasicBlocks()) for(auto& instruction:block->getInstructions())
