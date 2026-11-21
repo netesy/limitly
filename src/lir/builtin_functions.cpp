@@ -411,21 +411,29 @@ void LIRBuiltinFunctions::registerUtilityFunctions() {
         }
     ));
     
-    // Assert is handled directly by VM, not as a builtin function
-    // registerFunction(std::make_shared<LIRBuiltinFunction>(
-    //     "assert",
-    //     std::vector<TypeTag>{TypeTag::Bool, TypeTag::String},
-    //     TypeTag::Nil,
-    //     [](const std::vector<ValuePtr>& args) -> ValuePtr {
-    //         bool condition = args[0]->as<bool>();
-    //         std::string message = args[1]->as<std::string>();
-    //         if (!condition) {
-    //             throw std::runtime_error("Assertion failed: " + message);
-    //         }
-    //         auto nil_type = std::make_shared<::Type>(TypeTag::Nil);
-    //         return std::make_shared<Value>(nil_type);
-    //     }
-    // ));
+    // Assert is special-cased in the register-VM call path, but precompiled
+    // module dispatch can route it through the generic builtin fallback —
+    // register it here too so both paths behave identically. Empty
+    // paramTypes = variable arity (assert takes 1 or 2 args).
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "assert",
+        std::vector<TypeTag>{},
+        TypeTag::Nil,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            if (args.empty()) {
+                return std::make_shared<Value>(std::make_shared<::Type>(TypeTag::Nil));
+            }
+            bool condition = args[0]->as<bool>();
+            if (!condition) {
+                std::string message = "Assertion failed";
+                if (args.size() > 1) {
+                    try { message = args[1]->as<std::string>(); } catch (...) {}
+                }
+                throw std::runtime_error("Assertion failed: " + message);
+            }
+            return std::make_shared<Value>(std::make_shared<::Type>(TypeTag::Nil));
+        }
+    ));
 
     registerFunction(std::make_shared<LIRBuiltinFunction>(
         "len",

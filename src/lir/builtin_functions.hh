@@ -46,6 +46,7 @@ public:
         // These are builtin API contracts, not inferred ownership effects.
         if (name_ == "print") return true;
         if (name_ == "input") return count <= 1;
+        if (name_ == "assert") return count >= 1 && count <= 2;
         return count == paramTypes_.size();
     }
 };
