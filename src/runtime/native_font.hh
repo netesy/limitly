@@ -1,12 +1,11 @@
 // native_font.hh — self-contained TrueType/OpenType coverage font engine.
 //
 // C++ port of the std/font Lymar pipeline (tables.lm + glyph.lm +
-// rasterizer.lm) used by the VM-side renderers that previously depended on
-// stb_truetype / fontstash:
+// rasterizer.lm) used by the VM-side renderers:
 //   - src/runtime/software_graphics.hh  (headless software text)
 //   - src/runtime/sokol/sokol_gfx_runtime.cpp (windowed GPU text)
 //
-// Scaling matches stbtt_ScaleForPixelHeight: px / (hhea.ascent - hhea.descent).
+// Scaling: px / (hhea.ascent - hhea.descent), matching std.font.
 // Coverage rasterization uses the same non-zero-winding scanline approach as
 // rasterizer.lm, with per-pixel x-overlap accumulation for horizontal AA.
 //
@@ -164,7 +163,7 @@ public:
         return true;
     }
 
-    // stbtt_ScaleForPixelHeight equivalent.
+    // Pixel-height scale: px / (ascent - descent).
     float scale_for_pixel_height(float px) const {
         float h = (float)(ascent - descent);
         if (h <= 0.0f) h = (float)units_per_em;

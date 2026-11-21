@@ -477,6 +477,7 @@ int main(int argc, char* argv[]) {
                     size_t dot = mod_name.rfind(".lm");
                     if (dot != std::string::npos) mod_name.erase(dot);
                     std::replace(mod_name.begin(), mod_name.end(), '/', '.');
+                    std::replace(mod_name.begin(), mod_name.end(), '\\', '.');
 
                     auto mod = LM::Frontend::ModuleManager::getInstance().get_module(mod_name);
                     if (!mod) {

@@ -1,9 +1,9 @@
 // std/image/font.lm
 // TrueType font loading, metrics, and CPU coverage rasterization —
 // native std.font pipeline (table parsing + glyph outlines + scanline
-// rasterizer). No stb_truetype dependency.
+// rasterizer). No external font library.
 //
-// API-compatible with the previous stb-backed implementation:
+// API-compatible with the previous C-backed implementation:
 //   load_font / load_system_font / detect_system_font
 //   Font.text_width / Font.text_height / Font.render / Font.free
 //
@@ -20,7 +20,6 @@ import std.font.rasterizer as rast;
 import std.image.index as image;
 import std.io.file as _iof;
 import std.ffi as ffi;
-import std.os.identity as osid;
 
 frame Metrics {
     pub var ascent: float;
@@ -104,7 +103,7 @@ frame Font {
         if (not self.is_valid or text == "") { return 0.0; }
         var info = self._info;
         var rdr = self._rdr;
-        // stbtt_ScaleForPixelHeight parity: font_size maps to the
+        // Pixel-height scaling parity: font_size maps to the
         // hhea ascent-descent extent, not the em square.
         var upem = info.ascent - info.descent;
         if (upem <= 0) { upem = 1000; }
@@ -134,7 +133,7 @@ frame Font {
     pub fn text_height(text: str, font_size: float = 16.0): float {
         if (not self.is_valid or text == "") { return 0.0; }
         var info = self._info;
-        // stbtt_ScaleForPixelHeight parity: font_size maps to the
+        // Pixel-height scaling parity: font_size maps to the
         // hhea ascent-descent extent, not the em square.
         var upem = info.ascent - info.descent;
         if (upem <= 0) { upem = 1000; }
@@ -156,7 +155,7 @@ pub fn render(text: str, font_size: float = 16.0, color: any = nil): image.Image
 
         var info = self._info;
         var rdr = self._rdr;
-        // stbtt_ScaleForPixelHeight parity: font_size maps to the
+        // Pixel-height scaling parity: font_size maps to the
         // hhea ascent-descent extent, not the em square.
         var upem = info.ascent - info.descent;
         if (upem <= 0) { upem = 1000; }
@@ -278,89 +277,8 @@ pub fn render(text: str, font_size: float = 16.0, color: any = nil): image.Image
     }
 }
 
-// ── System font detection ────────────────────────────────────────────────
-// Native port of the previous stb_wrapper detect_system_font_path:
-// preferred name searched in platform font dirs, then a fallback list.
-
-fn _font_dirs(): [str] {
-    var dirs: [str] = [];
-    if (osid.TARGET_OS == osid.OS_WINDOWS) {
-        dirs.append("C:/Windows/Fonts/");
-        dirs.append("C:/WinNT/Fonts/");
-    } elif (osid.TARGET_OS == osid.OS_MACOS) {
-        dirs.append("/System/Library/Fonts/");
-        dirs.append("/Library/Fonts/");
-        dirs.append("/System/Library/Fonts/Supplemental/");
-    } else {
-        dirs.append("/usr/share/fonts/truetype/dejavu/");
-        dirs.append("/usr/share/fonts/TTF/");
-        dirs.append("/usr/share/fonts/truetype/liberation/");
-        dirs.append("/usr/share/fonts/truetype/freefont/");
-        dirs.append("/usr/share/fonts/truetype/ubuntu/");
-        dirs.append("/usr/share/fonts/");
-        dirs.append("/usr/local/share/fonts/");
-    }
-    return dirs;
-}
-
-fn _file_exists(path: str): int {
-    var f = _iof.open(path, "rb")? else { return 0; };
-    f.close()? else { return 0; };
-    return 1;
-}
-
-fn _has_font_ext(name: str): int {
-    // True when `name` already ends in .ttf/.ttc/.otf (any case).
-    var n = len(name);
-    if (n < 4) { return 0; }
-    if ((name[n - 4] as int) != 46) { return 0; } // '.'
-    var e3 = (name[n - 3] as int) | 32;
-    var e2 = (name[n - 2] as int) | 32;
-    var e1 = (name[n - 1] as int) | 32;
-    if (e3 == 116 and e2 == 116 and (e1 == 102 or e1 == 99)) { return 1; } // .ttf/.ttc
-    if (e3 == 111 and e2 == 116 and e1 == 102) { return 1; }                // .otf
-    return 0;
-}
-
 pub fn detect_system_font(preferred_name: str = ""): str {
-    var dirs = _font_dirs();
-    if (preferred_name != "") {
-        var i = 0;
-        while (i < len(dirs)) {
-            var p1 = dirs[i] + preferred_name;
-            if (_file_exists(p1) != 0) { return p1; }
-            if (_has_font_ext(preferred_name) == 0) {
-                var p2 = dirs[i] + preferred_name + ".ttf";
-                if (_file_exists(p2) != 0) { return p2; }
-            }
-            i = i + 1;
-        }
-    }
-    var fallbacks: [str] = [];
-    if (osid.TARGET_OS == osid.OS_WINDOWS) {
-        fallbacks.append("C:/Windows/Fonts/segoeui.ttf");
-        fallbacks.append("C:/Windows/Fonts/arial.ttf");
-        fallbacks.append("C:/Windows/Fonts/tahoma.ttf");
-        fallbacks.append("C:/Windows/Fonts/calibri.ttf");
-        fallbacks.append("C:/Windows/Fonts/consola.ttf");
-    } elif (osid.TARGET_OS == osid.OS_MACOS) {
-        fallbacks.append("/System/Library/Fonts/SFNS.ttf");
-        fallbacks.append("/System/Library/Fonts/Helvetica.ttc");
-        fallbacks.append("/Library/Fonts/Arial.ttf");
-        fallbacks.append("/System/Library/Fonts/Supplemental/Arial.ttf");
-    } else {
-        fallbacks.append("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf");
-        fallbacks.append("/usr/share/fonts/TTF/DejaVuSans.ttf");
-        fallbacks.append("/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf");
-        fallbacks.append("/usr/share/fonts/truetype/freefont/FreeSans.ttf");
-        fallbacks.append("/usr/share/fonts/truetype/ubuntu/Ubuntu-R.ttf");
-    }
-    i = 0;
-    while (i < len(fallbacks)) {
-        if (_file_exists(fallbacks[i]) != 0) { return fallbacks[i]; }
-        i = i + 1;
-    }
-    return "";
+    return image.detect_system_font(preferred_name);
 }
 
 pub fn load_font(filepath: str): Font? {

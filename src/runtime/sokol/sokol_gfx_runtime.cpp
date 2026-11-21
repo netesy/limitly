@@ -29,7 +29,7 @@
 
 // Immediate-mode text: native std/font coverage pipeline (native_font.hh)
 // rasterizes glyphs into an R8 atlas drawn through a dedicated sg pipeline.
-// (Replaces the vendored fontstash/fons + stb_truetype stack.)
+// (Replaces the old vendored C text stack.)
 
 #include <algorithm>
 #include <chrono>
@@ -538,7 +538,7 @@ float4 fs_main(VSOut i) : SV_TARGET {
 )";
 
 // ---------------------------------------------------------------------------
-// Native text glyph record + atlas constants (fontstash FONSglyph equivalent)
+// Native text glyph record + atlas constants
 // ---------------------------------------------------------------------------
 struct TextGlyphRec {
     float u0 = 0, v0 = 0, u1 = 0, v1 = 0; // atlas UVs over the bitmap region
@@ -823,7 +823,7 @@ float gfx_font_size_for_scale(int scale) {
 
 // VM-thread text metrics via the native font engine (no GPU resources).
 // Advance math mirrors the draw path: per-glyph int-rounded advances and
-// kern pairs, UTF-8 decoded — same totals fonsDrawText produced.
+// kern pairs, UTF-8 decoded — same totals the previous text path produced.
 static NativeFont g_metrics_font;
 static bool g_metrics_tried = false;
 
@@ -861,7 +861,7 @@ float gfx_measure_text(const char* text, int scale) {
 float gfx_line_height(int scale) {
     if (!ensure_metrics()) return 0.0f;
     const float size_px = gfx_font_size_for_scale(scale);
-    // fontstash normalized lineh: (ascent - descent + lineGap) / (ascent - descent) * size
+    // normalized lineh: (ascent - descent + lineGap) / (ascent - descent) * size
     const float fh = (float)(g_metrics_font.ascent - g_metrics_font.descent);
     if (fh <= 0.0f) return size_px;
     return (fh + (float)g_metrics_font.line_gap) / fh * size_px;
@@ -1720,7 +1720,7 @@ void SokolGfxRuntime::flush_text() {
         const float size_px = gfx_font_size_for_scale((int)cmd.f[6]);
         const int isize = (int)(size_px * 10.0f);
         const float fscale = font.scale_for_pixel_height(size_px);
-        // fontstash normalized metrics: lineh = (fh + gap)/fh * size,
+        // normalized metrics: lineh = (fh + gap)/fh * size,
         // baseline sits `ascent * fscale` below the line top.
         const float fh = (float)(font.ascent - font.descent);
         const float lineh = (fh > 0.0f)
@@ -1770,7 +1770,7 @@ void SokolGfxRuntime::flush_text() {
 
     // ONE atlas upload per frame max (sokol allows a single sg_update_image
     // per image per frame); glyphs rasterized after this frame's upload show
-    // up on the next frame, matching the old fontstash dirty-rect behavior.
+    // up on the next frame, matching the previous dirty-rect behavior.
     if (im->text_atlas_dirty && last_text_flush_ != frame_id_) {
         last_text_flush_ = frame_id_;
         im->text_atlas_dirty = false;

@@ -217,7 +217,7 @@ fn main(): int {
 
     var log_messages = [
         "[00:00.01] Engine core initialized (Sokol GLES / Metal / D3D11)",
-        "[00:00.04] TrueType font rasterizer loaded via stb_truetype",
+        "[00:00.04] TrueType font rasterizer loaded via std.font",
         "[00:00.07] Audio mixer initialized (44.1kHz, 32 channels)",
         "[00:00.12] Starship entity spawned in central orbit",
         "[00:00.18] Sector radar operational: 12 stellar bodies detected",

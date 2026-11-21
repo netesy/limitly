@@ -22,7 +22,7 @@ Deliberately NOT implemented (documented limits):
     from UnicodeData.txt names ("ARABIC LETTER X INITIAL FORM").
   - No mark positioning, no ligatures beyond lam-alef, no GSUB/GPOS.
   - Whether the loaded font HAS the presentation-form glyphs is a font
-    property; fons renders whatever the cmap provides.
+    property; the renderer draws whatever the cmap provides.
 
 ## Symbols
 

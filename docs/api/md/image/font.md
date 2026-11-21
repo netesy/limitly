@@ -3,7 +3,7 @@
 ## Overview
 
 std/image/font.lm
-TrueType Font loading, rasterization, and system font detection using stb_truetype.
+TrueType Font loading, rasterization, and system font detection using the native std.font pipeline.
 
 ## Symbols
 

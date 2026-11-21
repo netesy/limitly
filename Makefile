@@ -94,6 +94,39 @@ PRECOMPILE_PLATFORM := $(if $(filter Windows_NT,$(OS)),windows,$(if $(filter .dy
 # Helper to find all precompilable modules (directories in std/ containing index.lm)
 ALL_PRECOMPILE_MODULES := $(patsubst std/%/,std.%,$(dir $(wildcard std/*/index.lm)))
 
+OBJCOPY := objcopy
+NM := nm
+ifeq ($(PLATFORM),windows)
+	OBJCOPY := $(MSYS2_PATH)/mingw64/bin/objcopy.exe
+	NM := $(MSYS2_PATH)/mingw64/bin/nm.exe
+endif
+
+# =============================
+# Native std.font VM-dispatch artifacts
+# =============================
+# Selected std/font leaf modules are compiled with the shared-module emitter
+# (canonical tagged LmValue ABI via the host Api table — the same codegen the
+# .dll artifacts use), the retained C++ is compiled to an object, non-export
+# globals are privatized (scripts/font_obj_privatize.py), and the object is
+# archived as bin/lib<leaf>.a. The .meta sidecar is rewritten to
+# artifact_kind=vmstatic + the .a path so the VM resolves the symbols from
+# the executable itself while the AOT linker never sees them.
+# bin/liblymar_font.a bundles all module objects for the bin/lymar and
+# liblymar_aot.a links.
+#
+# NOTE: no libfont/std.font artifact — the index module's export surface
+# includes frame constructors and frame-returning methods whose values cannot
+# cross the VM/native ABI boundary. Only scalar-API leaf modules are safe for
+# precompiled dispatch.
+FONT_MODULES := sdf_atlas cov_atlas
+FONT_OBJ_DIR := $(OBJ_DIR)/fontmod
+FONT_OBJS := $(addprefix $(FONT_OBJ_DIR)/,$(addsuffix .o,$(FONT_MODULES)))
+FONT_BUNDLE := $(BIN_DIR)/liblymar_font.a
+LYMAR_BOOT := $(BIN_DIR)/lymar_boot$(EXE_EXT)
+FONT_MODULE_SRCS := $(wildcard std/font/*.lm)
+FONT_MODULE_OUTPUTS := $(BIN_DIR)/libsdf_atlas.a $(BIN_DIR)/libsdf_atlas.a.meta \
+                       $(BIN_DIR)/libcov_atlas.a $(BIN_DIR)/libcov_atlas.a.meta
+
 # =============================
 # Sources
 # =============================
@@ -127,7 +160,7 @@ LYRA_LIB_OBJS := $(patsubst $(LYRA_DIR)/src/%.cpp,$(OBJ_DIR)/lyra/%.o,$(LYRA_LIB
 LYRA_LIB := $(OBJ_DIR)/liblyra.a
 LYRA_BIN := $(BIN_DIR)/lyra$(EXE_EXT)
 
-REGISTER_SRCS := src/backend/native/abi.cpp src/backend/native/emitter.cpp src/backend/native/foreign_sources.cpp src/backend/native/header_parser.cpp src/backend/native/binding_generator.cpp src/backend/vm/resource_manager.cpp src/runtime/os_info.cpp src/runtime/sokol/sokol_app_runtime.cpp src/runtime/sokol/sokol_gfx_runtime.cpp src/runtime/native_d3d11_window.cpp src/runtime/truetype.cpp src/runtime/lymarrt/lymarrt.cpp src/backend/vm/register.cpp src/backend/vm/ops/arithmetic.cpp src/backend/vm/ops/comparison.cpp src/backend/vm/ops/collections.cpp src/backend/vm/ops/frames.cpp src/backend/vm/ops/control_flow.cpp src/backend/vm/ops/io.cpp src/backend/vm/ops/bitwise.cpp src/backend/vm/ops/concurrency.cpp src/backend/vm/ops/modules.cpp src/backend/vm/ops/objects.cpp src/backend/vm/ops/vm_strings.cpp src/backend/vm/ops/vm_calls.cpp src/backend/vm/ops/gpu.cpp src/backend/vm/ops/vm_cast.cpp src/backend/vm/ops/memory.cpp src/backend/vm/ops/construction.cpp src/backend/vm/ops/marshal.cpp src/backend/vm/ops/ffi.cpp src/backend/vm/vm_dict.cpp src/backend/vm/vm_image.cpp src/backend/vm/vm_list.cpp src/backend/vm/vm_runtime.cpp src/backend/vm/vm_string.cpp src/backend/vm/vm_tuple.cpp src/backend/vm/vm_value.cpp
+REGISTER_SRCS := src/backend/native/abi.cpp src/backend/native/emitter.cpp src/backend/native/foreign_sources.cpp src/backend/native/header_parser.cpp src/backend/native/binding_generator.cpp src/backend/vm/resource_manager.cpp src/runtime/os_info.cpp src/runtime/sokol/sokol_app_runtime.cpp src/runtime/sokol/sokol_gfx_runtime.cpp src/runtime/native_d3d11_window.cpp src/runtime/lymarrt/lymarrt.cpp src/backend/vm/register.cpp src/backend/vm/ops/arithmetic.cpp src/backend/vm/ops/comparison.cpp src/backend/vm/ops/collections.cpp src/backend/vm/ops/frames.cpp src/backend/vm/ops/control_flow.cpp src/backend/vm/ops/io.cpp src/backend/vm/ops/bitwise.cpp src/backend/vm/ops/concurrency.cpp src/backend/vm/ops/modules.cpp src/backend/vm/ops/objects.cpp src/backend/vm/ops/vm_strings.cpp src/backend/vm/ops/vm_calls.cpp src/backend/vm/ops/gpu.cpp src/backend/vm/ops/vm_cast.cpp src/backend/vm/ops/memory.cpp src/backend/vm/ops/construction.cpp src/backend/vm/ops/marshal.cpp src/backend/vm/ops/ffi.cpp src/backend/vm/vm_dict.cpp src/backend/vm/vm_image.cpp src/backend/vm/vm_list.cpp src/backend/vm/vm_runtime.cpp src/backend/vm/vm_string.cpp src/backend/vm/vm_tuple.cpp src/backend/vm/vm_value.cpp
 
 LIR_CORE_SRCS := src/lir/lir.cpp src/lir/lir_utils.cpp src/lir/functions.cpp \
                  src/lir/builtin_functions.cpp src/lir/intrinsic_registry.cpp src/lir/verifier.cpp src/lir/lir_types.cpp src/lir/generator.cpp \
@@ -281,28 +314,78 @@ $(OBJ_DIR)/liblymar.a: $(LIB_LYMAR_OBJS) $(FYRA_LIB) $(LYRA_LIB)
 	@rm -f $@
 	$(AR) rcs $@ $(LIB_LYMAR_OBJS) $(LYRA_LIB_OBJS)
 
-windows: $(BIN_DIR) $(MAIN_RSP) liblymar ssl-lib $(LYRA_BIN) $(BIN_DIR)/liblymar_aot.a
+windows: $(BIN_DIR) $(MAIN_RSP) liblymar ssl-lib $(LYRA_BIN) $(BIN_DIR)/liblymar_aot.a $(FONT_BUNDLE) $(FONT_MODULE_OUTPUTS)
 	@echo "[BUILD] Linking lymar.exe ..."
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) @$(MAIN_RSP) $(OBJ_DIR)/liblymar.a $(FYRA_LIB) $(LYRA_LIB) -o $(BIN_DIR)/lymar$(EXE_EXT) $(LIBS) -lssl -lcrypto -lz
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) @$(MAIN_RSP) -Wl,--whole-archive $(FONT_BUNDLE) -Wl,--no-whole-archive $(OBJ_DIR)/liblymar.a $(FYRA_LIB) $(LYRA_LIB) -o $(BIN_DIR)/lymar$(EXE_EXT) $(LIBS) -lssl -lcrypto -lz
 	@echo "[OK] lymar.exe built."
 
-linux: $(BIN_DIR) $(MAIN_RSP) liblymar ssl-lib $(LYRA_BIN) $(BIN_DIR)/liblymar_aot.a
+linux: $(BIN_DIR) $(MAIN_RSP) liblymar ssl-lib $(LYRA_BIN) $(BIN_DIR)/liblymar_aot.a $(FONT_BUNDLE) $(FONT_MODULE_OUTPUTS)
 	@echo "[BUILD] Linking lymar ..."
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) @$(MAIN_RSP) $(OBJ_DIR)/liblymar.a $(FYRA_LIB) $(LYRA_LIB) -o $(BIN_DIR)/lymar$(EXE_EXT) $(LIBS) -lssl -lcrypto -lz -lpthread
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) @$(MAIN_RSP) -Wl,--whole-archive $(FONT_BUNDLE) -Wl,--no-whole-archive $(OBJ_DIR)/liblymar.a $(FYRA_LIB) $(LYRA_LIB) -o $(BIN_DIR)/lymar$(EXE_EXT) $(FONT_EXPORT_LDFLAGS) $(LIBS) -lssl -lcrypto -lz -lpthread
 	@echo "[OK] lymar built."
 
 # The toolchain's static libffi archive is absorbed into liblymar_aot.a so the
 # standalone runtime resolves ffi_prep_cif/ffi_call for both the Fyra internal
 # linker and target drivers without a separate -lffi input.
 LIBFFI_A := $(shell $(CXX) -print-file-name=libffi.a)
-$(BIN_DIR)/liblymar_aot.a: $(OBJ_DIR)/src/memory/aot_runtime.o $(OBJ_DIR)/src/memory/aot_graphics.o $(OBJ_DIR)/src/memory/aot_ffi.o $(OBJ_DIR)/src/runtime/os_info.o $(OBJ_DIR)/src/runtime/lymarrt/lymarrt.o $(OBJ_DIR)/src/runtime/native_d3d11_window.o $(OBJ_DIR)/src/runtime/truetype.o Makefile | $(BIN_DIR)
+$(BIN_DIR)/liblymar_aot.a: $(OBJ_DIR)/src/memory/aot_runtime.o $(OBJ_DIR)/src/memory/aot_graphics.o $(OBJ_DIR)/src/memory/aot_ffi.o $(OBJ_DIR)/src/runtime/os_info.o $(OBJ_DIR)/src/runtime/lymarrt/lymarrt.o $(OBJ_DIR)/src/runtime/native_d3d11_window.o $(FONT_BUNDLE) Makefile | $(BIN_DIR)
 	$(RM) $@.tmp
 	$(AR) rcs $@.tmp $(filter %.o,$^)
 	$(PYTHON) scripts/merge_archive_members.py $@.tmp "$(LIBFFI_A)" $(AR)
 	mv $@.tmp $@
+	$(PYTHON) scripts/merge_archive_members.py $@ "$(FONT_BUNDLE)" $(AR)
 	# The AOT linker prefers runtimes/<target-key>/liblymar_aot.a over this
 	# archive; keep the per-target copy in sync so it can never go stale.
 	@if [ -n "$(RUNTIME_KEY)" ]; then mkdir -p "$(BIN_DIR)/runtimes/$(RUNTIME_KEY)" && cp $@ "$(BIN_DIR)/runtimes/$(RUNTIME_KEY)/liblymar_aot.a"; fi
+
+# ELF executables need dynamic symbols exported for the VM's process-handle
+# lookup; macOS ld uses -export_dynamic instead of -rdynamic.
+FONT_EXPORT_LDFLAGS := -rdynamic
+ifeq ($(RUNTIME_KEY),x64-macos)
+	FONT_EXPORT_LDFLAGS := -Wl,-export_dynamic
+endif
+
+# Bootstrap compiler used to AOT-build the font artifacts. bin/lymar itself
+# cannot be the bootstrap: it statically links the font bundle, which is what
+# these rules produce.
+$(LYMAR_BOOT): $(MAIN_RSP) $(OBJ_DIR)/liblymar.a $(LYMAR_SSL_LIB) $(LYRA_LIB) | $(BIN_DIR)
+	@echo "[BUILD] Linking bootstrap lymar$(EXE_EXT) ..."
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) @$(MAIN_RSP) $(OBJ_DIR)/liblymar.a $(FYRA_LIB) $(LYRA_LIB) -o $@ $(LIBS) -lssl -lcrypto -lz $(if $(filter linux,$(PLATFORM)),-lpthread,)
+	@echo "[OK] lymar_boot$(EXE_EXT) built."
+
+# One VM-dispatch object per module: the shared-module emitter produces
+# wrapper-ABI C++ (LYMAR_KEEP_NATIVE_SOURCE retains it next to the .dll). The
+# helper structs (N, NativeScope) and the ABI-version export are renamed
+# per-module in the source so their mangled names cannot collide; remaining
+# std-lib ODR instantiations are weakened so the linker deduplicates them.
+# The object is archived as bin/lib<leaf>.a beside a rewritten
+# artifact_kind=vmstatic .meta sidecar.
+$(FONT_OBJ_DIR)/%.o: std/font/%.lm $(LYMAR_BOOT) $(FONT_MODULE_SRCS) | $(FONT_OBJ_DIR) $(BIN_DIR)
+	@echo "[AOT] Building VM-dispatch object for std.font.$* ..."
+	LYMAR_KEEP_NATIVE_SOURCE=1 $(LYMAR_BOOT) build -target $(PRECOMPILE_PLATFORM) -shared std/font/$*.lm -o $(BIN_DIR)/lib$*.dll
+	@set -e; cpp=$$(ls $(BIN_DIR)/lib$*.dll.lymar-*.cpp | head -1); mod=$*_lfb; \
+	sed -e 's/\bN\b/N_'"$$mod"'/g' \
+	    -e 's/\bNativeScope\b/NativeScope_'"$$mod"'/g' \
+	    -e 's/lymar_module_abi_version/lymar_module_abi_version_'"$$mod"'/g' \
+	    $$cpp > $(FONT_OBJ_DIR)/$*.cpp; \
+	$(CXX) -std=c++20 -O2 -c $(FONT_OBJ_DIR)/$*.cpp -o $(FONT_OBJ_DIR)/$*.o; \
+	rm -f $$cpp $(FONT_OBJ_DIR)/$*.cpp $(BIN_DIR)/lib$*.dll
+	$(PYTHON) scripts/font_obj_privatize.py $(FONT_OBJ_DIR)/$*.o -- $(NM) $(OBJCOPY)
+	$(AR) rcs $(BIN_DIR)/lib$*.a $(FONT_OBJ_DIR)/$*.o
+	@sed -e 's/^artifact_kind=shared/artifact_kind=vmstatic/' \
+	  -e 's|^artifact_path=.*|artifact_path=bin/lib$*.a|' \
+	  $(BIN_DIR)/lib$*.dll.meta > $(BIN_DIR)/lib$*.a.meta
+	@rm -f $(BIN_DIR)/lib$*.dll.meta
+
+$(FONT_OBJ_DIR):
+	@mkdir -p $@
+
+$(FONT_BUNDLE): $(FONT_OBJS) | $(BIN_DIR)
+	$(AR) rcs $@ $(FONT_OBJS)
+
+# The per-module .a/.meta are produced inside the %.o rule above.
+$(BIN_DIR)/lib%.a $(BIN_DIR)/lib%.a.meta: $(FONT_OBJ_DIR)/%.o
+	@true
 
 # =============================
 # Precompilation targets

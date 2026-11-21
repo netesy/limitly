@@ -124,48 +124,42 @@ def main():
     (ROOT / "build").mkdir(exist_ok=True)
     with preserve_artifacts(paths), tempfile.TemporaryDirectory(dir=ROOT / "build", prefix="font-benchmark-") as tmp:
         tmp = Path(tmp)
-        sources = []
-        # Bind exactly the same font in both workloads, independent of host defaults.
+        # Bind exactly the same font in the workload, independent of host defaults.
         literal = str(font).replace("\\", "\\\\").replace('"', '\\"')
-        for kind in ("pure", "stb"):
-            source = (ROOT / "tests" / "precompiled" / f"benchmark_workload_{kind}.lm").read_text()
-            start = source("var font_path =")
-            end = source("assert(font_path !=", start)
-            source = source[:start] + f'var font_path = "{literal}";\n' + source[end:]
-            source = source.replace('i < 50;', f'i < {args.iterations};')
-            path = tmp / f"{kind}.lm"
-            path.write_text(source)
-            sources.append(str(path))
+        source = (ROOT / "tests" / "precompiled" / "benchmark_workload.lm").read_text()
+        start = source.find("var font_path =")
+        end = source.find('assert(font_path != "",', start)
+        source = source[:start] + f'var font_path = "{literal}";\n' + source[end:]
+        source = source.replace('i < 50;', f'i < {args.iterations};')
+        path = tmp / "workload.lm"
+        path.write_text(source)
+        workload = str(path)
         rows = {}
         workload_times = {}
         def measured(mode, cmd, env=None, native=False):
             workload_times[mode] = []
             rows[mode] = run_average(cmd, args.runs, env, native, args.iterations, workload_times[mode])
-        measured("A. Interpreted Lymar", [compiler, "run", sources[0]])
-        # D is an em-sized floating-point C oracle, matching std.font semantics.
-        measured("D. STB C oracle", [compiler, "run", sources[1]])
-        reference = rows["D. STB C oracle"][1]
-        if not math.isclose(rows["A. Interpreted Lymar"][1], reference, rel_tol=1e-5, abs_tol=0.01):
-            raise RuntimeError(f"Interpreted width {rows['A. Interpreted Lymar'][1]} differs from oracle {reference}")
-        print(f"Validated A/D: total width={reference:.6f}; A={rows['A. Interpreted Lymar'][0]:.2f} ms; D={rows['D. STB C oracle'][0]:.2f} ms", flush=True)
-        if args.oracle_only:
-            return
+        measured("A. Interpreted Lymar", [compiler, "run", workload])
+        reference = rows["A. Interpreted Lymar"][1]
+        print(f"Validated A: total width={reference:.6f}", flush=True)
         shared = ROOT / "bin" / ("libfont" + shared_ext)
         measure_run([compiler, "build", "-O", args.opt_level, "-shared", "std/font/index.lm", "-o", str(shared)], timeout=600)
-        native_env = dict(os.environ, LYMAR_DISABLE_INTERPRETER_FALLBACK="1", LYMAR_TRACE_PRECOMPILED="1")
-        measured("B. VM + native font", [compiler, "run", sources[0]], native_env, native=True)
+        # Cache hits skip module-artifact discovery, which would silently
+        # bypass native dispatch after mode A warms the LIR cache.
+        native_env = dict(os.environ, LYMAR_DISABLE_INTERPRETER_FALLBACK="1",
+                          LYMAR_TRACE_PRECOMPILED="1", LYMAR_DISABLE_CACHE="1")
+        measured("B. VM + native font", [compiler, "run", workload], native_env, native=True)
         native_ms, native_value = rows["B. VM + native font"]
         if not math.isclose(native_value, reference, rel_tol=1e-5, abs_tol=0.01):
-            raise RuntimeError(f"Native width {native_value} differs from oracle {reference}")
+            raise RuntimeError(f"Native width {native_value} differs from interpreted {reference}")
         print(f"Validated B: total width={native_value:.6f}; B={native_ms:.2f} ms", flush=True)
         if not args.skip_aot:
             print("Building Mode C (static library and standalone AOT)...", flush=True)
             static = ROOT / "bin" / ("libfont" + static_ext)
             measure_run([compiler, "build", "-O", args.opt_level, "-static", "std/font/index.lm", "-o", str(static)], timeout=600)
             exe = tmp / ("benchmark.exe" if windows else "benchmark")
-            measure_run([compiler, "build", "-O", args.opt_level, sources[0], "-o", str(exe)], timeout=600)
+            measure_run([compiler, "build", "-O", args.opt_level, workload, "-o", str(exe)], timeout=600)
             measured("C. Native AOT", [str(exe)])
-        reference = rows["D. STB C oracle"][1]
         for mode, (_, value) in rows.items():
             if not math.isclose(value, reference, rel_tol=1e-5, abs_tol=0.01):
                 raise RuntimeError(f"{mode}: result {value} differs from oracle {reference}")

@@ -8,6 +8,8 @@ from unittest.mock import patch
 
 from run_benchmark import ROOT, measure_run, preserve_artifacts, resolve_font, workload_result, run_average
 
+SHARED_EXT = ".dll" if os.name == "nt" else (".dylib" if sys.platform == "darwin" else ".so")
+
 
 class BenchmarkValidationTests(unittest.TestCase):
     def test_native_dispatch_logging_is_not_timed(self):
@@ -34,7 +36,7 @@ class BenchmarkValidationTests(unittest.TestCase):
 
     def test_restores_existing_artifacts_after_failure(self):
         with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "libfont.so"
+            path = Path(tmp) / ("libfont" + SHARED_EXT)
             path.write_text("original")
             with self.assertRaises(RuntimeError):
                 with preserve_artifacts([path]):
@@ -78,7 +80,7 @@ print("OPERANDS_OK");
             with preserve_artifacts([library, Path(str(library) + ".meta")]):
                 _, interpreted, _ = measure_run([self.compiler(), "run", str(check)])
                 measure_run([self.compiler(), "build", "-shared", str(module.relative_to(ROOT)), "-o", str(library)])
-                env = dict(os.environ, LYMAR_DISABLE_INTERPRETER_FALLBACK="1", LYMAR_TRACE_PRECOMPILED="1")
+                env = dict(os.environ, LYMAR_DISABLE_INTERPRETER_FALLBACK="1", LYMAR_TRACE_PRECOMPILED="1", LYMAR_DISABLE_CACHE="1")
                 _, native, trace = measure_run([self.compiler(), "run", str(check)], env)
                 self.assertEqual(native, interpreted)
                 self.assertIn("PRECOMPILED_CALL:", trace)
@@ -113,8 +115,8 @@ print("OPERANDS_OK");
                               "pub fn value(): int { return helper.value(); }\n")
             check = directory / "check.lm"
             check.write_text(f'import build.{name}.{name} as probe; print("VALUE: {{probe.value()}}");')
-            library = ROOT / "bin" / ("lib" + name + ".so")
-            env = dict(os.environ, LYMAR_TRACE_PRECOMPILED="1")
+            library = ROOT / "bin" / ("lib" + name + SHARED_EXT)
+            env = dict(os.environ, LYMAR_TRACE_PRECOMPILED="1", LYMAR_DISABLE_CACHE="1")
             with preserve_artifacts([library, Path(str(library) + ".meta")]):
                 measure_run([self.compiler(), "build", "-shared", str(module.relative_to(ROOT)), "-o", str(library)])
                 _, native, trace = measure_run([self.compiler(), "run", str(check)], env)
@@ -202,11 +204,11 @@ var cycle = probe.cycle(first, second);
 assert(cycle.next == second and second.next == first);
 print("OBJECTS_OK");
 ''')
-            library = ROOT / "bin" / ("lib" + name + ".so")
+            library = ROOT / "bin" / ("lib" + name + SHARED_EXT)
             with preserve_artifacts([library, Path(str(library) + ".meta")]):
                 _, interpreted, _ = measure_run([self.compiler(), "run", str(check)])
                 measure_run([self.compiler(), "build", "-shared", str(module.relative_to(ROOT)), "-o", str(library)])
-                env = dict(os.environ, LYMAR_DISABLE_INTERPRETER_FALLBACK="1", LYMAR_TRACE_PRECOMPILED="1")
+                env = dict(os.environ, LYMAR_DISABLE_INTERPRETER_FALLBACK="1", LYMAR_TRACE_PRECOMPILED="1", LYMAR_DISABLE_CACHE="1")
                 _, native, trace = measure_run([self.compiler(), "run", str(check)], env)
                 self.assertEqual(native, interpreted)
                 for function in ("mutate", "make_box", "pair", "greet", "outcome", "closure_sum", "make_adder", "make_adder.__lambda_0", "cycle"):
@@ -269,9 +271,9 @@ print("FONT_NATIVE_OK");
                          for ext in (".so", ".dll", ".dylib", ".a", ".lib") for suffix in ("", ".meta")]
             with preserve_artifacts(artifacts):
                 _, interpreted, _ = measure_run([self.compiler(), "run", str(path)])
-                library = ROOT / "bin" / "libfont.so"
+                library = ROOT / "bin" / ("libfont" + SHARED_EXT)
                 measure_run([self.compiler(), "build", "-shared", "std/font/index.lm", "-o", str(library)], timeout=600)
-                env = dict(os.environ, LYMAR_DISABLE_INTERPRETER_FALLBACK="1", LYMAR_TRACE_PRECOMPILED="1")
+                env = dict(os.environ, LYMAR_DISABLE_INTERPRETER_FALLBACK="1", LYMAR_TRACE_PRECOMPILED="1", LYMAR_DISABLE_CACHE="1")
                 _, native, trace = measure_run([self.compiler(), "run", str(path)], env)
                 self.assertEqual(native, interpreted)
                 self.assertIn("FONT_NATIVE_OK", native)

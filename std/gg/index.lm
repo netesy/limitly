@@ -896,7 +896,7 @@ pub fn get_line_height(scale: int = 1): float {
 
 // ── Pixel-sized text variants ────────────────────────────────────────────────
 // px is the physical font size. The native atlas snaps to the nearest baked
-// glyph size; the sokol/fons path receives the exact size because runtime
+// glyph size; the sokol path receives the exact size because runtime
 // scale ints > 7 are treated as pixel sizes (gfx_font_size_for_scale).
 
 fn px_scale_arg(px: float): int {

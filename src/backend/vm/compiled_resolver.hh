@@ -12,6 +12,8 @@
 #include "runtime/lymarrt/lymarrt.h"
 #include "backend/native/abi.hh"
 
+#include <mutex>
+
 #if defined(_WIN32)
 #include <windows.h>
 #else
@@ -37,18 +39,37 @@ public:
             return it->second;
         }
 
-        // Try searching in all loaded precompiled modules
+        // Prefer statically linked artifacts (already inside this process, no
+        // runtime loading), then fall back to shared libraries.
         auto& mm = LM::Frontend::ModuleManager::getInstance();
-        for (const auto& [mod_name, vec] : mm.get_compiled_modules()) {
-            for (const auto& meta : vec) {
-                if (meta.artifact_kind == "shared" && !meta.artifact_path.empty() &&
-                    std::find(meta.exports.begin(), meta.exports.end(), symbol) != meta.exports.end()) {
-                    void* handle = getLibraryHandle(meta.artifact_path);
-                    if (handle) {
-                        void* sym = findSymbolInHandle(handle, symbol);
+        for (int pass = 0; pass < 2; ++pass) {
+            // "vmstatic" artifacts are statically linked VM-dispatch objects;
+            // they are deliberately distinct from "static" AOT artifacts so
+            // the AOT linker never picks up the tagged-ABI wrappers.
+            const bool want_static = pass == 0;
+            for (const auto& [mod_name, vec] : mm.get_compiled_modules()) {
+                for (const auto& meta : vec) {
+                    const bool kind_match = want_static
+                        ? (meta.artifact_kind == "static" || meta.artifact_kind == "vmstatic")
+                        : meta.artifact_kind == "shared";
+                    if (kind_match && !meta.artifact_path.empty() &&
+                        std::find(meta.exports.begin(), meta.exports.end(), symbol) != meta.exports.end()) {
+                        void* sym = nullptr;
+                        if (want_static) {
+                            ensure_static_init();
+                            sym = findProcessSymbol(symbol);
+                            symbol_abi_[symbol] = Backend::Native::ABI_VERSION;
+                        } else {
+                            void* handle = getLibraryHandle(meta.artifact_path);
+                            if (handle) {
+                                sym = findSymbolInHandle(handle, symbol);
+                                if (sym) {
+                                    auto version = reinterpret_cast<uint32_t (*)()>(findSymbolInHandle(handle, "lymar_module_abi_version"));
+                                    symbol_abi_[symbol] = version ? version() : 0;
+                                }
+                            }
+                        }
                         if (sym) {
-                            auto version = reinterpret_cast<uint32_t (*)()>(findSymbolInHandle(handle, "lymar_module_abi_version"));
-                            symbol_abi_[symbol] = version ? version() : 0;
                             resolved_symbols_[symbol] = sym;
                             return sym;
                         }
@@ -71,7 +92,7 @@ public:
         if (inserted) {
             for (const auto& [name, variants] : Frontend::ModuleManager::getInstance().get_compiled_modules()) {
                 for (const auto& meta : variants) {
-                    if (meta.artifact_kind == "shared" &&
+                    if (((meta.artifact_kind == "shared" || meta.artifact_kind == "static" || meta.artifact_kind == "vmstatic")) &&
                         std::find(meta.exports.begin(), meta.exports.end(), symbol) != meta.exports.end()) {
                         target.exported = true;
                         break;
@@ -108,16 +129,24 @@ public:
                   const std::vector<LmValue>& closure_args = {}) {
         // Baseline ABI 1 shares canonical VM values; legacy scalar artifacts must rebuild.
         auto* function = LIR::FunctionRegistry::getInstance().getFunction(symbol);
-        if (!function) return false;
+        if (!function) {
+            if (std::getenv("LYMAR_TRACE_PRECOMPILED") && symbol.find("sdf_atlas") != std::string::npos)
+                std::cerr << "DISPATCH_FAIL_NO_LIR: " << symbol << "\n";
+            return false;
+        }
         refresh_metadata();
         // Pure VM execution needs no target cache when no native artifacts exist.
-        if (Frontend::ModuleManager::getInstance().get_compiled_modules().empty()) return false;
+        if (Frontend::ModuleManager::getInstance().get_compiled_modules().empty()) {
+            if (std::getenv("LYMAR_TRACE_PRECOMPILED") && symbol.find("sdf_atlas") != std::string::npos)
+                std::cerr << "DISPATCH_FAIL_NO_MODULES: " << symbol << "\n";
+            return false;
+        }
         auto [position, inserted] = dispatch_targets_.try_emplace(symbol);
         auto& target = position->second;
         if (inserted) {
             for (const auto& [name, variants] : Frontend::ModuleManager::getInstance().get_compiled_modules()) {
                 for (const auto& meta : variants) {
-                    if (meta.artifact_kind == "shared" &&
+                    if (((meta.artifact_kind == "shared" || meta.artifact_kind == "static" || meta.artifact_kind == "vmstatic")) &&
                         std::find(meta.exports.begin(), meta.exports.end(), symbol) != meta.exports.end()) {
                         target.exported = true;
                         break;
@@ -126,7 +155,11 @@ public:
                 if (target.exported) break;
             }
         }
-        if (!target.exported) return false;
+        if (!target.exported) {
+            if (std::getenv("LYMAR_TRACE_PRECOMPILED") && symbol.find("sdf_atlas") != std::string::npos)
+                std::cerr << "DISPATCH_FAIL_NOT_EXPORTED: " << symbol << "\n";
+            return false;
+        }
         // Retry unresolved symbols; a temporarily missing library is not a
         // permanently negative cache entry. Successful targets retain ABI validation.
         if (!target.entry) {
@@ -148,7 +181,9 @@ public:
             for (auto r : call.call_args) args[index++] = registers.at(r);
             for (auto value : closure_args) args[index++] = value;
             auto entry = target.entry;
+            if (std::getenv("LYMAR_TRACE_PRECOMPILED")) std::cerr << "DISPATCH_ENTER: " << symbol << "\n";
             auto value = entry(&Backend::Native::host_api(), vm_context, args, count);
+            if (std::getenv("LYMAR_TRACE_PRECOMPILED")) std::cerr << "DISPATCH_LEAVE: " << symbol << "\n";
             if (call.dst != UINT32_MAX) registers.at(call.dst) = value;
             if (std::getenv("LYMAR_TRACE_PRECOMPILED")) std::cerr << "PRECOMPILED_CALL: " << symbol << "\n";
             return true;
@@ -207,6 +242,29 @@ private:
 #else
         return dlsym(handle, symbol.c_str());
 #endif
+    }
+
+    // Symbols from statically linked AOT archives live in this executable's
+    // own symbol table; look them up with the default process handle.
+    void* findProcessSymbol(const std::string& symbol) {
+#if defined(_WIN32)
+        return reinterpret_cast<void*>(GetProcAddress(GetModuleHandleA(nullptr), symbol.c_str()));
+#else
+        return dlsym(RTLD_DEFAULT, symbol.c_str());
+#endif
+    }
+
+    // Statically linked module objects carry a `main` init runner renamed to
+    // `lymar_module_init` at build time; invoke it once so module globals and
+    // `__init` bodies run before the first dispatched call.
+    void ensure_static_init() {
+        static std::once_flag flag;
+        std::call_once(flag, [this] {
+            if (std::getenv("LYMAR_TRACE_PRECOMPILED")) std::cerr << "STATIC_INIT: calling lymar_module_init\n";
+            auto init = reinterpret_cast<void (*)()>(findProcessSymbol("lymar_module_init"));
+            if (init) init();
+            if (std::getenv("LYMAR_TRACE_PRECOMPILED")) std::cerr << "STATIC_INIT: done\n";
+        });
     }
 };
 

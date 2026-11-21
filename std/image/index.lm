@@ -4,6 +4,8 @@
 // Sub-modules (png, jpg, bmp, tga, hdr) import this module.
 
 import std.ffi as ffi;
+import std.io.file as _iof;
+import std.os.identity as osid;
 
 // ── Channel format enumeration ──────────────────────────────────────────────
 enum ChannelFormat {
@@ -982,32 +984,83 @@ pub var jpg: JpgFacade = JpgFacade();
 pub var bmp: BmpFacade = BmpFacade();
 pub var tga: TgaFacade = TgaFacade();
 
-pub fn detect_system_font(preferred_name: str = ""): str {
-    unsafe {
-        var lib: int = _open_lib();
-        if (lib == nil) { return ""; }
-        var fn_detect: int = ffi.library_get_symbol(lib, "detect_system_font_path");
-        if (fn_detect == nil) { ffi.library_unload(lib); return ""; }
-
-        var cs_pref: ffi.CString = ffi.string_to_cstring(preferred_name);
-        var out_buf: int = ffi.alloc(512);
-        ffi.memset(out_buf, 0, 512);
-
-        var found: int = ffi.foreign_call(
-            fn_detect,
-            [ffi.cstring_as_ptr(cs_pref), out_buf, 512],
-            ffi.TYPE_I32,
-            [ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_I32]
-        ) as int;
-
-        ffi.cstring_free(cs_pref);
-        var result: str = "";
-        if (found != 0) {
-            result = ffi.cstring_to_string(out_buf);
-        }
-        ffi.free(out_buf);
-        ffi.library_unload(lib);
-        return result;
+fn _font_dirs(): [str] {
+    var dirs: [str] = [];
+    if (osid.TARGET_OS == osid.OS_WINDOWS) {
+        dirs.append("C:/Windows/Fonts/");
+        dirs.append("C:/WinNT/Fonts/");
+    } elif (osid.TARGET_OS == osid.OS_MACOS) {
+        dirs.append("/System/Library/Fonts/");
+        dirs.append("/Library/Fonts/");
+        dirs.append("/System/Library/Fonts/Supplemental/");
+    } else {
+        dirs.append("/usr/share/fonts/truetype/dejavu/");
+        dirs.append("/usr/share/fonts/TTF/");
+        dirs.append("/usr/share/fonts/truetype/liberation/");
+        dirs.append("/usr/share/fonts/truetype/freefont/");
+        dirs.append("/usr/share/fonts/truetype/ubuntu/");
+        dirs.append("/usr/share/fonts/");
+        dirs.append("/usr/local/share/fonts/");
     }
+    return dirs;
+}
+
+fn _font_file_exists(path: str): int {
+    var f = _iof.open(path, "rb")? else { return 0; };
+    f.close()? else { return 0; };
+    return 1;
+}
+
+fn _has_font_ext(name: str): int {
+    var n = len(name);
+    if (n < 4) { return 0; }
+    if ((name[n - 4] as int) != 46) { return 0; }
+    var e3 = (name[n - 3] as int) | 32;
+    var e2 = (name[n - 2] as int) | 32;
+    var e1 = (name[n - 1] as int) | 32;
+    if (e3 == 116 and e2 == 116 and (e1 == 102 or e1 == 99)) { return 1; }
+    if (e3 == 111 and e2 == 116 and e1 == 102) { return 1; }
+    return 0;
+}
+
+pub fn detect_system_font(preferred_name: str = ""): str {
+    var dirs = _font_dirs();
+    if (preferred_name != "") {
+        var i = 0;
+        while (i < len(dirs)) {
+            var p1 = dirs[i] + preferred_name;
+            if (_font_file_exists(p1) != 0) { return p1; }
+            if (_has_font_ext(preferred_name) == 0) {
+                var p2 = dirs[i] + preferred_name + ".ttf";
+                if (_font_file_exists(p2) != 0) { return p2; }
+            }
+            i = i + 1;
+        }
+    }
+    var fallbacks: [str] = [];
+    if (osid.TARGET_OS == osid.OS_WINDOWS) {
+        fallbacks.append("C:/Windows/Fonts/segoeui.ttf");
+        fallbacks.append("C:/Windows/Fonts/arial.ttf");
+        fallbacks.append("C:/Windows/Fonts/tahoma.ttf");
+        fallbacks.append("C:/Windows/Fonts/calibri.ttf");
+        fallbacks.append("C:/Windows/Fonts/consola.ttf");
+    } elif (osid.TARGET_OS == osid.OS_MACOS) {
+        fallbacks.append("/System/Library/Fonts/SFNS.ttf");
+        fallbacks.append("/System/Library/Fonts/Helvetica.ttc");
+        fallbacks.append("/Library/Fonts/Arial.ttf");
+        fallbacks.append("/System/Library/Fonts/Supplemental/Arial.ttf");
+    } else {
+        fallbacks.append("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf");
+        fallbacks.append("/usr/share/fonts/TTF/DejaVuSans.ttf");
+        fallbacks.append("/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf");
+        fallbacks.append("/usr/share/fonts/truetype/freefont/FreeSans.ttf");
+        fallbacks.append("/usr/share/fonts/truetype/ubuntu/Ubuntu-R.ttf");
+    }
+    i = 0;
+    while (i < len(fallbacks)) {
+        if (_font_file_exists(fallbacks[i]) != 0) { return fallbacks[i]; }
+        i = i + 1;
+    }
+    return "";
 }
 

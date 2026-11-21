@@ -51,12 +51,6 @@
 
 #endif
 
-extern "C" int init_font_atlas_multi(const char*, int, int, const float*, int, unsigned char*, void*, float*);
-extern "C" void* lymar_aot_font_anchor() {
-    return (void*)&init_font_atlas_multi;
-}
-
-
 namespace {
 using Word = uint64_t;
 constexpr Word object_kind = static_cast<Word>(LM::Memory::AOTValueKind::Object);
@@ -1292,7 +1286,6 @@ void lymar_aot_region_move(uint64_t value, uint64_t lexical, uint64_t caller) {
     }
 }
 uint64_t lymar_aot_alloc(uint64_t size) {
-    if (size == 0xdeadbeefc001ULL) return reinterpret_cast<uint64_t>(lymar_aot_font_anchor());
     try {
     RuntimeGuard runtime_guard;
 

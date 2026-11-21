@@ -97,12 +97,12 @@ Font metric provider for the retained UI — pixel-parity with the
 renderer when a graphics context exists, real advances otherwise.
 
 Parity chain (first hit wins):
-  1. gg.measure_text / gg.get_line_height — the RENDERER's own fons
+  1. gg.measure_text / gg.get_line_height — the RENDERER's own
      metrics context: same embedded font, same gfx_font_size_for_scale
      size mapping the draw path uses. Pixel-exact.
   2. std.image.font system font at the renderer-mapped pixel size —
      real advances, possibly a different typeface than the embedded
-     fons font (advances can differ slightly).
+     font (advances can differ slightly).
   3. Heuristic: FALLBACK_CHAR_W per codepoint — headless/no-font.
 
 font_scale maps to renderer scale EXACTLY like replay():

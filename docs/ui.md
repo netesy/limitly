@@ -398,7 +398,7 @@ on the focused component — reuse, don't rewrite.
    codepoint units, space-preferring greedy wrap), real `selection_text()`
    (was copy-everything stub) and `delete_char()`. Font metric accuracy:
    `std/ui/text_metrics.lm` loads the system font once via
-   `std.image.font` (same stb_truetype family as the renderer) and
+   `std.image.font` (same native std.font pipeline as the renderer) and
    serves cached `text_width`/`line_height` in real advances; Label/
    Button/TextInput measure and center with it. Fallback is the staged
    8px heuristic when no font is available. `tests/
@@ -406,7 +406,7 @@ on the focused component — reuse, don't rewrite.
    cross-line selection, and wrapping.
    Metric parity (final fix): when a graphics context is live,
    `text_metrics` defers to `gg.measure_text`/`gg.get_line_height` —
-   the renderer's own fons metrics context, same embedded font and
+   the renderer's own metrics context, same embedded font and
    same `font_scale >= 1.5 -> scale 2` mapping `replay()` uses, so
    measured widths are pixel-exact with what is drawn. Headless or
    contextless runs fall back to `std.image.font` system metrics at

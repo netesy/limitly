@@ -1,5 +1,5 @@
 // std/font/cov_atlas.lm
-// Native coverage-atlas baker — drop-in replacement for the stb
+// Native coverage-atlas baker — drop-in replacement for the previous
 // init_font_atlas_multi C entry point. Produces the same buffer
 // layouts consumed by std.gg.native:
 //
@@ -8,14 +8,14 @@
 //                 {x0,y0,x1,y1,u0,v0,u1,v1,xadvance} — ASCII 32..127
 //   metrics_ptr : num_tiers records of 3 f32 {ascent, descent, line_h}
 //
-// Atlas layout matches stb: top 8 rows reserved (white 8x8 block at
+// Atlas layout matches the previous atlas: top 8 rows reserved (white 8x8 block at
 // the origin), shelf-packed coverage bitmaps below. Glyph quad offsets
 // are relative to the pen position with y measured down from the
 // ascender line (record.y = bitmap_top_rel_baseline + ascent_px),
-// matching stbtt_GetPackedQuad + the +asc shift in init_font_atlas_multi.
+// matching the old packed-quad helper + the +asc shift in init_font_atlas_multi.
 //
-// Scaling uses hhea ascent-descent pixel height (stb
-// ScaleForPixelHeight parity, verified in std/image/font.lm).
+// Scaling uses hhea ascent-descent pixel height (pixel-height
+// parity, verified in std/image/font.lm).
 
 import std.font.tables as tables;
 import std.font.reader as reader;

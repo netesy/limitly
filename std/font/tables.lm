@@ -153,7 +153,7 @@ frame Info {
     pub var kern_offset: int;
     pub var kerning_pairs: [KerningEntry];
 
-    // Cached glyph metrics for fast lookup (like stb_truetype)
+    // Cached glyph metrics for fast lookup
     pub var glyph_metrics_cache: [CachedGlyphMetrics];
 
     pub var is_valid: bool;
@@ -407,7 +407,7 @@ var glyf_offset = find_table_offset(TAG_GLYF);
 if (glyf_offset < 0) { return err(); }
 info.glyf_offset = glyf_offset;
 
-// Build glyph metrics cache for fast lookup (like stb_truetype)
+// Build glyph metrics cache for fast lookup
 info.build_glyph_metrics_cache(reader);
 
 // 5. Parse 'cmap' table
