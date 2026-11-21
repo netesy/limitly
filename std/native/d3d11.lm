@@ -1583,7 +1583,8 @@ pub fn gfx_raster_state_create(fill: int, cull: int): int {
         // FrontCounterClockwise @8 = 0, DepthBias @12 = 0,
         // DepthBiasClamp @16 = 0.0, SlopeScaled @20 = 0.0
         ffi.store_u32(ffi.ptr_add(desc, 24), 1);          // DepthClipEnable
-        // ScissorEnable @28 = 0, Multisample @32 = 0, AA lines @36 = 0
+        ffi.store_u32(ffi.ptr_add(desc, 28), 1);          // ScissorEnable — push_clip/pop_clip depend on it
+        // Multisample @32 = 0, AA lines @36 = 0
         var slot = ffi.alloc(8);
         ffi.store_i64(slot, 0);
         var hr = com_i32(_device, VT_DEVICE_CREATE_RS, [desc, slot]);

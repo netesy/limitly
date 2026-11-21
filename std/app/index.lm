@@ -47,6 +47,7 @@ import std.native as native;
 import std.time.timer show Timer, Duration;
 import std.color as color;
 import std.os.environment as osenv;
+import std.parse.numbers as parse_num;
 
 // ── Application state ────────────────────────────────────────────────────────
 // Windowing and the retained-component UI loop live here. OS event pumping
@@ -175,7 +176,10 @@ frame App {
         _end_pass();
         global_app_state.frame_count = global_app_state.frame_count + 1;
         val shot_path = osenv.getenv_or("LYMAR_SCREENSHOT_EXIT", "");
-        if (shot_path != "" and global_app_state.frame_count >= 5) {
+        var shot_frame = osenv.getenv_or("LYMAR_SCREENSHOT_FRAME", "5");
+        var shot_at = parse_num.parse_int(shot_frame)? else { 5 };
+        if (shot_at < 1) { shot_at = 1; }
+        if (shot_path != "" and global_app_state.frame_count >= shot_at) {
             gg.save_screenshot(shot_path);
             global_app_state.is_running = 0;
         }
