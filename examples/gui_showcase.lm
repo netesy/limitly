@@ -335,7 +335,7 @@ fn build_gallery_page(): ui.Flow {
     g.add(ui.calendar("2025-06-15"));
     var vals = [12.0, 34.0, 21.0, 55.0, 42.0, 78.0];
     var cat_lbls = ["Jan", "Feb", "Mar", "Apr", "May", "Jun"];
-    var charts = ui.row(8.0);
+    var charts = ui.grid(3, 8.0);
     charts.add(ui.bar_chart("Bar", vals, cat_lbls));
     charts.add(ui.line_chart("Line", vals, cat_lbls));
     charts.add(ui.pie_chart("Pie", vals, cat_lbls));
