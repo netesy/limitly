@@ -36,6 +36,8 @@ var _ascent_v: int = 800;
 var _descent_v: int = -200;
 var _line_gap_v: int = 0;
 var _ready: int = 0;
+var _adv_mem: int = 0;   // f32 xadvance per (tier*96 + glyph), filled by bake()
+var _adv_tiers: int = 0;
 
 fn _load(preferred: str): int {
     if (_ready != 0) { return 1; }
@@ -116,6 +118,10 @@ pub fn bake(preferred: str, atlas_w: int, atlas_h: int,
             rgba_ptr: int, glyphs_ptr: int, metrics_ptr: int): int {
     if (_load(preferred) == 0) { return 0; }
     unsafe {
+        // Retain per-glyph advances so measure entry points can run without
+        // the caller's glyph record buffer.
+        _adv_mem = ffi.alloc(num_tiers * TIER_GLYPHS * 4);
+        _adv_tiers = num_tiers;
         // Clear atlas + reserved top rows; white 8x8 block at origin
         // (stb parity — used as a fallback texel).
         ffi.memset(rgba_ptr, 0, atlas_w * atlas_h * 4);
@@ -160,6 +166,7 @@ pub fn bake(preferred: str, atlas_w: int, atlas_h: int,
                 var gid = _info.get_glyph_index(_rdr, cp);
                 var hmet = _info.get_glyph_hmetrics(_rdr, gid);
                 var adv = (hmet[0] as float) * sc;
+                ffi.store_f32(ffi.ptr_add(_adv_mem, rec * 4), adv);
 
                 var outline = glyph.parse_glyph(_rdr, _info, gid);
                 var cov = rast.rasterize_glyph_subpixel(outline, sc, 2, 2, 0.0, 0.0);
@@ -202,3 +209,41 @@ pub fn bake(preferred: str, atlas_w: int, atlas_h: int,
 }
 
 pub fn ready(): int { return _ready; }
+
+// measure_text_tier sums per-glyph advances for one baked tier. Matches the
+// coverage measure in std.gg.native: raw ASCII bytes, '\n' resets the line
+// width and returns the widest line. Non-ASCII bytes contribute nothing.
+pub fn measure_text_tier(text: str, tier: int): float {
+    if (_ready == 0 or _adv_mem == 0 or tier < 0 or tier >= _adv_tiers) {
+        return 0.0;
+    }
+    unsafe {
+        var base = _adv_mem + tier * TIER_GLYPHS * 4;
+        var max_w = 0.0;
+        var cur_w = 0.0;
+        var n = len(text);
+        var i = 0;
+        while (i < n) {
+            var ch = _builtin_string_byte_at(text, i);
+            if (ch == 10) {
+                if (cur_w > max_w) { max_w = cur_w; }
+                cur_w = 0.0;
+            } elif (ch >= 32 and ch < 128) {
+                cur_w = cur_w + ffi.load_f32(base + (ch - 32) * 4);
+            }
+            i = i + 1;
+        }
+        if (cur_w > max_w) { max_w = cur_w; }
+        return max_w;
+    }
+}
+
+// measure_texts_tier measures a whole batch in one call so VM dispatch
+// overhead is paid once per batch instead of once per string.
+pub fn measure_texts_tier(texts: [str], tier: int): [float] {
+    var out: [float] = [];
+    iter (t in texts) {
+        out.append(measure_text_tier(t, tier));
+    }
+    return out;
+}

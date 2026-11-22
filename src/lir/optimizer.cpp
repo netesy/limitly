@@ -471,13 +471,29 @@ bool Optimizer::remove_loop_region_ops() {
     // bodies contain no heap allocations.
     bool changed = false;
 
-    auto is_allocating_op = [](LIR_Op op) -> bool {
-        switch (op) {
+    // Builtin calls that only read their arguments and return a scalar
+    // (int/bool) cannot allocate, so they must not pin a region open.
+    // String producers, collection builders, and decode-to-list helpers are
+    // deliberately absent — they do allocate.
+    auto is_scalar_builtin = [](const LIR_Inst& inst) -> bool {
+        static const std::unordered_set<std::string> safe{
+            "_builtin_string_byte_at", "_builtin_string_byte_len",
+            "_builtin_string_decode_next", "_builtin_string_hash_bytes",
+            "_builtin_string_contains", "_builtin_string_starts_with",
+            "_builtin_string_ends_with", "_builtin_string_index_of",
+            "_builtin_len", "_builtin_length",
+        };
+        return safe.count(inst.func_name) != 0;
+    };
+
+    auto is_allocating_op = [&](const LIR_Inst& inst) -> bool {
+        switch (inst.op) {
         case LIR_Op::Call:
         case LIR_Op::CallVoid:
         case LIR_Op::CallIndirect:
         case LIR_Op::CallBuiltin:
         case LIR_Op::CallVariadic:
+            return !is_scalar_builtin(inst);
         case LIR_Op::ForeignCall:
         case LIR_Op::ForeignCallDirect:
         case LIR_Op::FrameCallMethod:
@@ -529,7 +545,7 @@ bool Optimizer::remove_loop_region_ops() {
             // Check if there are any allocating operations between region_start and region_end
             bool has_allocations = false;
             for (size_t j = region_start + 1; j < region_end; ++j) {
-                if (is_allocating_op(func_.instructions[j].op)) {
+                if (is_allocating_op(func_.instructions[j])) {
                     has_allocations = true;
                     break;
                 }

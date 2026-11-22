@@ -880,26 +880,7 @@ fn measure_text_at(text_str: str, size_idx: int): float {
         if (ensure_font_atlas() == 0) {
             return (len(text_str) * atlas_px(size_idx) * 0.6) as float;
         }
-        var gbuf = ffi.ptr_add(_glyphs_buf, size_idx * 3456);
-
-        var max_w = 0.0;
-        var cur_w = 0.0;
-        var n = len(text_str);
-        var i = 0;
-        while (i < n) {
-            var ch = _builtin_string_byte_at(text_str, i);
-            if (ch == 10) {
-                if (cur_w > max_w) { max_w = cur_w; }
-                cur_w = 0.0;
-            } elif (ch >= 32 and ch < 128) {
-                var idx = ch - 32;
-                var xadv = ffi.load_f32(ffi.ptr_add(gbuf, idx * 36 + 32));
-                cur_w = cur_w + xadv;
-            }
-            i = i + 1;
-        }
-        if (cur_w > max_w) { max_w = cur_w; }
-        return max_w;
+        return covatlas.measure_text_tier(text_str, size_idx);
     }
 }
 

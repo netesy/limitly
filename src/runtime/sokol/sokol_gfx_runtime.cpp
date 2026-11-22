@@ -35,6 +35,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <map>
 #include <unordered_map>
@@ -547,8 +548,8 @@ struct TextGlyphRec {
     int gw = 0, gh = 0;                   // bitmap size (0 = advance-only glyph)
 };
 
-static const int TEXT_ATLAS_W = 1024;
-static const int TEXT_ATLAS_H = 1024;
+static const int TEXT_ATLAS_SIZE = 1024;
+static const int TEXT_ATLAS_MAX = 4096;
 static const int TEXT_ATLAS_PAD = 1;
 
 // ---------------------------------------------------------------------------
@@ -611,7 +612,9 @@ struct SokolGfxRuntime::Impl {
     sg_buffer text_vbuf = {SG_INVALID_ID};
     std::vector<uint8_t> text_atlas_px; // R8 atlas pixels (CPU copy)
     bool text_atlas_dirty = false;
+    int text_atlas_w = TEXT_ATLAS_SIZE, text_atlas_h = TEXT_ATLAS_SIZE;
     int text_atlas_x = 0, text_atlas_y = 0, text_atlas_rowh = 0;
+    bool text_atlas_regrown = false;   // set by text_glyph; flush_text restarts pass 1
     std::unordered_map<uint64_t, TextGlyphRec> text_glyphs;
     std::vector<float> text_verts;     // staged vertex floats (8 per vert)
     struct TextDrawRange { size_t v0, v1; std::vector<int> clip; };
@@ -698,8 +701,46 @@ static sg_buffer ensure_buffer(SokolGfxRuntime::Impl* im, int id, bool is_index)
 // resolved by the caller which owns the pen position.
 // ---------------------------------------------------------------------------
 
+// Double the atlas (up to TEXT_ATLAS_MAX), reset packing state, and drop every
+// cached glyph record: UVs are normalized by atlas dimensions, so growth
+// invalidates the whole table. flush_text detects text_atlas_regrown and
+// re-runs pass 1 so no quad ever references stale UVs. Returns false at the
+// size cap (caller then treats the glyph as advance-only).
+static bool text_atlas_grow(SokolGfxRuntime::Impl* im) {
+    if (im->text_atlas_w >= TEXT_ATLAS_MAX) return false;
+    const int nw = std::min(im->text_atlas_w * 2, TEXT_ATLAS_MAX);
+    const int nh = std::min(im->text_atlas_h * 2, TEXT_ATLAS_MAX);
+    im->text_atlas_px.assign((size_t)nw * nh, 0);
+    im->text_atlas_w = nw;
+    im->text_atlas_h = nh;
+    im->text_atlas_x = 0;
+    im->text_atlas_y = 0;
+    im->text_atlas_rowh = 0;
+    im->text_glyphs.clear();
+    im->text_atlas_dirty = true;
+    im->text_atlas_regrown = true;
+    if (im->text_img.id != SG_INVALID_ID) sg_destroy_image(im->text_img);
+    if (im->text_view.id != SG_INVALID_ID) sg_destroy_view(im->text_view);
+    sg_image_desc id{};
+    id.width = nw;
+    id.height = nh;
+    id.pixel_format = SG_PIXELFORMAT_R8;
+    id.num_mipmaps = 1;
+    id.usage.dynamic_update = true;
+    id.label = "lymar_text_atlas";
+    im->text_img = sg_make_image(&id);
+    sg_view_desc vd{};
+    vd.texture.image = im->text_img;
+    im->text_view = sg_make_view(&vd);
+    if (std::getenv("LYMAR_TEXT_ATLAS_DEBUG"))
+        fprintf(stderr, "[text_atlas] grew to %dx%d\n", nw, nh);
+    return true;
+}
+
 // Rasterize `cp` at `size_px` into the atlas. Returns the cached record
-// (advance-only records have gw == gh == 0). `scratch` is caller-owned reuse.
+// (advance-only records have gw == gh == 0), or nullptr when the atlas grew
+// mid-flush — the caller must restart pass 1 before using any record.
+// `scratch` is caller-owned reuse.
 static const TextGlyphRec* text_glyph(SokolGfxRuntime::Impl* im, uint32_t cp,
                                       int isize, float size_px, float scale,
                                       GlyphBitmap& scratch) {
@@ -714,31 +755,39 @@ static const TextGlyphRec* text_glyph(SokolGfxRuntime::Impl* im, uint32_t cp,
         scratch.width > 0 && scratch.height > 0) {
         const int cw = scratch.width + TEXT_ATLAS_PAD * 2;
         const int ch = scratch.height + TEXT_ATLAS_PAD * 2;
-        if (cw <= TEXT_ATLAS_W && ch <= TEXT_ATLAS_H) {
-            if (im->text_atlas_x + cw > TEXT_ATLAS_W) {
-                im->text_atlas_x = 0;
-                im->text_atlas_y += im->text_atlas_rowh;
-                im->text_atlas_rowh = 0;
-            }
-            if (im->text_atlas_y + ch <= TEXT_ATLAS_H) {
-                const int gx = im->text_atlas_x + TEXT_ATLAS_PAD;
-                const int gy = im->text_atlas_y + TEXT_ATLAS_PAD;
-                for (int yy = 0; yy < scratch.height; ++yy) {
-                    uint8_t* dst = &im->text_atlas_px[(size_t)(gy + yy) * TEXT_ATLAS_W + gx];
-                    memcpy(dst, &scratch.pixels[(size_t)yy * scratch.width],
-                           (size_t)scratch.width);
+        if (cw <= TEXT_ATLAS_MAX && ch <= TEXT_ATLAS_MAX) {
+            if (cw > im->text_atlas_w || ch > im->text_atlas_h) {
+                // Glyph can never fit at the current size; grow once and let
+                // the caller restart with the enlarged atlas.
+                if (text_atlas_grow(im)) return nullptr;
+            } else {
+                if (im->text_atlas_x + cw > im->text_atlas_w) {
+                    im->text_atlas_x = 0;
+                    im->text_atlas_y += im->text_atlas_rowh;
+                    im->text_atlas_rowh = 0;
                 }
-                g.u0 = (float)gx / (float)TEXT_ATLAS_W;
-                g.v0 = (float)gy / (float)TEXT_ATLAS_H;
-                g.u1 = (float)(gx + scratch.width) / (float)TEXT_ATLAS_W;
-                g.v1 = (float)(gy + scratch.height) / (float)TEXT_ATLAS_H;
-                g.xoff = (float)scratch.x_offset;
-                g.yoff = (float)scratch.y_offset;
-                g.gw = scratch.width;
-                g.gh = scratch.height;
-                im->text_atlas_x += cw;
-                if (ch > im->text_atlas_rowh) im->text_atlas_rowh = ch;
-                im->text_atlas_dirty = true;
+                if (im->text_atlas_y + ch <= im->text_atlas_h) {
+                    const int gx = im->text_atlas_x + TEXT_ATLAS_PAD;
+                    const int gy = im->text_atlas_y + TEXT_ATLAS_PAD;
+                    for (int yy = 0; yy < scratch.height; ++yy) {
+                        uint8_t* dst = &im->text_atlas_px[(size_t)(gy + yy) * im->text_atlas_w + gx];
+                        memcpy(dst, &scratch.pixels[(size_t)yy * scratch.width],
+                               (size_t)scratch.width);
+                    }
+                    g.u0 = (float)gx / (float)im->text_atlas_w;
+                    g.v0 = (float)gy / (float)im->text_atlas_h;
+                    g.u1 = (float)(gx + scratch.width) / (float)im->text_atlas_w;
+                    g.v1 = (float)(gy + scratch.height) / (float)im->text_atlas_h;
+                    g.xoff = (float)scratch.x_offset;
+                    g.yoff = (float)scratch.y_offset;
+                    g.gw = scratch.width;
+                    g.gh = scratch.height;
+                    im->text_atlas_x += cw;
+                    if (ch > im->text_atlas_rowh) im->text_atlas_rowh = ch;
+                    im->text_atlas_dirty = true;
+                } else if (text_atlas_grow(im)) {
+                    return nullptr;
+                }
             }
         }
     }
@@ -1251,10 +1300,10 @@ bool SokolGfxRuntime::setup() {
     // immediate-mode text: native coverage atlas (R8) + dedicated pipeline
     if (load_font_data() && impl_->text_font.init(g_font_data.data(), g_font_data.size(), 0)) {
         impl_->text_font_ok = true;
-        impl_->text_atlas_px.assign((size_t)TEXT_ATLAS_W * TEXT_ATLAS_H, 0);
+        impl_->text_atlas_px.assign((size_t)impl_->text_atlas_w * impl_->text_atlas_h, 0);
         sg_image_desc id{};
-        id.width = TEXT_ATLAS_W;
-        id.height = TEXT_ATLAS_H;
+        id.width = impl_->text_atlas_w;
+        id.height = impl_->text_atlas_h;
         id.pixel_format = SG_PIXELFORMAT_R8;
         id.num_mipmaps = 1;
         id.usage.dynamic_update = true;
@@ -1712,11 +1761,19 @@ void SokolGfxRuntime::flush_text() {
 
     // Pass 1: rasterize every glyph into the atlas and stage all quads.
     // Atlas upload is deferred to a single sg_update_image below.
-    im->text_verts.clear();
-    im->text_draws.clear();
+    // If the atlas outgrows its size, text_glyph clears every cached UV and
+    // sets text_atlas_regrown; pass 1 then restarts from scratch so staged
+    // quads never reference stale atlas coordinates.
     GlyphBitmap scratch;
-    for (const GfxCommand& cmd : im->deferred_text) {
-        if (cmd.s.empty()) continue;
+    bool regrown;
+    do {
+        regrown = false;
+        im->text_atlas_regrown = false;
+        im->text_verts.clear();
+        im->text_draws.clear();
+        for (const GfxCommand& cmd : im->deferred_text) {
+            if (im->text_atlas_regrown) break;
+            if (cmd.s.empty()) continue;
         const float size_px = gfx_font_size_for_scale((int)cmd.f[6]);
         const int isize = (int)(size_px * 10.0f);
         const float fscale = font.scale_for_pixel_height(size_px);
@@ -1751,6 +1808,7 @@ void SokolGfxRuntime::flush_text() {
                     pen += (float)(int)(kern * fscale + 0.5f);
                 }
                 const TextGlyphRec* g = text_glyph(im, cp, isize, size_px, fscale, scratch);
+                if (im->text_atlas_regrown) break;
                 if (g != nullptr && g->gw > 0) {
                     const float qx = (float)(int)(pen + g->xoff);
                     const float qy = (float)(int)(baseline + g->yoff);
@@ -1760,11 +1818,15 @@ void SokolGfxRuntime::flush_text() {
                 if (g != nullptr) pen += (float)(int)(g->xadv + 0.5f);
                 prev_gid = gid;
             }
+            if (im->text_atlas_regrown) break;
             ty += lineh;
             p = (nl < end) ? nl + 1 : end;
         }
-        im->text_draws.push_back({vstart, im->text_verts.size() / 8, cmd.clip});
-    }
+        if (!im->text_atlas_regrown)
+            im->text_draws.push_back({vstart, im->text_verts.size() / 8, cmd.clip});
+        }
+        if (im->text_atlas_regrown) regrown = true;
+    } while (regrown);
     im->deferred_text.clear();
     if (im->text_draws.empty()) return;
 
@@ -1802,6 +1864,7 @@ void SokolGfxRuntime::flush_text() {
     sg_range vrng{ub, sizeof(ub)};
     sg_apply_uniforms(0, &vrng);
     sg_bindings tb{};
+    tb.vertex_buffers[0] = im->text_vbuf;
     tb.views[0] = im->text_view;
     tb.samplers[0] = im->tex_smp;
     sg_apply_bindings(&tb);

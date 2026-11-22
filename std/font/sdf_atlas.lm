@@ -663,6 +663,16 @@ pub fn measure_text_px(text: str, px: float): float {
     return max_w;
 }
 
+// measure_texts_px measures a whole batch of strings in one call so VM
+// dispatch overhead is paid once per batch instead of once per string.
+pub fn measure_texts_px(texts: [str], px: float): [float] {
+    var out: [float] = [];
+    iter (t in texts) {
+        out.append(measure_text_px(t, px));
+    }
+    return out;
+}
+
 // emit_text_sum runs emit_text with an internal accumulating sink and
 // returns the summed quad coordinates — a callback-free variant for
 // benchmarks and for callers behind native/DLL boundaries where a Lymar
