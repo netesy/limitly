@@ -1589,7 +1589,9 @@ void Generator::emit_list_iter_stmt(LM::Frontend::AST::IterStatement& stmt, LM::
         : nullptr;
     TypePtr raw_elem = raw_int_iter_type(list_type, 0);
     Type elem_abi = raw_elem ? Type::I64 : (elem_type && elem_type->tag == TypeTag::String ? Type::Ptr : (elem_type ? language_type_to_abi_type(elem_type) : Type::Ptr));
-    emit_instruction(LIR_Inst(LIR_Op::ListIndex, elem_abi, elem_reg, list_reg, index_reg));
+    // imm & 0x1 = bound-proven: index runs 0..len-1 against a fresh literal
+    // list, so the element fetch cannot go out of bounds.
+    emit_instruction(LIR_Inst(LIR_Op::ListIndex, elem_abi, elem_reg, list_reg, index_reg, 1));
     set_register_type(elem_reg, elem_type ? elem_type : (raw_elem ? raw_elem : std::make_shared<::Type>(::TypeTag::Any)));
     if (elem_type) set_register_language_type(elem_reg, elem_type);
     
@@ -1958,7 +1960,9 @@ void Generator::emit_list_var_iter_stmt(LM::Frontend::AST::IterStatement& stmt, 
     if (is_tuple) {
         emit_instruction(LIR_Inst(LIR_Op::TupleGet, Type::Ptr, elem_reg, list_reg, index_reg));
     } else {
-        emit_instruction(LIR_Inst(LIR_Op::ListIndex, elem_abi, elem_reg, list_reg, index_reg));
+        // imm & 0x1 = bound-proven: the header re-reads ListLen and compares
+        // index < len immediately before this fetch, so bounds always hold.
+        emit_instruction(LIR_Inst(LIR_Op::ListIndex, elem_abi, elem_reg, list_reg, index_reg, 1));
     }
     set_register_type(elem_reg, elem_type ? elem_type : (raw_elem ? raw_elem : std::make_shared<::Type>(::TypeTag::Any)));
     if (elem_type) set_register_language_type(elem_reg, elem_type);
@@ -2321,7 +2325,7 @@ void Generator::emit_iter_stmt_linear(LM::Frontend::AST::IterStatement& stmt) {
             [&]() {
                 Reg elem = allocate_register();
                 TypePtr raw_elem = raw_int_iter_type(get_register_type(list_reg), 0);
-                emit_instruction(LIR_Inst(LIR_Op::ListIndex, raw_elem ? Type::I64 : Type::Ptr, elem, list_reg, index_reg));
+                emit_instruction(LIR_Inst(LIR_Op::ListIndex, raw_elem ? Type::I64 : Type::Ptr, elem, list_reg, index_reg, 1));
                 set_register_type(elem, raw_elem ? raw_elem : any_type);
                 emit_instruction(LIR_Inst(LIR_Op::Mov, loop_var_reg, elem, 0));
                 set_register_type(loop_var_reg, raw_elem ? raw_elem : any_type);
@@ -2494,7 +2498,11 @@ void Generator::emit_iter_stmt_linear(LM::Frontend::AST::IterStatement& stmt) {
                 if (use_tuple_get) {
                     emit_instruction(LIR_Inst(LIR_Op::TupleGet, Type::Ptr, elem, iterable_reg, index_reg));
                 } else {
-                    emit_instruction(LIR_Inst(LIR_Op::ListIndex, raw_elem ? Type::I64 : Type::Ptr, elem, iterable_reg, index_reg));
+                    // imm & 0x1 = bound-proven: the loop header re-reads
+                    // ListLen and compares index < len immediately before
+                    // this fetch, so 0 <= index < len always holds. The Fyra
+                    // backend uses it to skip the per-element safety CFG.
+                    emit_instruction(LIR_Inst(LIR_Op::ListIndex, raw_elem ? Type::I64 : Type::Ptr, elem, iterable_reg, index_reg, 1));
                 }
                 set_register_type(elem, raw_elem ? raw_elem : any_type);
                 emit_instruction(LIR_Inst(LIR_Op::Mov, loop_var_reg, elem, 0));

@@ -1207,7 +1207,20 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
     std::unordered_set<uint32_t> reassigned_parameters;
     size_t max_reg = lir_func.register_count;
     for (const auto& inst : lir_func.instructions) {
-        if (inst.dst < lir_func.param_count) reassigned_parameters.insert(inst.dst);
+        // Control-flow ops carry dst=0 padding and never write a register;
+        // counting them would mark parameter 0 as reassigned in every
+        // function containing a jump or return.
+        bool writes_dst = true;
+        switch (inst.op) {
+            case LIR::LIR_Op::Jump: case LIR::LIR_Op::JumpIfFalse: case LIR::LIR_Op::JumpIf:
+            case LIR::LIR_Op::Label: case LIR::LIR_Op::Nop: case LIR::LIR_Op::Return:
+            case LIR::LIR_Op::Ret:
+                writes_dst = false;
+                break;
+            default: break;
+        }
+        if (writes_dst && inst.result_type != LIR::Type::Void && inst.dst < lir_func.param_count)
+            reassigned_parameters.insert(inst.dst);
         if (inst.dst != UINT32_MAX) max_reg = std::max(max_reg, (size_t)inst.dst);
         // Scheduler cores and deadline are immediate configuration, not
         // register operands. A duration must never size the register frame.
@@ -1671,9 +1684,38 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
         param_idx++;
     }
 
+    // A hoisted element-buffer pointer is only sound when nothing in the
+    // function can mutate the list behind the compiler's back. Ownership
+    // moves prevent local aliasing, but calls, FFI, indirect dispatch, raw
+    // memory writes, and cross-task handoff can all reach the list without
+    // a ListAppend/ListSet on this register (e.g. `iter (x in xs) { bump(xs) }`
+    // reallocs mid-loop). When any such op exists, skip the entry-block
+    // hoist; per-access loads still see the current header.
+    bool may_mutate_lists = false;
+    for (const auto& inst : lir_func.instructions) {
+        switch (inst.op) {
+            case LIR::LIR_Op::Call: case LIR::LIR_Op::CallVoid:
+            case LIR::LIR_Op::CallIndirect: case LIR::LIR_Op::CallBuiltin:
+            case LIR::LIR_Op::CallVariadic:
+            case LIR::LIR_Op::ForeignCall: case LIR::LIR_Op::ForeignCallDirect:
+            case LIR::LIR_Op::FrameCallMethod: case LIR::LIR_Op::TraitCallMethod:
+            case LIR::LIR_Op::ResourceCall:
+            case LIR::LIR_Op::MemoryStore: case LIR::LIR_Op::MemoryCopy:
+            case LIR::LIR_Op::MemoryFill: case LIR::LIR_Op::MemoryResize:
+            case LIR::LIR_Op::ChannelPush: case LIR::LIR_Op::ChannelSend:
+            case LIR::LIR_Op::ChannelOffer: case LIR::LIR_Op::ParallelInit:
+            case LIR::LIR_Op::ParallelSync: case LIR::LIR_Op::SchedulerRun:
+            case LIR::LIR_Op::SchedulerTick:
+                may_mutate_lists = true;
+                break;
+            default: break;
+        }
+        if (may_mutate_lists) break;
+    }
+
     std::unordered_map<uint32_t, ir::Value*> hoisted_data_ptrs;
     size_t num_params = main_fn->getParameters().size();
-    for (size_t p = 0; p < num_params; ++p) {
+    for (size_t p = 0; p < num_params && !may_mutate_lists; ++p) {
         if (is_typed_primitive_list(p) && !reassigned_parameters.count(p)) {
             ir::Value* p_val = regs[p];
             ir::Value* unboxed = builder_->createAnd(p_val, context_->getConstantInt(context_->getIntegerType(64), ~7ULL));
@@ -3740,14 +3782,13 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 }
                 std::string lidx_id = std::to_string(label_counter_++);
 
-                // Bound-proven hint (stream_fusion scope): lazily cache the
-                // unboxed data pointer for this register so subsequent in-loop
-                // accesses reuse it and Fyra's LoopVectorizer sees a single
-                // affine load per iteration instead of the CFG-wrapped check.
-                // The hint is only set inside a synthesized stream-fusion block,
-                // which rejects pipelines whose body would grow/shrink the
-                // source; the append/set handlers below still drop the cache on
-                // mutation as a defense in depth.
+                // Bound-proven hint (iter loops): skip the null/type/bounds
+                // CFG and lm_list_get fallback — the loop header re-reads
+                // ListLen and compares index < len immediately before each
+                // fetch, so 0 <= index < len always holds. Registers with a
+                // hoisted entry-block data pointer reuse it; everyone else
+                // re-loads the header field per access so mid-loop mutation
+                // through calls stays correct.
                 const bool bound_proven = (inst.imm & 0x1u) != 0u;
                 if (hoisted_data_ptrs.count(inst.a) || is_typed_primitive_list(inst.a)) {
                     if (std::getenv("LYMAR_DEBUG_LIDX")) {
@@ -3756,13 +3797,12 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     ir::Value* data_ptr = nullptr;
                     if (hoisted_data_ptrs.count(inst.a)) {
                         data_ptr = hoisted_data_ptrs[inst.a];
-                    } else if (bound_proven) {
-                        ir::Value* unboxed = builder_->createAnd(list_val, context_->getConstantInt(context_->getIntegerType(64), ~7ULL));
-                        ir::Instruction* dptr = builder_->createLoadl(builder_->createAdd(unboxed, context_->getConstantInt(context_->getIntegerType(64), 8)));
-                        dptr->setName("hoisted_data_ptr_r" + std::to_string(inst.a) + "_lazy");
-                        hoisted_data_ptrs[inst.a] = dptr;
-                        data_ptr = dptr;
                     } else {
+                        // Fresh load per access: a lazily cached SSA value
+                        // defined inside a loop body is not guaranteed to
+                        // dominate later uses in sibling blocks, and an
+                        // entry-block hoist is unsound when the function can
+                        // mutate the list through a call (see may_mutate_lists).
                         ir::Value* unboxed = builder_->createAnd(list_val, context_->getConstantInt(context_->getIntegerType(64), ~7ULL));
                         data_ptr = builder_->createLoadl(builder_->createAdd(unboxed, context_->getConstantInt(context_->getIntegerType(64), 8)));
                     }
@@ -3811,6 +3851,47 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     break;
                 }
 
+                if (bound_proven) {
+                    // Straight-line fetch: the producer proved 0 <= index < len
+                    // for this access (iter loop header re-reads ListLen and
+                    // compares immediately before the fetch; stream_fusion
+                    // rejects mutating pipelines), so the null/type/bounds CFG
+                    // and lm_list_get fallback are dead weight. Element-storage
+                    // kind still gates decoding: kind 0 (tagged-word storage —
+                    // every non-primitive list) is the identity decode, while
+                    // kinds 1/2 (raw int/bool) still need the runtime helper.
+                    ir::Function* cur_fn = builder_->getInsertPoint()->getParent();
+                    ir::BasicBlock* b_k0 = builder_->createBasicBlock("lidx_pb_k0_" + lidx_id, cur_fn);
+                    ir::BasicBlock* b_dec = builder_->createBasicBlock("lidx_pb_dec_" + lidx_id, cur_fn);
+                    ir::BasicBlock* b_pdone = builder_->createBasicBlock("lidx_pb_done_" + lidx_id, cur_fn);
+
+                    ir::Value* unboxed = builder_->createAnd(list_val, context_->getConstantInt(context_->getIntegerType(64), ~7ULL));
+                    ir::Instruction* hdr_val = builder_->createLoadl(unboxed);
+                    hdr_val->setName("lpb_hdr_" + lidx_id);
+                    ir::Value* elem_kind = builder_->createShr(hdr_val, context_->getConstantInt(context_->getIntegerType(64), 32));
+                    ir::Value* data_ptr = builder_->createLoadl(builder_->createAdd(unboxed, context_->getConstantInt(context_->getIntegerType(64), 8)));
+                    ir::Value* offset = builder_->createMul(idx_val, context_->getConstantInt(context_->getIntegerType(64), 8));
+                    ir::Value* elem_addr = builder_->createAdd(data_ptr, offset);
+                    ir::Instruction* elem = builder_->createLoadl(elem_addr);
+                    elem->setName("lpb_elem_" + lidx_id);
+
+                    ir::Value* is_tagged = builder_->createCeq(elem_kind, context_->getConstantInt(context_->getIntegerType(64), 0));
+                    builder_->createBr(is_tagged, b_k0, b_dec);
+
+                    builder_->setInsertPoint(b_k0);
+                    store_reg(inst.dst, untag_word(elem, inst.dst, inst.result_type), inst.result_type);
+                    builder_->createJmp(b_pdone);
+
+                    builder_->setInsertPoint(b_dec);
+                    ir::Value* decoded = builder_->createExternCall("lymar_aot_list_elem_decode",
+                        {elem, elem_kind}, context_->getIntegerType(64));
+                    store_reg(inst.dst, untag_word(decoded, inst.dst, inst.result_type), inst.result_type);
+                    builder_->createJmp(b_pdone);
+
+                    builder_->setInsertPoint(b_pdone);
+                    break;
+                }
+
                 used_builtins_.insert("lm_list_get");
                 ir::Function* fn = current_module_->getFunction("lm_list_get");
                 if (!fn) fn = builder_->createFunction("lm_list_get", context_->getIntegerType(64), {context_->getIntegerType(64), context_->getIntegerType(64)});
@@ -3848,8 +3929,6 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
 
                 // Step 3: Fast path array access
                 builder_->setInsertPoint(b_fast);
-                if (std::getenv("LYMAR_DEBUG_LIDX")) {
-                }
                 ir::Value* data_addr = builder_->createAdd(unboxed_ptr, context_->getConstantInt(context_->getIntegerType(64), 8));
                 ir::Instruction* data_ptr = builder_->createLoadl(data_addr);
                 data_ptr->setName("lidx_data_ptr_" + lidx_id);
@@ -3860,10 +3939,26 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 // Primitive-storage lists keep raw int/bool elements; decode them
                 // into tagged LmValue words using the header's element kind before
                 // the destination-domain untag decides the final representation.
+                // Kind 0 (tagged-word storage) is the identity decode, so the
+                // common erased-view case skips the extern call entirely.
                 ir::Value* elem_kind = builder_->createShr(hdr_val, context_->getConstantInt(context_->getIntegerType(64), 32));
-                ir::Value* decoded = builder_->createExternCall("lymar_aot_list_elem_decode", {elem, elem_kind}, context_->getIntegerType(64));
-                ir::Value* final_elem = untag_word(decoded, inst.dst, inst.result_type);
-                store_reg(inst.dst, final_elem, inst.result_type);
+                ir::BasicBlock* b_k0 = builder_->createBasicBlock("lidx_k0_" + lidx_id, cur_fn);
+                ir::BasicBlock* b_dec = builder_->createBasicBlock("lidx_dec_" + lidx_id, cur_fn);
+                ir::BasicBlock* b_fused = builder_->createBasicBlock("lidx_fused_" + lidx_id, cur_fn);
+                ir::Value* is_tagged = builder_->createCeq(elem_kind, context_->getConstantInt(context_->getIntegerType(64), 0));
+                builder_->createBr(is_tagged, b_k0, b_dec);
+
+                builder_->setInsertPoint(b_k0);
+                store_reg(inst.dst, untag_word(elem, inst.dst, inst.result_type), inst.result_type);
+                builder_->createJmp(b_fused);
+
+                builder_->setInsertPoint(b_dec);
+                ir::Value* decoded = builder_->createExternCall("lymar_aot_list_elem_decode",
+                    {elem, elem_kind}, context_->getIntegerType(64));
+                store_reg(inst.dst, untag_word(decoded, inst.dst, inst.result_type), inst.result_type);
+                builder_->createJmp(b_fused);
+
+                builder_->setInsertPoint(b_fused);
                 builder_->createJmp(b_done);
 
                 // Step 4: Slow path fallback
@@ -4906,8 +5001,19 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                         default:              return context_->getIntegerType(32);
                     }
                 };
+                auto c_param_ty = [&](LIR::Type t) -> ir::Type* {
+                    switch (t) {
+                        case LIR::Type::F32:  return context_->getFloatType();
+                        case LIR::Type::F64:  return context_->getDoubleType();
+                        default:              return context_->getIntegerType(64);
+                    }
+                };
+                // Non-precise (wrapper-path) calls declare the extern return
+                // from the Lymar result type; an f32 stub still needs a true
+                // `float` return so the ABI reads xmm0, not rax.
                 ir::Type* ret_ty = precise_ret ? c_ret_ty(inst.type_a)
-                                               : lir_type_to_fyra_type(inst.result_type);
+                    : (inst.result_type == LIR::Type::F32 ? context_->getFloatType()
+                                                         : lir_type_to_fyra_type(inst.result_type));
                 ir::Function* cfn = current_module_->getFunction(inst.func_name);
                 if (!cfn) {
                     auto created = std::make_unique<ir::Function>(ret_ty, inst.func_name, current_module_.get());
@@ -4915,16 +5021,22 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     for (size_t i = 0; i < inst.call_args.size(); ++i) {
                         LIR::Type at = i < inst.call_arg_types.size() ? inst.call_arg_types[i] : LIR::Type::I64;
                         cfn->addParameter(std::make_unique<ir::Parameter>(
-                            at == LIR::Type::F64 ? static_cast<ir::Type*>(context_->getDoubleType())
-                                                 : static_cast<ir::Type*>(context_->getIntegerType(64)),
-                            "a" + std::to_string(i)));
+                            c_param_ty(at), "a" + std::to_string(i)));
                     }
                     current_module_->addFunction(std::move(created));
                 }
                 std::vector<ir::Value*> args;
                 for (size_t i = 0; i < inst.call_args.size(); ++i) {
                     LIR::Type at = i < inst.call_arg_types.size() ? inst.call_arg_types[i] : LIR::Type::I64;
-                    args.push_back(load_reg(inst.call_args[i], at == LIR::Type::F64 ? LIR::Type::F64 : LIR::Type::I64));
+                    if (at == LIR::Type::F32 || at == LIR::Type::F64) {
+                        // Float-family registers always hold f64 words in AOT;
+                        // C `float` params get a real f32 via cvtsd2ss.
+                        ir::Value* fv = load_reg(inst.call_args[i], LIR::Type::F64);
+                        args.push_back(at == LIR::Type::F32
+                            ? builder_->createCast(fv, context_->getFloatType()) : fv);
+                    } else {
+                        args.push_back(load_reg(inst.call_args[i], LIR::Type::I64));
+                    }
                 }
                 ir::Value* res = builder_->createCall(cfn, args);
                 if (inst.dst != UINT32_MAX && res && inst.result_type != LIR::Type::Void) {
@@ -4942,6 +5054,8 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                             case LIR::Type::I64: case LIR::Type::U64:
                             case LIR::Type::Ptr: case LIR::Type::F64:
                                 break; // already the Lymar word width
+                            case LIR::Type::F32:
+                                break; // float result widened below
                             case LIR::Type::I32:
                                 out = builder_->createExtSW(res, i64ty); break;
                             case LIR::Type::U32:
@@ -4970,6 +5084,10 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                                 out = builder_->createCast(res, i64ty); break;
                         }
                     }
+                    // C `float` returns arrive as f32 in xmm0; AOT float
+                    // registers hold f64 words, so widen before storing.
+                    if (out->getType() && out->getType()->isFloatTy())
+                        out = builder_->createCast(out, context_->getDoubleType());
                     store_reg(inst.dst, out, inst.result_type);
                 }
                 break;

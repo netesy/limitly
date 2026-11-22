@@ -77,6 +77,7 @@ static inline bool is_numeric_internal(LmValue v) {
 }
 
 RUNTIME_API int64_t as_i64(LmValue v) {
+    if (IS_BOOL(v)) return UNBOX_BOOL(v) ? 1 : 0;
     if (IS_INT(v)) return UNBOX_INT(v);
     if (IS_PTR(v)) {
         ObjHeader* h = (ObjHeader*)UNBOX_PTR(v);
@@ -96,6 +97,7 @@ RUNTIME_API int64_t as_i64(LmValue v) {
 }
 
 RUNTIME_API uint64_t as_u64(LmValue v) {
+    if (IS_BOOL(v)) return UNBOX_BOOL(v) ? 1 : 0;
     if (IS_INT(v)) return (uint64_t)UNBOX_INT(v);
     if (IS_PTR(v)) {
         ObjHeader* h = (ObjHeader*)UNBOX_PTR(v);
@@ -114,6 +116,7 @@ RUNTIME_API uint64_t as_u64(LmValue v) {
 }
 
 RUNTIME_API __int128 as_i128(LmValue v) {
+    if (IS_BOOL(v)) return (__int128)(UNBOX_BOOL(v) ? 1 : 0);
     if (IS_INT(v)) return (__int128)UNBOX_INT(v);
     if (IS_PTR(v)) {
         ObjHeader* h = (ObjHeader*)UNBOX_PTR(v);
@@ -133,6 +136,7 @@ RUNTIME_API __int128 as_i128(LmValue v) {
 }
 
 RUNTIME_API unsigned __int128 as_u128(LmValue v) {
+    if (IS_BOOL(v)) return (unsigned __int128)(UNBOX_BOOL(v) ? 1 : 0);
     if (IS_INT(v)) return (unsigned __int128)UNBOX_INT(v);
     if (IS_PTR(v)) {
         ObjHeader* h = (ObjHeader*)UNBOX_PTR(v);
@@ -151,6 +155,7 @@ RUNTIME_API unsigned __int128 as_u128(LmValue v) {
 }
 
 RUNTIME_API double as_float(LmValue v) {
+    if (IS_BOOL(v)) return UNBOX_BOOL(v) ? 1.0 : 0.0;
     if (IS_PTR(v)) {
         ObjHeader* h = (ObjHeader*)UNBOX_PTR(v);
         if (h->type_id == TYPE_FLOAT) return ((ObjFloat*)h)->value;

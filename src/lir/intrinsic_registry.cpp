@@ -94,6 +94,11 @@ IntrinsicRegistry::IntrinsicRegistry() {
     registerIntrinsic("std.ffi.c_call_f64_2", {LIR_Op::ForeignCallDirect, 0, 0, 4, 0});
     registerIntrinsic("std.ffi.c_call_f64_3", {LIR_Op::ForeignCallDirect, 0, 0, 5, 0});
     registerIntrinsic("std.ffi.c_call_f64_4", {LIR_Op::ForeignCallDirect, 0, 0, 6, 0});
+    registerIntrinsic("std.ffi.c_call_f32_0", {LIR_Op::ForeignCallDirect, 0, 0, 2, 0});
+    registerIntrinsic("std.ffi.c_call_f32_1", {LIR_Op::ForeignCallDirect, 0, 0, 3, 0});
+    registerIntrinsic("std.ffi.c_call_f32_2", {LIR_Op::ForeignCallDirect, 0, 0, 4, 0});
+    registerIntrinsic("std.ffi.c_call_f32_3", {LIR_Op::ForeignCallDirect, 0, 0, 5, 0});
+    registerIntrinsic("std.ffi.c_call_f32_4", {LIR_Op::ForeignCallDirect, 0, 0, 6, 0});
     registerIntrinsic("std.ffi.c_call_ptr_0", {LIR_Op::ForeignCallDirect, 0, 0, 2, 0});
     registerIntrinsic("std.ffi.c_call_ptr_1", {LIR_Op::ForeignCallDirect, 0, 0, 3, 0});
     registerIntrinsic("std.ffi.c_call_ptr_2", {LIR_Op::ForeignCallDirect, 0, 0, 4, 0});

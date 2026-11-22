@@ -1562,9 +1562,14 @@ bool Generator::try_emit_c_direct_call(LM::Frontend::AST::CallExpr& expr,
     // ForeignCallDirect leaves type_a == Void and keeps result_type semantics.
     inst.type_a = c_direct_lir_type(sig->return_type);
     inst.call_args = arg_regs;
-    for (const auto& at : sig->arg_types)
+    for (const auto& at : sig->arg_types) {
+        // call_arg_types describes the C ABI: f32 params take Type::F32 so the
+        // backend narrows the (always f64-stored) Lymar float at the boundary.
         inst.call_arg_types.push_back(
-            at.kind == LM::Backend::Native::CType::Double ? Type::F64 : Type::I64);
+            at.kind == LM::Backend::Native::CType::Double ? Type::F64
+            : at.kind == LM::Backend::Native::CType::Float ? Type::F32
+            : Type::I64);
+    }
     if (expr.inferred_type) {
         set_register_type(result, expr.inferred_type);
         set_register_language_type(result, expr.inferred_type);

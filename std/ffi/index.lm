@@ -276,6 +276,11 @@ pub fn c_call_f64_1(func_ptr: fnptr, name: str, arg1: any): float { return 0.0; 
 pub fn c_call_f64_2(func_ptr: fnptr, name: str, arg1: any, arg2: any): float { return 0.0; }
 pub fn c_call_f64_3(func_ptr: fnptr, name: str, arg1: any, arg2: any, arg3: any): float { return 0.0; }
 pub fn c_call_f64_4(func_ptr: fnptr, name: str, arg1: any, arg2: any, arg3: any, arg4: any): float { return 0.0; }
+pub fn c_call_f32_0(func_ptr: fnptr, name: str): f32 { return 0.0; }
+pub fn c_call_f32_1(func_ptr: fnptr, name: str, arg1: any): f32 { return 0.0; }
+pub fn c_call_f32_2(func_ptr: fnptr, name: str, arg1: any, arg2: any): f32 { return 0.0; }
+pub fn c_call_f32_3(func_ptr: fnptr, name: str, arg1: any, arg2: any, arg3: any): f32 { return 0.0; }
+pub fn c_call_f32_4(func_ptr: fnptr, name: str, arg1: any, arg2: any, arg3: any, arg4: any): f32 { return 0.0; }
 pub fn c_call_ptr_0(func_ptr: fnptr, name: str): pubptr { return 0; }
 pub fn c_call_ptr_1(func_ptr: fnptr, name: str, arg1: any): pubptr { return 0; }
 pub fn c_call_ptr_2(func_ptr: fnptr, name: str, arg1: any, arg2: any): pubptr { return 0; }

@@ -817,12 +817,13 @@ uint64_t lymar_aot_is_print_object(uint64_t value) {
 }
 double lymar_aot_to_float(uint64_t value) {
     try {
-    RuntimeGuard runtime_guard;
-
+    // Lock-free fast paths first: tag/immediate words never touch the heap,
+    // so they must not pay the runtime mutex on every numeric conversion.
     Word tag = word_tag(value);
     if (tag == TAG_IMMEDIATE) return value == VAL_TRUE ? 1.0 : 0.0;
     if (tag == TAG_INT) return static_cast<double>(static_cast<int64_t>(value) >> 3);
     if (tag != TAG_PTR || value <= 4096) return static_cast<double>(static_cast<int64_t>(value));
+    RuntimeGuard runtime_guard;
     auto found = heap().allocations.find(value);
     if (found != heap().allocations.end() && !found->second.raw_memory && !found->second.dictionary && found->second.size >= 16) {
         if ((read_word(value) & 0xffffffff) == 9) {
@@ -843,14 +844,15 @@ double lymar_aot_to_float(uint64_t value) {
 }
 uint64_t lymar_aot_to_integer(uint64_t value) {
     try {
-    RuntimeGuard runtime_guard;
-
+    // Lock-free fast paths first: tag/immediate words never touch the heap,
+    // so they must not pay the runtime mutex on every numeric conversion.
     Word tag = word_tag(value);
     if (tag == TAG_INT) return static_cast<uint64_t>(static_cast<int64_t>(value) >> 3);
     if (value == VAL_FALSE || value == VAL_NIL || value == 0) return 0;
     if (value == VAL_TRUE) return 1;
     if (tag == TAG_IMMEDIATE) return 0;
     if (tag != TAG_PTR || value <= 4096) return value;
+    RuntimeGuard runtime_guard;
     if (auto integer = integer_number(value)) return static_cast<Word>(*integer);
     auto found = heap().allocations.find(value);
     if (found != heap().allocations.end() && !found->second.raw_memory) {
@@ -887,13 +889,14 @@ uint64_t lymar_aot_float_to_integer(double number) {
 }
 uint64_t lymar_aot_to_boolean(uint64_t value) {
     try {
-    RuntimeGuard runtime_guard;
-
+    // Lock-free fast paths first: tag/immediate words never touch the heap,
+    // so they must not pay the runtime mutex on every truthiness check.
     if (value == VAL_FALSE || value == VAL_NIL || value == 0) return 0;
     if (value == VAL_TRUE) return 1;
     if ((value & TAG_MASK) == TAG_INT) return (static_cast<int64_t>(value) >> 3) != 0;
     if ((value & TAG_MASK) == TAG_IMMEDIATE) return value != VAL_FALSE && value != VAL_NIL && value != 0;
     if (value <= 4096) return value != 0;
+    RuntimeGuard runtime_guard;
     if (!is_heap_word(value)) return value != 0;
     if ((read_word(value) & 0xffffffff) == 9) return lymar_aot_to_float(value) != 0.0;
     return 1;

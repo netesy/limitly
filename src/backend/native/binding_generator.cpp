@@ -97,12 +97,14 @@ std::string select_helper(const CFunctionDecl& fn) {
 std::string safe_param_name(const CParam& p, size_t index);
 std::string c_signature_str_impl(const CFunctionDecl& fn);
 // A param is direct-safe when its C ABI maps cleanly onto the Lymar word the
-// binding passes: int-family -> i64, double -> f64, pointer -> i64. C `float`
-// (f32), variadic, and struct/unknown types stay on the generic path.
+// binding passes: int-family -> i64, float/double -> f64 (the boundary cast
+// narrows to f32 for C `float`), pointer -> i64. Variadic and struct/unknown
+// types stay on the generic path.
 bool direct_safe_param(const CType& t) {
     switch (t.kind) {
         case CType::Bool: case CType::Char: case CType::Short: case CType::Int:
         case CType::Long: case CType::LongLong: case CType::Ptr: case CType::Double:
+        case CType::Float:
             return true;
         case CType::FixedWidth: return t.width <= 64;
         default: return false;
@@ -123,6 +125,7 @@ std::string direct_helper(const CFunctionDecl& fn) {
     if (is_void_type(r)) return p + "void_" + n;
     if (r.kind == CType::Ptr) return p + "ptr_" + n;
     if (r.kind == CType::Double) return p + "f64_" + n;
+    if (r.kind == CType::Float) return p + "f32_" + n;
     switch (r.kind) {
         case CType::Bool: case CType::Char: case CType::Short: case CType::Int:
         case CType::Long: case CType::LongLong:
@@ -180,6 +183,11 @@ std::string direct_arg_expr(const CFunctionDecl& fn, size_t i) {
         case CType::Bool: case CType::Char: case CType::Short: case CType::Int:
         case CType::Long: case CType::LongLong: case CType::FixedWidth:
             return name + " as int";
+        case CType::Float:
+            // C `float` is f32; the Lymar `float` param is f64. The `as f32`
+            // gives the argument an F32 ABI type so VM libffi marshals a
+            // true float and AOT narrows at the extern boundary.
+            return name + " as f32";
         default:
             return name; // Double -> float, Ptr -> ffi.pubptr
     }
@@ -207,6 +215,9 @@ void emit_direct_fn(std::ostringstream& out, const CFunctionDecl& fn,
     std::string fixup = return_fixup(fn.return_type);
     if (helper.rfind("c_call_void_", 0) == 0) {
         out << "        return " << call << ";\n";
+    } else if (fn.return_type.kind == CType::Float) {
+        // c_call_f32_* yields f32; widen back to the wrapper's `float` (f64).
+        out << "        return (" << call << ") as float;\n";
     } else if (fixup.empty()) {
         out << "        return " << call << ";\n";
     } else {

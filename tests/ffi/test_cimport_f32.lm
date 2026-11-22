@@ -1,0 +1,38 @@
+// Regression: `import "c:"` direct lowering of f32 C signatures.
+//
+// C `float` params/results are ABI f32 while Lymar `float` is f64, so the
+// AOT backend must emit cvtsd2ss / cvtss2sd conversions around the native
+// call. The byte-assembler path originally moved the raw 64-bit slot bits
+// instead of converting, so every f32 call returned 0. VM marshals f32
+// through libffi and was always correct — this test pins VM/AOT parity.
+import "c:tests/native/cimport_fixture.h" from "tests/native/libcimport_fixture.dll" as fx;
+
+fn main() {
+    var fails = 0;
+
+    // float -> float round trip through sqrt (f32 rounding: sqrt(2) = 1.4142135)
+    var r: float = fx.fixture_sqrt(4.0);
+    assert(r == 2.0, "sqrt(4) != 2");
+    var r2: float = fx.fixture_sqrt(2.0);
+    assert(r2 > 1.4142134 and r2 < 1.4142136, "sqrt(2) lost f32 precision");
+    var r3: float = fx.fixture_sqrt(0.25);
+    assert(r3 == 0.5, "sqrt(0.25) != 0.5");
+
+    // two f32 args (xmm0 + xmm1 on Windows)
+    var s: float = fx.fixture_f32_add(1.5, 2.25);
+    assert(s == 3.75, "f32_add(1.5, 2.25) != 3.75");
+
+    // mixed int + float positions (param 1 travels in xmm1)
+    var m: float = fx.fixture_mix_i_f(3, 1.5);
+    assert(m == 4.5, "mix_i_f(3, 1.5) != 4.5");
+
+    // float arg under an integer-return helper (c_call_i64_* + f32 arg)
+    assert(fx.fixture_i32_f32(21.0) == 42, "i32_f32(21) != 42");
+
+    // existing integer signatures still correct alongside the f32 ones
+    assert(fx.fixture_answer() == 42, "fixture_answer != 42");
+    assert(fx.fixture_add(10, 32) == 42, "fixture_add != 42");
+
+    print("fails=", fails);
+    return fails;
+}

@@ -74,6 +74,10 @@ tests/ffi/test_ffi_load.lm
 # Real C fixture: scalar/float/pointer/string calls + C->Lymar callback
 # roundtrip through libnative_fixture (.dll/.so; skips if not built)
 tests/ffi/test_native_fixture.lm
+# pubptr null comparisons (== 0 / != 0) + bool->int cast parity VM/AOT
+tests/ffi/test_pubptr_null_cmp.lm
+# import "c:" f32/float signature lowering (VM; AOT covered by verify_cimport.py)
+tests/ffi/test_cimport_f32.lm
 # Pure-Lymar Win32 window proof (WNDCLASSEXA marshaling + WndProc callback
 # trampoline + message pump, all via std.ffi — no C glue, no sokol)
 tests/ffi/win32_window.lm

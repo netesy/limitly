@@ -16,6 +16,12 @@ int32_t fixture_add(int32_t a, int32_t b);
 
 float fixture_sqrt(float x);
 
+float fixture_f32_add(float a, float b);
+
+float fixture_mix_i_f(int32_t n, float f);
+
+int32_t fixture_i32_f32(float x);
+
 #ifdef __cplusplus
 }
 #endif

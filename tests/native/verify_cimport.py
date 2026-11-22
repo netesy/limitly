@@ -209,6 +209,33 @@ fn main() {{ print("SYSHDR_OK"); }}
         return 1
     print("PASS: binding cache reused on second run (mtime unchanged)")
 
+    # ---- Test 6: AOT f32 direct-call lowering ----
+    # C `float` is ABI f32 while Lymar `float` is f64, so the AOT backend must
+    # emit cvtsd2ss/cvtss2sd around the native call. Regression: the
+    # byte-assembler emitCast moved raw 64-bit slot bits, so every f32 call
+    # returned 0 under AOT while the VM (libffi marshaling) was correct.
+    if os.name == "nt":
+        aot_prog = ROOT / "tests" / "ffi" / "test_cimport_f32.lm"
+        aot_exe = SCRATCH / "cimport_f32_aot.exe"
+        res = run([str(BIN), "build", "-target", "windows", str(aot_prog),
+                   "-o", str(aot_exe)], timeout=180)
+        if res.returncode != 0:
+            print("FAIL: AOT build of f32 cimport test")
+            print(res.stdout + res.stderr)
+            return 1
+        # The test program links tests/native/libcimport_fixture.dll, so the
+        # exe's import table needs that DLL name beside it at run time.
+        shutil.copy(ROOT / "tests" / "native" / "libcimport_fixture.dll",
+                    SCRATCH / "libcimport_fixture.dll")
+        res = run([str(aot_exe)], cwd=SCRATCH, timeout=30)
+        if res.returncode != 0 or "fails= 0" not in res.stdout:
+            print("FAIL: AOT f32 cimport run")
+            print(res.stdout + res.stderr)
+            return 1
+        print("PASS: AOT f32 `import \"c:\"` signatures return correct values")
+    else:
+        print("SKIP: AOT f32 check is Windows-only")
+
     print("2c verification: ALL PASSED")
     return 0
 

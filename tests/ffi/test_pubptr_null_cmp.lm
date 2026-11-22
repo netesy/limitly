@@ -1,0 +1,44 @@
+// Regression: pubptr null comparisons and bool->int casts.
+//
+// Two bugs lived here:
+//  1. `ffi.pubptr` values compare correctly against `0`, but the result is a
+//     bool; casting that bool `as int` yielded 0 in the VM (VAL_TRUE/VAL_FALSE
+//     are TAG_IMMEDIATE words that as_i64 did not decode) while AOT produced
+//     1. Every `(ptr != 0) as int` guard therefore read false in the VM.
+//  2. pubptr is not nil-able: a NULL pubptr compares `== 0` but `== nil` is
+//     false in BOTH backends. The test pins that contract so a future "fix"
+//     cannot silently diverge VM from AOT.
+import std.ffi as ffi;
+
+fn main() {
+    unsafe {
+        // Non-null pointer: every null check must be false/true respectively,
+        // and casting the comparison result to int must give 0/1.
+        var p = ffi.alloc(8);
+        assert(p != 0, "alloc'd pubptr == 0");
+        assert(not (p == 0), "alloc'd pubptr == 0 was true");
+        assert((p != 0) as int == 1, "(p != 0) as int != 1");
+        assert((p == 0) as int == 0, "(p == 0) as int != 0");
+        assert((p as int) != 0, "pubptr as int lost the address");
+
+        // Typed null pubptr: `== 0` is the null check; `== nil` stays false
+        // (pubptr is a distinct non-nilable type — same in VM and AOT).
+        var q: ffi.pubptr = 0;
+        assert(q == 0, "null pubptr != 0");
+        assert(not (q != 0), "null pubptr != 0 was true");
+        assert((q == 0) as int == 1, "(q == 0) as int != 1");
+        assert(not (q == nil), "pubptr null compared equal to nil");
+
+        // Bool -> numeric casts (the root cause of symptom 1).
+        assert((true) as int == 1, "true as int != 1");
+        assert((false) as int == 0, "false as int != 0");
+        assert((true) as float == 1.0, "true as float != 1.0");
+        assert((false) as float == 0.0, "false as float != 0.0");
+        var flag = p != 0;
+        assert(flag as int == 1, "bool var as int != 1");
+        assert((flag as int) + 5 == 6, "bool->int arithmetic wrong");
+
+        ffi.free(p);
+    }
+    return 0;
+}
