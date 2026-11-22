@@ -44,12 +44,21 @@ lymarrt_type type(Word id,bool result=false) {
     if(id>LYMARRT_TYPE_VOID || (!result && id==LYMARRT_TYPE_VOID)) throw std::runtime_error("Invalid FFI type ID");
     return static_cast<lymarrt_type>(id);
 }
-lymarrt_value argument(Word value,lymarrt_type target) {
+static bool ffi_int_type(lymarrt_type t) {
+    switch(t) {
+        case LYMARRT_TYPE_I8: case LYMARRT_TYPE_U8:
+        case LYMARRT_TYPE_I16: case LYMARRT_TYPE_U16:
+        case LYMARRT_TYPE_I32: case LYMARRT_TYPE_U32:
+        case LYMARRT_TYPE_I64: case LYMARRT_TYPE_U64: return true;
+        default: return false;
+    }
+}
+lymarrt_value argument(Word value,lymarrt_type target,bool raw_int=false) {
     lymarrt_value out{};out.type=target;
     if(target==LYMARRT_TYPE_F32) out.val.f32=lymar_aot_to_float(value);
     else if(target==LYMARRT_TYPE_F64) out.val.f64=lymar_aot_to_float(value);
     else if(target==LYMARRT_TYPE_PTR || target==LYMARRT_TYPE_CSTRING) out.val.ptr=reinterpret_cast<void*>(lymar_aot_ffi_pointer(value));
-    else {auto number=lymar_aot_to_integer(value);switch(target) {
+    else {auto number=raw_int?static_cast<int64_t>(value):lymar_aot_to_integer(value);switch(target) {
         case LYMARRT_TYPE_I8: out.val.i8=number;break;case LYMARRT_TYPE_U8:out.val.u8=number;break;
         case LYMARRT_TYPE_I16:out.val.i16=number;break;case LYMARRT_TYPE_U16:out.val.u16=number;break;
         case LYMARRT_TYPE_I32:out.val.i32=number;break;case LYMARRT_TYPE_U32:out.val.u32=number;break;
@@ -192,12 +201,16 @@ void lymar_aot_library_close(Word handle) {
 // struct-by-value arguments (packed native bytes + element type list),
 // mirroring the VM's lymarrt_ffi_call_ex path.
 static Word foreign_call_impl(Word function,Word* words,Word* ids,Word count,Word return_type,
-                              const lymarrt_struct_layout* layouts,size_t num_layouts) {
+                              const lymarrt_struct_layout* layouts,size_t num_layouts,
+                              bool raw_int_words=false) {
     std::unique_lock guard(mutex);
     auto* pointer=reinterpret_cast<void*>(lymar_aot_ffi_pointer(function));
     if(!pointer) return lymar_aot_nil();
     std::vector<lymarrt_type> signature;std::vector<lymarrt_value> arguments;
-    for(Word index=0;index<count;++index) {signature.push_back(type(ids[index]));arguments.push_back(argument(words[index],signature.back()));}
+    // raw_int_words: the typed-helper path (call_i64_N etc.) stores raw i64
+    // domain words, not tagged LmValue words — lymar_aot_to_integer would
+    // misread raw values whose low bits collide with the SMI tag.
+    for(Word index=0;index<count;++index) {signature.push_back(type(ids[index]));arguments.push_back(argument(words[index],signature.back(),raw_int_words&&ffi_int_type(signature.back())));}
     // Opaque C may invoke any registered callback, including on another
     // thread. Pin executable code and userdata, then release the registry
     // lock before entering C so a callback can safely re-enter FFI.
@@ -212,7 +225,7 @@ static Word foreign_call_impl(Word function,Word* words,Word* ids,Word count,Wor
     return result(returned);
 }
 Word lymar_aot_foreign_call(Word function,Word values,Word types,Word count,Word return_type) {
-    return foreign_call_impl(function,reinterpret_cast<Word*>(values),reinterpret_cast<Word*>(types),count,return_type,nullptr,0);
+    return foreign_call_impl(function,reinterpret_cast<Word*>(values),reinterpret_cast<Word*>(types),count,return_type,nullptr,0,true);
 }
 Word lymar_aot_foreign_call_list(Word function,Word values,Word return_type,Word types) {
     auto count=lymar_aot_ffi_list_size(values),type_count=lymar_aot_ffi_list_size(types);
