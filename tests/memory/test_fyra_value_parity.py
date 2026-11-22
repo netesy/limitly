@@ -41,6 +41,8 @@ class FyraValueParityTests(unittest.TestCase):
             "tests/strings/interpolation.lm",
             "tests/loops/match_advanced.lm",
             "tests/stdlib/collections/priority_queue_test.lm",
+            "tests/regression/frame_list_field_test.lm",
+            "tests/modules/record_scalarization_test.lm",
         )
         env = dict(os.environ, LYMAR_AOT_LINKER="driver",
                    LYMAR_AOT_CXX=str(ROOT / "tests/memory/aot_linker.py"))

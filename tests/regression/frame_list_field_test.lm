@@ -1,0 +1,41 @@
+// Regression: erased frame-field reads ([float] list field) through
+// flattened frame params, bool returns across unproven region boundaries,
+// and CFG-join lowering inside branch-free .direct functions.
+frame Wrap {
+    pub data: [float];
+}
+
+fn first(b: Wrap): float {
+    var t = b.data;
+    return t[0] * 10.0;
+}
+
+fn pair(a: Wrap, b: Wrap): float {
+    var ta = a.data;
+    var tb = b.data;
+    return ta[0] + tb[1];
+}
+
+fn inside(flag: bool, n: int): bool {
+    var i = 0;
+    var acc = 0;
+    while (i < n) {
+        acc += i;
+        i += 1;
+    }
+    return flag and acc >= 0;
+}
+
+fn main(): int {
+    var x = Wrap();
+    x.data = [1.0, 2.0, 3.0];
+    var y = Wrap();
+    y.data = [5.0, 6.0, 7.0];
+    assert(first(x) == 10.0, "first x");
+    assert(first(y) == 50.0, "first y");
+    assert(pair(x, y) == 7.0, "pair");
+    assert(inside(true, 3) == true, "inside true");
+    assert(inside(false, 3) == false, "inside false");
+    print("frame_list_field_test: PASSED");
+    return 0;
+}

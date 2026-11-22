@@ -2596,6 +2596,21 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
         return inst;
     };
 
+    // CFG-join safety for lowerings that produce a register on multiple
+    // predecessor paths (ListIndex, Div/Mod zero guards, MemoryLoad nil
+    // guards): SSA-only functions (scalar registers / branch-free .direct)
+    // have no spill slots, so the last-emitted store_reg would win regs[r]
+    // and later uses would bind to a value defined on a non-dominating
+    // path. A dedicated join slot makes every path store to memory and
+    // load_reg reload after the merge.
+    auto ensure_join_slot = [&](uint32_t r, const std::string& tag) {
+        if (r == UINT32_MAX || reg_slots.count(r)) return;
+        auto* slot = entry_alloc(nullptr,
+            context_->getConstantInt(context_->getIntegerType(64), 8));
+        slot->setName("join_" + tag);
+        reg_slots[r] = slot;
+    };
+
     // Canonical element spill slots for loop-variant virtual tuples. Each
     // pseudo register gets an entry-block slot; definitions store element
     // values and uses reload them, preserving values across back-edges.
@@ -3554,8 +3569,10 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
     for (size_t i = 0; i < lir_func.instructions.size(); ++i) {
         const auto& inst = lir_func.instructions[i];
 
-        if (region_skip.count(i)) continue;
-
+        // Block wiring must run even for region-skipped instructions: a
+        // skipped leader (e.g. instruction 0's RegionEnter) would otherwise
+        // leave the insert point in the entry block, emitting the whole body
+        // after its terminator.
         if (block_map.count(i)) {
             if (!terminated && builder_->getInsertPoint() && i > 0 && builder_->getInsertPoint() != block_map.at(i)) {
                 builder_->createJmp(block_map.at(i));
@@ -3563,6 +3580,8 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             builder_->setInsertPoint(block_map.at(i));
             terminated = false;
         }
+
+        if (region_skip.count(i)) continue;
 
         if (inst.op == LIR::LIR_Op::Label) {
             continue;
@@ -4040,6 +4059,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     ir::BasicBlock* b_safe = builder_->createBasicBlock("div_safe_" + div_id, cur_fn);
                     ir::BasicBlock* b_zero = builder_->createBasicBlock("div_zero_" + div_id, cur_fn);
                     ir::BasicBlock* b_done = builder_->createBasicBlock("div_done_" + div_id, cur_fn);
+                    ensure_join_slot(inst.dst, "div_" + div_id);
 
                     builder_->createBr(is_zero, b_zero, b_safe);
 
@@ -4069,6 +4089,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 ir::BasicBlock* b_safe = builder_->createBasicBlock("mod_safe_" + mod_id, cur_fn);
                 ir::BasicBlock* b_zero = builder_->createBasicBlock("mod_zero_" + mod_id, cur_fn);
                 ir::BasicBlock* b_done = builder_->createBasicBlock("mod_done_" + mod_id, cur_fn);
+                ensure_join_slot(inst.dst, "mod_" + mod_id);
 
                 builder_->createBr(is_zero, b_zero, b_safe);
 
@@ -5597,6 +5618,10 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     break;
                 }
 
+                // CFG-join safety: both remaining lowerings produce inst.dst on
+                // multiple predecessor paths; see ensure_join_slot.
+                ensure_join_slot(inst.dst, "lidx_" + lidx_id);
+
                 if (bound_proven) {
                     // Straight-line fetch: the producer proved 0 <= index < len
                     // for this access (iter loop header re-reads ListLen and
@@ -6575,6 +6600,19 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                             default: break;
                         }
                     }
+                    // A nominal bool return on an unproven boundary can carry
+                    // an erased alias, so callers store the result as a tagged
+                    // LmValue word (erased_boolean at the call sites). Emit the
+                    // tagged immediate here or raw 0/1 aliases SMI/nil patterns.
+                    if (ret_val && lir_func.return_language_type &&
+                        lir_func.return_language_type->tag == ::TypeTag::Bool &&
+                        !Memory::proven_closed_boolean_boundary(lir_func) &&
+                        !ret_val->getType()->isFloatingPoint()) {
+                        if (ret_val->getType() != context_->getIntegerType(64))
+                            ret_val = builder_->createCast(ret_val, context_->getIntegerType(64));
+                        ret_val = builder_->createExternCall("lymar_aot_tag_bool",
+                            {ret_val}, context_->getIntegerType(64));
+                    }
                     builder_->createRet(ret_val);
                 } else {
                     // VAL_NIL is the constant word 2; `.direct` variants emit
@@ -6799,6 +6837,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     ir::BasicBlock* b_ok = builder_->createBasicBlock(mid + "_ok", cur_fn);
                     ir::BasicBlock* b_nil = builder_->createBasicBlock(mid + "_nil", cur_fn);
                     ir::BasicBlock* b_done = builder_->createBasicBlock(mid + "_done", cur_fn);
+                    ensure_join_slot(inst.dst, mid);
                     builder_->createBr(builder_->createCeq(addr, context_->getConstantInt(i64ty, 0)), b_nil, b_ok);
                     builder_->setInsertPoint(b_nil);
                     if (inst.imm == 9) {

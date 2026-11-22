@@ -169,6 +169,8 @@ tests/regression/ownership_refactor_test.lm
 tests/regression/trait_dispatch_test.lm
 # Regression - Integer Payload Overflow Past 2^60
 tests/regression/int64_immediate_overflow_test.lm
+# Regression - Frame List Fields, Bool Boundary, CFG Joins
+tests/regression/frame_list_field_test.lm
 # Graphics & Retained UI
 tests/std_gg_smoke.lm
 tests/graphics_triangle_test.lm
