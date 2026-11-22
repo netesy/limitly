@@ -14,6 +14,7 @@
 #include <stdexcept>
 #include <string_view>
 #include <limits>
+#include <vector>
 
 namespace LM::Backend::Native {
 using Machine = VM::Register::RegisterVM;
@@ -579,6 +580,7 @@ LmValue helper(void *context, uint32_t operation, LmValue a, LmValue b,
   }
   throw std::runtime_error("Unknown native runtime helper");
 }
+
 } // namespace
 const Api &host_api() {
   static const Api api{ABI_VERSION,     sizeof(Api), helper,     make_i64,

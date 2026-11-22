@@ -13,6 +13,7 @@
 #include "vm_value.hh"
 #include "callstack.hh"
 #include "resource_types.hh"
+#include "ptr_map.hh"
 #include <vector>
 #include <string>
 #include <thread>
@@ -111,7 +112,7 @@ public:
     }
     void consume_memory(RegisterValue value);
     uint64_t move_memory_reference(uint64_t token, uint32_t lexical);
-    size_t live_allocation_count() const { return vm_allocation_types.size(); }
+    size_t live_allocation_count() const { return vm_allocations.size(); }
     size_t live_raw_allocation_count() const { return owned_raw_memory.size(); }
     size_t live_callback_count() const { return owned_callbacks.size(); }
     void finalize_frame(RegisterValue value);
@@ -338,8 +339,12 @@ private:
         return (id < region_depth_table.size()) ? region_depth_table[id] : 0;
     }
     Memory::RegionInstances<RegionInstance> region_instances;
-    std::unordered_map<uint64_t, std::unordered_set<uintptr_t>> region_allocations;
-    std::unordered_map<uintptr_t, uint64_t> vm_allocation_regions;
+    std::unordered_map<uint64_t, PtrSet> region_allocations;
+    // Cached pointer to region_allocations[active_region_id]; lazily resolved
+    // and invalidated when that set is destroyed (exit_region/reset).
+    uint64_t active_alloc_cache_id_ = UINT64_MAX;
+    PtrSet* active_alloc_cache_ = nullptr;
+    PtrSet& active_allocations();
     std::vector<uint64_t> invocation_parents;
     std::unordered_set<int64_t> owned_callbacks;
     std::unordered_set<int64_t> owned_resources;
@@ -361,8 +366,8 @@ private:
     void attach_raw_memory(uintptr_t address, uint64_t region);
     void detach_raw_memory(uintptr_t address);
     void export_raw_memory(RegisterVM& parent);
-    std::unordered_set<uintptr_t> borrowed_constants;
-    std::unordered_set<uintptr_t> opaque_runtime_pointers;
+    PtrSet borrowed_constants;
+    PtrSet opaque_runtime_pointers;
     RegisterVM* heap_parent_ = nullptr;
     std::recursive_mutex heap_mutex_;
     void export_graph(RegisterValue value);
@@ -377,7 +382,14 @@ private:
     void invalidate_raw_aliases(uintptr_t address, size_t size);
     RegisterValue allocate_raw_memory(size_t size);
     size_t raw_memory_size(RegisterValue value);
-    std::unordered_map<uintptr_t, uint32_t> vm_allocation_types;
+    // Per-object ownership record: owning region + heap kind. Merged from the
+    // former vm_allocation_regions/vm_allocation_types pair so every lookup
+    // touches one flat table instead of two node-based maps.
+    struct AllocInfo {
+        uint64_t region = 0;
+        uint32_t type = 0;
+    };
+    PtrMap<AllocInfo> vm_allocations;
     
     struct ErrorInfo {
         std::string errorType;

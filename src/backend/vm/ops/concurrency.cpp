@@ -320,7 +320,7 @@ void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
                         worker_vm.opaque_runtime_pointers = opaque_runtime_pointers;
                         {
                             std::lock_guard<std::recursive_mutex> lock(heap_mutex_);
-                            for (const auto& [ptr, kind] : vm_allocation_types) worker_vm.borrowed_constants.insert(ptr);
+                            for (const auto& entry : vm_allocations) worker_vm.borrowed_constants.insert(entry.first);
                         }
                         while (true) {
                             TaskContext* context = nullptr;

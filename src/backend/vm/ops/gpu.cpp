@@ -151,7 +151,7 @@ bool RegisterVM::gpu_dispatch_task(const std::string& task_name, int64_t gx, int
     // by the resolver (invalidated on module-metadata changes).
     Backend::Native::Entry native_entry =
         CompiledResolver::getInstance().resolve_entry(task_name);
-    if (native_entry && std::getenv("LYMAR_TRACE_PRECOMPILED"))
+    if (native_entry && trace_precompiled())
         std::cerr << "GPU_NATIVE_DISPATCH: " << task_name << "\n";
 
     auto* task = LIR::FunctionRegistry::getInstance().getFunction(task_name);

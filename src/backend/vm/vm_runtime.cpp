@@ -252,9 +252,11 @@ RUNTIME_API void* lm_trait_dispatch(void* trait_obj, const char* trait_name, con
 #include <unordered_map>
 #include <vector>
 #include <mutex>
+#include <atomic>
 namespace {
 struct ConstantPool {
     std::unordered_map<uintptr_t, uint32_t> objects;
+    std::atomic<bool> nonempty{false};
     std::mutex mutex;
     ~ConstantPool() {
         for (auto [ptr, kind] : objects) {
@@ -286,6 +288,7 @@ void lm_keep_constant(LmValue value) {
         auto ptr = reinterpret_cast<uintptr_t>(UNBOX_PTR(v));
         auto* h = reinterpret_cast<ObjHeader*>(ptr);
         if (!pool.objects.emplace(ptr, h->type_id).second) continue;
+        pool.nonempty.store(true);
         if (h->type_id == TYPE_LIST) {
             auto* list = reinterpret_cast<LmList*>(h);
             for (uint64_t i = 0; i < list->size; ++i) work.push_back(list->data[i]);
@@ -305,6 +308,7 @@ void lm_keep_constant(LmValue value) {
 bool lm_is_constant(LmValue value) {
     if (!IS_PTR(value)) return false;
     auto& pool = constants();
+    if (!pool.nonempty.load()) return false;
     std::lock_guard<std::mutex> lock(pool.mutex);
     return pool.objects.count(reinterpret_cast<uintptr_t>(UNBOX_PTR(value))) != 0;
 }

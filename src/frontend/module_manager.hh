@@ -148,6 +148,14 @@ public:
     bool register_compiled_module(const CompiledModuleMeta& meta);
     bool find_compiled_module(const std::string& module_name, const std::string& target_triple, const std::string& required_kind, CompiledModuleMeta& out_meta);
     bool is_artifact_valid(const CompiledModuleMeta& meta, const std::string& current_source_path);
+    // LIR-cache hits skip load_module (and its per-import .meta discovery),
+    // which would silently drop precompiled-module dispatch. Scan the usual
+    // artifact directories for *.meta sidecars and register every artifact
+    // that passes is_artifact_valid so dispatch behaves identically to a
+    // cache-miss compile. Safe to over-register: dispatch only consults
+    // exports matching the called symbol, and stale artifacts fail
+    // source/dependency hash validation.
+    void discover_compiled_artifacts(const std::string& entry_file);
     CompiledModuleMeta generate_metadata(
         std::shared_ptr<Module> module,
         const std::string& target,

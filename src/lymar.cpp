@@ -60,11 +60,19 @@ int Compiler::executeFile(const std::string& filename, const CompileOptions& opt
                          !options.print_cst && !options.print_lir && !options.print_fyra_ir &&
                          !options.no_cache;
 
+        // Include paths are needed even on LIR-cache hits: artifact discovery
+        // validates .meta sidecars against module sources via find_module_file.
+        LM::Frontend::ModuleManager::getInstance().set_include_dirs(options.include_dirs);
+
         if (can_cache) {
             auto t_cache_start = std::chrono::steady_clock::now();
             lir_function = LIR::CacheManager::try_load_program_cache(filename);
             if (lir_function) {
                 loaded_from_cache = true;
+                // Cache hits skip module loading, including .meta artifact
+                // discovery — without this, precompiled-module calls silently
+                // fall back to interpretation.
+                LM::Frontend::ModuleManager::getInstance().discover_compiled_artifacts(filename);
                 if (options.profile) {
                     auto ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t_cache_start).count();
                     std::cout << "\n========================================================================================\n"

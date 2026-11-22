@@ -39,6 +39,7 @@ size_t required_register_count(const LIR::LIR_Function& function) {
     }
     return max_register + 1;
 }
+
 } // namespace
 
 RegisterVM::RegisterVM() : type_system(std::make_unique<TypeSystem>()) {
@@ -62,8 +63,8 @@ void RegisterVM::release_resources() {
 void RegisterVM::finalize_frame(RegisterValue value) {
     if (!IS_PTR(value)) return;
     auto ptr = reinterpret_cast<uintptr_t>(UNBOX_PTR(value));
-    auto type = vm_allocation_types.find(ptr);
-    if (type == vm_allocation_types.end() || type->second != TYPE_FRAME) return;
+    auto type = vm_allocations.find(ptr);
+    if (type == vm_allocations.end() || type->second.type != TYPE_FRAME) return;
     auto* frame = reinterpret_cast<LmFrame*>(ptr);
     constexpr uint32_t finalized = 1u << 31;
     if (frame->header.metadata & finalized) return;
@@ -77,11 +78,11 @@ void RegisterVM::finalize_owned_frames(uint64_t region, bool all) {
     // Keep all fields alive while destructors run; physical reclamation follows.
     std::vector<uintptr_t> frames;
     if (all) {
-        for (const auto& [ptr, kind] : vm_allocation_types)
-            if (kind == TYPE_FRAME) frames.push_back(ptr);
+        for (const auto& [ptr, info] : vm_allocations)
+            if (info.type == TYPE_FRAME) frames.push_back(ptr);
     } else if (auto members = region_allocations.find(region); members != region_allocations.end()) {
         for (auto ptr : members->second)
-            if (vm_allocation_types.at(ptr) == TYPE_FRAME) frames.push_back(ptr);
+            if (vm_allocations.at(ptr).type == TYPE_FRAME) frames.push_back(ptr);
     }
     for (auto ptr : frames) finalize_frame(BOX_PTR(ptr));
 }
@@ -93,7 +94,12 @@ RegisterVM::~RegisterVM() {
     revoke_callbacks();
     release_resources();
     release_raw_memory();
-    while (!vm_allocation_types.empty()) reclaim_value(BOX_PTR(vm_allocation_types.begin()->first));
+    // Snapshot keys first: PtrMap::begin() scans from slot 0, so repeatedly
+    // taking begin() while reclaiming is quadratic on large tables.
+    std::vector<uintptr_t> pending;
+    pending.reserve(vm_allocations.size());
+    for (const auto& entry : vm_allocations) pending.push_back(entry.first);
+    for (auto ptr : pending) reclaim_value(BOX_PTR(ptr));
 }
 
 void RegisterVM::reset() {
@@ -101,11 +107,18 @@ void RegisterVM::reset() {
     revoke_callbacks();
     release_resources();
     release_raw_memory();
-    while (!vm_allocation_types.empty()) reclaim_value(BOX_PTR(vm_allocation_types.begin()->first));
+    // Snapshot keys first: PtrMap::begin() scans from slot 0, so repeatedly
+    // taking begin() while reclaiming is quadratic on large tables.
+    std::vector<uintptr_t> pending;
+    pending.reserve(vm_allocations.size());
+    for (const auto& entry : vm_allocations) pending.push_back(entry.first);
+    for (auto ptr : pending) reclaim_value(BOX_PTR(ptr));
     vm_region_stack.clear();
     region_instances.clear();
     memory_lifetimes_.reset();
     region_allocations.clear();
+    active_alloc_cache_ = nullptr;
+    active_alloc_cache_id_ = UINT64_MAX;
     invocation_parents.clear();
     borrowed_constants.clear();
     opaque_runtime_pointers.clear();
@@ -602,25 +615,21 @@ void RegisterVM::share_value(RegisterValue value) {
     if (header->type_id != TYPE_STRING || !(header->metadata & LM_STR_EXCLUSIVE)) return;
     // Confirm the candidate is a tracked string before mutating objects whose
     // layout could coincidentally match the tag pattern (opaque native data).
-    auto kind = vm_allocation_types.find(reinterpret_cast<uintptr_t>(header));
-    if (kind == vm_allocation_types.end() || kind->second != TYPE_STRING) return;
+    auto kind = vm_allocations.find(reinterpret_cast<uintptr_t>(header));
+    if (kind == vm_allocations.end() || kind->second.type != TYPE_STRING) return;
     header->metadata &= ~LM_STR_EXCLUSIVE;
 }
 
 void RegisterVM::relocate_allocation(uintptr_t old_ptr, uintptr_t new_ptr) {
     if (old_ptr == new_ptr) return;
-    auto type_it = vm_allocation_types.find(old_ptr);
-    if (type_it == vm_allocation_types.end()) return;
-    uint32_t kind = type_it->second;
-    auto region_it = vm_allocation_regions.find(old_ptr);
-    uint64_t region = region_it != vm_allocation_regions.end() ? region_it->second : active_region_id;
-    region_allocations[region].erase(old_ptr);
-    vm_allocation_types.erase(type_it);
-    if (region_it != vm_allocation_regions.end()) vm_allocation_regions.erase(region_it);
+    auto info_it = vm_allocations.find(old_ptr);
+    if (info_it == vm_allocations.end()) return;
+    AllocInfo info = info_it->second;
+    region_allocations[info.region].erase(old_ptr);
+    vm_allocations.erase(info_it);
     memory_lifetimes_.revoke(old_ptr);
-    vm_allocation_types[new_ptr] = kind;
-    vm_allocation_regions[new_ptr] = region;
-    region_allocations[region].insert(new_ptr);
+    vm_allocations[new_ptr] = info;
+    region_allocations[info.region].insert(new_ptr);
 }
 
 RegisterValue RegisterVM::load_constant(RegisterValue value) {
@@ -690,7 +699,7 @@ uint64_t RegisterVM::borrow_memory(RegisterValue value, bool writable) {
     std::lock_guard<std::recursive_mutex> lock(heap_mutex_);
     if (!IS_PTR(value)) throw std::runtime_error("Borrow requires a managed object");
     auto address = reinterpret_cast<uintptr_t>(UNBOX_PTR(value));
-    if (!vm_allocation_types.count(address)) throw std::runtime_error("Borrow requires locally owned object");
+    if (!vm_allocations.count(address)) throw std::runtime_error("Borrow requires locally owned object");
     memory_lifetimes_.adopt(address);
     return memory_lifetimes_.borrow(address, writable, active_region_id);
 }
@@ -717,7 +726,7 @@ uint64_t RegisterVM::move_memory_reference(uint64_t token, uint32_t lexical) {
         if (!found) throw std::runtime_error("Reference move target is not active");
     }
     auto depth = [&](uint64_t region) { return region ? region_instances.at(region).depth : size_t(0); };
-    if (depth(vm_allocation_regions.at(pointer)) > depth(target))
+    if (depth(vm_allocations.at(pointer).region) > depth(target))
         throw std::runtime_error("Reference promotion requires owner promotion");
     auto origin = memory_lifetimes_.reference_region(token);
     if (depth(origin) < depth(target)) target = origin;
@@ -727,42 +736,60 @@ void RegisterVM::consume_memory(RegisterValue value) {
     std::lock_guard<std::recursive_mutex> lock(heap_mutex_);
     if (!IS_PTR(value)) return;
     auto address = reinterpret_cast<uintptr_t>(UNBOX_PTR(value));
-    if (!vm_allocation_types.count(address)) throw std::runtime_error("Consume requires locally owned object");
+    if (!vm_allocations.count(address)) throw std::runtime_error("Consume requires locally owned object");
     memory_lifetimes_.adopt(address);
     memory_lifetimes_.consume(address);
 }
+PtrSet& RegisterVM::active_allocations() {
+    if (active_alloc_cache_id_ != active_region_id || !active_alloc_cache_) {
+        active_alloc_cache_id_ = active_region_id;
+        active_alloc_cache_ = &region_allocations[active_region_id];
+    }
+    return *active_alloc_cache_;
+}
+
 void RegisterVM::register_native_allocation(RegisterValue value) {
     if (!IS_PTR(value)) return;
     auto root = reinterpret_cast<uintptr_t>(UNBOX_PTR(value));
-    if (vm_allocation_types.count(root) || borrowed_constants.count(root) || opaque_runtime_pointers.count(root) || lm_is_constant(value)) return;
+    if (vm_allocations.find(root) != vm_allocations.end()) return;
+    if ((!borrowed_constants.empty() && borrowed_constants.count(root)) ||
+        (!opaque_runtime_pointers.empty() && opaque_runtime_pointers.count(root)) ||
+        lm_is_constant(value)) return;
     if (heap_parent_) {
         std::lock_guard<std::recursive_mutex> lock(heap_parent_->heap_mutex_);
-        if (heap_parent_->vm_allocation_types.count(root)) return;
+        if (heap_parent_->vm_allocations.count(root)) return;
     }
     auto kind = reinterpret_cast<ObjHeader*>(root)->type_id;
     if (kind > TYPE_FOREIGN_PTR) throw std::runtime_error("Invalid heap object kind");
     if (kind != TYPE_LIST && kind != TYPE_DICT && kind != TYPE_TUPLE && kind != TYPE_FRAME && kind != TYPE_CLOSURE) {
-        vm_allocation_regions[root] = active_region_id;
-        vm_allocation_types[root] = kind;
+        AllocInfo info{active_region_id, kind};
+        vm_allocations[root] = info;
         if (kind == TYPE_FOREIGN_PTR) index_raw_alias(root);
-        region_allocations[active_region_id].insert(root);
+        active_allocations().insert(root);
         return;
     }
     std::vector<RegisterValue> work{value};
-    std::unordered_set<uintptr_t> visited;
+    PtrSet visited;
+    auto& allocations = active_allocations();
     while (!work.empty()) {
         auto current = work.back(); work.pop_back();
         if (!IS_PTR(current)) continue;
         auto ptr = reinterpret_cast<uintptr_t>(UNBOX_PTR(current));
-        if (!visited.insert(ptr).second || borrowed_constants.count(ptr) || opaque_runtime_pointers.count(ptr) || lm_is_constant(current)) continue;
+        // Already-registered nodes (the common case for shared/borrowed
+        // children) must skip every other check, including the constant
+        // pool's mutex.
+        if (vm_allocations.find(ptr) != vm_allocations.end()) continue;
+        if (!visited.insert(ptr).second) continue;
+        if ((!borrowed_constants.empty() && borrowed_constants.count(ptr)) ||
+            (!opaque_runtime_pointers.empty() && opaque_runtime_pointers.count(ptr)) ||
+            lm_is_constant(current)) continue;
         auto* header = reinterpret_cast<ObjHeader*>(ptr);
         if (!header || header->type_id > TYPE_FOREIGN_PTR) continue;
-        if (vm_allocation_types.count(ptr)) continue;
-        if (!vm_allocation_regions.count(ptr)) {
-            vm_allocation_regions[ptr] = active_region_id;
-            vm_allocation_types[ptr] = header->type_id;
+        if (!vm_allocations.count(ptr)) {
+            AllocInfo info{active_region_id, header->type_id};
+            vm_allocations[ptr] = info;
             if (header->type_id == TYPE_FOREIGN_PTR) index_raw_alias(ptr);
-            region_allocations[active_region_id].insert(ptr);
+            allocations.insert(ptr);
         }
         if (header->type_id == TYPE_LIST) {
             auto* list = reinterpret_cast<LmList*>(header);
@@ -798,14 +825,13 @@ void RegisterVM::set_global(const std::string& name, RegisterValue value) {
 void RegisterVM::reclaim_value(RegisterValue val) {
     if (!IS_PTR(val)) return;
     auto ptr = reinterpret_cast<uintptr_t>(UNBOX_PTR(val));
-    auto type = vm_allocation_types.find(ptr);
-    if (type == vm_allocation_types.end()) return;
-    uint32_t kind = type->second;
+    auto info = vm_allocations.find(ptr);
+    if (info == vm_allocations.end()) return;
+    uint32_t kind = info->second.type;
     if (kind == TYPE_FOREIGN_PTR) unindex_raw_alias(ptr);
-    region_allocations[vm_allocation_regions.at(ptr)].erase(ptr);
+    region_allocations[info->second.region].erase(ptr);
     memory_lifetimes_.revoke(ptr);
-    vm_allocation_types.erase(type);
-    vm_allocation_regions.erase(ptr);
+    vm_allocations.erase(info);
     auto* header = reinterpret_cast<ObjHeader*>(ptr);
     // Children have independent region membership. Never recursively free an
     // older/shared child merely because this container is being reclaimed.
@@ -827,22 +853,22 @@ void RegisterVM::reclaim_value(RegisterValue val) {
 
 void RegisterVM::promote_graph(RegisterValue value, uint64_t target) {
     if (!IS_PTR(value)) return;
-    auto initial = vm_allocation_regions.find(reinterpret_cast<uintptr_t>(UNBOX_PTR(value)));
-    if (initial == vm_allocation_regions.end() || initial->second == target) return;
-    size_t initial_depth = get_region_depth(initial->second);
+    auto initial = vm_allocations.find(reinterpret_cast<uintptr_t>(UNBOX_PTR(value)));
+    if (initial == vm_allocations.end() || initial->second.region == target) return;
+    size_t initial_depth = get_region_depth(initial->second.region);
     size_t destination_depth = get_region_depth(target);
     if (initial_depth <= destination_depth) return;
     std::vector<RegisterValue> work{value};
-    std::unordered_set<uintptr_t> visited;
+    PtrSet visited;
     size_t target_depth = destination_depth;
     while (!work.empty()) {
         auto current = work.back(); work.pop_back();
         if (!IS_PTR(current)) continue;
         auto ptr = reinterpret_cast<uintptr_t>(UNBOX_PTR(current));
         if (!visited.insert(ptr).second) continue;
-        auto owner = vm_allocation_regions.find(ptr);
-        if (owner == vm_allocation_regions.end()) continue;
-        uint64_t source = owner->second;
+        auto owner = vm_allocations.find(ptr);
+        if (owner == vm_allocations.end()) continue;
+        uint64_t source = owner->second.region;
         size_t source_depth = get_region_depth(source);
         // Stores preserve the invariant that children outlive their container.
         // An older graph therefore needs no traversal or scratch allocations.
@@ -851,7 +877,7 @@ void RegisterVM::promote_graph(RegisterValue value, uint64_t target) {
         if (source_depth > target_depth) {
             region_allocations[source].erase(ptr);
             region_allocations[target].insert(ptr);
-            owner->second = target;
+            owner->second.region = target;
         }
         auto* header = reinterpret_cast<ObjHeader*>(ptr);
         switch (header->type_id) {
@@ -896,13 +922,17 @@ void RegisterVM::exit_region() {
     // The region stack is strictly LIFO, so the parent is the new stack top.
     active_region_id = vm_region_stack.empty() ? 0 : vm_region_stack.back().id;
     if (auto members = region_allocations.find(id); members != region_allocations.end()) {
-        auto& objects = members->second;
-        while (!objects.empty()) {
-            auto ptr = *objects.begin();
-            reclaim_value(BOX_PTR(ptr));
-            objects.erase(ptr);
-        }
+        // Steal the set and drain it in one pass: PtrSet::begin() scans from
+        // slot 0, so repeatedly taking begin() on a large sparse table is
+        // quadratic. reclaim_value erases each pointer from vm_allocations
+        // itself; it may recreate an empty node for this region via
+        // region_allocations[region], removed again below.
+        PtrSet objects = std::move(members->second);
         region_allocations.erase(members);
+        active_alloc_cache_ = nullptr;
+        active_alloc_cache_id_ = UINT64_MAX;
+        for (auto ptr : objects) reclaim_value(BOX_PTR(ptr));
+        region_allocations.erase(id);
     }
     release_region_raw_memory(id);
     region_instances.erase(id);
@@ -974,29 +1004,30 @@ void RegisterVM::export_graph(RegisterValue value) {
     // Export the worker's promoted graph before publishing it in a shared
     // container/channel. The parent owns its lifetime through the join.
     export_raw_memory(*heap_parent_);
-    auto& exported = region_allocations[0];
-    while (!exported.empty()) {
-        auto ptr = *exported.begin(); exported.erase(ptr);
-        heap_parent_->vm_allocation_regions[ptr] = 0;
-        heap_parent_->vm_allocation_types[ptr] = vm_allocation_types.at(ptr);
-        if (vm_allocation_types.at(ptr) == TYPE_FOREIGN_PTR) {
+    // Steal the set: PtrSet::begin() scans from slot 0, so repeatedly taking
+    // begin() while draining is quadratic on large sparse tables.
+    PtrSet exported = std::move(region_allocations[0]);
+    for (auto ptr : exported) {
+        auto info = vm_allocations.at(ptr);
+        heap_parent_->vm_allocations[ptr] = info;
+        if (info.type == TYPE_FOREIGN_PTR) {
             unindex_raw_alias(ptr);
             heap_parent_->index_raw_alias(ptr);
         }
         heap_parent_->region_allocations[0].insert(ptr);
         memory_lifetimes_.revoke(ptr);
-        vm_allocation_types.erase(ptr); vm_allocation_regions.erase(ptr);
+        vm_allocations.erase(ptr);
         borrowed_constants.insert(ptr);
     }
 }
 
 void RegisterVM::transfer_ownership(RegisterValue child, RegisterValue container) {
     if (!IS_PTR(child) || !IS_PTR(container)) return;
-    auto found = vm_allocation_regions.find(reinterpret_cast<uintptr_t>(UNBOX_PTR(container)));
-    if (found != vm_allocation_regions.end()) promote_graph(child, found->second);
+    auto found = vm_allocations.find(reinterpret_cast<uintptr_t>(UNBOX_PTR(container)));
+    if (found != vm_allocations.end()) promote_graph(child, found->second.region);
     else if (heap_parent_) {
         std::lock_guard<std::recursive_mutex> lock(heap_parent_->heap_mutex_);
-        if (heap_parent_->vm_allocation_types.count(reinterpret_cast<uintptr_t>(UNBOX_PTR(container))))
+        if (heap_parent_->vm_allocations.count(reinterpret_cast<uintptr_t>(UNBOX_PTR(container))))
             export_graph(child);
     }
 }

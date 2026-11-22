@@ -15,6 +15,7 @@
 #include <future>
 #include <iomanip>
 #include <cstdlib>
+#include <unordered_set>
 
 #include <filesystem>
 
@@ -259,6 +260,44 @@ bool ModuleManager::find_compiled_module(const std::string& module_name, const s
         }
     }
     return false;
+}
+
+void ModuleManager::discover_compiled_artifacts(const std::string& entry_file) {
+    namespace fs = std::filesystem;
+    std::vector<fs::path> dirs;
+    fs::path parent = fs::path(entry_file).parent_path();
+    if (!parent.empty()) {
+        dirs.push_back(parent / "bin");
+        dirs.push_back(parent);
+    }
+    dirs.push_back("bin");
+    for (const auto& dir : include_dirs_) {
+        dirs.push_back(fs::path(dir) / "bin");
+        dirs.push_back(dir);
+    }
+    const bool trace_meta = std::getenv("LYMAR_TRACE_PRECOMPILED") != nullptr;
+    std::unordered_set<std::string> seen;
+    for (const auto& dir : dirs) {
+        std::error_code ec;
+        if (!fs::exists(dir, ec) || !fs::is_directory(dir, ec)) continue;
+        for (const auto& entry : fs::directory_iterator(dir, ec)) {
+            if (entry.path().extension() != ".meta") continue;
+            auto artifact = entry.path();
+            artifact.replace_extension(); // lib<mod>.<ext>.meta -> lib<mod>.<ext>
+            const std::string artifact_key = fs::absolute(artifact).generic_string();
+            if (!seen.insert(artifact_key).second) continue;
+            std::ifstream mf(entry.path());
+            if (!mf.is_open()) continue;
+            std::stringstream mbuf;
+            mbuf << mf.rdbuf();
+            CompiledModuleMeta meta;
+            if (!CompiledModuleMeta::deserialize(mbuf.str(), meta)) continue;
+            meta.artifact_path = artifact_key;
+            if (!is_artifact_valid(meta, find_module_file(meta.module_name))) continue;
+            if (trace_meta) std::cerr << "META_REGISTERED_SCAN: " << meta.module_name << "\n";
+            register_compiled_module(meta);
+        }
+    }
 }
 
 bool ModuleManager::is_artifact_valid(const CompiledModuleMeta& meta, const std::string& current_source_path) {

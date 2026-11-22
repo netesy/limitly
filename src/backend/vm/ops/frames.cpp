@@ -19,8 +19,8 @@ LmFrame* RegisterVM::checked_frame(RegisterValue value, uint32_t index) {
         bool live = false;
         for (auto* owner = this; owner && !live; owner = owner->heap_parent_) {
             std::lock_guard<std::recursive_mutex> lock(owner->heap_mutex_);
-            auto found = owner->vm_allocation_types.find(pointer);
-            live = found != owner->vm_allocation_types.end() && found->second == TYPE_FRAME;
+            auto found = owner->vm_allocations.find(pointer);
+            live = found != owner->vm_allocations.end() && found->second.type == TYPE_FRAME;
         }
         if (!live) throw std::runtime_error("Invalid or expired frame receiver");
         auto* frame = reinterpret_cast<LmFrame*>(pointer);

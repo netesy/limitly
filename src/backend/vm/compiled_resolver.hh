@@ -22,6 +22,16 @@
 
 namespace LM {
 
+// getenv scans the whole environment block; never call it per dispatch.
+inline bool trace_precompiled() {
+    static const bool t = std::getenv("LYMAR_TRACE_PRECOMPILED") != nullptr;
+    return t;
+}
+inline bool no_interpreter_fallback() {
+    static const bool t = std::getenv("LYMAR_DISABLE_INTERPRETER_FALLBACK") != nullptr;
+    return t;
+}
+
 class CompiledResolver {
 public:
     static CompiledResolver& getInstance() {
@@ -119,7 +129,7 @@ public:
         if (!entry) return false;
         auto value = entry(&Backend::Native::host_api(), vm_context, args, count);
         if (out) *out = value;
-        if (std::getenv("LYMAR_TRACE_PRECOMPILED")) std::cerr << "PRECOMPILED_CALL: " << symbol << "\n";
+        if (trace_precompiled()) std::cerr << "PRECOMPILED_CALL: " << symbol << "\n";
         return true;
     }
 
@@ -130,14 +140,14 @@ public:
         // Baseline ABI 1 shares canonical VM values; legacy scalar artifacts must rebuild.
         auto* function = LIR::FunctionRegistry::getInstance().getFunction(symbol);
         if (!function) {
-            if (std::getenv("LYMAR_TRACE_PRECOMPILED") && symbol.find("sdf_atlas") != std::string::npos)
+            if (trace_precompiled() && symbol.find("sdf_atlas") != std::string::npos)
                 std::cerr << "DISPATCH_FAIL_NO_LIR: " << symbol << "\n";
             return false;
         }
         refresh_metadata();
         // Pure VM execution needs no target cache when no native artifacts exist.
         if (Frontend::ModuleManager::getInstance().get_compiled_modules().empty()) {
-            if (std::getenv("LYMAR_TRACE_PRECOMPILED") && symbol.find("sdf_atlas") != std::string::npos)
+            if (trace_precompiled() && symbol.find("sdf_atlas") != std::string::npos)
                 std::cerr << "DISPATCH_FAIL_NO_MODULES: " << symbol << "\n";
             return false;
         }
@@ -156,7 +166,7 @@ public:
             }
         }
         if (!target.exported) {
-            if (std::getenv("LYMAR_TRACE_PRECOMPILED") && symbol.find("sdf_atlas") != std::string::npos)
+            if (trace_precompiled() && symbol.find("sdf_atlas") != std::string::npos)
                 std::cerr << "DISPATCH_FAIL_NOT_EXPORTED: " << symbol << "\n";
             return false;
         }
@@ -181,17 +191,17 @@ public:
             for (auto r : call.call_args) args[index++] = registers.at(r);
             for (auto value : closure_args) args[index++] = value;
             auto entry = target.entry;
-            if (std::getenv("LYMAR_TRACE_PRECOMPILED")) std::cerr << "DISPATCH_ENTER: " << symbol << "\n";
+            if (trace_precompiled()) std::cerr << "DISPATCH_ENTER: " << symbol << "\n";
             auto value = entry(&Backend::Native::host_api(), vm_context, args, count);
-            if (std::getenv("LYMAR_TRACE_PRECOMPILED")) std::cerr << "DISPATCH_LEAVE: " << symbol << "\n";
+            if (trace_precompiled()) std::cerr << "DISPATCH_LEAVE: " << symbol << "\n";
             if (call.dst != UINT32_MAX) registers.at(call.dst) = value;
-            if (std::getenv("LYMAR_TRACE_PRECOMPILED")) std::cerr << "PRECOMPILED_CALL: " << symbol << "\n";
+            if (trace_precompiled()) std::cerr << "PRECOMPILED_CALL: " << symbol << "\n";
             return true;
         }
         if (target.entry) {
             throw std::runtime_error("Unsupported precompiled module ABI for '" + symbol + "'; rebuild the module");
         }
-        if (std::getenv("LYMAR_DISABLE_INTERPRETER_FALLBACK")) {
+        if (no_interpreter_fallback()) {
             throw std::runtime_error("Precompiled dispatch unavailable for '" + symbol + "': native symbol unavailable");
         }
         return false;
@@ -260,10 +270,10 @@ private:
     void ensure_static_init() {
         static std::once_flag flag;
         std::call_once(flag, [this] {
-            if (std::getenv("LYMAR_TRACE_PRECOMPILED")) std::cerr << "STATIC_INIT: calling lymar_module_init\n";
+            if (trace_precompiled()) std::cerr << "STATIC_INIT: calling lymar_module_init\n";
             auto init = reinterpret_cast<void (*)()>(findProcessSymbol("lymar_module_init"));
             if (init) init();
-            if (std::getenv("LYMAR_TRACE_PRECOMPILED")) std::cerr << "STATIC_INIT: done\n";
+            if (trace_precompiled()) std::cerr << "STATIC_INIT: done\n";
         });
     }
 };
