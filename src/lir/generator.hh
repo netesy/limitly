@@ -432,7 +432,25 @@ private:
     // `synthesized` flag is set, decremented on exit; nested synthesized blocks
     // keep the counter positive until every enclosing scope has unwound.
     int synthesized_fused_depth_ = 0;
-    
+
+    // Bound proof for `iter (i in 0..xs.len())` indexed access. While a
+    // canonical ascending range loop over a list's live length is emitted,
+    // `xs[i]` IndexExprs may set ListIndex imm|=0x1: the cond lambda re-emits
+    // xs.len() every iteration so i < len(xs) holds at each fetch, and
+    // builtin lists cannot shrink, so the only hazards are writes to the
+    // index or list registers between the header check and the access —
+    // range_index_bound_proven rejects those by scanning emitted code.
+    struct RangeBoundProof {
+        LIR_Function* function = nullptr;
+        std::string loop_var;
+        std::string list_var;
+        Reg loop_var_reg = UINT32_MAX;
+        Reg list_reg = UINT32_MAX;
+        size_t body_start = 0;
+    };
+    std::vector<RangeBoundProof> range_bound_proofs_;
+    bool range_index_bound_proven(LM::Frontend::AST::IndexExpr& expr, Reg object_reg, Reg index_reg);
+
     // Function symbol table for visibility control
     struct FunctionInfo {
         std::string name;

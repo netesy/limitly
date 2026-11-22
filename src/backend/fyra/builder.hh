@@ -30,6 +30,10 @@ public:
     // the binary assembler, so their fs.mkdirp capability lowers to a call to
     // the module-level `fyra_mkdir_p` IR helper this builder emits on demand.
     void set_fs_mkdirp_helper(bool enabled) { fs_mkdirp_helper_ = enabled; }
+    // C ABI for direct `import "c:"` struct-by-value lowering: Win64 on
+    // Windows targets, SysV AMD64 elsewhere. Non-x64 targets should leave
+    // struct signatures on the libffi wrapper path.
+    void set_c_abi_windows(bool enabled) { c_abi_windows_ = enabled; }
 
 private:
     std::shared_ptr<ir::IRContext> context_;
@@ -45,6 +49,7 @@ private:
     // the runtime file service, keeping std::filesystem out of the image.
     bool fs_capabilities_ = false;
     bool fs_mkdirp_helper_ = false;
+    bool c_abi_windows_ = true;
     bool needs_service_dispatch_ = false;
     bool needs_fs_dispatch_ = false;
     bool needs_mkdirp_helper_ = false;

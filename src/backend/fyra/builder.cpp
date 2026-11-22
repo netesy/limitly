@@ -29,8 +29,26 @@
 #include "../../lir/builtin_functions.hh"
 #include "../../lir/builtin_callable.hh"
 #include "../../frontend/module_manager.hh"
+#include "backend/native/binding_generator.hh"
 
 namespace LM::Backend::Fyra {
+
+namespace {
+// Byte size of a scalar CType, mirroring the header parser's struct layout
+// (used for SysV eightbyte classification of struct fields).
+uint32_t c_scalar_size(const LM::Backend::Native::CType& t) {
+    using LM::Backend::Native::CType;
+    switch (t.kind) {
+        case CType::Bool: case CType::Char: return 1;
+        case CType::Short: return 2;
+        case CType::Int: case CType::Float: return 4;
+        case CType::Long: case CType::LongLong: case CType::Double:
+        case CType::Ptr: return 8;
+        case CType::FixedWidth: return t.width > 0 ? uint32_t((t.width + 7) / 8) : 8;
+        default: return 8;
+    }
+}
+} // namespace
 
 // Private assembler symbols must be injective in the canonical LIR identity.
 // Replacing dots with underscores also merges a.b_c with a_b.c.
@@ -443,6 +461,13 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
                 trait_sites.insert({inst.type_name, inst.func_name});
                 try_seed_trait_candidates(inst.type_name, inst.func_name);
             }
+            // ForeignCallDirect call-site lowering carries the c-import
+            // registry key in type_name; keep the generated wrapper reachable
+            // so struct signatures the native ABI packing cannot express can
+            // still fall back to it.
+            if (inst.op == LIR::LIR_Op::ForeignCallDirect && !inst.type_name.empty() &&
+                registry.getFunction(inst.type_name) && reachable_funcs.insert(inst.type_name).second)
+                worklist.push_back(inst.type_name);
             if (!callee.empty() && registry.getFunction(callee)) {
                 if (is_init_name(callee)) {
                     auto pit = init_pure.find(callee);
@@ -1698,6 +1723,9 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             case LIR::LIR_Op::CallIndirect: case LIR::LIR_Op::CallBuiltin:
             case LIR::LIR_Op::CallVariadic:
             case LIR::LIR_Op::ForeignCall: case LIR::LIR_Op::ForeignCallDirect:
+            // ListAppend can realloc the element buffer (words[1]); a cached
+            // entry-block data pointer would go stale on the next iteration.
+            case LIR::LIR_Op::ListAppend:
             case LIR::LIR_Op::FrameCallMethod: case LIR::LIR_Op::TraitCallMethod:
             case LIR::LIR_Op::ResourceCall:
             case LIR::LIR_Op::MemoryStore: case LIR::LIR_Op::MemoryCopy:
@@ -3790,7 +3818,10 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 // re-loads the header field per access so mid-loop mutation
                 // through calls stays correct.
                 const bool bound_proven = (inst.imm & 0x1u) != 0u;
-                if (hoisted_data_ptrs.count(inst.a) || is_typed_primitive_list(inst.a)) {
+                // The unchecked primitive load is only sound for bound-proven
+                // accesses: without the hint an out-of-range index must fall
+                // through to the bounds CFG below (VM parity: xs[10] -> nil).
+                if (bound_proven && (hoisted_data_ptrs.count(inst.a) || is_typed_primitive_list(inst.a))) {
                     if (std::getenv("LYMAR_DEBUG_LIDX")) {
                         builder_->createExternCall("lymar_aot_dbg_lidx", {list_val, idx_val}, context_->getVoidType());
                     }
@@ -4929,8 +4960,12 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 auto* zero=context_->getConstantInt(context_->getIntegerType(64),0);
                 ir::Value* result=nullptr;
                 if(inst.func_name=="std.ffi.foreign_call" || inst.func_name=="ffi.foreign_call") {
-                    if(inst.call_args.size()!=4) throw std::runtime_error("Malformed canonical foreign_call arguments");
-                    result=builder_->createExternCall("lymar_aot_foreign_call_list",{load_reg(inst.call_args[0],LIR::Type::Ptr),load_reg(inst.call_args[1],LIR::Type::Ptr),load_reg(inst.call_args[2],LIR::Type::I64),load_reg(inst.call_args[3],LIR::Type::Ptr)},context_->getIntegerType(64));
+                    if(inst.call_args.size()!=4 && inst.call_args.size()!=5) throw std::runtime_error("Malformed canonical foreign_call arguments");
+                    // 5th arg (optional) is the struct-return result buffer.
+                    ir::Value* ret_buf = inst.call_args.size()==5
+                        ? load_reg(inst.call_args[4],LIR::Type::I64)
+                        : static_cast<ir::Value*>(context_->getConstantInt(context_->getIntegerType(64),0));
+                    result=builder_->createExternCall("lymar_aot_foreign_call_list",{load_reg(inst.call_args[0],LIR::Type::Ptr),load_reg(inst.call_args[1],LIR::Type::Ptr),load_reg(inst.call_args[2],LIR::Type::I64),load_reg(inst.call_args[3],LIR::Type::Ptr),ret_buf},context_->getIntegerType(64));
                 } else {
                     if(inst.call_args.empty()) throw std::runtime_error("Foreign call missing target");
                     size_t count=inst.call_args.size()-1;
@@ -5014,7 +5049,213 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 ir::Type* ret_ty = precise_ret ? c_ret_ty(inst.type_a)
                     : (inst.result_type == LIR::Type::F32 ? context_->getFloatType()
                                                          : lir_type_to_fyra_type(inst.result_type));
-                ir::Function* cfn = current_module_->getFunction(inst.func_name);
+
+                // Struct-by-value signatures (`import "c:"` with flat C
+                // structs): type_name holds the c-direct registry key so the
+                // full C signature (field layouts) is recoverable here.
+                const auto* csig = precise_ret && !inst.type_name.empty()
+                    ? LM::Backend::Native::find_c_direct_signature(inst.type_name) : nullptr;
+                bool sig_has_struct = false;
+                if (csig) {
+                    using CType = LM::Backend::Native::CType;
+                    if (csig->return_type.kind == CType::Struct) sig_has_struct = true;
+                    for (const auto& at : csig->arg_types)
+                        if (at.kind == CType::Struct) sig_has_struct = true;
+                }
+
+                ir::Function* cfn = nullptr;
+                std::vector<ir::Value*> args;
+                ir::Value* res = nullptr;
+                ir::Value* struct_out = nullptr; // non-null: result already a pubptr word
+                if (sig_has_struct) {
+                    using CType = LM::Backend::Native::CType;
+                    using CStructDef = LM::Backend::Native::CStructDef;
+                    auto i64ty = context_->getIntegerType(64);
+                    auto f64ty = context_->getDoubleType();
+                    auto c64 = [&](uint64_t v) -> ir::Value* {
+                        return static_cast<ir::Value*>(context_->getConstantInt(i64ty, v));
+                    };
+                    const CType& cret = csig->return_type;
+                    const bool ret_st = cret.kind == CType::Struct && cret.def && cret.def->supported;
+                    // Exact-byte struct copy via widest-aligned chunks.
+                    // (ir::Blit has no x64 lowering, so emit load/store pairs.)
+                    auto struct_copy = [&](ir::Value* dst, ir::Value* src, uint32_t sz) {
+                        uint32_t off = 0;
+                        while (off < sz) {
+                            uint32_t rem = sz - off;
+                            ir::Value* dp = off ? builder_->createAdd(dst, c64(off)) : dst;
+                            ir::Value* sp2 = off ? builder_->createAdd(src, c64(off)) : src;
+                            if (rem >= 8) {
+                                builder_->createStorel(builder_->createLoadl(sp2), dp);
+                                off += 8;
+                            } else if (rem >= 4) {
+                                builder_->createStore(builder_->createLoaduw(sp2), dp);
+                                off += 4;
+                            } else if (rem >= 2) {
+                                builder_->createStoreh(builder_->createLoaduh(sp2), dp);
+                                off += 2;
+                            } else {
+                                builder_->createStoreb(builder_->createLoadub(sp2), dp);
+                                off += 1;
+                            }
+                        }
+                    };
+                    // SysV >8B aggregate returns use register pairs or sret
+                    // depending on eightbyte classes; only <=8B is modeled
+                    // natively, larger struct returns stay on the wrapper.
+                    const bool native_ok = c_abi_windows_ || !ret_st || cret.def->size <= 8;
+                    if (!native_ok) {
+                        // Fallback: call the generated ffi.foreign_call wrapper
+                        // (kept reachable via the type_name call edge).
+                        ir::Function* wf = current_module_->getFunction(inst.type_name);
+                        if (!wf) {
+                            std::vector<ir::Type*> wpts;
+                            for (const auto& at : csig->arg_types)
+                                wpts.push_back((at.kind == CType::Double || at.kind == CType::Float)
+                                    ? static_cast<ir::Type*>(f64ty) : static_cast<ir::Type*>(i64ty));
+                            wf = builder_->createFunction(inst.type_name,
+                                lir_type_to_fyra_type(inst.result_type), wpts);
+                        }
+                        std::vector<ir::Value*> wargs;
+                        for (size_t i = 0; i < inst.call_args.size(); ++i) {
+                            const CType& at = csig->arg_types[i];
+                            if (at.kind == CType::Double || at.kind == CType::Float)
+                                wargs.push_back(load_reg(inst.call_args[i], LIR::Type::F64));
+                            else
+                                wargs.push_back(load_reg(inst.call_args[i], LIR::Type::I64));
+                        }
+                        ir::Value* wres = builder_->createCall(wf, wargs);
+                        if (inst.dst != UINT32_MAX && inst.result_type != LIR::Type::Void)
+                            store_reg(inst.dst, wres, inst.result_type);
+                        break;
+                    }
+
+                    // SysV eightbyte classification: INTEGER (GP reg) unless
+                    // every field touching the eightbyte is float/double.
+                    auto eightbyte_is_sse = [](const CStructDef& d, int eb) -> bool {
+                        bool has_int = false, has_flt = false;
+                        for (const auto& f : d.fields) {
+                            bool flt = f.type.kind == CType::Float || f.type.kind == CType::Double;
+                            uint32_t fsz = c_scalar_size(f.type);
+                            for (uint32_t b = f.offset; b < f.offset + fsz; ++b) {
+                                if (int(b / 8) != eb) continue;
+                                if (flt) has_flt = true; else has_int = true;
+                            }
+                        }
+                        return !has_int && has_flt;
+                    };
+
+                    // Win64 sret: aggregates >8B or with size not in {1,2,4,8}
+                    // take a hidden pointer first parameter.
+                    bool need_sret = false;
+                    ir::Value* sret_buf = nullptr;
+                    if (ret_st && c_abi_windows_) {
+                        uint32_t rsz = cret.def->size;
+                        need_sret = !(rsz == 1 || rsz == 2 || rsz == 4 || rsz == 8);
+                    }
+                    std::vector<ir::Type*> ptypes;
+                    if (need_sret) {
+                        sret_buf = builder_->createExternCall("memory.alloc", {c64(cret.def->size)}, i64ty);
+                        ptypes.push_back(i64ty);
+                        args.push_back(sret_buf);
+                    }
+                    for (size_t i = 0; i < inst.call_args.size(); ++i) {
+                        const CType& at = csig->arg_types[i];
+                        uint32_t r = inst.call_args[i];
+                        if (at.kind != CType::Struct) {
+                            LIR::Type lat = i < inst.call_arg_types.size() ? inst.call_arg_types[i] : LIR::Type::I64;
+                            ptypes.push_back(c_param_ty(lat));
+                            if (lat == LIR::Type::F32 || lat == LIR::Type::F64) {
+                                ir::Value* fv = load_reg(r, LIR::Type::F64);
+                                args.push_back(lat == LIR::Type::F32
+                                    ? builder_->createCast(fv, context_->getFloatType()) : fv);
+                            } else {
+                                args.push_back(load_reg(r, LIR::Type::I64));
+                            }
+                            continue;
+                        }
+                        const auto& sd = *at.def;
+                        uint32_t sz = sd.size;
+                        ir::Value* sp = load_reg(r, LIR::Type::I64);
+                        if (c_abi_windows_) {
+                            if (sz == 8) {
+                                ptypes.push_back(i64ty);
+                                args.push_back(builder_->createLoadl(sp));
+                            } else if (sz == 4 || sz == 2 || sz == 1) {
+                                ptypes.push_back(i64ty);
+                                ir::Value* v = sz == 4 ? builder_->createLoaduw(sp)
+                                    : sz == 2 ? builder_->createLoaduh(sp)
+                                              : builder_->createLoadub(sp);
+                                args.push_back(builder_->createExtUW(v, i64ty));
+                            } else {
+                                // 3,5,6,7,9..16 bytes: passed by reference to a
+                                // caller-owned copy (byval semantics).
+                                auto* tmp = entry_alloc(i64ty, c64(sz));
+                                struct_copy(tmp, sp, sz);
+                                ptypes.push_back(i64ty);
+                                args.push_back(tmp);
+                            }
+                        } else if (sz > 16) {
+                            // SysV MEMORY class: aggregates over 16 bytes are
+                            // passed by invisible reference to a caller copy.
+                            auto* tmp = entry_alloc(i64ty, c64(sz));
+                            struct_copy(tmp, sp, sz);
+                            ptypes.push_back(i64ty);
+                            args.push_back(tmp);
+                        } else {
+                            // SysV: one IR param per eightbyte, INTEGER->i64,
+                            // SSE->f64. Copy into a 16B temp first so full
+                            // eightbyte loads stay in bounds for odd sizes.
+                            auto* tmp = entry_alloc(i64ty, c64(16));
+                            struct_copy(tmp, sp, sz);
+                            int ne = int((sz + 7) / 8);
+                            for (int eb = 0; eb < ne; ++eb) {
+                                ir::Value* ep = eb ? builder_->createAdd(tmp, c64(8)) : tmp;
+                                if (eightbyte_is_sse(sd, eb)) {
+                                    ptypes.push_back(f64ty);
+                                    args.push_back(builder_->createLoadd(ep));
+                                } else {
+                                    ptypes.push_back(i64ty);
+                                    args.push_back(builder_->createLoadl(ep));
+                                }
+                            }
+                        }
+                    }
+                    // Extern return type: sret echoes the buffer ptr (i64,
+                    // ignored); Win64 small structs return in rax (i64);
+                    // SysV <=8B returns in rax (INTEGER) or xmm0 (SSE).
+                    ir::Type* cret_ty = ret_ty;
+                    if (ret_st) {
+                        if (need_sret) cret_ty = i64ty;
+                        else if (c_abi_windows_) cret_ty = i64ty;
+                        else cret_ty = eightbyte_is_sse(*cret.def, 0)
+                            ? static_cast<ir::Type*>(f64ty) : static_cast<ir::Type*>(i64ty);
+                    }
+                    cfn = current_module_->getFunction(inst.func_name);
+                    if (!cfn) {
+                        auto created = std::make_unique<ir::Function>(cret_ty, inst.func_name, current_module_.get());
+                        for (size_t pi = 0; pi < ptypes.size(); ++pi) {
+                            created->addParameter(std::make_unique<ir::Parameter>(
+                                ptypes[pi], "s" + std::to_string(pi)));
+                        }
+                        current_module_->addFunction(std::move(created));
+                        cfn = current_module_->getFunction(inst.func_name);
+                    }
+                    res = builder_->createCall(cfn, args);
+                    if (need_sret) {
+                        struct_out = sret_buf;
+                    } else if (ret_st) {
+                        // Register return: copy the raw register bytes into a
+                        // fresh 8-byte buffer (struct_size <= 8 here).
+                        ir::Value* rbuf = builder_->createExternCall("memory.alloc", {c64(8)}, i64ty);
+                        if (res->getType() && res->getType()->isFloatingPoint())
+                            builder_->createStored(res, rbuf);
+                        else
+                            builder_->createStorel(res, rbuf);
+                        struct_out = rbuf;
+                    }
+                } else {
+                cfn = current_module_->getFunction(inst.func_name);
                 if (!cfn) {
                     auto created = std::make_unique<ir::Function>(ret_ty, inst.func_name, current_module_.get());
                     cfn = created.get();
@@ -5025,7 +5266,6 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     }
                     current_module_->addFunction(std::move(created));
                 }
-                std::vector<ir::Value*> args;
                 for (size_t i = 0; i < inst.call_args.size(); ++i) {
                     LIR::Type at = i < inst.call_arg_types.size() ? inst.call_arg_types[i] : LIR::Type::I64;
                     if (at == LIR::Type::F32 || at == LIR::Type::F64) {
@@ -5038,10 +5278,11 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                         args.push_back(load_reg(inst.call_args[i], LIR::Type::I64));
                     }
                 }
-                ir::Value* res = builder_->createCall(cfn, args);
+                res = builder_->createCall(cfn, args);
+                }
                 if (inst.dst != UINT32_MAX && res && inst.result_type != LIR::Type::Void) {
-                    ir::Value* out = res;
-                    if (precise_ret) {
+                    ir::Value* out = struct_out ? struct_out : res;
+                    if (precise_ret && !struct_out) {
                         // Narrow C returns leave undefined bits above the return
                         // width in rax: mask to the width, then extend to the
                         // Lymar i64 word (signed types sign-extend).

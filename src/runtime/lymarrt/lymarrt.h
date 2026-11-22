@@ -82,6 +82,15 @@ typedef struct lymarrt_struct_layout {
     lymarrt_type types[LYMARRT_MAX_STRUCT_ELEMS];
 } lymarrt_struct_layout;
 
+// Struct-by-value return support: when non-null, `ret_result` describes the
+// C function's struct return type and `buffer` is caller-allocated native
+// memory (>= sizeof(struct)) that libffi writes the result bytes into.
+typedef struct lymarrt_struct_result {
+    uint32_t count;
+    lymarrt_type types[LYMARRT_MAX_STRUCT_ELEMS];
+    void* buffer;
+} lymarrt_struct_result;
+
 bool lymarrt_ffi_call_ex(
     void* func_ptr,
     lymarrt_type ret_type,
@@ -90,6 +99,7 @@ bool lymarrt_ffi_call_ex(
     size_t num_args,
     const lymarrt_struct_layout* struct_layouts,
     size_t num_struct_layouts,
+    const lymarrt_struct_result* ret_result,
     lymarrt_value* out_result
 );
 

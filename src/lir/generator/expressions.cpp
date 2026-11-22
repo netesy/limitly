@@ -1540,6 +1540,8 @@ static Type c_direct_lir_type(const LM::Backend::Native::CType& t) {
             if (t.width <= 32) return t.is_unsigned ? Type::U32 : Type::I32;
             return t.is_unsigned ? Type::U64 : Type::I64;
         case CType::Custom:   return Type::I64;
+        // Struct-by-value returns surface as a pubptr to the result bytes.
+        case CType::Struct:   return Type::Ptr;
     }
     return Type::I64;
 }
@@ -1557,6 +1559,9 @@ bool Generator::try_emit_c_direct_call(LM::Frontend::AST::CallExpr& expr,
 
     LIR_Inst inst(LIR_Op::ForeignCallDirect, res_abi, result);
     inst.func_name = sig->symbol;
+    // type_name carries the registry key so the AOT builder can recover the
+    // full C signature (struct layouts) for native ABI packing.
+    inst.type_name = resolved_name;
     // type_a carries the precise C return type so AOT declares the extern with
     // the correct ABI width and sign/zero-extends the result. The wrapper-path
     // ForeignCallDirect leaves type_a == Void and keeps result_type semantics.
@@ -2171,6 +2176,14 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
                 return result;
             }
             if (method_name == "len" || method_name == "length") {
+                if (object_type->tag == TypeTag::List) {
+                    // ListLen inlines to a header load in AOT; the generic
+                    // `len` builtin pays an extern call per evaluation, which
+                    // dominates `iter (i in 0..xs.len())` loop headers.
+                    emit_instruction(LIR_Inst(LIR_Op::ListLen, Type::I64, result, object_reg));
+                    set_register_language_type(result, std::make_shared<::Type>(::TypeTag::Int64));
+                    return result;
+                }
                 LIR_Inst inst;
                 inst.op = LIR_Op::CallBuiltin; inst.dst = result; inst.func_name = "len";
                 inst.call_args.push_back(object_reg);
@@ -2900,6 +2913,51 @@ Reg Generator::emit_checked_dereference(LM::Frontend::AST::Expression& object, R
     return resolved;
 }
 
+// `xs[i]` inside `iter (i in 0..xs.len())` is provably in bounds when:
+//  - the index object/index are plain variables matching an active
+//    RangeBoundProof (same names, same resolved registers, same function),
+//  - neither the loop variable nor the list register is written by any
+//    instruction emitted between the body start and this access. Writes
+//    after this point cannot affect this fetch; writes in earlier
+//    iterations are re-checked by the header's fresh xs.len() compare.
+// Calls cannot shrink a builtin list (no remove/pop ops exist; append only
+// grows, and the header re-reads len), and captured-variable accesses
+// resolve to different registers so they fail the reg equality checks.
+bool Generator::range_index_bound_proven(LM::Frontend::AST::IndexExpr& expr, Reg object_reg, Reg index_reg) {
+    auto obj_var = dynamic_cast<LM::Frontend::AST::VariableExpr*>(expr.object.get());
+    auto idx_var = dynamic_cast<LM::Frontend::AST::VariableExpr*>(expr.index.get());
+    if (!obj_var || !idx_var || object_reg == UINT32_MAX || index_reg == UINT32_MAX) return false;
+    for (auto it = range_bound_proofs_.rbegin(); it != range_bound_proofs_.rend(); ++it) {
+        const auto& p = *it;
+        if (p.loop_var != idx_var->name || p.list_var != obj_var->name) continue;
+        if (p.function != current_function_.get()) continue;
+        if (p.loop_var_reg == UINT32_MAX || p.list_reg == UINT32_MAX) continue;
+        if (resolve_variable(p.loop_var) != p.loop_var_reg ||
+            resolve_variable(p.list_var) != p.list_reg) continue;
+        if (object_reg != p.list_reg || index_reg != p.loop_var_reg) continue;
+        bool written = false;
+        const auto& instrs = current_function_->instructions;
+        for (size_t pc = p.body_start; pc < instrs.size(); ++pc) {
+            const auto& in = instrs[pc];
+            if (in.dst != p.loop_var_reg && in.dst != p.list_reg) continue;
+            if (in.result_type == LIR::Type::Void) continue;
+            switch (in.op) {
+                case LIR::LIR_Op::Jump: case LIR::LIR_Op::JumpIfFalse: case LIR::LIR_Op::JumpIf:
+                case LIR::LIR_Op::Label: case LIR::LIR_Op::Nop: case LIR::LIR_Op::Return:
+                case LIR::LIR_Op::Ret:
+                    break;
+                default:
+                    written = true;
+                    break;
+            }
+            if (written) break;
+        }
+        if (!written) return true;
+        return false;
+    }
+    return false;
+}
+
 Reg Generator::emit_index_expr(LM::Frontend::AST::IndexExpr& expr) {
     // Evaluate the object (list/dict/tuple/string)
     Reg object_reg = emit_checked_dereference(*expr.object, emit_expr(*expr.object));
@@ -2949,15 +3007,38 @@ Reg Generator::emit_index_expr(LM::Frontend::AST::IndexExpr& expr) {
     } else {
         // Use ListIndex for lists and other types
         Reg result_reg = allocate_register();
-        Type abi_type = language_type_to_abi_type(result_type);
-        // imm & 0x1 = bound-proven hint set inside a stream_fusion synthesized
-        // block; the Fyra backend uses it to emit a straight-line direct-load
-        // instead of the safety CFG. VM ignores the hint and still bounds-checks.
-        uint32_t hint = (synthesized_fused_depth_ > 0) ? 1u : 0u;
-        LIR_Inst inst(LIR_Op::ListIndex, abi_type, result_reg, object_reg, index_reg, hint);
+        const bool proven = (synthesized_fused_depth_ > 0) ||
+                            range_index_bound_proven(expr, object_reg, index_reg);
+        // A non-proven access can yield nil on out-of-bounds; raw scalar
+        // domains (int/uint/float/bool/decimal element types) cannot
+        // represent nil, so those results stay in the erased tagged-word
+        // domain — the same contract DictGet uses. Proven accesses cannot
+        // go out of bounds and keep the element's raw scalar domain.
+        auto needs_erased = [](const TypePtr& t) -> bool {
+            if (!t) return false;
+            switch (t->tag) {
+                case ::TypeTag::Bool:
+                case ::TypeTag::Int: case ::TypeTag::Int8: case ::TypeTag::Int16:
+                case ::TypeTag::Int32: case ::TypeTag::Int64:
+                case ::TypeTag::UInt: case ::TypeTag::UInt8: case ::TypeTag::UInt16:
+                case ::TypeTag::UInt32: case ::TypeTag::UInt64:
+                case ::TypeTag::Float32: case ::TypeTag::Float64:
+                case ::TypeTag::Decimal2: case ::TypeTag::Decimal4: case ::TypeTag::Decimal6:
+                    return true;
+                default:
+                    return false;
+            }
+        };
+        const bool erase_result = !proven && needs_erased(result_type);
+        Type abi_type = erase_result ? Type::Ptr : language_type_to_abi_type(result_type);
+        LIR_Inst inst(LIR_Op::ListIndex, abi_type, result_reg, object_reg, index_reg, proven ? 1u : 0u);
         emit_instruction(inst);
-        set_register_type(result_reg, result_type);
-        set_register_language_type(result_reg, result_type);  // Ensure language type is set
+        if (erase_result) {
+            tag_register_erased(result_reg);
+        } else {
+            set_register_type(result_reg, result_type);
+            set_register_language_type(result_reg, result_type);  // Ensure language type is set
+        }
         return result_reg;
     }
 }

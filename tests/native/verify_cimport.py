@@ -233,8 +233,29 @@ fn main() {{ print("SYSHDR_OK"); }}
             print(res.stdout + res.stderr)
             return 1
         print("PASS: AOT f32 `import \"c:\"` signatures return correct values")
+
+        # ---- Test 7: AOT struct-by-value direct-call lowering ----
+        # Flat C structs (<=16 bytes) marshal through ffi.struct_alloc buffers;
+        # the AOT backend packs them per the Win64 ABI (<=8B in registers,
+        # >8B by reference, >8B returns via hidden sret pointer). Regression
+        # coverage: parallel-move arg shuffling, struct_size/struct_offset
+        # `any`-element coercion, and exact-byte byval copies.
+        aot_prog = ROOT / "tests" / "ffi" / "test_cimport_struct.lm"
+        aot_exe = SCRATCH / "cimport_struct_aot.exe"
+        res = run([str(BIN), "build", "--opt-level", "2", "-target", "windows",
+                   str(aot_prog), "-o", str(aot_exe)], timeout=180)
+        if res.returncode != 0:
+            print("FAIL: AOT build of struct cimport test")
+            print(res.stdout + res.stderr)
+            return 1
+        res = run([str(aot_exe)], cwd=SCRATCH, timeout=30)
+        if res.returncode != 0 or "fails= 0" not in res.stdout:
+            print("FAIL: AOT struct cimport run")
+            print(res.stdout + res.stderr)
+            return 1
+        print("PASS: AOT struct `import \"c:\"` signatures return correct values")
     else:
-        print("SKIP: AOT f32 check is Windows-only")
+        print("SKIP: AOT f32/struct checks are Windows-only")
 
     print("2c verification: ALL PASSED")
     return 0

@@ -19,6 +19,31 @@ namespace LM {
 namespace LIR {
 
 namespace {
+
+// `0` as an INT_LITERAL (integer suffixes tolerated). Used to recognise the
+// canonical `iter (i in 0..xs.len())` lower bound.
+bool is_zero_int_literal(LM::Frontend::AST::Expression& e) {
+    auto lit = dynamic_cast<LM::Frontend::AST::LiteralExpr*>(&e);
+    if (!lit || lit->literalType != LM::Frontend::TokenType::INT_LITERAL ||
+        !std::holds_alternative<std::string>(lit->value)) return false;
+    std::string s = std::get<std::string>(lit->value);
+    while (!s.empty() && (s.back() == 'u' || s.back() == 'U' || s.back() == 'l' || s.back() == 'L'))
+        s.pop_back();
+    return s == "0";
+}
+
+// When `end` is exactly `xs.len()` (member call, no args), return "xs".
+// Anything else — len(xs), xs.size(), computed expressions — returns "".
+std::string range_end_list_len(LM::Frontend::AST::Expression* end) {
+    auto call = dynamic_cast<LM::Frontend::AST::CallExpr*>(end);
+    if (!call || !call->arguments.empty() || !call->namedArgs.empty()) return "";
+    auto mem = dynamic_cast<LM::Frontend::AST::MemberExpr*>(call->callee.get());
+    if (!mem || mem->name != "len" || mem->isSafeAccess) return "";
+    auto var = dynamic_cast<LM::Frontend::AST::VariableExpr*>(mem->object.get());
+    if (!var) return "";
+    return var->name;
+}
+
 // Integer-family language types are stored as raw unboxed words inside typed
 // lists and dictionaries. An iter binding over such a container must carry
 // that concrete type: stamping it `any` (abi Ptr) makes the AOT value-kind
@@ -1234,6 +1259,26 @@ void Generator::emit_iter_stmt(LM::Frontend::AST::IterStatement& stmt) {
         Reg loop_var_reg = allocate_register();
         bind_variable(loop_var_name, loop_var_reg);
 
+        // Same canonical `iter (i in 0..xs.len())` bound proof as the linear
+        // path: the header block re-evaluates xs.len() every iteration.
+        std::string bound_list;
+        // `..` is always exclusive in Lymar (the parser sets `inclusive`
+        // unconditionally); the header's CmpLT against a fresh xs.len()
+        // provides the upper bound.
+        bool range_bound_ok = !range_expr->step &&
+                              range_expr->start && is_zero_int_literal(*range_expr->start);
+        if (range_bound_ok) {
+            bound_list = range_end_list_len(range_expr->end.get());
+            range_bound_ok = !bound_list.empty();
+        }
+        if (range_bound_ok) {
+            RangeBoundProof proof;
+            proof.function = current_function_.get();
+            proof.loop_var = loop_var_name;
+            proof.list_var = bound_list;
+            range_bound_proofs_.push_back(proof);
+        }
+
         Reg start_reg = emit_expr(*range_expr->start);
         emit_instruction(LIR_Inst(LIR_Op::Mov, loop_var_reg, start_reg, 0));
         set_register_type(loop_var_reg, get_register_type(start_reg));
@@ -1252,6 +1297,13 @@ void Generator::emit_iter_stmt(LM::Frontend::AST::IterStatement& stmt) {
 
         set_current_block(body_block);
         emit_iter_binding_event(stmt);
+        if (!range_bound_proofs_.empty()) {
+            auto& p = range_bound_proofs_.back();
+            p.function = current_function_.get();
+            p.loop_var_reg = resolve_variable(p.loop_var);
+            p.list_reg = resolve_variable(p.list_var);
+            p.body_start = current_function_->instructions.size();
+        }
         if (stmt.body) {
             emit_stmt(*stmt.body);
         }
@@ -1278,6 +1330,7 @@ void Generator::emit_iter_stmt(LM::Frontend::AST::IterStatement& stmt) {
         set_current_block(exit_block);
         exit_loop();
         exit_scope();
+        if (range_bound_ok) range_bound_proofs_.pop_back();
         
     } else if (list_expr) {
         emit_list_iter_stmt(stmt, *list_expr);
@@ -2250,6 +2303,27 @@ void Generator::emit_iter_stmt_linear(LM::Frontend::AST::IterStatement& stmt) {
         }
         Reg loop_var_reg = 0;
         Reg step_reg = 0;
+        // Canonical `iter (i in 0..xs.len())`: start literal 0, exclusive end,
+        // no step, end re-read as xs.len() every iteration. Combined with the
+        // write scan in range_index_bound_proven this proves `xs[i]` fetches
+        // in-bounds (builtin lists can only grow via append).
+        std::string bound_list;
+        // `..` is always exclusive in Lymar (the parser sets `inclusive`
+        // unconditionally); the header's CmpLT against a fresh xs.len()
+        // provides the upper bound.
+        bool range_bound_ok = !range_expr->step &&
+                              range_expr->start && is_zero_int_literal(*range_expr->start);
+        if (range_bound_ok) {
+            bound_list = range_end_list_len(range_expr->end.get());
+            range_bound_ok = !bound_list.empty();
+        }
+        if (range_bound_ok) {
+            RangeBoundProof proof;
+            proof.function = current_function_.get();
+            proof.loop_var = stmt.loopVars[0];
+            proof.list_var = bound_list;
+            range_bound_proofs_.push_back(proof);
+        }
         emit_linear_iter_loop(
             stmt,
             [&]() {
@@ -2284,7 +2358,19 @@ void Generator::emit_iter_stmt_linear(LM::Frontend::AST::IterStatement& stmt) {
                 set_register_type(cmp, bool_type);
                 return cmp;
             },
-            []() {});
+            [&]() {
+                // Snapshot the bindings the proof compares against: everything
+                // emitted from here on runs between the header's xs.len() check
+                // and any `xs[i]` fetch inside the body.
+                if (!range_bound_proofs_.empty()) {
+                    auto& p = range_bound_proofs_.back();
+                    p.function = current_function_.get();
+                    p.loop_var_reg = resolve_variable(p.loop_var);
+                    p.list_reg = resolve_variable(p.list_var);
+                    p.body_start = current_function_->instructions.size();
+                }
+            });
+        if (range_bound_ok) range_bound_proofs_.pop_back();
         return;
     }
 

@@ -254,10 +254,42 @@ void RegisterVM::execute_extern_call_function(const LIR::LIR_Inst* pc) {
     std::vector<lymarrt_type> resolved_arg_types;
     std::vector<lymarrt_struct_layout> struct_layouts;
 
+    lymarrt_struct_result ret_struct{};
+    const lymarrt_struct_result* ret_struct_ptr = nullptr;
+    RegisterValue ret_buf_val = VAL_NIL;
+
     if (pc->func_name == "std.ffi.foreign_call" || pc->func_name == "ffi.foreign_call") {
+        if (pc->call_args.size() > 4)
+            ret_buf_val = registers[pc->call_args[4]];
         if (pc->call_args.size() > 2) {
-            int64_t ret_id = as_i64(registers[pc->call_args[2]]);
-            ffi_type_id_to_lymarrt(ret_id, true, ret_type);
+            RegisterValue rt_val = registers[pc->call_args[2]];
+            // return_type may be a struct descriptor list
+            // [TYPE_STRUCT, e1, e2, ...] for struct-by-value returns; the
+            // result bytes are written into the ret_buf pubptr.
+            if (IS_PTR(rt_val) &&
+                ((ObjHeader*)UNBOX_PTR(rt_val))->type_id == TYPE_LIST) {
+                LmList* rdesc = (LmList*)UNBOX_PTR(rt_val);
+                if (rdesc->size >= 2 && rdesc->size - 1 <= LYMARRT_MAX_STRUCT_ELEMS &&
+                    as_i64(rdesc->data[0]) == 13 /* TYPE_STRUCT */) {
+                    ret_struct.count = (uint32_t)(rdesc->size - 1);
+                    bool ok_layout = true;
+                    for (uint32_t e = 0; e < ret_struct.count; ++e) {
+                        int64_t etid = as_i64(rdesc->data[e + 1]);
+                        if (!ffi_type_id_to_lymarrt(etid, false, ret_struct.types[e])) {
+                            ok_layout = false;
+                            break;
+                        }
+                    }
+                    if (ok_layout && ret_buf_val != VAL_NIL) {
+                        ret_struct.buffer = value_to_ptr(ret_buf_val);
+                        ret_struct_ptr = ret_struct.buffer ? &ret_struct : nullptr;
+                        ret_type = LYMARRT_TYPE_PTR;
+                    }
+                }
+            } else {
+                int64_t ret_id = as_i64(rt_val);
+                ffi_type_id_to_lymarrt(ret_id, true, ret_type);
+            }
         }
 
         LmList* pt_list = nullptr;
@@ -345,10 +377,17 @@ void RegisterVM::execute_extern_call_function(const LIR::LIR_Inst* pc) {
     lymarrt_value out_res;
     std::memset(&out_res, 0, sizeof(out_res));
     if (lymarrt_ffi_call_ex(func_ptr, ret_type, resolved_arg_types.data(), lymarrt_args.data(), num_args,
-                            struct_layouts.empty() ? nullptr : struct_layouts.data(), struct_layouts.size(), &out_res)) {
-        RegisterValue val = lymarrt_val_to_vm_val(out_res, ret_type);
-        registers[pc->dst] = val;
-        register_native_allocation(registers[pc->dst]);
+                            struct_layouts.empty() ? nullptr : struct_layouts.data(), struct_layouts.size(),
+                            ret_struct_ptr, &out_res)) {
+        if (ret_struct_ptr) {
+            // Struct return: result bytes were written into the ret_buf
+            // pubptr; hand that value back (the wrapper returns it directly).
+            registers[pc->dst] = ret_buf_val;
+        } else {
+            RegisterValue val = lymarrt_val_to_vm_val(out_res, ret_type);
+            registers[pc->dst] = val;
+            register_native_allocation(registers[pc->dst]);
+        }
     } else {
         registers[pc->dst] = VAL_NIL;
     }

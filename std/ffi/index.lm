@@ -130,16 +130,20 @@ pub fn ptr_diff(ptr1: pubptr, ptr2: pubptr): int { return ptr1 - ptr2; }
 // pointer to raw bytes laid out with native alignment: allocate with
 // struct_alloc(elem_types) then store each field at struct_offset(...)
 // using store_i64/store_f64/store_ptr as appropriate.
-fn _ffi_type_size(t: int): int {
-    if (t == TYPE_I8 or t == TYPE_U8) { return 1; }
-    if (t == TYPE_I16 or t == TYPE_U16) { return 2; }
-    if (t == TYPE_I32 or t == TYPE_U32 or t == TYPE_F32) { return 4; }
+fn _ffi_type_size(t: any): int {
+    // Elements arrive as `any` (tagged words in AOT); coerce to raw int so
+    // the comparisons below see the type id, not a boxed/tagged value.
+    var ti: int = (t) as int;
+    if (ti == TYPE_I8 or ti == TYPE_U8) { return 1; }
+    if (ti == TYPE_I16 or ti == TYPE_U16) { return 2; }
+    if (ti == TYPE_I32 or ti == TYPE_U32 or ti == TYPE_F32) { return 4; }
     return 8;
 }
-fn _ffi_type_align(t: int): int {
-    if (t == TYPE_I8 or t == TYPE_U8) { return 1; }
-    if (t == TYPE_I16 or t == TYPE_U16) { return 2; }
-    if (t == TYPE_I32 or t == TYPE_U32 or t == TYPE_F32) { return 4; }
+fn _ffi_type_align(t: any): int {
+    var ti: int = (t) as int;
+    if (ti == TYPE_I8 or ti == TYPE_U8) { return 1; }
+    if (ti == TYPE_I16 or ti == TYPE_U16) { return 2; }
+    if (ti == TYPE_I32 or ti == TYPE_U32 or ti == TYPE_F32) { return 4; }
     return 8;
 }
 // Byte size of a struct with the given element type ids (0..12).
@@ -235,7 +239,10 @@ pub fn library_unload(handle: pubptr): nil {}
 pub fn library_get_symbol(handle: pubptr, symbol: str): fnptr { return 0; }
 
 // Foreign Calls
-pub fn foreign_call(func_ptr: fnptr, args: [any], return_type: int = 6, param_types: [any] = []) { return 0; }
+// return_type is `any` so struct-by-value returns can pass a
+// ffi.struct_param([...]) descriptor; in that case ret_buf must point to a
+// ffi.struct_alloc(...) buffer that receives the result bytes.
+pub fn foreign_call(func_ptr: fnptr, args: [any], return_type: any = 6, param_types: [any] = [], ret_buf: pubptr = 0) { return 0; }
 
 // Typed calls are the supported safe-wrapper building blocks. Unlike
 // `foreign_call`, their complete ABI signature is visible in LIR and can be

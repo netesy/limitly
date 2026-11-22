@@ -1,0 +1,23 @@
+// Three-way benchmark, mode B: precompiled Lymar module import.
+// `kernel` resolves to bin/libkernel.dll + .meta when the runner has built
+// it with `lymar build -shared`; otherwise the .lm source is used.
+import kernel as bk;
+
+fn main() {
+    var N: int = 2000000;
+    var v: (float, float) = (1.0, 2.0);
+    var d: (float, float) = (0.001, -0.0007);
+    var acc: float = 0.0;
+    var t0 = clock();
+    var i = 0;
+    while (i < N) {
+        v = bk.vadd(v, d);
+        acc = acc + bk.vdot(v, v);
+        i = i + 1;
+    }
+    var ms = (clock() - t0) * 1000.0;
+    print("MODE: module");
+    print("CPU_MS: ", ms);
+    print("NS_PER_ITER: ", ms * 1000000.0 / (N * 2));
+    print("RESULT: ", acc);
+}

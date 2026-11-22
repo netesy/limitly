@@ -128,6 +128,9 @@ CompileResult FyraCompiler::compile(const LIR::LIR_Function& lir_func,
     // Windows uses it too — SHCreateDirectoryExA rejects relative paths.
     builder.set_fs_mkdirp_helper(options.platform == Platform::Windows ||
         options.platform == Platform::Linux || options.platform == Platform::MacOS);
+    // Direct `import "c:"` struct-by-value lowering packs aggregates per the
+    // target C ABI: Win64 on Windows, SysV AMD64 on the unix targets.
+    builder.set_c_abi_windows(options.platform == Platform::Windows);
     auto module = builder.build(lir_func, options.exported_module);
     if (builder.has_errors()) {
         CompileResult result;

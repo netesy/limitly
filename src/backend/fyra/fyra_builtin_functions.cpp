@@ -762,10 +762,18 @@ void FyraBuiltinFunctions::emit_list_ir(ir::Module* module, ir::IRBuilder* build
     }
 
     // 3. lm_list_get(list_ptr: i64, index: i64) -> i64
+    // Out-of-range or null/ nil lists yield VAL_NIL (2), matching the VM's
+    // list-get semantics; previously this loaded data[index] unconditionally
+    // so AOT reads past the element buffer where the VM returns nil.
     ir::Function* fn_get = module->getFunction("lm_list_get");
     if (!fn_get) fn_get = builder->createFunction("lm_list_get", i64, {i64, i64});
     if (fn_get->getBasicBlocks().empty()) {
         ir::BasicBlock* b_entry = builder->createBasicBlock("entry", fn_get);
+        ir::BasicBlock* b_chk_hdr = builder->createBasicBlock("get_chk_hdr", fn_get);
+        ir::BasicBlock* b_list_chk = builder->createBasicBlock("get_list_chk", fn_get);
+        ir::BasicBlock* b_list = builder->createBasicBlock("get_list", fn_get);
+        ir::BasicBlock* b_tuple = builder->createBasicBlock("get_tuple", fn_get);
+        ir::BasicBlock* b_oob = builder->createBasicBlock("get_oob", fn_get);
         builder->setInsertPoint(b_entry);
         auto it = fn_get->getParameters().begin();
         ir::Value* raw_list_ptr = it->get();
@@ -773,17 +781,26 @@ void FyraBuiltinFunctions::emit_list_ir(ir::Module* module, ir::IRBuilder* build
         ir::Value* index = it->get();
 
         ir::Value* list_ptr = builder->createAnd(raw_list_ptr, ctx->getConstantInt(i64, ~7ULL));
-        ir::Value* data_ptr_slot = builder->createAdd(list_ptr, ctx->getConstantInt(i64, 8));
-        ir::Value* data = builder->createLoadl(data_ptr_slot);
+        ir::Value* is_null = builder->createCeq(list_ptr, ctx->getConstantInt(i64, 0));
+        builder->createBr(is_null, b_oob, b_chk_hdr);
+
+        builder->setInsertPoint(b_chk_hdr);
         ir::Value* hdr = builder->createLoadl(list_ptr);
         ir::Value* kind = builder->createAnd(hdr, ctx->getConstantInt(i64, 0xFFFFFFFF));
         ir::Value* is_tuple = builder->createCeq(kind, ctx->getConstantInt(i64, 3));
+        builder->createBr(is_tuple, b_tuple, b_list_chk);
 
-        ir::BasicBlock* b_list = builder->createBasicBlock("get_list", fn_get);
-        ir::BasicBlock* b_tuple = builder->createBasicBlock("get_tuple", fn_get);
-        builder->createBr(is_tuple, b_tuple, b_list);
+        builder->setInsertPoint(b_list_chk);
+        // words[2] (offset 16) is the element count; require 0 <= index < len.
+        ir::Value* len = builder->createLoadl(builder->createAdd(list_ptr, ctx->getConstantInt(i64, 16)));
+        ir::Value* non_neg = builder->createCsge(index, ctx->getConstantInt(i64, 0));
+        ir::Value* in_upper = builder->createCslt(index, len);
+        ir::Value* in_bounds = builder->createAnd(non_neg, in_upper);
+        builder->createBr(in_bounds, b_list, b_oob);
 
         builder->setInsertPoint(b_list);
+        ir::Value* data_ptr_slot = builder->createAdd(list_ptr, ctx->getConstantInt(i64, 8));
+        ir::Value* data = builder->createLoadl(data_ptr_slot);
         ir::Value* offset = builder->createMul(index, ctx->getConstantInt(i64, 8));
         ir::Value* elem_ptr = builder->createAdd(data, offset);
         ir::Value* val = builder->createLoadl(elem_ptr);
@@ -794,10 +811,15 @@ void FyraBuiltinFunctions::emit_list_ir(ir::Module* module, ir::IRBuilder* build
         builder->createRet(decoded);
 
         builder->setInsertPoint(b_tuple);
+        ir::Value* data_ptr_slot_t = builder->createAdd(list_ptr, ctx->getConstantInt(i64, 8));
+        ir::Value* data_t = builder->createLoadl(data_ptr_slot_t);
         ir::Value* t_offset = builder->createMul(index, ctx->getConstantInt(i64, 8));
-        ir::Value* t_elem_ptr = builder->createAdd(data, t_offset);
+        ir::Value* t_elem_ptr = builder->createAdd(data_t, t_offset);
         ir::Value* t_val = builder->createLoadl(t_elem_ptr);
         builder->createRet(t_val);
+
+        builder->setInsertPoint(b_oob);
+        builder->createRet(ctx->getConstantInt(i64, 2)); // VAL_NIL
     }
 
     // 4. lm_list_set(list_ptr: i64, index: i64, val: i64) -> void

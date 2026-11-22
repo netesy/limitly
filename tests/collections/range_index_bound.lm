@@ -1,0 +1,124 @@
+// Range-loop bound proof: `iter (i in 0..xs.len()) { ... xs[i] ... }` must
+// produce identical results in VM and AOT, including out-of-bounds accesses
+// outside proven loops (which must yield nil, never garbage).
+
+fn sum_idx_int(xs: [int]): int {
+    var s = 0;
+    iter (i in 0..xs.len()) {
+        s = s + xs[i];
+    }
+    return s;
+}
+
+fn sum_iter_int(xs: [int]): int {
+    var s = 0;
+    iter (v in xs) {
+        s = s + v;
+    }
+    return s;
+}
+
+fn sum_idx_float(xs: [float]): float {
+    var s = 0.0;
+    iter (i in 0..xs.len()) {
+        s = s + xs[i];
+    }
+    return s;
+}
+
+fn sum_iter_float(xs: [float]): float {
+    var s = 0.0;
+    iter (v in xs) {
+        s = s + v;
+    }
+    return s;
+}
+
+fn main(): int {
+    // [int] indexed range loop == iterator loop
+    var xi: [int] = [];
+    var i = 0;
+    while (i < 1000) {
+        xi.append(i * 3);
+        i = i + 1;
+    }
+    assert(sum_idx_int(xi) == sum_iter_int(xi), "[int] range index sum mismatch");
+    assert(sum_idx_int(xi) == 1498500, "[int] range index sum wrong");
+
+    // [float] indexed range loop == iterator loop
+    var xf: [float] = [];
+    i = 0;
+    while (i < 100) {
+        xf.append((i as float) * 0.5);
+        i = i + 1;
+    }
+    assert(sum_idx_float(xf) == sum_iter_float(xf), "[float] range index sum mismatch");
+    assert(sum_idx_float(xf) == 2475.0, "[float] range index sum wrong");
+
+    // [any] indexed range loop reads every element
+    var xa: [any] = [1, "x", 2.5, true];
+    var cnt = 0;
+    var acc = 0;
+    iter (k in 0..xa.len()) {
+        var e = xa[k];
+        if (e != nil) {
+            cnt = cnt + 1;
+        }
+        if (e == 1) {
+            acc = acc + 10;
+        }
+    }
+    assert(cnt == 4, "[any] range index count wrong");
+    assert(acc == 10, "[any] range index value wrong");
+
+    // Out-of-bounds access outside a proven loop must yield nil in both backends
+    var n: [int] = [7, 8];
+    assert(n[10] == nil, "[int] OOB should be nil");
+    assert(n[-1] == nil, "[int] negative OOB should be nil");
+    var nf: [float] = [1.5];
+    assert(nf[5] == nil, "[float] OOB should be nil");
+    var na: [any] = [1];
+    assert(na[9] == nil, "[any] OOB should be nil");
+    var ns: [str] = ["a"];
+    assert(ns[3] == nil, "[str] OOB should be nil");
+
+    // In-bounds edge: last valid index works
+    assert(n[1] == 8, "[int] last index wrong");
+    assert(n[0] == 7, "[int] first index wrong");
+
+    // Rebinding the list inside the loop must not use the stale proof:
+    // ys shrinks to [9], the fresh len() check ends the loop.
+    var ys: [int] = [1, 2, 3];
+    var total = 0;
+    iter (m in 0..ys.len()) {
+        total = total + ys[m];
+        if (m == 1) {
+            ys = [9];
+        }
+    }
+    assert(total == 3, "rebind during range loop wrong");
+
+    // Appending during the loop grows the bound; every fetched index stays valid
+    var zs: [int] = [1];
+    var zsum = 0;
+    var guard = 0;
+    iter (g in 0..zs.len()) {
+        zsum = zsum + zs[g];
+        if (guard < 3) {
+            zs.append(guard + 2);
+            guard = guard + 1;
+        }
+    }
+    assert(zsum == 1 + 2 + 3 + 4, "append during range loop wrong");
+
+    // Non-canonical range (computed bound, step) still correct
+    var w: [int] = [5, 6, 7, 8];
+    var wsum = 0;
+    iter (q in 0..(w.len() - 1)) {
+        wsum = wsum + w[q];
+    }
+    assert(wsum == 18, "computed-bound range index wrong");
+
+    print("range index tests passed!");
+    return 0;
+}

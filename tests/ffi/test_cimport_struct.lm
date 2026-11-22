@@ -1,0 +1,168 @@
+// Regression: `import "c:"` struct-by-value signatures.
+//
+// Flat C structs (<=16 bytes) marshal through ffi.struct_alloc buffers:
+// param_types entries are ffi.struct_param([...]) descriptors and the arg
+// value is a pubptr to packed native-layout bytes. Struct returns arrive as
+// a pubptr to the result bytes. In AOT the call site lowers to
+// ForeignCallDirect with native ABI packing (Win64 register/sret rules,
+// SysV eightbyte classification); signatures the target ABI cannot express
+// fall back to the generated ffi.foreign_call wrapper. VM always uses the
+// libffi wrapper path — this test pins VM/AOT bit-exact parity.
+import std.ffi as ffi;
+import "c:tests/native/cimport_fixture.h" from "tests/native/libcimport_fixture.dll" as fx;
+
+fn v2(x: float, y: float): ffi.pubptr {
+    unsafe {
+        var t: [any] = [ffi.TYPE_F32, ffi.TYPE_F32];
+        var p = ffi.struct_alloc(t);
+        ffi.store_f32(p + ffi.struct_offset(t, 0), x);
+        ffi.store_f32(p + ffi.struct_offset(t, 1), y);
+        return p;
+    }
+}
+fn iv2(x: int, y: int): ffi.pubptr {
+    unsafe {
+        var t: [any] = [ffi.TYPE_I32, ffi.TYPE_I32];
+        var p = ffi.struct_alloc(t);
+        ffi.store_i32(p + ffi.struct_offset(t, 0), x);
+        ffi.store_i32(p + ffi.struct_offset(t, 1), y);
+        return p;
+    }
+}
+fn v4(x: float, y: float, z: float, w: float): ffi.pubptr {
+    unsafe {
+        var t: [any] = [ffi.TYPE_F32, ffi.TYPE_F32, ffi.TYPE_F32, ffi.TYPE_F32];
+        var p = ffi.struct_alloc(t);
+        ffi.store_f32(p + ffi.struct_offset(t, 0), x);
+        ffi.store_f32(p + ffi.struct_offset(t, 1), y);
+        ffi.store_f32(p + ffi.struct_offset(t, 2), z);
+        ffi.store_f32(p + ffi.struct_offset(t, 3), w);
+        return p;
+    }
+}
+fn irect(x: int, y: int, w: int, h: int): ffi.pubptr {
+    unsafe {
+        var t: [any] = [ffi.TYPE_I32, ffi.TYPE_I32, ffi.TYPE_I32, ffi.TYPE_I32];
+        var p = ffi.struct_alloc(t);
+        ffi.store_i32(p + ffi.struct_offset(t, 0), x);
+        ffi.store_i32(p + ffi.struct_offset(t, 1), y);
+        ffi.store_i32(p + ffi.struct_offset(t, 2), w);
+        ffi.store_i32(p + ffi.struct_offset(t, 3), h);
+        return p;
+    }
+}
+fn dv2(x: float, y: float): ffi.pubptr {
+    unsafe {
+        var t: [any] = [ffi.TYPE_F64, ffi.TYPE_F64];
+        var p = ffi.struct_alloc(t);
+        ffi.store_f64(p + ffi.struct_offset(t, 0), x);
+        ffi.store_f64(p + ffi.struct_offset(t, 1), y);
+        return p;
+    }
+}
+fn color(r: int, g: int, b: int, a: int): ffi.pubptr {
+    unsafe {
+        var t: [any] = [ffi.TYPE_U8, ffi.TYPE_U8, ffi.TYPE_U8, ffi.TYPE_U8];
+        var p = ffi.struct_alloc(t);
+        ffi.store_u8(p + ffi.struct_offset(t, 0), r);
+        ffi.store_u8(p + ffi.struct_offset(t, 1), g);
+        ffi.store_u8(p + ffi.struct_offset(t, 2), b);
+        ffi.store_u8(p + ffi.struct_offset(t, 3), a);
+        return p;
+    }
+}
+
+fn f2(p: ffi.pubptr): (float, float) {
+    unsafe {
+        var t: [any] = [ffi.TYPE_F32, ffi.TYPE_F32];
+        return (ffi.load_f32(p + ffi.struct_offset(t, 0)),
+                ffi.load_f32(p + ffi.struct_offset(t, 1)));
+    }
+}
+fn i2(p: ffi.pubptr): (int, int) {
+    unsafe {
+        var t: [any] = [ffi.TYPE_I32, ffi.TYPE_I32];
+        return (ffi.load_i32(p + ffi.struct_offset(t, 0)),
+                ffi.load_i32(p + ffi.struct_offset(t, 1)));
+    }
+}
+fn i4(p: ffi.pubptr): (int, int, int, int) {
+    unsafe {
+        var t: [any] = [ffi.TYPE_I32, ffi.TYPE_I32, ffi.TYPE_I32, ffi.TYPE_I32];
+        return (ffi.load_i32(p + ffi.struct_offset(t, 0)),
+                ffi.load_i32(p + ffi.struct_offset(t, 1)),
+                ffi.load_i32(p + ffi.struct_offset(t, 2)),
+                ffi.load_i32(p + ffi.struct_offset(t, 3)));
+    }
+}
+fn f4(p: ffi.pubptr): (float, float, float, float) {
+    unsafe {
+        var t: [any] = [ffi.TYPE_F32, ffi.TYPE_F32, ffi.TYPE_F32, ffi.TYPE_F32];
+        return (ffi.load_f32(p + ffi.struct_offset(t, 0)),
+                ffi.load_f32(p + ffi.struct_offset(t, 1)),
+                ffi.load_f32(p + ffi.struct_offset(t, 2)),
+                ffi.load_f32(p + ffi.struct_offset(t, 3)));
+    }
+}
+fn rd2(p: ffi.pubptr): (float, float) {
+    unsafe {
+        var t: [any] = [ffi.TYPE_F64, ffi.TYPE_F64];
+        return (ffi.load_f64(p + ffi.struct_offset(t, 0)),
+                ffi.load_f64(p + ffi.struct_offset(t, 1)));
+    }
+}
+
+fn main() {
+    unsafe {
+        var fails = 0;
+
+        // 8-byte float struct: two struct params + struct return (rax/xmm0)
+        var s = fx.cvec2_add(v2(1.5, 2.5), v2(0.5, -1.0));
+        var r = f2(s);
+        if (r.0 != 2.0 or r.1 != 1.5) { fails = fails + 1; print("cvec2_add bad"); }
+
+        // struct params + f32 scalar return
+        var d: float = fx.cvec2_dot(v2(1.5, 2.5), v2(2.0, 0.5));
+        if (d != 4.25) { fails = fails + 1; print("cvec2_dot bad: ", d); }
+
+        // 8-byte int struct pair
+        var si = fx.civec2_add(iv2(10, -3), iv2(5, 7));
+        var ri = i2(si);
+        if (ri.0 != 15 or ri.1 != 4) { fails = fails + 1; print("civec2_add bad"); }
+        var di: int = fx.civec2_dot(iv2(3, 4), iv2(5, 6));
+        if (di != 39) { fails = fails + 1; print("civec2_dot bad: ", di); }
+
+        // 4-byte struct return + struct param round trip
+        var pk = fx.ccolor_pack(2864434397);
+        var pr = ffi.load_u32(pk);
+        if (pr != 2864434397) { fails = fails + 1; print("ccolor_pack bad: ", pr); }
+        var un = fx.ccolor_unpack(color(0x11, 0x22, 0x33, 0x44));
+        if (un != 1144201745) { fails = fails + 1; print("ccolor_unpack bad: ", un); }
+
+        // 16-byte struct param (byval on Win64) + int return
+        var area: int = fx.crect_area(irect(1, 2, 3, 4));
+        if (area != 12) { fails = fails + 1; print("crect_area bad: ", area); }
+
+        // 16-byte struct param + two int params + 16-byte sret return
+        var off = fx.crect_offset(irect(10, 20, 5, 6), 1, 2);
+        var ro = i4(off);
+        if (ro.0 != 11 or ro.1 != 22 or ro.2 != 5 or ro.3 != 6) {
+            fails = fails + 1; print("crect_offset bad");
+        }
+
+        // scalar params + 16-byte sret return (double fields)
+        var dv = fx.cdvec2_make(1.5, -2.5);
+        var rd = rd2(dv);
+        if (rd.0 != 1.5 or rd.1 != -2.5) { fails = fails + 1; print("cdvec2_make bad"); }
+
+        // 16-byte float struct params + sret return
+        var q = fx.cvec4_add(v4(1.0, 2.0, 3.0, 4.0), v4(0.5, -1.0, 2.5, 1.0));
+        var rq = f4(q);
+        if (rq.0 != 1.5 or rq.1 != 1.0 or rq.2 != 5.5 or rq.3 != 5.0) {
+            fails = fails + 1; print("cvec4_add bad");
+        }
+
+        print("fails=", fails);
+        return fails;
+    }
+}

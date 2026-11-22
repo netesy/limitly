@@ -1,0 +1,36 @@
+// Three-way benchmark, mode A: direct `import "c:"` struct-by-value calls.
+// Each iteration performs one CDVec2 add + one CDVec2 dot through the
+// ForeignCallDirect fast path (16-byte structs: Win64 byval + sret).
+import std.ffi as ffi;
+import "c:tests/native/cimport_fixture.h" from "tests/native/libcimport_fixture.dll" as fx;
+
+fn dv2(x: float, y: float): ffi.pubptr {
+    unsafe {
+        var t: [any] = [ffi.TYPE_F64, ffi.TYPE_F64];
+        var p = ffi.struct_alloc(t);
+        ffi.store_f64(p + ffi.struct_offset(t, 0), x);
+        ffi.store_f64(p + ffi.struct_offset(t, 1), y);
+        return p;
+    }
+}
+
+fn main() {
+    var N: int = 2000000;
+    unsafe {
+        var vb = dv2(1.0, 2.0);
+        var db = dv2(0.001, -0.0007);
+        var acc: float = 0.0;
+        var t0 = clock();
+        var i = 0;
+        while (i < N) {
+            vb = fx.cdvec2_add(vb, db);
+            acc = acc + fx.cdvec2_dot(vb, vb);
+            i = i + 1;
+        }
+        var ms = (clock() - t0) * 1000.0;
+        print("MODE: cimport");
+        print("CPU_MS: ", ms);
+        print("NS_PER_ITER: ", ms * 1000000.0 / (N * 2));
+        print("RESULT: ", acc);
+    }
+}

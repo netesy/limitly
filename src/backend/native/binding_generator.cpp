@@ -19,6 +19,37 @@ std::unordered_map<std::string, CDirectSignature>& direct_signature_table() {
 
 // ─── Type mapping helpers ─────────────────────────────────────────────────────
 
+std::string ffi_type_id(const CType& t);
+
+// ffi.TYPE_* ids for a struct's flat scalar fields, in declaration order.
+// Used to build ffi.struct_param([...]) / ffi.struct_alloc([...]) arguments.
+std::vector<std::string> struct_elem_type_ids(const CType& t) {
+    std::vector<std::string> ids;
+    if (t.kind != CType::Struct || !t.def) return ids;
+    for (const auto& f : t.def->fields) ids.push_back(ffi_type_id(f.type));
+    return ids;
+}
+
+// Lymar expression producing the [any] element-type list for a struct type,
+// e.g. "ffi.struct_param([ffi.TYPE_F32, ffi.TYPE_F32])" or "[]" when the
+// type is not a supported struct.
+std::string struct_param_expr(const CType& t, const std::string& ffi_prefix = "ffi.") {
+    auto ids = struct_elem_type_ids(t);
+    if (ids.empty()) return ffi_prefix + "struct_param([])";
+    std::string out = ffi_prefix + "struct_param([";
+    for (size_t i = 0; i < ids.size(); ++i) {
+        if (i) out += ", ";
+        out += ids[i];
+    }
+    out += "])";
+    return out;
+}
+
+// A struct type is marshalable when it parsed to a supported flat layout.
+bool is_supported_struct(const CType& t) {
+    return t.kind == CType::Struct && t.def && t.def->supported && !t.def->fields.empty();
+}
+
 // Returns the Lymar type annotation for a CType (e.g., "int", "float", "ffi.pubptr")
 std::string lymar_type(const CType& t) {
     switch (t.kind) {
@@ -33,6 +64,7 @@ std::string lymar_type(const CType& t) {
         case CType::Double:   return "float";
         case CType::Ptr:      return "ffi.pubptr";
         case CType::FixedWidth: return "int";
+        case CType::Struct:   return is_supported_struct(t) ? "ffi.pubptr" : "int";
         case CType::Custom:   return "int"; // fallback
     }
     return "int";
@@ -57,6 +89,7 @@ std::string ffi_type_id(const CType& t) {
             if (t.width == 32) return t.is_unsigned ? "ffi.TYPE_U32" : "ffi.TYPE_I32";
             return t.is_unsigned ? "ffi.TYPE_U64" : "ffi.TYPE_I64";
         }
+        case CType::Struct:   return "ffi.TYPE_PTR"; // struct args use struct_param() descriptors
         case CType::Custom:   return "ffi.TYPE_I64";
     }
     return "ffi.TYPE_I64";
@@ -107,8 +140,32 @@ bool direct_safe_param(const CType& t) {
         case CType::Float:
             return true;
         case CType::FixedWidth: return t.width <= 64;
+        // Small flat structs (<=16 bytes) lower to native register/stack
+        // packing in AOT; the VM path marshals them through libffi.
+        case CType::Struct:
+            return is_supported_struct(t) && t.def->size <= 16;
         default: return false;
     }
+}
+
+// Whether the function's return type can be produced by the direct path:
+// void, scalar types, or a small supported struct (register/sret return).
+bool direct_safe_return(const CType& t) {
+    if (is_void_type(t)) return true;
+    if (t.kind == CType::Struct)
+        return is_supported_struct(t) && t.def->size <= 16;
+    return direct_safe_param(t);
+}
+
+// A signature eligible for AOT call-site lowering (ForeignCallDirect with
+// native ABI packing). Unlike direct_helper this admits struct params and
+// struct returns; the generated wrapper still uses ffi.foreign_call so the
+// VM path stays correct.
+bool direct_call_site_safe(const CFunctionDecl& fn) {
+    if (fn.is_variadic || fn.params.size() > 8) return false;
+    for (const auto& p : fn.params)
+        if (!direct_safe_param(p.type)) return false;
+    return direct_safe_return(fn.return_type);
 }
 
 // Returns the c_call_* helper name for signatures that can use a direct
@@ -118,10 +175,13 @@ bool direct_safe_param(const CType& t) {
 std::string direct_helper(const CFunctionDecl& fn) {
     if (fn.is_variadic || fn.params.size() > 4) return "";
     for (const auto& p : fn.params)
-        if (!direct_safe_param(p.type)) return "";
+        // Struct args need libffi struct marshaling the c_call_* intrinsics
+        // cannot express; they stay on the ffi.foreign_call wrapper path.
+        if (p.type.kind == CType::Struct || !direct_safe_param(p.type)) return "";
+    const CType& r = fn.return_type;
+    if (r.kind == CType::Struct) return "";
     const std::string p = "c_call_";
     const std::string n = std::to_string(fn.params.size());
-    const CType& r = fn.return_type;
     if (is_void_type(r)) return p + "void_" + n;
     if (r.kind == CType::Ptr) return p + "ptr_" + n;
     if (r.kind == CType::Double) return p + "f64_" + n;
@@ -244,6 +304,7 @@ std::string c_signature_str_impl(const CFunctionDecl& fn) {
         case CType::Ptr: ss << "void*"; break;
         case CType::FixedWidth: ss << fn.return_type.base_name; break;
         case CType::Custom: ss << (fn.return_type.base_name.empty() ? "auto" : fn.return_type.base_name); break;
+        case CType::Struct: ss << (fn.return_type.base_name.empty() ? "struct" : "struct " + fn.return_type.base_name); break;
     }
     ss << " " << fn.name << "(";
     for (size_t i = 0; i < fn.params.size(); ++i) {
@@ -254,6 +315,7 @@ std::string c_signature_str_impl(const CFunctionDecl& fn) {
             case CType::Ptr: ss << "void*"; break;
             case CType::FixedWidth: ss << p.type.base_name; break;
             case CType::Custom: ss << (p.type.base_name.empty() ? "?" : p.type.base_name); break;
+            case CType::Struct: ss << (p.type.base_name.empty() ? "struct" : "struct " + p.type.base_name); break;
             default:
                 if (p.type.is_unsigned) ss << "unsigned ";
                 switch (p.type.kind) {
@@ -353,6 +415,27 @@ void emit_typed_fn(std::ostringstream& out, const CFunctionDecl& fn,
     out << "}\n\n";
 }
 
+// Raw [any] literal of ffi.TYPE_* ids for a struct's fields (for
+// ffi.struct_alloc); "[]" for non-struct types.
+std::string struct_elem_list(const CType& t) {
+    auto ids = struct_elem_type_ids(t);
+    if (ids.empty()) return "[]";
+    std::string out = "[";
+    for (size_t i = 0; i < ids.size(); ++i) {
+        if (i) out += ", ";
+        out += ids[i];
+    }
+    out += "]";
+    return out;
+}
+
+bool uses_struct(const CFunctionDecl& fn) {
+    if (fn.return_type.kind == CType::Struct) return true;
+    for (const auto& p : fn.params)
+        if (p.type.kind == CType::Struct) return true;
+    return false;
+}
+
 void emit_generic_fn(std::ostringstream& out, const CFunctionDecl& fn) {
     out << "// C: " << c_signature_str_impl(fn) << "\n";
     out << "// (generic fallback -- >2 params or mixed types)\n";
@@ -375,10 +458,31 @@ void emit_generic_fn(std::ostringstream& out, const CFunctionDecl& fn) {
     out << "        var _ptypes: [any] = [";
     for (size_t i = 0; i < fn.params.size(); ++i) {
         if (i > 0) out << ", ";
-        out << ffi_type_id(fn.params[i].type);
+        const auto& pt = fn.params[i].type;
+        if (pt.kind == CType::Struct && is_supported_struct(pt))
+            out << "ffi.struct_param(" << struct_elem_list(pt) << ")";
+        else
+            out << ffi_type_id(pt);
     }
     out << "];\n";
-    out << "        return ffi.foreign_call(_sym, _args, " << ffi_type_id(fn.return_type) << ", _ptypes) as " << lymar_type(fn.return_type) << ";\n";
+
+    const bool struct_ret = fn.return_type.kind == CType::Struct && is_supported_struct(fn.return_type);
+    if (struct_ret) {
+        // Struct-by-value return: foreign_call writes the result bytes into
+        // a caller-allocated buffer (libffi handles sret/register returns).
+        out << "        var _rb: ffi.pubptr = ffi.struct_alloc(" << struct_elem_list(fn.return_type) << ");\n";
+        out << "        ffi.foreign_call(_sym, _args, " << struct_param_expr(fn.return_type)
+            << ", _ptypes, _rb);\n";
+        out << "        return _rb;\n";
+    } else {
+        std::string ret_expr;
+        if (fn.return_type.kind == CType::Struct)
+            ret_expr = "ffi.struct_param(" + struct_elem_list(fn.return_type) + ")";
+        else
+            ret_expr = ffi_type_id(fn.return_type);
+        out << "        return ffi.foreign_call(_sym, _args, " << ret_expr << ", _ptypes) as "
+            << lymar_type(fn.return_type) << ";\n";
+    }
     out << "    }\n";
     out << "}\n\n";
 }
@@ -433,6 +537,12 @@ std::string generate_bindings(const std::vector<CFunctionDecl>& functions,
     emit_constants(out, constants);
 
     for (const auto& fn : functions) {
+        if (uses_struct(fn)) {
+            // Struct-by-value signatures always take the descriptor-driven
+            // foreign_call path: correct on VM (libffi) and AOT fallback.
+            emit_generic_fn(out, fn);
+            continue;
+        }
         std::string direct = direct_helper(fn);
         if (!direct.empty()) {
             emit_direct_fn(out, fn, direct);
@@ -452,7 +562,11 @@ void register_c_direct_signatures(const std::string& module_name,
                                   const std::vector<CFunctionDecl>& decls) {
     auto& table = direct_signature_table();
     for (const auto& fn : decls) {
-        if (direct_helper(fn).empty()) continue;
+        // Registration covers both c_call_* wrapper lowering AND call-site
+        // ForeignCallDirect lowering; the builder picks native packing when
+        // the signature is ABI-expressible and falls back to the wrapper
+        // call otherwise.
+        if (direct_helper(fn).empty() && !direct_call_site_safe(fn)) continue;
         CDirectSignature sig;
         sig.symbol = fn.name;
         sig.return_type = fn.return_type;

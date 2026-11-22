@@ -114,6 +114,8 @@ struct Parser {
     const std::vector<Token>& toks;
     size_t pos = 0;
     std::unordered_map<std::string, CType> typedefs;
+    // Struct/union tag name -> definition (populated as bodies are parsed).
+    std::unordered_map<std::string, std::shared_ptr<CStructDef>> struct_defs;
     std::vector<std::string>& warnings;
     std::string filename;
     std::vector<CConstantDecl>* constants = nullptr;
@@ -168,12 +170,41 @@ struct Parser {
         else if (cur().text == "float") { result = {CType::Float, false, 32, ""}; advance(); }
         else if (cur().text == "double") { result = {CType::Double, false, 64, ""}; advance(); }
         else if (cur().text == "struct" || cur().text == "union" || cur().text == "enum") {
-            // Skip the tag and return as Custom/Ptr
             std::string tag = cur().text;
             advance();
-            std::string name = cur().text;
-            if (cur().kind == IDENT) advance();
-            result = {CType::Custom, false, 0, tag + " " + name};
+            std::string name;
+            if (cur().kind == IDENT) { name = cur().text; advance(); }
+            if (tag == "enum") {
+                // enum used as a type: body (if any) handled by callers;
+                // enums marshal as i32.
+                result = {CType::Custom, false, 0, "enum " + name};
+            } else if (cur().text == "{") {
+                // Inline body: `struct S { ... }` or `typedef struct { ... } T;`
+                auto def = parse_struct_body(tag == "union", name);
+                if (def && def->supported) {
+                    result.kind = CType::Struct;
+                    result.def = def;
+                    result.base_name = name;
+                    if (!name.empty()) struct_defs[name] = def;
+                } else {
+                    result = {CType::Custom, false, 0, tag + " " + name};
+                    if (def) {
+                        // Keep the definition for diagnostics/future use but
+                        // mark the type unmarshalable.
+                        if (!name.empty()) struct_defs[name] = def;
+                    }
+                }
+            } else {
+                // Tag reference without body: resolve previously parsed def.
+                auto it = struct_defs.find(name);
+                if (it != struct_defs.end() && it->second->supported) {
+                    result.kind = CType::Struct;
+                    result.def = it->second;
+                    result.base_name = name;
+                } else {
+                    result = {CType::Custom, false, 0, tag + " " + name};
+                }
+            }
         }
         else if (cur().kind == IDENT) {
             // Unknown identifier type - check if stdint fixed-width
@@ -422,15 +453,136 @@ struct Parser {
         expect(";");
     }
 
+    // Scalar size/alignment in bytes for layout purposes. Returns false for
+    // types that cannot appear as a flat struct field (nested aggregates,
+    // void, unknown/custom).
+    static bool scalar_layout(const CType& t, uint32_t& size, uint32_t& align) {
+        switch (t.kind) {
+            case CType::Bool:
+            case CType::Char:   size = 1; align = 1; return true;
+            case CType::Short:  size = 2; align = 2; return true;
+            case CType::Int:
+            case CType::Float:  size = 4; align = 4; return true;
+            case CType::Long:
+            case CType::LongLong:
+            case CType::Double:
+            case CType::Ptr:    size = 8; align = 8; return true;
+            case CType::FixedWidth: {
+                if (t.width <= 0 || t.width > 64) return false;
+                size = static_cast<uint32_t>((t.width + 7) / 8);
+                align = size < 8 ? size : 8;
+                return true;
+            }
+            default: return false;
+        }
+    }
+
+    static uint32_t align_up(uint32_t v, uint32_t a) {
+        return a == 0 ? v : ((v + a - 1) / a) * a;
+    }
+
+    // Parses `{ field-decl; ... }` starting at '{'. Each field declaration is
+    // `<type> <declarator> (, <declarator>)* ;`. Arrays, bitfields, nested
+    // aggregates, and unions mark the definition unsupported but are still
+    // consumed so parsing stays in sync.
+    std::shared_ptr<CStructDef> parse_struct_body(bool is_union, const std::string& name) {
+        auto def = std::make_shared<CStructDef>();
+        def->name = name;
+        def->is_union = is_union;
+        if (!expect("{")) return def;
+        while (cur().kind != EOF_TOK && cur().text != "}") {
+            if (cur().text == ";") { advance(); continue; }
+            CType field_type = parse_type();
+            // Declarator list for this field type
+            bool first = true;
+            while (cur().kind != EOF_TOK && cur().text != ";" && cur().text != "}") {
+                if (!first) {
+                    if (!expect(",")) break;
+                }
+                first = false;
+                // Skip pointer stars (already folded into field_type by
+                // parse_type for the first declarator only; extra stars here
+                // are rare — treat as unsupported).
+                while (cur().text == "*") { advance(); }
+                if (cur().text == "(") {
+                    // Function-pointer or parenthesized declarator: unsupported
+                    int depth = 0;
+                    while (cur().kind != EOF_TOK) {
+                        if (cur().text == "(") ++depth;
+                        else if (cur().text == ")") { --depth; if (depth == 0) { advance(); break; } }
+                        advance();
+                    }
+                    def->supported = false;
+                    continue;
+                }
+                if (cur().kind != IDENT) { advance(); continue; }
+                std::string fname = cur().text;
+                advance();
+                bool bad = false;
+                // Array suffix -> unsupported
+                while (cur().text == "[") {
+                    bad = true;
+                    advance();
+                    while (cur().kind != EOF_TOK && cur().text != "]") advance();
+                    expect("]");
+                }
+                // Bitfield `: N` -> unsupported
+                if (cur().text == ":") {
+                    bad = true;
+                    advance();
+                    while (cur().kind != EOF_TOK && cur().text != "," && cur().text != ";" && cur().text != "}") advance();
+                }
+                CStructField f;
+                f.name = fname;
+                f.type = field_type;
+                if (bad || is_union || field_type.kind == CType::Struct ||
+                    field_type.kind == CType::Void || field_type.kind == CType::Custom) {
+                    def->supported = false;
+                }
+                def->fields.push_back(f);
+            }
+            expect(";");
+        }
+        expect("}");
+        if (is_union || !def->supported || def->fields.empty() || def->fields.size() > 16) {
+            def->supported = false;
+        }
+        if (def->supported) {
+            // Compute native layout (LP64/Win64 agree for these scalar types:
+            // align = min(size, 8), tail padding to struct alignment).
+            uint32_t offset = 0;
+            uint32_t max_align = 1;
+            for (auto& f : def->fields) {
+                uint32_t fsz = 0, fal = 1;
+                if (!scalar_layout(f.type, fsz, fal)) { def->supported = false; break; }
+                offset = align_up(offset, fal);
+                f.offset = offset;
+                offset += fsz;
+                if (fal > max_align) max_align = fal;
+            }
+            if (def->supported) {
+                def->align = max_align;
+                def->size = align_up(offset, max_align);
+            }
+        }
+        return def;
+    }
+
     bool handle_struct_union_enum() {
         std::string kw = cur().text; // struct/union/enum
         advance();
         // Skip optional tag
-        if (cur().kind == IDENT) advance();
-        // If { follows, parse enum bodies for constants; skip struct/union
+        std::string tag_name;
+        if (cur().kind == IDENT) { tag_name = cur().text; advance(); }
+        // If { follows, parse enum bodies for constants; parse struct/union
+        // bodies into definitions.
         if (cur().text == "{") {
-            if (kw == "enum") parse_enum_body();
-            else skip_braces();
+            if (kw == "enum") {
+                parse_enum_body();
+            } else {
+                auto def = parse_struct_body(kw == "union", tag_name);
+                if (!tag_name.empty()) struct_defs[tag_name] = def;
+            }
         }
         // After body, there might be variable declarations or typedef names
         // Just skip to ;

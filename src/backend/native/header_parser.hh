@@ -4,18 +4,43 @@
 
 #pragma once
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <vector>
 
 namespace LM::Backend::Native {
 
+struct CStructDef;
+
 struct CType {
     enum Kind { Void, Bool, Char, Short, Int, Long, LongLong,
-                Float, Double, Ptr, FixedWidth, Custom };
+                Float, Double, Ptr, FixedWidth, Custom, Struct };
     Kind kind;
     bool is_unsigned = false;
     int width = 0;           // for FixedWidth: 8/16/32/64
     std::string base_name;   // for Custom/typedef resolution
+    // For Kind::Struct: the parsed definition (fields, size, alignment).
+    // Null for forward-declared or unsupported structs.
+    std::shared_ptr<CStructDef> def;
+};
+
+// A parsed C struct definition: flat scalar fields with native-layout
+// offsets. `supported` is false when the body contains constructs the
+// binding layer cannot marshal (nested aggregates, arrays, bitfields,
+// unions, oversized field counts).
+struct CStructField {
+    std::string name;
+    CType type;
+    uint32_t offset = 0;
+};
+
+struct CStructDef {
+    std::string name;                 // tag name or typedef alias (may be "")
+    bool is_union = false;
+    bool supported = true;
+    std::vector<CStructField> fields;
+    uint32_t size = 0;                // sizeof including tail padding
+    uint32_t align = 1;               // struct alignment
 };
 
 struct CParam {

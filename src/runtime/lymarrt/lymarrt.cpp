@@ -208,7 +208,7 @@ bool lymarrt_ffi_call(
     lymarrt_value* out_result)
 {
     return lymarrt_ffi_call_ex(func_ptr, ret_type, arg_types, arg_values,
-                               num_args, nullptr, 0, out_result);
+                               num_args, nullptr, 0, nullptr, out_result);
 }
 
 bool lymarrt_ffi_call_ex(
@@ -219,11 +219,12 @@ bool lymarrt_ffi_call_ex(
     size_t num_args,
     const lymarrt_struct_layout* struct_layouts,
     size_t num_struct_layouts,
+    const lymarrt_struct_result* ret_result,
     lymarrt_value* out_result)
 {
 #if !LYMAR_HAS_LIBFFI
     (void)func_ptr; (void)ret_type; (void)arg_types; (void)arg_values; (void)num_args;
-    (void)struct_layouts; (void)num_struct_layouts; (void)out_result;
+    (void)struct_layouts; (void)num_struct_layouts; (void)ret_result; (void)out_result;
     return false;
 #else
     if (!func_ptr) return false;
@@ -290,14 +291,43 @@ bool lymarrt_ffi_call_ex(
         ffi_arg_values[i] = &arg_storage[i];
     }
 
-    ffi_cif cif;
+    // Struct-by-value return: build an ffi_type for the result and point
+    // ffi_call's rvalue at the caller's buffer (libffi writes the bytes,
+    // handling register returns and hidden sret pointers itself).
+    uint64_t result_storage = 0;
+    ffi_type struct_ret_type{};
+    std::vector<ffi_type*> struct_ret_elems;
     ffi_type* ffi_ret = lymarrt_type_to_ffi(ret_type);
+    void* rvalue = &result_storage;
+    if (ret_result && ret_result->count > 0 &&
+        ret_result->count <= LYMARRT_MAX_STRUCT_ELEMS && ret_result->buffer) {
+        struct_ret_elems.resize(ret_result->count + 1, nullptr);
+        for (uint32_t e = 0; e < ret_result->count; ++e) {
+            struct_ret_elems[e] = lymarrt_type_to_ffi(ret_result->types[e]);
+        }
+        struct_ret_type.size = 0;
+        struct_ret_type.alignment = 0;
+        struct_ret_type.type = FFI_TYPE_STRUCT;
+        struct_ret_type.elements = struct_ret_elems.data();
+        ffi_ret = &struct_ret_type;
+        rvalue = ret_result->buffer;
+    }
+
+    ffi_cif cif;
     if (ffi_prep_cif(&cif, FFI_DEFAULT_ABI, (unsigned)num_args, ffi_ret, ffi_arg_types.data()) != FFI_OK) {
         return false;
     }
 
-    uint64_t result_storage = 0;
-    ffi_call(&cif, FFI_FN(func_ptr), &result_storage, ffi_arg_values.data());
+    ffi_call(&cif, FFI_FN(func_ptr), rvalue, ffi_arg_values.data());
+
+    if (ret_result && ret_result->count > 0 && ret_result->buffer && out_result) {
+        // The bytes already live in the caller's buffer; report a pointer
+        // result so callers can hand the buffer back to Lymar land.
+        std::memset(out_result, 0, sizeof(*out_result));
+        out_result->type = LYMARRT_TYPE_PTR;
+        out_result->val.ptr = ret_result->buffer;
+        return true;
+    }
 
     if (out_result) {
         std::memset(out_result, 0, sizeof(*out_result));

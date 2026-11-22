@@ -1,0 +1,24 @@
+// Three-way benchmark, mode C: native pure-Lymar code (no calls).
+// Identical math to mode_c.lm / mode_module.lm, inlined.
+
+fn main() {
+    var N: int = 2000000;
+    var vx: float = 1.0;
+    var vy: float = 2.0;
+    var dx: float = 0.001;
+    var dy: float = -0.0007;
+    var acc: float = 0.0;
+    var t0 = clock();
+    var i = 0;
+    while (i < N) {
+        vx = vx + dx;
+        vy = vy + dy;
+        acc = acc + (vx * vx + vy * vy);
+        i = i + 1;
+    }
+    var ms = (clock() - t0) * 1000.0;
+    print("MODE: pure");
+    print("CPU_MS: ", ms);
+    print("NS_PER_ITER: ", ms * 1000000.0 / (N * 2));
+    print("RESULT: ", acc);
+}

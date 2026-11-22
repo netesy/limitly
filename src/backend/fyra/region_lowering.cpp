@@ -50,7 +50,7 @@ void lower_region_ownership(ir::Module& module, const std::unordered_map<std::st
     declare("lymar_aot_library_symbol",2,i64);
     declare("lymar_aot_library_close",1,void_type);
     declare("lymar_aot_foreign_call",5,i64);
-    declare("lymar_aot_foreign_call_list",4,i64);
+    declare("lymar_aot_foreign_call_list",5,i64);
     declare("lymar_aot_callback_create",3,i64);
     declare("lymar_aot_callback_pointer",1,i64);
     declare("lymar_aot_callback_destroy",1,void_type);

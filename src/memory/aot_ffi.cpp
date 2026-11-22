@@ -199,9 +199,11 @@ void lymar_aot_library_close(Word handle) {
 }
 // Shared foreign-call implementation. `layouts`/`num_layouts` describe
 // struct-by-value arguments (packed native bytes + element type list),
-// mirroring the VM's lymarrt_ffi_call_ex path.
+// `ret_result` an optional struct-by-value return destination, mirroring
+// the VM's lymarrt_ffi_call_ex path.
 static Word foreign_call_impl(Word function,Word* words,Word* ids,Word count,Word return_type,
                               const lymarrt_struct_layout* layouts,size_t num_layouts,
+                              const lymarrt_struct_result* ret_result,
                               bool raw_int_words=false) {
     std::unique_lock guard(mutex);
     auto* pointer=reinterpret_cast<void*>(lymar_aot_ffi_pointer(function));
@@ -220,17 +222,42 @@ static Word foreign_call_impl(Word function,Word* words,Word* ids,Word count,Wor
     for(const auto& entry:libraries) library_pins.push_back(entry.second);
     guard.unlock();
     lymarrt_value returned{};
-    auto okcall=lymarrt_ffi_call_ex(pointer,type(return_type,true),signature.data(),arguments.data(),count,layouts,num_layouts,&returned);
+    auto okcall=lymarrt_ffi_call_ex(pointer,type(return_type,true),signature.data(),arguments.data(),count,layouts,num_layouts,ret_result,&returned);
     if(!okcall) return lymar_aot_nil();
     return result(returned);
 }
 Word lymar_aot_foreign_call(Word function,Word values,Word types,Word count,Word return_type) {
-    return foreign_call_impl(function,reinterpret_cast<Word*>(values),reinterpret_cast<Word*>(types),count,return_type,nullptr,0,true);
+    return foreign_call_impl(function,reinterpret_cast<Word*>(values),reinterpret_cast<Word*>(types),count,return_type,nullptr,0,nullptr,true);
 }
-Word lymar_aot_foreign_call_list(Word function,Word values,Word return_type,Word types) {
+Word lymar_aot_foreign_call_list(Word function,Word values,Word return_type,Word types,Word ret_buf) {
     auto count=lymar_aot_ffi_list_size(values),type_count=lymar_aot_ffi_list_size(types);
     std::vector<Word> words,ids;
     std::vector<lymarrt_struct_layout> layouts;
+    // return_type may be a struct descriptor list [TYPE_STRUCT, elem_id, ...]
+    // for struct-by-value returns; ret_buf is the pubptr result buffer.
+    lymarrt_struct_result ret_struct{};
+    const lymarrt_struct_result* ret_struct_ptr=nullptr;
+    {
+        Word hdr=0;
+        if(lymar_aot_heap_read(return_type,0,&hdr,8) && (hdr&0xffffffff)==1) {
+            auto n=lymar_aot_ffi_list_size(return_type);
+            if(n>=2 && n-1<=LYMARRT_MAX_STRUCT_ELEMS &&
+               lymar_aot_to_integer(lymar_aot_ffi_list_item(return_type,0))==13 && ret_buf!=0) {
+                ret_struct.count=(uint32_t)(n-1);
+                bool ok=true;
+                for(uint32_t e=0;e<ret_struct.count;++e) {
+                    auto et=lymar_aot_to_integer(lymar_aot_ffi_list_item(return_type,e+1));
+                    if(et>(int64_t)LYMARRT_TYPE_PTR) {ok=false;break;}
+                    ret_struct.types[e]=static_cast<lymarrt_type>(et);
+                }
+                if(ok) {
+                    ret_struct.buffer=reinterpret_cast<void*>(ret_buf);
+                    ret_struct_ptr=&ret_struct;
+                    return_type=(Word)LYMARRT_TYPE_PTR;
+                }
+            }
+        }
+    }
     for(Word index=0;index<count;++index) {
         auto value=lymar_aot_ffi_list_item(values,index);
         words.push_back(value);
@@ -249,7 +276,7 @@ Word lymar_aot_foreign_call_list(Word function,Word values,Word return_type,Word
                     bool ok=true;
                     for(uint32_t e=0;e<lay.count;++e) {
                         auto et=lymar_aot_to_integer(lymar_aot_ffi_list_item(titem,e+1));
-                        if(et<0 || et>(int64_t)LYMARRT_TYPE_PTR) {ok=false;break;}
+                        if(et>(int64_t)LYMARRT_TYPE_PTR) {ok=false;break;}
                         lay.types[e]=static_cast<lymarrt_type>(et);
                     }
                     if(ok) {layouts.push_back(lay);ids.push_back(LYMARRT_TYPE_PTR);continue;}
@@ -259,7 +286,7 @@ Word lymar_aot_foreign_call_list(Word function,Word values,Word return_type,Word
         }
         else ids.push_back(lymar_aot_ffi_infer_type(value));
     }
-    return foreign_call_impl(function,words.data(),ids.data(),count,return_type,layouts.data(),layouts.size());
+    return foreign_call_impl(function,words.data(),ids.data(),count,return_type,layouts.data(),layouts.size(),ret_struct_ptr);
 }
 Word lymar_aot_callback_create(Word name,Word arguments,Word return_type) {
     std::lock_guard guard(mutex);auto text=std::string(lymar_aot_ffi_string(name));auto found=functions.find(text);

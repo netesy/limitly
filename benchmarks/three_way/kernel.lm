@@ -1,0 +1,11 @@
+// Precompiled-module kernel for the three-way binding benchmark.
+// Tuple args/returns are the Lymar analogue of the C struct-by-value
+// parameters used by mode_c.lm; both compute identical f64 math.
+
+pub fn vadd(a: (float, float), b: (float, float)): (float, float) {
+    return (a.0 + b.0, a.1 + b.1);
+}
+
+pub fn vdot(a: (float, float), b: (float, float)): float {
+    return a.0 * b.0 + a.1 * b.1;
+}

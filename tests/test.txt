@@ -78,6 +78,9 @@ tests/ffi/test_native_fixture.lm
 tests/ffi/test_pubptr_null_cmp.lm
 # import "c:" f32/float signature lowering (VM; AOT covered by verify_cimport.py)
 tests/ffi/test_cimport_f32.lm
+# import "c:" small struct-by-value params/returns (VM; AOT covered by
+# verify_cimport.py struct section + manual --opt-level 2 builds)
+tests/ffi/test_cimport_struct.lm
 # Pure-Lymar Win32 window proof (WNDCLASSEXA marshaling + WndProc callback
 # trampoline + message pump, all via std.ffi — no C glue, no sokol)
 tests/ffi/win32_window.lm
@@ -104,6 +107,7 @@ tests/stdlib/collections/queue_stack_test.lm
 tests/stdlib/collections/queue_stack_bitset_test.lm
 tests/stdlib/collections/arraylist_test.lm
 tests/stdlib/collections/priority_queue_test.lm
+tests/collections/range_index_bound.lm
 tests/stdlib/collections_module_test.lm
 # Stdlib - Algorithm
 tests/stdlib/algorithm_module_test.lm
