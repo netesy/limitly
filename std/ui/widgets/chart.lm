@@ -240,18 +240,31 @@ frame Chart {
         return self.pal_color(self.pie_pos_index(i));
     }
 
+    // All legend entry widths in one batch measure (index-aligned with
+    // legend_text(0..legend_count)).
+    fn legend_widths(): [float] {
+        var n: int = self.legend_count();
+        var texts: [str] = [];
+        var i: int = 0;
+        while (i < n) {
+            texts.append(textshape.prepare_display(self.legend_text(i)));
+            i = i + 1;
+        }
+        return tm.text_widths(texts, self.font_scale * 0.85);
+    }
+
     // Greedy row packing over the legend strip; returns 0 when the entries
     // would need more than 3 rows (legend is skipped rather than clipped).
     fn legend_rows(avail: float): int {
         var n: int = self.legend_count();
         if (n <= 0) { return 0; }
         if (avail < 40.0) { avail = 40.0; }
+        var ws = self.legend_widths();
         var row_w: float = 0.0;
         var rows: int = 1;
         var i: int = 0;
         while (i < n) {
-            var tw: float = tm.text_width(textshape.prepare_display(self.legend_text(i)),
-                self.font_scale * 0.85);
+            var tw: float = ws[i];
             var ew: float = tw + 18.0;
             if (row_w > 0.0 and row_w + ew > avail) {
                 rows = rows + 1;
@@ -280,11 +293,11 @@ frame Chart {
         var sx: float = self.rect.x + 10.0;
         var sy: float = self.rect.y + self._ch - ((rows as float) * 13.0 + 8.0) + 4.0;
         var row_w: float = 0.0;
+        var ws = self.legend_widths();
         var i: int = 0;
         while (i < n) {
             var txt: str = self.legend_text(i);
-            var tw: float = tm.text_width(textshape.prepare_display(txt),
-                self.font_scale * 0.85);
+            var tw: float = ws[i];
             var ew: float = tw + 18.0;
             if (row_w > 0.0 and row_w + ew > avail) {
                 sy = sy + 13.0;

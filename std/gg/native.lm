@@ -895,6 +895,25 @@ pub fn measure_text_px(text_str: str, px: float): float {
     return measure_text_at(text_str, size_index_for_px(px));
 }
 
+// Batch variant: one dispatch for the whole list. Falls back to the same
+// per-string paths (sdf batch / cov tier batch / atlas-missing heuristic)
+// so results are identical to calling measure_text_px per item.
+pub fn measure_texts_px(texts: [str], px: float): [float] {
+    if (pipeline_init() != 0 and _sdf_on != 0) {
+        return sdfatlas.measure_texts_px(texts, px);
+    }
+    var tier = size_index_for_px(px);
+    if (ensure_font_atlas() == 0) {
+        var apx = atlas_px(tier);
+        var out: [float] = [];
+        iter (t in texts) {
+            out.append((len(t) * apx * 0.6) as float);
+        }
+        return out;
+    }
+    return covatlas.measure_texts_tier(texts, tier);
+}
+
 fn line_height_at(size_idx: int): float {
     unsafe {
         if (ensure_font_atlas() == 0) {

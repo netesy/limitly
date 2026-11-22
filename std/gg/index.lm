@@ -923,6 +923,20 @@ pub fn measure_text_px(text_str: str, px: float): float {
     return (len(text_str) * px * 0.6) as float;
 }
 
+// Batch variant of measure_text_px: identical per-item results. The native
+// backend dispatches the whole list in one call; other backends fall back
+// to per-string measurement.
+pub fn measure_texts_px(texts: [str], px: float): [float] {
+    if (osid.GG_BACKEND != osid.GG_BACKEND_SOKOL and _native_on != 0) {
+        return ggn.measure_texts_px(texts, px);
+    }
+    var out: [float] = [];
+    iter (t in texts) {
+        out.append(measure_text_px(t, px));
+    }
+    return out;
+}
+
 pub fn get_line_height_px(px: float): float {
     if (osid.GG_BACKEND != osid.GG_BACKEND_SOKOL and _native_on != 0) {
         return ggn.get_line_height_px(px);

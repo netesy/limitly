@@ -104,6 +104,61 @@ pub fn text_width(text: str, font_scale: float = 1.0): float {
     return w;
 }
 
+// Batch variant of text_width: results are index-aligned with `texts`.
+// Cache hits resolve per-item; misses are measured together through the
+// renderer's batch entry point when available, then run the same
+// per-item fallback chain (system font, then heuristic) so values are
+// identical to calling text_width on each string.
+pub fn text_widths(texts: [str], font_scale: float = 1.0): [float] {
+    var eff: float = eff_scale(font_scale);
+    var px: float = BASE_FONT_PX * eff;
+    var milli: int = (eff * 1000.0) as int;
+    var out: [float] = [];
+    var pending: [str] = [];
+    var pending_slot: [int] = []; // pending index -> position in out
+    iter (t in texts) {
+        var key: str = t + "#" + (milli as str);
+        val hit = _width_cache[key];
+        if (hit != nil) {
+            out.append(hit as float);
+        } else {
+            pending_slot.append(len(out));
+            pending.append(t);
+            out.append(0.0);
+        }
+    }
+    if (len(pending) == 0) { return out; }
+    if (using_renderer_metrics()) {
+        var ws = gg.measure_texts_px(pending, px);
+        var font_ok = ensure_font() == 1;
+        var j = 0;
+        while (j < len(pending)) {
+            var w: float = 0.0;
+            if (j < len(ws)) { w = ws[j]; }
+            var t = pending[j];
+            var key: str = t + "#" + (milli as str);
+            if (w <= 0.0 and font_ok) {
+                w = (_ui_font as imgfont.Font).text_width(t, px);
+            }
+            if (w <= 0.0) {
+                w = layout.measure_width(t, FALLBACK_CHAR_W * eff);
+            }
+            _width_cache[key] = w;
+            out[pending_slot[j]] = w;
+            j = j + 1;
+        }
+        return out;
+    }
+    // No renderer metrics: identical to per-item text_width.
+    var j2 = 0;
+    while (j2 < len(pending)) {
+        var w2 = text_width(pending[j2], font_scale);
+        out[pending_slot[j2]] = w2;
+        j2 = j2 + 1;
+    }
+    return out;
+}
+
 // Line height for single-line widgets at the given font_scale.
 pub fn line_height(font_scale: float = 1.0): float {
     var eff: float = eff_scale(font_scale);

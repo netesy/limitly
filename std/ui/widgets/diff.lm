@@ -169,9 +169,13 @@ frame Diff {
     pub fn measure(min_w: float, max_w: float, min_h: float, max_h: float): comp.Size {
         self.rebuild();
         var w: float = 220.0;
-        var max_tw: float = 0.0;
+        var texts: [str] = [];
         iter (ln in self._lines) {
-            var tw = tm.text_width(textshape.prepare_display(ln.text), self.font_scale);
+            texts.append(textshape.prepare_display(ln.text));
+        }
+        var widths = tm.text_widths(texts, self.font_scale);
+        var max_tw: float = 0.0;
+        iter (tw in widths) {
             if (tw > max_tw) { max_tw = tw; }
         }
         w = max_tw + 34.0;
