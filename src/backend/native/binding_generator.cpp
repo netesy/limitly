@@ -4,10 +4,18 @@
 #include "binding_generator.hh"
 #include <sstream>
 #include <algorithm>
+#include <unordered_map>
 #include <unordered_set>
 
 namespace LM::Backend::Native {
 namespace {
+
+// Qualified name ("<module>.<fn>") -> precise C signature for direct-safe
+// c-import wrappers. Read by the LIR generator in AOT mode.
+std::unordered_map<std::string, CDirectSignature>& direct_signature_table() {
+    static std::unordered_map<std::string, CDirectSignature> table;
+    return table;
+}
 
 // ─── Type mapping helpers ─────────────────────────────────────────────────────
 
@@ -85,6 +93,130 @@ std::string select_helper(const CFunctionDecl& fn) {
     return ""; // generic fallback
 }
 
+// ─── Direct C-extern calls (AOT native Call, VM fnptr+libffi) ────────────────
+std::string safe_param_name(const CParam& p, size_t index);
+std::string c_signature_str_impl(const CFunctionDecl& fn);
+// A param is direct-safe when its C ABI maps cleanly onto the Lymar word the
+// binding passes: int-family -> i64, double -> f64, pointer -> i64. C `float`
+// (f32), variadic, and struct/unknown types stay on the generic path.
+bool direct_safe_param(const CType& t) {
+    switch (t.kind) {
+        case CType::Bool: case CType::Char: case CType::Short: case CType::Int:
+        case CType::Long: case CType::LongLong: case CType::Ptr: case CType::Double:
+            return true;
+        case CType::FixedWidth: return t.width <= 64;
+        default: return false;
+    }
+}
+
+// Returns the c_call_* helper name for signatures that can use a direct
+// extern call, or "" to keep the typed/generic foreign_call path. Return
+// kinds: void, i64-family ints, f64, ptr. Narrower signed/unsigned returns
+// are handled by a shift/mask fixup in the emitted wrapper.
+std::string direct_helper(const CFunctionDecl& fn) {
+    if (fn.is_variadic || fn.params.size() > 4) return "";
+    for (const auto& p : fn.params)
+        if (!direct_safe_param(p.type)) return "";
+    const std::string p = "c_call_";
+    const std::string n = std::to_string(fn.params.size());
+    const CType& r = fn.return_type;
+    if (is_void_type(r)) return p + "void_" + n;
+    if (r.kind == CType::Ptr) return p + "ptr_" + n;
+    if (r.kind == CType::Double) return p + "f64_" + n;
+    switch (r.kind) {
+        case CType::Bool: case CType::Char: case CType::Short: case CType::Int:
+        case CType::Long: case CType::LongLong:
+            return p + "i64_" + n;
+        case CType::FixedWidth:
+            return r.width <= 64 ? p + "i64_" + n : "";
+        default:
+            return ""; // Float(f32), Custom, etc.
+    }
+}
+
+// Post-call fixup for sub-64-bit integer returns: the extern call yields the
+// raw register contents; sign-extend signed values and mask unsigned ones.
+// Sign extension uses the (x ^ signbit) - signbit trick because `>>` is not
+// reliably arithmetic across VM/AOT. Returns "" when i64 is already exact.
+std::string return_fixup(const CType& t) {
+    auto mask = [](uint64_t bits) {
+        return "(_r & " + std::to_string(bits) + ")";
+    };
+    auto sext = [](uint64_t signbit) {
+        return "((_r ^ " + std::to_string(signbit) + ") - " +
+               std::to_string(signbit) + ")";
+    };
+    // Sub-32-bit returns can carry garbage above the return width in rax, so
+    // mask to the width before sign-extending.
+    auto sext_narrow = [&](uint64_t mask_bits, uint64_t signbit) {
+        return "(((_r & " + std::to_string(mask_bits) + ") ^ " +
+               std::to_string(signbit) + ") - " + std::to_string(signbit) + ")";
+    };
+    switch (t.kind) {
+        case CType::Bool:   return mask(1);
+        case CType::Char:   return t.is_unsigned ? mask(0xFF) : sext_narrow(0xFF, 0x80);
+        case CType::Short:  return t.is_unsigned ? mask(0xFFFF) : sext_narrow(0xFFFF, 0x8000);
+        case CType::Int:    return t.is_unsigned ? mask(0xFFFFFFFFULL) : sext(0x80000000ULL);
+        case CType::FixedWidth:
+            if (t.width >= 64) return "";
+            if (t.width == 32) {
+                return t.is_unsigned ? mask(0xFFFFFFFFULL) : sext(0x80000000ULL);
+            }
+            if (t.is_unsigned) {
+                if (t.width == 8)  return mask(0xFF);
+                return mask(0xFFFF);
+            }
+            if (t.width == 8)  return sext_narrow(0xFF, 0x80);
+            return sext_narrow(0xFFFF, 0x8000);
+        default: return ""; // i64/u64/long/longlong: exact already
+    }
+}
+
+// Per-argument expression: int-family params normalize with `as int`,
+// float/ptr params already carry the right Lymar type.
+std::string direct_arg_expr(const CFunctionDecl& fn, size_t i) {
+    std::string name = safe_param_name(fn.params[i], i);
+    switch (fn.params[i].type.kind) {
+        case CType::Bool: case CType::Char: case CType::Short: case CType::Int:
+        case CType::Long: case CType::LongLong: case CType::FixedWidth:
+            return name + " as int";
+        default:
+            return name; // Double -> float, Ptr -> ffi.pubptr
+    }
+}
+
+void emit_direct_fn(std::ostringstream& out, const CFunctionDecl& fn,
+                    const std::string& helper) {
+    out << "// C: " << c_signature_str_impl(fn) << "\n";
+    out << "// (direct extern call -- AOT emits a native call)\n";
+
+    out << "pub fn " << fn.name << "(";
+    for (size_t i = 0; i < fn.params.size(); ++i) {
+        if (i > 0) out << ", ";
+        out << safe_param_name(fn.params[i], i) << ": " << lymar_type(fn.params[i].type);
+    }
+    out << "): " << lymar_type(fn.return_type) << " {\n";
+    out << "    _ensure();\n";
+    out << "    unsafe {\n";
+
+    std::string call = "ffi." + helper + "(_sym_" + fn.name + ", \"" + fn.name + "\"";
+    for (size_t i = 0; i < fn.params.size(); ++i)
+        call += ", " + direct_arg_expr(fn, i);
+    call += ")";
+
+    std::string fixup = return_fixup(fn.return_type);
+    if (helper.rfind("c_call_void_", 0) == 0) {
+        out << "        return " << call << ";\n";
+    } else if (fixup.empty()) {
+        out << "        return " << call << ";\n";
+    } else {
+        out << "        var _r: int = " << call << ";\n";
+        out << "        return " << fixup << ";\n";
+    }
+    out << "    }\n";
+    out << "}\n\n";
+}
+
 // Helper to format a C signature for comments in generated output
 std::string c_signature_str_impl(const CFunctionDecl& fn) {
     std::ostringstream ss;
@@ -153,14 +285,20 @@ std::string safe_param_name(const CParam& p, size_t index) {
 // ─── Code emitter ─────────────────────────────────────────────────────────────
 
 void emit_preamble(std::ostringstream& out, const std::string& module_name,
-                   const std::string& lib_path) {
+                   const std::string& lib_path,
+                   const std::vector<std::string>& direct_syms) {
     out << "// Auto-generated from " << module_name << " header -- do not edit.\n";
     out << "import std.ffi as ffi;\n\n";
-    out << "var _handle: ffi.pubptr = 0;\n\n";
+    out << "var _handle: ffi.pubptr = 0;\n";
+    for (const auto& sym : direct_syms)
+        out << "var _sym_" << sym << ": ffi.fnptr = 0;\n";
+    out << "\n";
     out << "fn _ensure() {\n";
     out << "    if (_handle == 0) {\n";
     out << "        unsafe {\n";
     out << "            _handle = ffi.library_load(\"" << lib_path << "\");\n";
+    for (const auto& sym : direct_syms)
+        out << "            _sym_" << sym << " = ffi.library_get_symbol(_handle, \"" << sym << "\");\n";
     out << "        }\n";
     out << "    }\n";
     out << "}\n\n";
@@ -270,10 +408,25 @@ std::string generate_bindings(const std::vector<CFunctionDecl>& functions,
                               const std::string& module_name,
                               const std::string& lib_path) {
     std::ostringstream out;
-    emit_preamble(out, module_name, lib_path);
+
+    // Publish direct-call signatures so AOT call sites can bypass wrappers.
+    register_c_direct_signatures(module_name, functions);
+
+    // Pre-scan: signatures that qualify for a direct extern call get their
+    // fnptr cached by _ensure so wrappers can pass it to c_call_*.
+    std::vector<std::string> direct_syms;
+    for (const auto& fn : functions)
+        if (!direct_helper(fn).empty()) direct_syms.push_back(fn.name);
+
+    emit_preamble(out, module_name, lib_path, direct_syms);
     emit_constants(out, constants);
 
     for (const auto& fn : functions) {
+        std::string direct = direct_helper(fn);
+        if (!direct.empty()) {
+            emit_direct_fn(out, fn, direct);
+            continue;
+        }
         std::string helper = select_helper(fn);
         if (helper.empty()) {
             emit_generic_fn(out, fn);
@@ -282,6 +435,26 @@ std::string generate_bindings(const std::vector<CFunctionDecl>& functions,
         }
     }
     return out.str();
+}
+
+void register_c_direct_signatures(const std::string& module_name,
+                                  const std::vector<CFunctionDecl>& decls) {
+    auto& table = direct_signature_table();
+    for (const auto& fn : decls) {
+        if (direct_helper(fn).empty()) continue;
+        CDirectSignature sig;
+        sig.symbol = fn.name;
+        sig.return_type = fn.return_type;
+        sig.arg_types.reserve(fn.params.size());
+        for (const auto& p : fn.params) sig.arg_types.push_back(p.type);
+        table[module_name + "." + fn.name] = std::move(sig);
+    }
+}
+
+const CDirectSignature* find_c_direct_signature(const std::string& qualified_name) {
+    auto& table = direct_signature_table();
+    auto it = table.find(qualified_name);
+    return it == table.end() ? nullptr : &it->second;
 }
 
 } // namespace LM::Backend::Native

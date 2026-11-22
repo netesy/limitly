@@ -261,6 +261,32 @@ pub fn call_void_2(func_ptr: fnptr, arg1: pubptr, arg2: pubptr): nil {}
 pub fn call_void_3(func_ptr: fnptr, arg1: pubptr, arg2: pubptr, arg3: pubptr): nil {}
 pub fn call_void_4(func_ptr: fnptr, arg1: pubptr, arg2: pubptr, arg3: pubptr, arg4: pubptr): nil {}
 
+// Direct C-extern calls used by `import "c:"` bindings. arg0 is the resolved
+// fnptr (VM path), arg1 is the C symbol name as a string literal (AOT lowers
+// it to a link-time extern call), and the remaining args are the C arguments.
+// Params are `any` so mixed int/float/ptr signatures keep their inferred
+// argument types for ABI marshaling.
+pub fn c_call_i64_0(func_ptr: fnptr, name: str): int { return 0; }
+pub fn c_call_i64_1(func_ptr: fnptr, name: str, arg1: any): int { return 0; }
+pub fn c_call_i64_2(func_ptr: fnptr, name: str, arg1: any, arg2: any): int { return 0; }
+pub fn c_call_i64_3(func_ptr: fnptr, name: str, arg1: any, arg2: any, arg3: any): int { return 0; }
+pub fn c_call_i64_4(func_ptr: fnptr, name: str, arg1: any, arg2: any, arg3: any, arg4: any): int { return 0; }
+pub fn c_call_f64_0(func_ptr: fnptr, name: str): float { return 0.0; }
+pub fn c_call_f64_1(func_ptr: fnptr, name: str, arg1: any): float { return 0.0; }
+pub fn c_call_f64_2(func_ptr: fnptr, name: str, arg1: any, arg2: any): float { return 0.0; }
+pub fn c_call_f64_3(func_ptr: fnptr, name: str, arg1: any, arg2: any, arg3: any): float { return 0.0; }
+pub fn c_call_f64_4(func_ptr: fnptr, name: str, arg1: any, arg2: any, arg3: any, arg4: any): float { return 0.0; }
+pub fn c_call_ptr_0(func_ptr: fnptr, name: str): pubptr { return 0; }
+pub fn c_call_ptr_1(func_ptr: fnptr, name: str, arg1: any): pubptr { return 0; }
+pub fn c_call_ptr_2(func_ptr: fnptr, name: str, arg1: any, arg2: any): pubptr { return 0; }
+pub fn c_call_ptr_3(func_ptr: fnptr, name: str, arg1: any, arg2: any, arg3: any): pubptr { return 0; }
+pub fn c_call_ptr_4(func_ptr: fnptr, name: str, arg1: any, arg2: any, arg3: any, arg4: any): pubptr { return 0; }
+pub fn c_call_void_0(func_ptr: fnptr, name: str): nil {}
+pub fn c_call_void_1(func_ptr: fnptr, name: str, arg1: any): nil {}
+pub fn c_call_void_2(func_ptr: fnptr, name: str, arg1: any, arg2: any): nil {}
+pub fn c_call_void_3(func_ptr: fnptr, name: str, arg1: any, arg2: any, arg3: any): nil {}
+pub fn c_call_void_4(func_ptr: fnptr, name: str, arg1: any, arg2: any, arg3: any, arg4: any): nil {}
+
 // CString wrapper
 frame CString {
     pub var ptr: pubptr;

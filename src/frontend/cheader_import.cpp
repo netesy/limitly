@@ -23,6 +23,7 @@ namespace {
 // Stored here so the type checker can pass manifest paths without threading
 // them through every call site.
 static std::vector<std::string> g_extra_include_dirs;
+static std::vector<std::string> g_c_import_link_libs;
 
 // Detect system C include directories by probing well-known paths.
 std::vector<std::string> detect_system_include_dirs() {
@@ -117,6 +118,17 @@ void set_c_header_extra_include_dirs(const std::vector<std::string>& dirs) {
     g_extra_include_dirs = dirs;
 }
 
+void register_c_import_link_lib(const std::string& lib_path) {
+    if (std::find(g_c_import_link_libs.begin(), g_c_import_link_libs.end(), lib_path)
+        == g_c_import_link_libs.end()) {
+        g_c_import_link_libs.push_back(lib_path);
+    }
+}
+
+const std::vector<std::string>& c_import_link_libs() {
+    return g_c_import_link_libs;
+}
+
 std::string resolve_c_header_import(
     const std::string& header_path,
     const std::optional<std::string>& from_lib,
@@ -125,6 +137,12 @@ std::string resolve_c_header_import(
     const std::string& namespace_alias,
     std::string& error) {
 
+    // Register the link library up front: cached binding reuse returns before
+    // generation, but AOT still needs the lib on the link line.
+    if (from_lib.has_value() && !from_lib->empty()) {
+        register_c_import_link_lib(*from_lib);
+    }
+
     // 1. Locate the header
     std::string resolved = locate_header(header_path, include_dirs);
     if (resolved.empty()) {
@@ -132,7 +150,46 @@ std::string resolve_c_header_import(
         return "";
     }
 
-    // 2. Check cache: if the binding .lm exists, is newer than the header, and
+    // 2. Read and parse the header. This runs even on binding-cache hits:
+    // the direct-call signature registry must be populated on every resolve
+    // so AOT call sites can bypass generated wrappers.
+    std::ifstream hdr_file(resolved);
+    if (!hdr_file.is_open()) {
+        error = "cannot read C header '" + resolved + "'";
+        return "";
+    }
+    std::stringstream ss;
+    ss << hdr_file.rdbuf();
+    std::string source = ss.str();
+    hdr_file.close();
+
+    // 3. Parse function declarations and enum constants
+    std::vector<std::string> warnings;
+    std::vector<Backend::Native::CConstantDecl> constants;
+    auto decls = Backend::Native::parse_header(source, resolved, warnings, &constants);
+
+    // 4. Filter by symbol names if requested
+    if (!filter.identifiers.empty()) {
+        std::vector<Backend::Native::CFunctionDecl> filtered;
+        for (const auto& d : decls) {
+            if (std::find(filter.identifiers.begin(), filter.identifiers.end(), d.name)
+                != filter.identifiers.end()) {
+                filtered.push_back(d);
+            }
+        }
+        decls = std::move(filtered);
+    }
+
+    if (decls.empty()) {
+        error = "no function declarations found in '" + header_path + "'"
+                + (filter.identifiers.empty() ? "" : " (after symbol filter)");
+        return "";
+    }
+
+    // Publish direct-call signatures for AOT wrapper bypass (cache hits too).
+    Backend::Native::register_c_direct_signatures(namespace_alias, decls);
+
+    // 5. Check cache: if the binding .lm exists, is newer than the header, and
     // was generated from THIS header, reuse it. The alias-only filename means
     // two different headers imported `as vk` would otherwise share stale
     // bindings, so the source path is stamped into the file and verified.
@@ -157,44 +214,8 @@ std::string resolve_c_header_import(
         }
     }
 
-    // 3. Read the header source
-    std::ifstream hdr_file(resolved);
-    if (!hdr_file.is_open()) {
-        error = "cannot read C header '" + resolved + "'";
-        return "";
-    }
-    std::stringstream ss;
-    ss << hdr_file.rdbuf();
-    std::string source = ss.str();
-    hdr_file.close();
-
-    // 4. Parse function declarations and enum constants
-    std::vector<std::string> warnings;
-    std::vector<Backend::Native::CConstantDecl> constants;
-    auto decls = Backend::Native::parse_header(source, resolved, warnings, &constants);
-
-    // 5. Filter by symbol names if requested
-    if (!filter.identifiers.empty()) {
-        std::vector<Backend::Native::CFunctionDecl> filtered;
-        for (const auto& d : decls) {
-            if (std::find(filter.identifiers.begin(), filter.identifiers.end(), d.name)
-                != filter.identifiers.end()) {
-                filtered.push_back(d);
-            }
-        }
-        decls = std::move(filtered);
-    }
-
-    if (decls.empty()) {
-        error = "no function declarations found in '" + header_path + "'"
-                + (filter.identifiers.empty() ? "" : " (after symbol filter)");
-        return "";
-    }
-
-    // 6. Determine library path: from clause or empty string (system)
+    // 7. Generate bindings (also re-registers direct signatures)
     std::string lib_path = from_lib.value_or("");
-
-    // 7. Generate bindings
     std::string gen_source = Backend::Native::generate_bindings(decls, constants, namespace_alias, lib_path);
     gen_source = "// c-import-source: " + resolved + "\n" + gen_source;
 

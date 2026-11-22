@@ -218,6 +218,7 @@ int Compiler::executeFile(const std::string& filename, const CompileOptions& opt
             LIR::Generator lir_generator;
             lir_generator.set_import_aliases(type_check_result.import_aliases);
             lir_generator.set_registered_modules(type_check_result.registered_modules);
+            lir_generator.set_aot_mode(options.use_aot);
 
             lir_function = lir_generator.generate_program(type_check_result);
             if (lir_generator.has_errors()) {
@@ -281,6 +282,15 @@ int Compiler::executeFile(const std::string& filename, const CompileOptions& opt
                 fyra_options.output_file = options.output_file;
                 fyra_options.strip = options.strip;
                 fyra_options.dump_intermediate = options.dump_intermediate;
+                // Libraries named by `import "c:" ... from "<lib>"` clauses must
+                // reach the linker so direct C-extern calls resolve.
+                for (const auto& lib : LM::Frontend::c_import_link_libs()) {
+                    if (std::find(fyra_options.native_link_libs.begin(),
+                                  fyra_options.native_link_libs.end(), lib)
+                        == fyra_options.native_link_libs.end()) {
+                        fyra_options.native_link_libs.push_back(lib);
+                    }
+                }
 
                 switch (options.artifact_type) {
                     case LM::ArtifactType::Object:
@@ -338,7 +348,13 @@ int Compiler::executeFile(const std::string& filename, const CompileOptions& opt
                             std::cerr << "[ERROR] Native source compilation failed: " << e.what() << std::endl;
                             return 1;
                         }
-                        fyra_options.native_link_libs = options.native_link_libs;
+                        for (const auto& lib : options.native_link_libs) {
+                            if (std::find(fyra_options.native_link_libs.begin(),
+                                          fyra_options.native_link_libs.end(), lib)
+                                == fyra_options.native_link_libs.end()) {
+                                fyra_options.native_link_libs.push_back(lib);
+                            }
+                        }
                         struct CleanupNativeObjects {
                             std::vector<std::string> objects;
                             ~CleanupNativeObjects() { LM::Backend::Native::cleanup_foreign_objects(objects); }

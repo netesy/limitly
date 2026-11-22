@@ -301,6 +301,11 @@ std::filesystem::path libffi_archive(const target::TargetDescriptor& t) {
         command.insert(command.end(), {"-lws2_32", "-lgdi32", "-luser32", "-lshell32", "-lopengl32",
                                        "-ld3d11", "-ldxgi", "-ld3dcompiler"});
     command.insert(command.end(), {"-o", options.output_file});
+    if (std::getenv("LYMAR_DEBUG_LINK")) {
+        std::string cmdline;
+        for (const auto& c : command) { cmdline += c; cmdline += ' '; }
+        std::cerr << "[link-cmd] " << cmdline << "\n";
+    }
     auto status = run_driver(command);
     result.success = status == 0;
     if (!result.success) result.errors.push_back("Target driver failed (status " + std::to_string(status) +

@@ -20,4 +20,24 @@ std::string generate_bindings(const std::vector<CFunctionDecl>& functions,
                               const std::string& module_name,
                               const std::string& lib_path);
 
+// ─── Direct C-extern signature registry ──────────────────────────────────────
+// Populated at binding-generation/`import "c:"` resolution time so the LIR
+// generator can emit ForeignCallDirect at wrapper call sites in AOT mode,
+// bypassing the generated wrapper's runtime scaffolding (_ensure, region
+// tracking, fnptr indirection). VM mode keeps calling the wrapper.
+struct CDirectSignature {
+    std::string symbol;                 // C symbol name (extern decl)
+    CType return_type;                  // precise C return type (ABI width/sign)
+    std::vector<CType> arg_types;       // C param types (1:1 with wrapper params)
+};
+
+// Register every direct-safe function in `decls` under "<module_name>.<name>".
+// Idempotent: re-registration overwrites with identical data.
+void register_c_direct_signatures(const std::string& module_name,
+                                  const std::vector<CFunctionDecl>& decls);
+
+// Look up by qualified Lymar name (e.g. "fx.fixture_add"). Returns nullptr
+// when the name is not a registered direct-safe c-import wrapper.
+const CDirectSignature* find_c_direct_signature(const std::string& qualified_name);
+
 } // namespace LM::Backend::Native

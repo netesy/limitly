@@ -35,4 +35,9 @@ std::vector<std::string> collect_c_include_dirs();
 // Register additional include dirs (from CLI/manifest) for header resolution.
 void set_c_header_extra_include_dirs(const std::vector<std::string>& dirs);
 
+// Libraries named by `import "c:" ... from "<lib>"` clauses. The AOT link
+// step appends these so direct C-extern calls resolve at link time.
+void register_c_import_link_lib(const std::string& lib_path);
+const std::vector<std::string>& c_import_link_libs();
+
 } // namespace LM::Frontend

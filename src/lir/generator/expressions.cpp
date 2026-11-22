@@ -8,6 +8,7 @@
 #include "../builtin_functions.hh"
 #include "../../frontend/ast.hh"
 #include "../../frontend/scanner.hh"
+#include "../../backend/native/binding_generator.hh"
 #include <algorithm>
 #include <map>
 #include <limits>
@@ -1517,6 +1518,62 @@ Reg Generator::emit_unary_expr(LM::Frontend::AST::UnaryExpr& expr) {
 }
 
 
+// Map a C type to the LIR ABI type describing the extern's true signature.
+// Used only for ForeignCallDirect's type_a (precise C return width/sign) —
+// arguments always pass as i64/f64 words per the SysV/Win64 register ABIs.
+static Type c_direct_lir_type(const LM::Backend::Native::CType& t) {
+    using CType = LM::Backend::Native::CType;
+    switch (t.kind) {
+        case CType::Void:     return Type::Void;
+        case CType::Bool:     return Type::Bool;
+        case CType::Char:     return t.is_unsigned ? Type::U8  : Type::I8;
+        case CType::Short:    return t.is_unsigned ? Type::U16 : Type::I16;
+        case CType::Int:      return t.is_unsigned ? Type::U32 : Type::I32;
+        case CType::Long:
+        case CType::LongLong: return t.is_unsigned ? Type::U64 : Type::I64;
+        case CType::Float:    return Type::F32;
+        case CType::Double:   return Type::F64;
+        case CType::Ptr:      return Type::Ptr;
+        case CType::FixedWidth:
+            if (t.width <= 8)  return t.is_unsigned ? Type::U8  : Type::I8;
+            if (t.width <= 16) return t.is_unsigned ? Type::U16 : Type::I16;
+            if (t.width <= 32) return t.is_unsigned ? Type::U32 : Type::I32;
+            return t.is_unsigned ? Type::U64 : Type::I64;
+        case CType::Custom:   return Type::I64;
+    }
+    return Type::I64;
+}
+
+bool Generator::try_emit_c_direct_call(LM::Frontend::AST::CallExpr& expr,
+                                       const std::string& resolved_name,
+                                       const std::vector<Reg>& arg_regs, Reg result) {
+    if (!aot_mode_) return false;
+    const auto* sig = LM::Backend::Native::find_c_direct_signature(resolved_name);
+    if (!sig || arg_regs.size() != sig->arg_types.size()) return false;
+
+    const bool void_ret = sig->return_type.kind == LM::Backend::Native::CType::Void;
+    Type res_abi = void_ret ? Type::Void
+        : (expr.inferred_type ? language_type_to_abi_type(expr.inferred_type) : Type::I64);
+
+    LIR_Inst inst(LIR_Op::ForeignCallDirect, res_abi, result);
+    inst.func_name = sig->symbol;
+    // type_a carries the precise C return type so AOT declares the extern with
+    // the correct ABI width and sign/zero-extends the result. The wrapper-path
+    // ForeignCallDirect leaves type_a == Void and keeps result_type semantics.
+    inst.type_a = c_direct_lir_type(sig->return_type);
+    inst.call_args = arg_regs;
+    for (const auto& at : sig->arg_types)
+        inst.call_arg_types.push_back(
+            at.kind == LM::Backend::Native::CType::Double ? Type::F64 : Type::I64);
+    if (expr.inferred_type) {
+        set_register_type(result, expr.inferred_type);
+        set_register_language_type(result, expr.inferred_type);
+        set_register_abi_type(result, res_abi);
+    }
+    emit_instruction(inst);
+    return true;
+}
+
 Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
     // A staged fn call is folded to a compile-time constant by the type checker; emit
     // the constant instead of a runtime call (identical on VM and AOT backends).
@@ -1593,13 +1650,56 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
         }
 
         if (intrinsic.has_value()) {
+            const bool is_direct_c = (intrinsic->opcode == LIR_Op::ForeignCallDirect);
             std::vector<Reg> arg_regs;
             arg_regs.reserve(expr.arguments.size());
-            for (const auto& arg : expr.arguments) arg_regs.push_back(emit_argument(*arg, arg_regs.size()));
+            for (size_t ai = 0; ai < expr.arguments.size(); ++ai) {
+                // c_call_* arg1 is a string-literal symbol name: compile-time
+                // metadata for AOT (func_name), never a runtime value. Skip
+                // emitting it so no string allocation/edge occurs per call.
+                // `ai` (not arg_regs.size()) stays the true argument index for
+                // ownership-fact lookup.
+                if (is_direct_c && ai == 1) continue;
+                arg_regs.push_back(emit_argument(*expr.arguments[ai], ai));
+            }
             Reg result = allocate_register();
             Type abi_res_type = (expr.inferred_type) ? language_type_to_abi_type(expr.inferred_type) : Type::Void;
             if (expr.inferred_type) set_register_language_type(result, expr.inferred_type);
-            
+
+            if (is_direct_c) {
+                // c_call_* (`import "c:"` bindings): (fnptr, "symbol", args...).
+                // arg0's register stays in `a` so the VM can call through the
+                // resolved pointer; arg1's string literal becomes func_name so
+                // AOT emits a link-time extern call; call_args holds only the
+                // actual C arguments (arg_regs[1..] == expr.arguments[2..]).
+                auto* sym_lit = expr.arguments.size() > 1
+                    ? dynamic_cast<LM::Frontend::AST::LiteralExpr*>(expr.arguments[1].get())
+                    : nullptr;
+                if (!sym_lit || sym_lit->literalType != LM::Frontend::TokenType::STRING ||
+                    !std::holds_alternative<std::string>(sym_lit->value)) {
+                    report_error("Direct C call requires a string literal symbol name");
+                    return result;
+                }
+                LIR_Inst inst(LIR_Op::ForeignCallDirect, abi_res_type, result);
+                inst.func_name = std::get<std::string>(sym_lit->value);
+                if (!arg_regs.empty()) inst.a = arg_regs[0];
+                for (size_t k = 1; k < arg_regs.size(); ++k) {
+                    inst.call_args.push_back(arg_regs[k]);
+                    size_t src_idx = k + 1;  // expr.arguments index (arg1 skipped)
+                    Type arg_abi = Type::I64;
+                    if (expr.arguments[src_idx] && expr.arguments[src_idx]->inferred_type) {
+                        arg_abi = language_type_to_abi_type(expr.arguments[src_idx]->inferred_type);
+                    } else if (auto lang_type = get_register_language_type(arg_regs[k])) {
+                        arg_abi = language_type_to_abi_type(lang_type);
+                    } else {
+                        arg_abi = get_register_abi_type(arg_regs[k]);
+                    }
+                    inst.call_arg_types.push_back(arg_abi);
+                }
+                emit_instruction(inst);
+                return result;
+            }
+
             LIR_Inst inst(intrinsic->opcode, abi_res_type, result, 0, 0, 0);
             inst.imm = intrinsic->type_id; 
             inst.func_name = registry_lookup_name;
@@ -1737,6 +1837,10 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
             !current_module_declares_function(func_name)) {
             std::string imported_name = resolve_imported_symbol_name(func_name);
             if (!imported_name.empty()) vm_name = imported_name;
+        }
+
+        if (aot_mode_ && try_emit_c_direct_call(expr, vm_name, arg_regs, result)) {
+            return result;
         }
 
         LIR_Inst inst(LIR_Op::Call, result, vm_name, arg_regs);
@@ -1934,15 +2038,52 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
                     return result;
                 }
 
+                const bool is_direct_c_q =
+                    IntrinsicRegistry::getInstance().getIntrinsic(qualified_name)
+                    && IntrinsicRegistry::getInstance().getIntrinsic(qualified_name)->opcode == LIR_Op::ForeignCallDirect;
                 std::vector<Reg> arg_regs;
                 arg_regs.reserve(expr.arguments.size());
-                for (const auto& arg : expr.arguments) arg_regs.push_back(emit_argument(*arg, arg_regs.size()));
+                for (size_t ai = 0; ai < expr.arguments.size(); ++ai) {
+                    // c_call_* arg1 is a string-literal symbol name: compile-time
+                    // metadata for AOT (func_name), never a runtime value.
+                    if (is_direct_c_q && ai == 1) continue;
+                    arg_regs.push_back(emit_argument(*expr.arguments[ai], ai));
+                }
                 Reg result = allocate_register();
 
                 // ── Intrinsic check (mirrors the VariableExpr path at line 1323) ──
                 if (auto intrinsic = IntrinsicRegistry::getInstance().getIntrinsic(qualified_name)) {
                     Type abi_res_type = (expr.inferred_type) ? language_type_to_abi_type(expr.inferred_type) : Type::Void;
                     if (expr.inferred_type) set_register_language_type(result, expr.inferred_type);
+                    if (intrinsic->opcode == LIR_Op::ForeignCallDirect) {
+                        // c_call_* (`import "c:"` bindings): (fnptr, "symbol", args...).
+                        auto* sym_lit = expr.arguments.size() > 1
+                            ? dynamic_cast<LM::Frontend::AST::LiteralExpr*>(expr.arguments[1].get())
+                            : nullptr;
+                        if (!sym_lit || sym_lit->literalType != LM::Frontend::TokenType::STRING ||
+                            !std::holds_alternative<std::string>(sym_lit->value)) {
+                            report_error("Direct C call requires a string literal symbol name");
+                            return result;
+                        }
+                        LIR_Inst inst(LIR_Op::ForeignCallDirect, abi_res_type, result);
+                        inst.func_name = std::get<std::string>(sym_lit->value);
+                        if (!arg_regs.empty()) inst.a = arg_regs[0];
+                        for (size_t k = 1; k < arg_regs.size(); ++k) {
+                            inst.call_args.push_back(arg_regs[k]);
+                            size_t src_idx = k + 1;
+                            Type arg_abi = Type::I64;
+                            if (expr.arguments[src_idx] && expr.arguments[src_idx]->inferred_type) {
+                                arg_abi = language_type_to_abi_type(expr.arguments[src_idx]->inferred_type);
+                            } else if (auto lang_type = get_register_language_type(arg_regs[k])) {
+                                arg_abi = language_type_to_abi_type(lang_type);
+                            } else {
+                                arg_abi = get_register_abi_type(arg_regs[k]);
+                            }
+                            inst.call_arg_types.push_back(arg_abi);
+                        }
+                        emit_instruction(inst);
+                        return result;
+                    }
                     LIR_Inst inst(intrinsic->opcode, abi_res_type, result, 0, 0, 0);
                     inst.imm = intrinsic->type_id;
                     inst.func_name = qualified_name;
@@ -1966,6 +2107,11 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
                     } else {
                         vm_name = qualified_name.substr(9);
                     }
+                }
+
+                if (op == LIR_Op::Call && aot_mode_ &&
+                    try_emit_c_direct_call(expr, vm_name, arg_regs, result)) {
+                    return result;
                 }
 
                 LIR_Inst inst;

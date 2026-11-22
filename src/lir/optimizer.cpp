@@ -495,7 +495,13 @@ bool Optimizer::remove_loop_region_ops() {
         case LIR_Op::CallVariadic:
             return !is_scalar_builtin(inst);
         case LIR_Op::ForeignCall:
+            return true;
         case LIR_Op::ForeignCallDirect:
+            // A link-time C extern cannot allocate Lymar region memory; values
+            // produced by a C->Lymar callback during the call are marshaled by
+            // the FFI layer and attributed to the parent region at worst
+            // (over-retention, never premature free). Must not pin regions.
+            return false;
         case LIR_Op::FrameCallMethod:
         case LIR_Op::FrameCallInit:
         case LIR_Op::TraitCallMethod:

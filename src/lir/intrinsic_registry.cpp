@@ -80,6 +80,30 @@ IntrinsicRegistry::IntrinsicRegistry() {
     registerIntrinsic("std.ffi.call_void_2", {LIR_Op::ForeignCall, 0, 0, 3, 0});
     registerIntrinsic("std.ffi.call_void_3", {LIR_Op::ForeignCall, 0, 0, 4, 0});
     registerIntrinsic("std.ffi.call_void_4", {LIR_Op::ForeignCall, 0, 0, 5, 0});
+    // Direct C-extern calls emitted by `import "c:"` bindings. Signature is
+    // (fnptr, symbol_name_literal, c_arg1..c_argN); the generator rewrites
+    // this to ForeignCallDirect with func_name = the C symbol so AOT emits a
+    // link-time extern call while the VM keeps using the fnptr + libffi.
+    registerIntrinsic("std.ffi.c_call_i64_0", {LIR_Op::ForeignCallDirect, 0, 0, 2, 0});
+    registerIntrinsic("std.ffi.c_call_i64_1", {LIR_Op::ForeignCallDirect, 0, 0, 3, 0});
+    registerIntrinsic("std.ffi.c_call_i64_2", {LIR_Op::ForeignCallDirect, 0, 0, 4, 0});
+    registerIntrinsic("std.ffi.c_call_i64_3", {LIR_Op::ForeignCallDirect, 0, 0, 5, 0});
+    registerIntrinsic("std.ffi.c_call_i64_4", {LIR_Op::ForeignCallDirect, 0, 0, 6, 0});
+    registerIntrinsic("std.ffi.c_call_f64_0", {LIR_Op::ForeignCallDirect, 0, 0, 2, 0});
+    registerIntrinsic("std.ffi.c_call_f64_1", {LIR_Op::ForeignCallDirect, 0, 0, 3, 0});
+    registerIntrinsic("std.ffi.c_call_f64_2", {LIR_Op::ForeignCallDirect, 0, 0, 4, 0});
+    registerIntrinsic("std.ffi.c_call_f64_3", {LIR_Op::ForeignCallDirect, 0, 0, 5, 0});
+    registerIntrinsic("std.ffi.c_call_f64_4", {LIR_Op::ForeignCallDirect, 0, 0, 6, 0});
+    registerIntrinsic("std.ffi.c_call_ptr_0", {LIR_Op::ForeignCallDirect, 0, 0, 2, 0});
+    registerIntrinsic("std.ffi.c_call_ptr_1", {LIR_Op::ForeignCallDirect, 0, 0, 3, 0});
+    registerIntrinsic("std.ffi.c_call_ptr_2", {LIR_Op::ForeignCallDirect, 0, 0, 4, 0});
+    registerIntrinsic("std.ffi.c_call_ptr_3", {LIR_Op::ForeignCallDirect, 0, 0, 5, 0});
+    registerIntrinsic("std.ffi.c_call_ptr_4", {LIR_Op::ForeignCallDirect, 0, 0, 6, 0});
+    registerIntrinsic("std.ffi.c_call_void_0", {LIR_Op::ForeignCallDirect, 0, 0, 2, 0});
+    registerIntrinsic("std.ffi.c_call_void_1", {LIR_Op::ForeignCallDirect, 0, 0, 3, 0});
+    registerIntrinsic("std.ffi.c_call_void_2", {LIR_Op::ForeignCallDirect, 0, 0, 4, 0});
+    registerIntrinsic("std.ffi.c_call_void_3", {LIR_Op::ForeignCallDirect, 0, 0, 5, 0});
+    registerIntrinsic("std.ffi.c_call_void_4", {LIR_Op::ForeignCallDirect, 0, 0, 6, 0});
     registerIntrinsic("std.ffi.ffi_alloc", {LIR_Op::MemoryAlloc, 0, 0, 1, 0});
     registerIntrinsic("std.ffi.ffi_free", {LIR_Op::MemoryFree, 0, 0, 1, 0});
     registerIntrinsic("std.ffi.ffi_realloc", {LIR_Op::MemoryResize, 0, 0, 2, 0});

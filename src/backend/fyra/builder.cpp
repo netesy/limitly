@@ -4886,10 +4886,92 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             case LIR::LIR_Op::CallbackDestroy:
                 builder_->createExternCall("lymar_aot_callback_destroy",{load_reg(inst.a,LIR::Type::I64)},context_->getVoidType());break;
             case LIR::LIR_Op::ForeignCallDirect: {
+                // Direct C-extern call (`import "c:"`). Two shapes share this op:
+                //  - type_a == Void: wrapper path (c_call_* intrinsic inside the
+                //    generated binding). The extern is declared i64/f64 and the
+                //    wrapper body performs any narrow-return fixup in Lymar.
+                //  - type_a != Void: call-site lowering of a registered c-import
+                //    wrapper (AOT). type_a carries the precise C return type so
+                //    the extern gets the true ABI width and the raw result is
+                //    masked/sign-extended into the Lymar i64 word here.
+                const bool precise_ret = inst.type_a != LIR::Type::Void;
+                auto c_ret_ty = [&](LIR::Type t) -> ir::Type* {
+                    switch (t) {
+                        case LIR::Type::Void: return context_->getVoidType();
+                        case LIR::Type::F32:  return context_->getFloatType();
+                        case LIR::Type::F64:  return context_->getDoubleType();
+                        case LIR::Type::I64:
+                        case LIR::Type::U64:
+                        case LIR::Type::Ptr:  return context_->getIntegerType(64);
+                        default:              return context_->getIntegerType(32);
+                    }
+                };
+                ir::Type* ret_ty = precise_ret ? c_ret_ty(inst.type_a)
+                                               : lir_type_to_fyra_type(inst.result_type);
+                ir::Function* cfn = current_module_->getFunction(inst.func_name);
+                if (!cfn) {
+                    auto created = std::make_unique<ir::Function>(ret_ty, inst.func_name, current_module_.get());
+                    cfn = created.get();
+                    for (size_t i = 0; i < inst.call_args.size(); ++i) {
+                        LIR::Type at = i < inst.call_arg_types.size() ? inst.call_arg_types[i] : LIR::Type::I64;
+                        cfn->addParameter(std::make_unique<ir::Parameter>(
+                            at == LIR::Type::F64 ? static_cast<ir::Type*>(context_->getDoubleType())
+                                                 : static_cast<ir::Type*>(context_->getIntegerType(64)),
+                            "a" + std::to_string(i)));
+                    }
+                    current_module_->addFunction(std::move(created));
+                }
                 std::vector<ir::Value*> args;
-                for (auto r : inst.call_args) args.push_back(load_reg(r, LIR::Type::I64));
-                ir::Value* res = builder_->createExternCall(inst.func_name, args, lir_type_to_fyra_type(inst.result_type));
-                if (inst.dst != UINT32_MAX) store_reg(inst.dst, res, inst.result_type);
+                for (size_t i = 0; i < inst.call_args.size(); ++i) {
+                    LIR::Type at = i < inst.call_arg_types.size() ? inst.call_arg_types[i] : LIR::Type::I64;
+                    args.push_back(load_reg(inst.call_args[i], at == LIR::Type::F64 ? LIR::Type::F64 : LIR::Type::I64));
+                }
+                ir::Value* res = builder_->createCall(cfn, args);
+                if (inst.dst != UINT32_MAX && res && inst.result_type != LIR::Type::Void) {
+                    ir::Value* out = res;
+                    if (precise_ret) {
+                        // Narrow C returns leave undefined bits above the return
+                        // width in rax: mask to the width, then extend to the
+                        // Lymar i64 word (signed types sign-extend).
+                        auto i64ty = context_->getIntegerType(64);
+                        auto i32ty = context_->getIntegerType(32);
+                        auto c32 = [&](uint64_t v) {
+                            return static_cast<ir::Value*>(context_->getConstantInt(i32ty, v));
+                        };
+                        switch (inst.type_a) {
+                            case LIR::Type::I64: case LIR::Type::U64:
+                            case LIR::Type::Ptr: case LIR::Type::F64:
+                                break; // already the Lymar word width
+                            case LIR::Type::I32:
+                                out = builder_->createExtSW(res, i64ty); break;
+                            case LIR::Type::U32:
+                                out = builder_->createExtUW(res, i64ty); break;
+                            case LIR::Type::I16: {
+                                auto* m = builder_->createAnd(res, c32(0xFFFF));
+                                out = builder_->createExtSH(m, i64ty); break;
+                            }
+                            case LIR::Type::U16: {
+                                auto* m = builder_->createAnd(res, c32(0xFFFF));
+                                out = builder_->createExtUH(m, i64ty); break;
+                            }
+                            case LIR::Type::I8: {
+                                auto* m = builder_->createAnd(res, c32(0xFF));
+                                out = builder_->createExtSB(m, i64ty); break;
+                            }
+                            case LIR::Type::U8: {
+                                auto* m = builder_->createAnd(res, c32(0xFF));
+                                out = builder_->createExtUB(m, i64ty); break;
+                            }
+                            case LIR::Type::Bool: {
+                                auto* m = builder_->createAnd(res, c32(1));
+                                out = builder_->createExtUW(m, i64ty); break;
+                            }
+                            default:
+                                out = builder_->createCast(res, i64ty); break;
+                        }
+                    }
+                    store_reg(inst.dst, out, inst.result_type);
+                }
                 break;
             }
             default:

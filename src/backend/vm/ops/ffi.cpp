@@ -239,7 +239,12 @@ void RegisterVM::execute_extern_library_get_symbol(const LIR::LIR_Inst* pc) {
 }
 
 void RegisterVM::execute_extern_call_function(const LIR::LIR_Inst* pc) {
-    RegisterValue func_ptr_val = registers[arg_reg(pc, 0, pc->a)];
+    // ForeignCallDirect carries the resolved fnptr in `a` and the C arguments
+    // in call_args (func_name holds the symbol for AOT); ForeignCall carries
+    // the fnptr as call_args[0] followed by the C arguments.
+    RegisterValue func_ptr_val = (pc->op == LIR::LIR_Op::ForeignCallDirect && pc->a != UINT32_MAX)
+        ? registers[pc->a]
+        : registers[arg_reg(pc, 0, pc->a)];
     void* func_ptr = value_to_ptr(func_ptr_val);
     if (!func_ptr) { registers[pc->dst] = VAL_NIL; return; }
 

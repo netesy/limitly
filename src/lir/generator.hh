@@ -43,6 +43,13 @@ public:
     void set_current_module(const std::string& module_path) {
         current_module_ = module_path;
     }
+
+    // AOT mode: `import "c:"` wrapper calls lower to ForeignCallDirect at the
+    // call site (link-time extern symbol). VM mode keeps the wrapper so the
+    // runtime can resolve the symbol via dlopen. The LIR cache is only used
+    // for VM runs, so the two modes never share cached LIR.
+    void set_aot_mode(bool enabled) { aot_mode_ = enabled; }
+    bool aot_mode() const { return aot_mode_; }
     
     // Optimization control
     static void set_optimization_enabled(bool enabled) {
@@ -222,6 +229,12 @@ private:
     Reg emit_unary_expr(LM::Frontend::AST::UnaryExpr& expr);
     Reg emit_grouping_expr(LM::Frontend::AST::GroupingExpr& expr);
     Reg emit_call_expr(LM::Frontend::AST::CallExpr& expr);
+    // AOT-only: lower a call to a registered `import "c:"` wrapper directly to
+    // ForeignCallDirect (link-time extern symbol, precise C ABI). Returns true
+    // when emitted; false falls back to a normal Call of the wrapper.
+    bool try_emit_c_direct_call(LM::Frontend::AST::CallExpr& expr,
+                                const std::string& resolved_name,
+                                const std::vector<Reg>& arg_regs, Reg result);
     Reg emit_cast_expr(LM::Frontend::AST::CastExpr& expr);
     Reg emit_assign_expr(LM::Frontend::AST::AssignExpr& expr);
     Reg emit_list_expr(LM::Frontend::AST::ListExpr& expr);
@@ -449,6 +462,7 @@ private:
     std::unordered_map<std::string, std::string> import_aliases_;
     std::unordered_map<std::string, LM::Frontend::ModuleInfo> registered_modules_;
     std::string current_module_ = "";  // Current module context
+    bool aot_mode_ = false;            // Emit link-time extern calls for c-import wrappers
     std::unordered_set<std::string> global_variables_; // Global variables in entry script / modules
     
     Reg this_register_ = UINT32_MAX;  // Register holding 'this' pointer in methods
