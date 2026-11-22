@@ -47,6 +47,7 @@ tests/modules/function_params_test.lm
 tests/modules/alias_import_test.lm
 tests/modules/multiple_imports_test.lm
 tests/modules/enum_match_import_test.lm
+tests/modules/record_scalarization_test.lm
 # LIR
 tests/lir/devirtualization_lir_test.lm
 # Optimizer

@@ -67,6 +67,167 @@ static VDom vdom_of_type(const TypePtr& t, LIR::Type fallback = LIR::Type::Void)
     }
 }
 
+// Recover per-field domains for a named frame from LIR evidence: NewFrame
+// carries the field count in imm; FrameGetField/FrameSetField carry the
+// field index and the accessed value's language/ABI type. Names may be
+// module-qualified or bare depending on which module declared the access,
+// so lookups fall back to a unique unqualified-tail match.
+void LIRToFyraIRBuilder::build_frame_field_table() {
+    if (frame_fields_built_) return;
+    frame_fields_built_ = true;
+    auto& registry = LIR::FunctionRegistry::getInstance();
+    auto frame_name_of = [](const LIR::LIR_Function& f, uint32_t r) -> std::string {
+        if (r == UINT32_MAX) return {};
+        auto it = f.register_language_types.find(r);
+        if (it == f.register_language_types.end() || !it->second ||
+            it->second->tag != ::TypeTag::Frame) return {};
+        auto* ft = std::get_if<FrameType>(&it->second->extra);
+        return ft ? ft->name : std::string{};
+    };
+    auto reg_vdom = [](const LIR::LIR_Function& f, uint32_t r, LIR::Type fb) -> int {
+        auto it = f.register_language_types.find(r);
+        if (it != f.register_language_types.end() && it->second)
+            return vdom_of_type(it->second, fb);
+        return vdom_of_type(TypePtr(), fb);
+    };
+    // evidence slots: -1 = never observed (resolves to VDOM_TAGGED, the safe
+    // boxed-word domain); otherwise a bitmask of observed domains (bit d set
+    // when domain d was seen). Conflicting observations are resolved in
+    // frame_flat_domains: a set containing VDOM_TAGGED collapses to TAGGED
+    // (every domain normalizes to an LmValue word through tag_word on store
+    // and erased/union reads always consume a word); scalar-only conflicts
+    // reject flattening.
+    auto note_domain = [&](const std::string& fname, uint32_t idx, int dom) {
+        if (fname.empty() || idx == UINT32_MAX) return;
+        auto& info = frame_fields_[fname];
+        if (info.field_count == -2 ||
+            (info.field_count >= 0 && idx >= static_cast<uint32_t>(info.field_count))) {
+            if (info.domains.size() <= idx) info.domains.resize(idx + 1, -1);
+            info.domains[idx] = 1 << VDOM_INVALID;
+            return;
+        }
+        if (info.domains.size() <= idx) info.domains.resize(idx + 1, -1);
+        int& slot = info.domains[idx];
+        if (slot == -1) slot = 0;
+        slot |= 1 << dom;
+    };
+    auto names = registry.getFunctionNames();
+    for (const auto& fname : names) {
+        auto* f = registry.getFunction(fname);
+        if (!f) continue;
+        for (const auto& in : f->instructions) {
+            switch (in.op) {
+                case LIR::LIR_Op::NewFrame: {
+                    std::string nm = !in.type_name.empty() ? in.type_name : in.func_name;
+                    if (nm.empty()) break;
+                    auto& info = frame_fields_[nm];
+                    int cnt = static_cast<int>(in.imm);
+                    if (info.field_count < 0) info.field_count = cnt;
+                    else if (info.field_count != cnt) info.field_count = -2; // conflict
+                    break;
+                }
+                case LIR::LIR_Op::FrameSetField: {
+                    std::string nm = frame_name_of(*f, in.dst);
+                    int dom = reg_vdom(*f, in.b, in.type_b);
+                    note_domain(nm, in.a, dom);
+                    break;
+                }
+                case LIR::LIR_Op::FrameGetField: {
+                    std::string nm = frame_name_of(*f, in.a);
+                    uint32_t idx = (in.b != UINT32_MAX) ? in.b : in.imm;
+                    int dom = reg_vdom(*f, in.dst, in.result_type);
+                    note_domain(nm, idx, dom);
+                    break;
+                }
+                default: break;
+            }
+        }
+    }
+    // Deinit frames can never be virtualized: scope-exit cleanup must run on
+    // a real object. Function names are `<frame>.deinit`; match on the full
+    // name and on the unqualified tail to cover alias spellings.
+    auto tail_of = [](const std::string& n) {
+        size_t d = n.rfind('.');
+        return d == std::string::npos ? n : n.substr(d + 1);
+    };
+    std::vector<std::string> tails;
+    for (const auto& [k, v] : frame_fields_) tails.push_back(tail_of(k));
+    for (const auto& fname : names) {
+        const std::string suf = ".deinit";
+        if (fname.size() <= suf.size() || fname.compare(fname.size() - suf.size(), suf.size(), suf) != 0) continue;
+        std::string base = fname.substr(0, fname.size() - suf.size());
+        std::string btail = tail_of(base);
+        for (size_t i = 0; i < tails.size(); ++i) {
+            // Deliberately over-approximate: a same-tail deinit in any module
+            // disqualifies the frame (safe direction).
+            (void)i;
+        }
+        for (auto& [k, info] : frame_fields_) {
+            if (k == base || tail_of(k) == btail) info.deinit = true;
+        }
+        // The deinit frame may have no other evidence yet; record it anyway.
+        frame_fields_[base].deinit = true;
+    }
+}
+
+// Resolve a frame's flattenable field domains: nullptr when the frame is
+// unknown, oversized, has conflicting/non-scalar field evidence, or has a
+// deinit. Unobserved fields degrade to VDOM_TAGGED (boxed LmValue words).
+const std::vector<int>* LIRToFyraIRBuilder::frame_flat_domains(const FrameFieldInfo* info,
+                                                             std::vector<int>& scratch) {
+    if (!info || info->field_count < 1 || info->field_count > 8 || info->deinit ||
+        info->field_count == -2) return nullptr;
+    scratch.clear();
+    scratch.reserve(info->field_count);
+    for (int i = 0; i < info->field_count; ++i) {
+        int mask = (i < static_cast<int>(info->domains.size())) ? info->domains[i] : -1;
+        int d;
+        if (mask == -1) {
+            d = VDOM_TAGGED; // never observed: boxed-word domain
+        } else if (mask & (1 << VDOM_INVALID)) {
+            return nullptr; // out-of-range or unclassifiable evidence
+        } else if (mask & (1 << VDOM_TAGGED)) {
+            // `any`/union field seen with mixed representations: every store
+            // normalizes through tag_word and erased reads consume the word,
+            // so the tagged domain is always the correct common denominator.
+            d = VDOM_TAGGED;
+        } else if ((mask & (mask - 1)) == 0) {
+            d = __builtin_ctz(static_cast<unsigned>(mask)); // single domain
+        } else {
+            return nullptr; // genuine scalar conflict (e.g. int vs float)
+        }
+        // PTR fields hold raw object addresses; the pointee stays a normal
+        // heap value and canon-slot stores keep their region edge, so they
+        // scalarize like scalars. TAGGED covers `any`/union erased words.
+        if (d != VDOM_INT && d != VDOM_FLOAT && d != VDOM_BOOL &&
+            d != VDOM_TAGGED && d != VDOM_PTR)
+            return nullptr;
+        scratch.push_back(d);
+    }
+    return &scratch;
+}
+
+const LIRToFyraIRBuilder::FrameFieldInfo* LIRToFyraIRBuilder::frame_field_info(const std::string& name) {
+    build_frame_field_table();
+    auto it = frame_fields_.find(name);
+    if (it != frame_fields_.end()) return &it->second;
+    // Unique unqualified-tail fallback for alias/qualified name mismatches.
+    std::string tail = name;
+    size_t d = name.rfind('.');
+    if (d != std::string::npos) tail = name.substr(d + 1);
+    const FrameFieldInfo* found = nullptr;
+    for (const auto& [k, info] : frame_fields_) {
+        std::string kt = k;
+        size_t kd = k.rfind('.');
+        if (kd != std::string::npos) kt = k.substr(kd + 1);
+        if (kt == tail) {
+            if (found) return nullptr; // ambiguous tail: refuse to guess
+            found = &info;
+        }
+    }
+    return found;
+}
+
 // One element of a virtual tuple: either a direct SSA value (function
 // parameters of `.direct` variants and sret loads) or a reference to the
 // source register whose slot is reloaded at each use (keeps loads
@@ -79,7 +240,14 @@ struct VTupleElem {
     bool has = false;
     // Canonical spill-slot element: src_reg is a pseudo register whose slot
     // every definition writes and every use reloads (loop-variant tuples).
+    // Virtual records always use this form so `var q = p` shares the same
+    // element slots and field writes stay visible through every alias.
     bool canon_elem = false;
+    // INOUT record-parameter element: the value lives in the caller-owned
+    // field buffer at mem_base + mem_idx * 8 so callee FrameSetField writes
+    // propagate back to the caller's slots after the call.
+    ir::Value* mem_base = nullptr;
+    uint32_t mem_idx = 0;
 };
 
 // Register-domain classification, factored out of build_function_body so the
@@ -100,6 +268,16 @@ static bool s_lang_type_is_erased(const LIR::LIR_Function& f, uint32_t reg) {
         default:
             return false;
     }
+}
+
+// True when the register's language type is an aggregate record (frame or
+// tuple): such registers may hold a virtual container whose elements live
+// in scalar slots, so they never need the erased tagged word a plain
+// `any`/union destination would.
+static bool s_lang_type_is_record(const LIR::LIR_Function& f, uint32_t reg) {
+    auto it = f.register_language_types.find(reg);
+    if (it == f.register_language_types.end() || !it->second) return false;
+    return it->second->tag == ::TypeTag::Frame || it->second->tag == ::TypeTag::Tuple;
 }
 
 static bool s_lang_type_holds_tagged_word(const LIR::LIR_Function& f, uint32_t reg) {
@@ -1060,10 +1238,12 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
         if (dsig->eligible) {
             DirectFnCtx dctx;
             dctx.sret_return = dsig->ret_sret;
+            dctx.ret_frame = dsig->ret_frame;
             dctx.ret_domains = dsig->ret_domains;
             std::vector<ir::Type*> dpts;
             for (size_t pi = 0; pi < f->param_count; ++pi) {
                 const auto& doms = dsig->param_elem_domains[pi];
+                const bool inout = pi < dsig->param_inout.size() && dsig->param_inout[pi] == 2;
                 if (doms.empty()) {
                     ir::Type* pty = context_->getIntegerType(64);
                     auto lt = f->register_language_types.find(pi);
@@ -1077,6 +1257,13 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
                     }
                     dpts.push_back(pty);
                     dctx.params.push_back({static_cast<uint32_t>(pi), -1, VDOM_INT});
+                } else if (inout) {
+                    // Record param passed as a pointer to a caller-owned field
+                    // buffer; the callee's virtual record reads/writes it in
+                    // place so mutations propagate back after the call.
+                    dpts.push_back(context_->getIntegerType(64));
+                    dctx.params.push_back({static_cast<uint32_t>(pi), -2, VDOM_PTR});
+                    dctx.inout_domains[static_cast<uint32_t>(pi)] = doms;
                 } else {
                     for (size_t ei = 0; ei < doms.size(); ++ei) {
                         dpts.push_back(doms[ei] == VDOM_FLOAT
@@ -1573,7 +1760,114 @@ const LIRToFyraIRBuilder::DirectFnSig* LIRToFyraIRBuilder::direct_sig_for(const 
         return true;
     };
 
+    // Frame params flatten like tuples when the callee treats the record
+    // read-only (FLAT: per-field scalar args) or only mutates fields without
+    // letting the object escape (INOUT: one pointer to a caller-owned field
+    // buffer). Anything else keeps the boxed pointer ABI so mutations and
+    // identity semantics stay intact.
+    auto frame_param_mode = [&](uint32_t p, const TypePtr& lt,
+                                std::vector<int>& doms) -> int {
+        if (!lt || lt->tag != ::TypeTag::Frame) return 0;
+        auto* ft = std::get_if<FrameType>(&lt->extra);
+        if (std::getenv("LYMAR_DEBUG_VT2"))
+            std::cerr << "[FPM] " << f->name << " p" << p << " ft=" << (ft != nullptr)
+                      << " name=" << (ft ? ft->name : std::string("?")) << "\n";
+        if (!ft) return 0;
+        const FrameFieldInfo* info = frame_field_info(ft->name);
+        std::vector<int> scratch;
+        const std::vector<int>* fd = frame_flat_domains(info, scratch);
+        if (std::getenv("LYMAR_DEBUG_VT2"))
+            std::cerr << "[FPM] " << f->name << " p" << p << " info=" << (info != nullptr)
+                      << " fd=" << (fd != nullptr) << "\n";
+        if (!fd) return 0;
+        doms = *fd;
+        // A redefined param register cannot stay virtual.
+        for (const auto& in : f->instructions) {
+            if (in.dst == p && in.result_type != LIR::Type::Void &&
+                in.op != LIR::LIR_Op::Return && in.op != LIR::LIR_Op::Ret &&
+                in.op != LIR::LIR_Op::RegionMove && in.op != LIR::LIR_Op::RegionEnter &&
+                in.op != LIR::LIR_Op::RegionExit && in.op != LIR::LIR_Op::Nop &&
+                in.op != LIR::LIR_Op::Label && in.op != LIR::LIR_Op::Jump &&
+                in.op != LIR::LIR_Op::JumpIf && in.op != LIR::LIR_Op::JumpIfFalse &&
+                in.op != LIR::LIR_Op::FuncDef && in.op != LIR::LIR_Op::Param &&
+                !(in.op == LIR::LIR_Op::TupleSet || in.op == LIR::LIR_Op::DictSet ||
+                  in.op == LIR::LIR_Op::ListSet || in.op == LIR::LIR_Op::ListAppend ||
+                  in.op == LIR::LIR_Op::FrameSetField || in.op == LIR::LIR_Op::FrameSetFieldAtomic ||
+                  in.op == LIR::LIR_Op::FrameFieldAtomicAdd || in.op == LIR::LIR_Op::FrameFieldAtomicSub ||
+                  in.op == LIR::LIR_Op::TaskSetField || in.op == LIR::LIR_Op::TaskSetState))
+                return 0;
+        }
+        // Alias closure: the param plus every Mov/Copy destination reachable
+        // from it. Mutations or escapes through any alias disqualify FLAT.
+        std::unordered_set<uint32_t> alias{p};
+        bool grew = true;
+        while (grew) {
+            grew = false;
+            for (const auto& in : f->instructions) {
+                if ((in.op == LIR::LIR_Op::Mov || in.op == LIR::LIR_Op::Copy) &&
+                    in.a != UINT32_MAX && alias.count(in.a) && in.dst != UINT32_MAX &&
+                    !alias.count(in.dst)) {
+                    alias.insert(in.dst);
+                    grew = true;
+                }
+            }
+        }
+        bool mutates = false;
+        for (const auto& in : f->instructions) {
+            auto uses_alias = [&](uint32_t r) { return r != UINT32_MAX && alias.count(r); };
+            switch (in.op) {
+                case LIR::LIR_Op::RegionEnter: case LIR::LIR_Op::RegionExit:
+                case LIR::LIR_Op::Nop: case LIR::LIR_Op::Label:
+                case LIR::LIR_Op::Jump: case LIR::LIR_Op::JumpIf:
+                case LIR::LIR_Op::JumpIfFalse: case LIR::LIR_Op::RegionMove:
+                    break;
+                case LIR::LIR_Op::FrameGetField:
+                    // Field read; the index operand is a constant, not a reg.
+                    break;
+                case LIR::LIR_Op::FrameSetField:
+                    if (uses_alias(in.dst)) mutates = true;
+                    break;
+                case LIR::LIR_Op::Mov: case LIR::LIR_Op::Copy:
+                    break; // alias propagation already accounted for
+                case LIR::LIR_Op::NewFrame:
+                    break; // a/b are ctor zeros, not register operands
+                case LIR::LIR_Op::Return: case LIR::LIR_Op::Ret: {
+                    // `a` carries the returned value only for aggregate
+                    // returns; scalar/void returns leave ctor-garbage that
+                    // must not alias-match (self is often register 0). The
+                    // declared return type is the only reliable signal —
+                    // `a`'s register type can alias param 0 on void returns.
+                    bool ret_agg = f->return_language_type &&
+                        (f->return_language_type->tag == ::TypeTag::Frame ||
+                         f->return_language_type->tag == ::TypeTag::Tuple);
+                    if (ret_agg && uses_alias(in.a)) return 0;
+                    break;
+                }
+                case LIR::LIR_Op::TupleCreate: case LIR::LIR_Op::DictCreate:
+                case LIR::LIR_Op::ListCreate:
+                    // Elements arrive via call_args; storing the record into
+                    // a container is an escape.
+                    for (auto ar : in.call_args)
+                        if (uses_alias(ar)) return 0;
+                    break;
+                case LIR::LIR_Op::Call: case LIR::LIR_Op::CallVoid:
+                default: {
+                    // Any other use of an alias — call args, returns, stores,
+                    // comparisons, atomics, container writes — is an escape or
+                    // a mutation the flattened ABI cannot express.
+                    bool bad = uses_alias(in.a) || uses_alias(in.b) || uses_alias(in.dst);
+                    for (auto ar : in.call_args) bad = bad || uses_alias(ar);
+                    if (bad) return 0;
+                    break;
+                }
+            }
+        }
+        return mutates ? 2 : 1;
+    };
+
     out.param_elem_domains.assign(f->param_count, {});
+    out.param_inout.assign(f->param_count, 0);
+    std::vector<int> fd_scratch;
     for (uint32_t i = 0; i < f->param_count; ++i) {
         auto lt_it = f->register_language_types.find(i);
         const TypePtr& lt = (lt_it != f->register_language_types.end()) ? lt_it->second : TypePtr();
@@ -1581,6 +1875,13 @@ const LIRToFyraIRBuilder::DirectFnSig* LIRToFyraIRBuilder::direct_sig_for(const 
             std::vector<int> doms;
             if (!tuple_domains(lt, doms)) return &out; // nested/oversized/invalid
             out.param_elem_domains[i] = std::move(doms);
+        } else if (lt && lt->tag == ::TypeTag::Frame) {
+            std::vector<int> doms;
+            int mode = frame_param_mode(i, lt, doms);
+            if (mode) {
+                out.param_elem_domains[i] = std::move(doms);
+                out.param_inout[i] = static_cast<char>(mode);
+            }
         }
     }
 
@@ -1597,7 +1898,7 @@ const LIRToFyraIRBuilder::DirectFnSig* LIRToFyraIRBuilder::direct_sig_for(const 
                 inst.a != UINT32_MAX) {
                 auto rit = f->register_language_types.find(inst.a);
                 if (rit != f->register_language_types.end() && rit->second &&
-                    rit->second->tag == ::TypeTag::Tuple) {
+                    (rit->second->tag == ::TypeTag::Tuple || rit->second->tag == ::TypeTag::Frame)) {
                     ret_owned = rit->second;
                     ret_lt = &ret_owned;
                 }
@@ -1605,7 +1906,16 @@ const LIRToFyraIRBuilder::DirectFnSig* LIRToFyraIRBuilder::direct_sig_for(const 
             }
         }
     }
-    if (ret_lt && (*ret_lt)->tag == ::TypeTag::Tuple) {
+    if (ret_lt && (*ret_lt)->tag == ::TypeTag::Frame) {
+        auto* ft = std::get_if<FrameType>(&(*ret_lt)->extra);
+        const FrameFieldInfo* info = ft ? frame_field_info(ft->name) : nullptr;
+        std::vector<int> scratch;
+        const std::vector<int>* fd = frame_flat_domains(info, scratch);
+        if (!fd || fd->empty()) return &out;
+        out.ret_sret = true;
+        out.ret_frame = true;
+        out.ret_domains = *fd;
+    } else if (ret_lt && (*ret_lt)->tag == ::TypeTag::Tuple) {
         std::vector<int> doms;
         if (!tuple_domains(*ret_lt, doms) || doms.empty()) return &out;
         out.ret_sret = true;
@@ -1613,6 +1923,7 @@ const LIRToFyraIRBuilder::DirectFnSig* LIRToFyraIRBuilder::direct_sig_for(const 
     } else if (ret_lt) {
         auto tag = (*ret_lt)->tag;
         if (tag == ::TypeTag::Float32 || tag == ::TypeTag::Float64) out.ret_float = true;
+        if (tag == ::TypeTag::Nil) out.ret_nil = true;
     } else {
         for (const auto& inst : f->instructions) {
             if (inst.op != LIR::LIR_Op::Return && inst.op != LIR::LIR_Op::Ret) continue;
@@ -1620,6 +1931,31 @@ const LIRToFyraIRBuilder::DirectFnSig* LIRToFyraIRBuilder::direct_sig_for(const 
             auto rt = f->register_types.find(inst.a);
             if (rt != f->register_types.end() && (rt->second == LIR::Type::F64 || rt->second == LIR::Type::F32)) { out.ret_float = true; break; }
         }
+    }
+
+    // Nil-returning functions (`: nil` lowers to Any; implicit fallthrough
+    // returns the nil word): when every Return/Ret yields nil — or there are
+    // no value returns at all — the .direct result is the constant VAL_NIL,
+    // letting callers store a provably-scalar constant and skip the edge.
+    if (!out.ret_sret && !out.ret_float && !out.ret_nil) {
+        bool all_nil = true;
+        for (const auto& inst : f->instructions) {
+            if (inst.op != LIR::LIR_Op::Return && inst.op != LIR::LIR_Op::Ret) continue;
+            if (inst.a == UINT32_MAX) continue;
+            auto lt = f->register_language_types.find(inst.a);
+            if (lt != f->register_language_types.end() && lt->second) {
+                if (lt->second->tag != ::TypeTag::Nil) { all_nil = false; break; }
+                continue; // explicitly nil-typed return value
+            }
+            auto rt = f->register_types.find(inst.a);
+            // Without language-type evidence only an explicit void operand
+            // proves nil; a bare pointer could be a real returned object.
+            if (rt == f->register_types.end() || rt->second != LIR::Type::Void) {
+                all_nil = false;
+                break;
+            }
+        }
+        out.ret_nil = all_nil;
     }
 
     // Varargs entry points keep the standard ABI.
@@ -1706,6 +2042,18 @@ LIRToFyraIRBuilder::VtSafeInfo LIRToFyraIRBuilder::compute_vt_safe(
             for (const auto& et : tt->elementTypes)
                 if (vdom_of_type(et) == VDOM_INVALID) { ok = false; break; }
             if (ok) cand.insert(in.dst);
+        } else if (in.op == LIR::LIR_Op::NewFrame) {
+            // Small primitive-field records virtualize like tuples; the field
+            // domains come from the recovered frame table.
+            if (dc_of(in.dst) != 1) continue;
+            auto lt = fn.register_language_types.find(in.dst);
+            if (lt == fn.register_language_types.end() || !lt->second ||
+                lt->second->tag != ::TypeTag::Frame) continue;
+            auto* ft = std::get_if<FrameType>(&lt->second->extra);
+            if (!ft) continue;
+            const FrameFieldInfo* info = frame_field_info(ft->name);
+            std::vector<int> scratch;
+            if (frame_flat_domains(info, scratch)) cand.insert(in.dst);
         } else if (in.op == LIR::LIR_Op::Call && !in.func_name.empty()) {
             // sret results of `.direct` calls arrive as virtual tuples. The
             // condition mirrors the Call lowering exactly: reachable callee,
@@ -1744,12 +2092,25 @@ LIRToFyraIRBuilder::VtSafeInfo LIRToFyraIRBuilder::compute_vt_safe(
     }
     if (cand.empty()) return out;
 
-    auto tuple_elem_count = [&](uint32_t r) -> size_t {
+    // Element count for virtual-container candidacy: tuples use their type's
+    // element list; frames use the recovered field count (0 when unknown —
+    // unflattenable frames are never candidates anyway).
+    auto vrecord_elem_count = [&](uint32_t r) -> size_t {
         auto lt = fn.register_language_types.find(r);
-        if (lt == fn.register_language_types.end() || !lt->second ||
-            lt->second->tag != ::TypeTag::Tuple) return 0;
-        auto* tt = std::get_if<TupleType>(&lt->second->extra);
-        return tt ? tt->elementTypes.size() : 0;
+        if (lt == fn.register_language_types.end() || !lt->second) return 0;
+        if (lt->second->tag == ::TypeTag::Tuple) {
+            auto* tt = std::get_if<TupleType>(&lt->second->extra);
+            return tt ? tt->elementTypes.size() : 0;
+        }
+        if (lt->second->tag == ::TypeTag::Frame) {
+            auto* ft = std::get_if<FrameType>(&lt->second->extra);
+            if (!ft) return 0;
+            const FrameFieldInfo* info = frame_field_info(ft->name);
+            if (!info || info->field_count < 1) return 0;
+            std::vector<int> scratch;
+            return frame_flat_domains(info, scratch) ? static_cast<size_t>(info->field_count) : 0;
+        }
+        return 0;
     };
 
     // uses_ok[r]: false when some use of r forces materialization or moves
@@ -1757,19 +2118,40 @@ LIRToFyraIRBuilder::VtSafeInfo LIRToFyraIRBuilder::compute_vt_safe(
     // it does not depend on which other registers are virtual.
     std::unordered_map<uint32_t, bool> uses_ok;
     for (uint32_t r : cand) uses_ok[r] = true;
+    size_t dbg_idx = 0;
     auto unsafe_use = [&](uint32_t r) {
-        if (r != UINT32_MAX && uses_ok.count(r)) uses_ok[r] = false;
+        if (r != UINT32_MAX && uses_ok.count(r) && uses_ok[r]) {
+            uses_ok[r] = false;
+            if (std::getenv("LYMAR_DEBUG_VT2"))
+                std::cerr << "[VTU] " << fn.name << " r" << r << " unset by op "
+                          << (int)fn.instructions[dbg_idx].op << " @" << dbg_idx
+                          << " dst=" << fn.instructions[dbg_idx].dst
+                          << " a=" << fn.instructions[dbg_idx].a
+                          << " b=" << fn.instructions[dbg_idx].b
+                          << " fn=" << fn.instructions[dbg_idx].func_name << "\n";
+        }
     };
-    for (const auto& in : fn.instructions) {
+    for (size_t ii = 0; ii < fn.instructions.size(); ++ii) {
+        const auto& in = fn.instructions[ii];
+        dbg_idx = ii;
         switch (in.op) {
             case LIR::LIR_Op::RegionEnter: case LIR::LIR_Op::RegionExit:
             case LIR::LIR_Op::TupleGet: case LIR::LIR_Op::TupleLen:
             case LIR::LIR_Op::RegionMove: case LIR::LIR_Op::Nop:
             case LIR::LIR_Op::Label: case LIR::LIR_Op::Jump:
             case LIR::LIR_Op::JumpIf: case LIR::LIR_Op::JumpIfFalse:
+            case LIR::LIR_Op::NewFrame:
             case LIR::LIR_Op::Mov: case LIR::LIR_Op::Copy:
                 // Mov/Copy propagate virtual slots to their destination;
-                // the source remains virtual (handled via mov_srcs).
+                // record aliases share canonical element slots so field
+                // writes stay visible through every name. An erased
+                // (`any`/union) destination still needs the tagged word, so
+                // the source must materialize — except record-typed
+                // destinations, which stay virtual themselves.
+                if ((in.op == LIR::LIR_Op::Mov || in.op == LIR::LIR_Op::Copy) &&
+                    in.dst != UINT32_MAX && s_lang_type_is_erased(fn, in.dst) &&
+                    !s_lang_type_is_record(fn, in.dst))
+                    unsafe_use(in.a);
                 break;
             case LIR::LIR_Op::TupleSet:
                 // Container mutation keeps the tuple virtual; the stored
@@ -1780,9 +2162,29 @@ LIRToFyraIRBuilder::VtSafeInfo LIRToFyraIRBuilder::compute_vt_safe(
                 // a/b are ctor-default zeros; elements arrive via call_args.
                 for (auto ar : in.call_args) unsafe_use(ar);
                 break;
+            case LIR::LIR_Op::FrameGetField:
+                // Virtual field read; `b` is the constant field index.
+                break;
+            case LIR::LIR_Op::FrameSetField:
+                // Virtual field write on the container in `dst`; only the
+                // stored value (b) must materialize if virtual. `a` is the
+                // constant field index.
+                unsafe_use(in.b);
+                break;
+            case LIR::LIR_Op::FrameGetFieldAtomic:
+                // Atomic access needs the real object; `b` is a constant.
+                unsafe_use(in.a);
+                break;
+            case LIR::LIR_Op::FrameSetFieldAtomic:
+            case LIR::LIR_Op::FrameFieldAtomicAdd:
+            case LIR::LIR_Op::FrameFieldAtomicSub:
+                unsafe_use(in.dst);
+                unsafe_use(in.b);
+                break;
             case LIR::LIR_Op::Return: case LIR::LIR_Op::Ret:
                 // Value is in `a`; safe only for sret `.direct` returns.
-                if (!sret_ret) unsafe_use(in.a);
+                // Void returns carry ctor-garbage operands — never a use.
+                if (!sret_ret && in.result_type != LIR::Type::Void) unsafe_use(in.a);
                 break;
             case LIR::LIR_Op::Call: case LIR::LIR_Op::CallVoid: {
                 // Per-argument safety: a flattened `.direct` callee keeps
@@ -1804,8 +2206,13 @@ LIRToFyraIRBuilder::VtSafeInfo LIRToFyraIRBuilder::compute_vt_safe(
                     if (csig && ai < csig->param_elem_domains.size()) {
                         const auto& doms = csig->param_elem_domains[ai];
                         osafe = doms.empty()
-                            ? tuple_elem_count(ar) == 0
-                            : tuple_elem_count(ar) == doms.size();
+                            ? vrecord_elem_count(ar) == 0
+                            : vrecord_elem_count(ar) == doms.size();
+                        if (std::getenv("LYMAR_DEBUG_VT2") && uses_ok.count(ar))
+                            std::cerr << "[VTU] " << fn.name << " call " << in.func_name
+                                      << " arg" << ai << " r" << ar << " cnt="
+                                      << vrecord_elem_count(ar) << " doms=" << doms.size()
+                                      << " csig=" << (csig != nullptr) << "\n";
                     }
                     if (ar != UINT32_MAX && !osafe) unsafe_use(ar);
                 }
@@ -1876,26 +2283,40 @@ LIRToFyraIRBuilder::VtSafeInfo LIRToFyraIRBuilder::compute_vt_safe(
         }
         uint32_t next_pseudo = 0x40000000u;
         for (uint32_t r : cand) {
-            auto fu = first_use.find(r);
             auto ld = defs_of.find(r);
-            if (fu == first_use.end() || ld == defs_of.end() || ld->second.empty()) continue;
-            size_t last_def = ld->second.back();
-            if (fu->second >= last_def) continue; // defs all precede uses
+            if (ld == defs_of.end() || ld->second.empty()) continue; // params: no defs
             auto lt = fn.register_language_types.find(r);
-            if (lt == fn.register_language_types.end() || !lt->second ||
-                lt->second->tag != ::TypeTag::Tuple) continue;
-            auto* tt = std::get_if<TupleType>(&lt->second->extra);
-            if (!tt || tt->elementTypes.empty() || tt->elementTypes.size() > 8) continue;
-            std::vector<uint32_t> preds;
+            if (lt == fn.register_language_types.end() || !lt->second) continue;
             std::vector<int> doms;
-            bool ok = true;
-            for (const auto& et : tt->elementTypes) {
-                int d = vdom_of_type(et);
-                if (d == VDOM_INVALID) { ok = false; break; }
-                doms.push_back(d);
-                preds.push_back(next_pseudo++);
+            if (lt->second->tag == ::TypeTag::Frame) {
+                // Virtual records always spill elements to canonical slots:
+                // `var q = p` then shares the same slots, preserving frame
+                // reference semantics (field writes visible via every alias).
+                auto* ft = std::get_if<FrameType>(&lt->second->extra);
+                if (!ft) continue;
+                const FrameFieldInfo* info = frame_field_info(ft->name);
+                std::vector<int> scratch;
+                const std::vector<int>* fd = frame_flat_domains(info, scratch);
+                if (!fd) continue;
+                doms = *fd;
+            } else {
+                if (lt->second->tag != ::TypeTag::Tuple) continue;
+                auto fu = first_use.find(r);
+                if (fu == first_use.end()) continue;
+                size_t last_def = ld->second.back();
+                if (fu->second >= last_def) continue; // defs all precede uses
+                auto* tt = std::get_if<TupleType>(&lt->second->extra);
+                if (!tt || tt->elementTypes.empty() || tt->elementTypes.size() > 8) continue;
+                bool ok = true;
+                for (const auto& et : tt->elementTypes) {
+                    int d = vdom_of_type(et);
+                    if (d == VDOM_INVALID) { ok = false; break; }
+                    doms.push_back(d);
+                }
+                if (!ok) continue;
             }
-            if (!ok) continue;
+            std::vector<uint32_t> preds;
+            for (size_t j = 0; j < doms.size(); ++j) preds.push_back(next_pseudo++);
             out.canon_regs[r] = std::move(preds);
             out.canon_domains[r] = std::move(doms);
         }
@@ -2128,6 +2549,10 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
     // (any use outside TupleGet/TupleSet/TupleLen/direct-call args/sret
     // returns) materialize the real tuple lazily at the use point.
     std::unordered_map<uint32_t, std::vector<VTupleElem>> vtuples;
+    // Registers whose virtual container is a named record (frame) rather than
+    // a tuple: materialization builds an LmFrame and Mov propagation shares
+    // canonical element slots to preserve reference semantics.
+    std::unordered_set<uint32_t> vframes;
     std::function<void(uint32_t)> materialize_vtuple;
     // `.direct` flattened-ABI variants of branch-free functions are pure
     // scalar SSA: no CFG joins or back-edges exist, so spill slots are
@@ -2180,7 +2605,12 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             auto* slot = entry_alloc(nullptr,
                 context_->getConstantInt(context_->getIntegerType(64), 8));
             slot->setName("vt_slot_r" + std::to_string(cr) + "_e" + std::to_string(j));
-            builder_->createStore(context_->getConstantInt(context_->getIntegerType(64), 0), slot);
+            // Tagged-domain record fields hold nil until first written, like
+            // a real frame's fields array; scalar domains read as zero.
+            ir::Value* init_v = (j < cdoms.size() && cdoms[j] == VDOM_TAGGED)
+                ? builder_->createExternCall("lymar_aot_nil", {}, context_->getIntegerType(64))
+                : static_cast<ir::Value*>(context_->getConstantInt(context_->getIntegerType(64), 0));
+            builder_->createStore(init_v, slot);
             reg_slots[preds[j]] = slot;
             reg_types[preds[j]] = (j < cdoms.size() && cdoms[j] == VDOM_FLOAT)
                 ? LIR::Type::F64 : LIR::Type::I64;
@@ -2203,12 +2633,35 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 elem = dctx->params[param_idx].elem;
                 domain = dctx->params[param_idx].domain;
             }
+            if (elem == -2) {
+                // INOUT record param: `param` is the caller's field buffer.
+                // Elements read/write it in place so mutations propagate.
+                auto dit = dctx->inout_domains.find(orig);
+                if (dit != dctx->inout_domains.end()) {
+                    for (size_t j = 0; j < dit->second.size(); ++j) {
+                        VTupleElem ve;
+                        ve.mem_base = param.get();
+                        ve.mem_idx = static_cast<uint32_t>(j);
+                        ve.domain = dit->second[j];
+                        ve.has = true;
+                        vtuples[orig].push_back(ve);
+                    }
+                    vframes.insert(orig);
+                }
+                param_idx++;
+                continue;
+            }
             if (elem >= 0) {
                 VTupleElem ve;
                 ve.direct_v = param.get();
                 ve.domain = domain;
                 ve.has = true;
                 vtuples[orig].push_back(ve);
+                // A flattened record param is still a virtual frame.
+                auto lt = lir_func.register_language_types.find(orig);
+                if (lt != lir_func.register_language_types.end() && lt->second &&
+                    lt->second->tag == ::TypeTag::Frame)
+                    vframes.insert(orig);
                 param_idx++;
                 continue;
             }
@@ -2464,7 +2917,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
 
     auto store_reg = [&](uint32_t r, ir::Value* v, LIR::Type t, bool preserve_kind = false) {
         // Redefining a register kills its virtual tuple; the old value is dead.
-        if (vtuples.count(r)) vtuples.erase(r);
+        if (vtuples.count(r)) { vtuples.erase(r); vframes.erase(r); }
         // Object-classified registers have a uniform erased-word slot. A float
         // local that ever joins an erased value (frame field, `any`, boxed
         // arithmetic) must store a boxed word on every path: otherwise a loop
@@ -2511,6 +2964,16 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
     };
     auto velem_value = [&](const VTupleElem& e) -> ir::Value* {
         if (e.direct_v) return e.direct_v;
+        if (e.mem_base) {
+            // INOUT record element: raw domain value inside the caller's
+            // field buffer at mem_base + mem_idx * 8.
+            auto* i64ty = context_->getIntegerType(64);
+            ir::Value* addr = builder_->createAdd(e.mem_base,
+                context_->getConstantInt(i64ty, static_cast<long long>(e.mem_idx * 8)));
+            return (e.domain == VDOM_FLOAT)
+                ? static_cast<ir::Value*>(builder_->createLoadd(addr))
+                : static_cast<ir::Value*>(builder_->createLoadl(addr));
+        }
         // load_reg already selects Loadd for float-typed registers, so the
         // raw f64 domain value comes back directly.
         return load_reg(e.src_reg, e.src_type);
@@ -2552,6 +3015,32 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
         if (dom == VDOM_FLOAT || dom == VDOM_INT || dom == VDOM_BOOL)
             st->setName("scalar_store_vt");
     };
+    // Store a raw domain value into an element's backing location: canonical
+    // pseudo-register slot or INOUT buffer slot. Used by FrameSetField so
+    // writes through any alias land in the shared backing store.
+    auto canon_store_elem = [&](const VTupleElem& e, ir::Value* v) {
+        if (!v) return;
+        int dom = e.domain;
+        auto* i64ty = context_->getIntegerType(64);
+        if (dom == VDOM_FLOAT) {
+            if (!v->getType()->isFloatingPoint())
+                v = builder_->createExternCall("lymar_aot_to_float", {v}, context_->getDoubleType());
+        } else if (v->getType() != i64ty) {
+            v = builder_->createCast(v, i64ty);
+        }
+        ir::Instruction* st = nullptr;
+        if (e.canon_elem) {
+            st = builder_->createStore(v, reg_slots[e.src_reg]);
+        } else if (e.mem_base) {
+            ir::Value* addr = builder_->createAdd(e.mem_base,
+                context_->getConstantInt(i64ty, static_cast<long long>(e.mem_idx * 8)));
+            st = builder_->createStore(v, addr);
+        } else {
+            return;
+        }
+        if (dom == VDOM_FLOAT || dom == VDOM_INT || dom == VDOM_BOOL)
+            st->setName("scalar_store_vt");
+    };
     // Capture the current element values of `src_elems` into r's canonical
     // slots, then re-point r's vtuple at the pseudo registers.
     auto canon_capture = [&](uint32_t r, const std::vector<VTupleElem>& src_elems) {
@@ -2565,7 +3054,77 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
         if (vit == vtuples.end()) return;
         auto elems = std::move(vit->second);
         vtuples.erase(r);
+        const bool was_frame = vframes.count(r) != 0;
+        vframes.erase(r);
         auto* i64ty = context_->getIntegerType(64);
+        if (was_frame) {
+            // Materialize a real LmFrame: same layout NewFrame emits —
+            // header/type id, name, fields array of tagged LmValue words.
+            std::string fname;
+            auto lt = lir_func.register_language_types.find(r);
+            if (lt != lir_func.register_language_types.end() && lt->second &&
+                lt->second->tag == ::TypeTag::Frame) {
+                if (auto* ft = std::get_if<FrameType>(&lt->second->extra)) fname = ft->name;
+            }
+            if (fname.empty()) fname = "Frame";
+            ir::Value* frame_ptr = builder_->createExternCall("memory.alloc",
+                {context_->getConstantInt(i64ty, 40)}, lir_type_to_fyra_type(LIR::Type::Ptr));
+            builder_->createStore(context_->getConstantInt(i64ty, 15), frame_ptr);
+            ir::GlobalVariable* gv_name = FyraBuiltinFunctions::get_or_create_global_str(
+                current_module_.get(), builder_.get(),
+                "fr_name_" + fname + "_" + std::to_string(label_counter_++), fname);
+            ir::Value* name_addr = builder_->createAdd(frame_ptr,
+                context_->getConstantInt(i64ty, 8));
+            auto* name_copy = builder_->createExternCall("lymar_aot_copy_constant",
+                {gv_name, context_->getConstantInt(i64ty, 24 + fname.size() + 1)}, i64ty);
+            builder_->createStore(name_copy, name_addr);
+            uint32_t nfields = static_cast<uint32_t>(elems.size());
+            uint32_t field_bytes = (nfields > 0 ? nfields : 2) * 8;
+            ir::Value* fields_array = builder_->createExternCall("memory.alloc",
+                {context_->getConstantInt(i64ty, field_bytes)}, lir_type_to_fyra_type(LIR::Type::Ptr));
+            auto* initial_nil = builder_->createExternCall("lymar_aot_nil", {}, i64ty);
+            for (uint32_t fi = 0; fi < (nfields > 0 ? nfields : 2); ++fi) {
+                ir::Value* f_addr = builder_->createAdd(fields_array,
+                    context_->getConstantInt(i64ty, fi * 8));
+                builder_->createStore(initial_nil, f_addr);
+            }
+            ir::Value* fields_ptr_addr = builder_->createAdd(frame_ptr,
+                context_->getConstantInt(i64ty, 16));
+            builder_->createStore(fields_array, fields_ptr_addr);
+            builder_->createExternCall("lymar_aot_edge", {fields_ptr_addr, fields_array},
+                context_->getVoidType());
+            ir::Value* cnt_addr = builder_->createAdd(frame_ptr,
+                context_->getConstantInt(i64ty, 24));
+            builder_->createStore(context_->getConstantInt(i64ty, nfields), cnt_addr);
+            for (size_t j = 0; j < elems.size(); ++j) {
+                const auto& e = elems[j];
+                ir::Value* v = e.has ? velem_value(e)
+                    : (e.domain == VDOM_FLOAT)
+                        ? static_cast<ir::Value*>(context_->getConstantFP(context_->getDoubleType(), 0.0))
+                        : static_cast<ir::Value*>(context_->getConstantInt(i64ty, 0));
+                // Unset record fields hold nil in a real frame — preserve
+                // that exactly so erased reads (`== nil`) stay equivalent.
+                ir::Value* tagged = !e.has
+                    ? builder_->createExternCall("lymar_aot_nil", {}, i64ty)
+                    : [&]() -> ir::Value* {
+                        switch (e.domain) {
+                            case VDOM_FLOAT: return tag_word(v);
+                            case VDOM_INT:
+                                return builder_->createExternCall("lymar_aot_tag_int", {v}, i64ty);
+                            case VDOM_BOOL:
+                                return builder_->createExternCall("lymar_aot_tag_bool", {v}, i64ty);
+                            case VDOM_PTR:
+                                return builder_->createExternCall("lymar_aot_tag_pointer", {v}, i64ty);
+                            default: return v; // VDOM_TAGGED: already a word
+                        }
+                    }();
+                builder_->createExternCall("lymar_aot_frame_set_field",
+                    {frame_ptr, context_->getConstantInt(i64ty, static_cast<long long>(j)), tagged},
+                    context_->getVoidType());
+            }
+            store_reg(r, frame_ptr, LIR::Type::Ptr);
+            return;
+        }
         used_builtins_.insert("lm_tuple_new");
         ir::Function* tfn = current_module_->getFunction("lm_tuple_new");
         if (!tfn) tfn = builder_->createFunction("lm_tuple_new", i64ty, {i64ty});
@@ -2879,6 +3438,33 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 case LIR::LIR_Op::TupleSet: case LIR::LIR_Op::TupleLen:
                 case LIR::LIR_Op::RegionEnter: case LIR::LIR_Op::RegionExit:
                     return true;
+                case LIR::LIR_Op::NewFrame:
+                    // A proven-virtual record allocates nothing; a
+                    // materialized frame is a heap object that needs the
+                    // region it was created in.
+                    return pi.vt.count(in.dst) && pi.vt.at(in.dst);
+                case LIR::LIR_Op::FrameGetField:
+                    // Virtual field reads are plain slot loads plus pure
+                    // untag decodes — no allocation, region-neutral.
+                    return pi.vt.count(in.a) && pi.vt.at(in.a);
+                case LIR::LIR_Op::FrameSetField: {
+                    // Virtual writes store raw domain values; only TAGGED
+                    // fields can allocate (tag_word boxing), so scalar/PTR
+                    // domains stay neutral.
+                    if (!pi.vt.count(in.dst) || !pi.vt.at(in.dst)) return false;
+                    if (in.b != UINT32_MAX && pi.vt.count(in.b) && pi.vt.at(in.b))
+                        return false; // stored value materializes → alloc
+                    auto lt = fn->register_language_types.find(in.dst);
+                    if (lt == fn->register_language_types.end() || !lt->second ||
+                        lt->second->tag != ::TypeTag::Frame) return false;
+                    auto* ft = std::get_if<FrameType>(&lt->second->extra);
+                    const FrameFieldInfo* info = ft ? frame_field_info(ft->name) : nullptr;
+                    std::vector<int> scratch;
+                    const std::vector<int>* fd = frame_flat_domains(info, scratch);
+                    if (!fd || in.a >= fd->size()) return false;
+                    int d = (*fd)[in.a];
+                    return d == VDOM_INT || d == VDOM_FLOAT || d == VDOM_BOOL || d == VDOM_PTR;
+                }
                 case LIR::LIR_Op::RegionMove: {
                     // Neutral exactly when lowering emits nothing: the scalar
                     // gate below, or a source register whose tuple is
@@ -3069,12 +3655,32 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 // Virtual tuple propagation: a move of an unmaterialized
                 // tuple copies its scalar element slots instead of forcing
                 // a heap allocation. Erased destinations still need the
-                // tagged word, so they fall through to the boxed path.
-                if (!dst_is_erased && inst.a != UINT32_MAX && vtuples.count(inst.a)) {
-                    if (vt_info.canon_regs.count(inst.dst))
-                        canon_capture(inst.dst, vtuples[inst.a]);
-                    else
+                // tagged word — except record-typed (frame/tuple) ones,
+                // which propagate the virtual container itself.
+                const bool dst_is_record = s_lang_type_is_record(lir_func, inst.dst);
+                if ((!dst_is_erased || dst_is_record) && inst.a != UINT32_MAX && vtuples.count(inst.a)) {
+                    // Frame aliases share backing element slots (canonical
+                    // pseudo registers or INOUT buffers) so field writes
+                    // through one name are visible through every other —
+                    // preserving reference semantics. Non-shareable element
+                    // descriptors (read-only flattened params) fall back to
+                    // capturing values into the destination's own slots.
+                    bool share = vframes.count(inst.a) != 0;
+                    if (share) {
+                        for (const auto& e : vtuples[inst.a]) {
+                            if (!e.canon_elem && !e.mem_base) { share = false; break; }
+                        }
+                    }
+                    if (share) {
                         vtuples[inst.dst] = vtuples[inst.a];
+                        vframes.insert(inst.dst);
+                    } else if (vt_info.canon_regs.count(inst.dst)) {
+                        canon_capture(inst.dst, vtuples[inst.a]);
+                        if (vframes.count(inst.a)) vframes.insert(inst.dst);
+                    } else {
+                        vtuples[inst.dst] = vtuples[inst.a];
+                        if (vframes.count(inst.a)) vframes.insert(inst.dst);
+                    }
                     if (reg_types.count(inst.a)) reg_types[inst.dst] = reg_types[inst.a];
                     else if (inst.type_a != LIR::Type::Void) reg_types[inst.dst] = inst.type_a;
                     break;
@@ -3842,8 +4448,40 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     auto* i64ty = context_->getIntegerType(64);
                     std::vector<ir::Value*> dargs;
                     bool direct_ok = true;
+                    // INOUT record params: caller-owned field buffers whose
+                    // contents the callee may mutate; written back after the
+                    // call — into shared virtual-record slots for virtual
+                    // args, or via lymar_aot_frame_set_field for real ones.
+                    struct InoutWriteback { uint32_t argreg; ir::Value* buf; bool real_frame; ir::Value* frame_ptr; const std::vector<int>* doms; };
+                    std::vector<InoutWriteback> inout_writebacks;
+                    auto buf_store = [&](ir::Value* buf, size_t j, int dom, ir::Value* v) {
+                        if (dom == VDOM_FLOAT) {
+                            if (!v->getType()->isFloatingPoint())
+                                v = builder_->createExternCall("lymar_aot_to_float", {v}, context_->getDoubleType());
+                        } else if (v->getType() != i64ty) {
+                            v = builder_->createCast(v, i64ty);
+                        }
+                        ir::Value* addr = builder_->createAdd(buf,
+                            context_->getConstantInt(i64ty, static_cast<long long>(j * 8)));
+                        auto* st = builder_->createStore(v, addr);
+                        if (dom == VDOM_FLOAT || dom == VDOM_INT || dom == VDOM_BOOL)
+                            st->setName("scalar_store_vt");
+                    };
+                    auto buf_load = [&](ir::Value* buf, size_t j, int dom) -> ir::Value* {
+                        ir::Value* addr = builder_->createAdd(buf,
+                            context_->getConstantInt(i64ty, static_cast<long long>(j * 8)));
+                        return (dom == VDOM_FLOAT)
+                            ? static_cast<ir::Value*>(builder_->createLoadd(addr))
+                            : static_cast<ir::Value*>(builder_->createLoadl(addr));
+                    };
+                    auto param_is_frame = [&](size_t pi) -> bool {
+                        auto lt = dcallee->register_language_types.find(static_cast<uint32_t>(pi));
+                        return lt != dcallee->register_language_types.end() && lt->second &&
+                            lt->second->tag == ::TypeTag::Frame;
+                    };
                     for (size_t pi = 0; pi < dcallee->param_count && direct_ok; ++pi) {
                         const auto& doms = dsig->param_elem_domains[pi];
+                        const bool inout = pi < dsig->param_inout.size() && dsig->param_inout[pi] == 2;
                         uint32_t argreg = inst.call_args[pi];
                         if (doms.empty()) {
                             LIR::Type at = (pi < inst.call_arg_types.size()) ? inst.call_arg_types[pi] : LIR::Type::I64;
@@ -3863,18 +4501,76 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                                 }
                             }
                             dargs.push_back(av);
-                        } else if (vtuples.count(argreg) && vtuples[argreg].size() == doms.size()) {
-                            for (size_t ei = 0; ei < doms.size(); ++ei)
-                                dargs.push_back(velem_value(vtuples[argreg][ei]));
+                        } else if (inout) {
+                            // Record param by in/out buffer: copy current field
+                            // values in; the callee's FrameSetField writes land
+                            // in the buffer and are copied back after the call.
+                            ir::Value* buf = entry_alloc(nullptr,
+                                context_->getConstantInt(i64ty, static_cast<long long>(doms.size() * 8)));
+                            // Virtual args must back every element with
+                            // shared storage (canon slot or INOUT buffer) or
+                            // post-call write-back cannot reach the value.
+                            bool shareable = vtuples.count(argreg) &&
+                                vtuples[argreg].size() == doms.size();
+                            if (shareable) {
+                                const auto& elems = vtuples[argreg];
+                                for (size_t ei = 0; ei < elems.size(); ++ei) {
+                                    const auto& e = elems[ei];
+                                    if ((!e.canon_elem && !e.mem_base) || e.domain != doms[ei]) {
+                                        shareable = false; break;
+                                    }
+                                }
+                            }
+                            bool real_frame = !shareable;
+                            ir::Value* frame_ptr = nullptr;
+                            if (real_frame) frame_ptr = load_reg(argreg, LIR::Type::Ptr);
+                            for (size_t ei = 0; ei < doms.size(); ++ei) {
+                                ir::Value* fv = nullptr;
+                                if (!real_frame) {
+                                    const auto& e = vtuples[argreg][ei];
+                                    fv = e.has ? velem_value(e)
+                                        : (e.domain == VDOM_FLOAT)
+                                            ? static_cast<ir::Value*>(context_->getConstantFP(context_->getDoubleType(), 0.0))
+                                            : static_cast<ir::Value*>(context_->getConstantInt(i64ty, 0));
+                                } else {
+                                    ir::Value* raw = builder_->createExternCall("lymar_aot_frame_get_field",
+                                        {frame_ptr, context_->getConstantInt(i64ty, static_cast<long long>(ei))}, i64ty);
+                                    int d = doms[ei];
+                                    if (d == VDOM_FLOAT) fv = untag_word(raw, UINT32_MAX, LIR::Type::F64);
+                                    else if (d == VDOM_INT) fv = untag_word(raw, UINT32_MAX, LIR::Type::I64);
+                                    else if (d == VDOM_BOOL) fv = untag_word(raw, UINT32_MAX, LIR::Type::Bool);
+                                    else fv = raw; // VDOM_TAGGED: already a word
+                                }
+                                buf_store(buf, ei, doms[ei], fv);
+                            }
+                            dargs.push_back(buf);
+                            inout_writebacks.push_back({argreg, buf, real_frame, frame_ptr, &doms});
+                        } else if (vtuples.count(argreg)) {
+                            const auto& elems = vtuples[argreg];
+                            bool doms_match = elems.size() == doms.size();
+                            for (size_t ei = 0; doms_match && ei < elems.size(); ++ei)
+                                doms_match = elems[ei].domain == doms[ei];
+                            if (doms_match) {
+                                for (size_t ei = 0; ei < doms.size(); ++ei)
+                                    dargs.push_back(velem_value(elems[ei]));
+                            } else {
+                                direct_ok = false;
+                            }
                         } else {
                             if (vtuples.count(argreg)) materialize_vtuple(argreg);
-                            ir::Value* tup = load_reg(argreg, LIR::Type::Ptr);
-                            used_builtins_.insert("lm_tuple_get");
-                            ir::Function* gfn = current_module_->getFunction("lm_tuple_get");
-                            if (!gfn) gfn = builder_->createFunction("lm_tuple_get", i64ty, {i64ty, i64ty});
+                            ir::Value* obj = load_reg(argreg, LIR::Type::Ptr);
                             for (size_t ei = 0; ei < doms.size(); ++ei) {
-                                ir::Value* raw = builder_->createCall(gfn,
-                                    {tup, context_->getConstantInt(i64ty, static_cast<long long>(ei))}, i64ty);
+                                ir::Value* raw;
+                                if (param_is_frame(pi)) {
+                                    raw = builder_->createExternCall("lymar_aot_frame_get_field",
+                                        {obj, context_->getConstantInt(i64ty, static_cast<long long>(ei))}, i64ty);
+                                } else {
+                                    used_builtins_.insert("lm_tuple_get");
+                                    ir::Function* gfn = current_module_->getFunction("lm_tuple_get");
+                                    if (!gfn) gfn = builder_->createFunction("lm_tuple_get", i64ty, {i64ty, i64ty});
+                                    raw = builder_->createCall(gfn,
+                                        {obj, context_->getConstantInt(i64ty, static_cast<long long>(ei))}, i64ty);
+                                }
                                 int d = doms[ei];
                                 if (d == VDOM_FLOAT) dargs.push_back(untag_word(raw, UINT32_MAX, LIR::Type::F64));
                                 else if (d == VDOM_INT) dargs.push_back(untag_word(raw, UINT32_MAX, LIR::Type::I64));
@@ -3884,11 +4580,42 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                             }
                         }
                     }
-                    if (dsig->ret_sret) {
+                    auto emit_inout_writebacks = [&]() {
+                        for (const auto& wb : inout_writebacks) {
+                            if (wb.real_frame) {
+                                for (size_t j = 0; j < wb.doms->size(); ++j) {
+                                    ir::Value* v = buf_load(wb.buf, j, (*wb.doms)[j]);
+                                    ir::Value* tagged;
+                                    switch ((*wb.doms)[j]) {
+                                        case VDOM_FLOAT: tagged = tag_word(v); break;
+                                        case VDOM_INT:
+                                            tagged = builder_->createExternCall("lymar_aot_tag_int", {v}, i64ty);
+                                            break;
+                                        case VDOM_BOOL:
+                                            tagged = builder_->createExternCall("lymar_aot_tag_bool", {v}, i64ty);
+                                            break;
+                                        case VDOM_PTR:
+                                            tagged = builder_->createExternCall("lymar_aot_tag_pointer", {v}, i64ty);
+                                            break;
+                                        default: tagged = v; break;
+                                    }
+                                    builder_->createExternCall("lymar_aot_frame_set_field",
+                                        {wb.frame_ptr, context_->getConstantInt(i64ty, static_cast<long long>(j)), tagged},
+                                        context_->getVoidType());
+                                }
+                            } else if (vtuples.count(wb.argreg) && vtuples[wb.argreg].size() == wb.doms->size()) {
+                                for (size_t j = 0; j < wb.doms->size(); ++j) {
+                                    canon_store_elem(vtuples[wb.argreg][j], buf_load(wb.buf, j, (*wb.doms)[j]));
+                                }
+                            }
+                        }
+                    };
+                    if (direct_ok && dsig->ret_sret) {
                         ir::Value* buf = entry_alloc(nullptr,
                             context_->getConstantInt(i64ty, static_cast<long long>(dsig->ret_domains.size() * 8)));
                         dargs.push_back(buf);
                         builder_->createCall(dfn, dargs);
+                        emit_inout_writebacks();
                         if (inst.op == LIR::LIR_Op::Call && inst.dst != UINT32_MAX) {
                             std::vector<VTupleElem> relem(dsig->ret_domains.size());
                             for (size_t ei = 0; ei < relem.size(); ++ei) {
@@ -3902,15 +4629,26 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                                 ve.has = true;
                                 relem[ei] = ve;
                             }
-                            if (vt_info.canon_regs.count(inst.dst))
+                            if (vt_info.canon_regs.count(inst.dst)) {
                                 canon_capture(inst.dst, relem);
-                            else
+                            } else {
                                 vtuples[inst.dst] = std::move(relem);
+                            }
+                            if (dsig->ret_frame) vframes.insert(inst.dst);
                             reg_types[inst.dst] = LIR::Type::Ptr;
                         }
-                    } else {
+                    } else if (direct_ok) {
                         ir::Value* res = builder_->createCall(dfn, dargs);
+                        emit_inout_writebacks();
                         if (inst.op == LIR::LIR_Op::Call && inst.dst != UINT32_MAX) {
+                            if (dsig->ret_nil) {
+                                // The .direct callee returns the constant
+                                // VAL_NIL word; storing the constant keeps the
+                                // slot store provably scalar (no region edge).
+                                store_reg(inst.dst,
+                                    context_->getConstantInt(i64ty, 2), LIR::Type::Ptr, true);
+                                break;
+                            }
                             LIR::Type res_t = dsig->ret_float ? LIR::Type::F64 : inst.result_type;
                             if (res_t == LIR::Type::F64 || res_t == LIR::Type::F32) {
                                 store_float_reg(inst.dst, res);
@@ -3921,7 +4659,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                             }
                         }
                     }
-                    break;
+                    if (direct_ok) break;
                 }
 
                 std::vector<ir::Value*> args;
@@ -5375,6 +6113,34 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 break;
             }
             case LIR::LIR_Op::NewFrame: {
+                // Virtual record: small primitive-field frames whose value
+                // never escapes stay as canonical element slots — no heap
+                // LmFrame is allocated unless a use materializes it.
+                {
+                    auto nlt = lir_func.register_language_types.find(inst.dst);
+                    if (nlt != lir_func.register_language_types.end() && nlt->second &&
+                        nlt->second->tag == ::TypeTag::Frame && vt_info.safe.count(inst.dst)) {
+                        auto* nft = std::get_if<FrameType>(&nlt->second->extra);
+                        const FrameFieldInfo* ninfo = nft ? frame_field_info(nft->name) : nullptr;
+                        std::vector<int> nscratch;
+                        const std::vector<int>* ndoms = frame_flat_domains(ninfo, nscratch);
+                        if (ndoms && !ndoms->empty()) {
+                            if (vt_info.canon_regs.count(inst.dst)) {
+                                vtuples[inst.dst] = canon_elems(inst.dst);
+                            } else {
+                                std::vector<VTupleElem> elems(ndoms->size());
+                                for (size_t j = 0; j < elems.size(); ++j) {
+                                    elems[j].domain = (*ndoms)[j];
+                                    elems[j].has = false;
+                                }
+                                vtuples[inst.dst] = std::move(elems);
+                            }
+                            vframes.insert(inst.dst);
+                            reg_types[inst.dst] = LIR::Type::Ptr;
+                            break;
+                        }
+                    }
+                }
                 std::string name = !inst.type_name.empty() ? inst.type_name : (!inst.func_name.empty() ? inst.func_name : "Frame");
                 uint32_t fields = static_cast<uint32_t>(inst.imm);
                 // LmFrame layout:
@@ -5425,6 +6191,31 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 break;
             }
             case LIR::LIR_Op::FrameGetField: {
+                // Virtual record field read: element domains already hold the
+                // post-untag representation, so the value flows straight into
+                // the same store_reg shape the boxed path produces.
+                if (vtuples.count(inst.a)) {
+                    uint32_t field_idx = (inst.b != UINT32_MAX) ? inst.b : static_cast<uint32_t>(inst.imm);
+                    if (field_idx < vtuples[inst.a].size()) {
+                        const auto& e = vtuples[inst.a][static_cast<size_t>(field_idx)];
+                        const bool float_result = inst.result_type == LIR::Type::F64 || inst.result_type == LIR::Type::F32;
+                        const bool dst_erased = lang_type_is_erased(inst.dst);
+                        LIR::Type store_t = float_result && !dst_erased ? inst.result_type
+                            : (float_result ? LIR::Type::Ptr : inst.result_type);
+                        if (e.has) {
+                            store_reg(inst.dst, velem_value(e), store_t, true);
+                        } else {
+                            // Unset field: a real frame reads nil; push it
+                            // through the same untag path boxed reads take.
+                            ir::Value* word = builder_->createExternCall("lymar_aot_nil", {},
+                                context_->getIntegerType(64));
+                            word = untag_word(word, inst.dst, inst.result_type);
+                            store_reg(inst.dst, word, store_t, true);
+                        }
+                        break;
+                    }
+                    materialize_vtuple(inst.a);
+                }
                 uint32_t field_idx = (inst.b != UINT32_MAX) ? inst.b : static_cast<uint32_t>(inst.imm);
                 ir::Value* frame_ptr = load_reg(inst.a, LIR::Type::Ptr);
                 ir::Value* word = builder_->createExternCall("lymar_aot_frame_get_field",
@@ -5453,6 +6244,32 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 break;
             }
             case LIR::LIR_Op::FrameSetField: {
+                // Virtual record field write: store into the element's
+                // backing slot (canonical pseudo register or INOUT buffer)
+                // so every alias observes the mutation.
+                if (vtuples.count(inst.dst)) {
+                    if (vtuples.count(inst.b)) materialize_vtuple(inst.b);
+                    uint32_t field_idx = inst.a;
+                    if (field_idx < vtuples[inst.dst].size()) {
+                        auto& elem = vtuples[inst.dst][static_cast<size_t>(field_idx)];
+                        if (elem.canon_elem || elem.mem_base) {
+                            // Canonical slots keep each domain's raw
+                            // representation: scalars unboxed, TAGGED fields
+                            // as LmValue words (same word the boxed path
+                            // stores), PTR fields as raw addresses.
+                            ir::Value* fv = load_reg(inst.b, inst.type_b);
+                            if (elem.domain == VDOM_TAGGED) {
+                                fv = tag_word(fv, inst.b, inst.type_b);
+                            } else if (elem.domain == VDOM_PTR) {
+                                fv = untag_word(tag_word(fv, inst.b, inst.type_b),
+                                                inst.b, LIR::Type::Ptr);
+                            }
+                            canon_store_elem(elem, fv);
+                            break;
+                        }
+                    }
+                    materialize_vtuple(inst.dst);
+                }
                 ir::Value* frame_ptr = load_reg(inst.dst, LIR::Type::Ptr);
                 uint32_t field_idx = inst.a;
                 ir::Value* val = tag_word(load_reg(inst.b, inst.type_b), inst.b, inst.type_b);
@@ -5643,9 +6460,14 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     ir::Function* gfn = nullptr;
                     if (!have_vt && inst.a != UINT32_MAX) {
                         tup = load_reg(inst.a, inst.type_a);
-                        used_builtins_.insert("lm_tuple_get");
-                        gfn = current_module_->getFunction("lm_tuple_get");
-                        if (!gfn) gfn = builder_->createFunction("lm_tuple_get", i64ty, {i64ty, i64ty});
+                        if (dctx->ret_frame) {
+                            // Real (materialized) frame: read fields through
+                            // the same tagged-word accessor boxed code uses.
+                        } else {
+                            used_builtins_.insert("lm_tuple_get");
+                            gfn = current_module_->getFunction("lm_tuple_get");
+                            if (!gfn) gfn = builder_->createFunction("lm_tuple_get", i64ty, {i64ty, i64ty});
+                        }
                     }
                     for (size_t j = 0; j < n; ++j) {
                         int dom = dctx->ret_domains[j];
@@ -5657,8 +6479,14 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                                 ? static_cast<ir::Value*>(context_->getConstantFP(context_->getDoubleType(), 0.0))
                                 : static_cast<ir::Value*>(context_->getConstantInt(i64ty, 0));
                         } else if (tup) {
-                            ir::Value* raw = builder_->createCall(gfn,
-                                {tup, context_->getConstantInt(i64ty, static_cast<long long>(j))}, i64ty);
+                            ir::Value* raw;
+                            if (dctx->ret_frame) {
+                                raw = builder_->createExternCall("lymar_aot_frame_get_field",
+                                    {tup, context_->getConstantInt(i64ty, static_cast<long long>(j))}, i64ty);
+                            } else {
+                                raw = builder_->createCall(gfn,
+                                    {tup, context_->getConstantInt(i64ty, static_cast<long long>(j))}, i64ty);
+                            }
                             if (dom == VDOM_FLOAT) ev = untag_word(raw, UINT32_MAX, LIR::Type::F64);
                             else if (dom == VDOM_INT) ev = untag_word(raw, UINT32_MAX, LIR::Type::I64);
                             else if (dom == VDOM_BOOL) ev = untag_word(raw, UINT32_MAX, LIR::Type::Bool);
@@ -5683,7 +6511,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                             if (scalar_dom) st->setName("scalar_store_sret");
                         }
                     }
-                    if (have_vt) vtuples.erase(inst.a);
+                    if (have_vt) { vtuples.erase(inst.a); vframes.erase(inst.a); }
                     builder_->createRet(context_->getConstantInt(i64ty, 0));
                     terminated = true;
                     break;
@@ -5749,7 +6577,12 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     }
                     builder_->createRet(ret_val);
                 } else {
-                    builder_->createRet(builder_->createExternCall("lymar_aot_nil", {}, context_->getIntegerType(64)));
+                    // VAL_NIL is the constant word 2; `.direct` variants emit
+                    // it directly so `: nil` functions stay call-free and
+                    // inlinable (lymar_aot_nil() just returns 2).
+                    builder_->createRet(dctx
+                        ? static_cast<ir::Value*>(context_->getConstantInt(context_->getIntegerType(64), 2))
+                        : builder_->createExternCall("lymar_aot_nil", {}, context_->getIntegerType(64)));
                 }
                 terminated = true;
                 break;
@@ -6517,8 +7350,9 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
         }
     }
     if (!terminated && builder_->getInsertPoint())
-        builder_->createRet(main_fn->getName() == "main"
-            ? static_cast<ir::Value*>(context_->getConstantInt(context_->getIntegerType(64), 0))
+        builder_->createRet(main_fn->getName() == "main" || dctx
+            ? static_cast<ir::Value*>(context_->getConstantInt(context_->getIntegerType(64),
+                main_fn->getName() == "main" ? 0 : 2))
             : builder_->createExternCall("lymar_aot_nil", {}, context_->getIntegerType(64)));
 }
 

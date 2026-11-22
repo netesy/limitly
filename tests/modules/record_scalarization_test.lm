@@ -1,0 +1,78 @@
+import tests.modules.record_geom as g;
+
+fn main(): int {
+    // Scalar record: FLAT reads, INOUT mutation, sret construction.
+    var a = g.Vec2(1.0, 2.0);
+    var b = g.make_vec(3.0, 4.0);
+    assert(a.dot(b) == 11.0, "method dot");
+    assert(g.dot(a, b) == 11.0, "free dot");
+    assert(a.sum() == 3.0, "sum");
+    a.scale(2.0);
+    assert(a.x == 2.0 and a.y == 4.0, "scale mutates");
+    g.bump(b, 1.0);
+    assert(b.x == 4.0 and b.y == 5.0, "bump mutates param");
+
+    // Mixed str/int/float fields.
+    var n = g.Named("alpha", 3, 1.5);
+    assert(n.label == "alpha", "str field");
+    assert(n.count == 3, "int field");
+    assert(n.score == 1.5, "float field");
+    assert(n.describe() == "alpha", "method str");
+    assert(g.total(n) == 4.5, "total");
+    g.rename(n, "beta");
+    assert(n.label == "beta", "renamed");
+    assert(n.describe() == "beta", "describe after rename");
+    var m = g.make_named("gamma", 7, 2.5);
+    assert(m.label == "gamma" and m.count == 7, "sret mixed");
+
+    // bool + any + nested-frame + str fields.
+    var inner = g.Inner(9);
+    var bag = g.make_bag(true, 42, inner, "hi");
+    assert(bag.flag == true, "bool field");
+    assert(bag.note == 42, "any field");
+    assert(bag.inner.v == 9, "nested frame");
+    assert(bag.summary() == "hi", "bag summary");
+    bag.note = "changed";
+    assert(bag.note == "changed", "any mutate");
+
+    // Unset fields read as nil.
+    var s1 = g.Sparse(5);
+    assert(s1.geta() == 5, "sparse a");
+    assert(s1.getb() == nil, "unset field is nil");
+
+    // Multiple CFG return paths producing the same record type.
+    var p1 = g.pick(true, 1);
+    var p2 = g.pick(false, 1);
+    assert(p1.geta() == 1 and p2.geta() == 101, "multi-path returns");
+
+    // deinit frames must stay real objects.
+    var t = g.Tracked(42);
+    t.note = "hello";
+    assert(t.id == 42 and t.note == "hello", "tracked fields");
+
+    // Oversized record (>8 fields) stays boxed but correct.
+    var w = g.Wide();
+    w.f0 = 1; w.f1 = 2; w.f2 = 3; w.f3 = 4; w.f4 = 5;
+    w.f5 = 6; w.f6 = 7; w.f7 = 8; w.f8 = 9;
+    assert(w.total() == 45, "wide boxed");
+
+    // Escaping use: storing a record into a list materializes it once.
+    var xs = [];
+    xs.append(n);
+    var got = xs[0] as g.Named;
+    assert(got.label == "beta", "escaped list elem");
+    assert(got.count == 3 and got.score == 1.5, "escaped fields");
+
+    // Loop-carried virtual record with field mutation across back-edges.
+    var acc = g.Named("acc", 0, 0.0);
+    var i = 0;
+    while (i < 10) {
+        acc.count = acc.count + 1;
+        acc.score = acc.score + 0.5;
+        i = i + 1;
+    }
+    assert(acc.count == 10 and acc.score == 5.0, "loop carried");
+
+    print("record_scalarization_test: PASSED");
+    return 0;
+}

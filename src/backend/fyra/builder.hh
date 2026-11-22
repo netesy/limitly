@@ -78,17 +78,28 @@ private:
     struct DirectParamMap { uint32_t orig; int32_t elem; int32_t domain; };
     struct DirectFnCtx {
         bool sret_return = false;
+        bool ret_frame = false; // sret payload is a virtual record, not a tuple
         std::vector<int> ret_domains; // element domains for sret returns
         std::vector<DirectParamMap> params; // per ir::Function parameter
+        // orig LIR reg -> field domains for INOUT record params (elem == -2).
+        std::unordered_map<uint32_t, std::vector<int>> inout_domains;
     };
-    // Per-original-parameter element domains for tuple params (empty = scalar
-    // passthrough). Domains use the VDom encoding from builder.cpp.
+    // Per-original-parameter element domains for tuple/record params (empty =
+    // scalar passthrough). Domains use the VDom encoding from builder.cpp.
+    // param_inout[i] != 0 marks a record param passed as a pointer to a
+    // caller-owned field buffer so callee mutations propagate back.
     struct DirectFnSig {
         bool eligible = false;
         std::vector<std::vector<int>> param_elem_domains;
+        std::vector<char> param_inout;
         bool ret_sret = false;
+        bool ret_frame = false;
         std::vector<int> ret_domains;
         bool ret_float = false;
+        // Callee returns nil: the .direct result is the constant VAL_NIL (2),
+        // so callers can store a provably-scalar constant instead of the call
+        // result and skip the region edge on the destination slot.
+        bool ret_nil = false;
     };
 
     ir::Type* lir_type_to_fyra_type(LIR::Type lir_type);
@@ -113,8 +124,24 @@ private:
         std::unordered_map<uint32_t, std::vector<int>> canon_domains;
     };
     VtSafeInfo compute_vt_safe(const LIR::LIR_Function& fn, const DirectFnSig* sig);
+    // Frame field-domain table: LIR FrameType extras never carry field
+    // types, so domains are recovered from FrameGetField/FrameSetField
+    // evidence across all registered functions plus NewFrame field counts.
+    struct FrameFieldInfo {
+        int field_count = -1;
+        std::vector<int> domains; // VDom per field; VDOM_INVALID = conflict
+        bool deinit = false;
+    };
+    void build_frame_field_table();
+    const FrameFieldInfo* frame_field_info(const std::string& name);
+    // Resolve flattenable field domains or nullptr (unknown/oversized/
+    // conflicting/deinit). Unobserved fields degrade to VDOM_TAGGED.
+    static const std::vector<int>* frame_flat_domains(const FrameFieldInfo* info,
+                                                      std::vector<int>& scratch);
     std::unordered_map<std::string, DirectFnSig> direct_sigs_;
     std::unordered_map<std::string, DirectFnCtx> direct_contexts_;
+    std::unordered_map<std::string, FrameFieldInfo> frame_fields_;
+    bool frame_fields_built_ = false;
 };
 
 } // namespace LM::Backend::Fyra

@@ -1,0 +1,155 @@
+// Library for record_scalarization_test.lm — small named records that the
+// AOT backend may scalarize across module boundaries (.direct ABI + virtual
+// records). Exercises scalar, string, any, nested-frame, unset-field,
+// deinit, oversized, and escaping cases.
+
+frame Vec2 {
+    pub var x: float;
+    pub var y: float;
+
+    pub init(a: float, b: float) {
+        self.x = a;
+        self.y = b;
+    }
+
+    pub fn dot(o: Vec2): float {
+        return self.x * o.x + self.y * o.y;
+    }
+
+    pub fn sum(): float {
+        return self.x + self.y;
+    }
+
+    pub fn scale(k: float): nil {
+        self.x = self.x * k;
+        self.y = self.y * k;
+    }
+}
+
+frame Named {
+    pub var label: str;
+    pub var count: int;
+    pub var score: float;
+
+    pub init(s: str, n: int, f: float) {
+        self.label = s;
+        self.count = n;
+        self.score = f;
+    }
+
+    pub fn describe(): str {
+        return self.label;
+    }
+}
+
+frame Bag {
+    pub var flag: bool;
+    pub var note: any;
+    pub var inner: Inner;
+    pub var extra: str;
+
+    pub init(f: bool, n: any, i: Inner, s: str) {
+        self.flag = f;
+        self.note = n;
+        self.inner = i;
+        self.extra = s;
+    }
+
+    pub fn summary(): str {
+        return self.extra;
+    }
+}
+
+frame Inner {
+    pub var v: int;
+
+    pub init(x: int) {
+        self.v = x;
+    }
+}
+
+frame Tracked {
+    pub var id: int;
+    pub var note: any;
+
+    pub init(i: int) {
+        self.id = i;
+        self.note = nil;
+    }
+
+    pub deinit() {
+    }
+}
+
+frame Sparse {
+    pub var a: int;
+    pub var b: str;
+
+    pub init(x: int) {
+        self.a = x;
+    }
+
+    pub fn geta(): int {
+        return self.a;
+    }
+
+    pub fn getb(): str {
+        return self.b;
+    }
+}
+
+frame Wide {
+    pub var f0: int;
+    pub var f1: int;
+    pub var f2: int;
+    pub var f3: int;
+    pub var f4: int;
+    pub var f5: int;
+    pub var f6: int;
+    pub var f7: int;
+    pub var f8: int;
+
+    pub init() {
+    }
+
+    pub fn total(): int {
+        return self.f0 + self.f1 + self.f2 + self.f3 + self.f4 +
+               self.f5 + self.f6 + self.f7 + self.f8;
+    }
+}
+
+pub fn make_vec(a: float, b: float): Vec2 {
+    return Vec2(a, b);
+}
+
+pub fn bump(v: Vec2, k: float): nil {
+    v.x = v.x + k;
+    v.y = v.y + k;
+}
+
+pub fn dot(a: Vec2, b: Vec2): float {
+    return a.x * b.x + a.y * b.y;
+}
+
+pub fn make_named(s: str, n: int, f: float): Named {
+    return Named(s, n, f);
+}
+
+pub fn rename(n: Named, s: str): nil {
+    n.label = s;
+}
+
+pub fn total(n: Named): float {
+    return n.score + n.count as float;
+}
+
+pub fn make_bag(f: bool, n: any, i: Inner, s: str): Bag {
+    return Bag(f, n, i, s);
+}
+
+pub fn pick(c: bool, x: int): Sparse {
+    if (c) {
+        return Sparse(x);
+    }
+    return Sparse(x + 100);
+}
