@@ -1577,7 +1577,22 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
             registry_lookup_name = mod_name + "." + sym_name;
         }
 
-        if (auto intrinsic = IntrinsicRegistry::getInstance().getIntrinsic(registry_lookup_name)) {
+        auto intrinsic = IntrinsicRegistry::getInstance().getIntrinsic(registry_lookup_name);
+        // Module-internal calls use bare names (e.g. `library_load(path)`
+        // inside std.ffi). The registry keys on qualified names, so fall
+        // back to `current_module_.name` — this is what lets std.ffi's own
+        // helpers reach the VM intrinsics their stub bodies shadow.
+        if (!intrinsic.has_value() && func_name.find('.') == std::string::npos &&
+            !current_module_.empty() && current_module_ != "root") {
+            std::string mod_qualified = current_module_ + "." + func_name;
+            auto mod_intrinsic = IntrinsicRegistry::getInstance().getIntrinsic(mod_qualified);
+            if (mod_intrinsic.has_value()) {
+                intrinsic = mod_intrinsic;
+                registry_lookup_name = mod_qualified;
+            }
+        }
+
+        if (intrinsic.has_value()) {
             std::vector<Reg> arg_regs;
             arg_regs.reserve(expr.arguments.size());
             for (const auto& arg : expr.arguments) arg_regs.push_back(emit_argument(*arg, arg_regs.size()));

@@ -3999,10 +3999,18 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 break;
             }
             case LIR::LIR_Op::ListLen: {
+                // Inline the lm_list_len body: unbox the tagged word and load
+                // the header size field at +16. The builtin performs no type
+                // checks, so this is semantically identical but avoids a call
+                // per iteration in `iter` loops (ListLen is re-emitted in the
+                // loop header to preserve live-view semantics).
                 used_builtins_.insert("lm_list_len");
-                ir::Function* fn = current_module_->getFunction("lm_list_len");
-                if (!fn) fn = builder_->createFunction("lm_list_len", context_->getIntegerType(64), {context_->getIntegerType(64)});
-                store_reg(inst.dst, builder_->createCall(fn, {load_reg(inst.a, inst.type_a)}, lir_type_to_fyra_type(inst.result_type)), inst.result_type);
+                ir::Value* raw = load_reg(inst.a, inst.type_a);
+                ir::Value* unboxed = builder_->createAnd(raw, context_->getConstantInt(context_->getIntegerType(64), ~7ULL));
+                ir::Value* len_addr = builder_->createAdd(unboxed, context_->getConstantInt(context_->getIntegerType(64), 16));
+                ir::Instruction* len = builder_->createLoadl(len_addr);
+                len->setName("list_len_" + std::to_string(label_counter_++));
+                store_reg(inst.dst, len, inst.result_type);
                 break;
             }
             case LIR::LIR_Op::TupleCreate: {

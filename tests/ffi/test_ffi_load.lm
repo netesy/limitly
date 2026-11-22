@@ -1,0 +1,58 @@
+// FFI loader + ergonomics test: ffi.load / ffi.load_first, typed calls,
+// fn-value callbacks, and with_cstring. Uses kernel32.dll (always present
+// on Windows) so no fixture build is required.
+import std.ffi as ffi;
+
+pub fn cb_add(a: int, b: int): int {
+    return a + b;
+}
+
+fn main() {
+    unsafe {
+        // ffi.load must actually load (module-internal intrinsic dispatch).
+        var lib = ffi.load("kernel32.dll");
+        assert(lib.is_loaded, "ffi.load(kernel32.dll) failed");
+        assert(lib.handle != 0, "ffi.load returned null handle");
+
+        // ffi.load_first skips missing candidates.
+        var first = ffi.load_first(["definitely_missing_lib_xyz_123", "kernel32"]);
+        assert(first.is_loaded, "ffi.load_first fallback failed");
+
+        // Missing library reports not-loaded instead of crashing.
+        var missing = ffi.load("definitely_missing_lib_xyz_123");
+        assert(not missing.is_loaded, "ffi.load should fail for missing lib");
+
+        // Typed scalar call through the loaded library: GetTickCount64
+        // takes no args and returns u64 — call_i64_0 covers it.
+        var tick = ffi.call_i64_0(lib.symbol("GetTickCount64"));
+        assert(tick > 0, "GetTickCount64 returned non-positive");
+
+        // call_void_0: GetSystemTimeAsFileTime writes through an out-param;
+        // use a 2-ptr variant instead is overkill — just verify the symbol
+        // resolves and a void call doesn't crash on a harmless target.
+        var sym = lib.symbol("GetCurrentProcessId");
+        var pid = ffi.call_i64_0(sym);
+        assert(pid > 0, "GetCurrentProcessId returned non-positive");
+
+        // callback_create accepts a fn value directly (no fragile name str).
+        var h = ffi.callback_create(cb_add, [ffi.TYPE_I64, ffi.TYPE_I64], ffi.TYPE_I64);
+        assert(h != 0, "callback_create(fn value) failed");
+        var p = ffi.callback_ptr(h);
+        assert(p != 0, "callback_ptr returned null");
+        ffi.callback_destroy(h);
+
+        // callback_create still accepts the legacy string form.
+        var h2 = ffi.callback_create("cb_add", [ffi.TYPE_I64, ffi.TYPE_I64], ffi.TYPE_I64);
+        assert(h2 != 0, "callback_create(str) failed");
+        ffi.callback_destroy(h2);
+
+        // with_cstring frees on every path.
+        var echoed = ffi.with_cstring("roundtrip", fn(ptr: pubptr): any {
+            return ffi.cstring_to_string(ptr);
+        });
+        assert(echoed == "roundtrip", "with_cstring roundtrip failed");
+
+        lib.close();
+    }
+    print("ffi_load_test: PASS");
+}

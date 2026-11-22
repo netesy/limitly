@@ -68,6 +68,12 @@ tests/concurrency/concurrent_blocks.lm
 # FFI ABI and callback ownership
 tests/ffi/test_trampoline.lm
 tests/ffi/test_hardening.lm
+# ffi.load / ffi.load_first, typed scalar calls, fn-value callbacks,
+# with_cstring (kernel32.dll — no fixture build required)
+tests/ffi/test_ffi_load.lm
+# Real C fixture: scalar/float/pointer/string calls + C->Lymar callback
+# roundtrip through libnative_fixture (.dll/.so; skips if not built)
+tests/ffi/test_native_fixture.lm
 # Pure-Lymar Win32 window proof (WNDCLASSEXA marshaling + WndProc callback
 # trampoline + message pump, all via std.ffi — no C glue, no sokol)
 tests/ffi/win32_window.lm

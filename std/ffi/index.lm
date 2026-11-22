@@ -243,8 +243,23 @@ pub fn foreign_call(func_ptr: fnptr, args: [any], return_type: int = 6, param_ty
 pub fn call_i64_0(func_ptr: fnptr): int { return 0; }
 pub fn call_i64_1(func_ptr: fnptr, arg1: int): int { return 0; }
 pub fn call_i64_2(func_ptr: fnptr, arg1: int, arg2: int): int { return 0; }
-pub fn call_f64_2(func_ptr: fnptr, arg1: f64, arg2: f64): f64 { return 0.0; }
+pub fn call_i64_3(func_ptr: fnptr, arg1: int, arg2: int, arg3: int): int { return 0; }
+pub fn call_i64_4(func_ptr: fnptr, arg1: int, arg2: int, arg3: int, arg4: int): int { return 0; }
+pub fn call_f64_0(func_ptr: fnptr): float { return 0.0; }
+pub fn call_f64_1(func_ptr: fnptr, arg1: f64): float { return 0.0; }
+pub fn call_f64_2(func_ptr: fnptr, arg1: f64, arg2: f64): float { return 0.0; }
+pub fn call_f64_3(func_ptr: fnptr, arg1: f64, arg2: f64, arg3: f64): float { return 0.0; }
+pub fn call_f64_4(func_ptr: fnptr, arg1: f64, arg2: f64, arg3: f64, arg4: f64): float { return 0.0; }
+pub fn call_ptr_0(func_ptr: fnptr): pubptr { return 0; }
+pub fn call_ptr_1(func_ptr: fnptr, arg1: pubptr): pubptr { return 0; }
+pub fn call_ptr_2(func_ptr: fnptr, arg1: pubptr, arg2: pubptr): pubptr { return 0; }
+pub fn call_ptr_3(func_ptr: fnptr, arg1: pubptr, arg2: pubptr, arg3: pubptr): pubptr { return 0; }
+pub fn call_ptr_4(func_ptr: fnptr, arg1: pubptr, arg2: pubptr, arg3: pubptr, arg4: pubptr): pubptr { return 0; }
+pub fn call_void_0(func_ptr: fnptr): nil {}
 pub fn call_void_1(func_ptr: fnptr, arg1: pubptr): nil {}
+pub fn call_void_2(func_ptr: fnptr, arg1: pubptr, arg2: pubptr): nil {}
+pub fn call_void_3(func_ptr: fnptr, arg1: pubptr, arg2: pubptr, arg3: pubptr): nil {}
+pub fn call_void_4(func_ptr: fnptr, arg1: pubptr, arg2: pubptr, arg3: pubptr, arg4: pubptr): nil {}
 
 // CString wrapper
 frame CString {
@@ -296,6 +311,16 @@ pub fn cstring_free(cs: CString): nil {
 
 pub fn cstring_as_ptr(cs: CString): pubptr {
     return cs.ptr;
+}
+
+// with_cstring runs `body` with a NUL-terminated copy of `s` and frees it
+// afterwards on every path — the scoped alternative to manual
+// string_to_cstring + cstring_free pairs that cannot leak on early exits.
+pub fn with_cstring(s: str, body: fn(pubptr): any): any {
+    var cs = string_to_cstring(s);
+    var result = body(cstring_as_ptr(cs));
+    cstring_free(cs);
+    return result;
 }
 
 pub fn cstring_from_ptr(p: pubptr, take_ownership: int): CString {
@@ -420,7 +445,7 @@ pub fn load_first(candidates: [str]): Library {
 
 // ── Native Callback / Trampoline API ──────────────────────────────────────
 
-pub fn callback_create(func_name: str, arg_types: [any], ret_type: int): int {
+pub fn callback_create(func_name: any, arg_types: [any], ret_type: int): int {
     return 0; // implemented by the CallbackCreate LIR intrinsic via intrinsic_registry
 }
 
