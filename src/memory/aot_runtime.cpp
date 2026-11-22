@@ -1603,6 +1603,12 @@ static uint64_t format_argument(uint64_t value, bool printable) {
                     text += integer_text(static_cast<int64_t>(element));
                 } else if (element_kind == 2) {
                     text += element ? "true" : "false";
+                } else if (element_kind == 3) {
+                    double number;
+                    std::memcpy(&number, &element, sizeof(number));
+                    char buffer[64];
+                    std::snprintf(buffer, sizeof(buffer), "%.6g", number);
+                    text += buffer;
                 } else {
                     text += nested(element);
                 }
@@ -2076,10 +2082,59 @@ extern "C" void lymar_aot_list_append(uint64_t list_val, uint64_t val) {
     } catch (...) {
     }
 }
+// Raw-f64 append for element-kind-3 ([float]/[f64]) lists: stores the IEEE-754
+// bit pattern directly and records no ownership edge — a double's bits are
+// never a managed reference, and the exact-match heap check in
+// lymar_aot_list_append could false-positive on denormal bit patterns.
+extern "C" void lymar_aot_list_append_f64(uint64_t list_val, double val) {
+    try {
+        RuntimeGuard guard;
+        if (!list_val) return;
+        uint64_t list_ptr = list_val & ~7ULL;
+        auto& h = heap();
+        auto found = h.allocations.find(list_ptr);
+        if (found == h.allocations.end() || found->second.size < 32) return;
+        auto* words = reinterpret_cast<uint64_t*>(list_ptr);
+        if ((words[0] & 0xffffffff) != 1) return;
+        if ((words[0] >> 32) != 3) {
+            // Defensive: the list lost its typed-kind marker (e.g. an erased
+            // view created it before ListCreate stamped the kind). Fall back
+            // to a boxed tagged append so erased readers still decode it.
+            lymar_aot_list_append(list_val, lymar_aot_box_float(val));
+            return;
+        }
+        uint64_t len = words[2];
+        uint64_t cap = words[3];
+        if (len >= cap) {
+            uint64_t new_cap = cap ? cap * 2 : 8;
+            uint64_t old_data = words[1];
+            uint64_t new_data = lymar_aot_alloc(new_cap * sizeof(uint64_t));
+            if (!new_data) return;
+            if (old_data && len > 0) {
+                std::memcpy(reinterpret_cast<void*>(new_data),
+                            reinterpret_cast<const void*>(old_data),
+                            len * sizeof(uint64_t));
+            }
+            words[1] = new_data;
+            words[3] = new_cap;
+            lymar_aot_edge(list_ptr + 8, new_data);
+            if (found->second.owner != h.active) {
+                h.promote(new_data, found->second.owner);
+            }
+        }
+        auto* data = reinterpret_cast<uint64_t*>(words[1]);
+        uint64_t bits;
+        std::memcpy(&bits, &val, sizeof(bits));
+        data[len] = bits;
+        words[2] = len + 1;
+    } catch (...) {
+    }
+}
 // Element-storage kind for TYPE_LIST objects, kept in the high 32 bits of the
 // header word (low 32 bits hold the object type). 0 = tagged LmValue elements
-// (default), 1 = raw int elements, 2 = raw bool elements. Typed primitive
-// lists store unboxed scalars; the formatter needs this to decode them.
+// (default), 1 = raw int elements, 2 = raw bool elements, 3 = raw IEEE-754
+// f64 elements. Typed primitive lists store unboxed scalars; the formatter
+// needs this to decode them.
 extern "C" void lymar_aot_list_set_element_kind(uint64_t list_val, uint64_t kind) {
     try {
         RuntimeGuard guard;
@@ -2099,16 +2154,28 @@ extern "C" void lymar_aot_list_set_element_kind(uint64_t list_val, uint64_t kind
 //   0 = elements already tagged LmValue words -> passthrough
 //   1 = raw int64 elements -> tag_int
 //   2 = raw bool elements (0/1) -> tag_bool
+//   3 = raw IEEE-754 f64 elements -> box_float
 extern "C" uint64_t lymar_aot_list_elem_decode(uint64_t elem, uint64_t elem_kind) {
     if (elem_kind == 1) return lymar_aot_tag_int(static_cast<int64_t>(elem));
     if (elem_kind == 2) return lymar_aot_tag_bool(elem);
+    if (elem_kind == 3) {
+        double number;
+        std::memcpy(&number, &elem, sizeof(number));
+        return lymar_aot_box_float(number);
+    }
     return elem;
 }
-// Encode a tagged LmValue into element-storage form for kind 1/2 lists; kind 0
+// Encode a tagged LmValue into element-storage form for kind 1/2/3 lists; kind 0
 // passes the tagged word through unchanged.
 extern "C" uint64_t lymar_aot_list_elem_encode(uint64_t tagged, uint64_t elem_kind) {
     if (elem_kind == 1) return static_cast<uint64_t>(lymar_aot_untag_int(tagged));
     if (elem_kind == 2) return static_cast<uint64_t>(lymar_aot_untag_bool(tagged));
+    if (elem_kind == 3) {
+        double number = lymar_aot_to_float(tagged);
+        uint64_t bits;
+        std::memcpy(&bits, &number, sizeof(bits));
+        return bits;
+    }
     return tagged;
 }
 // Kind-aware element store for erased-view writes: encodes the tagged value per

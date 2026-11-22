@@ -127,6 +127,19 @@ void lower_region_ownership(ir::Module& module, const std::unordered_map<std::st
     declare("lymar_aot_global_edge", 2, void_type);
     declare("lymar_aot_list_append", 2, void_type);
     declare("lymar_aot_list_append_tagged", 2, void_type);
+    {
+        // Mixed signature (i64 list, f64 element): declare() only supports a
+        // uniform argument type, so this one is spelled out.
+        auto* fn = module.getFunction("lymar_aot_list_append_f64");
+        if (!fn) {
+            auto created = std::make_unique<ir::Function>(void_type, "lymar_aot_list_append_f64", &module);
+            fn = created.get();
+            fn->addParameter(std::make_unique<ir::Parameter>(i64, "a0"));
+            fn->addParameter(std::make_unique<ir::Parameter>(ctx->getDoubleType(), "a1"));
+            module.addFunction(std::move(created));
+        }
+        helpers["lymar_aot_list_append_f64"] = fn;
+    }
     declare("lymar_aot_list_elem_decode", 2, i64);
     declare("lymar_aot_list_elem_encode", 2, i64);
     declare("lymar_aot_list_elem_store", 3, void_type);

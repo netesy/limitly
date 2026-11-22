@@ -129,7 +129,7 @@ static bool s_is_typed_primitive_list(const LIR::LIR_Function& f, uint32_t r) {
                 etag != ::TypeTag::TraitObject &&
                 etag != ::TypeTag::Union && etag != ::TypeTag::ErrorUnion &&
                 etag != ::TypeTag::Nil &&
-                etag != ::TypeTag::Float32 && etag != ::TypeTag::Float64 &&
+                etag != ::TypeTag::Float32 &&
                 etag != ::TypeTag::Decimal2 && etag != ::TypeTag::Decimal4 &&
                 etag != ::TypeTag::Decimal6) {
                 return true;
@@ -152,6 +152,8 @@ static uint64_t s_typed_list_element_kind(const LIR::LIR_Function& f, uint32_t r
         case ::TypeTag::UInt: case ::TypeTag::UInt8: case ::TypeTag::UInt16:
         case ::TypeTag::UInt32: case ::TypeTag::UInt64:
             return 1;
+        case ::TypeTag::Float64:
+            return 3;
         default: return 0;
     }
 }
@@ -4749,6 +4751,13 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 if (!is_typed_primitive_list(inst.a) || lang_type_holds_tagged_word(inst.b)) {
                     elem_val = tag_word(elem_val, inst.b, inst.type_b);
                     builder_->createExternCall("lymar_aot_list_append_tagged", {list_val, elem_val}, context_->getVoidType());
+                } else if (elem_kind == 3) {
+                    // Raw f64 storage: pass the double directly so the runtime
+                    // stores IEEE-754 bits with no box and no edge barrier.
+                    ir::Value* fval = elem_val;
+                    if (fval->getType() != context_->getDoubleType())
+                        fval = builder_->createCast(fval, context_->getDoubleType());
+                    builder_->createExternCall("lymar_aot_list_append_f64", {list_val, fval}, context_->getVoidType());
                 } else {
                     builder_->createExternCall("lymar_aot_list_append", {list_val, elem_val}, context_->getVoidType());
                 }
@@ -4792,6 +4801,21 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     }
                     ir::Value* offset = builder_->createMul(idx_val, context_->getConstantInt(context_->getIntegerType(64), 8));
                     ir::Value* elem_addr = builder_->createAdd(data_ptr, offset);
+                    // Kind-3 ([float]/[f64]) lists store raw IEEE-754 doubles:
+                    // load them as f64 directly — no decode call, no box, and
+                    // erased destinations re-box through lymar_aot_box_float.
+                    if (typed_list_element_kind(inst.a) == 3) {
+                        ir::Instruction* felem = builder_->createLoadd(elem_addr);
+                        felem->setName("scalar_elem_" + lidx_id);
+                        if (lang_type_holds_tagged_word(inst.dst)) {
+                            ir::Value* boxed = builder_->createExternCall("lymar_aot_box_float",
+                                {felem}, context_->getIntegerType(64));
+                            store_reg(inst.dst, boxed, inst.result_type);
+                        } else {
+                            store_reg(inst.dst, felem, LIR::Type::F64);
+                        }
+                        break;
+                    }
                     ir::Instruction* elem = builder_->createLoadl(elem_addr);
                     elem->setName("scalar_elem_" + lidx_id);
                     // The typed-primitive fast path loads the raw unboxed word.
@@ -4988,7 +5012,11 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                         if (auto* add_inst = dynamic_cast<ir::Instruction*>(elem_addr))
                             add_inst->setName("scalar_elem_" + lset_id);
                         ir::Value* raw = elem_val;
-                        if (raw->getType() != context_->getIntegerType(64))
+                        auto* raw_ty = raw->getType();
+                        if (raw_ty == context_->getFloatType())
+                            raw = builder_->createCast(raw, context_->getDoubleType());
+                        else if (raw_ty != context_->getDoubleType() &&
+                                 raw_ty != context_->getIntegerType(64))
                             raw = builder_->createCast(raw, context_->getIntegerType(64));
                         auto* store_inst = builder_->createStore(raw, elem_addr);
                         store_inst->setName("scalar_store_" + lset_id);
