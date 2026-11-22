@@ -450,6 +450,11 @@ private:
     };
     std::vector<RangeBoundProof> range_bound_proofs_;
     bool range_index_bound_proven(LM::Frontend::AST::IndexExpr& expr, Reg object_reg, Reg index_reg);
+    // Same proof driven by raw object/index expressions so index-assignment
+    // targets (xs[i] = v) can mark ListSet imm|=0x1 as well.
+    bool range_index_bound_proven(LM::Frontend::AST::Expression* object,
+                                  LM::Frontend::AST::Expression* index,
+                                  Reg object_reg, Reg index_reg);
 
     // Function symbol table for visibility control
     struct FunctionInfo {

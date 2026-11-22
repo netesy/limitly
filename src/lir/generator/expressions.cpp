@@ -2779,6 +2779,16 @@ Reg Generator::emit_assign_expr(LM::Frontend::AST::AssignExpr& expr) {
             LIR_Op get_op = is_dict ? LIR_Op::DictGet : (is_tuple ? LIR_Op::TupleGet : LIR_Op::ListIndex);
             LIR_Op set_op = is_list ? LIR_Op::ListSet : (is_tuple ? LIR_Op::TupleSet : LIR_Op::DictSet);
 
+            // Bound-proven range-loop store: same proof as bound-proven
+            // ListIndex fetches — the loop header re-reads xs.len() and
+            // compares i < len immediately before the body, and neither the
+            // index nor list registers may be rewritten between the header
+            // check and this access. imm|=0x1 lets the AOT backend emit a
+            // straight-line store with no bounds/null/type CFG.
+            const bool index_bound_proven = is_list &&
+                range_index_bound_proven(expr.object.get(), expr.index.get(),
+                                         object_reg, index_reg) ? 1 : 0;
+
             // `coll[i] op= rhs` is a read-modify-write too, exactly like the field
             // case above: the Set opcodes store precisely the value they are given,
             // and `value` is only the right-hand side. Reading the current element
@@ -2798,7 +2808,7 @@ Reg Generator::emit_assign_expr(LM::Frontend::AST::AssignExpr& expr) {
                 Type abi_type = language_type_to_abi_type(result_type);
 
                 Reg current = allocate_register();
-                emit_instruction(LIR_Inst(get_op, abi_type, current, object_reg, index_reg));
+                emit_instruction(LIR_Inst(get_op, abi_type, current, object_reg, index_reg, index_bound_proven));
                 set_register_language_type(current, result_type);
                 set_register_abi_type(current, abi_type);
                 set_register_type(current, result_type);
@@ -2816,7 +2826,7 @@ Reg Generator::emit_assign_expr(LM::Frontend::AST::AssignExpr& expr) {
                 stored = current;
             }
 
-            emit_instruction(LIR_Inst(set_op, Type::Void, object_reg, index_reg, stored));
+            emit_instruction(LIR_Inst(set_op, Type::Void, object_reg, index_reg, stored, index_bound_proven));
             return stored;
         }
     } else {
@@ -2924,8 +2934,14 @@ Reg Generator::emit_checked_dereference(LM::Frontend::AST::Expression& object, R
 // grows, and the header re-reads len), and captured-variable accesses
 // resolve to different registers so they fail the reg equality checks.
 bool Generator::range_index_bound_proven(LM::Frontend::AST::IndexExpr& expr, Reg object_reg, Reg index_reg) {
-    auto obj_var = dynamic_cast<LM::Frontend::AST::VariableExpr*>(expr.object.get());
-    auto idx_var = dynamic_cast<LM::Frontend::AST::VariableExpr*>(expr.index.get());
+    return range_index_bound_proven(expr.object.get(), expr.index.get(), object_reg, index_reg);
+}
+
+bool Generator::range_index_bound_proven(LM::Frontend::AST::Expression* object_expr,
+                                         LM::Frontend::AST::Expression* index_expr,
+                                         Reg object_reg, Reg index_reg) {
+    auto obj_var = dynamic_cast<LM::Frontend::AST::VariableExpr*>(object_expr);
+    auto idx_var = dynamic_cast<LM::Frontend::AST::VariableExpr*>(index_expr);
     if (!obj_var || !idx_var || object_reg == UINT32_MAX || index_reg == UINT32_MAX) return false;
     for (auto it = range_bound_proofs_.rbegin(); it != range_bound_proofs_.rend(); ++it) {
         const auto& p = *it;

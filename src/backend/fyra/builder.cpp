@@ -20,6 +20,8 @@
 #include "backend/vm/vm_value_base.hh"
 #include "backend/vm/vm_runtime.hh"
 #include <unordered_map>
+#include <map>
+#include <set>
 #include <string>
 #include <vector>
 #include <sstream>
@@ -32,6 +34,400 @@
 #include "backend/native/binding_generator.hh"
 
 namespace LM::Backend::Fyra {
+
+// Element domains for virtual (unboxed) tuple values and the `.direct`
+// flattened call ABI. Every domain occupies exactly one 8-byte slot:
+// Float -> f64 bits, Int/Bool -> raw i64, Ptr -> raw address, Tagged ->
+// tagged LmValue word. Invalid marks types that cannot cross the boundary.
+enum VDom : int { VDOM_INT = 0, VDOM_FLOAT = 1, VDOM_BOOL = 2, VDOM_PTR = 3, VDOM_TAGGED = 4, VDOM_INVALID = 5 };
+
+static VDom vdom_of_type(const TypePtr& t, LIR::Type fallback = LIR::Type::Void) {
+    if (!t) {
+        if (fallback == LIR::Type::F64 || fallback == LIR::Type::F32) return VDOM_FLOAT;
+        if (fallback == LIR::Type::Bool) return VDOM_BOOL;
+        if (fallback == LIR::Type::Ptr) return VDOM_PTR;
+        return VDOM_INT;
+    }
+    switch (t->tag) {
+        case ::TypeTag::Float32: case ::TypeTag::Float64: return VDOM_FLOAT;
+        case ::TypeTag::Bool: return VDOM_BOOL;
+        case ::TypeTag::Int: case ::TypeTag::Int8: case ::TypeTag::Int16:
+        case ::TypeTag::Int32: case ::TypeTag::Int64:
+        case ::TypeTag::UInt: case ::TypeTag::UInt8: case ::TypeTag::UInt16:
+        case ::TypeTag::UInt32: case ::TypeTag::UInt64: return VDOM_INT;
+        case ::TypeTag::Any: case ::TypeTag::Union: case ::TypeTag::ErrorUnion:
+        case ::TypeTag::Sum: case ::TypeTag::Function: case ::TypeTag::Closure:
+        case ::TypeTag::Module: case ::TypeTag::Range: case ::TypeTag::Channel:
+        case ::TypeTag::Nil: return VDOM_TAGGED;
+        case ::TypeTag::String: case ::TypeTag::List: case ::TypeTag::Dict:
+        case ::TypeTag::Frame: case ::TypeTag::Enum: case ::TypeTag::Trait:
+        case ::TypeTag::TraitObject: case ::TypeTag::UserDefined:
+        case ::TypeTag::Tuple: return VDOM_PTR;
+        default: return VDOM_INVALID;
+    }
+}
+
+// One element of a virtual tuple: either a direct SSA value (function
+// parameters of `.direct` variants and sret loads) or a reference to the
+// source register whose slot is reloaded at each use (keeps loads
+// control-flow correct across CFG joins).
+struct VTupleElem {
+    ir::Value* direct_v = nullptr;
+    uint32_t src_reg = UINT32_MAX;
+    LIR::Type src_type = LIR::Type::Void;
+    int domain = VDOM_INT;
+    bool has = false;
+    // Canonical spill-slot element: src_reg is a pseudo register whose slot
+    // every definition writes and every use reloads (loop-variant tuples).
+    bool canon_elem = false;
+};
+
+// Register-domain classification, factored out of build_function_body so the
+// region-purity analysis can compute the same pointer/tagged sets for callee
+// functions (each function's RegionMove neutrality must use its own sets).
+static bool s_lang_type_is_erased(const LIR::LIR_Function& f, uint32_t reg) {
+    auto it = f.register_language_types.find(reg);
+    if (it == f.register_language_types.end() || !it->second) return false;
+    switch (it->second->tag) {
+        case ::TypeTag::Any: case ::TypeTag::Union: case ::TypeTag::ErrorUnion:
+        case ::TypeTag::Nil: case ::TypeTag::String: case ::TypeTag::List:
+        case ::TypeTag::Dict: case ::TypeTag::Tuple: case ::TypeTag::Frame:
+        case ::TypeTag::Enum: case ::TypeTag::Trait: case ::TypeTag::TraitObject:
+        case ::TypeTag::Sum: case ::TypeTag::Function: case ::TypeTag::Closure:
+        case ::TypeTag::Module: case ::TypeTag::Range: case ::TypeTag::Channel:
+        case ::TypeTag::Int128: case ::TypeTag::UInt128:
+            return true;
+        default:
+            return false;
+    }
+}
+
+static bool s_lang_type_holds_tagged_word(const LIR::LIR_Function& f, uint32_t reg) {
+    auto it = f.register_language_types.find(reg);
+    if (it == f.register_language_types.end() || !it->second) return false;
+    switch (it->second->tag) {
+        case ::TypeTag::Any: case ::TypeTag::Union: case ::TypeTag::ErrorUnion:
+        case ::TypeTag::Sum: case ::TypeTag::Function: case ::TypeTag::Closure:
+        case ::TypeTag::Module: case ::TypeTag::Range: case ::TypeTag::Channel:
+        case ::TypeTag::Int128: case ::TypeTag::UInt128:
+            return true;
+        default:
+            return false;
+    }
+}
+
+static bool s_is_typed_primitive_list(const LIR::LIR_Function& f, uint32_t r) {
+    auto it = f.register_language_types.find(r);
+    if (it != f.register_language_types.end() && it->second && it->second->tag == ::TypeTag::List) {
+        auto* lt = std::get_if<ListType>(&it->second->extra);
+        if (lt && lt->elementType) {
+            auto etag = lt->elementType->tag;
+            if (etag != ::TypeTag::List && etag != ::TypeTag::String &&
+                etag != ::TypeTag::Frame && etag != ::TypeTag::Dict &&
+                etag != ::TypeTag::Tuple && etag != ::TypeTag::Any &&
+                etag != ::TypeTag::Enum && etag != ::TypeTag::Trait &&
+                etag != ::TypeTag::TraitObject &&
+                etag != ::TypeTag::Union && etag != ::TypeTag::ErrorUnion &&
+                etag != ::TypeTag::Nil &&
+                etag != ::TypeTag::Float32 && etag != ::TypeTag::Float64 &&
+                etag != ::TypeTag::Decimal2 && etag != ::TypeTag::Decimal4 &&
+                etag != ::TypeTag::Decimal6) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+static uint64_t s_typed_list_element_kind(const LIR::LIR_Function& f, uint32_t r) {
+    if (!s_is_typed_primitive_list(f, r)) return 0;
+    auto it = f.register_language_types.find(r);
+    if (it == f.register_language_types.end() || !it->second) return 0;
+    auto* lt = std::get_if<ListType>(&it->second->extra);
+    if (!lt || !lt->elementType) return 0;
+    switch (lt->elementType->tag) {
+        case ::TypeTag::Bool: return 2;
+        case ::TypeTag::Int: case ::TypeTag::Int8: case ::TypeTag::Int16:
+        case ::TypeTag::Int32: case ::TypeTag::Int64:
+        case ::TypeTag::UInt: case ::TypeTag::UInt8: case ::TypeTag::UInt16:
+        case ::TypeTag::UInt32: case ::TypeTag::UInt64:
+            return 1;
+        default: return 0;
+    }
+}
+
+static bool s_bitwise_operand_erased(const LIR::LIR_Function& f, uint32_t reg, LIR::Type type) {
+    if (reg == UINT32_MAX) return false;
+    if (type == LIR::Type::Ptr) return true;
+    auto rt = f.register_types.find(reg);
+    if (rt != f.register_types.end() && rt->second == LIR::Type::Ptr) return true;
+    auto lt = f.register_language_types.find(reg);
+    if (lt != f.register_language_types.end() && lt->second &&
+        (lt->second->tag == ::TypeTag::Int128 || lt->second->tag == ::TypeTag::UInt128)) return true;
+    return false;
+}
+
+static bool s_declared_scalar(const LIR::LIR_Function& f, uint32_t reg) {
+    auto it = f.register_language_types.find(reg);
+    if (it != f.register_language_types.end() && it->second) {
+        switch (it->second->tag) {
+            case ::TypeTag::Bool:
+            case ::TypeTag::Int: case ::TypeTag::Int8: case ::TypeTag::Int16:
+            case ::TypeTag::Int32: case ::TypeTag::Int64:
+            case ::TypeTag::UInt: case ::TypeTag::UInt8: case ::TypeTag::UInt16:
+            case ::TypeTag::UInt32: case ::TypeTag::UInt64:
+            case ::TypeTag::Float32: case ::TypeTag::Float64:
+            case ::TypeTag::Decimal2: case ::TypeTag::Decimal4: case ::TypeTag::Decimal6:
+                return true;
+            default: break;
+        }
+    }
+    return false;
+}
+
+static bool s_lang_type_is_pointerish(const LIR::LIR_Function& f, uint32_t reg) {
+    auto it = f.register_language_types.find(reg);
+    if (it != f.register_language_types.end() && it->second) {
+        auto tag = it->second->tag;
+        if (tag == ::TypeTag::List || tag == ::TypeTag::String || tag == ::TypeTag::Frame ||
+            tag == ::TypeTag::Dict || tag == ::TypeTag::Tuple || tag == ::TypeTag::Any ||
+            tag == ::TypeTag::Enum || tag == ::TypeTag::Trait || tag == ::TypeTag::TraitObject ||
+            tag == ::TypeTag::Union || tag == ::TypeTag::ErrorUnion || tag == ::TypeTag::Sum ||
+            tag == ::TypeTag::Function || tag == ::TypeTag::Closure || tag == ::TypeTag::Module ||
+            tag == ::TypeTag::Range || tag == ::TypeTag::Channel ||
+            tag == ::TypeTag::Nil || tag == ::TypeTag::Int128 || tag == ::TypeTag::UInt128)
+            return true;
+    }
+    auto it2 = f.register_types.find(reg);
+    if (it2 != f.register_types.end() && it2->second == LIR::Type::Ptr) return true;
+    return false;
+}
+
+struct RegDomainSets {
+    std::unordered_set<uint32_t> pointer_assigned;
+    std::unordered_set<uint32_t> tagged_word;
+};
+
+// Pointer/tagged-word register classification for one LIR function. Mirrors
+// the prepass inside build_function_body verbatim; kept in sync by sharing
+// the s_* helpers above.
+static RegDomainSets compute_reg_domain_sets(const LIR::LIR_Function& lir_func) {
+    RegDomainSets out;
+    auto& pointer_assigned_regs = out.pointer_assigned;
+    auto& tagged_word_regs = out.tagged_word;
+    auto lang_type_is_erased = [&](uint32_t reg) -> bool { return s_lang_type_is_erased(lir_func, reg); };
+    auto lang_type_holds_tagged_word = [&](uint32_t reg) -> bool { return s_lang_type_holds_tagged_word(lir_func, reg); };
+    auto is_typed_primitive_list = [&](uint32_t r) -> bool { return s_is_typed_primitive_list(lir_func, r); };
+    auto bitwise_operand_erased = [&](uint32_t reg, LIR::Type type) { return s_bitwise_operand_erased(lir_func, reg, type); };
+    auto declared_scalar = [&](uint32_t reg) -> bool { return s_declared_scalar(lir_func, reg); };
+    for (const auto& inst : lir_func.instructions) {
+        if (inst.dst == UINT32_MAX) continue;
+        switch (inst.op) {
+            case LIR::LIR_Op::ListCreate:
+            case LIR::LIR_Op::TupleCreate:
+            case LIR::LIR_Op::DictCreate:
+            case LIR::LIR_Op::RefCreate:
+            case LIR::LIR_Op::RefResolve:
+            case LIR::LIR_Op::RefMove:
+            case LIR::LIR_Op::NewFrame:
+            case LIR::LIR_Op::MakeEnum:
+            case LIR::LIR_Op::ToString:
+            case LIR::LIR_Op::STR_CONCAT:
+            case LIR::LIR_Op::STR_FORMAT:
+            case LIR::LIR_Op::StringIndex:
+            case LIR::LIR_Op::ConstructError:
+            case LIR::LIR_Op::ConstructOk:
+            case LIR::LIR_Op::Unwrap:
+            case LIR::LIR_Op::UnwrapOr:
+            case LIR::LIR_Op::DictItems:
+            case LIR::LIR_Op::ResourceCreate:
+            case LIR::LIR_Op::ChannelAlloc:
+            case LIR::LIR_Op::MemoryAlloc:
+            case LIR::LIR_Op::MemoryResize:
+            case LIR::LIR_Op::LibraryLoad:
+            case LIR::LIR_Op::LibrarySymbol:
+            case LIR::LIR_Op::ForeignCall:
+            case LIR::LIR_Op::CallbackCreate:
+                pointer_assigned_regs.insert(inst.dst);
+                if (inst.op == LIR::LIR_Op::LibraryLoad ||
+                    inst.op == LIR::LIR_Op::LibrarySymbol ||
+                    (inst.op == LIR::LIR_Op::CallbackCreate && inst.imm == 1))
+                    tagged_word_regs.insert(inst.dst);
+                break;
+            case LIR::LIR_Op::MemoryLoad:
+                if (inst.imm >= 8) pointer_assigned_regs.insert(inst.dst);
+                break;
+            case LIR::LIR_Op::LoadGlobal: {
+                auto lt = lir_func.register_language_types.find(inst.dst);
+                bool scalar_global = false;
+                if (lt != lir_func.register_language_types.end() && lt->second) {
+                    switch (lt->second->tag) {
+                        case ::TypeTag::Bool:
+                        case ::TypeTag::Int: case ::TypeTag::Int8: case ::TypeTag::Int16:
+                        case ::TypeTag::Int32: case ::TypeTag::Int64: case ::TypeTag::Int128:
+                        case ::TypeTag::UInt: case ::TypeTag::UInt8: case ::TypeTag::UInt16:
+                        case ::TypeTag::UInt32: case ::TypeTag::UInt64: case ::TypeTag::UInt128:
+                        case ::TypeTag::Float32: case ::TypeTag::Float64:
+                        case ::TypeTag::Decimal2: case ::TypeTag::Decimal4: case ::TypeTag::Decimal6:
+                            scalar_global = true;
+                            break;
+                        default:
+                            break;
+                    }
+                }
+                if (!scalar_global) {
+                    pointer_assigned_regs.insert(inst.dst);
+                    if (lang_type_is_erased(inst.dst)) tagged_word_regs.insert(inst.dst);
+                }
+                break;
+            }
+            case LIR::LIR_Op::LoadConst:
+                if (IS_PTR(inst.const_val)) pointer_assigned_regs.insert(inst.dst);
+                break;
+            case LIR::LIR_Op::Cast:
+                if (inst.result_type == LIR::Type::Ptr) pointer_assigned_regs.insert(inst.dst);
+                break;
+            case LIR::LIR_Op::DictGet:
+            case LIR::LIR_Op::TupleGet:
+            case LIR::LIR_Op::FrameGetField:
+                if (lang_type_is_erased(inst.dst)) {
+                    pointer_assigned_regs.insert(inst.dst);
+                    if (lang_type_holds_tagged_word(inst.dst)) tagged_word_regs.insert(inst.dst);
+                }
+                break;
+            case LIR::LIR_Op::ListIndex:
+                if (!is_typed_primitive_list(inst.a) && lang_type_holds_tagged_word(inst.dst)) {
+                    pointer_assigned_regs.insert(inst.dst);
+                    tagged_word_regs.insert(inst.dst);
+                }
+                break;
+            case LIR::LIR_Op::IAdd_Unchecked:
+            case LIR::LIR_Op::Add:
+            case LIR::LIR_Op::Sub:
+            case LIR::LIR_Op::Mul:
+            case LIR::LIR_Op::Div:
+            case LIR::LIR_Op::Mod:
+            case LIR::LIR_Op::Neg: {
+                auto operand_may_be_erased = [&](uint32_t reg, LIR::Type type) {
+                    if (reg == UINT32_MAX) return false;
+                    if (type == LIR::Type::Ptr || type == LIR::Type::U64) return true;
+                    auto rt = lir_func.register_types.find(reg);
+                    if (rt != lir_func.register_types.end() &&
+                        (rt->second == LIR::Type::Ptr || rt->second == LIR::Type::U64)) return true;
+                    auto lt = lir_func.register_language_types.find(reg);
+                    if (lt != lir_func.register_language_types.end() && lt->second) {
+                        if (lt->second->tag == ::TypeTag::Int128 || lt->second->tag == ::TypeTag::UInt128)
+                            return true;
+                        switch (lt->second->tag) {
+                            case ::TypeTag::Any: case ::TypeTag::Union: case ::TypeTag::ErrorUnion:
+                            case ::TypeTag::Sum: case ::TypeTag::Function: case ::TypeTag::Closure:
+                            case ::TypeTag::Module: case ::TypeTag::Range: case ::TypeTag::Channel:
+                                return true;
+                            default: break;
+                        }
+                    }
+                    return false;
+                };
+                if ((operand_may_be_erased(inst.a, inst.type_a) ||
+                     operand_may_be_erased(inst.b, inst.type_b)) &&
+                    lang_type_holds_tagged_word(inst.dst)) {
+                    pointer_assigned_regs.insert(inst.dst);
+                    tagged_word_regs.insert(inst.dst);
+                }
+                break;
+            }
+            case LIR::LIR_Op::Shl:
+            case LIR::LIR_Op::Shr:
+            case LIR::LIR_Op::And:
+            case LIR::LIR_Op::Or:
+            case LIR::LIR_Op::Xor:
+            case LIR::LIR_Op::IAnd_Unchecked:
+            case LIR::LIR_Op::IOr_Unchecked:
+            case LIR::LIR_Op::IXor_Unchecked:
+                if ((bitwise_operand_erased(inst.a, inst.type_a) ||
+                     bitwise_operand_erased(inst.b, inst.type_b) ||
+                     bitwise_operand_erased(inst.dst, LIR::Type::I64)) &&
+                    lang_type_holds_tagged_word(inst.dst)) {
+                    pointer_assigned_regs.insert(inst.dst);
+                    tagged_word_regs.insert(inst.dst);
+                }
+                break;
+            case LIR::LIR_Op::ChannelPop:
+            case LIR::LIR_Op::ChannelRecv:
+            case LIR::LIR_Op::ChannelPoll:
+                if (lang_type_holds_tagged_word(inst.dst))
+                    tagged_word_regs.insert(inst.dst);
+                break;
+            case LIR::LIR_Op::Call:
+            case LIR::LIR_Op::CallVoid: {
+                if (!inst.func_name.empty()) {
+                    if (auto* cf = LIR::FunctionRegistry::getInstance().getFunction(inst.func_name)) {
+                        auto* rt = cf->return_language_type.get();
+                        if (rt) {
+                            switch (rt->tag) {
+                                case ::TypeTag::Int: case ::TypeTag::Int8: case ::TypeTag::Int16:
+                                case ::TypeTag::Int32: case ::TypeTag::Int64:
+                                case ::TypeTag::UInt: case ::TypeTag::UInt8: case ::TypeTag::UInt16:
+                                case ::TypeTag::UInt32: case ::TypeTag::UInt64:
+                                case ::TypeTag::Bool:
+                                case ::TypeTag::Float32: case ::TypeTag::Float64:
+                                case ::TypeTag::Decimal2: case ::TypeTag::Decimal4: case ::TypeTag::Decimal6:
+                                    break;
+                                default:
+                                    tagged_word_regs.insert(inst.dst);
+                                    break;
+                            }
+                        }
+                    }
+                }
+                break;
+            }
+            default:
+                if (inst.result_type == LIR::Type::Ptr || lang_type_is_erased(inst.dst))
+                    pointer_assigned_regs.insert(inst.dst);
+                break;
+        }
+        if (inst.op == LIR::LIR_Op::Unwrap || inst.op == LIR::LIR_Op::UnwrapOr) {
+            if (lang_type_holds_tagged_word(inst.dst))
+                tagged_word_regs.insert(inst.dst);
+        }
+    }
+    bool moved = true;
+    while (moved) {
+        moved = false;
+        for (const auto& inst : lir_func.instructions) {
+            if (inst.op == LIR::LIR_Op::Mov && inst.dst != UINT32_MAX) {
+                bool dst_erased = false;
+                auto dlt = lir_func.register_language_types.find(inst.dst);
+                if (dlt != lir_func.register_language_types.end() && dlt->second &&
+                    lang_type_is_erased(inst.dst)) dst_erased = true;
+                if ((inst.a != UINT32_MAX && tagged_word_regs.count(inst.a)) || dst_erased) {
+                    if (tagged_word_regs.insert(inst.dst).second) moved = true;
+                }
+            }
+            if (inst.dst == UINT32_MAX || pointer_assigned_regs.count(inst.dst) || declared_scalar(inst.dst)) continue;
+            bool propagate = false;
+            if (inst.op == LIR::LIR_Op::Mov) {
+                propagate = inst.a != UINT32_MAX && pointer_assigned_regs.count(inst.a);
+            } else if (inst.op == LIR::LIR_Op::IAdd_Unchecked || inst.op == LIR::LIR_Op::Add ||
+                       inst.op == LIR::LIR_Op::Sub || inst.op == LIR::LIR_Op::Mul ||
+                       inst.op == LIR::LIR_Op::Div || inst.op == LIR::LIR_Op::Mod ||
+                       inst.op == LIR::LIR_Op::Neg) {
+                propagate = (inst.a != UINT32_MAX && pointer_assigned_regs.count(inst.a)) ||
+                            (inst.b != UINT32_MAX && pointer_assigned_regs.count(inst.b));
+            }
+            if (propagate) {
+                pointer_assigned_regs.insert(inst.dst);
+                moved = true;
+            }
+        }
+    }
+    for (auto it = pointer_assigned_regs.begin(); it != pointer_assigned_regs.end();) {
+        if (declared_scalar(*it)) it = pointer_assigned_regs.erase(it);
+        else ++it;
+    }
+    return out;
+}
 
 namespace {
 // Byte size of a scalar CType, mirroring the header parser's struct layout
@@ -555,6 +951,8 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
     }
     constructed_frames_ = constructed_frames;
     reachable_funcs_ = reachable_funcs;
+    direct_sigs_.clear();
+    direct_contexts_.clear();
 
     // Collect every string literal in reachable code. Indirect-call callee
     // names (fn values, closures, task/callback targets) always originate as
@@ -652,6 +1050,46 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
             ret_type = context_->getDoubleType();
         }
         builder_->createFunction(ir_name, ret_type, param_types);
+
+        // `.direct` flattened-ABI variant: tuple params become per-element
+        // scalar parameters and tuple returns take a hidden sret buffer, so
+        // eligible cross-module calls skip the tagged heap-tuple ABI.
+        const DirectFnSig* dsig = direct_sig_for(func_name);
+        if (dsig->eligible) {
+            DirectFnCtx dctx;
+            dctx.sret_return = dsig->ret_sret;
+            dctx.ret_domains = dsig->ret_domains;
+            std::vector<ir::Type*> dpts;
+            for (size_t pi = 0; pi < f->param_count; ++pi) {
+                const auto& doms = dsig->param_elem_domains[pi];
+                if (doms.empty()) {
+                    ir::Type* pty = context_->getIntegerType(64);
+                    auto lt = f->register_language_types.find(pi);
+                    if (lt != f->register_language_types.end() && lt->second &&
+                        (lt->second->tag == ::TypeTag::Float64 || lt->second->tag == ::TypeTag::Float32))
+                        pty = context_->getDoubleType();
+                    {
+                        auto rt = f->register_types.find(pi);
+                        if (rt != f->register_types.end() && (rt->second == LIR::Type::F64 || rt->second == LIR::Type::F32))
+                            pty = context_->getDoubleType();
+                    }
+                    dpts.push_back(pty);
+                    dctx.params.push_back({static_cast<uint32_t>(pi), -1, VDOM_INT});
+                } else {
+                    for (size_t ei = 0; ei < doms.size(); ++ei) {
+                        dpts.push_back(doms[ei] == VDOM_FLOAT
+                            ? static_cast<ir::Type*>(context_->getDoubleType())
+                            : static_cast<ir::Type*>(context_->getIntegerType(64)));
+                        dctx.params.push_back({static_cast<uint32_t>(pi), static_cast<int32_t>(ei), doms[ei]});
+                    }
+                }
+            }
+            if (dsig->ret_sret) dpts.push_back(context_->getIntegerType(64));
+            ir::Type* dret = context_->getIntegerType(64);
+            if (!dsig->ret_sret && dsig->ret_float) dret = context_->getDoubleType();
+            builder_->createFunction(func_name + ".direct", dret, dpts);
+            direct_contexts_[func_name] = dctx;
+        }
     }
 
     auto is_instruction_float = [](const LIR::LIR_Function* f_func, uint32_t reg) -> bool {
@@ -707,6 +1145,14 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
         if (fn) {
             build_function_body(fn, *f);
         }
+    }
+
+    // 2b. Bodies of `.direct` flattened-ABI variants.
+    for (const auto& [dname, dctx] : direct_contexts_) {
+        auto* f = registry.getFunction(dname);
+        if (!f) continue;
+        auto* fn = current_module_->getFunction(dname + ".direct");
+        if (fn) build_function_body(fn, *f, &dctx);
     }
 
     // 3. Build the top-level main function body
@@ -1099,13 +1545,396 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
     return current_module_;
 }
 
-void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::LIR_Function& lir_func) {
+const LIRToFyraIRBuilder::DirectFnSig* LIRToFyraIRBuilder::direct_sig_for(const std::string& name) {
+    auto it = direct_sigs_.find(name);
+    if (it != direct_sigs_.end()) return &it->second;
+    DirectFnSig sig;
+    direct_sigs_.emplace(name, sig);
+    auto& out = direct_sigs_[name];
+
+    if (name == "main" || name == "__user_main" || name == "__top_level_wrapper__") return &out;
+    if (LIR::BuiltinUtils::isBuiltinFunction(name)) return &out;
+    auto* f = LIR::FunctionRegistry::getInstance().getFunction(name);
+    if (!f || reachable_funcs_.find(name) == reachable_funcs_.end()) return &out;
+    if (f->gpu_stage != 0) return &out;
+
+    auto tuple_domains = [](const TypePtr& lt, std::vector<int>& domains) -> bool {
+        if (!lt || lt->tag != ::TypeTag::Tuple) return false;
+        auto* tt = std::get_if<TupleType>(&lt->extra);
+        if (!tt || tt->elementTypes.empty() || tt->elementTypes.size() > 8) return true;
+        domains.clear();
+        for (const auto& et : tt->elementTypes) {
+            int d = vdom_of_type(et);
+            if (d == VDOM_INVALID) return false;
+            domains.push_back(d);
+        }
+        return true;
+    };
+
+    out.param_elem_domains.assign(f->param_count, {});
+    for (uint32_t i = 0; i < f->param_count; ++i) {
+        auto lt_it = f->register_language_types.find(i);
+        const TypePtr& lt = (lt_it != f->register_language_types.end()) ? lt_it->second : TypePtr();
+        if (lt && lt->tag == ::TypeTag::Tuple) {
+            std::vector<int> doms;
+            if (!tuple_domains(lt, doms)) return &out; // nested/oversized/invalid
+            out.param_elem_domains[i] = std::move(doms);
+        }
+    }
+
+    // Return shape: tuple returns use a caller-allocated sret buffer appended
+    // as the last flattened parameter; everything else returns one word.
+    const TypePtr* ret_lt = nullptr;
+    TypePtr ret_owned;
+    if (f->return_language_type) {
+        ret_owned = f->return_language_type;
+        ret_lt = &ret_owned;
+    } else {
+        for (const auto& inst : f->instructions) {
+            if ((inst.op == LIR::LIR_Op::Return || inst.op == LIR::LIR_Op::Ret) &&
+                inst.a != UINT32_MAX) {
+                auto rit = f->register_language_types.find(inst.a);
+                if (rit != f->register_language_types.end() && rit->second &&
+                    rit->second->tag == ::TypeTag::Tuple) {
+                    ret_owned = rit->second;
+                    ret_lt = &ret_owned;
+                }
+                break;
+            }
+        }
+    }
+    if (ret_lt && (*ret_lt)->tag == ::TypeTag::Tuple) {
+        std::vector<int> doms;
+        if (!tuple_domains(*ret_lt, doms) || doms.empty()) return &out;
+        out.ret_sret = true;
+        out.ret_domains = std::move(doms);
+    } else if (ret_lt) {
+        auto tag = (*ret_lt)->tag;
+        if (tag == ::TypeTag::Float32 || tag == ::TypeTag::Float64) out.ret_float = true;
+    } else {
+        for (const auto& inst : f->instructions) {
+            if (inst.op != LIR::LIR_Op::Return && inst.op != LIR::LIR_Op::Ret) continue;
+            if (inst.type_a == LIR::Type::F64 || inst.type_a == LIR::Type::F32) { out.ret_float = true; break; }
+            auto rt = f->register_types.find(inst.a);
+            if (rt != f->register_types.end() && (rt->second == LIR::Type::F64 || rt->second == LIR::Type::F32)) { out.ret_float = true; break; }
+        }
+    }
+
+    // Varargs entry points keep the standard ABI.
+    for (const auto& inst : f->instructions) {
+        if (inst.op == LIR::LIR_Op::VaStart || inst.op == LIR::LIR_Op::VaArg || inst.op == LIR::LIR_Op::VaEnd)
+            return &out;
+    }
+
+    out.eligible = true;
+    return &out;
+}
+
+LIRToFyraIRBuilder::VtSafeInfo LIRToFyraIRBuilder::compute_vt_safe(
+    const LIR::LIR_Function& fn, const DirectFnSig* sig) {
+    VtSafeInfo out;
+    // def_counts must count only true redefinitions: void-result ops
+    // (RegionEnter/Exit/Move, jumps, returns, Nop) are emitted with dst=0 —
+    // a valid parameter register! — and container ops (TupleSet/DictSet/
+    // ListSet/...) carry the mutated container in dst. Neither produces a
+    // new value for the register.
+    auto container_dst_use = [](LIR::LIR_Op op) -> bool {
+        switch (op) {
+            case LIR::LIR_Op::TupleSet: case LIR::LIR_Op::DictSet:
+            case LIR::LIR_Op::ListSet: case LIR::LIR_Op::ListAppend:
+            case LIR::LIR_Op::FrameSetField: case LIR::LIR_Op::FrameSetFieldAtomic:
+            case LIR::LIR_Op::FrameFieldAtomicAdd: case LIR::LIR_Op::FrameFieldAtomicSub:
+            case LIR::LIR_Op::TaskSetField: case LIR::LIR_Op::TaskSetState:
+                return true;
+            default: return false;
+        }
+    };
+    // Ops that never produce a fresh register value: their dst field is
+    // either the ctor default 0 (a valid parameter register!) or a mutated
+    // container. Return/Ret carry the value in `a`, RegionMove/Enter/Exit
+    // are bookkeeping, and the rest are control/meta ops.
+    auto non_defining_op = [](LIR::LIR_Op op) -> bool {
+        switch (op) {
+            case LIR::LIR_Op::Return: case LIR::LIR_Op::Ret:
+            case LIR::LIR_Op::RegionMove: case LIR::LIR_Op::RegionEnter:
+            case LIR::LIR_Op::RegionExit: case LIR::LIR_Op::Nop:
+            case LIR::LIR_Op::Label: case LIR::LIR_Op::Jump:
+            case LIR::LIR_Op::JumpIf: case LIR::LIR_Op::JumpIfFalse:
+            case LIR::LIR_Op::FuncDef: case LIR::LIR_Op::Param:
+                return true;
+            default: return false;
+        }
+    };
+    // defs_of collects every defining instruction per register. Call counts
+    // as a definition even when its LIR result_type is Void: sret `.direct`
+    // results are real register definitions the lowering tracks.
+    std::unordered_map<uint32_t, std::vector<size_t>> defs_of;
+    for (size_t i = 0; i < fn.instructions.size(); ++i) {
+        const auto& in = fn.instructions[i];
+        if (in.dst == UINT32_MAX) continue;
+        if (in.result_type == LIR::Type::Void && in.op != LIR::LIR_Op::Call) continue;
+        if (non_defining_op(in.op) || container_dst_use(in.op)) continue;
+        defs_of[in.dst].push_back(i);
+        out.def_inst_idx[in.dst] = i;
+    }
+    const bool sret_ret = sig && sig->ret_sret;
+
+    // Candidates: registers that can hold a virtual tuple.
+    //  - TupleCreate results (single def, tuple-typed, valid element domains)
+    //  - flattened `.direct` parameters (never redefined)
+    //  - sret results of `.direct` calls (single def, mirrors Call lowering)
+    //  - Mov/Copy destinations whose EVERY definition is a Mov/Copy (the
+    //    virtual-ness then propagates from whatever the sources are)
+    std::unordered_set<uint32_t> cand;
+    std::unordered_map<uint32_t, std::vector<uint32_t>> mov_srcs;
+    auto dc_of = [&](uint32_t r) -> int {
+        auto it = defs_of.find(r);
+        return it == defs_of.end() ? 0 : (int)it->second.size();
+    };
+    for (const auto& in : fn.instructions) {
+        if (in.dst == UINT32_MAX) continue;
+        if (in.op == LIR::LIR_Op::TupleCreate) {
+            if (dc_of(in.dst) != 1) continue;
+            auto lt = fn.register_language_types.find(in.dst);
+            if (lt == fn.register_language_types.end() || !lt->second ||
+                lt->second->tag != ::TypeTag::Tuple) continue;
+            auto* tt = std::get_if<TupleType>(&lt->second->extra);
+            if (!tt || tt->elementTypes.empty() || tt->elementTypes.size() > 8) continue;
+            bool ok = true;
+            for (const auto& et : tt->elementTypes)
+                if (vdom_of_type(et) == VDOM_INVALID) { ok = false; break; }
+            if (ok) cand.insert(in.dst);
+        } else if (in.op == LIR::LIR_Op::Call && !in.func_name.empty()) {
+            // sret results of `.direct` calls arrive as virtual tuples. The
+            // condition mirrors the Call lowering exactly: reachable callee,
+            // eligible flattened signature, declared `.direct` IR function,
+            // and matching argument count.
+            auto* cf = LIR::FunctionRegistry::getInstance().getFunction(in.func_name);
+            if (!cf || in.call_args.size() != cf->param_count) continue;
+            if (!reachable_funcs_.count(in.func_name)) continue;
+            const DirectFnSig* csig = direct_sig_for(in.func_name);
+            if (!csig->eligible || !csig->ret_sret) continue;
+            if (!current_module_->getFunction(in.func_name + ".direct")) continue;
+            if (dc_of(in.dst) == 1) cand.insert(in.dst);
+        }
+    }
+    if (sig) {
+        for (size_t p = 0; p < fn.param_count && p < sig->param_elem_domains.size(); ++p) {
+            if (sig->param_elem_domains[p].empty()) continue;
+            // A param register written anywhere in the body is redefined;
+            // its vtuple slot would not survive to later RegionMoves.
+            if (dc_of(static_cast<uint32_t>(p)) != 0) continue;
+            cand.insert(static_cast<uint32_t>(p));
+        }
+    }
+    // Mov/Copy-propagated candidates: every def must be a Mov/Copy so the
+    // register is virtual exactly when its sources are.
+    for (const auto& [r, didx] : defs_of) {
+        if (cand.count(r) || didx.empty()) continue;
+        std::vector<uint32_t> srcs;
+        bool allmov = true;
+        for (size_t i : didx) {
+            const auto& in = fn.instructions[i];
+            if (in.op != LIR::LIR_Op::Mov && in.op != LIR::LIR_Op::Copy) { allmov = false; break; }
+            if (in.a != UINT32_MAX) srcs.push_back(in.a);
+        }
+        if (allmov) { cand.insert(r); mov_srcs[r] = std::move(srcs); }
+    }
+    if (cand.empty()) return out;
+
+    auto tuple_elem_count = [&](uint32_t r) -> size_t {
+        auto lt = fn.register_language_types.find(r);
+        if (lt == fn.register_language_types.end() || !lt->second ||
+            lt->second->tag != ::TypeTag::Tuple) return 0;
+        auto* tt = std::get_if<TupleType>(&lt->second->extra);
+        return tt ? tt->elementTypes.size() : 0;
+    };
+
+    // uses_ok[r]: false when some use of r forces materialization or moves
+    // the value through the tagged/managed ABI. This is a static property —
+    // it does not depend on which other registers are virtual.
+    std::unordered_map<uint32_t, bool> uses_ok;
+    for (uint32_t r : cand) uses_ok[r] = true;
+    auto unsafe_use = [&](uint32_t r) {
+        if (r != UINT32_MAX && uses_ok.count(r)) uses_ok[r] = false;
+    };
+    for (const auto& in : fn.instructions) {
+        switch (in.op) {
+            case LIR::LIR_Op::RegionEnter: case LIR::LIR_Op::RegionExit:
+            case LIR::LIR_Op::TupleGet: case LIR::LIR_Op::TupleLen:
+            case LIR::LIR_Op::RegionMove: case LIR::LIR_Op::Nop:
+            case LIR::LIR_Op::Label: case LIR::LIR_Op::Jump:
+            case LIR::LIR_Op::JumpIf: case LIR::LIR_Op::JumpIfFalse:
+            case LIR::LIR_Op::Mov: case LIR::LIR_Op::Copy:
+                // Mov/Copy propagate virtual slots to their destination;
+                // the source remains virtual (handled via mov_srcs).
+                break;
+            case LIR::LIR_Op::TupleSet:
+                // Container mutation keeps the tuple virtual; the stored
+                // value materializes if it is itself a vtuple.
+                unsafe_use(in.b);
+                break;
+            case LIR::LIR_Op::TupleCreate:
+                // a/b are ctor-default zeros; elements arrive via call_args.
+                for (auto ar : in.call_args) unsafe_use(ar);
+                break;
+            case LIR::LIR_Op::Return: case LIR::LIR_Op::Ret:
+                // Value is in `a`; safe only for sret `.direct` returns.
+                if (!sret_ret) unsafe_use(in.a);
+                break;
+            case LIR::LIR_Op::Call: case LIR::LIR_Op::CallVoid: {
+                // Per-argument safety: a flattened `.direct` callee keeps
+                // tuple arguments virtual only when element counts match;
+                // scalar/tagged parameters force load_reg, which
+                // materializes any vtuple arg.
+                const DirectFnSig* csig = nullptr;
+                const LIR::LIR_Function* cf = nullptr;
+                if (!in.func_name.empty()) {
+                    cf = LIR::FunctionRegistry::getInstance().getFunction(in.func_name);
+                    if (cf && in.call_args.size() == cf->param_count) {
+                        const DirectFnSig* s = direct_sig_for(in.func_name);
+                        if (s->eligible) csig = s;
+                    }
+                }
+                for (size_t ai = 0; ai < in.call_args.size(); ++ai) {
+                    uint32_t ar = in.call_args[ai];
+                    bool osafe = false;
+                    if (csig && ai < csig->param_elem_domains.size()) {
+                        const auto& doms = csig->param_elem_domains[ai];
+                        osafe = doms.empty()
+                            ? tuple_elem_count(ar) == 0
+                            : tuple_elem_count(ar) == doms.size();
+                    }
+                    if (ar != UINT32_MAX && !osafe) unsafe_use(ar);
+                }
+                break;
+            }
+            default:
+                // a/b are register operands for all remaining ops; container
+                // ops additionally read their container from dst.
+                unsafe_use(in.a);
+                unsafe_use(in.b);
+                for (auto ar : in.call_args) unsafe_use(ar);
+                if (container_dst_use(in.op)) unsafe_use(in.dst);
+                break;
+        }
+    }
+
+    // Fixpoint: a candidate stays virtual iff all its uses are virtual-safe
+    // AND every Mov/Copy source feeding it is itself virtual-safe.
+    for (uint32_t r : cand) out.safe[r] = true;
+    bool changed = true;
+    while (changed) {
+        changed = false;
+        for (uint32_t r : cand) {
+            if (!out.safe[r]) continue;
+            bool ok = uses_ok[r];
+            if (ok) {
+                auto mi = mov_srcs.find(r);
+                if (mi != mov_srcs.end()) {
+                    for (uint32_t s : mi->second) {
+                        auto si = out.safe.find(s);
+                        if (si == out.safe.end() || !si->second) { ok = false; break; }
+                    }
+                }
+            }
+            if (!ok) {
+                if (std::getenv("LYMAR_DEBUG_VT"))
+                    std::cerr << "[VT] " << fn.name << " unset r" << r
+                              << " uses_ok=" << uses_ok[r] << "\n";
+                out.safe[r] = false;
+                changed = true;
+            }
+        }
+    }
+    for (auto it = out.safe.begin(); it != out.safe.end();) {
+        if (!it->second) it = out.safe.erase(it); else ++it;
+    }
+
+    // Canonical element slots for loop-variant candidates: a register whose
+    // first use precedes its last definition may carry a different tuple
+    // value around a CFG back-edge than the single-pass lowering saw at the
+    // use. Element values then live in spill slots that every definition
+    // writes and every use reloads.
+    {
+        std::unordered_map<uint32_t, size_t> first_use;
+        auto note_use = [&](uint32_t r, size_t i) {
+            if (r == UINT32_MAX || !cand.count(r)) return;
+            auto it = first_use.find(r);
+            if (it == first_use.end() || i < it->second) first_use[r] = i;
+        };
+        for (size_t i = 0; i < fn.instructions.size(); ++i) {
+            const auto& in = fn.instructions[i];
+            note_use(in.a, i);
+            note_use(in.b, i);
+            for (auto ar : in.call_args) note_use(ar, i);
+            if (container_dst_use(in.op) || in.isReturn() ||
+                in.op == LIR::LIR_Op::JumpIf || in.op == LIR::LIR_Op::JumpIfFalse)
+                note_use(in.dst, i);
+        }
+        uint32_t next_pseudo = 0x40000000u;
+        for (uint32_t r : cand) {
+            auto fu = first_use.find(r);
+            auto ld = defs_of.find(r);
+            if (fu == first_use.end() || ld == defs_of.end() || ld->second.empty()) continue;
+            size_t last_def = ld->second.back();
+            if (fu->second >= last_def) continue; // defs all precede uses
+            auto lt = fn.register_language_types.find(r);
+            if (lt == fn.register_language_types.end() || !lt->second ||
+                lt->second->tag != ::TypeTag::Tuple) continue;
+            auto* tt = std::get_if<TupleType>(&lt->second->extra);
+            if (!tt || tt->elementTypes.empty() || tt->elementTypes.size() > 8) continue;
+            std::vector<uint32_t> preds;
+            std::vector<int> doms;
+            bool ok = true;
+            for (const auto& et : tt->elementTypes) {
+                int d = vdom_of_type(et);
+                if (d == VDOM_INVALID) { ok = false; break; }
+                doms.push_back(d);
+                preds.push_back(next_pseudo++);
+            }
+            if (!ok) continue;
+            out.canon_regs[r] = std::move(preds);
+            out.canon_domains[r] = std::move(doms);
+        }
+    }
+    if (std::getenv("LYMAR_DEBUG_VT")) {
+        std::cerr << "[VT] " << fn.name << " sig=" << (sig ? 1 : 0) << " sret=" << sret_ret << " safe:";
+        for (auto& [r, v] : out.safe) std::cerr << " r" << r << "=" << v;
+        std::cerr << "\n";
+    }
+    return out;
+}
+
+void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::LIR_Function& lir_func,
+                                             const LIRToFyraIRBuilder::DirectFnCtx* dctx) {
     if (std::getenv("LYMAR_DUMP_LIR")) std::cerr << "=== LIR " << lir_func.name << " ===\n" << LIR::Disassembler(lir_func).disassemble();
     ir::BasicBlock* entry_bb = builder_->createBasicBlock("entry", main_fn);
     builder_->setInsertPoint(entry_bb);
-    ir::Value* caller_region = Memory::runtime_regions_proven_unnecessary(lir_func)
-        ? static_cast<ir::Value*>(context_->getConstantInt(context_->getIntegerType(64), 0))
-        : builder_->createExternCall("lymar_aot_region_current", {}, context_->getIntegerType(64));
+    // Lazy: only materialize the region_current call when a RegionMove (or
+    // other consumer) actually needs it — pure `.direct` functions with all
+    // moves elided must not carry a call that would block inlining.
+    ir::Value* caller_region = nullptr;
+    auto get_caller_region = [&]() -> ir::Value* {
+        if (!caller_region) {
+            if (Memory::runtime_regions_proven_unnecessary(lir_func)) {
+                caller_region = static_cast<ir::Value*>(
+                    context_->getConstantInt(context_->getIntegerType(64), 0));
+            } else {
+                // Emit at the entry block so the call is hoisted out of loops.
+                auto saved_ip = builder_->getInsertPoint();
+                auto& einstrs = entry_bb->getInstructions();
+                if (!einstrs.empty() && einstrs.back()->getOpcode() <= ir::Instruction::Hlt)
+                    builder_->setInsertPoint(entry_bb, std::prev(einstrs.end()));
+                else
+                    builder_->setInsertPoint(entry_bb);
+                caller_region = builder_->createExternCall("lymar_aot_region_current", {},
+                    context_->getIntegerType(64));
+                builder_->setInsertPoint(saved_ip);
+            }
+        }
+        return caller_region;
+    };
 
     std::unordered_map<uint32_t, size_t> label_to_index;
     for (size_t i = 0; i < lir_func.instructions.size(); ++i) {
@@ -1267,405 +2096,53 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
     // result_type is a scalar i64 — e.g. `var x: any = int_call()`. Without
     // this, the Call/Mov dst stays scalar-classified and word_kind reports 0,
     // so tagged SMIs reach consumers as "raw" ints (print shows 73 for 9).
-    auto lang_type_is_erased = [&](uint32_t reg) -> bool {
-        auto it = lir_func.register_language_types.find(reg);
-        if (it == lir_func.register_language_types.end() || !it->second) return false;
-        switch (it->second->tag) {
-            case ::TypeTag::Any: case ::TypeTag::Union: case ::TypeTag::ErrorUnion:
-            case ::TypeTag::Nil: case ::TypeTag::String: case ::TypeTag::List:
-            case ::TypeTag::Dict: case ::TypeTag::Tuple: case ::TypeTag::Frame:
-            case ::TypeTag::Enum: case ::TypeTag::Trait: case ::TypeTag::TraitObject:
-            case ::TypeTag::Sum: case ::TypeTag::Function: case ::TypeTag::Closure:
-            case ::TypeTag::Module: case ::TypeTag::Range: case ::TypeTag::Channel:
-            case ::TypeTag::Int128: case ::TypeTag::UInt128:
-                return true;
-            default:
-                return false;
-        }
-    };
+    auto lang_type_is_erased = [&](uint32_t reg) -> bool { return s_lang_type_is_erased(lir_func, reg); };
     // Registers whose content is still a tagged LmValue word after lowering.
     // This is exactly the set untag_word passes through unchanged; scalar
     // destinations (untag_int/untag_bool/to_float/untag_ptr outputs) hold raw
     // domain values and must NOT be marked or tag_word would skip encoding.
-    auto lang_type_holds_tagged_word = [&](uint32_t reg) -> bool {
-        auto it = lir_func.register_language_types.find(reg);
-        if (it == lir_func.register_language_types.end() || !it->second) return false;
-        switch (it->second->tag) {
-            case ::TypeTag::Any: case ::TypeTag::Union: case ::TypeTag::ErrorUnion:
-            case ::TypeTag::Sum: case ::TypeTag::Function: case ::TypeTag::Closure:
-            case ::TypeTag::Module: case ::TypeTag::Range: case ::TypeTag::Channel:
-            case ::TypeTag::Int128: case ::TypeTag::UInt128:
-                return true;
-            default:
-                return false;
-        }
-    };
-    auto is_typed_primitive_list = [&](uint32_t r) -> bool {
-        auto it = lir_func.register_language_types.find(r);
-        if (it != lir_func.register_language_types.end() && it->second && it->second->tag == ::TypeTag::List) {
-            auto* lt = std::get_if<ListType>(&it->second->extra);
-            if (lt && lt->elementType) {
-                auto etag = lt->elementType->tag;
-                if (etag != ::TypeTag::List && etag != ::TypeTag::String &&
-                    etag != ::TypeTag::Frame && etag != ::TypeTag::Dict &&
-                    etag != ::TypeTag::Tuple && etag != ::TypeTag::Any &&
-                    etag != ::TypeTag::Enum && etag != ::TypeTag::Trait &&
-                    etag != ::TypeTag::TraitObject &&
-                    etag != ::TypeTag::Union && etag != ::TypeTag::ErrorUnion &&
-                    etag != ::TypeTag::Nil &&
-                    // Floats/decimals box to heap objects — element stores need
-                    // ownership edges, so they are not "primitive" lists.
-                    etag != ::TypeTag::Float32 && etag != ::TypeTag::Float64 &&
-                    etag != ::TypeTag::Decimal2 && etag != ::TypeTag::Decimal4 &&
-                    etag != ::TypeTag::Decimal6) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    };
+    auto lang_type_holds_tagged_word = [&](uint32_t reg) -> bool { return s_lang_type_holds_tagged_word(lir_func, reg); };
+    auto is_typed_primitive_list = [&](uint32_t r) -> bool { return s_is_typed_primitive_list(lir_func, r); };
     // Typed primitive lists store raw scalar elements; the list header's high
     // bits record the element-storage kind (0=tagged, 1=raw int, 2=raw bool)
     // so runtime formatting can decode elements without a kind sidecar.
-    auto typed_list_element_kind = [&](uint32_t r) -> uint64_t {
-        if (!is_typed_primitive_list(r)) return 0;
-        auto it = lir_func.register_language_types.find(r);
-        if (it == lir_func.register_language_types.end() || !it->second) return 0;
-        auto* lt = std::get_if<ListType>(&it->second->extra);
-        if (!lt || !lt->elementType) return 0;
-        switch (lt->elementType->tag) {
-            case ::TypeTag::Bool: return 2;
-            case ::TypeTag::Int: case ::TypeTag::Int8: case ::TypeTag::Int16:
-            case ::TypeTag::Int32: case ::TypeTag::Int64:
-            case ::TypeTag::UInt: case ::TypeTag::UInt8: case ::TypeTag::UInt16:
-            case ::TypeTag::UInt32: case ::TypeTag::UInt64:
-                return 1;
-            default: return 0;
-        }
-    };
-    // Bitwise/shift ops route through lymar_aot_bitwise only for erased-word
-    // operands: boxed i128/u128 words (Ptr-classified or 128-bit language
-    // types). Plain u64 stays on the native path -- its raw-word representation
-    // already matches the hardware ops and the runtime helper's i64-fitting
-    // fast path would mis-box high-bit results.
-    auto bitwise_operand_erased = [&](uint32_t reg, LIR::Type type) {
-        if (reg == UINT32_MAX) return false;
-        // Mirror bitwise_erased's lowering condition: Ptr words and boxed
-        // 128-bit integers only. pointer_assigned alone over-matches boxed
-        // integer constants, which still lower to raw i64 here.
-        if (type == LIR::Type::Ptr) return true;
-        auto rt = lir_func.register_types.find(reg);
-        if (rt != lir_func.register_types.end() && rt->second == LIR::Type::Ptr) return true;
-        auto lt = lir_func.register_language_types.find(reg);
-        if (lt != lir_func.register_language_types.end() && lt->second &&
-            (lt->second->tag == ::TypeTag::Int128 || lt->second->tag == ::TypeTag::UInt128)) return true;
-        return false;
-    };
-    // Scalar-declared destinations (int/uint/bool/float/decimal) hold raw
-    // words even when the producer is pointer-classified — e.g. `pubptr` is
-    // an `int` alias, so `ffi.alloc` results stay address scalars and must
-    // not be object-classified through the register.
-    auto declared_scalar = [&](uint32_t reg) -> bool {
-        auto it = lir_func.register_language_types.find(reg);
-        if (it != lir_func.register_language_types.end() && it->second) {
-            switch (it->second->tag) {
-                case ::TypeTag::Bool:
-                case ::TypeTag::Int: case ::TypeTag::Int8: case ::TypeTag::Int16:
-                case ::TypeTag::Int32: case ::TypeTag::Int64:
-                case ::TypeTag::UInt: case ::TypeTag::UInt8: case ::TypeTag::UInt16:
-                case ::TypeTag::UInt32: case ::TypeTag::UInt64:
-                case ::TypeTag::Float32: case ::TypeTag::Float64:
-                case ::TypeTag::Decimal2: case ::TypeTag::Decimal4: case ::TypeTag::Decimal6:
-                    return true;
-                default: break;
-            }
-        }
-        return false;
-    };
-    for (const auto& inst : lir_func.instructions) {
-        if (inst.dst == UINT32_MAX) continue;
-        switch (inst.op) {
-            case LIR::LIR_Op::ListCreate:
-            case LIR::LIR_Op::TupleCreate:
-            case LIR::LIR_Op::DictCreate:
-            case LIR::LIR_Op::RefCreate:
-            case LIR::LIR_Op::RefResolve:
-            case LIR::LIR_Op::RefMove:
-            case LIR::LIR_Op::NewFrame:
-            case LIR::LIR_Op::MakeEnum:
-            case LIR::LIR_Op::ToString:
-            case LIR::LIR_Op::STR_CONCAT:
-            case LIR::LIR_Op::STR_FORMAT:
-            case LIR::LIR_Op::StringIndex:
-            case LIR::LIR_Op::ConstructError:
-            case LIR::LIR_Op::ConstructOk:
-            case LIR::LIR_Op::Unwrap:
-            case LIR::LIR_Op::UnwrapOr:
-            case LIR::LIR_Op::DictItems:
-            case LIR::LIR_Op::ResourceCreate:
-            case LIR::LIR_Op::ChannelAlloc:
-            case LIR::LIR_Op::MemoryAlloc:
-            case LIR::LIR_Op::MemoryResize:
-            case LIR::LIR_Op::LibraryLoad:
-            case LIR::LIR_Op::LibrarySymbol:
-            case LIR::LIR_Op::ForeignCall:
-            case LIR::LIR_Op::CallbackCreate:
-                pointer_assigned_regs.insert(inst.dst);
-                // ffi_wrap/ffi_symbol results are canonical tagged LmValue
-                // words (tag-13 box or VAL_NIL), not raw addresses — even
-                // when the declared return is an int-alias (pubptr/fnptr =
-                // int). Without the tagged mark, tag_word re-encodes VAL_NIL
-                // as SMI and `sym != nil` misfires. callback_ptr (imm==1)
-                // wraps too; callback_create (imm==0) returns a raw handle.
-                if (inst.op == LIR::LIR_Op::LibraryLoad ||
-                    inst.op == LIR::LIR_Op::LibrarySymbol ||
-                    (inst.op == LIR::LIR_Op::CallbackCreate && inst.imm == 1))
-                    tagged_word_regs.insert(inst.dst);
-                break;
-            case LIR::LIR_Op::MemoryLoad:
-                if (inst.imm >= 8) pointer_assigned_regs.insert(inst.dst);
-                break;
-            case LIR::LIR_Op::LoadGlobal: {
-                // Global cells are untyped: result_type is always Ptr, so the
-                // default case would object-classify every load. The value's
-                // kind must come from the variable's declared type recorded on
-                // dst by the generator. Only provably-scalar globals escape
-                // object classification; unknown/pointer-ish types stay object
-                // so strings/frames/`any` keep working. Without this,
-                // `var g: int = 0` loads (0, object-kind) which is_nil treats
-                // as nil.
-                auto lt = lir_func.register_language_types.find(inst.dst);
-                bool scalar_global = false;
-                if (lt != lir_func.register_language_types.end() && lt->second) {
-                    switch (lt->second->tag) {
-                        case ::TypeTag::Bool:
-                        case ::TypeTag::Int: case ::TypeTag::Int8: case ::TypeTag::Int16:
-                        case ::TypeTag::Int32: case ::TypeTag::Int64: case ::TypeTag::Int128:
-                        case ::TypeTag::UInt: case ::TypeTag::UInt8: case ::TypeTag::UInt16:
-                        case ::TypeTag::UInt32: case ::TypeTag::UInt64: case ::TypeTag::UInt128:
-                        case ::TypeTag::Float32: case ::TypeTag::Float64:
-                        case ::TypeTag::Decimal2: case ::TypeTag::Decimal4: case ::TypeTag::Decimal6:
-                            scalar_global = true;
-                            break;
-                        default:
-                            break;
-                    }
-                }
-                if (!scalar_global) {
-                    pointer_assigned_regs.insert(inst.dst);
-                    if (lang_type_is_erased(inst.dst)) tagged_word_regs.insert(inst.dst);
-                }
-                break;
-            }
-            case LIR::LIR_Op::LoadConst:
-                if (IS_PTR(inst.const_val)) pointer_assigned_regs.insert(inst.dst);
-                break;
-            case LIR::LIR_Op::Cast:
-                if (inst.result_type == LIR::Type::Ptr) pointer_assigned_regs.insert(inst.dst);
-                break;
-            case LIR::LIR_Op::DictGet:
-            case LIR::LIR_Op::TupleGet:
-            case LIR::LIR_Op::FrameGetField:
-                // Erased-typed destinations (`any`/union/frame fields) carry
-                // tagged LmValue words and need the object mark or word_kind
-                // reports 0 and consumers read tag bits as raw ints. Scalar
-                // destinations — including float fields, which untag_word
-                // decodes to native f64 — must stay scalar-classified or
-                // their slots mix boxed pointers with raw doubles.
-                if (lang_type_is_erased(inst.dst)) {
-                    pointer_assigned_regs.insert(inst.dst);
-                    if (lang_type_holds_tagged_word(inst.dst)) tagged_word_regs.insert(inst.dst);
-                }
-                break;
-            case LIR::LIR_Op::ListIndex:
-                // Typed-primitive lists load raw unboxed elements; erased
-                // element types yield tagged LmValue words — but only when the
-                // destination is itself erased-typed (untag_word decodes for
-                // scalar destinations, leaving a raw i64 that must stay
-                // scalar-classified).
-                if (!is_typed_primitive_list(inst.a) && lang_type_holds_tagged_word(inst.dst)) {
-                    pointer_assigned_regs.insert(inst.dst);
-                    tagged_word_regs.insert(inst.dst);
-                }
-                break;
-            case LIR::LIR_Op::IAdd_Unchecked:
-            case LIR::LIR_Op::Add:
-            case LIR::LIR_Op::Sub:
-            case LIR::LIR_Op::Mul:
-            case LIR::LIR_Op::Div:
-            case LIR::LIR_Op::Mod:
-            case LIR::LIR_Op::Neg: {
-                // Erased arithmetic lowers to lymar_aot_numeric_binary, whose
-                // result is an erased word (raw int or heap box, kind tracked
-                // dynamically). When either operand can be erased the result
-                // must stay object-classified or downstream consumers read the
-                // box pointer as a raw integer.
-                auto operand_may_be_erased = [&](uint32_t reg, LIR::Type type) {
-                    if (reg == UINT32_MAX) return false;
-                    // Mirror erased_arithmetic's lowering condition: only Ptr/
-                    // U64 words and boxed 128-bit integers take the tagged
-                    // numeric_binary path. pointer_assigned alone is NOT
-                    // sufficient — boxed integer constants are pointer-classified
-                    // yet still produce raw i64 results here.
-                    if (type == LIR::Type::Ptr || type == LIR::Type::U64) return true;
-                    auto rt = lir_func.register_types.find(reg);
-                    if (rt != lir_func.register_types.end() &&
-                        (rt->second == LIR::Type::Ptr || rt->second == LIR::Type::U64)) return true;
-                    auto lt = lir_func.register_language_types.find(reg);
-                    if (lt != lir_func.register_language_types.end() && lt->second) {
-                        if (lt->second->tag == ::TypeTag::Int128 || lt->second->tag == ::TypeTag::UInt128)
-                            return true;
-                        switch (lt->second->tag) {
-                            case ::TypeTag::Any: case ::TypeTag::Union: case ::TypeTag::ErrorUnion:
-                            case ::TypeTag::Sum: case ::TypeTag::Function: case ::TypeTag::Closure:
-                            case ::TypeTag::Module: case ::TypeTag::Range: case ::TypeTag::Channel:
-                                return true;
-                            default: break;
-                        }
-                    }
-                    return false;
-                };
-                if ((operand_may_be_erased(inst.a, inst.type_a) ||
-                     operand_may_be_erased(inst.b, inst.type_b)) &&
-                    lang_type_holds_tagged_word(inst.dst)) {
-                    pointer_assigned_regs.insert(inst.dst);
-                    tagged_word_regs.insert(inst.dst);
-                }
-                break;
-            }
-            case LIR::LIR_Op::Shl:
-            case LIR::LIR_Op::Shr:
-            case LIR::LIR_Op::And:
-            case LIR::LIR_Op::Or:
-            case LIR::LIR_Op::Xor:
-            case LIR::LIR_Op::IAnd_Unchecked:
-            case LIR::LIR_Op::IOr_Unchecked:
-            case LIR::LIR_Op::IXor_Unchecked:
-                if ((bitwise_operand_erased(inst.a, inst.type_a) ||
-                     bitwise_operand_erased(inst.b, inst.type_b) ||
-                     bitwise_operand_erased(inst.dst, LIR::Type::I64)) &&
-                    lang_type_holds_tagged_word(inst.dst)) {
-                    pointer_assigned_regs.insert(inst.dst);
-                    tagged_word_regs.insert(inst.dst);
-                }
-                break;
-            case LIR::LIR_Op::ChannelPop:
-            case LIR::LIR_Op::ChannelRecv:
-            case LIR::LIR_Op::ChannelPoll:
-                // channel_pop lowers through untag_word: only erased-typed
-                // destinations keep the tagged LmValue word.
-                if (lang_type_holds_tagged_word(inst.dst))
-                    tagged_word_regs.insert(inst.dst);
-                break;
-            case LIR::LIR_Op::Call:
-            case LIR::LIR_Op::CallVoid: {
-                if (!inst.func_name.empty()) {
-                    if (auto* cf = LIR::FunctionRegistry::getInstance().getFunction(inst.func_name)) {
-                        auto* rt = cf->return_language_type.get();
-                        if (rt) {
-                            switch (rt->tag) {
-                                case ::TypeTag::Int: case ::TypeTag::Int8: case ::TypeTag::Int16:
-                                case ::TypeTag::Int32: case ::TypeTag::Int64:
-                                case ::TypeTag::UInt: case ::TypeTag::UInt8: case ::TypeTag::UInt16:
-                                case ::TypeTag::UInt32: case ::TypeTag::UInt64:
-                                case ::TypeTag::Bool:
-                                case ::TypeTag::Float32: case ::TypeTag::Float64:
-                                case ::TypeTag::Decimal2: case ::TypeTag::Decimal4: case ::TypeTag::Decimal6:
-                                    break;
-                                default:
-                                    tagged_word_regs.insert(inst.dst);
-                                    break;
-                            }
-                        }
-                    }
-                }
-                break;
-            }
-            default:
-                if (inst.result_type == LIR::Type::Ptr || lang_type_is_erased(inst.dst))
-                    pointer_assigned_regs.insert(inst.dst);
-                break;
-        }
-        // Unwrap/UnwrapOr already normalize through untag_word: scalar-typed
-        // destinations hold raw values, erased-typed destinations still hold
-        // tagged LmValue words. Only the erased case belongs in the tagged set.
-        if (inst.op == LIR::LIR_Op::Unwrap || inst.op == LIR::LIR_Op::UnwrapOr) {
-            if (lang_type_holds_tagged_word(inst.dst))
-                tagged_word_regs.insert(inst.dst);
-        }
-    }
-    // A `Mov` copies the value *and* its dynamic kind (store_reg is called with
-    // preserve_kind), but the static scan above only marks the producer. Without
-    // propagation, `var r = ffi.foreign_call(...)` lands in a scalar-classified
-    // slot and every later load reports kind=0 — boxed FFI results (PTR/F64/
-    // CString) then surface as raw addresses. Propagate to a fixpoint so move
-    // chains (`var a = f(); var b = a;`) stay object-classified.
-    bool moved = true;
-    while (moved) {
-        moved = false;
-        for (const auto& inst : lir_func.instructions) {
-            // Tagged-word domain propagates through Mov and erased-destination
-            // Movs produce tagged words themselves. This must run even for
-            // registers already pointer_assigned (the `continue` below would
-            // otherwise skip Ptr-typed Mov destinations entirely).
-            if (inst.op == LIR::LIR_Op::Mov && inst.dst != UINT32_MAX) {
-                bool dst_erased = false;
-                auto dlt = lir_func.register_language_types.find(inst.dst);
-                if (dlt != lir_func.register_language_types.end() && dlt->second &&
-                    lang_type_is_erased(inst.dst)) dst_erased = true;
-                if ((inst.a != UINT32_MAX && tagged_word_regs.count(inst.a)) || dst_erased) {
-                    if (tagged_word_regs.insert(inst.dst).second) moved = true;
-                }
-            }
-            if (inst.dst == UINT32_MAX || pointer_assigned_regs.count(inst.dst) || declared_scalar(inst.dst)) continue;
-            bool propagate = false;
-            if (inst.op == LIR::LIR_Op::Mov) {
-                // Mov's source is `a` only (registers[dst] = registers[a]); `b` is
-                // an unused operand emitted as literal 0, which is a valid register
-                // number — checking it would false-positive on r0.
-                propagate = inst.a != UINT32_MAX && pointer_assigned_regs.count(inst.a);
-            } else if (inst.op == LIR::LIR_Op::IAdd_Unchecked || inst.op == LIR::LIR_Op::Add ||
-                       inst.op == LIR::LIR_Op::Sub || inst.op == LIR::LIR_Op::Mul ||
-                       inst.op == LIR::LIR_Op::Div || inst.op == LIR::LIR_Op::Mod ||
-                       inst.op == LIR::LIR_Op::Neg) {
-                // Same erased-word propagation as the prepass scan, for operand
-                // definitions that appear later in the instruction stream.
-                propagate = (inst.a != UINT32_MAX && pointer_assigned_regs.count(inst.a)) ||
-                            (inst.b != UINT32_MAX && pointer_assigned_regs.count(inst.b));
-            }
-            if (propagate) {
-                pointer_assigned_regs.insert(inst.dst);
-                moved = true;
-            }
-        }
-    }
-    // Final veto: a register whose declared language type is scalar keeps raw
-    // words regardless of producer/propgation marks (pubptr = int alias,
-    // `int` receivers of pointer-producing calls).
-    for (auto it = pointer_assigned_regs.begin(); it != pointer_assigned_regs.end();) {
-        if (declared_scalar(*it)) it = pointer_assigned_regs.erase(it);
-        else ++it;
+    auto typed_list_element_kind = [&](uint32_t r) -> uint64_t { return s_typed_list_element_kind(lir_func, r); };
+    {
+        auto _doms = compute_reg_domain_sets(lir_func);
+        pointer_assigned_regs = std::move(_doms.pointer_assigned);
+        tagged_word_regs = std::move(_doms.tagged_word);
     }
 
+    // Virtual-tuple safety + canonical-slot analysis, computed before
+    // parameter initialization so `.direct` tuple params can be backed by
+    // canonical spill slots when the register is loop-variant.
+    const DirectFnSig* self_sig = dctx ? direct_sig_for(lir_func.name) : nullptr;
+    if (self_sig && !self_sig->eligible) self_sig = nullptr;
+    auto vt_info = compute_vt_safe(lir_func, self_sig);
+
     std::unordered_map<uint32_t, ir::Instruction*> reg_slots;
-    const bool scalar_registers = Memory::runtime_regions_proven_unnecessary(lir_func) && Memory::proven_scalar_leaf(lir_func);
-    auto is_pointer_lang_type = [&](uint32_t reg) -> bool {
-        auto it = lir_func.register_language_types.find(reg);
-        if (it != lir_func.register_language_types.end() && it->second) {
-            auto tag = it->second->tag;
-            if (tag == ::TypeTag::List || tag == ::TypeTag::String || tag == ::TypeTag::Frame ||
-                tag == ::TypeTag::Dict || tag == ::TypeTag::Tuple || tag == ::TypeTag::Any ||
-                tag == ::TypeTag::Enum || tag == ::TypeTag::Trait || tag == ::TypeTag::TraitObject ||
-                tag == ::TypeTag::Union || tag == ::TypeTag::ErrorUnion || tag == ::TypeTag::Sum ||
-                tag == ::TypeTag::Function || tag == ::TypeTag::Closure || tag == ::TypeTag::Module ||
-                tag == ::TypeTag::Range || tag == ::TypeTag::Channel ||
-                tag == ::TypeTag::Nil || tag == ::TypeTag::Int128 || tag == ::TypeTag::UInt128)
-                return true;
+    // Virtual tuples: registers holding tuple values whose elements are kept
+    // as scalar SSA/slot values instead of a heap-allocated lm_tuple. Escapes
+    // (any use outside TupleGet/TupleSet/TupleLen/direct-call args/sret
+    // returns) materialize the real tuple lazily at the use point.
+    std::unordered_map<uint32_t, std::vector<VTupleElem>> vtuples;
+    std::function<void(uint32_t)> materialize_vtuple;
+    // `.direct` flattened-ABI variants of branch-free functions are pure
+    // scalar SSA: no CFG joins or back-edges exist, so spill slots are
+    // unnecessary and their Alloc instructions would block inlining.
+    bool branch_free = dctx != nullptr;
+    if (branch_free) {
+        for (const auto& inst : lir_func.instructions) {
+            if (inst.op == LIR::LIR_Op::Label || inst.op == LIR::LIR_Op::Jump ||
+                inst.op == LIR::LIR_Op::JumpIf || inst.op == LIR::LIR_Op::JumpIfFalse) {
+                branch_free = false;
+                break;
+            }
         }
-        auto it2 = lir_func.register_types.find(reg);
-        if (it2 != lir_func.register_types.end() && it2->second == LIR::Type::Ptr) return true;
-        return false;
-    };
+    }
+    const bool scalar_registers = (Memory::runtime_regions_proven_unnecessary(lir_func) &&
+        Memory::proven_scalar_leaf(lir_func)) || branch_free;
+    auto is_pointer_lang_type = [&](uint32_t reg) -> bool { return s_lang_type_is_pointerish(lir_func, reg); };
 
     for (size_t r = 0; !scalar_registers && r <= max_reg + 10; ++r) {
         reg_slots[r] = builder_->createAlloc(context_->getConstantInt(context_->getIntegerType(64), 8), context_->getIntegerType(64));
@@ -1692,21 +2169,65 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
         return inst;
     };
 
-    // Initialize registers from function parameters
-    size_t param_idx = 0;
-    for (const auto& param : main_fn->getParameters()) {
-        if (!scalar_registers) builder_->createStore(param.get(), reg_slots[param_idx]);
-        regs[param_idx] = param.get();
-        register_definitions[param_idx] = nullptr;
-        if (param->getType() && (param->getType()->isDoubleTy() || param->getType()->isFloatTy())) {
-            reg_types[param_idx] = LIR::Type::F64;
-        } else {
-            auto it = lir_func.register_types.find(param_idx);
-            if (it != lir_func.register_types.end()) {
-                reg_types[param_idx] = it->second;
-            }
+    // Canonical element spill slots for loop-variant virtual tuples. Each
+    // pseudo register gets an entry-block slot; definitions store element
+    // values and uses reload them, preserving values across back-edges.
+    for (const auto& [cr, preds] : vt_info.canon_regs) {
+        const auto& cdoms = vt_info.canon_domains[cr];
+        for (size_t j = 0; j < preds.size(); ++j) {
+            auto* slot = entry_alloc(nullptr,
+                context_->getConstantInt(context_->getIntegerType(64), 8));
+            slot->setName("vt_slot_r" + std::to_string(cr) + "_e" + std::to_string(j));
+            builder_->createStore(context_->getConstantInt(context_->getIntegerType(64), 0), slot);
+            reg_slots[preds[j]] = slot;
+            reg_types[preds[j]] = (j < cdoms.size() && cdoms[j] == VDOM_FLOAT)
+                ? LIR::Type::F64 : LIR::Type::I64;
         }
-        param_idx++;
+    }
+
+    // Initialize registers from function parameters. In `.direct` mode the
+    // ir::Function parameters are flattened: scalar params map back to their
+    // original LIR register and tuple elements accumulate into vtuples.
+    ir::Value* sret_buf_val = nullptr;
+    {
+        size_t param_idx = 0;
+        size_t np = main_fn->getParameters().size();
+        for (const auto& param : main_fn->getParameters()) {
+            uint32_t orig = static_cast<uint32_t>(param_idx);
+            int32_t elem = -1;
+            int32_t domain = VDOM_INT;
+            if (dctx && param_idx < dctx->params.size()) {
+                orig = dctx->params[param_idx].orig;
+                elem = dctx->params[param_idx].elem;
+                domain = dctx->params[param_idx].domain;
+            }
+            if (elem >= 0) {
+                VTupleElem ve;
+                ve.direct_v = param.get();
+                ve.domain = domain;
+                ve.has = true;
+                vtuples[orig].push_back(ve);
+                param_idx++;
+                continue;
+            }
+            if (dctx && dctx->sret_return && param_idx + 1 == np) {
+                sret_buf_val = param.get();
+                param_idx++;
+                continue;
+            }
+            if (!scalar_registers && reg_slots.count(orig)) builder_->createStore(param.get(), reg_slots[orig]);
+            regs[orig] = param.get();
+            register_definitions[orig] = nullptr;
+            if (param->getType() && (param->getType()->isDoubleTy() || param->getType()->isFloatTy())) {
+                reg_types[orig] = LIR::Type::F64;
+            } else {
+                auto it = lir_func.register_types.find(orig);
+                if (it != lir_func.register_types.end()) {
+                    reg_types[orig] = it->second;
+                }
+            }
+            param_idx++;
+        }
     }
 
     // A hoisted element-buffer pointer is only sound when nothing in the
@@ -1743,7 +2264,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
 
     std::unordered_map<uint32_t, ir::Value*> hoisted_data_ptrs;
     size_t num_params = main_fn->getParameters().size();
-    for (size_t p = 0; p < num_params && !may_mutate_lists; ++p) {
+    for (size_t p = 0; p < num_params && !may_mutate_lists && !dctx; ++p) {
         if (is_typed_primitive_list(p) && !reassigned_parameters.count(p)) {
             ir::Value* p_val = regs[p];
             ir::Value* unboxed = builder_->createAnd(p_val, context_->getConstantInt(context_->getIntegerType(64), ~7ULL));
@@ -1774,6 +2295,9 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
     }
 
     auto load_reg = [&](uint32_t r, LIR::Type t) -> ir::Value* {
+        // A virtual tuple has no slot value; any read outside the dedicated
+        // TupleGet/TupleSet/TupleLen/direct-call paths materializes it first.
+        if (vtuples.count(r)) materialize_vtuple(r);
         // The stack slot is the authoritative, control-flow-correct home for a
         // register's value whenever one exists: every store writes the slot and
         // every read reloads it, so a value carried across a loop back-edge or a
@@ -1937,6 +2461,8 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
     };
 
     auto store_reg = [&](uint32_t r, ir::Value* v, LIR::Type t, bool preserve_kind = false) {
+        // Redefining a register kills its virtual tuple; the old value is dead.
+        if (vtuples.count(r)) vtuples.erase(r);
         // Object-classified registers have a uniform erased-word slot. A float
         // local that ever joins an erased value (frame field, `any`, boxed
         // arithmetic) must store a boxed word on every path: otherwise a loop
@@ -1969,6 +2495,147 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
         regs[r] = v;
         register_definitions[r] = builder_->getInsertPoint();
         reg_types[r] = t;
+    };
+
+    // ---- Virtual tuple support -------------------------------------------
+    // Tuple values whose elements stay in scalar slots/registers. Element
+    // domains match the canonical post-untag representation: Float=f64,
+    // Int/Bool=raw i64, Ptr=raw address, Tagged=tagged LmValue word.
+    auto vdom_of_reg = [&](uint32_t r, LIR::Type t) -> int {
+        auto lt = lir_func.register_language_types.find(r);
+        if (lt != lir_func.register_language_types.end() && lt->second)
+            return vdom_of_type(lt->second, t);
+        return vdom_of_type(TypePtr(), t);
+    };
+    auto velem_value = [&](const VTupleElem& e) -> ir::Value* {
+        if (e.direct_v) return e.direct_v;
+        // load_reg already selects Loadd for float-typed registers, so the
+        // raw f64 domain value comes back directly.
+        return load_reg(e.src_reg, e.src_type);
+    };
+    // Canonical spill-slot helpers for loop-variant virtual tuples.
+    auto canon_elems = [&](uint32_t r) -> std::vector<VTupleElem> {
+        std::vector<VTupleElem> es;
+        auto ri = vt_info.canon_regs.find(r);
+        auto di = vt_info.canon_domains.find(r);
+        if (ri == vt_info.canon_regs.end() || di == vt_info.canon_domains.end()) return es;
+        for (size_t j = 0; j < ri->second.size(); ++j) {
+            VTupleElem e;
+            e.src_reg = ri->second[j];
+            e.domain = (j < di->second.size()) ? di->second[j] : VDOM_INT;
+            e.src_type = (e.domain == VDOM_FLOAT) ? LIR::Type::F64 : LIR::Type::I64;
+            e.has = true;
+            e.canon_elem = true;
+            es.push_back(e);
+        }
+        return es;
+    };
+    auto canon_slot_for = [&](uint32_t r, size_t j) -> ir::Instruction* {
+        return reg_slots[vt_info.canon_regs.at(r)[j]];
+    };
+    auto canon_store_val = [&](uint32_t r, size_t j, ir::Value* v) {
+        if (!v) return;
+        int dom = vt_info.canon_domains.at(r)[j];
+        auto* i64ty = context_->getIntegerType(64);
+        if (dom == VDOM_FLOAT) {
+            if (!v->getType()->isFloatingPoint())
+                v = builder_->createExternCall("lymar_aot_to_float", {v}, context_->getDoubleType());
+        } else if (v->getType() != i64ty) {
+            v = builder_->createCast(v, i64ty);
+        }
+        auto* st = builder_->createStore(v, canon_slot_for(r, j));
+        // FLOAT/INT/BOOL element slots can never hold a managed heap word;
+        // naming them scalar lets region lowering skip the per-store edge
+        // call, which would otherwise pin the slot to memory.
+        if (dom == VDOM_FLOAT || dom == VDOM_INT || dom == VDOM_BOOL)
+            st->setName("scalar_store_vt");
+    };
+    // Capture the current element values of `src_elems` into r's canonical
+    // slots, then re-point r's vtuple at the pseudo registers.
+    auto canon_capture = [&](uint32_t r, const std::vector<VTupleElem>& src_elems) {
+        size_t n = std::min(src_elems.size(), vt_info.canon_regs.at(r).size());
+        for (size_t j = 0; j < n; ++j)
+            canon_store_val(r, j, velem_value(src_elems[j]));
+        vtuples[r] = canon_elems(r);
+    };
+    materialize_vtuple = [&](uint32_t r) {
+        auto vit = vtuples.find(r);
+        if (vit == vtuples.end()) return;
+        auto elems = std::move(vit->second);
+        vtuples.erase(r);
+        auto* i64ty = context_->getIntegerType(64);
+        used_builtins_.insert("lm_tuple_new");
+        ir::Function* tfn = current_module_->getFunction("lm_tuple_new");
+        if (!tfn) tfn = builder_->createFunction("lm_tuple_new", i64ty, {i64ty});
+        ir::Value* tuple = builder_->createCall(tfn,
+            {context_->getConstantInt(i64ty, static_cast<long long>(elems.size()))}, i64ty);
+        used_builtins_.insert("lm_tuple_set");
+        ir::Function* sfn = current_module_->getFunction("lm_tuple_set");
+        if (!sfn) sfn = builder_->createFunction("lm_tuple_set", context_->getVoidType(), {i64ty, i64ty, i64ty});
+        for (size_t j = 0; j < elems.size(); ++j) {
+            const auto& e = elems[j];
+            ir::Value* v;
+            if (e.has) {
+                v = velem_value(e);
+            } else {
+                v = (e.domain == VDOM_FLOAT)
+                    ? static_cast<ir::Value*>(context_->getConstantFP(context_->getDoubleType(), 0.0))
+                    : static_cast<ir::Value*>(context_->getConstantInt(i64ty, 0));
+            }
+            ir::Value* tagged;
+            if (e.src_reg != UINT32_MAX && !e.canon_elem) {
+                // Replay exactly what the real TupleSet emits: tag_word with
+                // the source register's language type.
+                tagged = tag_word(v, e.src_reg, e.src_type);
+            } else {
+                switch (e.domain) {
+                    case VDOM_FLOAT:
+                        tagged = tag_word(v);
+                        break;
+                    case VDOM_INT:
+                        tagged = builder_->createExternCall("lymar_aot_tag_int", {v}, i64ty);
+                        break;
+                    case VDOM_BOOL:
+                        tagged = builder_->createExternCall("lymar_aot_tag_bool", {v}, i64ty);
+                        break;
+                    case VDOM_PTR:
+                        tagged = builder_->createExternCall("lymar_aot_tag_pointer", {v}, i64ty);
+                        break;
+                    default:
+                        tagged = v; // VDOM_TAGGED is already an LmValue word
+                        break;
+                }
+            }
+            builder_->createCall(sfn, {tuple, context_->getConstantInt(i64ty, static_cast<long long>(j)), tagged});
+        }
+        store_reg(r, tuple, LIR::Type::Ptr);
+    };
+
+    // Constant-int register values (tuple indices) and per-register def counts
+    // (virtual-tuple element stability: a source register written more than
+    // once cannot be reloaded at an arbitrary later use point).
+    std::unordered_map<uint32_t, int64_t> const_ints;
+    std::unordered_map<uint32_t, uint32_t> def_counts;
+    for (const auto& in : lir_func.instructions) {
+        if (in.dst != UINT32_MAX) def_counts[in.dst]++;
+        if (in.op == LIR::LIR_Op::LoadConst && !IS_PTR(in.const_val) && IS_INT(in.const_val) &&
+            (((in.const_val >> 3) << 3) | TAG_INT) == in.const_val) {
+            const_ints[in.dst] = UNBOX_INT(in.const_val);
+        }
+    }
+    auto const_index_of = [&](uint32_t r) -> int64_t {
+        if (const_ints.count(r)) return const_ints[r];
+        if (reg_int_values.count(r)) return reg_int_values[r];
+        return -1;
+    };
+    // Element sources must be write-once SSA-ish registers: params flagged
+    // reassigned and multiply-defined regs are rejected so a later TupleGet
+    // never observes a overwritten slot.
+    auto elem_src_stable = [&](uint32_t r) -> bool {
+        if (r == UINT32_MAX) return false;
+        if (reassigned_parameters.count(r)) return false;
+        auto dc = def_counts.find(r);
+        return dc == def_counts.end() || dc->second <= 1;
     };
 
     // lymar_aot_numeric_binary / lymar_aot_bitwise return tagged LmValue words
@@ -2131,8 +2798,175 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
     };
 
     bool terminated = false;
+    // Region-pair elision: RegionEnter/RegionExit pairs whose enclosed
+    // instructions are provably free of managed effects (no allocation, no
+    // calls except to provably-pure `.direct` callees, no memory/global ops)
+    // are skipped entirely — an empty region's enter/exit only mutates region
+    // bookkeeping. Purity is computed interprocedurally over the LIR, with
+    // each function judged under its OWN register classification and
+    // virtual-tuple proof and under the same lowering mode its call sites
+    // will use (`.direct` flattened ABI when eligible, boxed ABI otherwise).
+    std::unordered_set<size_t> region_skip;
+    // vt_safe is hoisted out of the analysis block: the RegionMove lowering
+    // below skips its runtime call under exactly this proof.
+    // vt_info (safe set, def indices, canonical slots) was computed before
+    // parameter initialization; reuse it here for region purity analysis.
+    const auto& vt_safe = vt_info.safe;
+    {
+        const auto& self_def_idx = vt_info.def_inst_idx;
+
+        struct PureInfo {
+            const LIR::LIR_Function* fn = nullptr;
+            const DirectFnSig* sig = nullptr; // non-null ⇒ `.direct` lowering
+            RegDomainSets doms;
+            std::unordered_map<uint32_t, bool> vt;
+            std::unordered_map<uint32_t, size_t> def_idx;
+        };
+        std::map<std::pair<const LIR::LIR_Function*, bool>, PureInfo> infos;
+        auto info_for = [&](const LIR::LIR_Function* f, bool as_dir) -> PureInfo& {
+            auto key = std::make_pair(f, as_dir);
+            auto it = infos.find(key);
+            if (it != infos.end()) return it->second;
+            PureInfo pi;
+            pi.fn = f;
+            if (as_dir) {
+                const DirectFnSig* s = direct_sig_for(f->name);
+                pi.sig = s->eligible ? s : nullptr;
+            }
+            pi.doms = compute_reg_domain_sets(*f);
+            auto vt2 = compute_vt_safe(*f, pi.sig);
+            pi.vt = std::move(vt2.safe);
+            pi.def_idx = std::move(vt2.def_inst_idx);
+            return infos.emplace(key, std::move(pi)).first->second;
+        };
+        // Seed the caller's own context from the sets already computed for
+        // this lowering (identical inputs, avoids duplicate analysis).
+        {
+            PureInfo self_pi;
+            self_pi.fn = &lir_func;
+            self_pi.sig = self_sig;
+            self_pi.doms.pointer_assigned = pointer_assigned_regs;
+            self_pi.doms.tagged_word = tagged_word_regs;
+            self_pi.vt = vt_safe;
+            self_pi.def_idx = self_def_idx;
+            infos[std::make_pair(&lir_func, self_sig != nullptr)] = std::move(self_pi);
+        }
+
+        std::map<std::pair<const LIR::LIR_Function*, bool>, int> purity; // 1=pure,2=impure
+        std::set<std::pair<const LIR::LIR_Function*, bool>> visiting;
+        std::function<bool(const PureInfo&, const LIR::LIR_Inst&)> region_neutral =
+        [&](const PureInfo& pi, const LIR::LIR_Inst& in) -> bool {
+            const auto* fn = pi.fn;
+            switch (in.op) {
+                case LIR::LIR_Op::Nop: case LIR::LIR_Op::Label:
+                case LIR::LIR_Op::Jump: case LIR::LIR_Op::JumpIf:
+                case LIR::LIR_Op::JumpIfFalse: case LIR::LIR_Op::Return:
+                case LIR::LIR_Op::Ret: case LIR::LIR_Op::Copy:
+                case LIR::LIR_Op::Mov:
+                case LIR::LIR_Op::IAdd_Unchecked: case LIR::LIR_Op::IXor_Unchecked:
+                case LIR::LIR_Op::IAnd_Unchecked: case LIR::LIR_Op::IOr_Unchecked:
+                case LIR::LIR_Op::Add: case LIR::LIR_Op::Sub: case LIR::LIR_Op::Mul:
+                case LIR::LIR_Op::Div: case LIR::LIR_Op::Mod: case LIR::LIR_Op::Neg:
+                case LIR::LIR_Op::And: case LIR::LIR_Op::Or: case LIR::LIR_Op::Xor:
+                case LIR::LIR_Op::Shl: case LIR::LIR_Op::Shr:
+                case LIR::LIR_Op::CmpEQ: case LIR::LIR_Op::CmpNEQ: case LIR::LIR_Op::CmpLT:
+                case LIR::LIR_Op::CmpLE: case LIR::LIR_Op::CmpGT: case LIR::LIR_Op::CmpGE:
+                case LIR::LIR_Op::Cast: case LIR::LIR_Op::LoadConst:
+                case LIR::LIR_Op::Load:
+                case LIR::LIR_Op::TupleCreate: case LIR::LIR_Op::TupleGet:
+                case LIR::LIR_Op::TupleSet: case LIR::LIR_Op::TupleLen:
+                case LIR::LIR_Op::RegionEnter: case LIR::LIR_Op::RegionExit:
+                    return true;
+                case LIR::LIR_Op::RegionMove: {
+                    // Neutral exactly when lowering emits nothing: the scalar
+                    // gate below, or a source register whose tuple is
+                    // guaranteed to stay virtual (no heap word exists).
+                    LIR::Type mvt = in.type_a != LIR::Type::Void ? in.type_a : LIR::Type::I64;
+                    if (mvt == LIR::Type::I64 || mvt == LIR::Type::Void) {
+                        auto rt = fn->register_types.find(in.a);
+                        if (rt != fn->register_types.end()) mvt = rt->second;
+                    }
+                    const bool mscalar =
+                        (mvt == LIR::Type::F64 || mvt == LIR::Type::F32 || mvt == LIR::Type::Bool ||
+                         mvt == LIR::Type::I8 || mvt == LIR::Type::U8 ||
+                         mvt == LIR::Type::I16 || mvt == LIR::Type::U16 ||
+                         mvt == LIR::Type::I32 || mvt == LIR::Type::U32 ||
+                         mvt == LIR::Type::I64) &&
+                        !pi.doms.pointer_assigned.count(in.a) &&
+                        !s_lang_type_is_pointerish(*fn, in.a) &&
+                        !pi.doms.tagged_word.count(in.a);
+                    if (mscalar) return true;
+                    auto di = pi.def_idx.find(in.a);
+                    return di != pi.def_idx.end() && pi.vt.count(in.a) && pi.vt.at(in.a);
+                }
+                case LIR::LIR_Op::Call: case LIR::LIR_Op::CallVoid: {
+                    std::string name = in.func_name;
+                    if (name.empty() && in.const_val) {
+                        if (IS_PTR(in.const_val)) {
+                            ObjHeader* h = (ObjHeader*)UNBOX_PTR(in.const_val);
+                            if (h->type_id == TYPE_STRING) {
+                                name = ((LmStringHeader*)h)->data;
+                            } else if (h->type_id == TYPE_BOX && ((LmBox*)h)->type == LM_BOX_STRING) {
+                                name = (char*)((LmBox*)h)->value.as_ptr;
+                            }
+                        }
+                    }
+                    if (name.empty()) return false;
+                    auto* cf = LIR::FunctionRegistry::getInstance().getFunction(name);
+                    if (!cf) return false;
+                    // Mirror the lowering's `.direct` selection: eligible
+                    // signature AND matching LIR arity take the flattened
+                    // path; anything else lowers through the boxed ABI.
+                    const DirectFnSig* csig = nullptr;
+                    if (in.call_args.size() == cf->param_count) {
+                        const DirectFnSig* s = direct_sig_for(name);
+                        if (s->eligible) csig = s;
+                    }
+                    auto key = std::make_pair(cf, csig != nullptr);
+                    auto pit = purity.find(key);
+                    if (pit == purity.end()) {
+                        if (visiting.count(key)) return false;
+                        visiting.insert(key);
+                        PureInfo& cpi = info_for(cf, csig != nullptr);
+                        bool p = true;
+                        for (const auto& ci : cf->instructions) {
+                            if (!region_neutral(cpi, ci)) { p = false; break; }
+                        }
+                        visiting.erase(key);
+                        purity[key] = p ? 1 : 2;
+                        pit = purity.find(key);
+                    }
+                    return pit->second == 1;
+                }
+                default:
+                    return false;
+            }
+        };
+        PureInfo& self_pi = info_for(&lir_func, self_sig != nullptr);
+        std::vector<size_t> rstack;
+        for (size_t i = 0; i < lir_func.instructions.size(); ++i) {
+            const auto& in = lir_func.instructions[i];
+            if (in.op == LIR::LIR_Op::RegionEnter) { rstack.push_back(i); continue; }
+            if (in.op != LIR::LIR_Op::RegionExit || rstack.empty()) continue;
+            size_t enter_idx = rstack.back(); rstack.pop_back();
+            bool clean = true;
+            for (size_t j = enter_idx + 1; j < i; ++j) {
+                if (!region_neutral(self_pi, lir_func.instructions[j])) {
+                    if (std::getenv("LYMAR_DEBUG_REGIONS"))
+                        std::cerr << "[REGION] " << lir_func.name << " impure op " << (int)lir_func.instructions[j].op
+                                  << " dst=" << lir_func.instructions[j].dst << " a=" << lir_func.instructions[j].a
+                                  << " b=" << lir_func.instructions[j].b << " fn=" << lir_func.instructions[j].func_name << "\n";
+                    clean = false; break;
+                }
+            }
+            if (clean) { region_skip.insert(enter_idx); region_skip.insert(i); }
+        }
+    }
+
     for (size_t i = 0; i < lir_func.instructions.size(); ++i) {
         const auto& inst = lir_func.instructions[i];
+
+        if (region_skip.count(i)) continue;
 
         if (block_map.count(i)) {
             if (!terminated && builder_->getInsertPoint() && i > 0 && builder_->getInsertPoint() != block_map.at(i)) {
@@ -2159,7 +2993,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             }
             case LIR::LIR_Op::RefMove: {
                 auto value = builder_->createExternCall("lymar_aot_ref_move", {load_reg(inst.a, inst.type_a),
-                    context_->getConstantInt(context_->getIntegerType(64), inst.imm), caller_region}, context_->getIntegerType(64));
+                    context_->getConstantInt(context_->getIntegerType(64), inst.imm), get_caller_region()}, context_->getIntegerType(64));
                 store_reg(inst.dst, value, inst.result_type); break;
             }
             case LIR::LIR_Op::RefRelease:
@@ -2172,6 +3006,14 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     {context_->getConstantInt(context_->getIntegerType(64), inst.imm)}, nullptr);
                 break;
             case LIR::LIR_Op::RegionMove: {
+                // Skip only under the vt_safe proof: the tuple is guaranteed
+                // to NEVER materialize, so no heap word exists to promote.
+                // A merely-currently-virtual tuple may materialize later
+                // inside this region; skipping the move would then leave the
+                // heap object in a region that exits before it is consumed.
+                // For those, load_reg materializes first and the move runs
+                // on the real heap word, preserving boxed-ABI semantics.
+                if (vt_safe.count(inst.a) && vt_safe.at(inst.a)) break;
                 // Escape analysis: region_move only promotes heap words
                 // (is_heap_word gate in the runtime). A register whose slot
                 // holds a raw scalar — unboxed int/float/bool — can never be
@@ -2197,7 +3039,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     !tagged_word_regs.count(inst.a);
                 if (!mv_scalar) {
                     builder_->createExternCall("lymar_aot_region_move", {load_reg(inst.a, inst.type_a),
-                        context_->getConstantInt(context_->getIntegerType(64), inst.imm), caller_region}, nullptr);
+                        context_->getConstantInt(context_->getIntegerType(64), inst.imm), get_caller_region()}, nullptr);
                 }
                 break;
             }
@@ -2222,6 +3064,19 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 if (reg_types.count(inst.a)) reg_types[inst.dst] = reg_types[inst.a];
                 else if (inst.type_a != LIR::Type::Void) reg_types[inst.dst] = inst.type_a;
                 auto destination_type = reg_types.count(inst.dst) ? reg_types[inst.dst] : inst.result_type;
+                // Virtual tuple propagation: a move of an unmaterialized
+                // tuple copies its scalar element slots instead of forcing
+                // a heap allocation. Erased destinations still need the
+                // tagged word, so they fall through to the boxed path.
+                if (!dst_is_erased && inst.a != UINT32_MAX && vtuples.count(inst.a)) {
+                    if (vt_info.canon_regs.count(inst.dst))
+                        canon_capture(inst.dst, vtuples[inst.a]);
+                    else
+                        vtuples[inst.dst] = vtuples[inst.a];
+                    if (reg_types.count(inst.a)) reg_types[inst.dst] = reg_types[inst.a];
+                    else if (inst.type_a != LIR::Type::Void) reg_types[inst.dst] = inst.type_a;
+                    break;
+                }
                 ir::Value* mov_value = load_reg(inst.a, inst.type_a);
                 if (dst_is_erased) {
                     // `any`/union registers hold tagged LmValue words: tag scalar
@@ -2966,6 +3821,104 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                         {context_->getIntegerType(64)});
                     store_reg(inst.dst, builder_->createCall(queue,
                         {context_->getConstantInt(context_->getIntegerType(64), 16)}, context_->getIntegerType(64)), LIR::Type::Ptr);
+                    break;
+                }
+
+                // `.direct` flattened-ABI call: eligible module functions with
+                // tuple params/returns bypass the tagged heap-tuple ABI. Args
+                // are per-element scalar words; tuple returns arrive through a
+                // caller-allocated sret buffer and become a virtual tuple.
+                const DirectFnSig* dsig = nullptr;
+                const LIR::LIR_Function* dcallee = nullptr;
+                if (!name.empty()) {
+                    if (auto* cf = LIR::FunctionRegistry::getInstance().getFunction(name)) {
+                        if (reachable_funcs_.count(name)) { dsig = direct_sig_for(name); dcallee = cf; }
+                    }
+                }
+                auto* dfn = (dsig && dsig->eligible) ? current_module_->getFunction(name + ".direct") : nullptr;
+                if (dfn && dcallee && inst.call_args.size() == dcallee->param_count) {
+                    auto* i64ty = context_->getIntegerType(64);
+                    std::vector<ir::Value*> dargs;
+                    bool direct_ok = true;
+                    for (size_t pi = 0; pi < dcallee->param_count && direct_ok; ++pi) {
+                        const auto& doms = dsig->param_elem_domains[pi];
+                        uint32_t argreg = inst.call_args[pi];
+                        if (doms.empty()) {
+                            LIR::Type at = (pi < inst.call_arg_types.size()) ? inst.call_arg_types[pi] : LIR::Type::I64;
+                            if (reg_types.count(argreg)) {
+                                LIR::Type rt = reg_types[argreg];
+                                if (rt == LIR::Type::F64 || rt == LIR::Type::F32) at = rt;
+                            }
+                            ir::Value* av = (at == LIR::Type::F64 || at == LIR::Type::F32)
+                                ? load_float_reg(argreg, at) : load_reg(argreg, at);
+                            auto lt = dcallee->register_language_types.find(pi);
+                            if (av && lt != dcallee->register_language_types.end() && lt->second) {
+                                switch (lt->second->tag) {
+                                    case ::TypeTag::Any: case ::TypeTag::Union: case ::TypeTag::ErrorUnion:
+                                        av = tag_word(av, argreg, at);
+                                        break;
+                                    default: break;
+                                }
+                            }
+                            dargs.push_back(av);
+                        } else if (vtuples.count(argreg) && vtuples[argreg].size() == doms.size()) {
+                            for (size_t ei = 0; ei < doms.size(); ++ei)
+                                dargs.push_back(velem_value(vtuples[argreg][ei]));
+                        } else {
+                            if (vtuples.count(argreg)) materialize_vtuple(argreg);
+                            ir::Value* tup = load_reg(argreg, LIR::Type::Ptr);
+                            used_builtins_.insert("lm_tuple_get");
+                            ir::Function* gfn = current_module_->getFunction("lm_tuple_get");
+                            if (!gfn) gfn = builder_->createFunction("lm_tuple_get", i64ty, {i64ty, i64ty});
+                            for (size_t ei = 0; ei < doms.size(); ++ei) {
+                                ir::Value* raw = builder_->createCall(gfn,
+                                    {tup, context_->getConstantInt(i64ty, static_cast<long long>(ei))}, i64ty);
+                                int d = doms[ei];
+                                if (d == VDOM_FLOAT) dargs.push_back(untag_word(raw, UINT32_MAX, LIR::Type::F64));
+                                else if (d == VDOM_INT) dargs.push_back(untag_word(raw, UINT32_MAX, LIR::Type::I64));
+                                else if (d == VDOM_BOOL) dargs.push_back(untag_word(raw, UINT32_MAX, LIR::Type::Bool));
+                                else if (d == VDOM_PTR) dargs.push_back(untag_word(raw, UINT32_MAX, LIR::Type::Ptr));
+                                else dargs.push_back(raw);
+                            }
+                        }
+                    }
+                    if (dsig->ret_sret) {
+                        ir::Value* buf = entry_alloc(nullptr,
+                            context_->getConstantInt(i64ty, static_cast<long long>(dsig->ret_domains.size() * 8)));
+                        dargs.push_back(buf);
+                        builder_->createCall(dfn, dargs);
+                        if (inst.op == LIR::LIR_Op::Call && inst.dst != UINT32_MAX) {
+                            std::vector<VTupleElem> relem(dsig->ret_domains.size());
+                            for (size_t ei = 0; ei < relem.size(); ++ei) {
+                                ir::Value* addr = builder_->createAdd(buf,
+                                    context_->getConstantInt(i64ty, static_cast<long long>(ei * 8)));
+                                VTupleElem ve;
+                                ve.direct_v = (dsig->ret_domains[ei] == VDOM_FLOAT)
+                                    ? static_cast<ir::Value*>(builder_->createLoadd(addr))
+                                    : static_cast<ir::Value*>(builder_->createLoadl(addr));
+                                ve.domain = dsig->ret_domains[ei];
+                                ve.has = true;
+                                relem[ei] = ve;
+                            }
+                            if (vt_info.canon_regs.count(inst.dst))
+                                canon_capture(inst.dst, relem);
+                            else
+                                vtuples[inst.dst] = std::move(relem);
+                            reg_types[inst.dst] = LIR::Type::Ptr;
+                        }
+                    } else {
+                        ir::Value* res = builder_->createCall(dfn, dargs);
+                        if (inst.op == LIR::LIR_Op::Call && inst.dst != UINT32_MAX) {
+                            LIR::Type res_t = dsig->ret_float ? LIR::Type::F64 : inst.result_type;
+                            if (res_t == LIR::Type::F64 || res_t == LIR::Type::F32) {
+                                store_float_reg(inst.dst, res);
+                            } else {
+                                const bool erased_boolean = res_t == LIR::Type::Bool &&
+                                    !Memory::proven_closed_boolean_boundary(*dcallee);
+                                store_reg(inst.dst, res, erased_boolean ? LIR::Type::Ptr : res_t, true);
+                            }
+                        }
+                    }
                     break;
                 }
 
@@ -4007,33 +4960,86 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 ir::Value* idx_val = load_reg(inst.a, inst.type_a);
                 ir::Value* elem_val = load_reg(inst.b, inst.type_b);
                 std::string lset_id = std::to_string(label_counter_++);
-                // Set may fall through to lm_list_set which reallocates; drop any
-                // cached data_ptr for this register so a subsequent ListIndex
-                // re-loads from the (possibly new) header.
-                hoisted_data_ptrs.erase(inst.dst);
 
-                // Typed-primitive lists take the raw store only when the value
-                // register is itself raw; an erased (tagged-word) element must
-                // fall through to the kind-aware encode path below.
-                if ((hoisted_data_ptrs.count(inst.dst) || is_typed_primitive_list(inst.dst)) &&
-                    !lang_type_holds_tagged_word(inst.b)) {
-                    ir::Value* data_ptr = nullptr;
-                    if (hoisted_data_ptrs.count(inst.dst)) {
-                        data_ptr = hoisted_data_ptrs[inst.dst];
-                    } else {
-                        ir::Value* unboxed = builder_->createAnd(list_val, context_->getConstantInt(context_->getIntegerType(64), ~7ULL));
-                        data_ptr = builder_->createLoadl(builder_->createAdd(unboxed, context_->getConstantInt(context_->getIntegerType(64), 8)));
+                // Bound-proven store (imm&1): the range-loop header re-reads
+                // ListLen and compares index < len immediately before the
+                // body, and the generator proved neither register is
+                // rewritten in between, so 0 <= index < len always holds —
+                // the null/type/bounds CFG is dead weight. Storage kind still
+                // gates encoding: typed-primitive ([int]/[bool]) lists take a
+                // straight raw store with no edge; everything else dispatches
+                // on the header's element kind — kind 0 stores the tagged
+                // LmValue word (edge barrier preserved for heap refs), kinds
+                // 1/2 go through the kind-aware encode helper.
+                if ((inst.imm & 0x1u) != 0u) {
+                    ir::Value* unboxed = builder_->createAnd(list_val,
+                        context_->getConstantInt(context_->getIntegerType(64), ~7ULL));
+                    auto proven_data_ptr = [&]() -> ir::Value* {
+                        auto hit = hoisted_data_ptrs.find(inst.dst);
+                        if (hit != hoisted_data_ptrs.end()) return hit->second;
+                        return builder_->createLoadl(builder_->createAdd(unboxed,
+                            context_->getConstantInt(context_->getIntegerType(64), 8)));
+                    };
+                    if (is_typed_primitive_list(inst.dst) && !lang_type_holds_tagged_word(inst.b)) {
+                        ir::Value* data_ptr = proven_data_ptr();
+                        ir::Value* offset = builder_->createMul(idx_val,
+                            context_->getConstantInt(context_->getIntegerType(64), 8));
+                        ir::Value* elem_addr = builder_->createAdd(data_ptr, offset);
+                        if (auto* add_inst = dynamic_cast<ir::Instruction*>(elem_addr))
+                            add_inst->setName("scalar_elem_" + lset_id);
+                        ir::Value* raw = elem_val;
+                        if (raw->getType() != context_->getIntegerType(64))
+                            raw = builder_->createCast(raw, context_->getIntegerType(64));
+                        auto* store_inst = builder_->createStore(raw, elem_addr);
+                        store_inst->setName("scalar_store_" + lset_id);
+                        break;
                     }
-                    ir::Value* offset = builder_->createMul(idx_val, context_->getConstantInt(context_->getIntegerType(64), 8));
+                    ir::Instruction* hdr_val = builder_->createLoadl(unboxed);
+                    hdr_val->setName("scalar_hdr_set_" + lset_id);
+                    ir::Value* elem_kind = builder_->createShr(hdr_val,
+                        context_->getConstantInt(context_->getIntegerType(64), 32));
+                    ir::Value* data_ptr = proven_data_ptr();
+                    ir::Value* offset = builder_->createMul(idx_val,
+                        context_->getConstantInt(context_->getIntegerType(64), 8));
                     ir::Value* elem_addr = builder_->createAdd(data_ptr, offset);
-                    if (auto* add_inst = dynamic_cast<ir::Instruction*>(elem_addr)) {
-                        add_inst->setName("scalar_elem_" + lset_id);
-                    }
-                    auto* store_inst = builder_->createStore(erased_word(elem_val), elem_addr);
-                    store_inst->setName("scalar_store_" + lset_id);
+                    ir::Value* tagged = tag_word(elem_val, inst.b, inst.type_b);
+
+                    ir::Function* cur_fn = builder_->getInsertPoint()->getParent();
+                    ir::BasicBlock* b_tag = builder_->createBasicBlock("lset_pb_tag_" + lset_id, cur_fn);
+                    ir::BasicBlock* b_enc = builder_->createBasicBlock("lset_pb_enc_" + lset_id, cur_fn);
+                    ir::BasicBlock* b_done = builder_->createBasicBlock("lset_pb_done_" + lset_id, cur_fn);
+                    ir::Value* is_tagged_kind = builder_->createCeq(elem_kind,
+                        context_->getConstantInt(context_->getIntegerType(64), 0));
+                    builder_->createBr(is_tagged_kind, b_tag, b_enc);
+
+                    builder_->setInsertPoint(b_tag);
+                    // Unnamed store: region lowering emits the edge barrier,
+                    // which tagged heap references (boxed floats, strings,
+                    // frames) still require.
+                    builder_->createStore(tagged, elem_addr);
+                    builder_->createJmp(b_done);
+
+                    builder_->setInsertPoint(b_enc);
+                    builder_->createExternCall("lymar_aot_list_elem_store",
+                        {elem_addr, tagged, elem_kind}, context_->getVoidType());
+                    builder_->createJmp(b_done);
+
+                    builder_->setInsertPoint(b_done);
                     break;
                 }
 
+                // Set may fall through to lm_list_set which reallocates; drop any
+                // cached data_ptr for this register so a subsequent ListIndex
+                // re-loads from the (possibly new) header. (The bound-proven
+                // path above stores in place and never reallocates.)
+                hoisted_data_ptrs.erase(inst.dst);
+
+                // Unproven stores always take the bounds-checked CFG below:
+                // the raw typed-primitive store is only sound when the
+                // producer proved 0 <= index < len (handled above), because
+                // an out-of-range store must reach lm_list_set's grow path —
+                // a bare data+idx*8 write would silently corrupt or drop the
+                // length update.
                 used_builtins_.insert("lm_list_set");
                 ir::Function* fn = current_module_->getFunction("lm_list_set");
                 if (!fn) fn = builder_->createFunction("lm_list_set", context_->getVoidType(), {context_->getIntegerType(64), context_->getIntegerType(64), context_->getIntegerType(64)});
@@ -4140,6 +5146,30 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 break;
             }
             case LIR::LIR_Op::TupleCreate: {
+                // Virtual tuple: keep elements in scalar slots. Element domains
+                // come from the tuple's declared language type; without it the
+                // real heap tuple is required.
+                auto lt = lir_func.register_language_types.find(inst.dst);
+                if (lt != lir_func.register_language_types.end() && lt->second &&
+                    lt->second->tag == ::TypeTag::Tuple) {
+                    auto* tt = std::get_if<TupleType>(&lt->second->extra);
+                    if (tt && !tt->elementTypes.empty() && tt->elementTypes.size() <= 8) {
+                        std::vector<VTupleElem> elems(tt->elementTypes.size());
+                        bool ok = true;
+                        for (size_t ei = 0; ei < elems.size(); ++ei) {
+                            int d = vdom_of_type(tt->elementTypes[ei]);
+                            if (d == VDOM_INVALID) { ok = false; break; }
+                            elems[ei].domain = d;
+                        }
+                        if (ok) {
+                            if (vt_info.canon_regs.count(inst.dst))
+                                vtuples[inst.dst] = canon_elems(inst.dst);
+                            else
+                                vtuples[inst.dst] = std::move(elems);
+                            break;
+                        }
+                    }
+                }
                 used_builtins_.insert("lm_tuple_new");
                 ir::Function* fn = current_module_->getFunction("lm_tuple_new");
                 if (!fn) fn = builder_->createFunction("lm_tuple_new", context_->getIntegerType(64), {context_->getIntegerType(64)});
@@ -4147,6 +5177,46 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 break;
             }
             case LIR::LIR_Op::TupleSet: {
+                if (vtuples.count(inst.dst)) {
+                    int64_t idx = const_index_of(inst.a);
+                    if (std::getenv("LYMAR_DEBUG_VT") && inst.dst == 2)
+                        std::cerr << "[VT] TupleSet dst=r" << inst.dst << " idx=" << idx
+                                  << " a=" << inst.a << " b=" << inst.b << "\n";
+                    if (idx >= 0 && static_cast<size_t>(idx) < vtuples[inst.dst].size()) {
+                        // A tuple-typed value stored into a tuple is itself a
+                        // pointer-domain element; materialize nested vtuples.
+                        if (vtuples.count(inst.b)) materialize_vtuple(inst.b);
+                        int dom = vdom_of_reg(inst.b, inst.type_b);
+                        // Canonical spill slot: capture the value immediately;
+                        // element stability of the source register is
+                        // irrelevant because the slot holds the value itself.
+                        auto ci = vt_info.canon_regs.find(inst.dst);
+                        if (ci != vt_info.canon_regs.end() &&
+                            static_cast<size_t>(idx) < ci->second.size() &&
+                            dom == vt_info.canon_domains.at(inst.dst)[static_cast<size_t>(idx)]) {
+                            canon_store_val(inst.dst, static_cast<size_t>(idx),
+                                load_reg(inst.b, inst.type_b));
+                            break;
+                        }
+                        if (std::getenv("LYMAR_DEBUG_VT") && inst.dst == 2)
+                            std::cerr << "[VT]   dom=" << dom << " stable=" << elem_src_stable(inst.b)
+                                      << " type_b=" << (int)inst.type_b << "\n";
+                        if (dom != VDOM_INVALID && elem_src_stable(inst.b)) {
+                            auto& slot = vtuples[inst.dst][static_cast<size_t>(idx)];
+                            slot.src_reg = inst.b;
+                            slot.src_type = (inst.type_b != LIR::Type::Void) ? inst.type_b
+                                : (reg_types.count(inst.b) ? reg_types[inst.b] : LIR::Type::I64);
+                            slot.domain = dom;
+                            slot.has = true;
+                            slot.direct_v = nullptr;
+                            break;
+                        }
+                        materialize_vtuple(inst.dst);
+                        // Fall through: emit the real lm_tuple_set on the
+                        // materialized tuple.
+                    }
+                    materialize_vtuple(inst.dst);
+                }
                 used_builtins_.insert("lm_tuple_set");
                 ir::Function* fn = current_module_->getFunction("lm_tuple_set");
                 if (!fn) fn = builder_->createFunction("lm_tuple_set", context_->getVoidType(), {context_->getIntegerType(64), context_->getIntegerType(64), context_->getIntegerType(64)});
@@ -4155,6 +5225,24 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 break;
             }
             case LIR::LIR_Op::TupleGet: {
+                if (vtuples.count(inst.a)) {
+                    int64_t idx = const_index_of(inst.b);
+                    if (idx >= 0 && static_cast<size_t>(idx) < vtuples[inst.a].size()) {
+                        const auto& e = vtuples[inst.a][static_cast<size_t>(idx)];
+                        if (e.has) {
+                            store_reg(inst.dst, velem_value(e), inst.result_type);
+                            break;
+                        }
+                        // Unset element: real tuples read uninitialized
+                        // memory; emit a typed zero instead.
+                        ir::Value* zv = (e.domain == VDOM_FLOAT)
+                            ? static_cast<ir::Value*>(context_->getConstantFP(context_->getDoubleType(), 0.0))
+                            : static_cast<ir::Value*>(context_->getConstantInt(context_->getIntegerType(64), 0));
+                        store_reg(inst.dst, zv, inst.result_type);
+                        break;
+                    }
+                    materialize_vtuple(inst.a);
+                }
                 used_builtins_.insert("lm_tuple_get");
                 ir::Function* fn = current_module_->getFunction("lm_tuple_get");
                 if (!fn) fn = builder_->createFunction("lm_tuple_get", context_->getIntegerType(64), {context_->getIntegerType(64), context_->getIntegerType(64)});
@@ -4164,6 +5252,11 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 break;
             }
             case LIR::LIR_Op::TupleLen: {
+                if (vtuples.count(inst.a)) {
+                    store_reg(inst.dst, context_->getConstantInt(context_->getIntegerType(64),
+                        static_cast<long long>(vtuples[inst.a].size())), inst.result_type);
+                    break;
+                }
                 // Canonical tuple header: kind, elements, size, capacity.
                 ir::Value* len = builder_->createExternCall("lymar_aot_tuple_length",
                     {load_reg(inst.a, inst.type_a)}, context_->getIntegerType(64));
@@ -4510,6 +5603,63 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             }
             case LIR::LIR_Op::Return:
             case LIR::LIR_Op::Ret:
+                if (dctx && dctx->sret_return && sret_buf_val) {
+                    // `.direct` tuple return: store element words into the
+                    // caller's sret buffer — no heap tuple is materialized.
+                    auto* i64ty = context_->getIntegerType(64);
+                    const size_t n = dctx->ret_domains.size();
+                    auto vit = vtuples.find(inst.a);
+                    const bool have_vt = vit != vtuples.end() && vit->second.size() == n;
+                    if (vit != vtuples.end() && !have_vt) materialize_vtuple(inst.a);
+                    ir::Value* tup = nullptr;
+                    ir::Function* gfn = nullptr;
+                    if (!have_vt && inst.a != UINT32_MAX) {
+                        tup = load_reg(inst.a, inst.type_a);
+                        used_builtins_.insert("lm_tuple_get");
+                        gfn = current_module_->getFunction("lm_tuple_get");
+                        if (!gfn) gfn = builder_->createFunction("lm_tuple_get", i64ty, {i64ty, i64ty});
+                    }
+                    for (size_t j = 0; j < n; ++j) {
+                        int dom = dctx->ret_domains[j];
+                        ir::Value* ev = nullptr;
+                        if (have_vt) {
+                            const auto& e = vit->second[j];
+                            if (e.has) ev = velem_value(e);
+                            else ev = (e.domain == VDOM_FLOAT)
+                                ? static_cast<ir::Value*>(context_->getConstantFP(context_->getDoubleType(), 0.0))
+                                : static_cast<ir::Value*>(context_->getConstantInt(i64ty, 0));
+                        } else if (tup) {
+                            ir::Value* raw = builder_->createCall(gfn,
+                                {tup, context_->getConstantInt(i64ty, static_cast<long long>(j))}, i64ty);
+                            if (dom == VDOM_FLOAT) ev = untag_word(raw, UINT32_MAX, LIR::Type::F64);
+                            else if (dom == VDOM_INT) ev = untag_word(raw, UINT32_MAX, LIR::Type::I64);
+                            else if (dom == VDOM_BOOL) ev = untag_word(raw, UINT32_MAX, LIR::Type::Bool);
+                            else if (dom == VDOM_PTR) ev = untag_word(raw, UINT32_MAX, LIR::Type::Ptr);
+                            else ev = raw;
+                        }
+                        if (!ev) ev = context_->getConstantInt(i64ty, 0);
+                        ir::Value* addr = builder_->createAdd(sret_buf_val,
+                            context_->getConstantInt(i64ty, static_cast<long long>(j * 8)));
+                        // Scalar-domain sret slots can never hold a managed
+                        // heap word, so region lowering may skip the edge.
+                        // PTR/TAGGED elements keep the barrier.
+                        const bool scalar_dom = dom == VDOM_FLOAT || dom == VDOM_INT || dom == VDOM_BOOL;
+                        if (dom == VDOM_FLOAT) {
+                            if (!ev->getType()->isFloatingPoint())
+                                ev = builder_->createExternCall("lymar_aot_to_float", {ev}, context_->getDoubleType());
+                            auto* st = builder_->createStore(ev, addr);
+                            if (scalar_dom) st->setName("scalar_store_sret");
+                        } else {
+                            if (ev->getType() != i64ty) ev = builder_->createCast(ev, i64ty);
+                            auto* st = builder_->createStore(ev, addr);
+                            if (scalar_dom) st->setName("scalar_store_sret");
+                        }
+                    }
+                    if (have_vt) vtuples.erase(inst.a);
+                    builder_->createRet(context_->getConstantInt(i64ty, 0));
+                    terminated = true;
+                    break;
+                }
                 if (main_fn->getName() == "main") {
                     builder_->createRet(context_->getConstantInt(context_->getIntegerType(64), 0));
                 } else if (inst.a != UINT32_MAX) {

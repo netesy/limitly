@@ -34,6 +34,49 @@ fn sum_iter_float(xs: [float]): float {
     return s;
 }
 
+// Bound-proven ListSet: `xs[i] = ...` inside `0..xs.len()` must store
+// in place with identical VM/AOT results.
+fn fill_scale_int(xs: [int], k: int): int {
+    iter (i in 0..xs.len()) {
+        xs[i] = xs[i] * k;
+    }
+    var s = 0;
+    iter (v in xs) {
+        s = s + v;
+    }
+    return s;
+}
+
+fn fill_index_int(xs: [int]): int {
+    iter (i in 0..xs.len()) {
+        xs[i] = i * 10;
+    }
+    var s = 0;
+    iter (v in xs) {
+        s = s + v;
+    }
+    return s;
+}
+
+fn fill_add_float(xs: [float]): float {
+    iter (i in 0..xs.len()) {
+        xs[i] = xs[i] + 0.5;
+    }
+    var s = 0.0;
+    iter (v in xs) {
+        s = s + v;
+    }
+    return s;
+}
+
+// Unproven write: bound is a literal, not xs.len() — full bounds path.
+fn fill_fixed(xs: [int]): int {
+    iter (i in 0..3) {
+        xs[i] = i + 100;
+    }
+    return xs[0] + xs[1] + xs[2];
+}
+
 fn main(): int {
     // [int] indexed range loop == iterator loop
     var xi: [int] = [];
@@ -119,6 +162,46 @@ fn main(): int {
     }
     assert(wsum == 18, "computed-bound range index wrong");
 
+    // Bound-proven ListSet on [int]: element-wise scale then checksum
+    var si: [int] = [1, 2, 3, 4, 5];
+    assert(fill_scale_int(si, 3) == 45, "[int] proven ListSet scale wrong");
+    assert(si[0] == 3 and si[4] == 15, "[int] proven ListSet values wrong");
+
+    // Bound-proven ListSet writing the index itself
+    var ii: [int] = [0, 0, 0, 0];
+    assert(fill_index_int(ii) == 60, "[int] proven ListSet index wrong");
+    assert(ii[3] == 30, "[int] proven ListSet last wrong");
+
+    // Bound-proven ListSet on [float]
+    var sf: [float] = [1.0, 2.0, 3.0];
+    assert(fill_add_float(sf) == 7.5, "[float] proven ListSet wrong");
+    assert(sf[1] == 2.5, "[float] proven ListSet value wrong");
+
+    // Unproven write (literal bound) still stores correctly
+    var uf: [int] = [0, 0, 0, 9];
+    assert(fill_fixed(uf) == 303, "unproven ListSet wrong");
+    assert(uf[3] == 9, "unproven ListSet clobbered");
+
+    // Rebinding the list inside the loop defeats the write proof: ys2
+    // becomes [9] at m2==1, the fresh len() check ends the loop, and the
+    // surviving list keeps its rebound contents.
+    var ys2: [int] = [1, 2, 3];
+    iter (m2 in 0..ys2.len()) {
+        ys2[m2] = ys2[m2] + 10;
+        if (m2 == 1) {
+            ys2 = [9];
+        }
+    }
+    assert(ys2.len() == 1 and ys2[0] == 9, "rebind during proven ListSet wrong");
+
+    // Out-of-bounds write outside a proven loop keeps the grow path:
+    // lm_list_set extends capacity/len rather than trapping. (Gap-fill
+    // semantics differ between backends today, so only the written slot
+    // and length are asserted.)
+    var oob: [int] = [1, 2];
+    oob[4] = 42;
+    assert(oob.len() == 5, "OOB ListSet did not grow");
+    assert(oob[4] == 42, "OOB ListSet contents wrong");
     print("range index tests passed!");
     return 0;
 }

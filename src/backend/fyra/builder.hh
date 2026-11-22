@@ -71,9 +71,50 @@ private:
     // match and are omitted from the dispatch chain.
     std::unordered_set<std::string> indirect_literals_;
 
+    // `.direct` flattened-ABI variants of eligible LIR functions. Tuple
+    // parameters/returns are passed as per-element scalar words (f64 for
+    // float elements, i64 otherwise) so small cross-module calls avoid the
+    // tagged heap-tuple ABI. The VM is unaffected: this is AOT-only lowering.
+    struct DirectParamMap { uint32_t orig; int32_t elem; int32_t domain; };
+    struct DirectFnCtx {
+        bool sret_return = false;
+        std::vector<int> ret_domains; // element domains for sret returns
+        std::vector<DirectParamMap> params; // per ir::Function parameter
+    };
+    // Per-original-parameter element domains for tuple params (empty = scalar
+    // passthrough). Domains use the VDom encoding from builder.cpp.
+    struct DirectFnSig {
+        bool eligible = false;
+        std::vector<std::vector<int>> param_elem_domains;
+        bool ret_sret = false;
+        std::vector<int> ret_domains;
+        bool ret_float = false;
+    };
+
     ir::Type* lir_type_to_fyra_type(LIR::Type lir_type);
     std::string generate_label();
-    void build_function_body(ir::Function* main_fn, const LIR::LIR_Function& lir_func);
+    void build_function_body(ir::Function* main_fn, const LIR::LIR_Function& lir_func,
+                             const DirectFnCtx* dctx = nullptr);
+    const DirectFnSig* direct_sig_for(const std::string& name);
+    // Virtual-tuple safety proof for one LIR function under one lowering
+    // mode (sig != nullptr ⇒ `.direct` flattened ABI). safe[r] is true when
+    // register r is guaranteed to remain a virtual tuple — every use is
+    // virtual-compatible, so no heap tuple is ever materialized and
+    // RegionMove on it emits nothing. def_inst_idx maps each defined
+    // register to its last defining instruction index.
+    struct VtSafeInfo {
+        std::unordered_map<uint32_t, bool> safe;
+        std::unordered_map<uint32_t, size_t> def_inst_idx;
+        // Loop-variant virtual tuples: register -> canonical element spill
+        // registers (+ their VDom domains). Single-pass lowering cannot
+        // represent the phi at a CFG back-edge, so every definition stores
+        // element values into these slots and every use reloads them.
+        std::unordered_map<uint32_t, std::vector<uint32_t>> canon_regs;
+        std::unordered_map<uint32_t, std::vector<int>> canon_domains;
+    };
+    VtSafeInfo compute_vt_safe(const LIR::LIR_Function& fn, const DirectFnSig* sig);
+    std::unordered_map<std::string, DirectFnSig> direct_sigs_;
+    std::unordered_map<std::string, DirectFnCtx> direct_contexts_;
 };
 
 } // namespace LM::Backend::Fyra

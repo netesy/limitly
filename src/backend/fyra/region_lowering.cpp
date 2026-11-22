@@ -185,6 +185,26 @@ void lower_region_ownership(ir::Module& module, const std::unordered_map<std::st
         {"memory.fill", "lymar_aot_raw_fill"}, {"memory.compare", "lymar_aot_raw_compare"},
         {"process.exit", "lymar_aot_exit"}};
 
+    // Functions reachable from task entries get worker-failure checks that
+    // call lymar_aot_call_abort, which pops the innermost invocation frame —
+    // they must keep call_enter/call_leave even when they stage no params.
+    std::unordered_set<ir::Function*> task_reachable;
+    {
+        std::vector<ir::Function*> pending;
+        auto root = [&](ir::Function* function) {
+            if (function && !function->getBasicBlocks().empty() && task_reachable.insert(function).second)
+                pending.push_back(function);
+        };
+        for (auto& owner : module.getFunctions())
+            if (owner->getName().starts_with("__lymar_task_entry_")) root(owner.get());
+        for (size_t index = 0; index < pending.size(); ++index)
+            for (auto& block : pending[index]->getBasicBlocks())
+                for (auto& instruction : block->getInstructions())
+                    for (auto& operand : instruction->getOperands())
+                        if (auto* target = dynamic_cast<ir::Function*>(operand->get()); target && !target->getBasicBlocks().empty() && task_reachable.insert(target).second)
+                            pending.push_back(target);
+    }
+
     for (auto& fn : module.getFunctions()) {
         if (fn->getBasicBlocks().empty()) continue;
         if (fn->getName() == "fyrA_service_dispatch" || fn->getName() == "fyrA_fs_dispatch" || fn->getName() == "fyra_mkdir_p") {
@@ -249,9 +269,30 @@ void lower_region_ownership(ir::Module& module, const std::unordered_map<std::st
             block->getInstructions().insert(where, std::move(call));
             return result;
         };
+        // Invocation frames exist solely for staged Param/ConstructError
+        // payloads (and task-abort unwinding). A function that stages nothing
+        // and is not task-reachable can skip call_enter/call_leave entirely.
+        bool needs_invocation = task_reachable.count(fn.get()) != 0;
+        if (!needs_invocation) {
+            for (auto& owner : fn->getBasicBlocks()) {
+                for (auto& instruction : owner->getInstructions()) {
+                    if (auto* external = dynamic_cast<ir::ExternCallInstruction*>(instruction.get())) {
+                        const auto& cap = external->getCapability();
+                        if (cap == "lymar_aot_param_push" || cap == "lymar_aot_param_pop") { needs_invocation = true; break; }
+                    }
+                    if (instruction->getOpcode() == ir::Instruction::Call && !instruction->getOperands().empty()) {
+                        if (auto* target = dynamic_cast<ir::Function*>(instruction->getOperands()[0]->get())) {
+                            const auto& tn = target->getName();
+                            if (tn == "lymar_aot_param_push" || tn == "lymar_aot_param_pop") { needs_invocation = true; break; }
+                        }
+                    }
+                }
+                if (needs_invocation) break;
+            }
+        }
         auto* entry = fn->getBasicBlocks().front().get();
         auto beginning = entry->getInstructions().begin();
-        emit(entry, beginning, "lymar_aot_call_enter", {});
+        if (needs_invocation) emit(entry, beginning, "lymar_aot_call_enter", {});
         for (auto& block_owner : fn->getBasicBlocks()) {
             auto* block = block_owner.get();
             for (auto it = block->getInstructions().begin(); it != block->getInstructions().end(); ++it) {
@@ -387,7 +428,7 @@ void lower_region_ownership(ir::Module& module, const std::unordered_map<std::st
                             current_operands[0]->set(number);
                         }
                     }
-                    emit(block, it, "lymar_aot_call_leave", {});
+                    if (needs_invocation) emit(block, it, "lymar_aot_call_leave", {});
                 }
                 // Skip helper calls inserted after this original instruction.
                 if (after != block->getInstructions().end()) it = std::prev(after);
